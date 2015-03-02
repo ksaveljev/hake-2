@@ -1,2 +1,6 @@
+import Quake
+
 main :: IO ()
-main = undefined
+main = do
+    quake undefined
+    return ()
