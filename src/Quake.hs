@@ -6,7 +6,7 @@ module Quake (quake) where
 import Control.Applicative
 import Control.Monad.State (MonadState, StateT, runStateT)
 
-data QuakeState
+import QuakeState
 
 type QBasePath = FilePath
 
