@@ -3,6 +3,8 @@
 import System.Environment (getArgs)
 
 import Quake
+import QuakeState
+import Control.Lens ((.=))
 import qualified QCommon.CVar as CVar
 
 isDedicatedCmdArg :: [String] -> Bool
@@ -12,10 +14,11 @@ isDedicatedCmdArg [] = False
 
 main :: IO ()
 main = do
-    runQuake undefined $ do
+    runQuake defaultQuakeState $ do
       args <- io getArgs
-      let dedicated = isDedicatedCmdArg args
-      CVar.get "dedicated" "0" 1
+      let dedicatedFlag = isDedicatedCmdArg args
+      dedicatedCVar <- CVar.get "dedicated" "0" 1
+      globals.dedicated .= dedicatedCVar
       -- check if we start in dedicated mode
       -- set dedicated value
       -- if not dedicated then init our client window

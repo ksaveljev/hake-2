@@ -1,5 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QuakeState where
+module QuakeState ( QuakeState(..)
+                  , defaultQuakeState
+                  , globals
+                  , module Globals
+                  ) where
 
 import Control.Lens (makeLenses)
 
@@ -9,3 +13,8 @@ data QuakeState = QuakeState { _globals :: Globals
                              }
 
 makeLenses ''QuakeState
+
+defaultQuakeState :: QuakeState
+defaultQuakeState =
+  QuakeState { _globals = defaultGlobals
+             }
