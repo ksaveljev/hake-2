@@ -5,6 +5,7 @@ module Globals ( Globals
                , curtime
                , dedicated
                , nostdout
+               , cmdText
                , module Game.CVarT
                ) where
 
@@ -27,8 +28,8 @@ makeLenses ''Globals
 defaultGlobals :: Globals
 defaultGlobals =
   Globals { _curtime   = 0
-          , _dedicated = CVarT "" "" "" 0 True 0.0 Nothing -- doesn't matter as it gets set in Main
-          , _nostdout  = CVarT "" "" "" 0 True 0.0 Nothing -- doesn't matter as it gets set in Main
+          , _dedicated = newCVarT
+          , _nostdout  = newCVarT
           
           , _cmdText   = SizeBufT False False UV.empty 0 0 0
           }

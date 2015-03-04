@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.CVarT where
 
 import Control.Lens (makeLenses)
@@ -15,3 +16,6 @@ data CVarT =
         }
 
 makeLenses ''CVarT
+
+newCVarT :: CVarT
+newCVarT = CVarT "" "" "" 0 False 0.0 Nothing
