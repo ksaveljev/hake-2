@@ -1,5 +1,4 @@
-module QCommon.CVar ( get
-                    ) where
+module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
 

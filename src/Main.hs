@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# LANGUAGE OverloadedStrings #-}
-import System.Environment (getArgs)
-
 import Control.Lens
 import Control.Monad.State
+import System.Environment (getArgs)
 
 import Quake
 import QuakeState
