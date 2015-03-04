@@ -1,26 +1,30 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.MoveInfoT where
 
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 
 data MoveInfoT =
-  MoveInfoT { miStartOrigin       :: V3 Float
-            , miStartAngles       :: V3 Float
-            , miEndOrigin         :: V3 Float
-            , miEndAngles         :: V3 Float
-            , miSoundStart        :: Int
-            , miSoundMiddle       :: Int
-            , miSoundEnd          :: Int
-            , miAccel             :: Float
-            , miSpeed             :: Float
-            , miDecel             :: Float
-            , miDistance          :: Float
-            , miWait              :: Float
-            , miState             :: Int
-            , miDir               :: V3 Float
-            , miCurrentSpeed      :: Float
-            , miMoveSpeed         :: Float
-            , miNextSpeed         :: Float
-            , miRemainingDistance :: Float
-            , miDecelDistance     :: Float
-            , miEndFunc           :: IO () -- TODO: ??
+  MoveInfoT { _miStartOrigin       :: V3 Float
+            , _miStartAngles       :: V3 Float
+            , _miEndOrigin         :: V3 Float
+            , _miEndAngles         :: V3 Float
+            , _miSoundStart        :: Int
+            , _miSoundMiddle       :: Int
+            , _miSoundEnd          :: Int
+            , _miAccel             :: Float
+            , _miSpeed             :: Float
+            , _miDecel             :: Float
+            , _miDistance          :: Float
+            , _miWait              :: Float
+            , _miState             :: Int
+            , _miDir               :: V3 Float
+            , _miCurrentSpeed      :: Float
+            , _miMoveSpeed         :: Float
+            , _miNextSpeed         :: Float
+            , _miRemainingDistance :: Float
+            , _miDecelDistance     :: Float
+            , _miEndFunc           :: IO () -- TODO: ??
             }
+
+makeLenses ''MoveInfoT

@@ -1,7 +1,12 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.MFrameT where
 
+import Control.Lens (makeLenses)
+
 data MFrameT =
-  MFrameT { mfAI    :: IO () -- TODO: ???
-          , mfDist  :: Float
-          , mfThink :: IO () -- TODO: ???
+  MFrameT { _mfAI    :: IO () -- TODO: ???
+          , _mfDist  :: Float
+          , _mfThink :: IO () -- TODO: ???
           }
+
+makeLenses ''MFrameT

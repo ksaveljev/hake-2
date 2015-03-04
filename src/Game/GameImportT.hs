@@ -1,6 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.GameImportT where
 
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -11,40 +13,42 @@ import Game.TraceT
 
 -- TODO: function return types - is it really IO ?
 data GameImportT =
-  GameImportT { bprintf            :: Int -> B.ByteString -> IO ()
-              , dprintf            :: B.ByteString -> IO ()
-              , cprintf            :: EdictT -> Int -> B.ByteString -> IO ()
-              , centerprintf       :: EdictT -> B.ByteString -> IO ()
-              , sound              :: EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
-              , positionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
-              , configstring       :: Int -> B.ByteString -> IO ()
-              , error              :: B.ByteString -> IO ()
-              , error2             :: Int -> B.ByteString -> IO ()
-              , modelindex         :: B.ByteString -> IO Int
-              , soundindex         :: B.ByteString -> IO Int
-              , imageindex         :: B.ByteString -> IO Int
-              , setmodel           :: EdictT -> B.ByteString -> IO ()
-              , trace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> IO TraceT
+  GameImportT { _bprintf            :: Int -> B.ByteString -> IO ()
+              , _dprintf            :: B.ByteString -> IO ()
+              , _cprintf            :: EdictT -> Int -> B.ByteString -> IO ()
+              , _centerprintf       :: EdictT -> B.ByteString -> IO ()
+              , _sound              :: EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
+              , _positionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
+              , _configstring       :: Int -> B.ByteString -> IO ()
+              , _error              :: B.ByteString -> IO ()
+              , _error2             :: Int -> B.ByteString -> IO ()
+              , _modelindex         :: B.ByteString -> IO Int
+              , _soundindex         :: B.ByteString -> IO Int
+              , _imageindex         :: B.ByteString -> IO Int
+              , _setmodel           :: EdictT -> B.ByteString -> IO ()
+              , _trace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> IO TraceT
               --, pmove_t.PointContentsAdapter -- TODO: ???
-              , inPHS              :: V3 Float -> V3 Float -> IO Bool
-              , setAreaPortalState :: Int -> Bool -> IO ()
-              , areasConnected     :: Int -> Int -> IO Bool
-              , linkentity         :: EdictT -> IO ()
-              , unlinkentity       :: EdictT -> IO ()
-              , boxEdicts          :: V3 Float -> V3 Float -> UV.Vector EdictT -> Int -> Int -> IO Int
-              , pmove              :: PMoveT -> IO ()
-              , multicast          :: V3 Float -> Int -> IO ()
-              , unicast            :: EdictT -> Bool -> IO ()
-              , writeByte          :: Int -> IO ()
-              , writeShort         :: Int -> IO ()
-              , writeString        :: B.ByteString -> IO ()
-              , writePosition      :: V3 Float -> IO ()
-              , writeDir           :: V3 Float -> IO ()
-              , cvar               :: B.ByteString -> B.ByteString -> Int -> IO CVarT
-              , cvarSet            :: B.ByteString -> B.ByteString -> IO CVarT
-              , cvarForceset       :: B.ByteString -> B.ByteString -> IO CVarT
-              , argc               :: IO Int
-              , argv               :: Int -> B.ByteString
-              , args               :: IO B.ByteString
-              , addCommandString   :: B.ByteString -> IO ()
+              , _inPHS              :: V3 Float -> V3 Float -> IO Bool
+              , _setAreaPortalState :: Int -> Bool -> IO ()
+              , _areasConnected     :: Int -> Int -> IO Bool
+              , _linkentity         :: EdictT -> IO ()
+              , _unlinkentity       :: EdictT -> IO ()
+              , _boxEdicts          :: V3 Float -> V3 Float -> UV.Vector EdictT -> Int -> Int -> IO Int
+              , _pmove              :: PMoveT -> IO ()
+              , _multicast          :: V3 Float -> Int -> IO ()
+              , _unicast            :: EdictT -> Bool -> IO ()
+              , _writeByte          :: Int -> IO ()
+              , _writeShort         :: Int -> IO ()
+              , _writeString        :: B.ByteString -> IO ()
+              , _writePosition      :: V3 Float -> IO ()
+              , _writeDir           :: V3 Float -> IO ()
+              , _cvar               :: B.ByteString -> B.ByteString -> Int -> IO CVarT
+              , _cvarSet            :: B.ByteString -> B.ByteString -> IO CVarT
+              , _cvarForceset       :: B.ByteString -> B.ByteString -> IO CVarT
+              , _argc               :: IO Int
+              , _argv               :: Int -> B.ByteString
+              , _args               :: IO B.ByteString
+              , _addCommandString   :: B.ByteString -> IO ()
               }
+
+makeLenses ''GameImportT

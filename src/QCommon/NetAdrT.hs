@@ -1,9 +1,13 @@
+{-# LANGUAGE TemplateHaskell #-}
 module QCommon.NetAdrT where
 
 import Data.Word (Word32)
+import Control.Lens (makeLenses)
 
 data NetAdrT =
-  NetAdrT { naType :: Int
-          , naPort :: Int
-          , naIP   :: Word32 -- TODO: how to represent?
+  NetAdrT { _naType :: Int
+          , _naPort :: Int
+          , _naIP   :: Word32 -- TODO: how to represent?
           }
+
+makeLenses ''NetAdrT

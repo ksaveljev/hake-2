@@ -1,27 +1,31 @@
+{-# LANGUAGE TemplateHaskell #-}
 module QCommon.NetChanT where
 
 import Data.Int (Int8)
+import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
 import QCommon.NetAdrT
 import QCommon.SizeBufT
 
 data NetChanT =
-  NetChanT { ncFatalError                   :: Bool
-           , ncSock                         :: Int
-           , ncDropped                      :: Int
-           , ncLastReceived                 :: Int
-           , ncLastSent                     :: Int
-           , ncRemoteAddress                :: NetAdrT
-           , ncQPort                        :: Int
-           , ncIncomingSequence             :: Int
-           , ncIncomingAcknowledged         :: Int
-           , ncIncomingReliableAcknowledged :: Int
-           , ncIncomingReliableSequence     :: Int
-           , ncOutgoingSequence             :: Int
-           , ncLastReliableSequence         :: Int
-           , ncMessage                      :: SizeBufT
-           , ncMessageBuf                   :: UV.Vector Int8 -- TODO: Word8?
-           , ncReliableLength               :: Int
-           , ncReliableBuf                  :: UV.Vector Int8 -- TODO: Word8?
+  NetChanT { _ncFatalError                   :: Bool
+           , _ncSock                         :: Int
+           , _ncDropped                      :: Int
+           , _ncLastReceived                 :: Int
+           , _ncLastSent                     :: Int
+           , _ncRemoteAddress                :: NetAdrT
+           , _ncQPort                        :: Int
+           , _ncIncomingSequence             :: Int
+           , _ncIncomingAcknowledged         :: Int
+           , _ncIncomingReliableAcknowledged :: Int
+           , _ncIncomingReliableSequence     :: Int
+           , _ncOutgoingSequence             :: Int
+           , _ncLastReliableSequence         :: Int
+           , _ncMessage                      :: SizeBufT
+           , _ncMessageBuf                   :: UV.Vector Int8 -- TODO: Word8?
+           , _ncReliableLength               :: Int
+           , _ncReliableBuf                  :: UV.Vector Int8 -- TODO: Word8?
            }
+
+makeLenses ''NetChanT

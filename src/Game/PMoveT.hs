@@ -1,6 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.PMoveT where
   
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
 import Game.EdictT
@@ -8,20 +10,20 @@ import Game.PMoveStateT
 import Game.UserCmdT
 
 data PMoveT =
-  PMoveT { pmState         :: PMoveStateT
-         , pmCmd           :: UserCmdT
-         , pmSnapInitial   :: Bool
-         , pmNumTouch      :: Int
-         , pmTouchEnts     :: UV.Vector EdictT
-         , pmViewAngles    :: V3 Float
-         , pmViewHeight    :: Float
-         , pmMins          :: V3 Float
-         , pmMaxs          :: V3 Float
-         , pmGroundEntity  :: EdictT
-         , pmWaterType     :: Int
-         , pmWaterLevel    :: Int
-         , pmTrace         :: IO () -- TODO: ???
-         , pmPointContents :: IO () -- TODO: ???
+  PMoveT { _pmState         :: PMoveStateT
+         , _pmCmd           :: UserCmdT
+         , _pmSnapInitial   :: Bool
+         , _pmNumTouch      :: Int
+         , _pmTouchEnts     :: UV.Vector EdictT
+         , _pmViewAngles    :: V3 Float
+         , _pmViewHeight    :: Float
+         , _pmMins          :: V3 Float
+         , _pmMaxs          :: V3 Float
+         , _pmGroundEntity  :: EdictT
+         , _pmWaterType     :: Int
+         , _pmWaterLevel    :: Int
+         , _pmTrace         :: IO () -- TODO: ???
+         , _pmPointContents :: IO () -- TODO: ???
          {-
          TODO:
          PMF_DUCKED = 1
@@ -33,3 +35,5 @@ data PMoveT =
          PMF_NO_PREDICTION = 64
          -}
          }
+
+makeLenses ''PMoveT

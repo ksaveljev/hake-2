@@ -1,6 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.Internal where
 
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -14,192 +16,196 @@ import Game.PMoveStateT
 import Game.PlayerStateT
 
 data EdictT =
-  EdictT { eEntityState           :: EntityStateT
-         , eInUse                 :: Bool
-         , eLinkCount             :: Int
-         , eArea                  :: LinkT
-         , eNumClusters           :: Int
-         , eClusterNums           :: UV.Vector Int
-         , eHeadNode              :: Int
-         , eAreaNum               :: Int
-         , eAreaNum2              :: Int
-         , eSvFlags               :: Int
-         , eMins                  :: V3 Float
-         , eMaxs                  :: V3 Float
-         , eAbsMin                :: V3 Float
-         , eAbsMax                :: V3 Float
-         , eSize                  :: V3 Float
-         , eSolid                 :: Int
-         , eSlipMask              :: Int
-         , eMoveType              :: Int
-         , eFlags                 :: Int
-         , eModel                 :: B.ByteString
-         , eFreeTime              :: Float
-         , eMessage               :: B.ByteString
-         , eClassName             :: B.ByteString
-         , eSpawnFlags            :: Int
-         , eTimeStamp             :: Float
-         , eAngle                 :: Float
-         , eTarget                :: B.ByteString
-         , eTargetName            :: B.ByteString
-         , eKillTarget            :: B.ByteString
-         , eTeam                  :: B.ByteString
-         , ePathTarget            :: B.ByteString
-         , eDeathTarget           :: B.ByteString
-         , eCombatTarget          :: B.ByteString
-         , eTargetEnt             :: Maybe EdictT
-         , eSpeed                 :: Float
-         , eAccel                 :: Float
-         , eDecel                 :: Float
-         , eMoveDir               :: V3 Float
-         , ePos1                  :: V3 Float
-         , ePos2                  :: V3 Float
-         , eVelocity              :: V3 Float
-         , eAVelocity             :: V3 Float
-         , eMass                  :: Int
-         , eAirFinished           :: Float
-         , eGravity               :: Float
-         , eGoalEntity            :: Maybe EdictT
-         , eMoveTarget            :: Maybe EdictT
-         , eYawSpeed              :: Float
-         , eIdealYaw              :: Float
-         , eNextThink             :: Float
-         , ePrethink              :: IO () -- TODO: ???
-         , eThink                 :: IO () -- TODO: ???
-         , eBlocked               :: IO () -- TODO: ???
-         , eTouch                 :: IO () -- TODO: ???
-         , eUse                   :: IO () -- TODO: ???
-         , ePain                  :: IO () -- TODO: ???
-         , eDie                   :: IO () -- TODO: ???
-         , eTouchDebounceTime     :: Float
-         , ePainDebounceTime      :: Float
-         , eDamageDebounceTime    :: Float
-         , eFlySoundDebounceTime  :: Float
-         , eLastMoveTime          :: Float
-         , eHealth                :: Int
-         , eMaxHealth             :: Int
-         , eGibHealth             :: Int
-         , eDeadFlag              :: Int
-         , eShowHostile           :: Int
-         , ePowerArmorTime        :: Float
-         , eMap                   :: Maybe B.ByteString
-         , eViewHeight            :: Int
-         , eTakeDamage            :: Int
-         , eDmg                   :: Int
-         , eRadiusDmg             :: Int
-         , eDmgRadius             :: Float
-         , eSounds                :: Int
-         , eCount                 :: Int
-         , eChain                 :: Maybe EdictT
-         , eEnemy                 :: Maybe EdictT
-         , eOldEnemy              :: Maybe EdictT
-         , eActivator             :: Maybe EdictT
-         , eGroundEntity          :: Maybe EdictT
-         , eGroundEntityLinkCount :: Int
-         , eTeamChain             :: Maybe EdictT
-         , eTeamMaster            :: Maybe EdictT
-         , eMyNoise               :: Maybe EdictT
-         , eMyNoise2              :: Maybe EdictT
-         , eNoiseIndex            :: Int
-         , eNoiseIndex2           :: Int
-         , eVolume                :: Float
-         , eAttenuation           :: Float
-         , eWait                  :: Float
-         , eDelay                 :: Float
-         , eRandom                :: Float
-         , eTeleportTime          :: Float
-         , eWaterType             :: Int
-         , eWaterLevel            :: Int
-         , eMoveOrigin            :: V3 Float
-         , eMoveAngles            :: V3 Float
-         , eLightLevel            :: Int
-         , eStyle                 :: Int
-         , eItem                  :: GItemT
-         , eMoveInfo              :: MoveInfoT
-         , eMonsterInfo           :: MonsterInfoT
-         , eClient                :: GClientT
-         , eOwner                 :: Maybe EdictT
-         , eIndex                 :: Int
+  EdictT { _eEntityState           :: EntityStateT
+         , _eInUse                 :: Bool
+         , _eLinkCount             :: Int
+         , _eArea                  :: LinkT
+         , _eNumClusters           :: Int
+         , _eClusterNums           :: UV.Vector Int
+         , _eHeadNode              :: Int
+         , _eAreaNum               :: Int
+         , _eAreaNum2              :: Int
+         , _eSvFlags               :: Int
+         , _eMins                  :: V3 Float
+         , _eMaxs                  :: V3 Float
+         , _eAbsMin                :: V3 Float
+         , _eAbsMax                :: V3 Float
+         , _eSize                  :: V3 Float
+         , _eSolid                 :: Int
+         , _eSlipMask              :: Int
+         , _eMoveType              :: Int
+         , _eFlags                 :: Int
+         , _eModel                 :: B.ByteString
+         , _eFreeTime              :: Float
+         , _eMessage               :: B.ByteString
+         , _eClassName             :: B.ByteString
+         , _eSpawnFlags            :: Int
+         , _eTimeStamp             :: Float
+         , _eAngle                 :: Float
+         , _eTarget                :: B.ByteString
+         , _eTargetName            :: B.ByteString
+         , _eKillTarget            :: B.ByteString
+         , _eTeam                  :: B.ByteString
+         , _ePathTarget            :: B.ByteString
+         , _eDeathTarget           :: B.ByteString
+         , _eCombatTarget          :: B.ByteString
+         , _eTargetEnt             :: Maybe EdictT
+         , _eSpeed                 :: Float
+         , _eAccel                 :: Float
+         , _eDecel                 :: Float
+         , _eMoveDir               :: V3 Float
+         , _ePos1                  :: V3 Float
+         , _ePos2                  :: V3 Float
+         , _eVelocity              :: V3 Float
+         , _eAVelocity             :: V3 Float
+         , _eMass                  :: Int
+         , _eAirFinished           :: Float
+         , _eGravity               :: Float
+         , _eGoalEntity            :: Maybe EdictT
+         , _eMoveTarget            :: Maybe EdictT
+         , _eYawSpeed              :: Float
+         , _eIdealYaw              :: Float
+         , _eNextThink             :: Float
+         , _ePrethink              :: IO () -- TODO: ???
+         , _eThink                 :: IO () -- TODO: ???
+         , _eBlocked               :: IO () -- TODO: ???
+         , _eTouch                 :: IO () -- TODO: ???
+         , _eUse                   :: IO () -- TODO: ???
+         , _ePain                  :: IO () -- TODO: ???
+         , _eDie                   :: IO () -- TODO: ???
+         , _eTouchDebounceTime     :: Float
+         , _ePainDebounceTime      :: Float
+         , _eDamageDebounceTime    :: Float
+         , _eFlySoundDebounceTime  :: Float
+         , _eLastMoveTime          :: Float
+         , _eHealth                :: Int
+         , _eMaxHealth             :: Int
+         , _eGibHealth             :: Int
+         , _eDeadFlag              :: Int
+         , _eShowHostile           :: Int
+         , _ePowerArmorTime        :: Float
+         , _eMap                   :: Maybe B.ByteString
+         , _eViewHeight            :: Int
+         , _eTakeDamage            :: Int
+         , _eDmg                   :: Int
+         , _eRadiusDmg             :: Int
+         , _eDmgRadius             :: Float
+         , _eSounds                :: Int
+         , _eCount                 :: Int
+         , _eChain                 :: Maybe EdictT
+         , _eEnemy                 :: Maybe EdictT
+         , _eOldEnemy              :: Maybe EdictT
+         , _eActivator             :: Maybe EdictT
+         , _eGroundEntity          :: Maybe EdictT
+         , _eGroundEntityLinkCount :: Int
+         , _eTeamChain             :: Maybe EdictT
+         , _eTeamMaster            :: Maybe EdictT
+         , _eMyNoise               :: Maybe EdictT
+         , _eMyNoise2              :: Maybe EdictT
+         , _eNoiseIndex            :: Int
+         , _eNoiseIndex2           :: Int
+         , _eVolume                :: Float
+         , _eAttenuation           :: Float
+         , _eWait                  :: Float
+         , _eDelay                 :: Float
+         , _eRandom                :: Float
+         , _eTeleportTime          :: Float
+         , _eWaterType             :: Int
+         , _eWaterLevel            :: Int
+         , _eMoveOrigin            :: V3 Float
+         , _eMoveAngles            :: V3 Float
+         , _eLightLevel            :: Int
+         , _eStyle                 :: Int
+         , _eItem                  :: GItemT
+         , _eMoveInfo              :: MoveInfoT
+         , _eMonsterInfo           :: MonsterInfoT
+         , _eClient                :: GClientT
+         , _eOwner                 :: Maybe EdictT
+         , _eIndex                 :: Int
          }
 
 data EntityStateT =
-  EntityStateT { esNumber         :: Int
-               , esSurroundingEnt :: Maybe EdictT
-               , esOrigin         :: V3 Float
-               , esAngles         :: V3 Float
-               , esOldOrigin      :: V3 Float
-               , esModelIndex     :: Int
-               , esModelIndex2    :: Int
-               , esModelIndex3    :: Int
-               , esModelIndex4    :: Int
-               , esFrame          :: Int
-               , esSkinNum        :: Int
-               , esEffects        :: Int
-               , esRenderFx       :: Int
-               , esSolid          :: Int
-               , esSound          :: Int
-               , esEvent          :: Int
+  EntityStateT { _esNumber         :: Int
+               , _esSurroundingEnt :: Maybe EdictT
+               , _esOrigin         :: V3 Float
+               , _esAngles         :: V3 Float
+               , _esOldOrigin      :: V3 Float
+               , _esModelIndex     :: Int
+               , _esModelIndex2    :: Int
+               , _esModelIndex3    :: Int
+               , _esModelIndex4    :: Int
+               , _esFrame          :: Int
+               , _esSkinNum        :: Int
+               , _esEffects        :: Int
+               , _esRenderFx       :: Int
+               , _esSolid          :: Int
+               , _esSound          :: Int
+               , _esEvent          :: Int
                }
 
 data GClientT =
-  GClientT { gcPlayerState        :: PlayerStateT
-           , gcPing               :: Int
-           , gcPers               :: ClientPersistantT
-           , gcResp               :: ClientRespawnT
-           , gcOldPMove           :: PMoveStateT
-           , gcShowScores         :: Bool
-           , gcShowInventory      :: Bool
-           , gcShowHelp           :: Bool
-           , gcShowHelpIcon       :: Bool
-           , gcAmmoIndex          :: Int
-           , gcButtons            :: Int
-           , gcOldButtons         :: Int
-           , gcLatchedButtons     :: Int
-           , gcWeaponThunk        :: Bool
-           , gcNewWeapon          :: GItemT
-           , gcDamageArmor        :: Int
-           , gcDamagePArmor       :: Int
-           , gcDamageBlood        :: Int
-           , gcDamageKnockback    :: Int
-           , gcDamageFrom         :: V3 Float
-           , gcKillerYaw          :: Float
-           , gcWeaponState        :: Int
-           , gcKickAngles         :: V3 Float
-           , gcKickOrigin         :: V3 Float
-           , gcVDmgRoll           :: Float
-           , gcVDmgPitch          :: Float
-           , gcVDmgTime           :: Float
-           , gcFallTime           :: Float
-           , gcFallValue          :: Float
-           , gcDamageAlpha        :: Float
-           , gcBonusAlpha         :: Float
-           , gcDamageBlend        :: V3 Float
-           , gcVAngle             :: V3 Float
-           , gcBobTime            :: Float
-           , gcOldViewAngles      :: V3 Float
-           , gcOldVelocity        :: V3 Float
-           , gcNextDrownTime      :: Float
-           , gcOldWaterLevel      :: Int
-           , gcBreatherSound      :: Int
-           , gcMachinegunShots    :: Int
-           , gcAnimEnd            :: Int
-           , gcAnimPriority       :: Int
-           , gcAnimDuck           :: Bool
-           , gcAnimRun            :: Bool
-           , gcQuadFrameNum       :: Float
-           , gcInvincibleFrameNum :: Float
-           , gcBreatherFrameNum   :: Float
-           , gcEnviroFrameNum     :: Float
-           , gcGrenadeBlewUp      :: Bool
-           , gcGrenadeTime        :: Float
-           , gcSilencerShots      :: Int
-           , gcWeaponSound        :: Int
-           , gcPickupMsgTime      :: Float
-           , gcFloodLockTill      :: Float
-           , gcFloodWhen          :: UV.Vector Float
-           , gcFloodWhenHead      :: Int
-           , gcRespawnTime        :: Float
-           , gcChaseTarget        :: EdictT
-           , gcUpdateChase        :: Bool
-           , gcIndex              :: Int
+  GClientT { _gcPlayerState        :: PlayerStateT
+           , _gcPing               :: Int
+           , _gcPers               :: ClientPersistantT
+           , _gcResp               :: ClientRespawnT
+           , _gcOldPMove           :: PMoveStateT
+           , _gcShowScores         :: Bool
+           , _gcShowInventory      :: Bool
+           , _gcShowHelp           :: Bool
+           , _gcShowHelpIcon       :: Bool
+           , _gcAmmoIndex          :: Int
+           , _gcButtons            :: Int
+           , _gcOldButtons         :: Int
+           , _gcLatchedButtons     :: Int
+           , _gcWeaponThunk        :: Bool
+           , _gcNewWeapon          :: GItemT
+           , _gcDamageArmor        :: Int
+           , _gcDamagePArmor       :: Int
+           , _gcDamageBlood        :: Int
+           , _gcDamageKnockback    :: Int
+           , _gcDamageFrom         :: V3 Float
+           , _gcKillerYaw          :: Float
+           , _gcWeaponState        :: Int
+           , _gcKickAngles         :: V3 Float
+           , _gcKickOrigin         :: V3 Float
+           , _gcVDmgRoll           :: Float
+           , _gcVDmgPitch          :: Float
+           , _gcVDmgTime           :: Float
+           , _gcFallTime           :: Float
+           , _gcFallValue          :: Float
+           , _gcDamageAlpha        :: Float
+           , _gcBonusAlpha         :: Float
+           , _gcDamageBlend        :: V3 Float
+           , _gcVAngle             :: V3 Float
+           , _gcBobTime            :: Float
+           , _gcOldViewAngles      :: V3 Float
+           , _gcOldVelocity        :: V3 Float
+           , _gcNextDrownTime      :: Float
+           , _gcOldWaterLevel      :: Int
+           , _gcBreatherSound      :: Int
+           , _gcMachinegunShots    :: Int
+           , _gcAnimEnd            :: Int
+           , _gcAnimPriority       :: Int
+           , _gcAnimDuck           :: Bool
+           , _gcAnimRun            :: Bool
+           , _gcQuadFrameNum       :: Float
+           , _gcInvincibleFrameNum :: Float
+           , _gcBreatherFrameNum   :: Float
+           , _gcEnviroFrameNum     :: Float
+           , _gcGrenadeBlewUp      :: Bool
+           , _gcGrenadeTime        :: Float
+           , _gcSilencerShots      :: Int
+           , _gcWeaponSound        :: Int
+           , _gcPickupMsgTime      :: Float
+           , _gcFloodLockTill      :: Float
+           , _gcFloodWhen          :: UV.Vector Float
+           , _gcFloodWhenHead      :: Int
+           , _gcRespawnTime        :: Float
+           , _gcChaseTarget        :: EdictT
+           , _gcUpdateChase        :: Bool
+           , _gcIndex              :: Int
            }
+
+makeLenses ''EdictT
+makeLenses ''EntityStateT
+makeLenses ''GClientT

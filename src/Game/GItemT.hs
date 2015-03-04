@@ -1,29 +1,33 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.GItemT where
 
+import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 
 import Game.GItemArmorT
 
 data GItemT =
-  GItemT { giId              :: Int
-         , giClassName       :: B.ByteString
-         , giPickup          :: IO () -- TODO: ???
-         , giUse             :: IO () -- TODO: ???
-         , giDrop            :: IO () -- TODO: ???
-         , giWeaponThink     :: IO () -- TODO: ???
-         , giPickupSound     :: B.ByteString
-         , giWorldModel      :: B.ByteString
-         , giWorldModelFlags :: Int
-         , giViewModel       :: B.ByteString
-         , giIcon            :: B.ByteString
-         , giPickupName      :: B.ByteString
-         , giCountWidth      :: Int
-         , giQuantity        :: Int
-         , giAmmo            :: B.ByteString
-         , giFlags           :: Int
-         , giWeaponModel     :: Int
-         , giInfo            :: GItemArmorT
-         , giTag             :: Int
-         , giPrecaches       :: B.ByteString
-         , giIndex           :: Int
+  GItemT { _giId              :: Int
+         , _giClassName       :: B.ByteString
+         , _giPickup          :: IO () -- TODO: ???
+         , _giUse             :: IO () -- TODO: ???
+         , _giDrop            :: IO () -- TODO: ???
+         , _giWeaponThink     :: IO () -- TODO: ???
+         , _giPickupSound     :: B.ByteString
+         , _giWorldModel      :: B.ByteString
+         , _giWorldModelFlags :: Int
+         , _giViewModel       :: B.ByteString
+         , _giIcon            :: B.ByteString
+         , _giPickupName      :: B.ByteString
+         , _giCountWidth      :: Int
+         , _giQuantity        :: Int
+         , _giAmmo            :: B.ByteString
+         , _giFlags           :: Int
+         , _giWeaponModel     :: Int
+         , _giInfo            :: GItemArmorT
+         , _giTag             :: Int
+         , _giPrecaches       :: B.ByteString
+         , _giIndex           :: Int
          }
+
+makeLenses ''GItemT

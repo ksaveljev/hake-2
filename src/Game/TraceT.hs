@@ -1,18 +1,22 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.TraceT where
 
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 
 import Game.CPlaneT
 import Game.CSurfaceT
 import Game.EdictT
 
 data TraceT =
-  TraceT { tAllSolid   :: Bool
-         , tStartSolid :: Bool
-         , tFraction   :: Float
-         , tEndPos     :: V3 Float
-         , tPlane      :: CPlaneT
-         , tSurface    :: CSurfaceT
-         , tContents   :: Int
-         , tEnt        :: EdictT
+  TraceT { _tAllSolid   :: Bool
+         , _tStartSolid :: Bool
+         , _tFraction   :: Float
+         , _tEndPos     :: V3 Float
+         , _tPlane      :: CPlaneT
+         , _tSurface    :: CSurfaceT
+         , _tContents   :: Int
+         , _tEnt        :: EdictT
          }
+
+makeLenses ''TraceT

@@ -1,15 +1,19 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.UserCmdT where
 
 import Data.Int (Int8, Int16)
 import Linear.V3 (V3)
+import Control.Lens (makeLenses)
 
 data UserCmdT =
-  UserCmdT { ucMsec        :: Int8
-           , ucButtons     :: Int8
-           , ucAngles      :: V3 Int16
-           , ucForwardMove :: Int16
-           , ucSideMove    :: Int16
-           , ucUpMove      :: Int16
-           , ucImpulse     :: Int8
-           , ucLightLevel  :: Int8
+  UserCmdT { _ucMsec        :: Int8
+           , _ucButtons     :: Int8
+           , _ucAngles      :: V3 Int16
+           , _ucForwardMove :: Int16
+           , _ucSideMove    :: Int16
+           , _ucUpMove      :: Int16
+           , _ucImpulse     :: Int8
+           , _ucLightLevel  :: Int8
            }
+
+makeLenses ''UserCmdT

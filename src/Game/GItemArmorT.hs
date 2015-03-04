@@ -1,9 +1,14 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Game.GItemArmorT where
 
+import Control.Lens (makeLenses)
+
 data GItemArmorT =
-  GItemArmorT { giaBaseCount        :: Int
-              , giaMaxCount         :: Int
-              , giaNormalProtection :: Float
-              , giaEnergyProteciton :: Float
-              , giaArmor            :: Int
+  GItemArmorT { _giaBaseCount        :: Int
+              , _giaMaxCount         :: Int
+              , _giaNormalProtection :: Float
+              , _giaEnergyProteciton :: Float
+              , _giaArmor            :: Int
               }
+
+makeLenses ''GItemArmorT
