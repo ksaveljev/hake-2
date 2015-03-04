@@ -1,6 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.QCommon where
 
+import Control.Lens
+import Control.Monad (liftM)
+
 import Quake
+import Constants (cvarArchive)
+import Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
@@ -34,4 +40,7 @@ frame :: Int -> Quake ()
 frame = undefined -- TODO
 
 reconfigure :: Bool -> Quake ()
-reconfigure = undefined -- TODO
+reconfigure clear = do
+    dir <- liftM (^.cvString) $ CVar.get "cddir" "" cvarArchive
+
+    undefined -- TODO
