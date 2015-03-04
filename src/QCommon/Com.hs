@@ -6,7 +6,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake (Quake)
 
 initArgv :: [String] -> Quake ()
-initArgv args = undefined
+initArgv args = undefined -- TODO
 
 -- CRC table
 chktbl :: UV.Vector Word8

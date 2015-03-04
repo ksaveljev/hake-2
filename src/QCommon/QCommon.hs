@@ -22,7 +22,7 @@ init args = do
     CBuf.addEarlyCommands False
     CBuf.execute
 
-    --whenQ (liftM () get) $ do undefined
+    --whenQ (liftM () get) $ do undefined -- TODO
 
     FS.initFileSystem
 
@@ -34,4 +34,4 @@ frame :: Int -> Quake ()
 frame = undefined -- TODO
 
 reconfigure :: Bool -> Quake ()
-reconfigure = undefined
+reconfigure = undefined -- TODO

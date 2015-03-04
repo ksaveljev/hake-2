@@ -28,8 +28,7 @@ main = do
 
       -- if (globals.dedicated.cvValue != 1.0)
       whenQ (liftM ((/= 1.0) . (^.globals.dedicated.cvValue)) get) $ do
-        -- TODO: init our client window
-        undefined
+        undefined -- TODO: init our client window
 
       -- TODO: strip some args and call QCommon.init
       QCommon.init undefined -- TODO
