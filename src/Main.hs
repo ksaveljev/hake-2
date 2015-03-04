@@ -2,10 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 import System.Environment (getArgs)
 
+import Control.Lens
+import Control.Monad.State
+
 import Quake
 import QuakeState
-import Control.Lens ((.=))
 import qualified QCommon.CVar as CVar
+import qualified QCommon.QCommon as QCommon
+import qualified Sys.Timer as Timer
 
 isDedicatedCmdArg :: [String] -> Bool
 isDedicatedCmdArg ("+set":"dedicated":"1":_) = True
@@ -17,13 +21,32 @@ main = do
     runQuake defaultQuakeState $ do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
-      dedicatedCVar <- CVar.get "dedicated" "0" 1
+
+      dedicatedCVar <- CVar.get "dedicated" "0" 1 -- TODO: last param
       globals.dedicated .= dedicatedCVar
-      -- check if we start in dedicated mode
-      -- set dedicated value
-      -- if not dedicated then init our client window
-      -- strip some args and call QCommon.init
-      -- grab current time
-      -- forever loop calling QCommon.frame
-      undefined
+
+      when dedicatedFlag $ globals.dedicated.cvValue .= 1.0
+
+      -- if (globals.dedicated.cvValue != 1.0)
+      whenQ (liftM ((/= 1.0) . (^.globals.dedicated.cvValue)) get) $ do
+        -- TODO: init our client window
+        undefined
+
+      -- TODO: strip some args and call QCommon.init
+      QCommon.init undefined -- TODO
+
+      nostdoutCVar <- CVar.get "nostdout" "0" 0
+      globals.nostdout .= nostdoutCVar
+
+      startTime <- Timer.milliseconds
+      mainLoop startTime
+
     return ()
+
+  where mainLoop oldTime = do
+          newTime <- Timer.milliseconds
+          let time = newTime - oldTime
+
+          when (time > 0) $ QCommon.frame time
+
+          mainLoop newTime

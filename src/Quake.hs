@@ -3,6 +3,7 @@
 module Quake ( Quake
              , runQuake
              , io
+             , whenQ
              ) where
 
 import Control.Applicative
@@ -18,3 +19,6 @@ runQuake qs (Quake q) = runStateT q qs
 
 io :: MonadIO m => IO a -> m a
 io = liftIO
+
+whenQ :: Quake Bool -> Quake () -> Quake ()
+whenQ q f = q >>= \b -> when b f
