@@ -1,6 +1,6 @@
 module Globals where
 
-import Game.Types
+import Game.CVarT
 
-data Globals = Globals { dedicated :: CVar
+data Globals = Globals { dedicated :: CVarT
                        }

@@ -18,10 +18,14 @@ newtype Quake a = Quake (StateT QuakeState IO a)
 runQuake :: QuakeState -> Quake a -> IO (a, QuakeState)
 runQuake qs (Quake q) = runStateT q qs
 
+io :: MonadIO m => IO a -> m a
+io = liftIO
+
 quake :: IO ()
 quake = do
     runQuake undefined $ do
-      args <- io $ getArgs
+      args <- io getArgs
+      let dedicated = isDedicatedCmdArg args
       -- check if we start in dedicated mode
       -- set dedicated value
       -- if not dedicated then init our client window
@@ -31,5 +35,7 @@ quake = do
       undefined
     return ()
 
-io :: MonadIO m => IO a -> m a
-io = liftIO
+isDedicatedCmdArg :: [String] -> Bool
+isDedicatedCmdArg ("+set":"dedicated":"1":_) = True
+isDedicatedCmdArg (_:xs) = isDedicatedCmdArg xs
+isDedicatedCmdArg [] = False

@@ -1,3 +1,6 @@
 module QuakeState where
 
-data QuakeState
+import Globals
+
+data QuakeState = QuakeState { globals :: Globals
+                             }
