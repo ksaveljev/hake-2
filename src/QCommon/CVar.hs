@@ -1,7 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
 
+import Control.Lens ((^.))
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -16,9 +18,14 @@ init :: Quake ()
 init = undefined -- TODO
 
 variableString :: B.ByteString -> Quake B.ByteString
-variableString = undefined -- TODO
+variableString varName = do
+    foundVar <- findVar varName
 
-findVar :: B.ByteString -> Quake CVarT
+    case foundVar of
+      Just v -> return $ v^.cvString
+      Nothing -> return ""
+
+findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar = undefined -- TODO
 
 fullSet :: B.ByteString -> B.ByteString -> B.ByteString -> Int -> Quake CVarT

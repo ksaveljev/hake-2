@@ -47,6 +47,9 @@ comError code fmt = do
         errReact c | c == Constants.errDrop = undefined -- TODO
         errReact _ = undefined -- TODO
 
+printf :: B.ByteString -> Quake ()
+printf = undefined -- TODO
+
 -- CRC table
 chktbl :: UV.Vector Word8
 chktbl = UV.fromList [ 0x84, 0x47, 0x51, 0xc1, 0x93, 0x22, 0x21, 0x24
