@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.CmdFunctionT ( CmdFunctionT
+module QCommon.CmdFunctionT ( CmdFunctionT(..)
                             , cfFunction
                             , cfName
                             ) where

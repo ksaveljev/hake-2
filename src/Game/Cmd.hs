@@ -3,7 +3,8 @@
 module Game.Cmd where
 
 import Data.Foldable (find)
-import Control.Lens ((^.))
+import Data.Sequence ((<|))
+import Control.Lens ((^.), (%=))
 import Control.Monad.State (liftM, get)
 import qualified Data.ByteString as B
 
@@ -24,7 +25,7 @@ init = do
 addCommand :: B.ByteString -> Quake () -> Quake ()
 addCommand cmdName f = do
     varStr <- CVar.variableString cmdName
-    cmdExists <- commandExists cmdName -- TODO
+    cmdExists <- commandExists cmdName
 
     -- fail if the command is a variable name
     -- fail if the command already exists
@@ -37,7 +38,8 @@ addCommand cmdName f = do
            Com.printf $ "Cmd.addCommand: "
              `B.append` cmdName
              `B.append` " already defined\n"
-       | otherwise -> undefined -- TODO
+       | otherwise ->
+           cmdGlobals.cgCmdFunctions %= (CmdFunctionT cmdName f <|)
 
   where commandExists name = do
           allFunctions <- liftM (^.cmdGlobals.cgCmdFunctions) get
