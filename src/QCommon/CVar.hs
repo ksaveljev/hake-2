@@ -10,13 +10,15 @@ import qualified Data.Vector.Unboxed as UV
 import Quake (Quake)
 import Game.CVarT
 import QCommon.XCommandT
---import qualified Game.Cmd as Cmd
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
 get :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
 get = undefined -- TODO
 
 init :: Quake ()
-init = undefined -- TODO
+init = do
+    Cmd.addCommand "set" undefined -- TODO
+    Cmd.addCommand "cvarlist" undefined -- TODO
 
 variableString :: B.ByteString -> Quake B.ByteString
 variableString varName = do
