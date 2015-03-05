@@ -5,8 +5,8 @@ import Control.Lens
 import Control.Monad (liftM)
 
 import Quake
-import Constants (cvarArchive)
 import Game.CVarT
+import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
@@ -41,6 +41,6 @@ frame = undefined -- TODO
 
 reconfigure :: Bool -> Quake ()
 reconfigure clear = do
-    dir <- liftM (^.cvString) $ CVar.get "cddir" "" cvarArchive
+    dir <- liftM (^.cvString) $ CVar.get "cddir" "" Constants.cvarArchive
 
     undefined -- TODO

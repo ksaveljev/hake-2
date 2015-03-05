@@ -1,12 +1,51 @@
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.Com where
 
 import Data.Word (Word8)
+import Control.Monad (when, void)
+import Control.Lens ((.=), (^.))
+import Control.Monad.State (liftM, get)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString as B
 
 import Quake (Quake)
+import QuakeState
+import qualified Constants
+import qualified Sys.Sys as Sys
 
+-- checks the number of command line arguments and
+-- copies all arguments with valid length into comArgv
 initArgv :: [String] -> Quake ()
-initArgv args = undefined -- TODO
+initArgv args = do
+    let len = length args
+
+    when (len > Constants.maxNumArgvs) $ comError Constants.errFatal "argc > MAX_NUM_ARGVS"
+
+    comGlobals.cgComArgc .= len
+    comGlobals.cgComArgv .= V.fromList (fmap (BC.pack . stripLongArg) args)
+
+  where stripLongArg s = if length s > Constants.maxTokenChars then "" else s
+
+comError :: Int -> B.ByteString -> Quake ()
+comError code fmt = do
+    rec <- liftM (^.comGlobals.cgRecursive) get
+
+    when rec $ do
+      msg <- liftM (^.comGlobals.cgMsg) get
+      Sys.sysError ("recursive error after: " `B.append` msg)
+
+    comGlobals.cgRecursive .= True
+    comGlobals.cgMsg .= fmt -- TODO: we do not have arguments for sprintf here like jake does
+
+    void $ errReact code
+
+    Sys.sysError fmt
+
+  where errReact c | c == Constants.errDisconnect = undefined -- TODO
+        errReact c | c == Constants.errDrop = undefined -- TODO
+        errReact _ = undefined -- TODO
 
 -- CRC table
 chktbl :: UV.Vector Word8
