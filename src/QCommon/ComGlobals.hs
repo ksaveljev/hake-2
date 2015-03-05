@@ -5,12 +5,7 @@ import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-data ComGlobals =
-  ComGlobals { _cgComArgc   :: Int
-             , _cgComArgv   :: V.Vector B.ByteString
-             , _cgRecursive :: Bool
-             , _cgMsg       :: B.ByteString
-             }
+import Internal
 
 makeLenses ''ComGlobals
 

@@ -1,19 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.CmdGlobals where
+module Game.CmdGlobals ( CmdGlobals
+                       , cgCmdFunctions
+                       , cgCmdArgc
+                       , cgCmdArgv
+                       , defaultCmdGlobals
+                       ) where
 
 import Control.Lens (makeLenses)
-import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
-import qualified Data.ByteString as B
 
-import QCommon.CmdFunctionT
-
-data CmdGlobals =
-  CmdGlobals { _cgCmdFunctions :: Seq CmdFunctionT
-             , _cgCmdArgc      :: Int
-             , _cgCmdArgv      :: V.Vector B.ByteString
-             }
+import Internal
 
 makeLenses ''CmdGlobals
 

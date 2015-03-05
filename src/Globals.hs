@@ -10,21 +10,13 @@ module Globals ( Globals
                , module Game.CVarT
                ) where
 
-import Data.Word (Word8)
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
 import Game.CVarT
 import QCommon.SizeBufT
 
-data Globals =
-  Globals { _curtime    :: Int
-          , _dedicated  :: CVarT
-          , _nostdout   :: CVarT
-
-          , _cmdText    :: SizeBufT
-          , _cmdTextBuf :: UV.Vector Word8
-          }
+import Internal
 
 makeLenses ''Globals
 

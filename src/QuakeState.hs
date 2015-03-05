@@ -15,10 +15,7 @@ import Globals
 import QCommon.ComGlobals
 import Game.CmdGlobals
 
-data QuakeState = QuakeState { _globals    :: Globals
-                             , _comGlobals :: ComGlobals
-                             , _cmdGlobals :: CmdGlobals
-                             }
+import Internal
 
 makeLenses ''QuakeState
 

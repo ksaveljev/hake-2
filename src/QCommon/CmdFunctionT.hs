@@ -1,14 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.CmdFunctionT where
+module QCommon.CmdFunctionT ( CmdFunctionT
+                            , cfFunction
+                            , cfName
+                            ) where
 
 import Control.Lens (makeLenses)
-import qualified Data.ByteString as B
 
-import QCommon.XCommandT
-
-data CmdFunctionT =
-  CmdFunctionT { _cfName     :: B.ByteString
-               , _cfFunction :: XCommandT
-               }
+import Internal
 
 makeLenses ''CmdFunctionT
