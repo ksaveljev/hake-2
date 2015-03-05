@@ -10,6 +10,7 @@ import Control.Monad.State (liftM, get)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -54,7 +55,10 @@ execF :: Quake ()
 execF = undefined -- TODO
 
 echoF :: Quake ()
-echoF = undefined -- TODO
+echoF = do
+    argv <- liftM (V.drop 1 . (^.cmdGlobals.cgCmdArgv)) get
+    _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") argv
+    Com.printf "'\n"
 
 listF :: Quake ()
 listF = do
