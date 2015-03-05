@@ -21,7 +21,7 @@ executable hake2
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
                      , bytestring
-                     , mtl
+                     , mtl >= 2.2.1
                      , vector
                      , linear
                      , cryptohash
