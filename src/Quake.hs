@@ -8,14 +8,16 @@ module Quake ( Quake
 
 import Control.Applicative
 import Control.Monad.State
+import Control.Monad.Except
+import qualified Data.ByteString as B
 
 import QuakeState
 
-newtype Quake a = Quake (StateT QuakeState IO a)
-                    deriving (Functor, Applicative, Monad, MonadIO, MonadState QuakeState)
+newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
+                    deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
 
-runQuake :: QuakeState -> Quake a -> IO (a, QuakeState)
-runQuake qs (Quake q) = runStateT q qs
+runQuake :: QuakeState -> Quake a -> IO (Either B.ByteString (a, QuakeState))
+runQuake qs (Quake q) = runExceptT $ runStateT q qs
 
 io :: MonadIO m => IO a -> m a
 io = liftIO
