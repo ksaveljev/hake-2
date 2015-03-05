@@ -7,10 +7,10 @@ import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
 
-import QCommon.XCommandT
+import QCommon.CmdFunctionT
 
 data CmdGlobals =
-  CmdGlobals { _cgCmdFunctions :: Seq XCommandT
+  CmdGlobals { _cgCmdFunctions :: Seq CmdFunctionT
              , _cgCmdArgc      :: Int
              , _cgCmdArgv      :: V.Vector B.ByteString
              }

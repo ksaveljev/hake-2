@@ -7,8 +7,7 @@ import qualified Data.ByteString as B
 import QCommon.XCommandT
 
 data CmdFunctionT =
-  CmdFunctionT { _cfNext     :: CmdFunctionT
-               , _cfName     :: B.ByteString
+  CmdFunctionT { _cfName     :: B.ByteString
                , _cfFunction :: XCommandT
                }
 
