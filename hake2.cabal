@@ -22,6 +22,7 @@ executable hake2
   build-depends:       base >=4.7 && <4.8
                      , bytestring
                      , mtl >= 2.2.1
+                     , containers
                      , vector
                      , linear
                      , cryptohash
