@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QuakeState ( QuakeState(..)
-                  , defaultQuakeState
+                  , initialQuakeState
                   , globals
                   , comGlobals
                   , cmdGlobals
@@ -19,9 +19,9 @@ import Internal
 
 makeLenses ''QuakeState
 
-defaultQuakeState :: QuakeState
-defaultQuakeState =
-  QuakeState { _globals    = defaultGlobals
-             , _comGlobals = defaultComGlobals
-             , _cmdGlobals = defaultCmdGlobals
+initialQuakeState :: QuakeState
+initialQuakeState =
+  QuakeState { _globals    = initialGlobals
+             , _comGlobals = initialComGlobals
+             , _cmdGlobals = initialCmdGlobals
              }

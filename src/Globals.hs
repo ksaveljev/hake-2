@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( Globals
-               , defaultGlobals
+               , initialGlobals
                , curtime
                , cmdWait
                , dedicated
@@ -21,8 +21,8 @@ import Internal
 
 makeLenses ''Globals
 
-defaultGlobals :: Globals
-defaultGlobals =
+initialGlobals :: Globals
+initialGlobals =
   Globals { _curtime    = 0
           , _cmdWait    = False
           , _dedicated  = newCVarT

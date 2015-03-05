@@ -1,9 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.CmdGlobals ( CmdGlobals
+                       , initialCmdGlobals
                        , cgCmdFunctions
                        , cgCmdArgc
                        , cgCmdArgv
-                       , defaultCmdGlobals
                        ) where
 
 import Control.Lens (makeLenses)
@@ -14,8 +14,8 @@ import Internal
 
 makeLenses ''CmdGlobals
 
-defaultCmdGlobals :: CmdGlobals
-defaultCmdGlobals =
+initialCmdGlobals :: CmdGlobals
+initialCmdGlobals =
   CmdGlobals { _cgCmdFunctions = Seq.empty
              , _cgCmdArgc      = 0
              , _cgCmdArgv      = V.empty

@@ -19,7 +19,7 @@ isDedicatedCmdArg [] = False
 
 main :: IO ()
 main = do
-    runQuake defaultQuakeState $ do
+    runQuake initialQuakeState $ do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
 

@@ -1,5 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.ComGlobals where
+module QCommon.ComGlobals ( ComGlobals
+                          , initialComGlobals
+                          , cgComArgc
+                          , cgComArgv
+                          , cgRecursive
+                          , cgMsg
+                          ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
@@ -9,8 +15,8 @@ import Internal
 
 makeLenses ''ComGlobals
 
-defaultComGlobals :: ComGlobals
-defaultComGlobals =
+initialComGlobals :: ComGlobals
+initialComGlobals =
   ComGlobals { _cgComArgc   = 0
              , _cgComArgv   = V.empty
              , _cgRecursive = False

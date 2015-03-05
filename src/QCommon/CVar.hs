@@ -10,6 +10,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake (Quake)
 import Game.CVarT
 import QCommon.XCommandT
+--import qualified Game.Cmd as Cmd
 
 get :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
 get = undefined -- TODO
