@@ -33,7 +33,10 @@ addCommand cmdName f = do
            Com.printf $ "Cmd.addCommand: "
              `B.append` cmdName
              `B.append` " already defined as a var\n"
-       | cmdExists -> undefined -- TODO
+       | cmdExists ->
+           Com.printf $ "Cmd.addCommand: "
+             `B.append` cmdName
+             `B.append` " already defined\n"
        | otherwise -> undefined -- TODO
 
   where commandExists name = do
