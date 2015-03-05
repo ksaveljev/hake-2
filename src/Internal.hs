@@ -29,10 +29,11 @@ data Globals =
           , _cmdTextBuf :: UV.Vector Word8
           }
 
-data QuakeState = QuakeState { _globals    :: Globals
-                             , _comGlobals :: ComGlobals
-                             , _cmdGlobals :: CmdGlobals
-                             }
+data QuakeState =
+  QuakeState { _globals    :: Globals
+             , _comGlobals :: ComGlobals
+             , _cmdGlobals :: CmdGlobals
+             }
 
 data ComGlobals =
   ComGlobals { _cgComArgc   :: Int
