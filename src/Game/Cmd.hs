@@ -3,10 +3,13 @@
 module Game.Cmd where
 
 import Data.Foldable (find)
+import Data.Traversable (traverse)
 import Data.Sequence ((<|))
 import Control.Lens ((^.), (%=))
 import Control.Monad.State (liftM, get)
+import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -42,8 +45,8 @@ addCommand cmdName f = do
            cmdGlobals.cgCmdFunctions %= (CmdFunctionT cmdName f <|)
 
   where commandExists name = do
-          allFunctions <- liftM (^.cmdGlobals.cgCmdFunctions) get
-          case find (\function -> function^.cfName == name) allFunctions of
+          allCommands <- liftM (^.cmdGlobals.cgCmdFunctions) get
+          case find (\cmd -> cmd^.cfName == name) allCommands of
             Just _ -> return True
             Nothing -> return False
 
@@ -54,7 +57,10 @@ echoF :: Quake ()
 echoF = undefined -- TODO
 
 listF :: Quake ()
-listF = undefined -- TODO
+listF = do
+    allCommands <- liftM (^.cmdGlobals.cgCmdFunctions) get
+    _ <- traverse (\cf -> Com.printf $ (cf^.cfName) `B.append` "\n") allCommands
+    Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- TODO: maybe use Data.Binary for Int to Bytestring conversion ?
 
 aliasF :: Quake ()
 aliasF = undefined -- TODO
