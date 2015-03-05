@@ -5,7 +5,7 @@ module Game.Cmd where
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Data.Sequence ((<|))
-import Control.Lens ((^.), (%=))
+import Control.Lens ((^.), (%=), (.=))
 import Control.Monad.State (liftM, get)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
@@ -70,4 +70,4 @@ aliasF :: Quake ()
 aliasF = undefined -- TODO
 
 waitF :: Quake ()
-waitF = undefined -- TODO
+waitF = globals.cmdWait .= True

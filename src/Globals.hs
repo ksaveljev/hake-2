@@ -3,6 +3,7 @@
 module Globals ( Globals
                , defaultGlobals
                , curtime
+               , cmdWait
                , dedicated
                , nostdout
                , cmdText
@@ -23,6 +24,7 @@ makeLenses ''Globals
 defaultGlobals :: Globals
 defaultGlobals =
   Globals { _curtime    = 0
+          , _cmdWait    = False
           , _dedicated  = newCVarT
           , _nostdout   = newCVarT
           

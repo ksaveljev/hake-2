@@ -22,6 +22,7 @@ type XCommandT = Quake ()
 
 data Globals =
   Globals { _curtime    :: Int
+          , _cmdWait    :: Bool
           , _dedicated  :: CVarT
           , _nostdout   :: CVarT
 
