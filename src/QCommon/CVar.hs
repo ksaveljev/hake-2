@@ -7,6 +7,7 @@ module QCommon.CVar where
 import Data.Bits ((.&.))
 import Control.Lens ((^.))
 import Control.Monad (liftM, void)
+import Data.Foldable (find)
 import Data.Traversable (traverse)
 import qualified Data.Sequence as Seq
 import qualified Control.Monad.State as State
@@ -38,7 +39,9 @@ variableString varName = do
       Nothing -> return ""
 
 findVar :: B.ByteString -> Quake (Maybe CVarT)
-findVar = undefined -- TODO
+findVar varName = do
+    vars <- liftM (^.globals.cvarVars) State.get
+    return $ find (\v -> v^.cvName == varName) vars
 
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
 fullSet = undefined -- TODO
