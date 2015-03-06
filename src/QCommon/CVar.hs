@@ -50,8 +50,9 @@ fullSet = undefined -- TODO
 set :: B.ByteString -> B.ByteString -> Quake CVarT
 set varName value = set2 varName value False
 
+-- sets the value of the variable with forcing
 forceSet :: B.ByteString -> B.ByteString -> Quake CVarT
-forceSet = undefined -- TODO
+forceSet varName value = set2 varName value True
 
 set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
 set2 = undefined -- TODO
