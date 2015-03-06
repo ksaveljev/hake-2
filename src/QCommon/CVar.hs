@@ -4,11 +4,13 @@ module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
 
-import Data.Bits ((.&.))
-import Control.Lens ((^.))
+import Data.Maybe (isJust, fromJust)
+import Data.Bits ((.&.), (.|.))
+import Control.Lens ((^.), (%=), (.=))
 import Control.Monad (liftM, void)
 import Data.Foldable (find)
 import Data.Traversable (traverse)
+import Data.Sequence ((<|))
 import qualified Data.Sequence as Seq
 import qualified Control.Monad.State as State
 import qualified Data.ByteString as B
@@ -18,12 +20,44 @@ import qualified Data.Vector.Unboxed as UV
 import Quake (Quake)
 import QuakeState
 import QCommon.XCommandT
+import qualified Game.CVarT as CVarT
 import qualified QCommon.Com as Com
 import qualified Constants
+import qualified Util.Lib as Lib
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
-get :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
-get = undefined -- TODO
+get :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
+get varName varValue flags = do
+    let isUserOrServerInfo = flags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)
+
+    if isUserOrServerInfo /= 0 && not (infoValidate varName)
+      then do
+        Com.printf "invalid info cvar name\n"
+        return Nothing
+      else do
+        var <- findVar varName
+
+        if | isJust var -> do
+               cvars <- liftM (^.globals.cvarVars) State.get
+               let cvar = fromJust var
+                   updatedCVar = cvar { _cvFlags = cvar^.cvFlags .|. flags }
+                   updatedCVars = fmap (\v -> if v^.cvName == varName then updatedCVar else v) cvars
+               globals.cvarVars .= updatedCVars
+               return $ Just updatedCVar
+           | isUserOrServerInfo /= 0 && not (infoValidate varValue) -> do
+               Com.printf "invalid info cvar value\n"
+               return Nothing
+           | otherwise -> do
+               let newCVar = CVarT.newCVarT { _cvName     = varName
+                                            , _cvString   = varValue
+                                            , _cvModified = True
+                                            , _cvValue    = Lib.atof varValue
+                                            , _cvFlags    = flags
+                                            }
+
+               globals.cvarVars %= (newCVar <|)
+
+               return $ Just newCVar
 
 init :: Quake ()
 init = do

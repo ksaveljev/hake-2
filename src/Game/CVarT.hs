@@ -1,6 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Game.CVarT ( CVarT
+                  , _cvName
+                  , _cvString
+                  , _cvLatchedString
+                  , _cvFlags
+                  , _cvModified
+                  , _cvValue
                   , newCVarT
                   , cvName
                   , cvString
