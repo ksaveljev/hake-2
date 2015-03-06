@@ -1,6 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Game.CVarT where
+module Game.CVarT ( CVarT
+                  , newCVarT
+                  , cvName
+                  , cvString
+                  , cvLatchedString
+                  , cvFlags
+                  , cvModified
+                  , cvValue
+                  , cvNext
+                  ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
