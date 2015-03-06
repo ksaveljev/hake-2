@@ -3,7 +3,6 @@
 import Control.Lens ((.=), (^.))
 import Control.Monad.State (when, liftM, get)
 import System.Environment (getArgs)
-import Control.Monad.Except (catchError)
 
 import Quake
 import QuakeState
@@ -23,7 +22,7 @@ main = do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
 
-      dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
+      Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
       globals.dedicated .= dedicatedCVar
 
       when dedicatedFlag $ globals.dedicated.cvValue .= 1.0
@@ -32,11 +31,12 @@ main = do
       whenQ (liftM ((/= 1.0) . (^.globals.dedicated.cvValue)) get) $ do
         undefined -- TODO: init our client window
 
-      -- TODO: strip some args
+      -- in C the first arg is the filename
+      let updatedArgs = "hake2" : args
 
-      QCommon.init undefined `catchError` undefined -- TODO
+      QCommon.init updatedArgs
 
-      nostdoutCVar <- CVar.get "nostdout" "0" 0
+      Just nostdoutCVar <- CVar.get "nostdout" "0" 0
       globals.nostdout .= nostdoutCVar
 
       startTime <- Timer.milliseconds
