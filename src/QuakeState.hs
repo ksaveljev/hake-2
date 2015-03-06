@@ -4,9 +4,11 @@ module QuakeState ( QuakeState(..)
                   , globals
                   , comGlobals
                   , cmdGlobals
+                  , keyGlobals
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals
+                  , module Client.KeyGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -14,6 +16,7 @@ import Control.Lens (makeLenses)
 import Globals
 import QCommon.ComGlobals
 import Game.CmdGlobals
+import Client.KeyGlobals
 
 import Internal
 
@@ -24,4 +27,5 @@ initialQuakeState =
   QuakeState { _globals    = initialGlobals
              , _comGlobals = initialComGlobals
              , _cmdGlobals = initialCmdGlobals
+             , _keyGlobals = initialKeyGlobals
              }

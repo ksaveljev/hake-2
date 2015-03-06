@@ -9,11 +9,19 @@ module Globals ( Globals
                , cmdText
                , cmdTextBuf
                , cvarVars
+               , keyBindings
+               , keyDown
+               , chatTeam
+               , chatBuffer
+               , keyLines
+               , keyLinePos
+               , editLine
                , module Game.CVarT
                ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Game.CVarT
@@ -25,13 +33,21 @@ makeLenses ''Globals
 
 initialGlobals :: Globals
 initialGlobals =
-  Globals { _curtime    = 0
-          , _cmdWait    = False
-          , _dedicated  = newCVarT
-          , _nostdout   = newCVarT
+  Globals { _curtime     = 0
+          , _cmdWait     = False
+          , _dedicated   = newCVarT
+          , _nostdout    = newCVarT
           
-          , _cmdText    = SizeBufT False False UV.empty 0 0 0
-          , _cmdTextBuf = UV.replicate 8192 0
+          , _cmdText     = SizeBufT False False UV.empty 0 0 0
+          , _cmdTextBuf  = UV.replicate 8192 0
 
-          , _cvarVars   = Seq.empty
+          , _cvarVars    = Seq.empty
+
+          , _keyBindings = V.empty
+          , _keyDown     = UV.empty
+          , _chatTeam    = False
+          , _chatBuffer  = ""
+          , _keyLines    = V.empty
+          , _keyLinePos  = 0
+          , _editLine    = 0
           }

@@ -20,23 +20,32 @@ newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
 
 type XCommandT = Quake ()
 
-data Globals =
-  Globals { _curtime    :: Int
-          , _cmdWait    :: Bool
-          , _dedicated  :: CVarT
-          , _nostdout   :: CVarT
-
-          , _cmdText    :: SizeBufT
-          , _cmdTextBuf :: UV.Vector Word8
-
-          , _cvarVars   :: Seq CVarT
-          }
-
 data QuakeState =
   QuakeState { _globals    :: Globals
              , _comGlobals :: ComGlobals
              , _cmdGlobals :: CmdGlobals
+             , _keyGlobals :: KeyGlobals
              }
+
+data Globals =
+  Globals { _curtime     :: Int
+          , _cmdWait     :: Bool
+          , _dedicated   :: CVarT
+          , _nostdout    :: CVarT
+
+          , _cmdText     :: SizeBufT
+          , _cmdTextBuf  :: UV.Vector Word8
+
+          , _cvarVars    :: Seq CVarT
+
+          , _keyBindings :: V.Vector B.ByteString
+          , _keyDown     :: UV.Vector Bool
+          , _chatTeam    :: Bool
+          , _chatBuffer  :: B.ByteString
+          , _keyLines    :: V.Vector B.ByteString
+          , _keyLinePos  :: Int
+          , _editLine    :: Int
+          }
 
 data ComGlobals =
   ComGlobals { _cgComArgc   :: Int
@@ -55,3 +64,14 @@ data CmdFunctionT =
   CmdFunctionT { _cfName     :: B.ByteString
                , _cfFunction :: XCommandT
                }
+
+data KeyGlobals =
+  KeyGlobals { _anyKeyDown  :: Int
+             , _keyWaiting  :: Int
+             , _historyLine :: Int
+             , _shiftDown   :: Bool
+             , _keyRepeats  :: UV.Vector Int
+             , _menuBound   :: UV.Vector Bool
+             , _consoleKeys :: UV.Vector Bool
+             , _keyNames    :: V.Vector B.ByteString
+             }
