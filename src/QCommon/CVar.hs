@@ -46,8 +46,9 @@ findVar varName = do
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
 fullSet = undefined -- TODO
 
+-- sets the value of the variable without forcing
 set :: B.ByteString -> B.ByteString -> Quake CVarT
-set = undefined -- TODO
+set varName value = set2 varName value False
 
 forceSet :: B.ByteString -> B.ByteString -> Quake CVarT
 forceSet = undefined -- TODO
