@@ -56,8 +56,8 @@ execF = undefined -- TODO
 
 echoF :: Quake ()
 echoF = do
-    argv <- liftM (V.drop 1 . (^.cmdGlobals.cgCmdArgv)) get
-    _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") argv
+    v <- liftM (V.drop 1 . (^.cmdGlobals.cgCmdArgv)) get
+    _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") v
     Com.printf "'\n"
 
 listF :: Quake ()
@@ -71,3 +71,16 @@ aliasF = undefined -- TODO
 
 waitF :: Quake ()
 waitF = globals.cmdWait .= True
+
+argc :: Quake Int
+argc = liftM (^.cmdGlobals.cgCmdArgc) get
+
+argv :: Int -> Quake B.ByteString
+argv idx = do
+    c <- argc
+
+    if (idx < 0) || (idx >= c)
+      then return ""
+      else do
+        v <- liftM (^.cmdGlobals.cgCmdArgv) get
+        return $ v V.! idx

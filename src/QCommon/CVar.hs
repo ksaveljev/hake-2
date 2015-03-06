@@ -6,7 +6,7 @@ module QCommon.CVar where
 
 import Data.Bits ((.&.))
 import Control.Lens ((^.))
-import Control.Monad (liftM)
+import Control.Monad (liftM, void)
 import Data.Traversable (traverse)
 import qualified Data.Sequence as Seq
 import qualified Control.Monad.State as State
@@ -40,7 +40,7 @@ variableString varName = do
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar = undefined -- TODO
 
-fullSet :: B.ByteString -> B.ByteString -> B.ByteString -> Int -> Quake CVarT
+fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
 fullSet = undefined -- TODO
 
 set :: B.ByteString -> B.ByteString -> Quake CVarT
@@ -52,8 +52,24 @@ forceSet = undefined -- TODO
 set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
 set2 = undefined -- TODO
 
+-- Set command, sets variables
 setF :: XCommandT
-setF = undefined -- TODO
+setF = do
+    c <- Cmd.argc
+
+    if | (c /= 3) && (c /= 4) ->
+           Com.printf "usage: set <variable> <value> [u / s]\n"
+       | c == 4 -> do
+           v1 <- Cmd.argv 1
+           v2 <- Cmd.argv 2
+           v3 <- Cmd.argv 3
+           if | v3 == "u" -> void $ fullSet v1 v2 Constants.cvarUserInfo
+              | v3 == "s" -> void $ fullSet v1 v2 Constants.cvarServerInfo
+              | otherwise -> Com.printf "flags can only be 'u' or 's'\n"
+       | otherwise -> do
+           v1 <- Cmd.argv 1
+           v2 <- Cmd.argv 2
+           void $ set v1 v2
 
 -- List command, lists all available commands
 listF :: XCommandT
