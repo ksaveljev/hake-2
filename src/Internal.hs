@@ -28,6 +28,8 @@ data Globals =
 
           , _cmdText    :: SizeBufT
           , _cmdTextBuf :: UV.Vector Word8
+
+          , _cvarVars   :: Seq CVarT
           }
 
 data QuakeState =

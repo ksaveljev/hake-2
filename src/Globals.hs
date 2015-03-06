@@ -8,10 +8,12 @@ module Globals ( Globals
                , nostdout
                , cmdText
                , cmdTextBuf
+               , cvarVars
                , module Game.CVarT
                ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as UV
 
 import Game.CVarT
@@ -30,4 +32,6 @@ initialGlobals =
           
           , _cmdText    = SizeBufT False False UV.empty 0 0 0
           , _cmdTextBuf = UV.replicate 8192 0
+
+          , _cvarVars   = Seq.empty
           }
