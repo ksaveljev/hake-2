@@ -43,7 +43,7 @@ initialGlobals =
 
           , _cvarVars    = Seq.empty
 
-          , _keyBindings = V.empty
+          , _keyBindings = V.replicate 256 Nothing
           , _keyDown     = UV.empty
           , _chatTeam    = False
           , _chatBuffer  = ""

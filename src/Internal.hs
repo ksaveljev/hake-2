@@ -38,7 +38,7 @@ data Globals =
 
           , _cvarVars    :: Seq CVarT
 
-          , _keyBindings :: V.Vector B.ByteString
+          , _keyBindings :: V.Vector (Maybe B.ByteString)
           , _keyDown     :: UV.Vector Bool
           , _chatTeam    :: Bool
           , _chatBuffer  :: B.ByteString

@@ -4,7 +4,7 @@ module Client.Key where
 
 import Data.Char (ord, toUpper)
 import Control.Lens ((.=), (%=), (^.))
-import Control.Monad.State (liftM, get)
+import Control.Monad.State (liftM, get, unless)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
@@ -53,9 +53,15 @@ bindF = do
         v <- Cmd.argv 1
         b <- stringToKeynum v
 
-        if | b == -1 -> undefined -- TODO
-           | c == 2 -> undefined -- TODO
-           | otherwise -> undefined -- TODO
+        if | b == -1 -> Com.printf $ "\"" `B.append` v `B.append` "\" isn't a valid key\n"
+           | c == 2 -> do
+               keybindings <- liftM (^.globals.keyBindings) get
+               case keybindings V.! b of
+                 Just binding -> Com.printf $ "\"" `B.append` v `B.append` "\" = \"" `B.append` binding `B.append` "\"\n"
+                 Nothing -> Com.printf $ "\"" `B.append` v `B.append` "\" is not bound\n"
+           | otherwise -> do
+               cmd <- liftM (B.intercalate " ") $ mapM Cmd.argv [2..c-1]
+               setBinding b cmd
 
 unbindF :: XCommandT
 unbindF = undefined -- TODO
@@ -80,3 +86,7 @@ stringToKeynum str =
         case V.findIndex (== upperStr) keynames of
           Just i -> return i
           Nothing -> return (-1)
+
+setBinding :: Int -> B.ByteString -> Quake ()
+setBinding keyNum binding =
+    unless (keyNum == -1) $ globals.keyBindings %= (V.// [(keyNum, Just binding)])
