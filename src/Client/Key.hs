@@ -22,7 +22,7 @@ init = do
              kDownArrow, kKpDownArrow, kBackspace, kHome, kKpHome,
              kEnd, kKpEnd, kPgUp, kKpPgUp, kPgDn, kKpPgDn, kShift,
              kIns, kKpIns, kKpDel, kKpSlash, kKpPlus, kKpMinus, 
-             kKp5] `zip` repeat True) ++ [(96, False), (126, False)]))
+             kKp5] `zip` repeat True) ++ [(96, False), (126, False)])) -- 96 is '`', 126 is '~'
 
     keyGlobals.menuBound %= (UV.// ([kF1, kF2, kF3, kF4, kF5,
                              kF6, kF7, kF8, kF9, kF10,
