@@ -17,6 +17,7 @@ module Globals ( Globals
                , keyLinePos
                , editLine
                , module Game.CVarT
+               , module QCommon.SizeBufT
                ) where
 
 import Control.Lens (makeLenses)
