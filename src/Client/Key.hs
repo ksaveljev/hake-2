@@ -20,7 +20,9 @@ import qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do
-    setupKeyLines
+    let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']', 0 is NUL
+    globals.keyLines .= kl
+    globals.keyLinePos .= 1
 
     keyGlobals.consoleKeys %= (UV.// (([32..127] `zip` repeat True) ++ 
             ([kEnter, kKpEnter, kTab, kLeftArrow, kKpLeftArrow,
@@ -38,11 +40,6 @@ init = do
     Cmd.addCommand "unbind" unbindF
     Cmd.addCommand "unbindall" unbindAllF
     Cmd.addCommand "bindlist" bindListF
-
-  where setupKeyLines = do
-          let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']', 0 is NUL
-          globals.keyLines .= kl
-          globals.keyLinePos .= 1
 
 bindF :: XCommandT
 bindF = do
