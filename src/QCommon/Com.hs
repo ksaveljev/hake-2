@@ -3,8 +3,7 @@ module QCommon.Com where
 
 import Data.Word (Word8)
 import Control.Monad (when, void)
-import Control.Lens ((.=), (^.))
-import Control.Monad.State (liftM, get)
+import Control.Lens ((.=), (%=), use)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString.Char8 as BC
@@ -30,10 +29,10 @@ initArgv args = do
 
 comError :: Int -> B.ByteString -> Quake ()
 comError code fmt = do
-    rec <- liftM (^.comGlobals.cgRecursive) get
+    rec <- use $ comGlobals.cgRecursive
 
     when rec $ do
-      msg <- liftM (^.comGlobals.cgMsg) get
+      msg <- use $ comGlobals.cgMsg
       Sys.sysError ("recursive error after: " `B.append` msg)
 
     comGlobals.cgRecursive .= True
@@ -49,6 +48,27 @@ comError code fmt = do
 
 printf :: B.ByteString -> Quake ()
 printf = undefined -- TODO
+
+argc :: Quake Int
+argc = use $ comGlobals.cgComArgc
+
+argv :: Int -> Quake B.ByteString
+argv idx = do
+    c <- use $ comGlobals.cgComArgc
+
+    if idx < 0 || idx >= c
+      then return ""
+      else do
+        args <- use $ comGlobals.cgComArgv
+        return $ args V.! idx
+
+clearArgv :: Int -> Quake ()
+clearArgv idx = do
+    c <- use $ comGlobals.cgComArgc
+
+    if idx < 0 || idx >= c
+      then return ()
+      else comGlobals.cgComArgv %= (V.// [(idx, "")])
 
 -- CRC table
 chktbl :: UV.Vector Word8

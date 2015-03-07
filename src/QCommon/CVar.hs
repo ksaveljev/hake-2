@@ -6,13 +6,12 @@ module QCommon.CVar where
 
 import Data.Maybe (isJust, fromJust)
 import Data.Bits ((.&.), (.|.))
-import Control.Lens ((^.), (%=), (.=))
-import Control.Monad (liftM, void)
+import Control.Lens ((^.), (%=), (.=), use)
+import Control.Monad (void)
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Data.Sequence ((<|))
 import qualified Data.Sequence as Seq
-import qualified Control.Monad.State as State
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
@@ -38,7 +37,7 @@ get varName varValue flags = do
         var <- findVar varName
 
         if | isJust var -> do
-               cvars <- liftM (^.globals.cvarVars) State.get
+               cvars <- use $ globals.cvarVars
                let cvar = fromJust var
                    updatedCVar = cvar { _cvFlags = cvar^.cvFlags .|. flags }
                    updatedCVars = fmap (\v -> if v^.cvName == varName then updatedCVar else v) cvars
@@ -74,7 +73,7 @@ variableString varName = do
 
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar varName = do
-    vars <- liftM (^.globals.cvarVars) State.get
+    vars <- use $ globals.cvarVars
     return $ find (\v -> v^.cvName == varName) vars
 
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
@@ -113,7 +112,7 @@ setF = do
 -- List command, lists all available commands
 listF :: XCommandT
 listF = do
-    vars <- liftM (^.globals.cvarVars) State.get
+    vars <- use $ globals.cvarVars
 
     _ <- traverse printCVar vars
 

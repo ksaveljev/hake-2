@@ -4,8 +4,8 @@ module Client.Key where
 
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord, toUpper, chr)
-import Control.Lens ((.=), (%=), (^.))
-import Control.Monad.State (liftM, get, unless, when, void)
+import Control.Lens ((.=), (%=), use)
+import Control.Monad.State (liftM, unless, when, void)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
@@ -53,7 +53,7 @@ bindF = do
 
         if | b == -1 -> Com.printf $ "\"" `B.append` v `B.append` "\" isn't a valid key\n"
            | c == 2 -> do
-               keybindings <- liftM (^.globals.keyBindings) get
+               keybindings <- use $ globals.keyBindings
                case keybindings V.! b of
                  Just binding -> Com.printf $ "\"" `B.append` v `B.append` "\" = \"" `B.append` binding `B.append` "\"\n"
                  Nothing -> Com.printf $ "\"" `B.append` v `B.append` "\" is not bound\n"
@@ -80,7 +80,7 @@ unbindAllF = globals.keyBindings .= V.replicate 256 Nothing
 
 bindListF :: XCommandT
 bindListF = do
-    bindings <- liftM (^.globals.keyBindings) get
+    bindings <- use $ globals.keyBindings
     void $ V.sequence $ V.imap printBinding bindings
 
   where printBinding _ Nothing = return ()
@@ -102,7 +102,7 @@ stringToKeynum str =
       then return $ ord $ BC.index str 0
       else do
         let upperStr = BC.map toUpper str
-        keynames <- liftM (^.keyGlobals.keyNames) get
+        keynames <- use $ keyGlobals.keyNames
 
         case V.findIndex (== Just upperStr) keynames of
           Just i -> return i
@@ -112,7 +112,7 @@ stringToKeynum str =
 -- given keynum.
 keynumToString :: Int -> Quake B.ByteString
 keynumToString keynum = do
-    keynames <- liftM (^.keyGlobals.keyNames) get
+    keynames <- use $ keyGlobals.keyNames
 
     if | keynum < 0 || keynum > 255 -> return "<KEY NOT FOUND>"
        | keynum > 32 && keynum < 127 -> return $ BC.pack [chr keynum]

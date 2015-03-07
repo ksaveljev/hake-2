@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# LANGUAGE OverloadedStrings #-}
-import Control.Lens ((.=), (^.))
-import Control.Monad.State (when, liftM, get)
+import Control.Lens ((.=), use)
+import Control.Monad.State (when, liftM)
 import System.Environment (getArgs)
 
 import Quake
@@ -28,7 +28,7 @@ main = do
       when dedicatedFlag $ globals.dedicated.cvValue .= 1.0
 
       -- if (globals.dedicated.cvValue != 1.0)
-      whenQ (liftM ((/= 1.0) . (^.globals.dedicated.cvValue)) get) $ do
+      whenQ (liftM (/= 1.0) (use $ globals.dedicated.cvValue)) $ do
         undefined -- TODO: init our client window
 
       -- in C the first arg is the filename

@@ -27,7 +27,7 @@ init args = do
     CBuf.addEarlyCommands False
     CBuf.execute
 
-    --whenQ (liftM () get) $ do undefined -- TODO
+    --whenQ () $ do undefined -- TODO
 
     FS.initFileSystem
 

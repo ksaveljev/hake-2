@@ -5,8 +5,8 @@ module Game.Cmd where
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Data.Sequence ((<|))
-import Control.Lens ((^.), (%=), (.=))
-import Control.Monad.State (liftM, get)
+import Control.Lens ((^.), (%=), (.=), use)
+import Control.Monad.State (liftM)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -46,7 +46,7 @@ addCommand cmdName f = do
            cmdGlobals.cgCmdFunctions %= (CmdFunctionT cmdName f <|)
 
   where commandExists name = do
-          allCommands <- liftM (^.cmdGlobals.cgCmdFunctions) get
+          allCommands <- use $ cmdGlobals.cgCmdFunctions
           case find (\cmd -> cmd^.cfName == name) allCommands of
             Just _ -> return True
             Nothing -> return False
@@ -56,13 +56,13 @@ execF = undefined -- TODO
 
 echoF :: Quake ()
 echoF = do
-    v <- liftM (V.drop 1 . (^.cmdGlobals.cgCmdArgv)) get
+    v <- liftM (V.drop 1) (use $ cmdGlobals.cgCmdArgv)
     _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") v
     Com.printf "'\n"
 
 listF :: Quake ()
 listF = do
-    allCommands <- liftM (^.cmdGlobals.cgCmdFunctions) get
+    allCommands <- use $ cmdGlobals.cgCmdFunctions
     _ <- traverse (\cf -> Com.printf $ (cf^.cfName) `B.append` "\n") allCommands
     Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- TODO: maybe use Data.Binary for Int to Bytestring conversion ?
 
@@ -73,7 +73,7 @@ waitF :: Quake ()
 waitF = globals.cmdWait .= True
 
 argc :: Quake Int
-argc = liftM (^.cmdGlobals.cgCmdArgc) get
+argc = use $ cmdGlobals.cgCmdArgc
 
 argv :: Int -> Quake B.ByteString
 argv idx = do
@@ -82,5 +82,5 @@ argv idx = do
     if (idx < 0) || (idx >= c)
       then return ""
       else do
-        v <- liftM (^.cmdGlobals.cgCmdArgv) get
+        v <- use $ cmdGlobals.cgCmdArgv
         return $ v V.! idx
