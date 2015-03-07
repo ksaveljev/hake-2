@@ -1,16 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.Key where
 
-import Control.Lens ((.=), (%=))
+import Data.Char (ord, toUpper)
+import Control.Lens ((.=), (%=), (^.))
+import Control.Monad.State (liftM, get)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
 import Client.KeyConstants
 import qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do
@@ -39,7 +44,18 @@ init = do
           globals.keyLinePos .= 1
 
 bindF :: XCommandT
-bindF = undefined -- TODO
+bindF = do
+    c <- Cmd.argc
+
+    if c < 2
+      then Com.printf "bind <key> [command] : attach a command to a key\n"
+      else do
+        v <- Cmd.argv 1
+        b <- stringToKeynum v
+
+        if | b == -1 -> undefined -- TODO
+           | c == 2 -> undefined -- TODO
+           | otherwise -> undefined -- TODO
 
 unbindF :: XCommandT
 unbindF = undefined -- TODO
@@ -49,3 +65,18 @@ unbindAllF = undefined -- TODO
 
 bindListF :: XCommandT
 bindListF = undefined -- TODO
+
+-- Returns a key number to be used to index keybindings[] by looking at
+-- the given string. Single ascii characters return themselves, while
+-- the K_* names are matched up.
+stringToKeynum :: B.ByteString -> Quake Int
+stringToKeynum str =
+    if B.length str == 1
+      then return $ ord $ BC.index str 0
+      else do
+        let upperStr = BC.map toUpper str
+        keynames <- liftM (^.keyGlobals.keyNames) get
+
+        case V.findIndex (== upperStr) keynames of
+          Just i -> return i
+          Nothing -> return (-1)
