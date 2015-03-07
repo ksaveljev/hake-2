@@ -73,5 +73,5 @@ data KeyGlobals =
              , _keyRepeats  :: UV.Vector Int
              , _menuBound   :: UV.Vector Bool
              , _consoleKeys :: UV.Vector Bool
-             , _keyNames    :: V.Vector B.ByteString
+             , _keyNames    :: V.Vector (Maybe B.ByteString)
              }
