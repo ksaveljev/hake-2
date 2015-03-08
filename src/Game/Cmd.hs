@@ -105,11 +105,14 @@ tokenizeString text macroExpand = do
 
 -- Cmd_MacroExpandString
 macroExpandString :: B.ByteString -> Int -> Quake (Maybe B.ByteString)
-macroExpandString text len = do
+macroExpandString text len =
     if len >= Constants.maxStringChars
       then do
         Com.printf $ "Line exceeded "
-          `B.append` (BC.pack $ show $ Constants.maxStringChars) -- TODO: use binary package for Int to ByteString conversion?
+          `B.append` BC.pack (show Constants.maxStringChars) -- TODO: use binary package for Int to ByteString conversion?
           `B.append` " chars, discarded.\n"
         return Nothing
-      else undefined -- TODO
+      else expand text False len 0 0
+
+  where expand :: B.ByteString -> Bool -> Int -> Int -> Int -> Quake (Maybe B.ByteString)
+        expand txt inquote newLen count idx = undefined -- TODO
