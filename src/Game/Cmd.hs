@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import QCommon.CmdFunctionT
+import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified QCommon.Com as Com
 
@@ -84,3 +85,31 @@ argv idx = do
       else do
         v <- use $ cmdGlobals.cgCmdArgv
         return $ v V.! idx
+
+-- Cmd_ExecuteStrig
+--
+-- A complete command line has been parsed, so try to execute it 
+executeString :: B.ByteString -> Quake ()
+executeString text = undefined -- TODO
+
+-- Cmd_TokenizeString
+--
+-- Parses the given string into command line tokens. $Cvars will
+-- be expanded unless they are in a quoted token.
+tokenizeString :: B.ByteString -> Bool -> Quake ()
+tokenizeString text macroExpand = do
+    cmdGlobals.cgCmdArgc .= 0
+    cmdGlobals.cgCmdArgs .= ""
+
+    undefined -- TODO
+
+-- Cmd_MacroExpandString
+macroExpandString :: B.ByteString -> Int -> Quake (Maybe B.ByteString)
+macroExpandString text len = do
+    if len >= Constants.maxStringChars
+      then do
+        Com.printf $ "Line exceeded "
+          `B.append` (BC.pack $ show $ Constants.maxStringChars) -- TODO: use binary package for Int to ByteString conversion?
+          `B.append` " chars, discarded.\n"
+        return Nothing
+      else undefined -- TODO

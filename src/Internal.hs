@@ -62,6 +62,7 @@ data CmdGlobals =
   CmdGlobals { _cgCmdFunctions :: Seq CmdFunctionT
              , _cgCmdArgc      :: Int
              , _cgCmdArgv      :: V.Vector B.ByteString
+             , _cgCmdArgs      :: B.ByteString
              }
 
 data CmdFunctionT =

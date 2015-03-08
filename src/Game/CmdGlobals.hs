@@ -1,9 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.CmdGlobals ( CmdGlobals
                        , initialCmdGlobals
                        , cgCmdFunctions
                        , cgCmdArgc
                        , cgCmdArgv
+                       , cgCmdArgs
                        ) where
 
 import Control.Lens (makeLenses)
@@ -19,4 +21,5 @@ initialCmdGlobals =
   CmdGlobals { _cgCmdFunctions = Seq.empty
              , _cgCmdArgc      = 0
              , _cgCmdArgv      = V.empty
+             , _cgCmdArgs      = ""
              }

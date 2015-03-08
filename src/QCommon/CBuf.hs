@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.CBuf where
 
-import Control.Lens (use, (.=))
+import Control.Lens (use, (.=), (%=), (-=))
 import Control.Monad (when)
 
 import qualified Data.ByteString as B
@@ -12,6 +12,7 @@ import Quake
 import QuakeState
 import qualified QCommon.SZ as SZ
 import qualified QCommon.Com as Com
+import qualified Game.Cmd as Cmd
 
 init :: Quake ()
 init = do
@@ -47,13 +48,35 @@ execute = do
     when (curSize /= 0) $ doStuff text curSize 0 0
 
   where doStuff :: B.ByteString -> Int -> Int -> Int -> Quake ()
-        doStuff text curSize idx quotes = do
+        doStuff text curSize idx quotes =
           if | idx == curSize -> do
                  undefined -- TODO
-             | BC.index text idx == '"' -> do
+
+             | BC.index text idx == '"' ->
                  doStuff text curSize (idx + 1) (quotes + 1)
+
              | (BC.index text idx == ';' && even quotes) || BC.index text idx == '\n' -> do
-                 undefined -- TODO
+                 let line = B.take (idx + 1) text
+
+                 if idx == curSize
+                   then globals.cmdText.sbCurSize .= 0
+                   else do
+                     globals.cmdText.sbCurSize -= idx + 1
+                     globals.cmdText.sbData %= B.drop (idx + 1)
+
+                 Cmd.executeString line
+
+                 wait <- use $ globals.cmdWait
+
+                 if wait
+                   -- skip out while text still remains in buffer, leaving
+                   -- it for next frame
+                   then globals.cmdWait .= False
+                   else do
+                     newText <- use $ globals.cmdText.sbData
+                     newCurSize <- use $ globals.cmdText.sbCurSize
+                     doStuff newText newCurSize 0 0
+
              | otherwise -> doStuff text curSize (idx + 1) quotes
 
 addText :: B.ByteString -> Quake ()
