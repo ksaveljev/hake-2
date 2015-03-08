@@ -15,7 +15,7 @@ import qualified QCommon.Com as Com
 init :: Quake ()
 init = do
     bufData <- use $ globals.cmdTextBuf
-    SZ.init bufData (UV.length bufData) (globals.cmdText .=)
+    SZ.init (globals.cmdText) bufData (UV.length bufData)
 
 addEarlyCommands :: Bool -> Quake ()
 addEarlyCommands clear = do
@@ -37,7 +37,10 @@ addEarlyCommands clear = do
               when (i + 3 < c) $ findAddCommand c (i + 3)
 
 execute :: Quake ()
-execute = undefined -- TODO
+execute = do
+    globals.aliasCount .= 0
+
+    undefined -- TODO
 
 addText :: B.ByteString -> Quake ()
 addText text = do

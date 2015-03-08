@@ -12,10 +12,9 @@ import Quake
 import QuakeState
 import qualified QCommon.Com as Com
 
-init :: UV.Vector Word8 -> Int -> (SizeBufT -> Quake a) -> Quake a
-init bufData len f =
-    let buf = SizeBufT False False bufData len 0 0
-    in f buf
+init :: SizeBufTLens -> UV.Vector Word8 -> Int -> Quake ()
+init bufLens bufData len =
+    bufLens .= SizeBufT False False bufData len 0 0
 
 clear :: SizeBufTLens -> Quake ()
 clear bufLens = do

@@ -32,6 +32,9 @@ data QuakeState =
 data Globals =
   Globals { _curtime     :: Int
           , _cmdWait     :: Bool
+
+          , _aliasCount  :: Int
+
           , _dedicated   :: CVarT
           , _nostdout    :: CVarT
 

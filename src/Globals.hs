@@ -4,6 +4,7 @@ module Globals ( Globals
                , initialGlobals
                , curtime
                , cmdWait
+               , aliasCount
                , dedicated
                , nostdout
                , cmdText
@@ -36,6 +37,9 @@ initialGlobals :: Globals
 initialGlobals =
   Globals { _curtime     = 0
           , _cmdWait     = False
+
+          , _aliasCount  = 0
+
           , _dedicated   = newCVarT
           , _nostdout    = newCVarT
           
