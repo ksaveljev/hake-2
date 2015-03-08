@@ -1,3 +1,4 @@
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Internal where
@@ -7,6 +8,7 @@ import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Except
+import Control.Lens (Lens)
 import qualified Control.Monad.State.Lazy as Lazy
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -75,3 +77,5 @@ data KeyGlobals =
              , _consoleKeys :: UV.Vector Bool
              , _keyNames    :: V.Vector (Maybe B.ByteString)
              }
+
+type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT

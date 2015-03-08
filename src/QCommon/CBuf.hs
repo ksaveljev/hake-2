@@ -48,6 +48,4 @@ addText text = do
 
     if curSize + len >= maxSize
       then Com.printf "Cbuf.addText: overflow\n"
-      else do
-        ct <- use $ globals.cmdText
-        SZ.write ct text len (globals.cmdText .=)
+      else SZ.write (globals.cmdText) text (B.length text)

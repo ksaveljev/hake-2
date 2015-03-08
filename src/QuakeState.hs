@@ -5,6 +5,7 @@ module QuakeState ( QuakeState(..)
                   , comGlobals
                   , cmdGlobals
                   , keyGlobals
+                  , SizeBufTLens
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals
