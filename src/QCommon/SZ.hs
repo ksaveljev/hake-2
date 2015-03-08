@@ -2,17 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.SZ where
 
-import Data.Word (Word8)
 import Control.Monad (when, unless)
-import Control.Lens ((^.), (%=), use, (.=))
-import qualified Data.Vector.Unboxed as UV
+import Control.Lens ((^.), use, (.=))
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import qualified QCommon.Com as Com
 
-init :: SizeBufTLens -> UV.Vector Word8 -> Int -> Quake ()
+init :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =
     bufLens .= SizeBufT False False bufData len 0 0
 
@@ -42,4 +40,6 @@ getSpace bufLens len = do
 write :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len = do
     idx <- getSpace bufLens len
-    bufLens.sbData %= (UV.// ([idx..] `zip` B.unpack bufData))
+    oldData <- use $ bufLens.sbData
+    let updatedData = B.take idx oldData `B.append` bufData `B.append` B.drop (idx + len) oldData
+    bufLens.sbData .= updatedData

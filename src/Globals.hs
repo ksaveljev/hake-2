@@ -43,8 +43,8 @@ initialGlobals =
           , _dedicated   = newCVarT
           , _nostdout    = newCVarT
           
-          , _cmdText     = SizeBufT False False UV.empty 0 0 0
-          , _cmdTextBuf  = UV.replicate 8192 0
+          , _cmdText     = SizeBufT False False "" 0 0 0
+          , _cmdTextBuf  = ""
 
           , _cvarVars    = Seq.empty
 

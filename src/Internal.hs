@@ -3,7 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Internal where
 
-import Data.Word (Word8)
 import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State
@@ -39,7 +38,7 @@ data Globals =
           , _nostdout    :: CVarT
 
           , _cmdText     :: SizeBufT
-          , _cmdTextBuf  :: UV.Vector Word8
+          , _cmdTextBuf  :: B.ByteString
 
           , _cvarVars    :: Seq CVarT
 
