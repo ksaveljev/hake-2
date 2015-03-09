@@ -19,10 +19,14 @@ makeLenses ''Globals
 
 initialGlobals :: Globals
 initialGlobals =
-  Globals { _curtime     = 0
-          , _cmdWait     = False
+  Globals { _curtime            = 0
+          , _cmdWait            = False
 
-          , _aliasCount  = 0
+          , _aliasCount         = 0
+          , _cTraces            = 0
+          , _cBrushTraces       = 0
+          , _cPointContents     = 0
+          , _serverState        = 0
 
           , _clAddBlend         = newCVarT
           , _clAddEntities      = newCVarT
@@ -61,16 +65,16 @@ initialGlobals =
           , _inMouse            = newCVarT
           , _inJoystick         = newCVarT
           
-          , _cmdText     = SizeBufT False False "" 0 0 0
-          , _cmdTextBuf  = ""
+          , _cmdText            = SizeBufT False False "" 0 0 0
+          , _cmdTextBuf         = ""
 
-          , _cvarVars    = Seq.empty
+          , _cvarVars           = Seq.empty
 
-          , _keyBindings = V.replicate 256 Nothing
-          , _keyDown     = UV.empty
-          , _chatTeam    = False
-          , _chatBuffer  = ""
-          , _keyLines    = V.empty
-          , _keyLinePos  = 0
-          , _editLine    = 0
+          , _keyBindings        = V.replicate 256 Nothing
+          , _keyDown            = UV.empty
+          , _chatTeam           = False
+          , _chatBuffer         = ""
+          , _keyLines           = V.empty
+          , _keyLinePos         = 0
+          , _editLine           = 0
           }

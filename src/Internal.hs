@@ -29,10 +29,14 @@ data QuakeState =
              }
 
 data Globals =
-  Globals { _curtime        :: Int
-          , _cmdWait        :: Bool
+  Globals { _curtime            :: Int
+          , _cmdWait            :: Bool
 
-          , _aliasCount     :: Int
+          , _aliasCount         :: Int
+          , _cTraces            :: Int
+          , _cBrushTraces       :: Int
+          , _cPointContents     :: Int
+          , _serverState        :: Int
 
           , _clAddBlend         :: CVarT
           , _clAddEntities      :: CVarT

@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module QCommon.QCommon where
 
-import Control.Lens
+import Control.Lens (use, (.=), (^.))
+import Control.Monad (when)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -38,7 +42,36 @@ init args = do
 frame :: Int -> Quake ()
 frame msec = do
     whenQ (use $ globals.logStats.cvModified) $ do
-      undefined
+      globals.logStats.cvModified .= False
+
+      lsv <- use $ globals.logStats.cvValue
+
+      if lsv /= 0.0
+        then undefined -- TODO
+        else undefined -- TODO
+
+    ftv <- use $ globals.fixedTime.cvValue
+    tsv <- use $ globals.timeScale.cvValue
+
+    let updatedMsec = if | ftv /= 0.0 -> truncate ftv
+                         | tsv /= 0.0 -> let tmp = fromIntegral msec * tsv
+                                       in if tmp < 1.0 then 1 else truncate tmp
+                         | otherwise -> msec
+
+    stv <- use $ globals.showTrace.cvValue
+
+    when (stv /= 0.0) $ do
+      ct <- use $ globals.cTraces
+      cpc <- use $ globals.cPointContents
+
+      Com.printf $ (BC.pack $ show ct)
+        `B.append` " traces "
+        `B.append` (BC.pack $ show cpc)
+        `B.append` " points\n" -- TODO: use binary to convert int to bytestring? OR printf with Text and Text.printf ?
+
+      globals.cTraces .= 0
+      globals.cBrushTraces .= 0
+      globals.cPointContents .= 0
 
     undefined -- TODO
 
