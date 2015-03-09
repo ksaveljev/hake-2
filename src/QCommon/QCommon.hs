@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as BC
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Sys.Timer as Timer
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
@@ -75,7 +76,31 @@ frame msec = do
 
     CBuf.execute
 
-    undefined -- TODO
+    hsv <- use $ cvarGlobals.hostSpeeds.cvValue
+
+    timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
+
+    -- Com.debugContext = "SV:" -- TODO
+    -- SV_MAIN.SV_FRAME(msec) -- TODO
+
+    timeBetween <- if hsv /= 0.0 then Timer.milliseconds else return 0
+
+    -- Com.debugContext = "CL:" -- TODO
+    -- CV.Frame(msec) -- TODO
+
+    when (hsv /= 0) $ do
+      timeAfter <- Timer.milliseconds
+      let timeAll = timeAfter - timeBefore
+          timeSV = timeBetween - timeBefore
+          timeCL = timeAfter - timeBetween
+          {- TODO
+          int gm= Globals.time_after_game - Globals.time_before_game;
+          int rf= Globals.time_after_ref - Globals.time_before_ref;
+          sv -= gm;
+          cl -= rf;
+          -}
+
+      Com.printf undefined -- TODO
 
 reconfigure :: Bool -> Quake ()
 reconfigure clear = do
