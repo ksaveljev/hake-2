@@ -4,7 +4,7 @@ module QCommon.QCommon where
 import Control.Lens
 
 import Quake
-import Game.CVarT
+import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
@@ -36,7 +36,11 @@ init args = do
     undefined -- TODO: many more commands
 
 frame :: Int -> Quake ()
-frame = undefined -- TODO
+frame msec = do
+    whenQ (use $ globals.logStats.cvModified) $ do
+      undefined
+
+    undefined -- TODO
 
 reconfigure :: Bool -> Quake ()
 reconfigure clear = do

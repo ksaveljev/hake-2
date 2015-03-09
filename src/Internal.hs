@@ -29,26 +29,60 @@ data QuakeState =
              }
 
 data Globals =
-  Globals { _curtime     :: Int
-          , _cmdWait     :: Bool
+  Globals { _curtime        :: Int
+          , _cmdWait        :: Bool
 
-          , _aliasCount  :: Int
+          , _aliasCount     :: Int
 
-          , _dedicated   :: CVarT
-          , _nostdout    :: CVarT
+          , _clAddBlend         :: CVarT
+          , _clAddEntities      :: CVarT
+          , _clAddLights        :: CVarT
+          , _clAddParticles     :: CVarT
+          , _clAngleSpeedKey    :: CVarT
+          , _clAutoSkins        :: CVarT
+          , _clFootSteps        :: CVarT
+          , _clForwardSpeed     :: CVarT
+          , _clGun              :: CVarT
+          , _clMaxFPS           :: CVarT
+          , _clNoSkins          :: CVarT
+          , _clPitchSpeed       :: CVarT
+          , _clPredict          :: CVarT
+          , _clRun              :: CVarT
+          , _clSideSpeed        :: CVarT
+          , _clStereo           :: CVarT
+          , _clStereoSeparation :: CVarT
+          , _clTimeDemo         :: CVarT
+          , _clTimeout          :: CVarT
+          , _clUpSpeed          :: CVarT
+          , _clYawSpeed         :: CVarT
+          , _dedicated          :: CVarT
+          , _developer          :: CVarT
+          , _fixedTime          :: CVarT
+          , _freeLook           :: CVarT
+          , _hostSpeeds         :: CVarT
+          , _logStats           :: CVarT
+          , _logfileActive      :: CVarT
+          , _lookSpring         :: CVarT
+          , _lookStrafe         :: CVarT
+          , _nostdout           :: CVarT
+          , _sensitivity        :: CVarT
+          , _showTrace          :: CVarT
+          , _timeScale          :: CVarT
+          , _inMouse            :: CVarT
+          , _inJoystick         :: CVarT
 
-          , _cmdText     :: SizeBufT
-          , _cmdTextBuf  :: B.ByteString
+          , _cmdText            :: SizeBufT
+          , _cmdTextBuf         :: B.ByteString
 
-          , _cvarVars    :: Seq CVarT
+          , _cvarVars           :: Seq CVarT
 
-          , _keyBindings :: V.Vector (Maybe B.ByteString)
-          , _keyDown     :: UV.Vector Bool
-          , _chatTeam    :: Bool
-          , _chatBuffer  :: B.ByteString
-          , _keyLines    :: V.Vector B.ByteString
-          , _keyLinePos  :: Int
-          , _editLine    :: Int
+          , _keyBindings        :: V.Vector (Maybe B.ByteString)
+          , _keyDown            :: UV.Vector Bool
+          , _chatTeam           :: Bool
+          , _chatBuffer         :: B.ByteString
+          , _keyLines           :: V.Vector B.ByteString
+          , _keyLinePos         :: Int
+          , _editLine           :: Int
           }
 
 data ComGlobals =
