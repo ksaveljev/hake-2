@@ -22,10 +22,11 @@ newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
 type XCommandT = Quake ()
 
 data QuakeState =
-  QuakeState { _globals    :: Globals
-             , _comGlobals :: ComGlobals
-             , _cmdGlobals :: CmdGlobals
-             , _keyGlobals :: KeyGlobals
+  QuakeState { _globals     :: Globals
+             , _comGlobals  :: ComGlobals
+             , _cmdGlobals  :: CmdGlobals
+             , _keyGlobals  :: KeyGlobals
+             , _cvarGlobals :: CVarGlobals
              }
 
 data Globals =
@@ -37,43 +38,6 @@ data Globals =
           , _cBrushTraces       :: Int
           , _cPointContents     :: Int
           , _serverState        :: Int
-
-          , _clAddBlend         :: CVarT
-          , _clAddEntities      :: CVarT
-          , _clAddLights        :: CVarT
-          , _clAddParticles     :: CVarT
-          , _clAngleSpeedKey    :: CVarT
-          , _clAutoSkins        :: CVarT
-          , _clFootSteps        :: CVarT
-          , _clForwardSpeed     :: CVarT
-          , _clGun              :: CVarT
-          , _clMaxFPS           :: CVarT
-          , _clNoSkins          :: CVarT
-          , _clPitchSpeed       :: CVarT
-          , _clPredict          :: CVarT
-          , _clRun              :: CVarT
-          , _clSideSpeed        :: CVarT
-          , _clStereo           :: CVarT
-          , _clStereoSeparation :: CVarT
-          , _clTimeDemo         :: CVarT
-          , _clTimeout          :: CVarT
-          , _clUpSpeed          :: CVarT
-          , _clYawSpeed         :: CVarT
-          , _dedicated          :: CVarT
-          , _developer          :: CVarT
-          , _fixedTime          :: CVarT
-          , _freeLook           :: CVarT
-          , _hostSpeeds         :: CVarT
-          , _logStats           :: CVarT
-          , _logfileActive      :: CVarT
-          , _lookSpring         :: CVarT
-          , _lookStrafe         :: CVarT
-          , _nostdout           :: CVarT
-          , _sensitivity        :: CVarT
-          , _showTrace          :: CVarT
-          , _timeScale          :: CVarT
-          , _inMouse            :: CVarT
-          , _inJoystick         :: CVarT
 
           , _cmdText            :: SizeBufT
           , _cmdTextBuf         :: B.ByteString
@@ -88,6 +52,45 @@ data Globals =
           , _keyLinePos         :: Int
           , _editLine           :: Int
           }
+
+data CVarGlobals =
+  CVarGlobals { _clAddBlend         :: CVarT
+              , _clAddEntities      :: CVarT
+              , _clAddLights        :: CVarT
+              , _clAddParticles     :: CVarT
+              , _clAngleSpeedKey    :: CVarT
+              , _clAutoSkins        :: CVarT
+              , _clFootSteps        :: CVarT
+              , _clForwardSpeed     :: CVarT
+              , _clGun              :: CVarT
+              , _clMaxFPS           :: CVarT
+              , _clNoSkins          :: CVarT
+              , _clPitchSpeed       :: CVarT
+              , _clPredict          :: CVarT
+              , _clRun              :: CVarT
+              , _clSideSpeed        :: CVarT
+              , _clStereo           :: CVarT
+              , _clStereoSeparation :: CVarT
+              , _clTimeDemo         :: CVarT
+              , _clTimeout          :: CVarT
+              , _clUpSpeed          :: CVarT
+              , _clYawSpeed         :: CVarT
+              , _dedicated          :: CVarT
+              , _developer          :: CVarT
+              , _fixedTime          :: CVarT
+              , _freeLook           :: CVarT
+              , _hostSpeeds         :: CVarT
+              , _logStats           :: CVarT
+              , _logfileActive      :: CVarT
+              , _lookSpring         :: CVarT
+              , _lookStrafe         :: CVarT
+              , _nostdout           :: CVarT
+              , _sensitivity        :: CVarT
+              , _showTrace          :: CVarT
+              , _timeScale          :: CVarT
+              , _inMouse            :: CVarT
+              , _inJoystick         :: CVarT
+              }
 
 data ComGlobals =
   ComGlobals { _cgComArgc   :: Int

@@ -41,24 +41,24 @@ init args = do
 
 frame :: Int -> Quake ()
 frame msec = do
-    whenQ (use $ globals.logStats.cvModified) $ do
-      globals.logStats.cvModified .= False
+    whenQ (use $ cvarGlobals.logStats.cvModified) $ do
+      cvarGlobals.logStats.cvModified .= False
 
-      lsv <- use $ globals.logStats.cvValue
+      lsv <- use $ cvarGlobals.logStats.cvValue
 
       if lsv /= 0.0
         then undefined -- TODO
         else undefined -- TODO
 
-    ftv <- use $ globals.fixedTime.cvValue
-    tsv <- use $ globals.timeScale.cvValue
+    ftv <- use $ cvarGlobals.fixedTime.cvValue
+    tsv <- use $ cvarGlobals.timeScale.cvValue
 
     let updatedMsec = if | ftv /= 0.0 -> truncate ftv
                          | tsv /= 0.0 -> let tmp = fromIntegral msec * tsv
                                        in if tmp < 1.0 then 1 else truncate tmp
                          | otherwise -> msec
 
-    stv <- use $ globals.showTrace.cvValue
+    stv <- use $ cvarGlobals.showTrace.cvValue
 
     when (stv /= 0.0) $ do
       ct <- use $ globals.cTraces
@@ -72,6 +72,8 @@ frame msec = do
       globals.cTraces .= 0
       globals.cBrushTraces .= 0
       globals.cPointContents .= 0
+
+    CBuf.execute
 
     undefined -- TODO
 

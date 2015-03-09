@@ -23,12 +23,12 @@ main = do
       let dedicatedFlag = isDedicatedCmdArg args
 
       Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
-      globals.dedicated .= dedicatedCVar
+      cvarGlobals.dedicated .= dedicatedCVar
 
-      when dedicatedFlag $ globals.dedicated.cvValue .= 1.0
+      when dedicatedFlag $ cvarGlobals.dedicated.cvValue .= 1.0
 
       -- if (globals.dedicated.cvValue != 1.0)
-      whenQ (liftM (/= 1.0) (use $ globals.dedicated.cvValue)) $ do
+      whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
         undefined -- TODO: init our client window
 
       -- in C the first arg is the filename
@@ -37,7 +37,7 @@ main = do
       QCommon.init updatedArgs
 
       Just nostdoutCVar <- CVar.get "nostdout" "0" 0
-      globals.nostdout .= nostdoutCVar
+      cvarGlobals.nostdout .= nostdoutCVar
 
       startTime <- Timer.milliseconds
       mainLoop startTime
