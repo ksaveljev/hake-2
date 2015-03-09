@@ -5,6 +5,8 @@ module Constants where
 import Data.Bits ((.|.), shiftL)
 import qualified Data.ByteString as B
 
+baseDirName = "baseq2" :: B.ByteString
+
 weaponReady      = 0 :: Int
 weaponActivating = 1 :: Int
 weaponDropping   = 2 :: Int
