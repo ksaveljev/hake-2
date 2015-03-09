@@ -51,8 +51,11 @@ createPath = undefined -- TODO
 addGameDirectory :: B.ByteString -> Quake ()
 addGameDirectory = undefined -- TODO
 
+-- set baseq2 directory
 setCDDir :: Quake ()
-setCDDir = undefined -- TODO
+setCDDir = do
+    Just fsCDDir <- CVar.get "cddir" "" Constants.cvarArchive
+    when (B.length (fsCDDir^.cvString) > 0) $ addGameDirectory (fsCDDir^.cvString)
 
 makeBaseSearchPaths :: Quake ()
 makeBaseSearchPaths = undefined -- TODO
