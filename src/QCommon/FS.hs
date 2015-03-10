@@ -4,7 +4,8 @@ module QCommon.FS where
 import Data.Bits ((.|.))
 import Control.Lens ((^.))
 import Control.Monad (when)
-import System.Directory (getHomeDirectory)
+import Control.Exception
+import System.Directory (getHomeDirectory, createDirectoryIfMissing)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -13,6 +14,7 @@ import Internal
 import QuakeState
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 
 initFileSystem :: Quake ()
@@ -46,7 +48,16 @@ initFileSystem = do
     when (B.length (fsGameDirVar^.cvString) > 0) $ setGameDir (fsGameDirVar^.cvString)
 
 createPath :: B.ByteString -> Quake ()
-createPath = undefined -- TODO
+createPath path = do
+    done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ -> do
+      return $ Left ()) -- TODO: maybe somehow include exception message?
+
+    case done of
+      Left _ -> Com.printf $ "can't create path \"" `B.append` path `B.append` "\"\n"
+      Right _ -> return ()
+
+  where catchAny :: IO a -> (SomeException -> IO a) -> IO a
+        catchAny = Control.Exception.catch
 
 addGameDirectory :: B.ByteString -> Quake ()
 addGameDirectory = undefined -- TODO
