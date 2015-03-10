@@ -50,13 +50,19 @@ execute = do
   where doStuff :: B.ByteString -> Int -> Int -> Int -> Quake ()
         doStuff text curSize idx quotes =
           if | idx == curSize -> do
-                 undefined -- TODO
+                 globals.cmdText.sbCurSize .= 0
+
+                 Cmd.executeString text
+
+                 wait <- use $ globals.cmdWait
+
+                 when wait $ globals.cmdWait .= False
 
              | BC.index text idx == '"' ->
                  doStuff text curSize (idx + 1) (quotes + 1)
 
              | (BC.index text idx == ';' && even quotes) || BC.index text idx == '\n' -> do
-                 let line = B.take (idx + 1) text
+                 let line = B.take idx text -- do not include ';' or '\n'
 
                  if idx == curSize
                    then globals.cmdText.sbCurSize .= 0
@@ -75,7 +81,7 @@ execute = do
                    else do
                      newText <- use $ globals.cmdText.sbData
                      newCurSize <- use $ globals.cmdText.sbCurSize
-                     doStuff newText newCurSize 0 0
+                     when (newCurSize /= 0) $ doStuff newText newCurSize 0 0
 
              | otherwise -> doStuff text curSize (idx + 1) quotes
 
