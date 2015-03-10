@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.FSGlobals ( module QCommon.FSGlobals
                          , module QCommon.SearchPathT
+                         , module QCommon.FileLinkT
                          ) where
 
 import Control.Lens (makeLenses)
@@ -10,6 +11,7 @@ import qualified Data.Sequence as Seq
 import Internal
 import Game.CVarT
 import QCommon.SearchPathT
+import QCommon.FileLinkT
 
 makeLenses ''FSGlobals
 

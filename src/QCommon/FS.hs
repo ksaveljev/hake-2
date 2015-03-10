@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module QCommon.FS where
 
 import Data.Char (toLower)
 import Data.Bits ((.|.))
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
 import Data.Functor ((<$>))
 import Control.Applicative ((<*>))
@@ -13,6 +14,7 @@ import Control.Exception
 import System.Directory
 import System.IO (openFile, IOMode(ReadMode))
 import System.IO.MMap (mmapFileByteString)
+import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
@@ -188,7 +190,31 @@ pathF :: XCommandT
 pathF = undefined -- TODO
 
 linkF :: XCommandT
-linkF = undefined -- TODO
+linkF = do
+    c <- Cmd.argc
+
+    if c /= 3
+      then Com.printf "USAGE: link <from> <to>\n"
+      else do
+        v1 <- Cmd.argv 1
+        v2 <- Cmd.argv 2
+        links <- use $ fsGlobals.fsLinks
+        let existingLinkIdx = Seq.findIndexL (\link -> (link^.flFrom) == v1) links
+
+        if | isJust existingLinkIdx -> do
+               let idx = fromJust existingLinkIdx
+
+               if B.length v2 < 1
+                 then -- delete it
+                   fsGlobals.fsLinks %= (\fsl -> Seq.take idx fsl Seq.>< Seq.drop (idx + 1) fsl)
+                 else do
+                   let link = Seq.index links idx
+                   fsGlobals.fsLinks %= Seq.update idx (link { _flTo = v2 })
+
+           | B.length v2 > 0 ->
+               fsGlobals.fsLinks %= (Seq.|> FileLinkT v1 (B.length v1) v2)
+
+           | otherwise -> return ()
 
 dirF :: XCommandT
 dirF = undefined -- TODO
