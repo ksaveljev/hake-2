@@ -64,12 +64,12 @@ initFileSystem = do
 
 createPath :: B.ByteString -> Quake ()
 createPath path = do
-    -- TODO: int index = path.lastIndexOf('/')
-    --       // -1 if not found and 0 means write to root
-    --       if (index > 0) ... then we create a directory
+    -- IMPROVE: int index = path.lastIndexOf('/')
+    --          // -1 if not found and 0 means write to root
+    --          if (index > 0) ... then we create a directory
 
     done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ ->
-      return $ Left ()) -- TODO: maybe somehow include exception message?
+      return $ Left ()) -- IMPROVE: maybe somehow include exception message?
 
     case done of
       Left _ -> Com.printf $ "can't create path \"" `B.append` path `B.append` "\"\n"
@@ -99,7 +99,7 @@ addGameDirectory dir = do
 
   where addPackFiles :: B.ByteString -> Int -> Quake ()
         addPackFiles directory i = do
-          let pakFile = directory `B.append` "/pak" `B.append` BC.pack (show i) `B.append` ".pak" -- TODO: use binary package for Int to ByteString conversion?
+          let pakFile = directory `B.append` "/pak" `B.append` BC.pack (show i) `B.append` ".pak" -- IMPROVE: use binary package for Int to ByteString conversion?
               pakFileS = BC.unpack pakFile
 
           fileExists <- io $ doesFileExist pakFileS
@@ -117,7 +117,7 @@ addGameDirectory dir = do
 --
 -- loads the header and directory, adding the files at the beginning of the
 -- list so they override previous pack files
--- TODO: there is a try catch block for IO operations in the original code ...
+-- IMPROVE: there is a try catch block for IO operations in the original code ...
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
 loadPackFile packfile = do
     let filePath = BC.unpack packfile
@@ -129,11 +129,11 @@ loadPackFile packfile = do
     when ((header^.dphIdent) /= FSConstants.idPakHeader) $
       Com.comError Constants.errFatal (packfile `B.append` " is not a packfile")
 
-    let numPackFiles = (header^.dphDirLen `div` packFileSize)
+    let numPackFiles = header^.dphDirLen `div` packFileSize
 
     when (numPackFiles > FSConstants.maxFilesInPack) $
       Com.comError Constants.errFatal (packfile `B.append` " has "
-                                                `B.append` (BC.pack $ show numPackFiles) -- TODO: convert Int to ByteString using binary package?
+                                                `B.append` BC.pack (show numPackFiles) -- IMPROVE: convert Int to ByteString using binary package?
                                                 `B.append` " files")
 
     let directoryFiles = parseDirectory (BL.drop (fromIntegral $ header^.dphDirOfs) fileContents) numPackFiles M.empty
@@ -141,7 +141,7 @@ loadPackFile packfile = do
 
     Com.printf $ "Added packfile " `B.append` packfile
                                    `B.append` " ("
-                                   `B.append` (BC.pack $ show numPackFiles) -- TODO: convert Int to ByteString using binary package?
+                                   `B.append` BC.pack (show numPackFiles) -- IMPROVE: convert Int to ByteString using binary package?
                                    `B.append` " files)\n"
 
     return $ Just pack
@@ -154,7 +154,7 @@ loadPackFile packfile = do
 
         getPackFile :: Get PackFileT
         getPackFile = do
-          fileName <- fmap strip $ getByteString packFileNameSize
+          fileName <- strip <$> getByteString packFileNameSize
           filePos <- getInt
           fileLen <- getInt
           return $ PackFileT fileName filePos fileLen

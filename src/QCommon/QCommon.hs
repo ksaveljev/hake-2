@@ -65,9 +65,9 @@ frame msec = do
       ct <- use $ globals.cTraces
       cpc <- use $ globals.cPointContents
 
-      Com.printf $ (BC.pack $ show ct)
+      Com.printf $ BC.pack (show ct)
         `B.append` " traces "
-        `B.append` (BC.pack $ show cpc)
+        `B.append` BC.pack (show cpc)
         `B.append` " points\n" -- TODO: use binary to convert int to bytestring? OR printf with Text and Text.printf ?
 
       globals.cTraces .= 0
