@@ -7,6 +7,7 @@ import Data.Bits ((.|.))
 import Data.Maybe (isJust, fromJust)
 import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
 import Data.Functor ((<$>))
+import Data.Traversable (traverse)
 import Control.Applicative ((<*>))
 import Control.Lens ((^.), (.=), (%=), use)
 import Control.Monad (when, void)
@@ -187,7 +188,36 @@ setGameDir :: B.ByteString -> Quake ()
 setGameDir = undefined -- TODO
 
 pathF :: XCommandT
-pathF = undefined -- TODO
+pathF = do
+    Com.printf "Current search path:\n"
+    searchPaths <- use $ fsGlobals.fsSearchPaths
+
+    void $ traverse printSearchPath searchPaths
+
+    Com.printf "\nLinks:\n"
+    links <- use $ fsGlobals.fsLinks
+
+    void $ traverse printLink links
+
+  where printLink link =
+          Com.printf $ (link^.flFrom) 
+            `B.append` " : "
+            `B.append` (link^.flTo)
+            `B.append` "\n"
+
+        printSearchPath sp =
+          {- IMPROVE:
+          - if (s == fs_base_searchpaths)
+          -     Com.Printf("----------\n");
+          -}
+          if isJust (sp^.spPack)
+            then do
+              let Just s = sp^.spPack
+              Com.printf $ (s^.pFilename)
+                `B.append` " ("
+                `B.append` BC.pack (show (s^.pNumFiles)) -- IMPROVE: convert Int to ByteString using binary package?
+                `B.append` " files)\n"
+            else Com.printf $ (sp^.spFilename) `B.append` "\n"
 
 linkF :: XCommandT
 linkF = do
@@ -217,4 +247,9 @@ linkF = do
            | otherwise -> return ()
 
 dirF :: XCommandT
-dirF = undefined -- TODO
+dirF = do
+    c <- Cmd.argc
+
+    wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
+
+    undefined -- TODO
