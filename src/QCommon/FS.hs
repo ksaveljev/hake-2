@@ -2,7 +2,7 @@
 module QCommon.FS where
 
 import Data.Bits ((.|.))
-import Control.Lens ((^.))
+import Control.Lens ((^.), (.=))
 import Control.Monad (when)
 import Control.Exception
 import System.Directory (getHomeDirectory, createDirectoryIfMissing)
@@ -24,14 +24,16 @@ initFileSystem = do
     Cmd.addCommand "dir" dirF
 
     homeDir <- io getHomeDirectory
-    let fsUserDir = BC.pack homeDir `B.append` "/.hake2"
+    let initialFsUserDir = BC.pack homeDir `B.append` "/.hake2"
+    fsGlobals.fsUserDir .= initialFsUserDir
 
-    createPath $ fsUserDir `B.append` "/"
-    addGameDirectory fsUserDir
+    createPath $ initialFsUserDir `B.append` "/"
+    addGameDirectory initialFsUserDir
 
     -- basedir <path>
     -- allows the game to run from outside the data tree
-    Just fsBaseDir <- CVar.get "basedir" "." Constants.cvarNoSet
+    Just baseDir <- CVar.get "basedir" "." Constants.cvarNoSet
+    fsGlobals.fsBaseDir .= baseDir
 
     -- cddir <path>
     -- Logically concatenates the cddir after the basedir for
@@ -39,13 +41,14 @@ initFileSystem = do
     setCDDir
 
     -- start up with baseq2 by default
-    addGameDirectory $ (fsBaseDir^.cvString) `B.append` "/" `B.append` Constants.baseDirName
+    addGameDirectory $ (baseDir^.cvString) `B.append` "/" `B.append` Constants.baseDirName
 
     makeBaseSearchPaths
 
-    Just fsGameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
+    Just gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
+    fsGlobals.fsGameDirVar .= gameDirVar
 
-    when (B.length (fsGameDirVar^.cvString) > 0) $ setGameDir (fsGameDirVar^.cvString)
+    when (B.length (gameDirVar^.cvString) > 0) $ setGameDir (gameDirVar^.cvString)
 
 createPath :: B.ByteString -> Quake ()
 createPath path = do
@@ -53,7 +56,7 @@ createPath path = do
     --       // -1 if not found and 0 means write to root
     --       if (index > 0) ... then we create a directory
 
-    done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ -> do
+    done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ ->
       return $ Left ()) -- TODO: maybe somehow include exception message?
 
     case done of
@@ -68,13 +71,17 @@ createPath path = do
 -- Sets fs_gamedir, adds the directory to the head of the path, then loads
 -- and adds pak1.pak pak2.pak ...
 addGameDirectory :: B.ByteString -> Quake ()
-addGameDirectory dir = undefined -- TODO
+addGameDirectory dir = do
+    fsGlobals.fsGameDir .= dir
+
+    undefined -- TODO
 
 -- set baseq2 directory
 setCDDir :: Quake ()
 setCDDir = do
-    Just fsCDDir <- CVar.get "cddir" "" Constants.cvarArchive
-    when (B.length (fsCDDir^.cvString) > 0) $ addGameDirectory (fsCDDir^.cvString)
+    Just cdDir <- CVar.get "cddir" "" Constants.cvarArchive
+    fsGlobals.fsCDDir .= cdDir
+    when (B.length (cdDir^.cvString) > 0) $ addGameDirectory (cdDir^.cvString)
 
 makeBaseSearchPaths :: Quake ()
 makeBaseSearchPaths = undefined -- TODO

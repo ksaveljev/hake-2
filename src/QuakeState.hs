@@ -6,6 +6,7 @@ module QuakeState ( QuakeState(..)
                   , cmdGlobals
                   , keyGlobals
                   , cvarGlobals
+                  , fsGlobals
                   , SizeBufTLens
                   , module Globals
                   , module CVarGlobals
