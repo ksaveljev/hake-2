@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.SearchPathT where
 
 import Control.Lens (makeLenses)
@@ -13,3 +14,6 @@ data SearchPathT =
               }
 
 makeLenses ''SearchPathT
+
+newSearchPathT :: SearchPathT
+newSearchPathT = SearchPathT "" newPackT Nothing

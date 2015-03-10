@@ -49,6 +49,10 @@ initFileSystem = do
 
 createPath :: B.ByteString -> Quake ()
 createPath path = do
+    -- TODO: int index = path.lastIndexOf('/')
+    --       // -1 if not found and 0 means write to root
+    --       if (index > 0) ... then we create a directory
+
     done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ -> do
       return $ Left ()) -- TODO: maybe somehow include exception message?
 
@@ -59,8 +63,12 @@ createPath path = do
   where catchAny :: IO a -> (SomeException -> IO a) -> IO a
         catchAny = Control.Exception.catch
 
+-- AddGameDirectory
+--
+-- Sets fs_gamedir, adds the directory to the head of the path, then loads
+-- and adds pak1.pak pak2.pak ...
 addGameDirectory :: B.ByteString -> Quake ()
-addGameDirectory = undefined -- TODO
+addGameDirectory dir = undefined -- TODO
 
 -- set baseq2 directory
 setCDDir :: Quake ()

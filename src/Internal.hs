@@ -15,6 +15,8 @@ import qualified Data.Vector.Unboxed as UV
 
 import Game.CVarT
 import QCommon.SizeBufT
+import QCommon.FileLinkT
+import QCommon.SearchPathT
 
 newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
                     deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
@@ -27,6 +29,7 @@ data QuakeState =
              , _cmdGlobals  :: CmdGlobals
              , _keyGlobals  :: KeyGlobals
              , _cvarGlobals :: CVarGlobals
+             , _fsGlobals   :: FSGlobals
              }
 
 data Globals =
@@ -106,11 +109,6 @@ data CmdGlobals =
              , _cgCmdArgs      :: B.ByteString
              }
 
-data CmdFunctionT =
-  CmdFunctionT { _cfName     :: B.ByteString
-               , _cfFunction :: XCommandT
-               }
-
 data KeyGlobals =
   KeyGlobals { _anyKeyDown  :: Int
              , _keyWaiting  :: Int
@@ -121,5 +119,21 @@ data KeyGlobals =
              , _consoleKeys :: UV.Vector Bool
              , _keyNames    :: V.Vector (Maybe B.ByteString)
              }
+
+data FSGlobals =
+  FSGlobals { _fsGameDir         :: B.ByteString
+            , _fsUserDir         :: B.ByteString
+            , _fsBaseDir         :: CVarT
+            , _fsCDDir           :: CVarT
+            , _fsGameDirVar      :: CVarT
+            , _fsLinks           :: Seq FileLinkT
+            , _fsSearchPaths     :: SearchPathT
+            , _fsBaseSearchPaths :: SearchPathT
+            }
+
+data CmdFunctionT =
+  CmdFunctionT { _cfName     :: B.ByteString
+               , _cfFunction :: XCommandT
+               }
 
 type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT
