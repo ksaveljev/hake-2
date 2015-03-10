@@ -1,19 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.FS where
 
+import Data.Char (isSpace, toLower)
 import Data.Bits ((.|.))
 import Data.Maybe (isJust)
+import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
+import Data.Functor ((<$>))
+import Control.Applicative ((<*>))
 import Control.Lens ((^.), (.=), (%=), use)
 import Control.Monad (when, void)
 import Control.Exception
 import System.Directory
+import System.IO (openFile, IOMode(ReadMode))
+import System.IO.MMap (mmapFileByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Map as M
 
 import Quake
 import Internal
 import QuakeState
+import QCommon.DPackHeaderT
+import QCommon.PackFileT
 import qualified Constants
+import qualified QCommon.FSConstants as FSConstants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -99,11 +110,67 @@ addGameDirectory dir = do
             when (readable permissions) $ do
               pak <- loadPackFile pakFile
 
-              when (isJust pak) $ do
+              when (isJust pak) $
                 fsGlobals.fsSearchPaths %= (newSearchPathT { _spFilename = "", _spPack = pak } :)
 
+-- takes an explicit (not game tree related) path to a pak file
+--
+-- loads the header and directory, adding the files at the beginning of the
+-- list so they override previous pack files
+-- TODO: there is a try catch block for IO operations in the original code ...
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
-loadPackFile = undefined
+loadPackFile packfile = do
+    let filePath = BC.unpack packfile
+    fileHandle <- io $ openFile filePath ReadMode
+    fileContents <- io $ BL.fromStrict <$> mmapFileByteString filePath Nothing
+
+    let header = runGet getDPackHeader fileContents
+
+    when ((header^.dphIdent) /= FSConstants.idPakHeader) $
+      Com.comError Constants.errFatal (packfile `B.append` " is not a packfile")
+
+    let numPackFiles = (header^.dphDirLen `div` packFileSize)
+
+    when (numPackFiles > FSConstants.maxFilesInPack) $
+      Com.comError Constants.errFatal (packfile `B.append` " has "
+                                                `B.append` (BC.pack $ show numPackFiles) -- TODO: convert Int to ByteString using binary package?
+                                                `B.append` " files")
+
+    let directoryFiles = parseDirectory (BL.drop (fromIntegral $ header^.dphDirOfs) fileContents) numPackFiles M.empty
+        pack = PackT packfile (Just fileHandle) "" numPackFiles directoryFiles
+
+    Com.printf $ "Added packfile " `B.append` packfile
+                                   `B.append` " ("
+                                   `B.append` (BC.pack $ show numPackFiles) -- TODO: convert Int to ByteString using binary package?
+                                   `B.append` " files)\n"
+
+    return $ Just pack
+
+  where getInt :: Get Int
+        getInt = fromIntegral <$> getWord32le
+
+        getDPackHeader :: Get DPackHeaderT
+        getDPackHeader = DPackHeaderT <$> getInt <*> getInt <*> getInt 
+
+        getPackFile :: Get PackFileT
+        getPackFile = do
+          fileName <- fmap strip $ getByteString packFileNameSize
+          filePos <- getInt
+          fileLen <- getInt
+          return $ PackFileT fileName filePos fileLen
+
+        trimR :: B.ByteString -> B.ByteString
+        trimR s = let rs = BC.reverse s in BC.dropWhile isSpace rs
+
+        strip :: B.ByteString -> B.ByteString
+        strip = trimR . trimR
+
+        parseDirectory :: BL.ByteString -> Int -> M.Map B.ByteString PackFileT -> M.Map B.ByteString PackFileT
+        parseDirectory _ 0 newFiles = newFiles
+        parseDirectory fileContents numberOfFiles newFiles =
+          let pf = runGet getPackFile fileContents
+              lowercaseName = BC.map toLower (pf^.pfName)
+          in parseDirectory (BL.drop (fromIntegral $ packFileNameSize + 8) fileContents) (numberOfFiles - 1) (M.insert lowercaseName pf newFiles)
 
 -- set baseq2 directory
 setCDDir :: Quake ()
