@@ -55,7 +55,7 @@ initFileSystem = do
     -- start up with baseq2 by default
     addGameDirectory $ (baseDir^.cvString) `B.append` "/" `B.append` Constants.baseDirName
 
-    makeBaseSearchPaths
+    markBaseSearchPaths
 
     Just gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
     fsGlobals.fsGameDirVar .= gameDirVar
@@ -179,8 +179,10 @@ setCDDir = do
     fsGlobals.fsCDDir .= cdDir
     when (B.length (cdDir^.cvString) > 0) $ addGameDirectory (cdDir^.cvString)
 
-makeBaseSearchPaths :: Quake ()
-makeBaseSearchPaths = undefined -- TODO
+markBaseSearchPaths :: Quake ()
+markBaseSearchPaths = do
+    searchPaths <- use $ fsGlobals.fsSearchPaths
+    fsGlobals.fsBaseSearchPaths .= searchPaths
 
 setGameDir :: B.ByteString -> Quake ()
 setGameDir = undefined -- TODO
