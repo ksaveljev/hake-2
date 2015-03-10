@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.FS where
 
-import Data.Char (isSpace, toLower)
+import Data.Char (toLower)
 import Data.Bits ((.|.))
 import Data.Maybe (isJust)
 import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
@@ -159,11 +159,8 @@ loadPackFile packfile = do
           fileLen <- getInt
           return $ PackFileT fileName filePos fileLen
 
-        trimR :: B.ByteString -> B.ByteString
-        trimR s = let rs = BC.reverse s in BC.dropWhile isSpace rs
-
         strip :: B.ByteString -> B.ByteString
-        strip = trimR . trimR
+        strip = B.takeWhile (/= 0)
 
         parseDirectory :: BL.ByteString -> Int -> M.Map B.ByteString PackFileT -> M.Map B.ByteString PackFileT
         parseDirectory _ 0 newFiles = newFiles

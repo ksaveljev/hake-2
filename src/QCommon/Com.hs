@@ -9,7 +9,7 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString as B
 
-import Quake (Quake)
+import Quake
 import QuakeState
 import qualified Constants
 import qualified Sys.Sys as Sys
@@ -47,7 +47,7 @@ comError code fmt = do
         errReact _ = undefined -- TODO
 
 printf :: B.ByteString -> Quake ()
-printf = undefined -- TODO
+printf = io.print -- TODO
 
 argc :: Quake Int
 argc = use $ comGlobals.cgComArgc
