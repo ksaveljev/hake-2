@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.FSGlobals where
+module QCommon.FSGlobals ( module QCommon.FSGlobals
+                         , module QCommon.SearchPathT
+                         ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq
@@ -19,6 +21,6 @@ initialFSGlobals =
             , _fsCDDir           = newCVarT
             , _fsGameDirVar      = newCVarT
             , _fsLinks           = Seq.empty
-            , _fsSearchPaths     = newSearchPathT
-            , _fsBaseSearchPaths = newSearchPathT
+            , _fsSearchPaths     = []
+            , _fsBaseSearchPaths = []
             }

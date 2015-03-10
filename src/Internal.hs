@@ -127,8 +127,8 @@ data FSGlobals =
             , _fsCDDir           :: CVarT
             , _fsGameDirVar      :: CVarT
             , _fsLinks           :: Seq FileLinkT
-            , _fsSearchPaths     :: SearchPathT
-            , _fsBaseSearchPaths :: SearchPathT
+            , _fsSearchPaths     :: [SearchPathT]
+            , _fsBaseSearchPaths :: [SearchPathT]
             }
 
 data CmdFunctionT =

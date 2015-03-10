@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.SearchPathT where
+module QCommon.SearchPathT ( module QCommon.SearchPathT
+                           , module QCommon.PackT
+                           ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
@@ -9,11 +11,10 @@ import QCommon.PackT
 
 data SearchPathT =
   SearchPathT { _spFilename :: B.ByteString
-              , _spPack     :: PackT
-              , _spNext     :: Maybe SearchPathT
+              , _spPack     :: Maybe PackT
               }
 
 makeLenses ''SearchPathT
 
 newSearchPathT :: SearchPathT
-newSearchPathT = SearchPathT "" newPackT Nothing
+newSearchPathT = SearchPathT "" Nothing

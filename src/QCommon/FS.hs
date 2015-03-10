@@ -2,10 +2,11 @@
 module QCommon.FS where
 
 import Data.Bits ((.|.))
-import Control.Lens ((^.), (.=))
-import Control.Monad (when)
+import Data.Maybe (isJust)
+import Control.Lens ((^.), (.=), (%=), use)
+import Control.Monad (when, void)
 import Control.Exception
-import System.Directory (getHomeDirectory, createDirectoryIfMissing)
+import System.Directory
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -74,7 +75,35 @@ addGameDirectory :: B.ByteString -> Quake ()
 addGameDirectory dir = do
     fsGlobals.fsGameDir .= dir
 
-    undefined -- TODO
+    -- add the directory to the search path
+    -- ensure fs_userdir is first in searchpath
+    let newSearchPath = newSearchPathT { _spFilename = dir }
+    searchPaths <- use $ fsGlobals.fsSearchPaths
+    case searchPaths of
+      [] -> fsGlobals.fsSearchPaths .= [newSearchPath]
+      (x:xs) -> fsGlobals.fsSearchPaths .= x : newSearchPath : xs
+
+    -- add any pack files in the format pak0.pak pak1.pak ...
+    void $ sequence $ fmap (addPackFiles dir) [0..9]
+
+  where addPackFiles :: B.ByteString -> Int -> Quake ()
+        addPackFiles directory i = do
+          let pakFile = directory `B.append` "/pak" `B.append` BC.pack (show i) `B.append` ".pak" -- TODO: use binary package for Int to ByteString conversion?
+              pakFileS = BC.unpack pakFile
+
+          fileExists <- io $ doesFileExist pakFileS
+
+          when fileExists $ do
+            permissions <- io $ getPermissions pakFileS
+
+            when (readable permissions) $ do
+              pak <- loadPackFile pakFile
+
+              when (isJust pak) $ do
+                fsGlobals.fsSearchPaths %= (newSearchPathT { _spFilename = "", _spPack = pak } :)
+
+loadPackFile :: B.ByteString -> Quake (Maybe PackT)
+loadPackFile = undefined
 
 -- set baseq2 directory
 setCDDir :: Quake ()
