@@ -1,6 +1,8 @@
 module Client.CL where
 
-import Control.Lens (use)
+import Control.Lens (use, (.=))
+import Control.Monad (unless)
+import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
@@ -18,20 +20,17 @@ init :: Quake ()
 init = do
     dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
 
-    if dedicatedValue /= 0
-      then return ()
-      else do
-        Console.init >> S.init >> VID.init >> V.init
+    unless (dedicatedValue /= 0) $ do
+      Console.init >> S.init >> VID.init >> V.init
 
-        {- TODO:
-        Globals.net_message.data = Globals.net_message_buffer;
-        Globals.net_message.maxsize = Globals.net_message_buffer.length;
-        -}
+      bufData <- use $ globals.netMessageBuffer
+      globals.netMessage.sbData .= bufData
+      globals.netMessage.sbMaxSize .= B.length bufData
 
-        Menu.init >> SCR.init >> initLocal >> IN.init
+      Menu.init >> SCR.init >> initLocal >> IN.init
 
-        FS.execAutoexec
-        CBuf.execute
+      FS.execAutoexec
+      CBuf.execute
 
 initLocal :: Quake ()
 initLocal = undefined -- TODO
