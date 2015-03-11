@@ -2,21 +2,27 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.QCommon where
 
+import Data.Bits ((.|.))
 import Control.Lens (use, (.=), (^.))
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, void)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
 import qualified Constants
-import qualified Sys.Timer as Timer
+import qualified Game.Cmd as Cmd
+import qualified Client.Key as Key
+import qualified QCommon.FS as FS
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
-import qualified QCommon.FS as FS
-import qualified Game.Cmd as Cmd
-import qualified Client.Key as Key
+import qualified QCommon.Netchan as Netchan
+import qualified Client.CL as CL
+import qualified Client.SCR as SCR
+import qualified Server.SVMain as SVMain
+import qualified Sys.NET as NET
+import qualified Sys.Timer as Timer
 
 init :: [String] -> Quake ()
 init args = do
@@ -60,7 +66,6 @@ init args = do
     --
     Cmd.addCommand "error" Com.errorF
 
-    
     Just hostSpeedsCVar <- CVar.get "host_speeds" "0" 0
     cvarGlobals.hostSpeeds .= hostSpeedsCVar
 
@@ -85,7 +90,59 @@ init args = do
     Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
     cvarGlobals.dedicated .= dedicatedCVar
 
-    undefined -- TODO: many more commands
+    {- IMPROVE:
+       public static final String BUILDSTRING = "Java " + System.getProperty("java.version");;
+       public static final String CPUSTRING = System.getProperty("os.arch");
+       String s = Com.sprintf("%4.2f %s %s %s",
+                       new Vargs(4)
+                               .add(Globals.VERSION)
+                               .add(CPUSTRING)
+                               .add(Globals.__DATE__)
+                               .add(BUILDSTRING));
+    -}
+    let s = BC.pack $ (show $ Constants.version) ++ (show $ Constants.__date__) -- IMPROVE: use formatting library?
+
+    void $ CVar.get "version" s (Constants.cvarServerInfo .|. Constants.cvarNoSet)
+
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing network subsystem...");
+
+    NET.init
+    Netchan.init
+
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing server subsystem...");
+
+    SVMain.init
+
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing client subsystem...");
+
+    CL.init
+
+    added <- CBuf.addLateCommands
+
+    if added
+      then do
+        dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+
+        if dedicatedValue == 0
+          then CBuf.addText "d1\n"
+          else CBuf.addText "dedicated_start\n"
+
+        CBuf.execute
+      else SCR.endLoadingPlaque
+
+    Com.printf "====== Quake2 Initialized ======\n\n"
+
+    CL.writeConfiguration
+
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.dispose();
 
 frame :: Int -> Quake ()
 frame msec = do

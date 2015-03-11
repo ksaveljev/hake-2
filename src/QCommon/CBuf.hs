@@ -38,6 +38,9 @@ addEarlyCommands clear = do
                              Com.clearArgv (i+2)
               when (i + 3 < c) $ findAddCommand c (i + 3)
 
+addLateCommands :: Quake Bool
+addLateCommands = undefined -- TODO
+
 execute :: Quake ()
 execute = do
     globals.aliasCount .= 0

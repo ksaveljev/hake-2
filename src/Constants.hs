@@ -5,6 +5,10 @@ module Constants where
 import Data.Bits ((.|.), shiftL)
 import qualified Data.ByteString as B
 
+version = 3.21 :: Float
+
+__date__ = 2003 :: Int
+
 baseDirName = "baseq2" :: B.ByteString
 
 weaponReady      = 0 :: Int
