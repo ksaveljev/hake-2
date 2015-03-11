@@ -29,3 +29,6 @@ data NetChanT =
            }
 
 makeLenses ''NetChanT
+
+newNetChanT :: NetChanT
+newNetChanT = undefined -- TODO

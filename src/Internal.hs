@@ -183,6 +183,93 @@ data CmdFunctionT =
 
 type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT
 
+data EdictActionT =
+  EdictActionT { _eaNextThink :: Float
+               , _eaPrethink  :: Quake () -- TODO: ???
+               , _eaThink     :: Quake () -- TODO: ???
+               , _eaBlocked   :: Quake () -- TODO: ???
+               , _eaTouch     :: Quake () -- TODO: ???
+               , _eaUse       :: Quake () -- TODO: ???
+               , _eaPain      :: Quake () -- TODO: ???
+               , _eaDie       :: Quake () -- TODO: ???
+               }
+
+data EdictOtherT =
+  EdictOtherT { _eoChain        :: Maybe EdictT
+              , _eoEnemy        :: Maybe EdictT
+              , _eoOldEnemy     :: Maybe EdictT
+              , _eoActivator    :: Maybe EdictT
+              , _eoGroundEntity :: Maybe EdictT
+              , _eoTeamChain    :: Maybe EdictT
+              , _eoTeamMaster   :: Maybe EdictT
+              , _eoMyNoise      :: Maybe EdictT
+              , _eoMyNoise2     :: Maybe EdictT
+              }
+
+data EdictTimingT =
+  EdictTimingT { _etTouchDebounceTime    :: Float
+               , _etPainDebounceTime     :: Float
+               , _etDamageDebounceTime   :: Float
+               , _etFlySoundDebounceTime :: Float
+               , _etLastMoveTime         :: Float
+               }
+
+data EdictMinMaxT =
+  EdictMinMaxT { _eMins   :: V3 Float
+               , _eMaxs   :: V3 Float
+               , _eAbsMin :: V3 Float
+               , _eAbsMax :: V3 Float
+               , _eSize   :: V3 Float
+               }
+
+data EdictInfoT =
+  EdictInfoT { _esModel        :: B.ByteString
+             , _esMessage      :: B.ByteString
+             , _esClassName    :: B.ByteString
+             , _esTarget       :: B.ByteString
+             , _esTargetName   :: B.ByteString
+             , _esKillTarget   :: B.ByteString
+             , _esTeam         :: B.ByteString
+             , _esPathTarget   :: B.ByteString
+             , _esDeathTarget  :: B.ByteString
+             , _esCombatTarget :: B.ByteString
+             , _esMap          :: B.ByteString
+             }
+
+data EdictPhysicsT =
+  EdictPhysicsT { _eAngle       :: Float
+                , _eSpeed       :: Float
+                , _eAccel       :: Float
+                , _eDecel       :: Float
+                , _eMoveDir     :: V3 Float
+                , _ePos1        :: V3 Float
+                , _ePos2        :: V3 Float
+                , _eVelocity    :: V3 Float
+                , _eAVelocity   :: V3 Float
+                , _eMass        :: Int
+                , _eAirFinished :: Float
+                , _eGravity     :: Float
+                , _eYawSpeed    :: Float
+                , _eIdealYaw    :: Float
+                }
+
+data EdictStatusT =
+  EdictStatusT { _eHealth         :: Int
+               , _eMaxHealth      :: Int
+               , _eGibHealth      :: Int
+               , _eDeadFlag       :: Int
+               , _eShowHostile    :: Int
+               , _ePowerArmorTime :: Float
+               , _eViewHeight     :: Int
+               , _eTakeDamage     :: Int
+               , _eDmg            :: Int
+               , _eRadiusDmg      :: Int
+               , _eDmgRadius      :: Float
+               }
+
+-- had to split EdictT into smaller EdictXXX types in order
+-- for makeLenses not to generate A LOT of code which eats up
+-- A LOT of memory
 data EdictT =
   EdictT { _eEntityState           :: EntityStateT
          , _eInUse                 :: Bool
@@ -194,82 +281,24 @@ data EdictT =
          , _eAreaNum               :: Int
          , _eAreaNum2              :: Int
          , _eSvFlags               :: Int
-         , _eMins                  :: V3 Float
-         , _eMaxs                  :: V3 Float
-         , _eAbsMin                :: V3 Float
-         , _eAbsMax                :: V3 Float
-         , _eSize                  :: V3 Float
          , _eSolid                 :: Int
          , _eSlipMask              :: Int
          , _eMoveType              :: Int
          , _eFlags                 :: Int
-         , _eModel                 :: B.ByteString
          , _eFreeTime              :: Float
-         , _eMessage               :: B.ByteString
-         , _eClassName             :: B.ByteString
          , _eSpawnFlags            :: Int
          , _eTimeStamp             :: Float
-         , _eAngle                 :: Float
-         , _eTarget                :: B.ByteString
-         , _eTargetName            :: B.ByteString
-         , _eKillTarget            :: B.ByteString
-         , _eTeam                  :: B.ByteString
-         , _ePathTarget            :: B.ByteString
-         , _eDeathTarget           :: B.ByteString
-         , _eCombatTarget          :: B.ByteString
+         , _eEdictPhysics          :: EdictPhysicsT
          , _eTargetEnt             :: Maybe EdictT
-         , _eSpeed                 :: Float
-         , _eAccel                 :: Float
-         , _eDecel                 :: Float
-         , _eMoveDir               :: V3 Float
-         , _ePos1                  :: V3 Float
-         , _ePos2                  :: V3 Float
-         , _eVelocity              :: V3 Float
-         , _eAVelocity             :: V3 Float
-         , _eMass                  :: Int
-         , _eAirFinished           :: Float
-         , _eGravity               :: Float
          , _eGoalEntity            :: Maybe EdictT
          , _eMoveTarget            :: Maybe EdictT
-         , _eYawSpeed              :: Float
-         , _eIdealYaw              :: Float
-         , _eNextThink             :: Float
-         , _ePrethink              :: Quake () -- TODO: ???
-         , _eThink                 :: Quake () -- TODO: ???
-         , _eBlocked               :: Quake () -- TODO: ???
-         , _eTouch                 :: Quake () -- TODO: ???
-         , _eUse                   :: Quake () -- TODO: ???
-         , _ePain                  :: Quake () -- TODO: ???
-         , _eDie                   :: Quake () -- TODO: ???
-         , _eTouchDebounceTime     :: Float
-         , _ePainDebounceTime      :: Float
-         , _eDamageDebounceTime    :: Float
-         , _eFlySoundDebounceTime  :: Float
-         , _eLastMoveTime          :: Float
-         , _eHealth                :: Int
-         , _eMaxHealth             :: Int
-         , _eGibHealth             :: Int
-         , _eDeadFlag              :: Int
-         , _eShowHostile           :: Int
-         , _ePowerArmorTime        :: Float
-         , _eMap                   :: Maybe B.ByteString
-         , _eViewHeight            :: Int
-         , _eTakeDamage            :: Int
-         , _eDmg                   :: Int
-         , _eRadiusDmg             :: Int
-         , _eDmgRadius             :: Float
+         , _eEdictAction           :: EdictActionT
+         , _eEdictTiming           :: EdictTimingT
+         , _eEdictStatus           :: EdictStatusT
          , _eSounds                :: Int
          , _eCount                 :: Int
-         , _eChain                 :: Maybe EdictT
-         , _eEnemy                 :: Maybe EdictT
-         , _eOldEnemy              :: Maybe EdictT
-         , _eActivator             :: Maybe EdictT
-         , _eGroundEntity          :: Maybe EdictT
          , _eGroundEntityLinkCount :: Int
-         , _eTeamChain             :: Maybe EdictT
-         , _eTeamMaster            :: Maybe EdictT
-         , _eMyNoise               :: Maybe EdictT
-         , _eMyNoise2              :: Maybe EdictT
+         , _eEdictOther            :: EdictOtherT
          , _eNoiseIndex            :: Int
          , _eNoiseIndex2           :: Int
          , _eVolume                :: Float
@@ -290,6 +319,7 @@ data EdictT =
          , _eClient                :: GClientT
          , _eOwner                 :: Maybe EdictT
          , _eIndex                 :: Int
+         , _eEdictInfo             :: EdictInfoT
          }
 
 data EntityStateT =
@@ -390,7 +420,7 @@ data ClientT =
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
           , _cDatagramBuf   :: UV.Vector Word8
-          , _cFrames        :: UV.Vector ClientFrameT
+          , _cFrames        :: V.Vector ClientFrameT
           , _cDownload      :: UV.Vector Word8
           , _cDownloadSize  :: Int
           , _cDownloadCount :: Int

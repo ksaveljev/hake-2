@@ -14,3 +14,6 @@ data SizeBufT =
            }
 
 makeLenses ''SizeBufT
+
+newSizeBufT :: SizeBufT
+newSizeBufT = undefined -- TODO

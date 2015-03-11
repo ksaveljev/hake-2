@@ -17,3 +17,6 @@ data UserCmdT =
            }
 
 makeLenses ''UserCmdT
+
+newUserCmdT :: UserCmdT
+newUserCmdT = undefined -- TODO
