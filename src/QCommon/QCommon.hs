@@ -17,7 +17,7 @@ import qualified QCommon.FS as FS
 import qualified QCommon.Com as Com
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
-import qualified QCommon.Netchan as Netchan
+import qualified QCommon.NetChannel as NetChannel
 import qualified Client.CL as CL
 import qualified Client.SCR as SCR
 import qualified Server.SVMain as SVMain
@@ -26,21 +26,13 @@ import qualified Sys.Timer as Timer
 
 init :: [String] -> Quake ()
 init args = do
-    Com.initArgv args
-
-    CBuf.init
-
-    Cmd.init
-    CVar.init
-
-    Key.init
+    Com.initArgv args >> CBuf.init >> Cmd.init >> CVar.init >> Key.init
 
     -- we need to add the early commands twice, because
     -- a basedir or cddir needs to be set before execing
     -- config files, but we want other parms to override
     -- the settings of the config files
-    CBuf.addEarlyCommands False
-    CBuf.execute
+    CBuf.addEarlyCommands False >> CBuf.execute
 
     -- if (globals.dedicated.cvValue != 1.0)
     whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
@@ -108,8 +100,7 @@ init args = do
     whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing network subsystem...");
 
-    NET.init
-    Netchan.init
+    NET.init >> NetChannel.init
 
     -- if (globals.dedicated.cvValue != 1.0)
     whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do

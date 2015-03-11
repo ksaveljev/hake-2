@@ -24,12 +24,13 @@ newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
 type XCommandT = Quake ()
 
 data QuakeState =
-  QuakeState { _globals     :: Globals
-             , _comGlobals  :: ComGlobals
-             , _cmdGlobals  :: CmdGlobals
-             , _keyGlobals  :: KeyGlobals
-             , _cvarGlobals :: CVarGlobals
-             , _fsGlobals   :: FSGlobals
+  QuakeState { _globals           :: Globals
+             , _comGlobals        :: ComGlobals
+             , _cmdGlobals        :: CmdGlobals
+             , _keyGlobals        :: KeyGlobals
+             , _cvarGlobals       :: CVarGlobals
+             , _fsGlobals         :: FSGlobals
+             , _netChannelGlobals :: NetChannelGlobals
              }
 
 data Globals =
@@ -130,6 +131,12 @@ data FSGlobals =
             , _fsSearchPaths     :: [SearchPathT]
             , _fsBaseSearchPaths :: [SearchPathT]
             }
+
+data NetChannelGlobals =
+  NetChannelGlobals { _ncShowPackets :: CVarT
+                    , _ncShowDrop    :: CVarT
+                    , _ncQPort       :: CVarT
+                    }
 
 data CmdFunctionT =
   CmdFunctionT { _cfName     :: B.ByteString
