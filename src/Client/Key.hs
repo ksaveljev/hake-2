@@ -36,10 +36,10 @@ init = do
                              kF6, kF7, kF8, kF9, kF10,
                              kF11, kF12, kEscape] `zip` repeat True))
 
-    Cmd.addCommand "bind" bindF
-    Cmd.addCommand "unbind" unbindF
-    Cmd.addCommand "unbindall" unbindAllF
-    Cmd.addCommand "bindlist" bindListF
+    Cmd.addCommand "bind" (Just bindF)
+    Cmd.addCommand "unbind" (Just unbindF)
+    Cmd.addCommand "unbindall" (Just unbindAllF)
+    Cmd.addCommand "bindlist" (Just bindListF)
 
 bindF :: XCommandT
 bindF = do

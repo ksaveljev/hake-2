@@ -14,6 +14,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import QCommon.XCommandT
 import QCommon.CmdFunctionT
 import qualified Constants
 import qualified QCommon.CVar as CVar
@@ -21,13 +22,13 @@ import qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do
-    addCommand "exec" execF
-    addCommand "echo" echoF
-    addCommand "cmdlist" listF
-    addCommand "alias" aliasF
-    addCommand "wait" waitF
+    addCommand "exec" (Just execF)
+    addCommand "echo" (Just echoF)
+    addCommand "cmdlist" (Just listF)
+    addCommand "alias" (Just aliasF)
+    addCommand "wait" (Just waitF)
 
-addCommand :: B.ByteString -> Quake () -> Quake ()
+addCommand :: B.ByteString -> Maybe XCommandT -> Quake ()
 addCommand cmdName f = do
     varStr <- CVar.variableString cmdName
     cmdExists <- commandExists cmdName

@@ -56,7 +56,7 @@ init args = do
     --
     -- init commands and vars
     --
-    Cmd.addCommand "error" Com.errorF
+    Cmd.addCommand "error" (Just Com.errorF)
 
     Just hostSpeedsCVar <- CVar.get "host_speeds" "0" 0
     cvarGlobals.hostSpeeds .= hostSpeedsCVar

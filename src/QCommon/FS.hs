@@ -34,9 +34,9 @@ import qualified QCommon.CVar as CVar
 
 initFileSystem :: Quake ()
 initFileSystem = do
-    Cmd.addCommand "path" pathF
-    Cmd.addCommand "link" linkF
-    Cmd.addCommand "dir" dirF
+    Cmd.addCommand "path" (Just pathF)
+    Cmd.addCommand "link" (Just linkF)
+    Cmd.addCommand "dir" (Just dirF)
 
     homeDir <- io getHomeDirectory
     let initialFsUserDir = BC.pack homeDir `B.append` "/.hake2"

@@ -60,8 +60,8 @@ get varName varValue flags = do
 
 init :: Quake ()
 init = do
-    Cmd.addCommand "set" setF
-    Cmd.addCommand "cvarlist" listF
+    Cmd.addCommand "set" (Just setF)
+    Cmd.addCommand "cvarlist" (Just listF)
 
 variableString :: B.ByteString -> Quake B.ByteString
 variableString varName = do

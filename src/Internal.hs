@@ -180,7 +180,7 @@ data SVGlobals =
 
 data CmdFunctionT =
   CmdFunctionT { _cfName     :: B.ByteString
-               , _cfFunction :: XCommandT
+               , _cfFunction :: Maybe XCommandT
                }
 
 type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT

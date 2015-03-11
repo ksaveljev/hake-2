@@ -11,27 +11,27 @@ import qualified Game.Cmd as Cmd
 
 initOperatorCommands :: Quake ()
 initOperatorCommands = do
-    Cmd.addCommand "heartbeat" heartbeatF
-    Cmd.addCommand "kick" kickF
-    Cmd.addCommand "status" statusF
-    Cmd.addCommand "serverinfo" serverInfoF
-    Cmd.addCommand "dumpuser" dumpUserF
-    Cmd.addCommand "map" mapF
-    Cmd.addCommand "demomap" demoMapF
-    Cmd.addCommand "gamemap" gameMapF
-    Cmd.addCommand "setmaster" setMasterF
+    Cmd.addCommand "heartbeat" (Just heartbeatF)
+    Cmd.addCommand "kick" (Just kickF)
+    Cmd.addCommand "status" (Just statusF)
+    Cmd.addCommand "serverinfo" (Just serverInfoF)
+    Cmd.addCommand "dumpuser" (Just dumpUserF)
+    Cmd.addCommand "map" (Just mapF)
+    Cmd.addCommand "demomap" (Just demoMapF)
+    Cmd.addCommand "gamemap" (Just gameMapF)
+    Cmd.addCommand "setmaster" (Just setMasterF)
 
     dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
 
     when (dedicatedValue /= 0) $
-      Cmd.addCommand "say" conSayF
+      Cmd.addCommand "say" (Just conSayF)
 
-    Cmd.addCommand "serverrecord" serverRecordF
-    Cmd.addCommand "serverstop" serverStopF
-    Cmd.addCommand "save" saveGameF
-    Cmd.addCommand "load" loadGameF
-    Cmd.addCommand "killserver" killServerF
-    Cmd.addCommand "sv" serverCommandF
+    Cmd.addCommand "serverrecord" (Just serverRecordF)
+    Cmd.addCommand "serverstop" (Just serverStopF)
+    Cmd.addCommand "save" (Just saveGameF)
+    Cmd.addCommand "load" (Just loadGameF)
+    Cmd.addCommand "killserver" (Just killServerF)
+    Cmd.addCommand "sv" (Just serverCommandF)
 
 heartbeatF :: XCommandT
 heartbeatF = undefined -- TODO
