@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.EntityStateT where
+module Game.EntityStateT ( EntityStateT(..)
+                         , module Game.EntityStateT
+                         ) where
 
 import Control.Lens (makeLenses)
 
