@@ -253,3 +253,6 @@ dirF = do
     wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
 
     undefined -- TODO
+
+execAutoexec :: Quake ()
+execAutoexec = undefined -- TODO

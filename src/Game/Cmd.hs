@@ -109,7 +109,7 @@ macroExpandString text len =
     if len >= Constants.maxStringChars
       then do
         Com.printf $ "Line exceeded "
-          `B.append` BC.pack (show Constants.maxStringChars) -- TODO: use binary package for Int to ByteString conversion?
+          `B.append` BC.pack (show Constants.maxStringChars) -- IMPROVE: use binary package for Int to ByteString conversion?
           `B.append` " chars, discarded.\n"
         return Nothing
       else expand text False len 0 0
