@@ -20,6 +20,7 @@ import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.GItemT
 import Game.LinkT
+import Game.CmdAliasT
 import Game.MonsterInfoT
 import Game.MoveInfoT
 import Game.PMoveStateT
@@ -62,6 +63,7 @@ data Globals =
           , _netMessageBuffer   :: B.ByteString
           , _cmdText            :: SizeBufT
           , _cmdTextBuf         :: B.ByteString
+          , _cmdAlias           :: Seq CmdAliasT
 
           , _cvarVars           :: Seq CVarT
 

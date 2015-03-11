@@ -32,6 +32,7 @@ initialGlobals =
           , _netMessageBuffer   = ""
           , _cmdText            = newSizeBufT
           , _cmdTextBuf         = ""
+          , _cmdAlias           = Seq.empty
 
           , _cvarVars           = Seq.empty
 
