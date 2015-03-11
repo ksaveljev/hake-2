@@ -3,7 +3,7 @@
 module QCommon.QCommon where
 
 import Control.Lens (use, (.=), (^.))
-import Control.Monad (when)
+import Control.Monad (when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -29,16 +29,61 @@ init args = do
 
     Key.init
 
+    -- we need to add the early commands twice, because
+    -- a basedir or cddir needs to be set before execing
+    -- config files, but we want other parms to override
+    -- the settings of the config files
     CBuf.addEarlyCommands False
     CBuf.execute
 
-    --whenQ () $ do undefined -- TODO
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing filesystem...");
 
     FS.initFileSystem
 
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.setStatus("loading config...");
+
     reconfigure False
 
+    FS.setCDDir -- use cddir from config.cfg
+    FS.markBaseSearchPaths -- mark the default search paths
+
+    -- if (globals.dedicated.cvValue != 1.0)
+    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      undefined -- TODO: Jake2.Q2Dialog.testQ2Data(); // test for valid baseq2
+
+    --
+    -- init commands and vars
+    --
     Cmd.addCommand "error" Com.errorF
+
+    
+    Just hostSpeedsCVar <- CVar.get "host_speeds" "0" 0
+    cvarGlobals.hostSpeeds .= hostSpeedsCVar
+
+    Just logStatsCVar <- CVar.get "log_stats" "0" 0
+    cvarGlobals.logStats .= logStatsCVar
+
+    Just developerCVar <- CVar.get "developer" "0" Constants.cvarArchive
+    cvarGlobals.developer .= developerCVar
+
+    Just timeScaleCVar <- CVar.get "timescale" "0" 0
+    cvarGlobals.timeScale .= timeScaleCVar
+
+    Just fixedTimeCVar <- CVar.get "fixedtime" "0" 0
+    cvarGlobals.fixedTime .= fixedTimeCVar
+
+    Just logfileActiveCVar <- CVar.get "logfile" "0" 0
+    cvarGlobals.logfileActive .= logfileActiveCVar
+
+    Just showTraceCVar <- CVar.get "showtrace" "0" 0
+    cvarGlobals.showTrace .= showTraceCVar
+
+    Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
+    cvarGlobals.dedicated .= dedicatedCVar
 
     undefined -- TODO: many more commands
 
