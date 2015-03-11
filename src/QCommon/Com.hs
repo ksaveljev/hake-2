@@ -11,6 +11,7 @@ import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
+import QCommon.XCommandT
 import qualified Constants
 import qualified Sys.Sys as Sys
 
@@ -69,6 +70,11 @@ clearArgv idx = do
     if idx < 0 || idx >= c
       then return ()
       else comGlobals.cgComArgv %= (V.// [(idx, "")])
+
+errorF :: XCommandT
+errorF = do
+    v1 <- argv 1
+    comError Constants.errFatal v1
 
 -- CRC table
 chktbl :: UV.Vector Word8

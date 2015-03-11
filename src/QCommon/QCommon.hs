@@ -38,6 +38,8 @@ init args = do
 
     reconfigure False
 
+    Cmd.addCommand "error" Com.errorF
+
     undefined -- TODO: many more commands
 
 frame :: Int -> Quake ()

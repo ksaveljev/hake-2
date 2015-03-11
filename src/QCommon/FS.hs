@@ -22,8 +22,8 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map as M
 
 import Quake
-import Internal
 import QuakeState
+import QCommon.XCommandT
 import QCommon.DPackHeaderT
 import QCommon.PackFileT
 import qualified Constants
