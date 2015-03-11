@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.SizeBufT where
 
 import Control.Lens (makeLenses)
@@ -16,4 +17,4 @@ data SizeBufT =
 makeLenses ''SizeBufT
 
 newSizeBufT :: SizeBufT
-newSizeBufT = undefined -- TODO
+newSizeBufT = SizeBufT False False "" 0 0 0

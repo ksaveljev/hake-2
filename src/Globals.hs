@@ -28,7 +28,9 @@ initialGlobals =
           , _cPointContents     = 0
           , _serverState        = 0
           
-          , _cmdText            = SizeBufT False False "" 0 0 0
+          , _netMessage         = newSizeBufT
+          , _netMessageBuffer   = ""
+          , _cmdText            = newSizeBufT
           , _cmdTextBuf         = ""
 
           , _cvarVars           = Seq.empty

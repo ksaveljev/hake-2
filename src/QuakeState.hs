@@ -8,6 +8,7 @@ module QuakeState ( QuakeState(..)
                   , cvarGlobals
                   , fsGlobals
                   , netChannelGlobals
+                  , svGlobals
                   , SizeBufTLens
                   , module Globals
                   , module CVarGlobals
@@ -16,6 +17,7 @@ module QuakeState ( QuakeState(..)
                   , module Client.KeyGlobals
                   , module QCommon.FSGlobals
                   , module QCommon.NetChannelGlobals
+                  , module Server.SVGlobals
                   ) where
 
 import Control.Lens (makeLenses)

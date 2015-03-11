@@ -1,5 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Server.SVGlobals where
+module Server.SVGlobals ( SVGlobals(..)
+                        , module Server.SVGlobals
+                        , module Game.CVarT
+                        , module Server.ClientT
+                        )where
 
 import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq

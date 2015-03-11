@@ -58,6 +58,8 @@ data Globals =
           , _cPointContents     :: Int
           , _serverState        :: Int
 
+          , _netMessage         :: SizeBufT
+          , _netMessageBuffer   :: B.ByteString
           , _cmdText            :: SizeBufT
           , _cmdTextBuf         :: B.ByteString
 

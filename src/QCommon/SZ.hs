@@ -12,7 +12,7 @@ import qualified QCommon.Com as Com
 
 init :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =
-    bufLens .= SizeBufT False False bufData len 0 0
+    bufLens .= newSizeBufT { _sbData = bufData, _sbMaxSize = len }
 
 clear :: SizeBufTLens -> Quake ()
 clear bufLens = do
