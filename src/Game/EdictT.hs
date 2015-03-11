@@ -1,3 +1,9 @@
-module Game.EdictT (EdictT(..)) where
+{-# LANGUAGE TemplateHaskell #-}
+module Game.EdictT ( module Game.EdictT
+                   ) where
 
-import Game.Internal
+import Control.Lens (makeLenses)
+
+import Internal
+
+makeLenses ''EdictT

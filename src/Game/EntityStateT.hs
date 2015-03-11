@@ -1,3 +1,8 @@
-module Game.EntityStateT (EntityStateT(..)) where
+{-# LANGUAGE TemplateHaskell #-}
+module Game.EntityStateT where
 
-import Game.Internal
+import Control.Lens (makeLenses)
+
+import Internal
+
+makeLenses ''EntityStateT

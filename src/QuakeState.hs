@@ -20,15 +20,15 @@ module QuakeState ( QuakeState(..)
 
 import Control.Lens (makeLenses)
 
+import Internal
 import Globals
 import CVarGlobals
-import QCommon.ComGlobals
 import Game.CmdGlobals
 import Client.KeyGlobals
+import Server.SVGlobals
+import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.NetChannelGlobals
-
-import Internal
 
 makeLenses ''QuakeState
 
@@ -41,4 +41,5 @@ initialQuakeState =
              , _cvarGlobals       = initialCVarGlobals
              , _fsGlobals         = initialFSGlobals
              , _netChannelGlobals = initialNetChannelGlobals
+             , _svGlobals         = initialSVGlobals
              }

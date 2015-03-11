@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.NetChanT where
 
-import Data.Int (Int8)
+import Data.Word (Word8)
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
@@ -23,9 +23,9 @@ data NetChanT =
            , _ncOutgoingSequence             :: Int
            , _ncLastReliableSequence         :: Int
            , _ncMessage                      :: SizeBufT
-           , _ncMessageBuf                   :: UV.Vector Int8 -- TODO: Word8?
+           , _ncMessageBuf                   :: UV.Vector Word8
            , _ncReliableLength               :: Int
-           , _ncReliableBuf                  :: UV.Vector Int8 -- TODO: Word8?
+           , _ncReliableBuf                  :: UV.Vector Word8
            }
 
 makeLenses ''NetChanT

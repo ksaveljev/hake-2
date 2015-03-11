@@ -1,11 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Game.Internal where
 
 import Linear.V3 (V3)
-import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import Quake
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.GItemT
@@ -66,13 +65,13 @@ data EdictT =
          , _eYawSpeed              :: Float
          , _eIdealYaw              :: Float
          , _eNextThink             :: Float
-         , _ePrethink              :: IO () -- TODO: ???
-         , _eThink                 :: IO () -- TODO: ???
-         , _eBlocked               :: IO () -- TODO: ???
-         , _eTouch                 :: IO () -- TODO: ???
-         , _eUse                   :: IO () -- TODO: ???
-         , _ePain                  :: IO () -- TODO: ???
-         , _eDie                   :: IO () -- TODO: ???
+         , _ePrethink              :: Quake () -- TODO: ???
+         , _eThink                 :: Quake () -- TODO: ???
+         , _eBlocked               :: Quake () -- TODO: ???
+         , _eTouch                 :: Quake () -- TODO: ???
+         , _eUse                   :: Quake () -- TODO: ???
+         , _ePain                  :: Quake () -- TODO: ???
+         , _eDie                   :: Quake () -- TODO: ???
          , _eTouchDebounceTime     :: Float
          , _ePainDebounceTime      :: Float
          , _eDamageDebounceTime    :: Float
@@ -205,7 +204,3 @@ data GClientT =
            , _gcUpdateChase        :: Bool
            , _gcIndex              :: Int
            }
-
-makeLenses ''EdictT
-makeLenses ''EntityStateT
-makeLenses ''GClientT
