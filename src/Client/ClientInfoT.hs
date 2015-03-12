@@ -5,6 +5,8 @@ import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
 
+import Render.ImageT
+
 data ClientInfoT =
   ClientInfoT { _ciName        :: B.ByteString
               , _ciCInfo       :: B.ByteString

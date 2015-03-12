@@ -9,7 +9,10 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
+import Client.RefDefT
+import Client.FrameT
 import Game.UserCmdT
+import Render.ImageT
 
 data ClientStateT =
   ClientStateT { _csTimeOutCount           :: Int
