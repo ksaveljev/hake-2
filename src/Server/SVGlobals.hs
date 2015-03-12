@@ -3,6 +3,8 @@ module Server.SVGlobals ( SVGlobals(..)
                         , module Server.SVGlobals
                         , module Game.CVarT
                         , module Server.ClientT
+                        , module Server.ServerT
+                        , module Server.ServerStaticT
                         )where
 
 import Control.Lens (makeLenses)
@@ -11,6 +13,8 @@ import qualified Data.Sequence as Seq
 import Internal
 import Game.CVarT
 import Server.ClientT
+import Server.ServerT
+import Server.ServerStaticT
 
 makeLenses ''SVGlobals
 
@@ -36,4 +40,6 @@ initialSVGlobals =
             , _svHostname             = newCVarT
             , _svPublicServer         = newCVarT
             , _svReconnectLimit       = newCVarT
+            , _svServer               = newServerT
+            , _svServerStatic         = newServerStaticT
             }

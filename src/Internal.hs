@@ -15,23 +15,25 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Game.CVarT
 import Game.ClientPersistantT
 import Game.ClientRespawnT
+import Game.CmdAliasT
+import Game.CModelT
+import Game.CVarT
 import Game.GItemT
 import Game.LinkT
-import Game.CmdAliasT
 import Game.MonsterInfoT
 import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.UserCmdT
+import Server.ChallengeT
 import Server.ClientFrameT
+import QCommon.FileLinkT
 import QCommon.NetAdrT
 import QCommon.NetChanT
-import QCommon.SizeBufT
-import QCommon.FileLinkT
 import QCommon.SearchPathT
+import QCommon.SizeBufT
 
 newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
                     deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
@@ -178,6 +180,8 @@ data SVGlobals =
             , _svHostname             :: CVarT
             , _svPublicServer         :: CVarT
             , _svReconnectLimit       :: CVarT
+            , _svServer               :: ServerT
+            , _svServerStatic         :: ServerStaticT
             }
 
 data CmdFunctionT =
@@ -434,4 +438,36 @@ data ClientT =
           , _cChallenge     :: Int
           , _cNetChan       :: NetChanT
           , _cServerIndex   :: Int
+          }
+
+data ServerStaticT =
+  ServerStaticT { _ssInitialized        :: Bool
+                , _ssRealTime           :: Int
+                , _ssMapCmd             :: B.ByteString
+                , _ssSpawnCount         :: Int
+                , _ssClients            :: V.Vector ClientT
+                , _ssNumClientEntities  :: Int
+                , _ssNextClientEntities :: Int
+                , _ssClientEntities     :: V.Vector EntityStateT
+                , _ssLastHeartbeat      :: Int
+                , _ssChallenges         :: V.Vector ChallengeT
+                , _ssDemoFile           :: B.ByteString
+                , _ssDemoMulticast      :: SizeBufT
+                , _ssDemoMulticastBuf   :: UV.Vector Word8
+                }
+
+data ServerT =
+  ServerT { _sState         :: Int
+          , _sAttractLoop   :: Bool
+          , _sLoadGame      :: Bool
+          , _sTime          :: Int
+          , _sFrameNum      :: Int
+          , _sName          :: B.ByteString
+          , _sModels        :: V.Vector CModelT
+          , _sConfigStrings :: V.Vector B.ByteString
+          , _sBaselines     :: V.Vector EntityStateT
+          , _sMulticast     :: SizeBufT
+          , _sMulticastBuf  :: UV.Vector Word8
+          , _sDemoFile      :: B.ByteString
+          , _sTimeDemo      :: Int
           }

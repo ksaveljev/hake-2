@@ -1,14 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SVConsoleCommands where
 
-import Control.Lens (use)
+import Data.Maybe (isJust)
+import Control.Lens (use, (.=))
 import Control.Monad (when)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
+import qualified Constants
+import qualified Server.SVInit as SVInit
 import qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
+import qualified QCommon.FS as FS
 
 {-
 ===============================================================================
@@ -114,7 +120,9 @@ Puts the server in demo mode on a specific map/cinematic
 ==================
 -}
 demoMapF :: XCommandT
-demoMapF = undefined -- TODO
+demoMapF = do
+    v1 <- Cmd.argv 1
+    SVInit.svMap True v1 False
 
 {-
 ==================
@@ -146,7 +154,27 @@ For development work
 ==================
 -}
 mapF :: XCommandT
-mapF = undefined -- TODO
+mapF = do
+    mapName <- Cmd.argv 1
+
+    fileLoaded <-
+      if BC.any (== '.') mapName
+        then do
+          return $ Just () -- dirty hack :(
+        else do
+          let expanded = "maps/" `B.append` mapName `B.append` ".bsp"
+          loadedFile <- FS.loadFile expanded
+          case loadedFile of
+            Just _ -> return $ Just ()
+            Nothing -> do
+              Com.printf $ "Can't find " `B.append` expanded `B.append` "\n"
+              return Nothing
+
+    when (isJust fileLoaded) $ do
+      svGlobals.svServer.sState .= Constants.ssDead
+
+      wipeSaveGame "current"
+      gameMapF
 
 {-
 =====================================================================

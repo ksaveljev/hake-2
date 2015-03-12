@@ -253,3 +253,12 @@ dirF = do
 
 execAutoexec :: Quake ()
 execAutoexec = undefined -- TODO
+
+{-
+- LoadFile
+- 
+- Filename are reletive to the quake search path a null buffer will just
+- return the file content as byte[]
+-}
+loadFile :: B.ByteString -> Quake (Maybe B.ByteString)
+loadFile = undefined -- TODO
