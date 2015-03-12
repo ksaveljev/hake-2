@@ -14,7 +14,6 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
-import qualified QCommon.Com as Com
 import qualified Sys.Sys as Sys
 
 -- checks the number of command line arguments and
@@ -76,44 +75,8 @@ errorF = do
     v1 <- argv 1
     comError Constants.errFatal v1
 
-parse :: B.ByteString -> Int -> Quake B.ByteString
-parse txt len =
-    if len == 0
-      then return ""
-      else
-        let parsedString = case skipWhites 0 of
-                             Nothing -> ""
-                             Just idx ->
-                               if txt `BC.index` idx == '\"' -- handle quoted strings specially
-                                 then BC.takeWhile (\c -> (c == '\"') || (c == chr 0)) (B.drop (idx + 1) txt)
-                                 -- parse a regular word
-                                 else BC.takeWhile (\c -> c > chr 32) (B.drop idx txt)
-        in if B.length parsedString > Constants.maxTokenChars
-             then do
-               -- In Quake2 original source code on github this printf is commented out
-               Com.printf $ "Token exceeded "
-                 `B.append` BC.pack (show Constants.maxTokenChars) -- IMPROVE: convert Int to ByteString using binary package?
-                 `B.append` " chars, discarded.\n"
-               return ""
-             else return parsedString
-
-  where skipWhites idx =
-          if idx < len
-            then let c = txt `BC.index` idx
-                 in if (c <= ' ') && (c /= chr 0)
-                      then skipWhites (idx + 1)
-                      else if B.take 2 (B.drop idx txt) == "//"
-                             then skipWhites (skipToEOL idx)
-                             else Just idx
-            else Nothing
-
-        skipToEOL idx =
-          if idx < len
-            then let c = txt `BC.index` idx
-                 in if (c /= '\n') && (c /= chr 0)
-                      then skipToEOL (idx + 1)
-                      else idx
-            else idx
+parse :: B.ByteString -> Int -> Int -> Quake (B.ByteString, Int)
+parse txt len i = undefined -- TODO
 
 -- CRC table
 chktbl :: UV.Vector Word8

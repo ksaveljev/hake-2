@@ -116,4 +116,18 @@ macroExpandString text len =
       else expand text False len 0 0
 
   where expand :: B.ByteString -> Bool -> Int -> Int -> Int -> Quake (Maybe B.ByteString)
-        expand txt inquote newLen count idx = undefined -- TODO
+        expand txt inquote newLen count idx =
+          if idx == newLen
+            then if inquote
+                   then do
+                     Com.printf "Line has unmatched quote, discarded.\n"
+                     return Nothing
+                   else return $ Just txt
+            else do
+              let newInQuote = if txt `BC.index` idx == '"'
+                                 then not inquote
+                                 else inquote
+
+              if newInQuote || (txt `BC.index` idx /= '$')
+                then expand txt newInQuote newLen count (idx + 1)
+                else undefined -- TODO
