@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.Com where
 
+import Data.Char (chr)
 import Data.Word (Word8)
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless)
 import Control.Lens ((.=), (%=), use)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -13,6 +14,7 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Sys.Sys as Sys
 
 -- checks the number of command line arguments and
@@ -30,9 +32,9 @@ initArgv args = do
 
 comError :: Int -> B.ByteString -> Quake ()
 comError code fmt = do
-    rec <- use $ comGlobals.cgRecursive
+    recursive <- use $ comGlobals.cgRecursive
 
-    when rec $ do
+    when recursive $ do
       msg <- use $ comGlobals.cgMsg
       Sys.sysError ("recursive error after: " `B.append` msg)
 
@@ -67,14 +69,51 @@ clearArgv :: Int -> Quake ()
 clearArgv idx = do
     c <- use $ comGlobals.cgComArgc
 
-    if idx < 0 || idx >= c
-      then return ()
-      else comGlobals.cgComArgv %= (V.// [(idx, "")])
+    unless (idx < 0 || idx >= c) $ comGlobals.cgComArgv %= (V.// [(idx, "")])
 
 errorF :: XCommandT
 errorF = do
     v1 <- argv 1
     comError Constants.errFatal v1
+
+parse :: B.ByteString -> Int -> Quake B.ByteString
+parse txt len =
+    if len == 0
+      then return ""
+      else
+        let parsedString = case skipWhites 0 of
+                             Nothing -> ""
+                             Just idx ->
+                               if txt `BC.index` idx == '\"' -- handle quoted strings specially
+                                 then BC.takeWhile (\c -> (c == '\"') || (c == chr 0)) (B.drop (idx + 1) txt)
+                                 -- parse a regular word
+                                 else BC.takeWhile (\c -> c > chr 32) (B.drop idx txt)
+        in if B.length parsedString > Constants.maxTokenChars
+             then do
+               -- In Quake2 original source code on github this printf is commented out
+               Com.printf $ "Token exceeded "
+                 `B.append` BC.pack (show Constants.maxTokenChars) -- IMPROVE: convert Int to ByteString using binary package?
+                 `B.append` " chars, discarded.\n"
+               return ""
+             else return parsedString
+
+  where skipWhites idx =
+          if idx < len
+            then let c = txt `BC.index` idx
+                 in if (c <= ' ') && (c /= chr 0)
+                      then skipWhites (idx + 1)
+                      else if B.take 2 (B.drop idx txt) == "//"
+                             then skipWhites (skipToEOL idx)
+                             else Just idx
+            else Nothing
+
+        skipToEOL idx =
+          if idx < len
+            then let c = txt `BC.index` idx
+                 in if (c /= '\n') && (c /= chr 0)
+                      then skipToEOL (idx + 1)
+                      else idx
+            else idx
 
 -- CRC table
 chktbl :: UV.Vector Word8
