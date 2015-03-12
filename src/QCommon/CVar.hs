@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.CVar where
 
@@ -57,6 +58,12 @@ get varName varValue flags = do
                globals.cvarVars %= (newCVar <|)
 
                return $ Just newCVar
+
+getAndSet :: B.ByteString -> B.ByteString -> Int -> CVarTLens -> Quake CVarT
+getAndSet varName varValue flags quakeStateLens = do
+    Just cVar <- get varName varValue flags
+    quakeStateLens .= cVar
+    return cVar
 
 init :: Quake ()
 init = do

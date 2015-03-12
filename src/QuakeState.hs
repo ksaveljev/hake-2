@@ -10,6 +10,7 @@ module QuakeState ( QuakeState(..)
                   , netChannelGlobals
                   , svGlobals
                   , SizeBufTLens
+                  , CVarTLens
                   , module Globals
                   , module CVarGlobals
                   , module QCommon.ComGlobals

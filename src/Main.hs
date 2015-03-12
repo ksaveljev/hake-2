@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# LANGUAGE OverloadedStrings #-}
 import Control.Lens ((.=), use)
-import Control.Monad.State (when, liftM)
+import Control.Monad.State (when, liftM, void)
 import System.Environment (getArgs)
 
 import Quake
@@ -22,8 +22,7 @@ main = do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
 
-      Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
-      cvarGlobals.dedicated .= dedicatedCVar
+      void $ CVar.getAndSet "dedicated" "0" Constants.cvarNoSet (cvarGlobals.dedicated)
 
       when dedicatedFlag $ cvarGlobals.dedicated.cvValue .= 1.0
 
@@ -36,8 +35,7 @@ main = do
 
       QCommon.init updatedArgs
 
-      Just nostdoutCVar <- CVar.get "nostdout" "0" 0
-      cvarGlobals.nostdout .= nostdoutCVar
+      void $ CVar.getAndSet "nostdout" "0" 0 (cvarGlobals.nostdout)
 
       startTime <- Timer.milliseconds
       mainLoop startTime

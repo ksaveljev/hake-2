@@ -58,29 +58,14 @@ init args = do
     --
     Cmd.addCommand "error" (Just Com.errorF)
 
-    Just hostSpeedsCVar <- CVar.get "host_speeds" "0" 0
-    cvarGlobals.hostSpeeds .= hostSpeedsCVar
-
-    Just logStatsCVar <- CVar.get "log_stats" "0" 0
-    cvarGlobals.logStats .= logStatsCVar
-
-    Just developerCVar <- CVar.get "developer" "0" Constants.cvarArchive
-    cvarGlobals.developer .= developerCVar
-
-    Just timeScaleCVar <- CVar.get "timescale" "0" 0
-    cvarGlobals.timeScale .= timeScaleCVar
-
-    Just fixedTimeCVar <- CVar.get "fixedtime" "0" 0
-    cvarGlobals.fixedTime .= fixedTimeCVar
-
-    Just logfileActiveCVar <- CVar.get "logfile" "0" 0
-    cvarGlobals.logfileActive .= logfileActiveCVar
-
-    Just showTraceCVar <- CVar.get "showtrace" "0" 0
-    cvarGlobals.showTrace .= showTraceCVar
-
-    Just dedicatedCVar <- CVar.get "dedicated" "0" Constants.cvarNoSet
-    cvarGlobals.dedicated .= dedicatedCVar
+    void $ CVar.getAndSet "host_speeds" "0" 0 (cvarGlobals.hostSpeeds)
+    void $ CVar.getAndSet "log_stats" "0" 0 (cvarGlobals.logStats)
+    void $ CVar.getAndSet "developer" "0" Constants.cvarArchive (cvarGlobals.developer)
+    void $ CVar.getAndSet "timescale" "0" 0 (cvarGlobals.timeScale)
+    void $ CVar.getAndSet "fixedtime" "0" 0 (cvarGlobals.fixedTime)
+    void $ CVar.getAndSet "logfile" "0" 0 (cvarGlobals.logfileActive)
+    void $ CVar.getAndSet "showtrace" "0" 0 (cvarGlobals.showTrace)
+    void $ CVar.getAndSet "dedicated" "0" Constants.cvarNoSet (cvarGlobals.dedicated)
 
     {- IMPROVE:
        public static final String BUILDSTRING = "Java " + System.getProperty("java.version");;

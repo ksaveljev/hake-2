@@ -186,6 +186,7 @@ data CmdFunctionT =
                }
 
 type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT
+type CVarTLens = Lens QuakeState QuakeState CVarT CVarT
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float

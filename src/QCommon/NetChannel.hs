@@ -2,7 +2,7 @@
 module QCommon.NetChannel where
 
 import Data.Bits ((.&.))
-import Control.Lens ((.=))
+import Control.Monad (void)
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
@@ -17,11 +17,6 @@ init = do
     
     let port = msec .&. 0xFFFF
 
-    Just showPacketsCVar <- CVar.get "showpackets" "0" 0
-    netChannelGlobals.ncShowPackets .= showPacketsCVar
-
-    Just showDropCVar <- CVar.get "showdrop" "0" 0
-    netChannelGlobals.ncShowDrop .= showDropCVar
-
-    Just qPortCVar <- CVar.get "qport" (BC.pack $ show port) Constants.cvarNoSet -- IMPROVE: convert Int to ByteString using binary package?
-    netChannelGlobals.ncQPort .= qPortCVar
+    void $ CVar.getAndSet "showpackets" "0" 0 (netChannelGlobals.ncShowPackets)
+    void $ CVar.getAndSet "showdrop" "0" 0 (netChannelGlobals.ncShowDrop)
+    void $ CVar.getAndSet "qport" (BC.pack $ show port) Constants.cvarNoSet (netChannelGlobals.ncQPort) -- IMPROVE: convert Int to ByteString using binary package?
