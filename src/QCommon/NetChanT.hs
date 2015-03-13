@@ -15,7 +15,7 @@ data NetChanT =
            , _ncLastReceived                 :: Int
            , _ncLastSent                     :: Int
            , _ncRemoteAddress                :: NetAdrT
-           , _ncQPort                        :: Int
+           , _ncRemoteQPort                  :: Int
            , _ncIncomingSequence             :: Int
            , _ncIncomingAcknowledged         :: Int
            , _ncIncomingReliableAcknowledged :: Int

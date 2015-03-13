@@ -8,6 +8,7 @@ module Game.EdictT ( EdictT(..)
                    , module Game.EdictInfoT
                    , module Game.EdictPhysicsT
                    , module Game.EdictStatusT
+                   , module Game.GClientT
                    ) where
 
 import Control.Lens (makeLenses)
@@ -20,6 +21,7 @@ import Game.EdictMinMaxT
 import Game.EdictInfoT
 import Game.EdictPhysicsT
 import Game.EdictStatusT
+import Game.GClientT
 
 makeLenses ''EdictT
 

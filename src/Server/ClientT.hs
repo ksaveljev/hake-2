@@ -1,6 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Server.ClientT where
+module Server.ClientT ( ClientT(..)
+                      , module Server.ClientT
+                      , module Game.UserCmdT
+                      , module Game.EdictT
+                      , module QCommon.SizeBufT
+                      , module QCommon.NetChanT
+                      ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V

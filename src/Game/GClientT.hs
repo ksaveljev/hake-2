@@ -1,8 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.GClientT where
+module Game.GClientT ( GClientT(..)
+                     , module Game.GClientT
+                     , module Game.PlayerStateT
+                     ) where
 
 import Control.Lens (makeLenses)
 
-import Game.Internal
+import Internal
+import Game.PlayerStateT
 
 makeLenses ''GClientT

@@ -1,11 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Server.SVConsoleCommands where
 
 import Data.Maybe (isJust)
 import Control.Lens (use, (.=))
+import Control.Lens.At (ix)
 import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -14,6 +17,7 @@ import qualified Constants
 import qualified Server.SVInit as SVInit
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 
 {-
@@ -200,7 +204,42 @@ SV_Savegame_f
 ==============
 -}
 saveGameF :: XCommandT
-saveGameF = undefined -- TODO
+saveGameF = do
+    state <- use $ svGlobals.svServer.sState
+    c <- Cmd.argc
+    deathmatchValue <- CVar.variableValue "deathmatch"
+    v1 <- Cmd.argv 1
+    maxClientsValue <- use $ svGlobals.svMaxClients.cvValue
+    playerStats <- use $ svGlobals.svServerStatic.ssClients.(ix 0).cEdict.eClient.gcPlayerState.psStats
+    let health = playerStats UV.! Constants.statHealth
+
+    if | state /= Constants.ssGame -> Com.printf "You must be in a game to save.\n"
+       | c /= 2 -> Com.printf "USAGE: savegame <directory>\n"
+       | deathmatchValue /= 0 -> Com.printf "Can't savegame in a deathmatch\n"
+       | v1 == "current" -> Com.printf "Can't save to 'current'\n"
+       | maxClientsValue == 1 && health <= 0 -> Com.printf "\nCan't savegame while dead!\n"
+       | ".." `B.isInfixOf` v1 || "/" `B.isInfixOf` v1 || "\\" `B.isInfixOf` v1 -> Com.printf "Bad savedir.\n"
+       | otherwise -> do
+           Com.printf "Saving game...\n"
+
+           -- archive current level, including all client edicts.
+           -- when the level is reloaded, they will be shells awaiting
+           -- a connecting client
+           writeLevelFile
+
+           -- // save server state
+           -- IMPROVE: catch exception
+           -- try {
+           --     SV_WriteServerFile(false);
+           -- }
+           -- catch (Exception e) {
+           --     Com.Printf("IOError in SV_WriteServerFile: " + e);
+           -- }
+           writeServerFile False
+
+           -- copy it off
+           copySaveGame "current" v1
+           Com.printf "Done.\n"
 
 -- ===============================================================
 {-
