@@ -274,7 +274,7 @@ SV_Heartbeat_f
 ==================
 -}
 heartbeatF :: XCommandT
-heartbeatF = undefined -- TODO
+heartbeatF = svGlobals.svServerStatic.ssLastHeartbeat .= -9999999
 
 {-
 ===========
