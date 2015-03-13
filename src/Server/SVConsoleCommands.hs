@@ -211,7 +211,7 @@ saveGameF = do
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
     maxClientsValue <- use $ svGlobals.svMaxClients.cvValue
-    playerStats <- use $ svGlobals.svServerStatic.ssClients.(ix 0).cEdict.eClient.gcPlayerState.psStats
+    playerStats <- use $ svGlobals.svServerStatic.ssClients.ix 0.cEdict.eClient.gcPlayerState.psStats
     let health = playerStats UV.! Constants.statHealth
 
     if | state /= Constants.ssGame -> Com.printf "You must be in a game to save.\n"
@@ -285,7 +285,9 @@ SV_Serverinfo_f
 ===========
 -}
 serverInfoF :: XCommandT
-serverInfoF = undefined -- TODO
+serverInfoF = do
+    Com.printf "Server info settings:\n"
+    CVar.serverInfo >>= Info.print
 
 {-
 ===========
