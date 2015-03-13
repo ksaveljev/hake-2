@@ -17,6 +17,7 @@ import qualified Constants
 import qualified Server.SVInit as SVInit
 import qualified Server.SVMain as SVMain
 import qualified Game.Cmd as Cmd
+import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -356,7 +357,7 @@ Let the game dll handle a command
 ===============
 -}
 serverCommandF :: XCommandT
-serverCommandF = undefined -- TODO
+serverCommandF = GameSVCmds.serverCommand
 -- ===========================================================
 
 {-
