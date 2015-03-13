@@ -262,3 +262,12 @@ execAutoexec = undefined -- TODO
 -}
 loadFile :: B.ByteString -> Quake (Maybe B.ByteString)
 loadFile = undefined -- TODO
+
+{-
+- Gamedir
+- 
+- Called to find where to write a file (demos, savegames, etc)
+- this is modified to <user.home>/.hake2 
+-}
+gameDir :: Quake B.ByteString
+gameDir = undefined -- TODO

@@ -3,11 +3,12 @@
 module Server.SVConsoleCommands where
 
 import Data.Maybe (isJust)
-import Control.Lens (use, (.=))
+import Control.Lens (use, (.=), (^.))
 import Control.Lens.At (ix)
 import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -151,7 +152,54 @@ goes to map jail.bsp.
 ==================
 -}
 gameMapF :: XCommandT
-gameMapF = undefined -- TODO
+gameMapF = do
+    c <- Cmd.argc
+
+    if c /= 2
+      then Com.printf "USAGE: gamemap <map>\n"
+      else do
+        -- check for clearing the current savegame
+        mapName <- Cmd.argv 1
+        Com.dprintf $ "SV_GameMap(" `B.append` mapName `B.append` ")\n"
+
+        gd <- FS.gameDir
+        FS.createPath $ gd `B.append` "/save/current/"
+
+        if BC.head mapName == '*'
+          then wipeSaveGame "current" -- wipe all the *.sav files
+          else do -- save the map just exited
+            state <- use $ svGlobals.svServer.sState
+
+            when (state == Constants.ssGame) $ do
+              -- clear all the client inuse flags before saving so that
+              -- when the level is re-entered, the clients will spawn
+              -- at spawn points instead of occupying body shells
+              maxClientsValue <- (use $ svGlobals.svMaxClients.cvValue) >>= return . truncate
+              clients <- use $ svGlobals.svServerStatic.ssClients
+              savedInUse <- mapM (\i -> do
+                                        let inuse = (clients V.! i)^.cEdict.eInUse
+                                        svGlobals.svServerStatic.ssClients.ix i.cEdict.eInUse .= False
+                                        return inuse
+                                ) [0..maxClientsValue-1]
+
+              writeLevelFile
+
+              -- we must restore these for clients to transfer over correctly
+              mapM_ (\(i, inuse) ->
+                      svGlobals.svServerStatic.ssClients.ix i.cEdict.eInUse .= inuse
+                    ) ([0..] `zip` savedInUse)
+
+        -- start up the next map
+        SVInit.svMap False mapName False
+
+        -- archive server state
+        svGlobals.svServerStatic.ssMapCmd .= mapName
+
+        -- copy off the level to the autosave slot
+        dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+        when (dedicatedValue == 0) $ do
+          writeServerFile True
+          copySaveGame "current" "save0"
 
 {-
 ==================

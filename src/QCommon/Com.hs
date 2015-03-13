@@ -51,6 +51,9 @@ comError code fmt = do
 printf :: B.ByteString -> Quake ()
 printf = io.print -- TODO
 
+dprintf :: B.ByteString -> Quake ()
+dprintf = io.print -- TODO
+
 argc :: Quake Int
 argc = use $ comGlobals.cgComArgc
 
