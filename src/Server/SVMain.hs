@@ -12,7 +12,7 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified QCommon.SZ as SZ
-import qualified Server.SVConsoleCommands as SVConsoleCommands
+import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 
 -- only called at quake2.exe startup, not for each game
 init :: Quake ()
@@ -50,3 +50,7 @@ init = do
 
     bufData <- use $ globals.netMessageBuffer
     SZ.init (globals.netMessage) bufData (B.length bufData)
+
+-- Called when each game quits, before Sys_Quit or Sys_Error.
+shutdown :: B.ByteString -> Bool -> Quake ()
+shutdown = undefined -- TODO

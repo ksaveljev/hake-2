@@ -15,11 +15,13 @@ import QuakeState
 import QCommon.XCommandT
 import qualified Constants
 import qualified Server.SVInit as SVInit
+import qualified Server.SVMain as SVMain
 import qualified Game.Cmd as Cmd
 import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import qualified Sys.NET as NET
 
 {-
 ===============================================================================
@@ -340,7 +342,11 @@ Kick everyone off, possibly in preparation for a new game
 ===============
 -}
 killServerF :: XCommandT
-killServerF = undefined -- TODO
+killServerF = do
+    initialized <- use $ svGlobals.svServerStatic.ssInitialized
+    when initialized $ do
+      SVMain.shutdown "Server was killed.\n" False
+      NET.config False -- close network sockets
 
 {-
 ===============
