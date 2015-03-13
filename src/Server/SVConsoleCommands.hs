@@ -16,6 +16,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Server.SVInit as SVInit
 import qualified Game.Cmd as Cmd
+import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
@@ -46,7 +47,7 @@ SV_SetPlayer
 Sets sv_client and sv_player to the player with idnum Cmd.Argv(1)
 ==================
 -}
-setPlayer :: Quake ()
+setPlayer :: Quake Bool
 setPlayer = undefined -- TODO
 
 {-
@@ -294,7 +295,18 @@ Examine all a users info strings
 ===========
 -}
 dumpUserF :: XCommandT
-dumpUserF = undefined -- TODO
+dumpUserF = do
+    c <- Cmd.argc
+
+    if c /= 2
+      then Com.printf "Usage: info <userid>\n"
+      else do
+        sp <- setPlayer
+        when sp $ do
+          Com.printf "userinfo\n"
+          Com.printf "--------\n"
+          userInfo <- use $ svGlobals.svClient.cUserInfo
+          Info.print userInfo
 
 {-
 ==============
