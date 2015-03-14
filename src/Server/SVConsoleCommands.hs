@@ -6,6 +6,7 @@ import Data.Maybe (isJust)
 import Control.Lens (use, (.=), (^.))
 import Control.Lens.At (ix)
 import Control.Monad (when)
+import System.Directory (doesFileExist)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -247,7 +248,35 @@ SV_Loadgame_f
 ==============
 -}
 loadGameF :: XCommandT
-loadGameF = undefined -- TODO
+loadGameF = do
+    c <- Cmd.argc
+
+    if c /= 2
+      then Com.printf "USAGE: loadgame <directory>\n"
+      else do
+        Com.printf "Loading game...\n"
+        
+        dir <- Cmd.argv 1
+
+        when (".." `B.isInfixOf` dir || "/" `B.isInfixOf` dir || "\\" `B.isInfixOf` dir) $
+          Com.printf "Bad savedir.\n"
+
+        gameDir <- FS.gameDir
+        v1 <- Cmd.argv 1
+        -- make sure the server.ssv file exists
+        let name = gameDir `B.append` "/save/" `B.append` v1 `B.append` "/server.ssv"
+        fileExists <- io $ doesFileExist (BC.unpack name)
+
+        if fileExists
+          then do
+            copySaveGame v1 "current"
+            readServerFile
+
+            -- go to the map
+            svGlobals.svServer.sState .= Constants.ssDead -- don't save current level when changing
+            mapCmd <- use $ svGlobals.svServerStatic.ssMapCmd
+            SVInit.svMap False mapCmd True
+          else Com.printf $ "No such savegame: " `B.append` name `B.append` "\n"
 
 {-
 ==============
