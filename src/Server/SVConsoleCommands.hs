@@ -18,6 +18,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Server.SVInit as SVInit
 import qualified Server.SVMain as SVMain
+import qualified Server.SVSend as SVSend
 import qualified Game.Cmd as Cmd
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.Info as Info
@@ -331,7 +332,26 @@ Kick a user off of the server
 ==================
 -}
 kickF :: XCommandT
-kickF = undefined -- TODO
+kickF = do
+    initialized <- use $ svGlobals.svServerStatic.ssInitialized
+    c <- Cmd.argc
+
+    if | not initialized -> Com.printf "No server running.\n"
+       | c /= 2 -> Com.printf "Usage: kick <userid>\n"
+       | otherwise -> do
+           sp <- setPlayer
+
+           when sp $ do
+             client <- use $ svGlobals.svClient
+             let playerName = client^.cName
+             SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
+             -- print directly, because the dropped client won't get the
+             -- SV_BroadcastPrintf message
+             SVSend.clientPrintf client Constants.printHigh "You were kicked from the game\n"
+             SVMain.dropClient client
+             -- SV_INIT.svs.realtime
+             realtime <- use $ svGlobals.svServerStatic.ssRealTime
+             svGlobals.svClient.cLastMessage .= realtime -- min case there is a funny zombie
 
 {-
 ================

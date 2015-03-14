@@ -54,3 +54,11 @@ init = do
 -- Called when each game quits, before Sys_Quit or Sys_Error.
 shutdown :: B.ByteString -> Bool -> Quake ()
 shutdown = undefined -- TODO
+
+{-
+- Called when the player is totally leaving the server, either willingly or
+- unwillingly. This is NOT called if the entire server is quiting or
+- crashing.
+-}
+dropClient :: ClientT -> Quake ()
+dropClient = undefined -- TODO
