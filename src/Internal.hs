@@ -160,7 +160,7 @@ data NetChannelGlobals =
                     }
 
 data SVGlobals =
-  SVGlobals { _svMasterAdr            :: Seq NetAdrT
+  SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
             , _svClient               :: ClientT
             , _svPaused               :: CVarT
             , _svTimeDemo             :: CVarT

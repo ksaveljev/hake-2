@@ -8,19 +8,21 @@ module Server.SVGlobals ( SVGlobals(..)
                         )where
 
 import Control.Lens (makeLenses)
-import qualified Data.Sequence as Seq
+import qualified Data.Vector as V
 
 import Internal
 import Game.CVarT
+import QCommon.NetAdrT
 import Server.ClientT
 import Server.ServerT
 import Server.ServerStaticT
+import qualified Constants
 
 makeLenses ''SVGlobals
 
 initialSVGlobals :: SVGlobals
 initialSVGlobals =
-  SVGlobals { _svMasterAdr            = Seq.empty -- TODO
+  SVGlobals { _svMasterAdr            = V.replicate Constants.maxMasters newNetAdrT
             , _svClient               = newClientT
             , _svPaused               = newCVarT
             , _svTimeDemo             = newCVarT

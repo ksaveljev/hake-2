@@ -3,9 +3,9 @@
 module Server.SVConsoleCommands where
 
 import Data.Maybe (isJust)
-import Control.Lens (use, (.=), (^.))
+import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
-import Control.Monad (when)
+import Control.Monad (when, void, liftM)
 import System.Directory (doesFileExist)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -14,6 +14,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import QCommon.NetAdrT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Server.SVInit as SVInit
@@ -25,6 +26,7 @@ import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import qualified QCommon.NetChannel as NetChannel
 import qualified Sys.NET as NET
 
 {-
@@ -44,7 +46,49 @@ Specify a list of master servers
 ====================
 -}
 setMasterF :: XCommandT
-setMasterF = undefined -- TODO
+setMasterF = do
+    dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+
+    -- only dedicated servers send heartbeats
+    if dedicatedValue == 0
+      then Com.printf "Only dedicated servers use masters.\n"
+      else do
+        -- make sure the server is listed public
+        void $ CVar.set "public" "1"
+
+        masters <- use $ svGlobals.svMasterAdr
+        let idmaster = masters V.! 0
+        svGlobals.svMasterAdr .= V.fromList (idmaster : map (const newNetAdrT) [1..Constants.maxMasters-1])
+
+        c <- Cmd.argc
+        newMasters <- collectMasters c 1 1 [] -- slot 0 will always contain the id master
+
+        svGlobals.svMasterAdr %= (V.// newMasters)
+
+        svGlobals.svServerStatic.ssLastHeartbeat .= -9999999
+
+  where collectMasters :: Int -> Int -> Int -> [(Int, NetAdrT)] -> Quake [(Int, NetAdrT)]
+        collectMasters argc idx slot accum
+          | idx == argc = return accum
+          | slot == Constants.maxMasters = return accum
+          | otherwise = do
+              vi <- Cmd.argv idx
+              netAdr <- NET.stringToAdr vi
+              case netAdr of
+                Nothing -> do
+                  Com.printf $ "Bad address: " `B.append` vi `B.append` "\n"
+                  collectMasters argc (idx + 1) slot accum
+                Just adr -> do
+                  let masterAdr = if (adr^.naPort) == 0
+                                    then adr { _naPort = Constants.portMaster }
+                                    else adr
+
+                  Com.printf $ "Master server at " `B.append` NET.adrToString masterAdr `B.append` "\n"
+                  Com.printf "Sending a ping.\n"
+
+                  NetChannel.outOfBandPrint Constants.nsServer masterAdr "ping"
+
+                  collectMasters argc (idx + 1) (slot + 1) ((slot, masterAdr) : accum)
 
 {-
 ==================
@@ -176,7 +220,7 @@ gameMapF = do
               -- clear all the client inuse flags before saving so that
               -- when the level is re-entered, the clients will spawn
               -- at spawn points instead of occupying body shells
-              maxClientsValue <- (use $ svGlobals.svMaxClients.cvValue) >>= return . truncate
+              maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue) -- >>= return . truncate
               clients <- use $ svGlobals.svServerStatic.ssClients
               savedInUse <- mapM (\i -> do
                                         let inuse = (clients V.! i)^.cEdict.eInUse
@@ -217,8 +261,7 @@ mapF = do
 
     fileLoaded <-
       if BC.any (== '.') mapName
-        then do
-          return $ Just () -- dirty hack :(
+        then return $ Just () -- dirty hack :(
         else do
           let expanded = "maps/" `B.append` mapName `B.append` ".bsp"
           loadedFile <- FS.loadFile expanded
