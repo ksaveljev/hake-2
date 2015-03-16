@@ -77,6 +77,9 @@ waitF = globals.cmdWait .= True
 argc :: Quake Int
 argc = use $ cmdGlobals.cgCmdArgc
 
+args :: Quake B.ByteString
+args = use $ cmdGlobals.cgCmdArgs
+
 argv :: Int -> Quake B.ByteString
 argv idx = do
     c <- argc

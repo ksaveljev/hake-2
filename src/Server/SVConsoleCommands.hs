@@ -554,7 +554,24 @@ SV_ConSay_f
 ==================
 -}
 conSayF :: XCommandT
-conSayF = undefined -- TODO
+conSayF = do
+    c <- Cmd.argc
+
+    when (c >= 2) $ do
+      p <- Cmd.args
+
+      let text = "console: " `B.append` (if p `BC.index` 0 == '"'
+                                           then B.take (B.length p - 2) (B.drop 1 p)
+                                           else p)
+
+      maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue)
+      clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
+
+      void $ traverse (sendMessage text) clients
+
+  where sendMessage text client =
+          when ((client^.cState) /= Constants.csSpawned) $
+            SVSend.clientPrintf client Constants.printChat (text `B.append` "\n")
 
 {-
 ==================
