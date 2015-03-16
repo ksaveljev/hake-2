@@ -14,6 +14,7 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Sys.Sys as Sys
 
 -- checks the number of command line arguments and
@@ -93,14 +94,22 @@ parse txt len idx = do
             if txt `BC.index` skipWhitesIdx == '\"'
               then do -- handle quoted strings specially
                 let droppedStr = B.drop (skipWhitesIdx + 1) txt
-                    str = BC.takeWhile (undefined) droppedStr
+                    str = BC.takeWhile (\c -> c == '\"' || c == chr 0) droppedStr
                     newIdx = skipWhitesIdx + 1 + B.length str
                     finalIdx = if newIdx >= len
                                  then newIdx
                                  else newIdx + 1 -- we have reached '\"' or NUL so we need to skip it
                 return (B.take Constants.maxTokenChars str, finalIdx)
               else do -- parse a regular word
-                undefined -- TODO
+                let droppedStr = B.drop skipWhitesIdx txt
+                    str = BC.takeWhile (\c -> c > chr 32) droppedStr
+                    newIdx = skipWhitesIdx + B.length str
+
+                if B.length str >= Constants.maxTokenChars
+                  then do
+                    Com.printf $ "Token exceeded " `B.append` BC.pack (show Constants.maxTokenChars) `B.append` " chars, discarded.\n"
+                    return ("", newIdx)
+                  else return (str, newIdx)
 
   where skipWhites :: B.ByteString -> Int -> Int
         skipWhites str startIdx =
