@@ -6,7 +6,7 @@ import Data.Maybe (isJust)
 import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, removeFile)
 import System.FilePath (takeFileName)
 import System.FilePath.Glob (namesMatching)
 import qualified Data.ByteString as B
@@ -115,7 +115,19 @@ remove = undefined -- TODO
 
 -- Delete save files save/(number)/.
 wipeSaveGame :: B.ByteString -> Quake ()
-wipeSaveGame = undefined -- TODO
+wipeSaveGame savename = do
+    Com.dprintf $ "SV_WipeSaveGame(" `B.append` savename `B.append` ")\n"
+
+    gamedir <- FS.gameDir
+
+    remove $ gamedir `B.append` "/save/" `B.append` savename `B.append` "/server.ssv"
+    remove $ gamedir `B.append` "/save/" `B.append` savename `B.append` "/game.ssv"
+
+    foundFiles <- io $ namesMatching $ BC.unpack $ gamedir `B.append` "/save/" `B.append` savename `B.append` "/*.sav"
+    io $ mapM_ removeFile foundFiles -- IMPROVE: catch exceptions?
+
+    otherFoundFiles <- io $ namesMatching $ BC.unpack $ gamedir `B.append` "/save/" `B.append` savename `B.append` "/*.sv2"
+    io $ mapM_ removeFile otherFoundFiles -- IMPROVE: catch exceptions?
 
 {-
 ================
