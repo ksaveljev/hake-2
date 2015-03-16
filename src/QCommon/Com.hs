@@ -79,7 +79,38 @@ errorF = do
     comError Constants.errFatal v1
 
 parse :: B.ByteString -> Int -> Int -> Quake (B.ByteString, Int)
-parse txt len i = undefined -- TODO
+parse txt len idx = do
+    let skipWhitesIdx = skipWhites txt idx
+
+    if skipWhitesIdx >= len
+      then return ("", skipWhitesIdx)
+      else
+        if BC.take 2 (B.drop skipWhitesIdx txt) == "//" -- skip // comments
+          then do
+            let skipToEolIdx = skipToEOL txt skipWhitesIdx
+            parse txt len skipToEolIdx
+          else
+            if txt `BC.index` skipWhitesIdx == '\"'
+              then do -- handle quoted strings specially
+                let droppedStr = B.drop (skipWhitesIdx + 1) txt
+                    str = BC.takeWhile (undefined) droppedStr
+                    newIdx = skipWhitesIdx + 1 + B.length str
+                    finalIdx = if newIdx >= len
+                                 then newIdx
+                                 else newIdx + 1 -- we have reached '\"' or NUL so we need to skip it
+                return (B.take Constants.maxTokenChars str, finalIdx)
+              else do -- parse a regular word
+                undefined -- TODO
+
+  where skipWhites :: B.ByteString -> Int -> Int
+        skipWhites str startIdx =
+          let droppedStr = B.drop startIdx str
+          in startIdx + B.length (BC.takeWhile (\c -> c <= ' ' && c /= chr 0) droppedStr)
+
+        skipToEOL :: B.ByteString -> Int -> Int
+        skipToEOL str startIdx =
+          let droppedStr = B.drop startIdx str
+          in startIdx + B.length (BC.takeWhile (\c -> c /= '\n' && c /= chr 0) droppedStr)
 
 -- CRC table
 chktbl :: UV.Vector Word8
