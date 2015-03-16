@@ -106,8 +106,8 @@ tokenizeString text macroExpand = do
     cmdGlobals.cgCmdArgs .= ""
 
     expandedText <- if macroExpand
-                 then macroExpandString text (B.length text)
-                 else return (Just text)
+                      then macroExpandString text (B.length text)
+                      else return (Just text)
 
     case expandedText of
       Nothing -> return ()
