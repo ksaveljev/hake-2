@@ -49,7 +49,7 @@ init = do
     void $ CVar.getAndSet "sv_reconnect_limit" "3" Constants.cvarArchive (svGlobals.svReconnectLimit)
 
     bufData <- use $ globals.netMessageBuffer
-    SZ.init (globals.netMessage) bufData (B.length bufData)
+    SZ.init (globals.netMessage) bufData Constants.maxMsglen
 
 -- Called when each game quits, before Sys_Quit or Sys_Error.
 shutdown :: B.ByteString -> Bool -> Quake ()
