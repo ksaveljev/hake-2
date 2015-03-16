@@ -268,7 +268,30 @@ SV_ReadLevelFile
 ==============
 -}
 readLevelFile :: Quake ()
-readLevelFile = undefined -- TODO
+readLevelFile = do
+    Com.dprintf "SV_ReadLevelFile()\n"
+
+    gamedir <- FS.gameDir
+    serverName <- use $ svGlobals.svServer.sName
+    let sv2name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sv2"
+
+    -- IMPROVE: catch exceptions?
+    -- catch (Exception e) {
+    --     Com.Printf("Failed to open " + name + "\n");
+    --     e.printStackTrace();
+    -- }
+    -- 
+    qf <- io $ QuakeFile.open sv2name
+
+    configStrings <- io $ liftM V.fromList (mapM (const $ QuakeFile.readString qf) [0..Constants.maxConfigStrings-1])
+    svGlobals.svServer.sConfigStrings .= configStrings
+
+    CM.readPortalState qf
+
+    io $ QuakeFile.close qf
+    
+    let name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sav"
+    GameSave.readLevel name
 
 {-
 ==============

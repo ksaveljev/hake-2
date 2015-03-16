@@ -9,5 +9,6 @@ import Internal
 
 makeLenses ''ServerT
 
+-- configstrings must be initialized to full vector of values
 newServerT :: ServerT
 newServerT = undefined -- TODO
