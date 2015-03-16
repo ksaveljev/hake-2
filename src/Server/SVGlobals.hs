@@ -12,6 +12,7 @@ import qualified Data.Vector as V
 
 import Internal
 import Game.CVarT
+import Game.EdictT
 import QCommon.NetAdrT
 import Server.ClientT
 import Server.ServerT
@@ -44,4 +45,5 @@ initialSVGlobals =
             , _svReconnectLimit       = newCVarT
             , _svServer               = newServerT
             , _svServerStatic         = newServerStaticT
+            , _svPlayer               = newEdictT
             }

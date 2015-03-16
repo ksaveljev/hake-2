@@ -2,7 +2,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVConsoleCommands where
 
+import Data.Char (isDigit)
 import Data.Maybe (isJust)
+import Data.Foldable (find)
 import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
@@ -30,6 +32,7 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.NetChannel as NetChannel
 import qualified Sys.NET as NET
+import qualified Util.Lib as Lib
 
 {-
 ===============================================================================
@@ -100,7 +103,52 @@ Sets sv_client and sv_player to the player with idnum Cmd.Argv(1)
 ==================
 -}
 setPlayer :: Quake Bool
-setPlayer = undefined -- TODO
+setPlayer = do
+    c <- Cmd.argc
+
+    if c < 2
+      then return False
+      else do
+        v1 <- Cmd.argv 1
+        let ch = v1 `BC.index` 0
+
+        maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue)
+
+        if isDigit ch
+          then do
+            let idnum = Lib.atoi v1
+            if idnum < 0 || idnum >= maxClientsValue
+              then do
+                Com.printf $ "Bad client slot: " `B.append` BC.pack (show idnum) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
+                return False
+              else do
+                clients <- use $ svGlobals.svServerStatic.ssClients
+                let client = clients V.! idnum
+                svGlobals.svClient .= client
+                svGlobals.svPlayer .= (client^.cEdict)
+
+                if (client^.cState) == 0
+                  then do
+                    Com.printf $ "Client " `B.append` BC.pack (show idnum) `B.append` " is not active\n" -- IMPROVE: convert Int to ByteString using binary package?
+                    return False
+                  else return True
+          else do -- check for a name match
+            clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
+            let found = find (clientNameMatch v1) clients
+
+            case found of
+              Nothing -> do
+                Com.printf $ "Userid " `B.append` v1 `B.append` " is not on the server\n"
+                return False
+              Just client -> do
+                svGlobals.svClient .= client
+                svGlobals.svPlayer .= (client^.cEdict)
+                return True
+
+  where clientNameMatch expectedName client =
+          if | (client^.cState) == 0 -> False
+             | (client^.cName) == expectedName -> True
+             | otherwise -> False
 
 {-
 ===============================================================================

@@ -182,6 +182,7 @@ data SVGlobals =
             , _svReconnectLimit       :: CVarT
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
+            , _svPlayer               :: EdictT
             }
 
 data CmdFunctionT =
