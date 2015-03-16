@@ -105,7 +105,16 @@ tokenizeString text macroExpand = do
     cmdGlobals.cgCmdArgc .= 0
     cmdGlobals.cgCmdArgs .= ""
 
-    undefined -- TODO
+    expandedText <- if macroExpand
+                 then macroExpandString text (B.length text)
+                 else return (Just text)
+
+    case expandedText of
+      Nothing -> return ()
+      Just newText -> do
+        let len = B.length newText
+
+        undefined -- TODO
 
 -- Cmd_MacroExpandString
 macroExpandString :: B.ByteString -> Int -> Quake (Maybe B.ByteString)
