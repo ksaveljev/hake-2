@@ -7,6 +7,8 @@ import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
 import System.Directory (doesFileExist)
+import System.FilePath (takeFileName)
+import System.FilePath.Glob (namesMatching)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -129,7 +131,39 @@ SV_CopySaveGame
 ================
 -}
 copySaveGame :: B.ByteString -> B.ByteString -> Quake ()
-copySaveGame = undefined -- TODO
+copySaveGame src dst = do
+    Com.dprintf $ "SV_CopySaveGame(" `B.append` src `B.append` "," `B.append` dst `B.append` ")\n"
+
+    wipeSaveGame dst
+
+    -- copy the savegame over
+    gamedir <- FS.gameDir
+    let s1 = gamedir `B.append` "/save/" `B.append` src `B.append` "/server.ssv"
+        s2 = gamedir `B.append` "/save/" `B.append` dst `B.append` "/server.ssv"
+    FS.createPath s2
+    copyFile s1 s2
+
+    let name_ = gamedir `B.append` "/save/" `B.append` src `B.append` "/game.ssv"
+        name2_ = gamedir `B.append` "/save/" `B.append` dst `B.append` "/gamessv"
+    copyFile name_ name2_
+
+    let name = gamedir `B.append` "/save/" `B.append` src `B.append` "/*.sav"
+
+    foundFiles <- io $ namesMatching (BC.unpack name)
+
+    mapM_ (copyFoundFile gamedir) foundFiles
+
+  where copyFoundFile gamedir foundFile = do
+          let foundFileB = BC.pack foundFile
+              foundFileName = BC.pack $ takeFileName foundFile
+              name2 = gamedir `B.append` "/save/" `B.append` dst `B.append` "/" `B.append` foundFileName
+
+          copyFile foundFileB name2
+
+          let sv2name = B.take (B.length foundFileB - 3) foundFileB `B.append` "sv2"
+              sv2name2 = B.take (B.length name2 - 3) name2 `B.append` "sv2"
+
+          copyFile sv2name sv2name2
 
 {-
 ==============
