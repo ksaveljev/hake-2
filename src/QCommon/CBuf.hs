@@ -17,7 +17,7 @@ import qualified Game.Cmd as Cmd
 init :: Quake ()
 init = do
     bufData <- use $ globals.cmdTextBuf
-    SZ.init (globals.cmdText) bufData (B.length bufData)
+    SZ.init (globals.cmdText) bufData 8192
 
 addEarlyCommands :: Bool -> Quake ()
 addEarlyCommands clear = do
