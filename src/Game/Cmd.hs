@@ -133,4 +133,26 @@ macroExpandString text len =
 
               if newInQuote || (txt `BC.index` idx /= '$')
                 then expand txt newInQuote newLen count (idx + 1)
-                else undefined -- TODO
+                else do
+                  (var, newIdx) <- Com.parse txt newLen (idx + 1)
+
+                  if var == ""
+                    then expand txt newInQuote newLen count newIdx
+                    else do
+                      token <- CVar.variableString var
+                      let updatedLen = newLen + B.length token
+
+                      if updatedLen >= Constants.maxStringChars
+                        then do
+                          Com.printf $ "Expanded line exceeded "
+                            `B.append` BC.pack (show Constants.maxStringChars) -- IMPROVE: convert Int to ByteString using binary package?
+                            `B.append` " chars, discarded.\n"
+                          return Nothing
+                        else do
+                          let newTxt = B.take idx txt `B.append` token `B.append` B.drop newIdx txt
+
+                          if count + 1 == 100
+                            then do
+                              Com.printf "Macro expansion loop, discarded.\n"
+                              return Nothing
+                            else expand newTxt newInQuote (B.length newTxt) (count + 1) idx

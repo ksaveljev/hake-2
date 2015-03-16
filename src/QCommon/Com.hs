@@ -14,7 +14,6 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
-import qualified QCommon.Com as Com
 import qualified Sys.Sys as Sys
 
 -- checks the number of command line arguments and
@@ -107,7 +106,7 @@ parse txt len idx = do
 
                 if B.length str >= Constants.maxTokenChars
                   then do
-                    Com.printf $ "Token exceeded " `B.append` BC.pack (show Constants.maxTokenChars) `B.append` " chars, discarded.\n"
+                    printf $ "Token exceeded " `B.append` BC.pack (show Constants.maxTokenChars) `B.append` " chars, discarded.\n" -- IMPROVE: convert Int to ByteString using binary package?
                     return ("", newIdx)
                   else return (str, newIdx)
 
