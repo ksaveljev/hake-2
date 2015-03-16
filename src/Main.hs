@@ -3,6 +3,7 @@
 import Control.Lens ((.=), use)
 import Control.Monad.State (when, liftM, void)
 import System.Environment (getArgs)
+import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
 
 import Quake
 import QuakeState
@@ -18,6 +19,8 @@ isDedicatedCmdArg [] = False
 
 main :: IO ()
 main = do
+    hSetBuffering stdout NoBuffering
+
     runQuake initialQuakeState $ do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
