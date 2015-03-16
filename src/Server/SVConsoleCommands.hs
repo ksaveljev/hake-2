@@ -111,7 +111,7 @@ SAVEGAME FILES
 -}
 
 remove :: B.ByteString -> Quake ()
-remove = undefined -- TODO
+remove name = io $ removeFile (BC.unpack name) -- IMPROVE: catch exceptions ?
 
 -- Delete save files save/(number)/.
 wipeSaveGame :: B.ByteString -> Quake ()
