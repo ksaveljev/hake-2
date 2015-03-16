@@ -5,6 +5,7 @@ module Server.SVConsoleCommands where
 import Data.Char (isDigit)
 import Data.Maybe (isJust)
 import Data.Foldable (find)
+import Data.Traversable (traverse)
 import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
@@ -25,14 +26,17 @@ import qualified Server.SVInit as SVInit
 import qualified Server.SVMain as SVMain
 import qualified Server.SVSend as SVSend
 import qualified Game.Cmd as Cmd
+import qualified Game.GameSave as GameSave
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.Info as Info
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.NetChannel as NetChannel
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
+import qualified Util.QuakeFile as QuakeFile
 
 {-
 ===============================================================================
@@ -232,7 +236,30 @@ SV_WriteLevelFile
 ==============
 -}
 writeLevelFile :: Quake ()
-writeLevelFile = undefined -- TODO
+writeLevelFile = do
+    Com.dprintf "SV_WriteLevelFile()\n"
+
+    gamedir <- FS.gameDir
+    serverName <- use $ svGlobals.svServer.sName
+    let sv2name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sv2"
+
+    -- IMPROVE: catch exceptions?
+    -- catch (Exception e) {
+    --     Com.Printf("Failed to open " + name + "\n");
+    --     e.printStackTrace();
+    -- }
+    -- 
+    qf <- io $ QuakeFile.open sv2name
+
+    configStrings <- liftM (V.take Constants.maxConfigStrings) (use $ svGlobals.svServer.sConfigStrings)
+    io $ void $ traverse (QuakeFile.writeString qf) configStrings
+
+    CM.writePortalState qf
+
+    io $ QuakeFile.close qf
+
+    let name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sav"
+    GameSave.writeLevel name
 
 {-
 ==============
