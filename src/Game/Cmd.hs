@@ -2,11 +2,12 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Cmd where
 
+import Data.Char (chr)
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Data.Sequence ((<|))
 import Control.Lens ((^.), (%=), (.=), use)
-import Control.Monad.State (liftM)
+import Control.Monad (liftM, when, unless)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -111,10 +112,35 @@ tokenizeString text macroExpand = do
 
     case expandedText of
       Nothing -> return ()
-      Just newText -> do
-        let len = B.length newText
+      Just newText -> tokenize newText 0
 
-        undefined -- TODO
+  where tokenize :: B.ByteString -> Int -> Quake ()
+        tokenize txt idx = do
+          -- skip whitespace up to a \n
+          let newIdx = skipWhitesToEOL txt idx
+              c = txt `BC.index` newIdx
+
+          -- a newline separates commands in the buffer
+          unless (c == '\n' || c == chr 0) $ do
+            cmdArgc <- use $ cmdGlobals.cgCmdArgc
+
+            -- set cmd_args to everything after the first arg
+            when (cmdArgc == 1) $ do
+              let str = BC.drop newIdx txt
+                  trimmedStr = B.reverse . BC.dropWhile (<= ' ') . B.reverse $ str
+              cmdGlobals.cgCmdArgs .= trimmedStr
+
+            (var, updatedIdx) <- Com.parse txt (B.length txt) newIdx
+
+            when (var /= "") $ do
+              cmdGlobals.cgCmdArgv %= (V.// [(cmdArgc, var)])
+              cmdGlobals.cgCmdArgc .= cmdArgc + 1
+              tokenize txt updatedIdx
+
+        skipWhitesToEOL :: B.ByteString -> Int -> Int
+        skipWhitesToEOL str startIdx =
+          let droppedStr = B.drop startIdx str
+          in startIdx + B.length (BC.takeWhile (\c -> c <= ' ' && c /= '\n' && c /= chr 0) droppedStr)
 
 -- Cmd_MacroExpandString
 macroExpandString :: B.ByteString -> Int -> Quake (Maybe B.ByteString)
