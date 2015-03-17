@@ -7,13 +7,14 @@ import Data.Bits ((.|.))
 import Data.Maybe (isJust, fromJust)
 import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
 import Data.Functor ((<$>))
+import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Control.Applicative ((<*>))
 import Control.Lens ((^.), (.=), (%=), use)
 import Control.Monad (when, void)
 import Control.Exception
 import System.Directory
-import System.IO (openFile, IOMode(ReadMode))
+import System.IO (openFile, hClose, Handle, IOMode(ReadMode))
 import System.IO.MMap (mmapFileByteString)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
@@ -261,7 +262,35 @@ execAutoexec = undefined -- TODO
 - return the file content as byte[]
 -}
 loadFile :: B.ByteString -> Quake (Maybe B.ByteString)
-loadFile = undefined -- TODO
+loadFile path = do
+    -- IMPROVE: do we need this?
+    {-
+    // todo: hack for bad strings (fuck \0)
+    int index = path.indexOf('\0');
+    if (index != -1)
+        path = path.substring(0, index);
+    -}
+
+    -- look for it in the filesystem or pack files
+    len <- fileLength path
+
+    if len < 1
+      then return Nothing
+      else do
+        -- IMPROVE: catch exceptions:
+        -- } catch (IOException e) {
+        --    Com.Error(Defines.ERR_FATAL, e.toString());
+        -- }
+        file <- fOpenFile path
+
+        case file of
+          Nothing -> do
+            Com.comError Constants.errFatal "LoadFile failed"
+            return Nothing
+          Just h -> do
+            contents <- io $ B.hGetContents h
+            io $ hClose h
+            return $ Just contents
 
 {-
 - Gamedir
@@ -271,3 +300,13 @@ loadFile = undefined -- TODO
 -}
 gameDir :: Quake B.ByteString
 gameDir = undefined -- TODO
+
+fileLength :: B.ByteString -> Quake Int
+fileLength filename = do
+    -- check for links first
+    links <- use $ fsGlobals.fsLinks
+    let foundLink = find (undefined) links
+    undefined -- TODO
+
+fOpenFile :: B.ByteString -> Quake (Maybe Handle)
+fOpenFile filename = undefined -- TODO

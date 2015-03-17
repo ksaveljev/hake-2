@@ -22,6 +22,7 @@ import qualified Constants
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 
 aliasLoopCount :: Int
 aliasLoopCount = 16
@@ -59,25 +60,38 @@ addCommand cmdName f = do
             Just _ -> return True
             Nothing -> return False
 
-execF :: Quake ()
-execF = undefined -- TODO
+execF :: XCommandT
+execF = do
+    c <- argc
 
-echoF :: Quake ()
+    if c /= 2
+      then Com.printf "exec <filename> : execute a script file\n"
+      else do
+        v1 <- argv 1
+        f <- FS.loadFile v1
+
+        case f of
+          Nothing -> Com.printf $ "couldn't exec " `B.append` v1 `B.append` "\n"
+          Just contents -> do
+            Com.printf $ "execing " `B.append` v1 `B.append` "\n"
+            CBuf.insertText contents
+
+echoF :: XCommandT
 echoF = do
     v <- liftM (V.drop 1) (use $ cmdGlobals.cgCmdArgv)
     _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") v
     Com.printf "'\n"
 
-listF :: Quake ()
+listF :: XCommandT
 listF = do
     allCommands <- use $ cmdGlobals.cgCmdFunctions
     _ <- traverse (\cf -> Com.printf $ (cf^.cfName) `B.append` "\n") allCommands
     Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- TODO: maybe use Data.Binary for Int to Bytestring conversion ?
 
-aliasF :: Quake ()
+aliasF :: XCommandT
 aliasF = undefined -- TODO
 
-waitF :: Quake ()
+waitF :: XCommandT
 waitF = globals.cmdWait .= True
 
 argc :: Quake Int

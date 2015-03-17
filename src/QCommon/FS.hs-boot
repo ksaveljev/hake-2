@@ -6,3 +6,4 @@ import Quake
 
 execAutoexec :: Quake ()
 setGameDir :: B.ByteString -> Quake ()
+loadFile :: B.ByteString -> Quake (Maybe B.ByteString)
