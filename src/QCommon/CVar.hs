@@ -5,7 +5,7 @@ module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
 
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, isNothing, fromJust)
 import Data.Bits ((.&.), (.|.))
 import Control.Lens ((^.), (%=), (.=), use)
 import Control.Monad (void, when)
@@ -22,6 +22,7 @@ import QuakeState
 import QCommon.XCommandT
 import qualified Game.CVarT as CVarT
 import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Constants
 import qualified Util.Lib as Lib
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
@@ -119,7 +120,65 @@ forceSet varName value = set2 varName value True
 -- Gereric set function, sets the value of the variable, with forcing its even possible to 
 -- override the variables write protection. 
 set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
-set2 varName value force = undefined -- TODO
+set2 varName value force = do
+    var <- findVar varName
+
+    case var of
+      Nothing -> get varName value 0 >>= return . fromJust -- create it
+      Just cvar -> do
+        let cvarFlags = cvar^.cvFlags
+            userServerFlag = cvarFlags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)
+            noSetFlag = cvarFlags .&. Constants.cvarNoSet
+            latchFlag = cvarFlags .&. Constants.cvarLatch
+
+        if | userServerFlag /= 0 && not (infoValidate value) -> do
+               Com.printf "invalid info cvar value\n"
+               return cvar
+           | not force && noSetFlag /= 0 -> do
+               Com.printf $ varName `B.append` " is write protected.\n"
+               return cvar
+           | not force && latchFlag /= 0 -> do
+               let latchedString = cvar^.cvLatchedString
+               state <- use $ globals.serverState
+
+               if | isJust latchedString && value == fromJust latchedString -> return cvar
+                  | isNothing latchedString && value == (cvar^.cvString) -> return cvar
+                  | state /= 0 -> do
+                      Com.printf $ varName `B.append` " will be changed for next game.\n"
+                      let updatedCVar = cvar { _cvLatchedString = Just value }
+                      update updatedCVar
+                      return updatedCVar
+                  | otherwise -> do
+                      let updatedCVar = cvar { _cvLatchedString = Nothing
+                                             , _cvString = value
+                                             , _cvValue = Lib.atof value
+                                             }
+
+                      update updatedCVar
+
+                      when (varName == "game") $ do
+                        FS.setGameDir value
+                        FS.execAutoexec
+
+                      return updatedCVar
+           | otherwise -> do
+             let updatedCVar = if (force && isJust (cvar^.cvLatchedString))
+                                 then cvar { _cvLatchedString = Nothing }
+                                 else cvar
+
+             if value == (updatedCVar^.cvString)
+               then return updatedCVar -- not changed
+               else do
+                 when (((updatedCVar^.cvFlags) .&. Constants.cvarUserInfo) /= 0) $
+                   globals.userInfoModified .= True -- transmit at next oportunity
+
+                 let finalCVar = updatedCVar { _cvModified = True
+                                             , _cvString = value
+                                             , _cvValue = Lib.atof value
+                                             }
+
+                 update finalCVar
+                 return finalCVar
 
 -- Set command, sets variables.
 setF :: XCommandT
@@ -163,14 +222,25 @@ listF = do
                            `B.append` (var^.cvString)
                            `B.append` "\"\n"
 
+{-
+- Sets a float value of a variable.
+- 
+- The overloading is very important, there was a problem with 
+- networt "rate" string --> 10000 became "10000.0" and that wasn't right.
+-}
 setValueI :: B.ByteString -> Int -> Quake ()
 setValueI = undefined -- TODO
 
 setValueF :: B.ByteString -> Float -> Quake ()
 setValueF = undefined -- TODO
 
+-- Returns the float value of a variable
 variableValue :: B.ByteString -> Quake Float
-variableValue = undefined -- TODO
+variableValue varName = do
+    var <- findVar varName
+    case var of
+      Nothing -> return 0
+      Just cvar -> return $ Lib.atof (cvar^.cvString)
 
 command :: Quake Bool
 command = undefined -- TODO
@@ -178,20 +248,27 @@ command = undefined -- TODO
 bitInfo :: Int -> Quake B.ByteString
 bitInfo = undefined -- TODO
 
+-- Returns an info string containing all the CVAR_SERVERINFO cvars.
 serverInfo :: Quake B.ByteString
-serverInfo = undefined -- TODO
+serverInfo = bitInfo Constants.cvarServerInfo
 
+-- Any variables with latched values will be updated.
 getLatchedVars :: Quake ()
 getLatchedVars = undefined -- TODO
 
+-- Returns an info string containing all the CVAR_USERINFO cvars.
 userInfo :: Quake B.ByteString
-userInfo = undefined -- TODO
+userInfo = bitInfo Constants.cvarUserInfo
 
+-- Appends lines containing \"set vaqriable value\" for all variables
+-- with the archive flag set true. 
 writeVariables :: FilePath -> Quake ()
 writeVariables = undefined -- TODO
 
+-- Variable typing auto completition.
 completeVariable :: B.ByteString -> UV.Vector B.ByteString
 completeVariable = undefined -- TODO
 
+-- Some characters are invalid for info strings.
 infoValidate :: B.ByteString -> Bool
-infoValidate = undefined -- TODO
+infoValidate s = not ('\\' `BC.elem` s || '"' `BC.elem` s || ';' `BC.elem` s)

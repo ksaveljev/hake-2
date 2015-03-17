@@ -22,7 +22,7 @@ import qualified Data.ByteString as B
 data CVarT =
   CVarT { _cvName          :: B.ByteString
         , _cvString        :: B.ByteString
-        , _cvLatchedString :: B.ByteString
+        , _cvLatchedString :: Maybe B.ByteString
         , _cvFlags         :: Int
         , _cvModified      :: Bool
         , _cvValue         :: Float
@@ -31,4 +31,4 @@ data CVarT =
 makeLenses ''CVarT
 
 newCVarT :: CVarT
-newCVarT = CVarT "" "" "" 0 False 0.0
+newCVarT = CVarT "" "" Nothing 0 False 0.0
