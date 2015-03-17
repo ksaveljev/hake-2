@@ -5,9 +5,11 @@ module QCommon.SZ where
 import Control.Monad (when, unless)
 import Control.Lens ((^.), use, (.=))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import qualified Constants
 import qualified QCommon.Com as Com
 
 init :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
@@ -19,14 +21,15 @@ clear bufLens = do
     bufLens.sbCurSize .= 0
     bufLens.sbOverflowed .= False
 
+-- ask for the pointer using sizebuf_t.cursize (RST)
 getSpace :: SizeBufTLens -> Int -> Quake Int
 getSpace bufLens len = do
     buf <- use bufLens
 
     when (buf^.sbCurSize + len > buf^.sbMaxSize) $
       do
-        unless (buf^.sbAllowOverflow) $ Com.comError undefined undefined -- TODO
-        when (len > buf^.sbMaxSize) $ Com.comError undefined undefined -- TODO
+        unless (buf^.sbAllowOverflow) $ Com.comError Constants.errFatal "SZ_GetSpace: overflow without allowoverflow set"
+        when (len > buf^.sbMaxSize) $ Com.comError Constants.errFatal ("SZ_GetSpace: " `B.append` BC.pack (show len) `B.append` " is > full buffer size") -- IMPROVE: convert Int to ByteString using binary package?
 
         Com.printf "SZ.getSpace: overflow\n"
         clear bufLens
