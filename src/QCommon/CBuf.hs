@@ -100,4 +100,18 @@ addText text = do
       else SZ.write (globals.cmdText) text (B.length text)
 
 insertText :: B.ByteString -> Quake ()
-insertText text = undefined -- TODO
+insertText text = do
+    templen <- use $ globals.cmdText.sbCurSize
+
+    -- copy off an commands still remaining in the exec buffer
+    tmp <- if templen /= 0
+             then do
+               txt <- use $ globals.cmdText.sbData
+               SZ.clear (globals.cmdText)
+               return $ B.take templen txt
+             else return ""
+
+    -- add the entire text of the file
+    addText text
+
+    when (templen /= 0) $ SZ.write (globals.cmdText) tmp templen
