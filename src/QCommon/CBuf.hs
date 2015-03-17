@@ -12,7 +12,7 @@ import Quake
 import QuakeState
 import qualified QCommon.SZ as SZ
 import qualified QCommon.Com as Com
-import qualified Game.Cmd as Cmd
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
 init :: Quake ()
 init = do
@@ -98,3 +98,6 @@ addText text = do
     if curSize + len >= maxSize
       then Com.printf "Cbuf.addText: overflow\n"
       else SZ.write (globals.cmdText) text (B.length text)
+
+insertText :: B.ByteString -> Quake ()
+insertText = undefined -- TODO

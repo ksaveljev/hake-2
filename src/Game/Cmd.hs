@@ -2,15 +2,16 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Cmd where
 
-import Data.Char (chr)
+import Data.Char (chr, toUpper)
 import Data.Foldable (find)
-import Data.Traversable (traverse)
+import Data.Maybe (fromMaybe)
 import Data.Sequence ((<|))
+import Data.Traversable (traverse)
 import Control.Lens ((^.), (%=), (.=), use)
 import Control.Monad (liftM, when, unless)
-import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 
 import Quake
@@ -18,8 +19,12 @@ import QuakeState
 import QCommon.XCommandT
 import QCommon.CmdFunctionT
 import qualified Constants
-import qualified QCommon.CVar as CVar
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
+
+aliasLoopCount :: Int
+aliasLoopCount = 16
 
 init :: Quake ()
 init = do
@@ -95,7 +100,47 @@ argv idx = do
 --
 -- A complete command line has been parsed, so try to execute it 
 executeString :: B.ByteString -> Quake ()
-executeString text = undefined -- TODO
+executeString text = do
+    tokenizeString text True
+
+    c <- argc
+
+    -- only when there are some tokens
+    when (c > 0) $ do
+      cmdFunctions <- use $ cmdGlobals.cgCmdFunctions
+      cmdArgv <- use $ cmdGlobals.cgCmdArgv
+      let name = BC.map toUpper (cmdArgv V.! 0)
+
+      case find (sameFunctionNameAs name) cmdFunctions of
+        Just cmdFunction ->
+                    -- forward to server command
+          fromMaybe (executeString $ "cmd " `B.append` text) (cmdFunction^.cfFunction)
+        Nothing -> do
+          cmdAliases <- use $ globals.cmdAlias
+          case find (sameAliasNameAs name) cmdAliases of
+            Just alias -> do
+              count <- use $ globals.aliasCount
+              globals.aliasCount .= count + 1
+
+              if count + 1 >= aliasLoopCount
+                then do
+                  Com.printf "ALIAS_LOOP_COUNT\n"
+                  return ()
+                else CBuf.insertText (alias^.caValue)
+            Nothing -> do
+              cmd <- CVar.command -- check cvars
+              unless cmd forwardToServer -- send it as a server command if we are connected
+
+  where sameNameAs :: B.ByteString -> B.ByteString -> Bool
+        sameNameAs expected given =
+          let current = BC.map toUpper given
+          in expected == current
+
+        sameFunctionNameAs :: B.ByteString -> CmdFunctionT -> Bool
+        sameFunctionNameAs expected fn = sameNameAs expected (fn^.cfName)
+
+        sameAliasNameAs :: B.ByteString -> CmdAliasT -> Bool
+        sameAliasNameAs expected alias = sameNameAs expected (alias^.caName)
 
 -- Cmd_TokenizeString
 --
@@ -192,3 +237,11 @@ macroExpandString text len =
                               Com.printf "Macro expansion loop, discarded.\n"
                               return Nothing
                             else expand newTxt newInQuote (B.length newTxt) (count + 1) idx
+
+{-
+- Adds the current command line as a clc_stringcmd to the client message.
+- things like godmode, noclip, etc, are commands directed to the server, so
+- when they are typed in at the console, they will need to be forwarded.
+-}
+forwardToServer :: Quake ()
+forwardToServer = undefined -- TODO

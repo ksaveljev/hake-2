@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
+               , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
                ) where
@@ -10,6 +11,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CmdAliasT
 import Game.CVarT
 import QCommon.SizeBufT
 
