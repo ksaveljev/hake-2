@@ -8,7 +8,7 @@ module QCommon.CVar where
 import Data.Maybe (isJust, fromJust)
 import Data.Bits ((.&.), (.|.))
 import Control.Lens ((^.), (%=), (.=), use)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Data.Sequence ((<|))
@@ -38,11 +38,9 @@ get varName varValue flags = do
         var <- findVar varName
 
         if | isJust var -> do
-               cvars <- use $ globals.cvarVars
                let cvar = fromJust var
-                   updatedCVar = cvar { _cvFlags = cvar^.cvFlags .|. flags }
-                   updatedCVars = fmap (\v -> if v^.cvName == varName then updatedCVar else v) cvars
-               globals.cvarVars .= updatedCVars
+                   updatedCVar = cvar { _cvFlags = (cvar^.cvFlags) .|. flags }
+               update updatedCVar
                return $ Just updatedCVar
            | isUserOrServerInfo /= 0 && not (infoValidate varValue) -> do
                Com.printf "invalid info cvar value\n"
@@ -65,6 +63,9 @@ getAndSet varName varValue flags quakeStateLens = do
     quakeStateLens .= cVar
     return cVar
 
+update :: CVarT -> Quake ()
+update cvar = globals.cvarVars %= fmap (\v -> if v^.cvName == cvar^.cvName then cvar else v)
+
 init :: Quake ()
 init = do
     Cmd.addCommand "set" (Just setF)
@@ -83,21 +84,44 @@ findVar varName = do
     vars <- use $ globals.cvarVars
     return $ find (\v -> v^.cvName == varName) vars
 
+-- Creates a variable if not found and sets their value, the parsed float value and their flags.
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
-fullSet = undefined -- TODO
+fullSet varName value flags = do
+    var <- findVar varName
 
--- sets the value of the variable without forcing
+    case var of
+      Nothing -> do -- create it
+        Just newCVar <- get varName value flags
+        return newCVar
+
+      Just cvar -> do
+        when (((cvar^.cvFlags) .&. Constants.cvarUserInfo) /= 0) $
+          globals.userInfoModified .= True
+
+        let updatedCVar = cvar { _cvModified = True
+                               , _cvString = value
+                               , _cvValue = Lib.atof value
+                               , _cvFlags = flags
+                               }
+
+        update updatedCVar
+
+        return updatedCVar
+
+-- Sets the value of the variable without forcing.
 set :: B.ByteString -> B.ByteString -> Quake CVarT
 set varName value = set2 varName value False
 
--- sets the value of the variable with forcing
+-- Sets the value of the variable with forcing.
 forceSet :: B.ByteString -> B.ByteString -> Quake CVarT
 forceSet varName value = set2 varName value True
 
+-- Gereric set function, sets the value of the variable, with forcing its even possible to 
+-- override the variables write protection. 
 set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
-set2 = undefined -- TODO
+set2 varName value force = undefined -- TODO
 
--- Set command, sets variables
+-- Set command, sets variables.
 setF :: XCommandT
 setF = do
     c <- Cmd.argc

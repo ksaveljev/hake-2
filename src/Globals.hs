@@ -36,6 +36,8 @@ initialGlobals =
           , _cmdTextBuf         = ""
           , _cmdAlias           = Seq.empty
 
+          , _userInfoModified   = False
+
           , _cvarVars           = Seq.empty
 
           , _keyBindings        = V.replicate 256 Nothing

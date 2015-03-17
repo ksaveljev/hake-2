@@ -67,6 +67,8 @@ data Globals =
           , _cmdTextBuf         :: B.ByteString
           , _cmdAlias           :: Seq CmdAliasT
 
+          , _userInfoModified   :: Bool
+
           , _cvarVars           :: Seq CVarT
 
           , _keyBindings        :: V.Vector (Maybe B.ByteString)
