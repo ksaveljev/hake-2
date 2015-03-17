@@ -8,6 +8,7 @@ import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.QCommon as QCommon
 import qualified Sys.Timer as Timer
@@ -27,7 +28,9 @@ main = do
 
       void $ CVar.getAndSet "dedicated" "0" Constants.cvarNoSet (cvarGlobals.dedicated)
 
-      when dedicatedFlag $ cvarGlobals.dedicated.cvValue .= 1.0
+      when dedicatedFlag $ do
+        Com.printf "Starting in dedicated mode.\n"
+        cvarGlobals.dedicated.cvValue .= 1.0
 
       -- if (globals.dedicated.cvValue != 1.0)
       whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
