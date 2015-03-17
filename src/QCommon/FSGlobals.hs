@@ -25,4 +25,5 @@ initialFSGlobals =
             , _fsLinks           = Seq.empty
             , _fsSearchPaths     = []
             , _fsBaseSearchPaths = []
+            , _fsFileFromPak     = 0
             }

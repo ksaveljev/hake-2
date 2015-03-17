@@ -11,11 +11,12 @@ import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Control.Applicative ((<*>))
 import Control.Lens ((^.), (.=), (%=), use)
-import Control.Monad (when, void)
+import Control.Monad (when, void, liftM, unless)
 import Control.Exception
 import System.Directory
 import System.IO (openFile, hClose, Handle, IOMode(ReadMode))
 import System.IO.MMap (mmapFileByteString)
+import System.PosixCompat.Files (getFileStatus, fileSize)
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -303,10 +304,88 @@ gameDir = undefined -- TODO
 
 fileLength :: B.ByteString -> Quake Int
 fileLength filename = do
+    fsGlobals.fsFileFromPak .= 0
+
     -- check for links first
     links <- use $ fsGlobals.fsLinks
-    let foundLink = find (undefined) links
-    undefined -- TODO
+    let foundLink = find (fileLinkMatch filename) links
+
+    case foundLink of
+      Just filelink -> do
+        let netpath = (filelink^.flTo) `B.append` B.take (filelink^.flFromLength) filename
+            netpathUnpacked = BC.unpack netpath
+
+        fileExists <- io $ doesFileExist netpathUnpacked
+        canRead <- if fileExists
+                    then io $ liftM readable (getPermissions netpathUnpacked)
+                    else return False
+        if canRead
+          then do
+            Com.dprintf $ "link file: " `B.append` netpath `B.append` "\n"
+            size <- io $ liftM fileSize (getFileStatus netpathUnpacked)
+            return (fromIntegral size)
+          else return (-1)
+
+      -- search through the path, one element at a time
+      Nothing -> do
+        searchPaths <- use $ fsGlobals.fsSearchPaths
+        foundFileLen <- searchPathMatch filename searchPaths
+
+        case foundFileLen of
+          Nothing -> do
+            Com.dprintf $ "FindFile: can't find " `B.append` filename `B.append` "\n"
+            return (-1)
+          Just fileLen -> return fileLen
+
+  where fileLinkMatch :: B.ByteString -> FileLinkT -> Bool
+        fileLinkMatch name fileLink =
+          let from = fileLink^.flFrom
+              len = fileLink^.flFromLength
+          in B.take len name == B.take len from
+
+        searchPathMatch :: B.ByteString -> [SearchPathT] -> Quake (Maybe Int)
+        searchPathMatch _ [] = return Nothing
+        searchPathMatch name (searchPath:xs) =
+          -- is the element a pak file?
+          case searchPath^.spPack of
+            Just pack -> do -- look through all the pak file elements
+              let fname = BC.map toLower name
+                  files = pack^.pFiles
+
+              case M.lookup fname files of
+                Just entry -> do -- found it!
+                  fsGlobals.fsFileFromPak .= 1
+
+                  Com.dprintf $ "PackFile: " `B.append` (pack^.pFilename) `B.append` " : " `B.append` fname `B.append` "\n"
+                  -- open a new file on the pakfile
+                  fileExists <- io $ doesFileExist (BC.unpack $ pack^.pFilename)
+                  canRead <- if fileExists
+                              then io $ liftM readable (getPermissions (BC.unpack $ pack^.pFilename))
+                              else return False
+
+                  unless canRead $
+                    Com.comError Constants.errFatal ("Couldn't reopen " `B.append` (pack^.pFilename))
+
+                  return $ Just (entry^.pfFileLen)
+
+                Nothing -> searchPathMatch name xs
+
+            Nothing -> do
+              -- check a file in the directory tree
+              let netpath = (searchPath^.spFilename) `B.append` "/" `B.append` name
+                  netpathUnpacked = BC.unpack netpath
+
+              fileExists <- io $ doesFileExist netpathUnpacked
+              canRead <- if fileExists
+                          then io $ liftM readable (getPermissions netpathUnpacked)
+                          else return False
+
+              if canRead
+                then do
+                  Com.dprintf $ "FindFile: " `B.append` netpath `B.append` "\n"
+                  size <- io $ liftM fileSize (getFileStatus netpathUnpacked)
+                  return $ Just (fromIntegral size)
+                else searchPathMatch name xs
 
 fOpenFile :: B.ByteString -> Quake (Maybe Handle)
 fOpenFile filename = undefined -- TODO

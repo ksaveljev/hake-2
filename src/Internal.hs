@@ -153,6 +153,7 @@ data FSGlobals =
             , _fsLinks           :: Seq FileLinkT
             , _fsSearchPaths     :: [SearchPathT]
             , _fsBaseSearchPaths :: [SearchPathT]
+            , _fsFileFromPak     :: Int
             }
 
 data NetChannelGlobals =
