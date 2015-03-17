@@ -133,8 +133,9 @@ tokenizeString text macroExpand = do
             (var, updatedIdx) <- Com.parse txt (B.length txt) newIdx
 
             when (var /= "") $ do
-              cmdGlobals.cgCmdArgv %= (V.// [(cmdArgc, var)])
-              cmdGlobals.cgCmdArgc .= cmdArgc + 1
+              when (cmdArgc < Constants.maxStringTokens) $ do
+                cmdGlobals.cgCmdArgv %= (V.// [(cmdArgc, var)])
+                cmdGlobals.cgCmdArgc .= cmdArgc + 1
               tokenize txt updatedIdx
 
         skipWhitesToEOL :: B.ByteString -> Int -> Int
