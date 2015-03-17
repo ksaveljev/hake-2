@@ -188,4 +188,20 @@ reconfigure clear = do
 
     let dir = cddirCVar^.cvString
 
-    undefined -- TODO
+    CBuf.addText "exec default.cfg\n"
+    CBuf.addText "bind MWHEELUP weapnext\n"
+    CBuf.addText "bind MWHEELDOWN weapprev\n"
+    CBuf.addText "bind w +forward\n"
+    CBuf.addText "bind s +back\n"
+    CBuf.addText "bind a +moveleft\n"
+    CBuf.addText "bind d +moveright\n"
+
+    CBuf.execute
+
+    void $ CVar.set "vid_fullscreen" "0"
+    CBuf.addText "exec config.cfg\n"
+
+    CBuf.addEarlyCommands clear
+    CBuf.execute
+
+    when (dir /= "") $ void (CVar.set "cddir" dir)
