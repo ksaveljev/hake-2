@@ -17,7 +17,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
 
-import Quake (Quake)
+import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Game.CVarT as CVarT

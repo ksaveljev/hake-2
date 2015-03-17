@@ -100,4 +100,4 @@ addText text = do
       else SZ.write (globals.cmdText) text (B.length text)
 
 insertText :: B.ByteString -> Quake ()
-insertText = undefined -- TODO
+insertText text = undefined -- TODO

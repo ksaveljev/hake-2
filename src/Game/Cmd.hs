@@ -163,10 +163,9 @@ tokenizeString text macroExpand = do
         tokenize txt idx = do
           -- skip whitespace up to a \n
           let newIdx = skipWhitesToEOL txt idx
-              c = txt `BC.index` newIdx
 
           -- a newline separates commands in the buffer
-          unless (c == '\n' || c == chr 0) $ do
+          unless (newIdx == B.length txt || txt `BC.index` newIdx == '\n') $ do
             cmdArgc <- use $ cmdGlobals.cgCmdArgc
 
             -- set cmd_args to everything after the first arg
