@@ -8,13 +8,11 @@ module QCommon.CVar where
 import Data.Maybe (isJust, isNothing, fromJust)
 import Data.Bits ((.&.), (.|.))
 import Control.Lens ((^.), (%=), (.=), use)
-import Control.Monad (void, when)
-import Data.Foldable (find)
+import Control.Monad (void, when, liftM)
 import Data.Traversable (traverse)
-import Data.Sequence ((<|))
-import qualified Data.Sequence as Seq
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Map as M
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -54,7 +52,7 @@ get varName varValue flags = do
                                             , _cvFlags    = flags
                                             }
 
-               globals.cvarVars %= (newCVar <|)
+               globals.cvarVars %= (M.insert varName newCVar)
 
                return $ Just newCVar
 
@@ -65,7 +63,7 @@ getAndSet varName varValue flags quakeStateLens = do
     return cVar
 
 update :: CVarT -> Quake ()
-update cvar = globals.cvarVars %= fmap (\v -> if v^.cvName == cvar^.cvName then cvar else v)
+update cvar = globals.cvarVars %= M.insert (cvar^.cvName) cvar
 
 init :: Quake ()
 init = do
@@ -83,7 +81,10 @@ variableString varName = do
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar varName = do
     vars <- use $ globals.cvarVars
-    return $ find (\v -> v^.cvName == varName) vars
+    return $ M.lookup varName vars
+
+getExisting :: B.ByteString -> Quake CVarT
+getExisting = (liftM fromJust) . findVar
 
 -- Creates a variable if not found and sets their value, the parsed float value and their flags.
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
@@ -206,7 +207,7 @@ listF = do
 
     _ <- traverse printCVar vars
 
-    Com.printf $ BC.pack (show (Seq.length vars)) `B.append` " cvars\n" -- TODO: maybe use binary package for Int to ByteString conversion?
+    Com.printf $ BC.pack (show (M.size vars)) `B.append` " cvars\n" -- TODO: maybe use binary package for Int to ByteString conversion?
 
   where printCVar var = do
           Com.printf $ if (var^.cvFlags .&. Constants.cvarArchive) /= 0 then "*" else " "

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# LANGUAGE OverloadedStrings #-}
-import Control.Lens ((.=), use)
+import Control.Lens ((^.))
 import Control.Monad.State (when, liftM, void)
 import System.Environment (getArgs)
 import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
@@ -26,14 +26,14 @@ main = do
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
 
-      void $ CVar.getAndSet "dedicated" "0" Constants.cvarNoSet (cvarGlobals.dedicated)
+      Just dedicated <- CVar.get "dedicated" "0" Constants.cvarNoSet
 
       when dedicatedFlag $ do
         Com.printf "Starting in dedicated mode.\n"
-        cvarGlobals.dedicated.cvValue .= 1.0
+        CVar.update dedicated { _cvValue = 1.0 }
 
       -- if (globals.dedicated.cvValue != 1.0)
-      whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+      whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
         undefined -- TODO: init our client window
 
       -- in C the first arg is the filename
@@ -41,7 +41,7 @@ main = do
 
       QCommon.init updatedArgs
 
-      void $ CVar.getAndSet "nostdout" "0" 0 (cvarGlobals.nostdout)
+      void $ CVar.get "nostdout" "0" 0
 
       startTime <- Timer.milliseconds
       mainLoop startTime

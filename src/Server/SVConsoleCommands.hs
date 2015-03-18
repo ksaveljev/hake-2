@@ -56,7 +56,8 @@ Specify a list of master servers
 -}
 setMasterF :: XCommandT
 setMasterF = do
-    dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+    --dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+    dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
 
     -- only dedicated servers send heartbeats
     if dedicatedValue == 0
@@ -386,7 +387,7 @@ gameMapF = do
         svGlobals.svServerStatic.ssMapCmd .= mapName
 
         -- copy off the level to the autosave slot
-        dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+        dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
         when (dedicatedValue == 0) $ do
           writeServerFile True
           copySaveGame "current" "save0"
@@ -678,7 +679,7 @@ initOperatorCommands = do
     Cmd.addCommand "gamemap" (Just gameMapF)
     Cmd.addCommand "setmaster" (Just setMasterF)
 
-    dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+    dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
 
     when (dedicatedValue /= 0) $
       Cmd.addCommand "say" (Just conSayF)

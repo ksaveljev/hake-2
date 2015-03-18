@@ -35,13 +35,13 @@ init args = do
     CBuf.addEarlyCommands False >> CBuf.execute
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing filesystem...");
 
     FS.initFileSystem
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("loading config...");
 
     reconfigure False
@@ -50,7 +50,7 @@ init args = do
     FS.markBaseSearchPaths -- mark the default search paths
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.testQ2Data(); // test for valid baseq2
 
     --
@@ -58,14 +58,14 @@ init args = do
     --
     Cmd.addCommand "error" (Just Com.errorF)
 
-    void $ CVar.getAndSet "host_speeds" "0" 0 (cvarGlobals.hostSpeeds)
-    void $ CVar.getAndSet "log_stats" "0" 0 (cvarGlobals.logStats)
-    void $ CVar.getAndSet "developer" "0" Constants.cvarArchive (cvarGlobals.developer)
-    void $ CVar.getAndSet "timescale" "0" 0 (cvarGlobals.timeScale)
-    void $ CVar.getAndSet "fixedtime" "0" 0 (cvarGlobals.fixedTime)
-    void $ CVar.getAndSet "logfile" "0" 0 (cvarGlobals.logfileActive)
-    void $ CVar.getAndSet "showtrace" "0" 0 (cvarGlobals.showTrace)
-    void $ CVar.getAndSet "dedicated" "0" Constants.cvarNoSet (cvarGlobals.dedicated)
+    void $ CVar.get "host_speeds" "0" 0
+    void $ CVar.get "log_stats" "0" 0
+    void $ CVar.get "developer" "0" Constants.cvarArchive
+    void $ CVar.get "timescale" "0" 0
+    void $ CVar.get "fixedtime" "0" 0
+    void $ CVar.get "logfile" "0" 0
+    void $ CVar.get "showtrace" "0" 0
+    void $ CVar.get "dedicated" "0" Constants.cvarNoSet
 
     {- IMPROVE:
        public static final String BUILDSTRING = "Java " + System.getProperty("java.version");;
@@ -77,24 +77,24 @@ init args = do
                                .add(Globals.__DATE__)
                                .add(BUILDSTRING));
     -}
-    let s = BC.pack $ (show $ Constants.version) ++ (show $ Constants.__date__) -- IMPROVE: use formatting library?
+    let s = BC.pack $ (show Constants.version) ++ (show Constants.__date__) -- IMPROVE: use formatting library?
 
     void $ CVar.get "version" s (Constants.cvarServerInfo .|. Constants.cvarNoSet)
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing network subsystem...");
 
     NET.init >> NetChannel.init
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing server subsystem...");
 
     SVMain.init
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing client subsystem...");
 
     CL.init
@@ -103,7 +103,7 @@ init args = do
 
     if added
       then do
-        dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+        dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
 
         if dedicatedValue == 0
           then CBuf.addText "d1\n"
@@ -117,29 +117,30 @@ init args = do
     CL.writeConfiguration
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM (/= 1.0) (use $ cvarGlobals.dedicated.cvValue)) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
       undefined -- TODO: Jake2.Q2Dialog.dispose();
 
 frame :: Int -> Quake ()
 frame msec = do
-    whenQ (use $ cvarGlobals.logStats.cvModified) $ do
-      cvarGlobals.logStats.cvModified .= False
+    logStats <- CVar.getExisting "log_stats"
+    when (logStats^.cvModified) $ do
+      CVar.update logStats { _cvModified = False }
 
-      lsv <- use $ cvarGlobals.logStats.cvValue
+      let lsv = logStats^.cvValue
 
       if lsv /= 0.0
         then undefined -- TODO
         else undefined -- TODO
 
-    ftv <- use $ cvarGlobals.fixedTime.cvValue
-    tsv <- use $ cvarGlobals.timeScale.cvValue
+    ftv <- liftM (^.cvValue) $ CVar.getExisting "fixedtime"
+    tsv <- liftM (^.cvValue) $ CVar.getExisting "timescale"
 
     let updatedMsec = if | ftv /= 0.0 -> truncate ftv
                          | tsv /= 0.0 -> let tmp = fromIntegral msec * tsv
                                        in if tmp < 1.0 then 1 else truncate tmp
                          | otherwise -> msec
 
-    stv <- use $ cvarGlobals.showTrace.cvValue
+    stv <- liftM (^.cvValue) $ CVar.getExisting "showtrace"
 
     when (stv /= 0.0) $ do
       ct <- use $ globals.cTraces
@@ -156,7 +157,7 @@ frame msec = do
 
     CBuf.execute
 
-    hsv <- use $ cvarGlobals.hostSpeeds.cvValue
+    hsv <- liftM (^.cvValue) $ CVar.getExisting "host_speeds"
 
     timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
 

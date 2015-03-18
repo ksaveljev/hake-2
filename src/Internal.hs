@@ -12,6 +12,7 @@ import Control.Monad.Except
 import Control.Lens (Lens)
 import qualified Control.Monad.State.Lazy as Lazy
 import qualified Data.ByteString as B
+import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -46,7 +47,6 @@ data QuakeState =
              , _comGlobals        :: ComGlobals
              , _cmdGlobals        :: CmdGlobals
              , _keyGlobals        :: KeyGlobals
-             , _cvarGlobals       :: CVarGlobals
              , _fsGlobals         :: FSGlobals
              , _netChannelGlobals :: NetChannelGlobals
              , _svGlobals         :: SVGlobals
@@ -72,7 +72,7 @@ data Globals =
 
           , _userInfoModified   :: Bool
 
-          , _cvarVars           :: Seq CVarT
+          , _cvarVars           :: M.Map B.ByteString CVarT
 
           , _keyBindings        :: V.Vector (Maybe B.ByteString)
           , _keyDown            :: UV.Vector Bool
@@ -82,45 +82,6 @@ data Globals =
           , _keyLinePos         :: Int
           , _editLine           :: Int
           }
-
-data CVarGlobals =
-  CVarGlobals { _clAddBlend         :: CVarT
-              , _clAddEntities      :: CVarT
-              , _clAddLights        :: CVarT
-              , _clAddParticles     :: CVarT
-              , _clAngleSpeedKey    :: CVarT
-              , _clAutoSkins        :: CVarT
-              , _clFootSteps        :: CVarT
-              , _clForwardSpeed     :: CVarT
-              , _clGun              :: CVarT
-              , _clMaxFPS           :: CVarT
-              , _clNoSkins          :: CVarT
-              , _clPitchSpeed       :: CVarT
-              , _clPredict          :: CVarT
-              , _clRun              :: CVarT
-              , _clSideSpeed        :: CVarT
-              , _clStereo           :: CVarT
-              , _clStereoSeparation :: CVarT
-              , _clTimeDemo         :: CVarT
-              , _clTimeout          :: CVarT
-              , _clUpSpeed          :: CVarT
-              , _clYawSpeed         :: CVarT
-              , _dedicated          :: CVarT
-              , _developer          :: CVarT
-              , _fixedTime          :: CVarT
-              , _freeLook           :: CVarT
-              , _hostSpeeds         :: CVarT
-              , _logStats           :: CVarT
-              , _logfileActive      :: CVarT
-              , _lookSpring         :: CVarT
-              , _lookStrafe         :: CVarT
-              , _nostdout           :: CVarT
-              , _sensitivity        :: CVarT
-              , _showTrace          :: CVarT
-              , _timeScale          :: CVarT
-              , _inMouse            :: CVarT
-              , _inJoystick         :: CVarT
-              }
 
 data ComGlobals =
   ComGlobals { _cgComArgc   :: Int

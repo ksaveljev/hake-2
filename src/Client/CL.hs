@@ -1,7 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Client.CL where
 
-import Control.Lens (use, (.=))
-import Control.Monad (unless)
+import Control.Lens (use, (.=), (^.))
+import Control.Monad (unless, liftM)
 import qualified Data.ByteString as B
 
 import Quake
@@ -14,11 +15,12 @@ import qualified Client.VID as VID
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 
 init :: Quake ()
 init = do
-    dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
+    dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
 
     unless (dedicatedValue /= 0) $ do
       Console.init >> S.init >> VID.init >> V.init

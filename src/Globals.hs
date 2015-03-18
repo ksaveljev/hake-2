@@ -8,6 +8,7 @@ module Globals ( module Globals
                ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Map as M
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -42,7 +43,7 @@ initialGlobals =
 
           , _userInfoModified   = False
 
-          , _cvarVars           = Seq.empty
+          , _cvarVars           = M.empty
 
           , _keyBindings        = V.replicate 256 Nothing
           , _keyDown            = UV.empty

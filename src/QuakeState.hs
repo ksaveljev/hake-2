@@ -5,14 +5,12 @@ module QuakeState ( QuakeState(..)
                   , comGlobals
                   , cmdGlobals
                   , keyGlobals
-                  , cvarGlobals
                   , fsGlobals
                   , netChannelGlobals
                   , svGlobals
                   , SizeBufTLens
                   , CVarTLens
                   , module Globals
-                  , module CVarGlobals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals
                   , module Client.KeyGlobals
@@ -25,7 +23,6 @@ import Control.Lens (makeLenses)
 
 import Internal
 import Globals
-import CVarGlobals
 import Game.CmdGlobals
 import Client.KeyGlobals
 import Server.SVGlobals
@@ -41,7 +38,6 @@ initialQuakeState =
              , _comGlobals        = initialComGlobals
              , _cmdGlobals        = initialCmdGlobals
              , _keyGlobals        = initialKeyGlobals
-             , _cvarGlobals       = initialCVarGlobals
              , _fsGlobals         = initialFSGlobals
              , _netChannelGlobals = initialNetChannelGlobals
              , _svGlobals         = initialSVGlobals
