@@ -56,12 +56,6 @@ get varName varValue flags = do
 
                return $ Just newCVar
 
-getAndSet :: B.ByteString -> B.ByteString -> Int -> CVarTLens -> Quake CVarT
-getAndSet varName varValue flags quakeStateLens = do
-    Just cVar <- get varName varValue flags
-    quakeStateLens .= cVar
-    return cVar
-
 update :: CVarT -> Quake ()
 update cvar = globals.cvarVars %= M.insert (cvar^.cvName) cvar
 
