@@ -19,6 +19,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.NetAdrT
 import QCommon.XCommandT
 import qualified Constants
@@ -57,7 +58,7 @@ Specify a list of master servers
 setMasterF :: XCommandT
 setMasterF = do
     --dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
-    dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     -- only dedicated servers send heartbeats
     if dedicatedValue == 0
@@ -117,7 +118,7 @@ setPlayer = do
         v1 <- Cmd.argv 1
         let ch = v1 `BC.index` 0
 
-        maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
+        maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
         if isDigit ch
           then do
@@ -365,7 +366,7 @@ gameMapF = do
               -- clear all the client inuse flags before saving so that
               -- when the level is re-entered, the clients will spawn
               -- at spawn points instead of occupying body shells
-              maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
+              maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
               clients <- use $ svGlobals.svServerStatic.ssClients
               savedInUse <- mapM (\i -> do
                                         let inuse = (clients V.! i)^.cEdict.eInUse
@@ -387,7 +388,7 @@ gameMapF = do
         svGlobals.svServerStatic.ssMapCmd .= mapName
 
         -- copy off the level to the autosave slot
-        dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
+        dedicatedValue <- liftM (^.cvValue) dedicatedCVar
         when (dedicatedValue == 0) $ do
           writeServerFile True
           copySaveGame "current" "save0"
@@ -479,7 +480,7 @@ saveGameF = do
     c <- Cmd.argc
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
-    maxClientsValue <- liftM ((^.cvValue)) $ CVar.getExisting "maxclients"
+    maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
     playerStats <- use $ svGlobals.svServerStatic.ssClients.ix 0.cEdict.eClient.gcPlayerState.psStats
     let health = playerStats UV.! Constants.statHealth
 
@@ -565,7 +566,7 @@ conSayF = do
                                            then B.take (B.length p - 2) (B.drop 1 p)
                                            else p)
 
-      maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
+      maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
       clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
 
       void $ traverse (sendMessage text) clients
@@ -679,7 +680,7 @@ initOperatorCommands = do
     Cmd.addCommand "gamemap" (Just gameMapF)
     Cmd.addCommand "setmaster" (Just setMasterF)
 
-    dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     when (dedicatedValue /= 0) $
       Cmd.addCommand "say" (Just conSayF)

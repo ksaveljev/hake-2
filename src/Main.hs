@@ -7,6 +7,7 @@ import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -33,7 +34,7 @@ main = do
         CVar.update dedicated { _cvValue = 1.0 }
 
       -- if (globals.dedicated.cvValue != 1.0)
-      whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+      whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
         undefined -- TODO: init our client window
 
       -- in C the first arg is the filename

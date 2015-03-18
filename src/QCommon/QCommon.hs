@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified Client.Key as Key
@@ -35,13 +36,13 @@ init args = do
     CBuf.addEarlyCommands False >> CBuf.execute
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing filesystem...");
 
     FS.initFileSystem
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("loading config...");
 
     reconfigure False
@@ -50,7 +51,7 @@ init args = do
     FS.markBaseSearchPaths -- mark the default search paths
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.testQ2Data(); // test for valid baseq2
 
     --
@@ -82,19 +83,19 @@ init args = do
     void $ CVar.get "version" s (Constants.cvarServerInfo .|. Constants.cvarNoSet)
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing network subsystem...");
 
     NET.init >> NetChannel.init
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing server subsystem...");
 
     SVMain.init
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing client subsystem...");
 
     CL.init
@@ -103,7 +104,7 @@ init args = do
 
     if added
       then do
-        dedicatedValue <- liftM (^.cvValue) $ CVar.getExisting "dedicated"
+        dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
         if dedicatedValue == 0
           then CBuf.addText "d1\n"
@@ -117,12 +118,12 @@ init args = do
     CL.writeConfiguration
 
     -- if (globals.dedicated.cvValue != 1.0)
-    whenQ (liftM ((/= 1.0) . (^.cvValue)) (CVar.getExisting "dedicated")) $ do
+    whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.dispose();
 
 frame :: Int -> Quake ()
 frame msec = do
-    logStats <- CVar.getExisting "log_stats"
+    logStats <- logStatsCVar
     when (logStats^.cvModified) $ do
       CVar.update logStats { _cvModified = False }
 
@@ -132,15 +133,15 @@ frame msec = do
         then undefined -- TODO
         else undefined -- TODO
 
-    ftv <- liftM (^.cvValue) $ CVar.getExisting "fixedtime"
-    tsv <- liftM (^.cvValue) $ CVar.getExisting "timescale"
+    ftv <- liftM (^.cvValue) fixedTimeCVar
+    tsv <- liftM (^.cvValue) timeScaleCVar
 
     let updatedMsec = if | ftv /= 0.0 -> truncate ftv
                          | tsv /= 0.0 -> let tmp = fromIntegral msec * tsv
                                        in if tmp < 1.0 then 1 else truncate tmp
                          | otherwise -> msec
 
-    stv <- liftM (^.cvValue) $ CVar.getExisting "showtrace"
+    stv <- liftM (^.cvValue) showTraceCVar
 
     when (stv /= 0.0) $ do
       ct <- use $ globals.cTraces
@@ -157,7 +158,7 @@ frame msec = do
 
     CBuf.execute
 
-    hsv <- liftM (^.cvValue) $ CVar.getExisting "host_speeds"
+    hsv <- liftM (^.cvValue) hostSpeedsCVar
 
     timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
