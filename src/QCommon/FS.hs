@@ -10,11 +10,11 @@ import Data.Functor ((<$>))
 import Data.Foldable (find)
 import Data.Traversable (traverse)
 import Control.Applicative ((<*>))
-import Control.Lens ((^.), (.=), (%=), use)
+import Control.Lens ((^.), (.=), (%=), use, set)
 import Control.Monad (when, void, liftM, unless)
 import Control.Exception
 import System.Directory
-import System.IO (openFile, hClose, Handle, IOMode(ReadMode))
+import System.IO (openBinaryFile, hClose, hIsOpen, Handle, IOMode(ReadMode), hSeek, SeekMode(AbsoluteSeek))
 import System.IO.MMap (mmapFileByteString)
 import System.PosixCompat.Files (getFileStatus, fileSize)
 import qualified Data.Sequence as Seq
@@ -124,7 +124,7 @@ addGameDirectory dir = do
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
 loadPackFile packfile = do
     let filePath = BC.unpack packfile
-    fileHandle <- io $ openFile filePath ReadMode
+    fileHandle <- io $ openBinaryFile filePath ReadMode
     fileContents <- io $ BL.fromStrict <$> mmapFileByteString filePath Nothing
 
     let header = runGet getDPackHeader fileContents
@@ -337,13 +337,7 @@ fileLength filename = do
             return (-1)
           Just fileLen -> return fileLen
 
-  where fileLinkMatch :: B.ByteString -> FileLinkT -> Bool
-        fileLinkMatch name fileLink =
-          let from = fileLink^.flFrom
-              len = fileLink^.flFromLength
-          in B.take len name == B.take len from
-
-        searchPathMatch :: B.ByteString -> [SearchPathT] -> Quake (Maybe Int)
+  where searchPathMatch :: B.ByteString -> [SearchPathT] -> Quake (Maybe Int)
         searchPathMatch _ [] = return Nothing
         searchPathMatch name (searchPath:xs) =
           -- is the element a pak file?
@@ -387,5 +381,102 @@ fileLength filename = do
                   return $ Just (fromIntegral size)
                 else searchPathMatch name xs
 
+{-
+- FOpenFile
+- 
+- Finds the file in the search path. returns a Handle. Used for
+- streaming data out of either a pak file or a seperate file.
+-}
 fOpenFile :: B.ByteString -> Quake (Maybe Handle)
-fOpenFile filename = undefined -- TODO
+fOpenFile filename = do
+    fsGlobals.fsFileFromPak .= 0
+
+    -- check for links first
+    links <- use $ fsGlobals.fsLinks
+    let foundLink = find (fileLinkMatch filename) links
+
+    case foundLink of
+      Just filelink -> do
+        let netpath = (filelink^.flTo) `B.append` B.take (filelink^.flFromLength) filename
+            netpathUnpacked = BC.unpack netpath
+
+        fileExists <- io $ doesFileExist netpathUnpacked
+        canRead <- if fileExists
+                    then io $ liftM readable (getPermissions netpathUnpacked)
+                    else return False
+        if canRead
+          then do
+            -- Com.dprintf $ "link file: " `B.append` netpath `B.append` "\n"
+            h <- io $ openBinaryFile netpathUnpacked ReadMode
+            return $ Just h
+          else return Nothing
+
+      -- search through the path, one element at a time
+      Nothing -> do
+        searchPaths <- use $ fsGlobals.fsSearchPaths
+        searchPathMatch filename searchPaths
+
+  -- IMPROVE: pretty much the same as in fileLength. Reduce duplication
+  where searchPathMatch :: B.ByteString -> [SearchPathT] -> Quake (Maybe Handle)
+        searchPathMatch _ [] = return Nothing
+        searchPathMatch name (searchPath:xs) =
+          -- is the element a pak file?
+          case searchPath^.spPack of
+            Just pack -> do -- look through all the pak file elements
+              let fname = BC.map toLower name
+                  files = pack^.pFiles
+
+              case M.lookup fname files of
+                Just entry -> do -- found it!
+                  fsGlobals.fsFileFromPak .= 1
+
+                  --Com.dprintf $ "PackFile: " `B.append` (pack^.pFilename) `B.append` " : " `B.append` fname `B.append` "\n"
+                  fileExists <- io $ doesFileExist (BC.unpack $ pack^.pFilename)
+                  canRead <- if fileExists
+                              then io $ liftM readable (getPermissions (BC.unpack $ pack^.pFilename))
+                              else return False
+
+                  unless canRead $
+                    Com.comError Constants.errFatal ("Couldn't reopen " `B.append` (pack^.pFilename))
+
+                  needsUpdate <- case pack^.pHandle of
+                                   Nothing -> return True
+                                   Just h -> do
+                                     isOpen <- io $ hIsOpen h
+                                     return $ not isOpen
+
+                  if needsUpdate
+                    then do
+                      h <- io $ openBinaryFile (BC.unpack $ pack^.pFilename) ReadMode
+                      let updatedSP = set spPack (Just $ pack { _pHandle = Just h }) searchPath
+                      fsGlobals.fsSearchPaths %= map (\sp -> if sp == searchPath then updatedSP else sp) -- IMPROVE: not nice, but how else would we do it?
+                      io $ hSeek h AbsoluteSeek (fromIntegral $ entry^.pfFilePos)
+                      return $ Just h
+                    else do
+                      io $ hSeek (fromJust $ pack^.pHandle) AbsoluteSeek (fromIntegral $ entry^.pfFilePos)
+                      return (pack^.pHandle)
+
+                Nothing -> searchPathMatch name xs
+
+            Nothing -> do
+              -- check a file in the directory tree
+              let netpath = (searchPath^.spFilename) `B.append` "/" `B.append` name
+                  netpathUnpacked = BC.unpack netpath
+
+              fileExists <- io $ doesFileExist netpathUnpacked
+              canRead <- if fileExists
+                          then io $ liftM readable (getPermissions netpathUnpacked)
+                          else return False
+
+              if canRead
+                then do
+                  -- Com.dprintf $ "FindFile: " `B.append` netpath `B.append` "\n"
+                  h <- io $ openBinaryFile netpathUnpacked ReadMode
+                  return $ Just h
+                else searchPathMatch name xs
+
+fileLinkMatch :: B.ByteString -> FileLinkT -> Bool
+fileLinkMatch name fileLink =
+    let from = fileLink^.flFrom
+        len = fileLink^.flFromLength
+    in B.take len name == B.take len from

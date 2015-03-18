@@ -15,7 +15,7 @@ data PackT =
         , _pBackBuffer :: B.ByteString
         , _pNumFiles   :: Int
         , _pFiles      :: M.Map B.ByteString PackFileT
-        }
+        } deriving (Eq)
 
 makeLenses ''PackT
 

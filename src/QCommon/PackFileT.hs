@@ -14,6 +14,6 @@ data PackFileT =
   PackFileT { _pfName    :: B.ByteString
             , _pfFilePos :: Int
             , _pfFileLen :: Int
-            }
+            } deriving (Eq)
 
 makeLenses ''PackFileT

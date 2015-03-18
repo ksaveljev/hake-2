@@ -12,7 +12,7 @@ import QCommon.PackT
 data SearchPathT =
   SearchPathT { _spFilename :: B.ByteString
               , _spPack     :: Maybe PackT
-              }
+              } deriving (Eq)
 
 makeLenses ''SearchPathT
 
