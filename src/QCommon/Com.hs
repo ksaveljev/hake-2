@@ -49,10 +49,10 @@ comError code fmt = do
         errReact _ = undefined -- TODO
 
 printf :: B.ByteString -> Quake ()
-printf = io.print -- TODO
+printf = io . B.putStr -- io.print -- TODO
 
 dprintf :: B.ByteString -> Quake ()
-dprintf = io.print -- TODO
+dprintf = io . B.putStr -- io.print -- TODO
 
 argc :: Quake Int
 argc = use $ comGlobals.cgComArgc
