@@ -3,7 +3,7 @@
 module QCommon.CBuf where
 
 import Control.Lens (use, (.=), (%=), (-=))
-import Control.Monad (when)
+import Control.Monad (when, liftM)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -39,7 +39,33 @@ addEarlyCommands clear = do
               when (i + 3 < c) $ findAddCommand c (i + 3)
 
 addLateCommands :: Quake Bool
-addLateCommands = undefined -- TODO
+addLateCommands = do
+    argc <- Com.argc
+
+    -- build the combined string to parse from
+    argsLength <- mapM (liftM B.length . Com.argv) [1..argc-1]
+
+    if sum argsLength == 0
+      then return False
+      else do
+        text <- liftM (B.intercalate " ") (mapM Com.argv [1..argc-1])
+
+        -- pull out the commands
+        let build = pullOutCommands text (B.length text) 0 ""
+            ret = B.length build /= 0
+
+        when ret $ addText build
+
+        return ret
+
+  where pullOutCommands :: B.ByteString -> Int -> Int -> B.ByteString -> B.ByteString
+        pullOutCommands txt len idx accum
+          | idx >= len = accum
+          | txt `BC.index` idx == '+' =
+              let command = "+" `B.append` BC.takeWhile (\ch -> ch /= '+' && ch /= '-') (B.drop (idx + 1) txt)
+                  commandLen = B.length command
+              in pullOutCommands txt len (idx + commandLen) (accum `B.append` command `B.append` "\n")
+          | otherwise = pullOutCommands txt len (idx + 1) accum
 
 execute :: Quake ()
 execute = do
