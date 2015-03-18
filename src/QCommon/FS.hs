@@ -49,7 +49,7 @@ initFileSystem = do
 
     -- basedir <path>
     -- allows the game to run from outside the data tree
-    baseDir <- CVar.getAndSet "basedir" "." Constants.cvarNoSet (fsGlobals.fsBaseDir)
+    Just baseDir <- CVar.get "basedir" "." Constants.cvarNoSet
 
     -- cddir <path>
     -- Logically concatenates the cddir after the basedir for
@@ -61,7 +61,7 @@ initFileSystem = do
 
     markBaseSearchPaths
 
-    gameDirVar <- CVar.getAndSet "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo) (fsGlobals.fsGameDirVar)
+    Just gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
 
     when (B.length (gameDirVar^.cvString) > 0) $ setGameDir (gameDirVar^.cvString)
 
@@ -175,7 +175,7 @@ loadPackFile packfile = do
 -- set baseq2 directory
 setCDDir :: Quake ()
 setCDDir = do
-    cdDir <- CVar.getAndSet "cddir" "" Constants.cvarArchive (fsGlobals.fsCDDir)
+    Just cdDir <- CVar.get "cddir" "" Constants.cvarArchive
     when (B.length (cdDir^.cvString) > 0) $ addGameDirectory (cdDir^.cvString)
 
 markBaseSearchPaths :: Quake ()

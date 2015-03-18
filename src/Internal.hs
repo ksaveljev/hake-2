@@ -111,9 +111,6 @@ data KeyGlobals =
 data FSGlobals =
   FSGlobals { _fsGameDir         :: B.ByteString
             , _fsUserDir         :: B.ByteString
-            , _fsBaseDir         :: CVarT
-            , _fsCDDir           :: CVarT
-            , _fsGameDirVar      :: CVarT
             , _fsLinks           :: Seq FileLinkT
             , _fsSearchPaths     :: [SearchPathT]
             , _fsBaseSearchPaths :: [SearchPathT]

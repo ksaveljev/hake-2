@@ -9,7 +9,6 @@ import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq
 
 import Internal
-import Game.CVarT
 import QCommon.SearchPathT
 import QCommon.FileLinkT
 
@@ -19,9 +18,6 @@ initialFSGlobals :: FSGlobals
 initialFSGlobals =
   FSGlobals { _fsGameDir         = ""
             , _fsUserDir         = ""
-            , _fsBaseDir         = newCVarT
-            , _fsCDDir           = newCVarT
-            , _fsGameDirVar      = newCVarT
             , _fsLinks           = Seq.empty
             , _fsSearchPaths     = []
             , _fsBaseSearchPaths = []
