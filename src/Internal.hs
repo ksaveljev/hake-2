@@ -118,9 +118,7 @@ data FSGlobals =
             }
 
 data NetChannelGlobals =
-  NetChannelGlobals { _ncShowPackets :: CVarT
-                    , _ncShowDrop    :: CVarT
-                    , _ncQPort       :: CVarT
+  NetChannelGlobals {
                     }
 
 data SVGlobals =

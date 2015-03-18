@@ -7,7 +7,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
-import QuakeState
 import QCommon.NetAdrT
 import qualified Constants
 import qualified QCommon.CVar as CVar
@@ -19,9 +18,9 @@ init = do
     
     let port = msec .&. 0xFFFF
 
-    void $ CVar.getAndSet "showpackets" "0" 0 (netChannelGlobals.ncShowPackets)
-    void $ CVar.getAndSet "showdrop" "0" 0 (netChannelGlobals.ncShowDrop)
-    void $ CVar.getAndSet "qport" (BC.pack $ show port) Constants.cvarNoSet (netChannelGlobals.ncQPort) -- IMPROVE: convert Int to ByteString using binary package?
+    void $ CVar.get "showpackets" "0" 0
+    void $ CVar.get "showdrop" "0" 0
+    void $ CVar.get "qport" (BC.pack $ show port) Constants.cvarNoSet
 
 outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
 outOfBandPrint = undefined -- TODO
