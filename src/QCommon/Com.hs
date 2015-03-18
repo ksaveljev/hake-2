@@ -93,7 +93,7 @@ parse txt len idx = do
             if txt `BC.index` skipWhitesIdx == '\"'
               then do -- handle quoted strings specially
                 let droppedStr = B.drop (skipWhitesIdx + 1) txt
-                    str = BC.takeWhile (\c -> c == '\"' || c == chr 0) droppedStr
+                    str = BC.takeWhile (\c -> c /= '\"' && c /= chr 0) droppedStr
                     newIdx = skipWhitesIdx + 1 + B.length str
                     finalIdx = if newIdx >= len
                                  then newIdx

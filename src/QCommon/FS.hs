@@ -289,7 +289,7 @@ loadFile path = do
             Com.comError Constants.errFatal "LoadFile failed"
             return Nothing
           Just h -> do
-            contents <- io $ B.hGetContents h
+            contents <- io $ B.hGet h len
             io $ hClose h
             return $ Just contents
 
