@@ -62,7 +62,7 @@ addLateCommands = do
         pullOutCommands txt len idx accum
           | idx >= len = accum
           | txt `BC.index` idx == '+' =
-              let command = "+" `B.append` BC.takeWhile (\ch -> ch /= '+' && ch /= '-') (B.drop (idx + 1) txt)
+              let command = BC.takeWhile (\ch -> ch /= '+' && ch /= '-') (B.drop (idx + 1) txt)
                   commandLen = B.length command
               in pullOutCommands txt len (idx + commandLen) (accum `B.append` command `B.append` "\n")
           | otherwise = pullOutCommands txt len (idx + 1) accum
