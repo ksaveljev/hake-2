@@ -117,7 +117,7 @@ setPlayer = do
         v1 <- Cmd.argv 1
         let ch = v1 `BC.index` 0
 
-        maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue)
+        maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
 
         if isDigit ch
           then do
@@ -365,7 +365,7 @@ gameMapF = do
               -- clear all the client inuse flags before saving so that
               -- when the level is re-entered, the clients will spawn
               -- at spawn points instead of occupying body shells
-              maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue) -- >>= return . truncate
+              maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
               clients <- use $ svGlobals.svServerStatic.ssClients
               savedInUse <- mapM (\i -> do
                                         let inuse = (clients V.! i)^.cEdict.eInUse
@@ -479,7 +479,7 @@ saveGameF = do
     c <- Cmd.argc
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
-    maxClientsValue <- use $ svGlobals.svMaxClients.cvValue
+    maxClientsValue <- liftM ((^.cvValue)) $ CVar.getExisting "maxclients"
     playerStats <- use $ svGlobals.svServerStatic.ssClients.ix 0.cEdict.eClient.gcPlayerState.psStats
     let health = playerStats UV.! Constants.statHealth
 
@@ -565,7 +565,7 @@ conSayF = do
                                            then B.take (B.length p - 2) (B.drop 1 p)
                                            else p)
 
-      maxClientsValue <- liftM truncate (use $ svGlobals.svMaxClients.cvValue)
+      maxClientsValue <- liftM (truncate . (^.cvValue)) $ CVar.getExisting "maxclients"
       clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
 
       void $ traverse (sendMessage text) clients

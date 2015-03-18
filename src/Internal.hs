@@ -126,24 +126,6 @@ data NetChannelGlobals =
 data SVGlobals =
   SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
             , _svClient               :: ClientT
-            , _svPaused               :: CVarT
-            , _svTimeDemo             :: CVarT
-            , _svEnforceTime          :: CVarT
-            , _svTimeout              :: CVarT
-            , _svZombieTime           :: CVarT
-            , _svRconPassword         :: CVarT
-            , _svAllowDownload        :: CVarT
-            , _svAllowDownloadPlayers :: CVarT
-            , _svAllowDownloadModels  :: CVarT
-            , _svAllowDownloadSounds  :: CVarT
-            , _svAllowDownloadMaps    :: CVarT
-            , _svAirAccelerate        :: CVarT
-            , _svNoReload             :: CVarT
-            , _svMaxClients           :: CVarT
-            , _svShowClamp            :: CVarT
-            , _svHostname             :: CVarT
-            , _svPublicServer         :: CVarT
-            , _svReconnectLimit       :: CVarT
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
             , _svPlayer               :: EdictT
