@@ -15,6 +15,7 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Client.ClientStaticT
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.CmdAliasT
@@ -66,6 +67,8 @@ data Globals =
           , _cmdText            :: SizeBufT
           , _cmdTextBuf         :: B.ByteString
           , _cmdAlias           :: Seq CmdAliasT
+
+          , _cls                :: ClientStaticT
 
           , _userInfoModified   :: Bool
 

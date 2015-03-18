@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
+               , module Client.ClientStaticT
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
@@ -11,6 +12,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Client.ClientStaticT
 import Game.CmdAliasT
 import Game.CVarT
 import QCommon.SizeBufT
@@ -35,6 +37,8 @@ initialGlobals =
           , _cmdText            = newSizeBufT
           , _cmdTextBuf         = ""
           , _cmdAlias           = Seq.empty
+
+          , _cls                = newClientStaticT
 
           , _userInfoModified   = False
 

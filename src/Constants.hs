@@ -1104,8 +1104,8 @@ miplevels    = 4 :: Int
 clcBad       = 0 :: Int
 clcNop       = 1 :: Int
 clcMove      = 2 :: Int -- [[usercmd_t]
-clcUserinfo  = 3 :: Int -- [[userinfo string]
-clcStringcmd = 4 :: Int -- [string] message
+clcUserInfo  = 3 :: Int -- [[userinfo string]
+clcStringCmd = 4 :: Int -- [string] message
 
 nsClient = 0 :: Int
 nsServer = 1 :: Int

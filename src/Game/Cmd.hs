@@ -22,6 +22,8 @@ import qualified Constants
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
+import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified QCommon.FS as FS
 
 aliasLoopCount :: Int
@@ -86,7 +88,7 @@ listF :: XCommandT
 listF = do
     allCommands <- use $ cmdGlobals.cgCmdFunctions
     _ <- traverse (\cf -> Com.printf $ (cf^.cfName) `B.append` "\n") allCommands
-    Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- TODO: maybe use Data.Binary for Int to Bytestring conversion ?
+    Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- IMPROVE: maybe use Data.Binary for Int to Bytestring conversion ?
 
 aliasF :: XCommandT
 aliasF = undefined -- TODO
@@ -257,4 +259,21 @@ macroExpandString text len =
 - when they are typed in at the console, they will need to be forwarded.
 -}
 forwardToServer :: Quake ()
-forwardToServer = undefined -- TODO
+forwardToServer = do
+    cmd <- argv 0
+
+    clientStatic <- use $ globals.cls
+    let ch = cmd `BC.index` 0
+
+    if (clientStatic^.csState) <= Constants.caConnected || ch == '-' || ch == '+'
+      then Com.printf $ "Unknown command \"" `B.append` cmd `B.append` "\"\n"
+      else do 
+        MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+        SZ.print (globals.cls.csNetChan.ncMessage) cmd
+
+        c <- argc
+
+        when (c > 1) $ do
+          cmdArgs <- args
+          SZ.print (globals.cls.csNetChan.ncMessage) " "
+          SZ.print (globals.cls.csNetChan.ncMessage) cmdArgs

@@ -46,3 +46,6 @@ write bufLens bufData len = do
     oldData <- use $ bufLens.sbData
     let updatedData = B.take idx oldData `B.append` bufData `B.append` B.drop (idx + len) oldData
     bufLens.sbData .= updatedData
+
+print :: SizeBufTLens -> B.ByteString -> Quake ()
+print = undefined -- TODO
