@@ -8,7 +8,7 @@ import Data.Maybe (fromMaybe)
 import Data.Sequence ((<|))
 import Data.Traversable (traverse)
 import Control.Lens ((^.), (%=), (.=), use)
-import Control.Monad (liftM, when, unless)
+import Control.Monad (liftM, when, unless, void)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Sequence as Seq
@@ -91,7 +91,47 @@ listF = do
     Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- IMPROVE: maybe use Data.Binary for Int to Bytestring conversion ?
 
 aliasF :: XCommandT
-aliasF = undefined -- TODO
+aliasF = do
+    c <- argc
+
+    if c == 1
+      then do
+        Com.printf "Current alias commands:\n"
+        aliases <- use $ globals.cmdAlias
+        void $ traverse (\alias -> Com.printf $ (alias^.caName)
+                                    `B.append` " : "
+                                    `B.append` (alias^.caValue)
+                        ) aliases
+      else do
+        s <- argv 1
+        let sUp = BC.map toUpper s
+
+        if B.length s > Constants.maxAliasName
+          then Com.printf "Alias name is too long\n"
+          else do
+            -- if the alias already exists, reuse it
+            aliases <- use $ globals.cmdAlias
+            let foundAlias = find (\a -> (BC.map toUpper (a^.caName)) == sUp) aliases
+                (alias, existing) = case foundAlias of
+                                      Nothing -> (newCmdAliasT, False)
+                                      Just a -> (a, True)
+
+            cmd <- liftM (`B.append` "\n") (restOfCommandLine 2 c "")
+            let updatedAlias = alias { _caName = s, _caValue = cmd }
+
+            if existing
+              then globals.cmdAlias %= fmap (\a -> if a == alias then updatedAlias else a)
+              else globals.cmdAlias %= (updatedAlias Seq.<|)
+
+  where restOfCommandLine :: Int -> Int -> B.ByteString -> Quake B.ByteString
+        restOfCommandLine idx count accum
+          | idx >= count = return accum
+          | idx == count - 1 = do
+              vi <- argv idx
+              return $ accum `B.append` vi
+          | otherwise = do
+              vi <- argv idx
+              restOfCommandLine (idx + 1) count (accum `B.append` vi `B.append` " ")
 
 waitF :: XCommandT
 waitF = globals.cmdWait .= True
