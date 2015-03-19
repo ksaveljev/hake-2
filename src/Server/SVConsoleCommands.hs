@@ -59,7 +59,6 @@ Specify a list of master servers
 -}
 setMasterF :: XCommandT
 setMasterF = do
-    --dedicatedValue <- use $ cvarGlobals.dedicated.cvValue
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     -- only dedicated servers send heartbeats
@@ -539,7 +538,7 @@ kickF = do
              -- print directly, because the dropped client won't get the
              -- SV_BroadcastPrintf message
              SVSend.clientPrintf client Constants.printHigh "You were kicked from the game\n"
-             SVMain.dropClient client
+             SVMain.dropClient (svGlobals.svClient)
              -- SV_INIT.svs.realtime
              realtime <- use $ svGlobals.svServerStatic.ssRealTime
              svGlobals.svClient.cLastMessage .= realtime -- min case there is a funny zombie

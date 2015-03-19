@@ -10,6 +10,8 @@ module QuakeState ( QuakeState(..)
                   , svGlobals
                   , SizeBufTLens
                   , CVarTLens
+                  , ClientTLens
+                  , EdictTLens
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals

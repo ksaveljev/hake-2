@@ -148,6 +148,8 @@ data CmdFunctionT =
 
 type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT
 type CVarTLens = Lens QuakeState QuakeState CVarT CVarT
+type ClientTLens = Lens QuakeState QuakeState ClientT ClientT
+type EdictTLens = Lens QuakeState QuakeState EdictT EdictT
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float
@@ -385,9 +387,9 @@ data ClientT =
           , _cName          :: B.ByteString
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
-          , _cDatagramBuf   :: UV.Vector Word8
+          , _cDatagramBuf   :: B.ByteString
           , _cFrames        :: V.Vector ClientFrameT
-          , _cDownload      :: UV.Vector Word8
+          , _cDownload      :: B.ByteString
           , _cDownloadSize  :: Int
           , _cDownloadCount :: Int
           , _cLastMessage   :: Int

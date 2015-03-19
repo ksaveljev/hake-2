@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE Rank2Types #-}
 module Server.SVMain where
 
 import Data.Bits ((.|.), (.&.))
@@ -14,8 +15,10 @@ import QuakeState
 import CVarVariables
 import QCommon.NetAdrT
 import qualified Constants
+import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
@@ -77,8 +80,20 @@ shutdown = undefined -- TODO
 - unwillingly. This is NOT called if the entire server is quiting or
 - crashing.
 -}
-dropClient :: ClientT -> Quake ()
-dropClient = undefined -- TODO
+dropClient :: ClientTLens -> Quake ()
+dropClient clientLens = do
+    client <- use $ clientLens
+
+    MSG.writeByteI (clientLens.cNetChan.ncMessage) Constants.svcDisconnect
+
+    when ((client^.cState) == Constants.csSpawned) $
+      PlayerClient.clientDisconnect (clientLens.cEdict)
+
+    when ((client^.cDownload) /= "") $
+      clientLens.cDownload .= ""
+
+    clientLens.cState .= Constants.csZombie
+    clientLens.cName .= ""
 
 {- ==============================================================================
 - 
