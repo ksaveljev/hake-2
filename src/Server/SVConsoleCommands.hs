@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVConsoleCommands where
 
 import Data.Char (isDigit)
@@ -9,6 +10,7 @@ import Data.Traversable (traverse)
 import Control.Lens (use, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
+import Control.Exception (handle, IOException)
 import System.Directory (doesFileExist, removeFile, copyFile)
 import System.FilePath (takeFileName)
 import System.FilePath.Glob (namesMatching)
@@ -165,7 +167,7 @@ SAVEGAME FILES
 -}
 
 remove :: B.ByteString -> Quake ()
-remove name = io $ removeFile (BC.unpack name) -- IMPROVE: catch exceptions ?
+remove name = io $ handle (\(_ :: IOException) -> return ()) (removeFile (BC.unpack name))
 
 -- Delete save files save/(number)/.
 wipeSaveGame :: B.ByteString -> Quake ()
