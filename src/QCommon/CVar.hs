@@ -257,7 +257,7 @@ userInfo = bitInfo Constants.cvarUserInfo
 
 -- Appends lines containing \"set vaqriable value\" for all variables
 -- with the archive flag set true. 
-writeVariables :: FilePath -> Quake ()
+writeVariables :: B.ByteString -> Quake ()
 writeVariables = undefined -- TODO
 
 -- Variable typing auto completition.

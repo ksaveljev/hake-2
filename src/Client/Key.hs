@@ -6,6 +6,7 @@ import Data.Maybe (isJust, fromJust)
 import Data.Char (ord, toUpper, chr)
 import Control.Lens ((.=), (%=), use)
 import Control.Monad.State (liftM, unless, when, void)
+import System.IO (Handle)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
@@ -122,3 +123,6 @@ keynumToString keynum = do
 setBinding :: Int -> Maybe B.ByteString -> Quake ()
 setBinding keyNum binding =
     unless (keyNum == -1) $ globals.keyBindings %= (V.// [(keyNum, binding)])
+
+writeBindings :: Handle -> Quake ()
+writeBindings = undefined -- TODO
