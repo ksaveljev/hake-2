@@ -38,5 +38,5 @@ broadcastPrintf = undefined -- TODO
 SV_SendClientMessages
 =======================
 -}
-svSendClientMessages :: Quake ()
-svSendClientMessages = undefined -- TODO
+sendClientMessages :: Quake ()
+sendClientMessages = undefined -- TODO

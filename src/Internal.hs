@@ -3,7 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Internal where
 
-import Data.Word (Word8)
 import Linear.V3 (V3)
 import Data.Sequence (Seq)
 import Control.Applicative
@@ -407,9 +406,9 @@ data ServerStaticT =
                 , _ssClientEntities     :: V.Vector EntityStateT
                 , _ssLastHeartbeat      :: Int
                 , _ssChallenges         :: V.Vector ChallengeT
-                , _ssDemoFile           :: B.ByteString
+                , _ssDemoFile           :: Maybe Handle
                 , _ssDemoMulticast      :: SizeBufT
-                , _ssDemoMulticastBuf   :: UV.Vector Word8
+                , _ssDemoMulticastBuf   :: B.ByteString
                 }
 
 data ServerT =

@@ -4,11 +4,14 @@
 module Server.SVMain where
 
 import Data.Bits ((.|.), (.&.))
+import Data.Maybe (isJust)
 import Data.Traversable (traverse)
 import Control.Lens (use, (.=), (%=), (^.))
 import Control.Monad (void, when, liftM)
+import System.IO (hClose)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -23,6 +26,7 @@ import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts as SVEnts
+import qualified Server.SVGame as SVGame
 import qualified Server.SVSend as SVSend
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
@@ -73,7 +77,45 @@ init = do
 
 -- Called when each game quits, before Sys_Quit or Sys_Error.
 shutdown :: B.ByteString -> Bool -> Quake ()
-shutdown = undefined -- TODO
+shutdown finalmsg reconnect = do
+    clients <- use $ svGlobals.svServerStatic.ssClients
+
+    when (V.null clients) $ 
+      finalMessage finalmsg reconnect
+
+    masterShutdown
+
+    SVGame.shutdownGameProgs
+
+    -- free current level
+    sDemofile <- use $ svGlobals.svServer.sDemoFile
+    when (isJust sDemofile) $ do
+      let Just h = sDemofile
+      io $ hClose h -- IMPROVE: catch exception
+
+    let newServer = newServerT
+    svGlobals.svServer .= newServer
+    globals.serverState .= (newServer^.sState)
+
+    ssDemofile <- use $ svGlobals.svServerStatic.ssDemoFile
+    when (isJust ssDemofile) $ do
+      let Just h = ssDemofile
+      io $ hClose h -- IMPROVE: catch exception
+
+    svGlobals.svServerStatic .= newServerStaticT
+
+{-
+- Used by SV_Shutdown to send a final message to all connected clients
+- before the server goes down. The messages are sent immediately, not just
+- stuck on the outgoing message list, because the server is going to
+- totally exit after returning from this function.
+-}
+finalMessage :: B.ByteString -> Bool -> Quake ()
+finalMessage = undefined -- TODO
+
+-- Master_Shutdown, Informs all masters that this server is going down.
+masterShutdown :: Quake ()
+masterShutdown = undefined -- TODO
 
 {-
 - Called when the player is totally leaving the server, either willingly or
@@ -104,11 +146,11 @@ dropClient clientLens = do
 {-
  - Builds the string that is sent as heartbeats and status replies.
  -}
-svStatusString :: Quake B.ByteString
-svStatusString = undefined -- TODO
+statusString :: Quake B.ByteString
+statusString = undefined -- TODO
 
-svFrame :: Int -> Quake ()
-svFrame msec = do
+frame :: Int -> Quake ()
+frame msec = do
     globals.timeBeforeGame .= 0
     globals.timeAfterGame .= 0
 
@@ -122,34 +164,34 @@ svFrame msec = do
       void Lib.rand
 
       -- check timeouts
-      svCheckTimeouts
+      checkTimeouts
 
       -- get packets from clients
-      svReadPackets
+      readPackets
 
       -- move autonomous things around if enough time has passed
       undefined -- TODO
 
       -- update ping based on the last known frame from all clients
-      svCalcPings
+      calcPings
 
       -- give the clients some timeslices
-      svGiveMsec
+      giveMsec
 
       -- let everything in the world think and move
-      svRunGameFrame
+      runGameFrame
 
       -- send messages back to the clients that had packets read this frame
-      SVSend.svSendClientMessages
+      SVSend.sendClientMessages
 
       -- save the entire world state if recording a serverdemo
-      SVEnts.svRecordDemoMessage
+      SVEnts.recordDemoMessage
 
       -- send a heartbeat to the master if needed
       masterHeartbeat
 
       -- clear teleport flags, etc for next frame
-      svPrepWorldFrame
+      prepWorldFrame
 
 {-
 - If a packet has not been received from a client for timeout.value
@@ -160,23 +202,23 @@ svFrame msec = do
 - for a few seconds to make sure any final reliable message gets resent if
 - necessary.
 -}
-svCheckTimeouts :: Quake ()
-svCheckTimeouts = undefined -- TODO
+checkTimeouts :: Quake ()
+checkTimeouts = undefined -- TODO
 
 -- Reads packets from the network or loopback
-svReadPackets :: Quake ()
-svReadPackets = undefined -- TODO
+readPackets :: Quake ()
+readPackets = undefined -- TODO
 
 -- Updates the cl.ping variables
-svCalcPings :: Quake ()
-svCalcPings = undefined -- TODO
+calcPings :: Quake ()
+calcPings = undefined -- TODO
 
 {-
 - Every few frames, gives all clients an allotment of milliseconds for
 - their command moves. If they exceed it, assume cheating.
 -}
-svGiveMsec :: Quake ()
-svGiveMsec = do
+giveMsec :: Quake ()
+giveMsec = do
     frameNum <- use $ svGlobals.svServer.sFrameNum
 
     when (frameNum .&. 15 == 0) $
@@ -186,8 +228,8 @@ svGiveMsec = do
                       else cl { _cCommandMsec = 1800 }) -- 1600 + some slop
 
 
-svRunGameFrame :: Quake ()
-svRunGameFrame = undefined -- TODO
+runGameFrame :: Quake ()
+runGameFrame = undefined -- TODO
 
 masterHeartbeat :: Quake ()
 masterHeartbeat = do
@@ -207,7 +249,7 @@ masterHeartbeat = do
              svGlobals.svServerStatic.ssLastHeartbeat .= realtime
 
              -- send the same string that we would give for a status OOB command
-             str <- svStatusString
+             str <- statusString
 
              -- send to group master
              masterAdr <- use $ svGlobals.svMasterAdr
@@ -224,5 +266,5 @@ masterHeartbeat = do
 - This has to be done before the world logic, because player processing
 - happens outside RunWorldFrame.
 -}
-svPrepWorldFrame :: Quake ()
-svPrepWorldFrame = undefined -- TODO
+prepWorldFrame :: Quake ()
+prepWorldFrame = undefined -- TODO

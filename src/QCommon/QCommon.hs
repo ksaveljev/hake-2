@@ -176,7 +176,7 @@ frame msec = do
     timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
     comGlobals.debugContext .= "SV:"
-    SVMain.svFrame msec
+    SVMain.frame msec
 
     timeBetween <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
