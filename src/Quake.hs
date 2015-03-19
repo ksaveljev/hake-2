@@ -4,7 +4,7 @@ module Quake ( Quake
              , whenQ
              ) where
 
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Except
 import qualified Data.ByteString as B
 

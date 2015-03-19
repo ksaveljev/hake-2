@@ -7,10 +7,9 @@ import Data.Word (Word8)
 import Linear.V3 (V3)
 import Data.Sequence (Seq)
 import Control.Applicative
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Except
 import Control.Lens (Lens)
-import qualified Control.Monad.State.Lazy as Lazy
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Vector as V
