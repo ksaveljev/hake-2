@@ -1,21 +1,35 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Server.SVMain where
 
 import Data.Bits ((.|.), (.&.))
+import Data.Traversable (traverse)
 import Control.Lens (use, (.=), (%=), (^.))
-import Control.Monad (void, when)
+import Control.Monad (void, when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
+import QCommon.NetAdrT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts as SVEnts
 import qualified Server.SVSend as SVSend
+import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
+
+{-
+- Send a message to the master every few minutes to let it know we are
+- alive, and log information.
+-}
+heartbeatSeconds :: Int
+heartbeatSeconds = 300
 
 -- only called at quake2.exe startup, not for each game
 init :: Quake ()
@@ -65,6 +79,18 @@ shutdown = undefined -- TODO
 -}
 dropClient :: ClientT -> Quake ()
 dropClient = undefined -- TODO
+
+{- ==============================================================================
+- 
+- CONNECTIONLESS COMMANDS
+- 
+- ==============================================================================-}
+
+{-
+ - Builds the string that is sent as heartbeats and status replies.
+ -}
+svStatusString :: Quake B.ByteString
+svStatusString = undefined -- TODO
 
 svFrame :: Int -> Quake ()
 svFrame msec = do
@@ -149,7 +175,33 @@ svRunGameFrame :: Quake ()
 svRunGameFrame = undefined -- TODO
 
 masterHeartbeat :: Quake ()
-masterHeartbeat = undefined -- TODO
+masterHeartbeat = do
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+    publicServerValue <- liftM (^.cvValue) publicServerCVar
+
+
+    -- only dedicated servers send heartbeats
+    -- no need if it is a private dedicated game
+    when (dedicatedValue /= 0 || publicServerValue == 0) $ do
+      lastHeartbeat <- use $ svGlobals.svServerStatic.ssLastHeartbeat
+      realtime <- use $ svGlobals.svServerStatic.ssRealTime
+
+      if | lastHeartbeat > realtime -> svGlobals.svServerStatic.ssLastHeartbeat .= realtime
+         | realtime - lastHeartbeat < heartbeatSeconds * 1000 -> return () -- not time to send yet
+         | otherwise -> do
+             svGlobals.svServerStatic.ssLastHeartbeat .= realtime
+
+             -- send the same string that we would give for a status OOB command
+             str <- svStatusString
+
+             -- send to group master
+             masterAdr <- use $ svGlobals.svMasterAdr
+             void $ traverse (sendToNetAdr str) masterAdr
+
+  where sendToNetAdr :: B.ByteString -> NetAdrT -> Quake ()
+        sendToNetAdr strToSend netAdr = do
+          Com.printf $ "Sending heartbeat to " `B.append` NET.adrToString netAdr `B.append` "\n"
+          NetChannel.outOfBandPrint Constants.nsServer netAdr ("heartbeat\n" `B.append` strToSend)
 
 {-
 - SV_PrepWorldFrame
