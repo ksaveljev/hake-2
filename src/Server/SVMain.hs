@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SVMain where
 
-import Data.Bits ((.|.))
-import Control.Lens (use, (.=), (%=))
+import Data.Bits ((.|.), (.&.))
+import Control.Lens (use, (.=), (%=), (^.))
 import Control.Monad (void, when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -78,7 +78,7 @@ svFrame msec = do
       svGlobals.svServerStatic.ssRealTime %= (+ msec)
 
       -- keep the random time dependent
-      void $ Lib.rand
+      void Lib.rand
 
       -- check timeouts
       svCheckTimeouts
@@ -135,7 +135,15 @@ svCalcPings = undefined -- TODO
 - their command moves. If they exceed it, assume cheating.
 -}
 svGiveMsec :: Quake ()
-svGiveMsec = undefined -- TODO
+svGiveMsec = do
+    frameNum <- use $ svGlobals.svServer.sFrameNum
+
+    when (frameNum .&. 15 == 0) $
+      svGlobals.svServerStatic.ssClients %=
+        fmap (\cl -> if (cl^.cState) == Constants.csFree
+                      then cl
+                      else cl { _cCommandMsec = 1800 }) -- 1600 + some slop
+
 
 svRunGameFrame :: Quake ()
 svRunGameFrame = undefined -- TODO
