@@ -125,4 +125,12 @@ setBinding keyNum binding =
     unless (keyNum == -1) $ globals.keyBindings %= (V.// [(keyNum, binding)])
 
 writeBindings :: Handle -> Quake ()
-writeBindings = undefined -- TODO
+writeBindings h = do
+    kb <- use $ globals.keyBindings
+    void $ V.sequence $ V.imap (writeKeyBinding h) kb
+
+  where writeKeyBinding :: Handle -> Int -> Maybe B.ByteString -> Quake ()
+        writeKeyBinding _ _ Nothing = return ()
+        writeKeyBinding handle i (Just b) = do
+          keyStr <- keynumToString i
+          io $ B.hPut handle $ "bind " `B.append` keyStr `B.append` " \"" `B.append` b `B.append` "\"\n"
