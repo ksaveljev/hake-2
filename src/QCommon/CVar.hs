@@ -10,6 +10,7 @@ import Data.Bits ((.&.), (.|.))
 import Control.Lens ((^.), (%=), (.=), use)
 import Control.Monad (void, when, liftM)
 import Data.Traversable (traverse)
+import System.IO (Handle, IOMode(ReadWriteMode), hSeek, hFileSize, SeekMode(AbsoluteSeek))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map as M
@@ -52,7 +53,7 @@ get varName varValue flags = do
                                             , _cvFlags    = flags
                                             }
 
-               globals.cvarVars %= (M.insert varName newCVar)
+               globals.cvarVars %= M.insert varName newCVar
 
                return $ Just newCVar
 
@@ -78,7 +79,7 @@ findVar varName = do
     return $ M.lookup varName vars
 
 getExisting :: B.ByteString -> Quake CVarT
-getExisting = (liftM fromJust) . findVar
+getExisting = liftM fromJust . findVar
 
 -- Creates a variable if not found and sets their value, the parsed float value and their flags.
 fullSet :: B.ByteString -> B.ByteString -> Int -> Quake CVarT
@@ -119,7 +120,7 @@ set2 varName value force = do
     var <- findVar varName
 
     case var of
-      Nothing -> get varName value 0 >>= return . fromJust -- create it
+      Nothing -> liftM fromJust (get varName value 0) -- create it
       Just cvar -> do
         let cvarFlags = cvar^.cvFlags
             userServerFlag = cvarFlags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)
@@ -157,7 +158,7 @@ set2 varName value force = do
 
                       return updatedCVar
            | otherwise -> do
-             let updatedCVar = if (force && isJust (cvar^.cvLatchedString))
+             let updatedCVar = if force && isJust (cvar^.cvLatchedString)
                                  then cvar { _cvLatchedString = Nothing }
                                  else cvar
 
@@ -258,7 +259,24 @@ userInfo = bitInfo Constants.cvarUserInfo
 -- Appends lines containing \"set vaqriable value\" for all variables
 -- with the archive flag set true. 
 writeVariables :: B.ByteString -> Quake ()
-writeVariables = undefined -- TODO
+writeVariables path = do
+    f <- Lib.fOpen path ReadWriteMode
+
+    case f of
+      Nothing -> return ()
+      Just h -> do
+        -- IMPROVE: catch exceptions
+        fileSize <- io $ hFileSize h
+        io $ hSeek h AbsoluteSeek fileSize
+
+        vars <- use $ globals.cvarVars
+        void $ traverse (writeVar h) vars
+        Lib.fClose h
+
+  where writeVar :: Handle -> CVarT -> Quake ()
+        writeVar handle cvar =
+          when ((cvar^.cvFlags) .&. Constants.cvarArchive /= 0) $
+            io $ B.hPut handle $ "set " `B.append` (cvar^.cvName) `B.append` " \"" `B.append` (cvar^.cvString) `B.append` "\"\n"
 
 -- Variable typing auto completition.
 completeVariable :: B.ByteString -> UV.Vector B.ByteString
