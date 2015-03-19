@@ -32,3 +32,11 @@ Sends text to all active clients
 -}
 broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = undefined -- TODO
+
+{-
+=======================
+SV_SendClientMessages
+=======================
+-}
+svSendClientMessages :: Quake ()
+svSendClientMessages = undefined -- TODO

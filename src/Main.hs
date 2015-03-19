@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 {-# LANGUAGE OverloadedStrings #-}
-import Control.Lens ((^.))
+import Control.Lens ((^.), (.=))
 import Control.Monad.State (when, liftM, void)
 import System.Environment (getArgs)
 import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
+import System.Random (newStdGen)
 
 import Quake
 import QuakeState
@@ -24,6 +25,8 @@ main = do
     hSetBuffering stdout NoBuffering
 
     runQuake initialQuakeState $ do
+      io newStdGen >>= \g -> globals.rnd .= g
+
       args <- io getArgs
       let dedicatedFlag = isDedicatedCmdArg args
 

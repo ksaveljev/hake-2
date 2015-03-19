@@ -2,14 +2,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Lib where
 
+import Data.Int (Int16)
 import Data.Maybe (fromMaybe)
 import Text.Read (readMaybe)
+import Control.Lens (use, (.=))
 import Control.Exception (handle, IOException)
 import System.IO (Handle, IOMode, openFile, hClose)
+import System.Random (random)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
+import QuakeState
 import qualified QCommon.Com as Com
 
 atof :: B.ByteString -> Float
@@ -38,3 +42,10 @@ fOpen name mode = do
 
 fClose :: Handle -> Quake ()
 fClose = io . hClose
+
+rand :: Quake Int16
+rand = do
+    g <- use $ globals.rnd
+    let (result, newG) = random g
+    globals.rnd .= newG
+    return result

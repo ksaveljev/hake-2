@@ -11,6 +11,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Except
 import Control.Lens (Lens)
 import System.IO (Handle)
+import System.Random (StdGen)
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Vector as V
@@ -68,6 +69,11 @@ data Globals =
           , _cmdTextBuf         :: B.ByteString
           , _cmdAlias           :: Seq CmdAliasT
 
+          , _timeBeforeGame     :: Int
+          , _timeAfterGame      :: Int
+          , _timeBeforeRef      :: Int
+          , _timeAfterRef       :: Int
+
           , _logStatsFile       :: Maybe Handle
 
           , _cls                :: ClientStaticT
@@ -83,6 +89,8 @@ data Globals =
           , _keyLines           :: V.Vector B.ByteString
           , _keyLinePos         :: Int
           , _editLine           :: Int
+
+          , _rnd                :: StdGen
           }
 
 data ComGlobals =

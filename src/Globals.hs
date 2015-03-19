@@ -8,6 +8,7 @@ module Globals ( module Globals
                ) where
 
 import Control.Lens (makeLenses)
+import System.Random (mkStdGen)
 import qualified Data.Map as M
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
@@ -39,6 +40,11 @@ initialGlobals =
           , _cmdTextBuf         = ""
           , _cmdAlias           = Seq.empty
 
+          , _timeBeforeGame     = 0
+          , _timeAfterGame      = 0
+          , _timeBeforeRef      = 0
+          , _timeAfterRef       = 0
+
           , _logStatsFile       = Nothing
 
           , _cls                = newClientStaticT
@@ -54,4 +60,6 @@ initialGlobals =
           , _keyLines           = V.empty
           , _keyLinePos         = 0
           , _editLine           = 0
+
+          , _rnd                = mkStdGen 0 -- must be changed in initialization code
           }
