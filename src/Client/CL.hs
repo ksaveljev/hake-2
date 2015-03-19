@@ -68,3 +68,6 @@ writeConfiguration = do
         Key.writeBindings h
         Lib.fClose h
         CVar.writeVariables path
+
+frame :: Int -> Quake ()
+frame msec = return () -- undefined -- TODO

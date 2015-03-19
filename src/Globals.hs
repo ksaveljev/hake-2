@@ -39,6 +39,8 @@ initialGlobals =
           , _cmdTextBuf         = ""
           , _cmdAlias           = Seq.empty
 
+          , _logStatsFile       = Nothing
+
           , _cls                = newClientStaticT
 
           , _userInfoModified   = False

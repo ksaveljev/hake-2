@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.QCommon where
 
 import Data.Bits ((.|.))
 import Control.Lens (use, (.=), (^.))
 import Control.Monad (when, liftM, void)
+import Control.Exception (IOException, handle)
+import System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek), hClose, IOMode(WriteMode), openFile)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -78,7 +81,7 @@ init args = do
                                .add(Globals.__DATE__)
                                .add(BUILDSTRING));
     -}
-    let s = BC.pack $ (show Constants.version) ++ (show Constants.__date__) -- IMPROVE: use formatting library?
+    let s = BC.pack $ show Constants.version ++ show Constants.__date__ -- IMPROVE: use formatting library?
 
     void $ CVar.get "version" s (Constants.cvarServerInfo .|. Constants.cvarNoSet)
 
@@ -121,6 +124,11 @@ init args = do
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.dispose();
 
+{-
+- Trigger generation of a frame for the given time. The setjmp/longjmp
+- mechanism of the original was replaced with exceptions.
+- @param msec the current game time
+-}
 frame :: Int -> Quake ()
 frame msec = do
     logStats <- logStatsCVar
@@ -130,8 +138,13 @@ frame msec = do
       let lsv = logStats^.cvValue
 
       if lsv /= 0.0
-        then undefined -- TODO
-        else undefined -- TODO
+        then do
+          closeLogStatsFile
+          openedFile <- openLogStatsFile "stats.log"
+          case openedFile of
+            Nothing -> return ()
+            Just h -> io $ B.hPut h "entities,dlights,parts,frame time\n" -- IMPROVE: catch exception ?
+        else closeLogStatsFile
 
     ftv <- liftM (^.cvValue) fixedTimeCVar
     tsv <- liftM (^.cvValue) timeScaleCVar
@@ -150,7 +163,7 @@ frame msec = do
       Com.printf $ BC.pack (show ct)
         `B.append` " traces "
         `B.append` BC.pack (show cpc)
-        `B.append` " points\n" -- TODO: use binary to convert int to bytestring? OR printf with Text and Text.printf ?
+        `B.append` " points\n" -- IMPROVE: use binary to convert int to bytestring? OR printf with Text and Text.printf ?
 
       globals.cTraces .= 0
       globals.cBrushTraces .= 0
@@ -162,13 +175,13 @@ frame msec = do
 
     timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
-    -- Com.debugContext = "SV:" -- TODO
-    -- SV_MAIN.SV_FRAME(msec) -- TODO
+    comGlobals.debugContext .= "SV:"
+    SVMain.svFrame msec
 
     timeBetween <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
-    -- Com.debugContext = "CL:" -- TODO
-    -- CV.Frame(msec) -- TODO
+    comGlobals.debugContext .= "CL:"
+    CL.frame msec
 
     when (hsv /= 0) $ do
       timeAfter <- Timer.milliseconds
@@ -183,6 +196,27 @@ frame msec = do
           -}
 
       Com.printf undefined -- TODO
+
+    io $ print "FRAME"
+
+  where closeLogStatsFile :: Quake ()
+        closeLogStatsFile = do
+          statsFile <- use $ globals.logStatsFile
+          case statsFile of
+            Nothing -> return ()
+            Just h -> do
+              io (handle (\(_ :: IOException) -> return ()) $ hClose h)
+              globals.logStatsFile .= Nothing
+
+        openLogStatsFile :: B.ByteString -> Quake (Maybe Handle)
+        openLogStatsFile name = do
+          -- IMPROVE: set to Nothing in case of exception ?
+          io (handle (\(_ :: IOException) -> return Nothing) $ do
+                h <- openFile (BC.unpack name) WriteMode
+                hSeek h AbsoluteSeek 0
+                hSetFileSize h 0
+                return $ Just h
+             )
 
 reconfigure :: Bool -> Quake ()
 reconfigure clear = do

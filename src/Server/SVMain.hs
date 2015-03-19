@@ -62,3 +62,6 @@ shutdown = undefined -- TODO
 -}
 dropClient :: ClientT -> Quake ()
 dropClient = undefined -- TODO
+
+svFrame :: Int -> Quake ()
+svFrame msec = return () -- undefined -- TODO

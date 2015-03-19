@@ -10,6 +10,7 @@ import Control.Applicative
 import Control.Monad.State.Strict
 import Control.Monad.Except
 import Control.Lens (Lens)
+import System.IO (Handle)
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Vector as V
@@ -67,6 +68,8 @@ data Globals =
           , _cmdTextBuf         :: B.ByteString
           , _cmdAlias           :: Seq CmdAliasT
 
+          , _logStatsFile       :: Maybe Handle
+
           , _cls                :: ClientStaticT
 
           , _userInfoModified   :: Bool
@@ -83,10 +86,12 @@ data Globals =
           }
 
 data ComGlobals =
-  ComGlobals { _cgComArgc   :: Int
-             , _cgComArgv   :: V.Vector B.ByteString
-             , _cgRecursive :: Bool
-             , _cgMsg       :: B.ByteString
+  ComGlobals { _cgComArgc     :: Int
+             , _cgComArgv     :: V.Vector B.ByteString
+             , _cgRecursive   :: Bool
+             , _cgMsg         :: B.ByteString
+             , _debugContext  :: B.ByteString
+             , _debugContext2 :: B.ByteString
              }
 
 data CmdGlobals =

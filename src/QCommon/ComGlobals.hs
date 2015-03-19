@@ -1,11 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.ComGlobals ( ComGlobals
-                          , initialComGlobals
-                          , cgComArgc
-                          , cgComArgv
-                          , cgRecursive
-                          , cgMsg
+                          , module QCommon.ComGlobals
                           ) where
 
 import Control.Lens (makeLenses)
@@ -19,8 +15,10 @@ makeLenses ''ComGlobals
 
 initialComGlobals :: ComGlobals
 initialComGlobals =
-  ComGlobals { _cgComArgc   = 0
-             , _cgComArgv   = V.replicate Constants.maxNumArgvs ""
-             , _cgRecursive = False
-             , _cgMsg       = B.empty
+  ComGlobals { _cgComArgc     = 0
+             , _cgComArgv     = V.replicate Constants.maxNumArgvs ""
+             , _cgRecursive   = False
+             , _cgMsg         = B.empty
+             , _debugContext  = ""
+             , _debugContext2 = ""
              }
