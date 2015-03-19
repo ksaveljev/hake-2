@@ -8,10 +8,7 @@ module QuakeState ( QuakeState(..)
                   , fsGlobals
                   , netChannelGlobals
                   , svGlobals
-                  , SizeBufTLens
-                  , CVarTLens
-                  , ClientTLens
-                  , EdictTLens
+                  , QuakeLens
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals

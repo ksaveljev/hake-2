@@ -80,7 +80,7 @@ shutdown = undefined -- TODO
 - unwillingly. This is NOT called if the entire server is quiting or
 - crashing.
 -}
-dropClient :: ClientTLens -> Quake ()
+dropClient :: QuakeLens ClientT -> Quake ()
 dropClient clientLens = do
     client <- use $ clientLens
 

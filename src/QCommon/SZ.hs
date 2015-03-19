@@ -12,17 +12,17 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
 
-init :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
+init :: QuakeLens SizeBufT -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =
     bufLens .= newSizeBufT { _sbData = bufData, _sbMaxSize = len }
 
-clear :: SizeBufTLens -> Quake ()
+clear :: QuakeLens SizeBufT -> Quake ()
 clear bufLens = do
     bufLens.sbCurSize .= 0
     bufLens.sbOverflowed .= False
 
 -- ask for the pointer using sizebuf_t.cursize (RST)
-getSpace :: SizeBufTLens -> Int -> Quake Int
+getSpace :: QuakeLens SizeBufT -> Int -> Quake Int
 getSpace bufLens len = do
     buf <- use bufLens
 
@@ -40,12 +40,12 @@ getSpace bufLens len = do
 
     return oldsize
 
-write :: SizeBufTLens -> B.ByteString -> Int -> Quake ()
+write :: QuakeLens SizeBufT -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len = do
     idx <- getSpace bufLens len
     oldData <- use $ bufLens.sbData
     let updatedData = B.take idx oldData `B.append` bufData `B.append` B.drop (idx + len) oldData
     bufLens.sbData .= updatedData
 
-print :: SizeBufTLens -> B.ByteString -> Quake ()
+print :: QuakeLens SizeBufT -> B.ByteString -> Quake ()
 print = undefined -- TODO

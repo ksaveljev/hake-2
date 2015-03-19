@@ -4,8 +4,8 @@ module QCommon.MSG where
 import Quake
 import QuakeState
 
-writeByteI :: SizeBufTLens -> Int -> Quake ()
+writeByteI :: QuakeLens SizeBufT -> Int -> Quake ()
 writeByteI = undefined -- TODO
 
-writeByteF :: SizeBufTLens -> Float -> Quake ()
+writeByteF :: QuakeLens SizeBufT -> Float -> Quake ()
 writeByteF = undefined -- TODO

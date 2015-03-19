@@ -146,10 +146,7 @@ data CmdFunctionT =
                , _cfFunction :: Maybe XCommandT
                }
 
-type SizeBufTLens = Lens QuakeState QuakeState SizeBufT SizeBufT
-type CVarTLens = Lens QuakeState QuakeState CVarT CVarT
-type ClientTLens = Lens QuakeState QuakeState ClientT ClientT
-type EdictTLens = Lens QuakeState QuakeState EdictT EdictT
+type QuakeLens a = Lens QuakeState QuakeState a a
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float
