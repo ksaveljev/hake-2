@@ -300,7 +300,12 @@ loadFile path = do
 - this is modified to <user.home>/.hake2 
 -}
 gameDir :: Quake B.ByteString
-gameDir = undefined -- TODO
+gameDir = do
+    userDir <- use $ fsGlobals.fsUserDir
+    -- TODO: dedice if fsUserDir should be Maybe B.ByteString...
+    return $ if userDir /= ""
+               then userDir
+               else Constants.baseDirName
 
 fileLength :: B.ByteString -> Quake Int
 fileLength filename = do
