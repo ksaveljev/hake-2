@@ -424,7 +424,7 @@ data ServerT =
           , _sConfigStrings :: V.Vector B.ByteString
           , _sBaselines     :: V.Vector EntityStateT
           , _sMulticast     :: SizeBufT
-          , _sMulticastBuf  :: UV.Vector Word8
-          , _sDemoFile      :: B.ByteString
+          , _sMulticastBuf  :: B.ByteString
+          , _sDemoFile      :: Maybe Handle
           , _sTimeDemo      :: Int
           }

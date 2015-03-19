@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.CModelT where
 
-import Linear.V3 (V3)
+import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
 data CModelT =
@@ -12,3 +12,11 @@ data CModelT =
           }
 
 makeLenses ''CModelT
+
+newCModelT :: CModelT
+newCModelT =
+  CModelT { _cmMins     = V3 0 0 0
+          , _cmMaxs     = V3 0 0 0
+          , _cmOrigin   = V3 0 0 0
+          , _cmHeadNode = 0
+          }
