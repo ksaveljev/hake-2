@@ -78,12 +78,12 @@ errorF = do
     v1 <- argv 1
     comError Constants.errFatal v1
 
-parse :: B.ByteString -> Int -> Int -> Quake (B.ByteString, Int)
+parse :: B.ByteString -> Int -> Int -> Quake (Maybe B.ByteString, Int)
 parse txt len idx = do
     let skipWhitesIdx = skipWhites txt idx
 
     if skipWhitesIdx >= len
-      then return ("", skipWhitesIdx)
+      then return (Nothing, skipWhitesIdx)
       else
         if BC.take 2 (B.drop skipWhitesIdx txt) == "//" -- skip // comments
           then do
@@ -98,7 +98,7 @@ parse txt len idx = do
                     finalIdx = if newIdx >= len
                                  then newIdx
                                  else newIdx + 1 -- we have reached '\"' or NUL so we need to skip it
-                return (B.take Constants.maxTokenChars str, finalIdx)
+                return (Just $ B.take Constants.maxTokenChars str, finalIdx)
               else do -- parse a regular word
                 let droppedStr = B.drop skipWhitesIdx txt
                     str = BC.takeWhile (\c -> c > chr 32) droppedStr
@@ -107,8 +107,8 @@ parse txt len idx = do
                 if B.length str >= Constants.maxTokenChars
                   then do
                     printf $ "Token exceeded " `B.append` BC.pack (show Constants.maxTokenChars) `B.append` " chars, discarded.\n" -- IMPROVE: convert Int to ByteString using binary package?
-                    return ("", newIdx)
-                  else return (str, newIdx)
+                    return (Just "", newIdx)
+                  else return (Just str, newIdx)
 
   where skipWhites :: B.ByteString -> Int -> Int
         skipWhites str startIdx =

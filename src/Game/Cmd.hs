@@ -111,7 +111,7 @@ aliasF = do
           else do
             -- if the alias already exists, reuse it
             aliases <- use $ globals.cmdAlias
-            let foundAlias = find (\a -> (BC.map toUpper (a^.caName)) == sUp) aliases
+            let foundAlias = find (\a -> BC.map toUpper (a^.caName) == sUp) aliases
                 (alias, existing) = case foundAlias of
                                       Nothing -> (newCmdAliasT, False)
                                       Just a -> (a, True)
@@ -230,13 +230,15 @@ tokenizeString text macroExpand = do
                   trimmedStr = B.reverse . BC.dropWhile (<= ' ') . B.reverse $ str
               cmdGlobals.cgCmdArgs .= trimmedStr
 
-            (var, updatedIdx) <- Com.parse txt (B.length txt) newIdx
+            (parsedVar, updatedIdx) <- Com.parse txt (B.length txt) newIdx
 
-            when (var /= "") $ do
-              when (cmdArgc < Constants.maxStringTokens) $ do
-                cmdGlobals.cgCmdArgv %= (V.// [(cmdArgc, var)])
-                cmdGlobals.cgCmdArgc .= cmdArgc + 1
-              tokenize txt updatedIdx
+            case parsedVar of
+              Nothing -> return ()
+              Just var -> do
+                when (cmdArgc < Constants.maxStringTokens) $ do
+                  cmdGlobals.cgCmdArgv %= (V.// [(cmdArgc, var)])
+                  cmdGlobals.cgCmdArgc .= cmdArgc + 1
+                tokenize txt updatedIdx
 
         skipWhitesToEOL :: B.ByteString -> Int -> Int
         skipWhitesToEOL str startIdx =
@@ -270,11 +272,11 @@ macroExpandString text len =
               if newInQuote || (txt `BC.index` idx /= '$')
                 then expand txt newInQuote newLen count (idx + 1)
                 else do
-                  (var, newIdx) <- Com.parse txt newLen (idx + 1)
+                  (parsedVar, newIdx) <- Com.parse txt newLen (idx + 1)
 
-                  if var == ""
-                    then expand txt newInQuote newLen count newIdx
-                    else do
+                  case parsedVar of
+                    Nothing -> expand txt newInQuote newLen count newIdx
+                    Just var -> do
                       token <- CVar.variableString var
                       let updatedLen = newLen + B.length token
 
