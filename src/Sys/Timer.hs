@@ -9,6 +9,6 @@ import QuakeState
 
 milliseconds :: Quake Int
 milliseconds = do
-    t <- io $ round <$> getPOSIXTime
+    t <- io $ round . (* 1000) <$> getPOSIXTime
     globals.curtime .= t
     return t

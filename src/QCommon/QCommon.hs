@@ -197,8 +197,6 @@ frame msec = do
 
       Com.printf undefined -- TODO
 
-    io $ print "FRAME"
-
   where closeLogStatsFile :: Quake ()
         closeLogStatsFile = do
           statsFile <- use $ globals.logStatsFile
