@@ -2,17 +2,22 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVInit where
 
-import Control.Lens ((.=), use)
-import Control.Monad (when, void, unless)
+import Data.Bits ((.|.))
+import Control.Lens ((.=), use, (^.))
+import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
+import qualified Client.CL as CL
 import qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified Server.SVMain as SVMain
 import qualified Server.SVSend as SVSend
 
 {-
@@ -30,7 +35,55 @@ spawnServer = undefined -- TODO
 - A brand new game has been started.
 -}
 initGame :: Quake ()
-initGame = undefined -- TODO
+initGame = do
+    initialized <- use $ svGlobals.svServerStatic.ssInitialized
+
+    if initialized
+      -- cause any connected clients to reconnect
+      then SVMain.shutdown "Server restarted\n" True
+      else do
+        -- make sure the client is down
+        CL.drop
+        SCR.beginLoadingPlaque
+
+    -- get any latched variable changes (maxclients, etc)
+    CVar.getLatchedVars
+
+    svGlobals.svServerStatic.ssInitialized .= True
+
+    coop <- CVar.variableValue "coop"
+    deathmatch <- CVar.variableValue "deathmatch"
+
+    when (coop /= 0 && deathmatch /= 0) $ do
+      Com.printf "Deathmatch and Coop both set, disabling Coop\n"
+      void $ CVar.fullSet "coop" "0" (Constants.cvarServerInfo .|. Constants.cvarLatch)
+
+    -- dedicated servers can't be single player and are usually DM
+    -- so unless they explicitly set coop, force it to deathmatch
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+    when (dedicatedValue /= 0 && coop == 0) $
+      void $ CVar.fullSet "deathmatch" "1" (Constants.cvarServerInfo .|. Constants.cvarLatch)
+
+    initClients
+
+    undefined -- TODO
+
+  where initClients :: Quake ()
+        initClients = do
+          coop <- CVar.variableValue "coop"
+          deathmatch <- CVar.variableValue "deathmatch"
+          maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+          let serverLatchFlags = Constants.cvarServerInfo .|. Constants.cvarLatch
+
+          if | deathmatch /= 0 ->
+                 if | maxClientsValue <= 1 -> void $ CVar.fullSet "maxclients" "8" serverLatchFlags
+                    | maxClientsValue > Constants.maxClients -> void $ CVar.fullSet "maxclients" (BC.pack $ show Constants.maxClients) serverLatchFlags
+             | coop /= 0 ->
+                 when (maxClientsValue <= 1 || maxClientsValue > 4) $
+                   void $ CVar.fullSet "maxclients" "4" serverLatchFlags
+             | otherwise ->
+                 -- non-deathmatch, non-coop is one player
+                 void $ CVar.fullSet "maxclients" "1" serverLatchFlags
 
 {-
 - SV_Map

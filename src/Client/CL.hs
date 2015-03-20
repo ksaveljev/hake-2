@@ -71,3 +71,7 @@ writeConfiguration = do
 
 frame :: Int -> Quake ()
 frame msec = return () -- undefined -- TODO
+
+-- Called after an ERR_DROP was thrown.
+drop :: Quake ()
+drop = undefined -- TODO
