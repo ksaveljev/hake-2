@@ -14,3 +14,6 @@ data CPlaneT =
           }
 
 makeLenses ''CPlaneT
+
+newCPlaneT :: CPlaneT
+newCPlaneT = undefined -- TODO

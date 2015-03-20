@@ -11,3 +11,11 @@ import qualified Game.GameBase as GameBase
 -}
 shutdownGameProgs :: Quake ()
 shutdownGameProgs = GameBase.shutdownGame
+
+{-
+- SV_InitGameProgs
+- 
+- Init the game subsystem for a new map. 
+-}
+initGameProgs :: Quake ()
+initGameProgs = undefined -- TODO

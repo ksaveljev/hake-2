@@ -24,3 +24,6 @@ data SpawnTempT =
              }
 
 makeLenses ''SpawnTempT
+
+newSpawnTempT :: SpawnTempT
+newSpawnTempT = undefined -- TODO

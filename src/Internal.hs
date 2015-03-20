@@ -21,6 +21,8 @@ import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.CmdAliasT
 import Game.CModelT
+import Game.CPlaneT
+import Game.CSurfaceT
 import Game.CVarT
 import Game.GItemT
 import Game.LinkT
@@ -28,6 +30,7 @@ import Game.MonsterInfoT
 import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
+import Game.SpawnTempT
 import Game.UserCmdT
 import Server.ChallengeT
 import Server.ClientFrameT
@@ -50,6 +53,7 @@ data QuakeState =
              , _fsGlobals         :: FSGlobals
              , _netChannelGlobals :: NetChannelGlobals
              , _svGlobals         :: SVGlobals
+             , _gameBaseGlobals   :: GameBaseGlobals
              }
 
 data Globals =
@@ -427,3 +431,158 @@ data ServerT =
           , _sDemoFile      :: Maybe Handle
           , _sTimeDemo      :: Int
           }
+
+data GameLocalsT =
+  GameLocalsT { _glHelpMessage1 :: B.ByteString
+              , _glHelpMessage2 :: B.ByteString
+              , _glHelpChanged  :: Int
+              , _glClients      :: UV.Vector GClientT
+              , _glSpawnPoint   :: B.ByteString
+              , _glMaxClients   :: Int
+              , _glMaxEntities  :: Int
+              , _glServerFlags  :: Int
+              , _glNumItems     :: Int
+              , _glAutosaved    :: Bool
+              }
+
+data LevelLocalsT =
+  LevelLocalsT { _llFrameNum             :: Int
+               , _llTime                 :: Float
+               , _llLevelName            :: B.ByteString
+               , _llMapName              :: B.ByteString
+               , _llNextMap              :: B.ByteString
+               , _llIntermissionTime     :: Float
+               , _llChangeMap            :: B.ByteString
+               , _llExitIntermission     :: Bool
+               , _llIntermissionOrigin   :: V3 Float
+               , _llIntermissionAngle    :: V3 Float
+               , _llSightClient          :: EdictT
+               , _llSightEntity          :: EdictT
+               , _llSightEntityFrameNum  :: Int
+               , _llSoundEntity          :: EdictT
+               , _llSoundEntityFrameNum  :: Int
+               , _llSound2Entity         :: EdictT
+               , _llSound2EntityFrameNum :: Int
+               , _llPicHealth            :: Int
+               , _llTotalSecrets         :: Int
+               , _llFoundSecrets         :: Int
+               , _llTotalGoals           :: Int
+               , _llFoundGoals           :: Int
+               , _llTotalMonsters        :: Int
+               , _llKilledMonsters       :: Int
+               , _llCurrentEntity        :: EdictT
+               , _llBodyQue              :: Int
+               , _llPowerCubes           :: Int
+               }
+
+-- TODO: function return types - is it really IO ?
+data GameImportT =
+  GameImportT { _giBprintf            :: Int -> B.ByteString -> IO ()
+              , _giDprintf            :: B.ByteString -> IO ()
+              , _giCprintf            :: EdictT -> Int -> B.ByteString -> IO ()
+              , _giCenterPrintf       :: EdictT -> B.ByteString -> IO ()
+              , _giSound              :: EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
+              , _giPositionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
+              , _giConfigString       :: Int -> B.ByteString -> IO ()
+              , _giError              :: B.ByteString -> IO ()
+              , _giError2             :: Int -> B.ByteString -> IO ()
+              , _giModelIndex         :: B.ByteString -> IO Int
+              , _giSoundIndex         :: B.ByteString -> IO Int
+              , _giImageIndex         :: B.ByteString -> IO Int
+              , _giSetModel           :: EdictT -> B.ByteString -> IO ()
+              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> IO TraceT
+              --, pmove_t.PointContentsAdapter -- TODO: ???
+              , _giInPHS              :: V3 Float -> V3 Float -> IO Bool
+              , _giSetAreaPortalState :: Int -> Bool -> IO ()
+              , _giAreasConnected     :: Int -> Int -> IO Bool
+              , _giLinkEntity         :: EdictT -> IO ()
+              , _giUnlinkEntity       :: EdictT -> IO ()
+              , _giBoxEdicts          :: V3 Float -> V3 Float -> UV.Vector EdictT -> Int -> Int -> IO Int
+              , _giPMove              :: PMoveT -> IO ()
+              , _giMulticast          :: V3 Float -> Int -> IO ()
+              , _giUnicast            :: EdictT -> Bool -> IO ()
+              , _giWriteByte          :: Int -> IO ()
+              , _giWriteShort         :: Int -> IO ()
+              , _giWriteString        :: B.ByteString -> IO ()
+              , _giWritePosition      :: V3 Float -> IO ()
+              , _giWriteDir           :: V3 Float -> IO ()
+              , _giCvar               :: B.ByteString -> B.ByteString -> Int -> IO CVarT
+              , _giCvarSet            :: B.ByteString -> B.ByteString -> IO CVarT
+              , _giCvarForceset       :: B.ByteString -> B.ByteString -> IO CVarT
+              , _giArgc               :: IO Int
+              , _giArgv               :: Int -> B.ByteString
+              , _giArgs               :: IO B.ByteString
+              , _giAddCommandString   :: B.ByteString -> IO ()
+              }
+
+data TraceT =
+  TraceT { _tAllSolid   :: Bool
+         , _tStartSolid :: Bool
+         , _tFraction   :: Float
+         , _tEndPos     :: V3 Float
+         , _tPlane      :: CPlaneT
+         , _tSurface    :: CSurfaceT
+         , _tContents   :: Int
+         , _tEnt        :: EdictT
+         }
+
+data PMoveT =
+  PMoveT { _pmState         :: PMoveStateT
+         , _pmCmd           :: UserCmdT
+         , _pmSnapInitial   :: Bool
+         , _pmNumTouch      :: Int
+         , _pmTouchEnts     :: UV.Vector EdictT
+         , _pmViewAngles    :: V3 Float
+         , _pmViewHeight    :: Float
+         , _pmMins          :: V3 Float
+         , _pmMaxs          :: V3 Float
+         , _pmGroundEntity  :: EdictT
+         , _pmWaterType     :: Int
+         , _pmWaterLevel    :: Int
+         , _pmTrace         :: IO () -- TODO: ???
+         , _pmPointContents :: IO () -- TODO: ???
+         }
+
+data GameBaseGlobals =
+  GameBaseGlobals { _gbDummyPlane        :: CPlaneT
+                  , _gbGame              :: GameLocalsT
+                  , _gbLevel             :: LevelLocalsT
+                  , _gbGameImport        :: GameImportT
+                  , _gbSpawnTemp         :: SpawnTempT
+                  , _gbSmMeatIndex       :: Int
+                  , _gbSndFry            :: Int
+                  , _gbMeansOfDeath      :: Int
+                  , _gbNumEdicts         :: Int
+                  , _gbGEdicts           :: V.Vector EdictT
+                  , _gbDeathmatch        :: CVarT
+                  , _gbCoop              :: CVarT
+                  , _gbDMFlags           :: CVarT
+                  , _gbSkill             :: CVarT
+                  , _gbFragLimit         :: CVarT
+                  , _gbTimeLimit         :: CVarT
+                  , _gbPassword          :: CVarT
+                  , _gbSpectatorPassword :: CVarT
+                  , _gbNeedPass          :: CVarT
+                  , _gbMaxClients        :: CVarT
+                  , _gbMaxSpectators     :: CVarT
+                  , _gbMaxEntities       :: CVarT
+                  , _gbGSelectEmpty      :: CVarT
+                  , _gbFilterBan         :: CVarT
+                  , _gbSvMaxVelocity     :: CVarT
+                  , _gbSvGravity         :: CVarT
+                  , _gbSvRollSpeed       :: CVarT
+                  , _gbSvRollAngle       :: CVarT
+                  , _gbGunX              :: CVarT
+                  , _gbGunY              :: CVarT
+                  , _gbGunZ              :: CVarT
+                  , _gbRunPitch          :: CVarT
+                  , _gbRunRoll           :: CVarT
+                  , _gbBobUp             :: CVarT
+                  , _gbBobPitch          :: CVarT
+                  , _gbBolRoll           :: CVarT
+                  , _gbSvCheats          :: CVarT
+                  , _gbFloodMsgs         :: CVarT
+                  , _gbFloodPerSecond    :: CVarT
+                  , _gbFloodWaitDelay    :: CVarT
+                  , _gbSvMapList         :: CVarT
+                  }

@@ -3,10 +3,11 @@
 module Server.SVInit where
 
 import Data.Bits ((.|.))
-import Control.Lens ((.=), use, (^.))
+import Control.Lens ((.=), use, (^.), (%=))
 import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -17,8 +18,11 @@ import qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified Server.SVGame as SVGame
 import qualified Server.SVMain as SVMain
 import qualified Server.SVSend as SVSend
+import qualified Sys.NET as NET
+import qualified Util.Lib as Lib
 
 {-
 - SV_SpawnServer.
@@ -66,7 +70,34 @@ initGame = do
 
     initClients
 
-    undefined -- TODO
+    r <- Lib.rand
+    svGlobals.svServerStatic.ssSpawnCount .= fromIntegral r
+
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+    svGlobals.svServerStatic.ssClients .= V.generate maxClientsValue (\idx -> newClientT { _cServerIndex = idx })
+
+    let numClientEntities = maxClientsValue * Constants.updateBackup * 64
+    svGlobals.svServerStatic.ssNumClientEntities .= numClientEntities
+    svGlobals.svServerStatic.ssClientEntities .= V.replicate numClientEntities newEntityStateT
+
+    -- init network stuff
+    NET.config (maxClientsValue > 1)
+
+    -- heartbeats will always be sent to the id master
+    svGlobals.svServerStatic.ssLastHeartbeat .= -99999 -- send immediately
+    let idmaster = "192.246.40.37:" `B.append` (BC.pack $ show Constants.portMaster) -- IMPROVE: convert Int to ByteString using binary package?
+    idmasterNetAdr <- NET.stringToAdr idmaster
+    case idmasterNetAdr of
+      Nothing -> return () -- well, shouldn't happen really
+      Just adr -> svGlobals.svMasterAdr %= (V.// [(0, adr)])
+
+    -- init game
+    SVGame.initGameProgs
+
+    clients <- use $ svGlobals.svServerStatic.ssClients
+    gEdicts <- use $ gameBaseGlobals.gbGEdicts
+    let updatedClients = V.imap (\idx client -> client { _cEdict = gEdicts V.! (idx + 1), _cLastCmd = newUserCmdT }) clients
+    svGlobals.svServerStatic.ssClients .= updatedClients
 
   where initClients :: Quake ()
         initClients = do
