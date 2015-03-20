@@ -15,7 +15,7 @@ import Internal
 import Game.CVarT
 import Game.CPlaneT
 import Game.GameLocalsT
-import Game.GameImportT
+import {-# SOURCE #-} Game.GameImportT
 import Game.LevelLocalsT
 import Game.SpawnTempT
 

@@ -2,7 +2,7 @@
 module Game.CPlaneT where
 
 import Data.Int (Int8)
-import Linear.V3 (V3)
+import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
 data CPlaneT =
@@ -16,4 +16,10 @@ data CPlaneT =
 makeLenses ''CPlaneT
 
 newCPlaneT :: CPlaneT
-newCPlaneT = undefined -- TODO
+newCPlaneT =
+  CPlaneT { _cpNormal   = V3 0 0 0
+          , _cpDist     = 0
+          , _cpType     = 0
+          , _cpSignBits = 0
+          , _cpPad      = (0, 0)
+          }

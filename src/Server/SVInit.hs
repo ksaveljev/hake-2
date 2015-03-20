@@ -26,6 +26,18 @@ import qualified Server.SVSend as SVSend
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
+findIndex :: B.ByteString -> Int -> Int -> Bool -> Quake Int
+findIndex = undefined -- TODO
+
+modelIndex :: B.ByteString -> Quake Int
+modelIndex = undefined -- TODO
+
+soundIndex :: B.ByteString -> Quake Int
+soundIndex = undefined -- TODO
+
+imageIndex :: B.ByteString -> Quake Int
+imageIndex = undefined -- TODO
+
 {-
 - SV_SpawnServer.
 - 

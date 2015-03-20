@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.CSurfaceT where
 
 import Control.Lens (makeLenses)
@@ -13,4 +14,8 @@ data CSurfaceT =
 makeLenses ''CSurfaceT
 
 newCSurfaceT :: CSurfaceT
-newCSurfaceT = undefined -- TODO
+newCSurfaceT =
+  CSurfaceT { _csName  = ""
+            , _csFlags = 0
+            , _csValue = 0
+            }

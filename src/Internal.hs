@@ -477,44 +477,43 @@ data LevelLocalsT =
                , _llPowerCubes           :: Int
                }
 
--- TODO: function return types - is it really IO ?
 data GameImportT =
-  GameImportT { _giBprintf            :: Int -> B.ByteString -> IO ()
-              , _giDprintf            :: B.ByteString -> IO ()
-              , _giCprintf            :: EdictT -> Int -> B.ByteString -> IO ()
-              , _giCenterPrintf       :: EdictT -> B.ByteString -> IO ()
-              , _giSound              :: EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
-              , _giPositionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> IO ()
-              , _giConfigString       :: Int -> B.ByteString -> IO ()
-              , _giError              :: B.ByteString -> IO ()
-              , _giError2             :: Int -> B.ByteString -> IO ()
-              , _giModelIndex         :: B.ByteString -> IO Int
-              , _giSoundIndex         :: B.ByteString -> IO Int
-              , _giImageIndex         :: B.ByteString -> IO Int
-              , _giSetModel           :: EdictT -> B.ByteString -> IO ()
-              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> IO TraceT
+  GameImportT { _giBprintf            :: Int -> B.ByteString -> Quake ()
+              , _giDprintf            :: B.ByteString -> Quake ()
+              , _giCprintf            :: EdictT -> Int -> B.ByteString -> Quake ()
+              , _giCenterPrintf       :: EdictT -> B.ByteString -> Quake ()
+              , _giSound              :: EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
+              , _giPositionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
+              , _giConfigString       :: Int -> B.ByteString -> Quake ()
+              , _giError              :: B.ByteString -> Quake ()
+              , _giError2             :: Int -> B.ByteString -> Quake ()
+              , _giModelIndex         :: B.ByteString -> Quake Int
+              , _giSoundIndex         :: B.ByteString -> Quake Int
+              , _giImageIndex         :: B.ByteString -> Quake Int
+              , _giSetModel           :: EdictT -> B.ByteString -> Quake ()
+              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
               --, pmove_t.PointContentsAdapter -- TODO: ???
-              , _giInPHS              :: V3 Float -> V3 Float -> IO Bool
-              , _giSetAreaPortalState :: Int -> Bool -> IO ()
-              , _giAreasConnected     :: Int -> Int -> IO Bool
-              , _giLinkEntity         :: EdictT -> IO ()
-              , _giUnlinkEntity       :: EdictT -> IO ()
-              , _giBoxEdicts          :: V3 Float -> V3 Float -> UV.Vector EdictT -> Int -> Int -> IO Int
-              , _giPMove              :: PMoveT -> IO ()
-              , _giMulticast          :: V3 Float -> Int -> IO ()
-              , _giUnicast            :: EdictT -> Bool -> IO ()
-              , _giWriteByte          :: Int -> IO ()
-              , _giWriteShort         :: Int -> IO ()
-              , _giWriteString        :: B.ByteString -> IO ()
-              , _giWritePosition      :: V3 Float -> IO ()
-              , _giWriteDir           :: V3 Float -> IO ()
-              , _giCvar               :: B.ByteString -> B.ByteString -> Int -> IO CVarT
-              , _giCvarSet            :: B.ByteString -> B.ByteString -> IO CVarT
-              , _giCvarForceset       :: B.ByteString -> B.ByteString -> IO CVarT
-              , _giArgc               :: IO Int
-              , _giArgv               :: Int -> B.ByteString
-              , _giArgs               :: IO B.ByteString
-              , _giAddCommandString   :: B.ByteString -> IO ()
+              , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
+              , _giSetAreaPortalState :: Int -> Bool -> Quake ()
+              , _giAreasConnected     :: Int -> Int -> Quake Bool
+              , _giLinkEntity         :: EdictT -> Quake ()
+              , _giUnlinkEntity       :: EdictT -> Quake ()
+              , _giBoxEdicts          :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
+              , _giPMove              :: PMoveT -> Quake ()
+              , _giMulticast          :: V3 Float -> Int -> Quake ()
+              , _giUnicast            :: EdictT -> Bool -> Quake ()
+              , _giWriteByte          :: Int -> Quake ()
+              , _giWriteShort         :: Int -> Quake ()
+              , _giWriteString        :: B.ByteString -> Quake ()
+              , _giWritePosition      :: V3 Float -> Quake ()
+              , _giWriteDir           :: V3 Float -> Quake ()
+              , _giCvar               :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
+              , _giCvarSet            :: B.ByteString -> B.ByteString -> Quake CVarT
+              , _giCvarForceset       :: B.ByteString -> B.ByteString -> Quake CVarT
+              , _giArgc               :: Quake Int
+              , _giArgv               :: Int -> Quake B.ByteString
+              , _giArgs               :: Quake B.ByteString
+              , _giAddCommandString   :: B.ByteString -> Quake ()
               }
 
 data TraceT =

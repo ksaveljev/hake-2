@@ -11,3 +11,9 @@ writePortalState = undefined -- TODO
 -- CM_ReadPortalState reads the portal state from a savegame file and recalculates the area connections.
 readPortalState :: QuakeFile -> Quake ()
 readPortalState = undefined -- TODO
+
+setAreaPortalState :: Int -> Bool -> Quake ()
+setAreaPortalState = undefined -- TODO
+
+areasConnected :: Int -> Int -> Quake Bool
+areasConnected = undefined -- TODO
