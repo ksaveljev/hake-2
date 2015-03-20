@@ -138,6 +138,7 @@ data SVGlobals =
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
             , _svPlayer               :: EdictT
+            , _svFirstMap             :: B.ByteString
             }
 
 data CmdFunctionT =

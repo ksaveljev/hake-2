@@ -141,3 +141,6 @@ insertText text = do
     addText text
 
     when (templen /= 0) $ SZ.write (globals.cmdText) tmp templen
+
+copyToDefer :: Quake ()
+copyToDefer = undefined -- TODO

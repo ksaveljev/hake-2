@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Server.SVGlobals ( SVGlobals(..)
                         , module Server.SVGlobals
                         , module Server.ClientT
@@ -26,4 +27,5 @@ initialSVGlobals =
             , _svServer               = newServerT
             , _svServerStatic         = newServerStaticT
             , _svPlayer               = newEdictT
+            , _svFirstMap             = ""
             }

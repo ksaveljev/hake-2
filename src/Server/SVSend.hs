@@ -34,6 +34,16 @@ broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = undefined -- TODO
 
 {-
+=================
+SV_BroadcastCommand
+
+Sends text to all active clients
+=================
+-}
+broadcastCommand :: B.ByteString -> Quake ()
+broadcastCommand = undefined -- TODO
+
+{-
 =======================
 SV_SendClientMessages
 =======================
