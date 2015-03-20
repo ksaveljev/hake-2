@@ -8,7 +8,6 @@ import Data.Maybe (isJust)
 import Data.Traversable (traverse)
 import Control.Lens (use, (.=), (%=), (^.))
 import Control.Monad (void, when, liftM)
-import System.IO (hClose)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -91,7 +90,7 @@ shutdown finalmsg reconnect = do
     sDemofile <- use $ svGlobals.svServer.sDemoFile
     when (isJust sDemofile) $ do
       let Just h = sDemofile
-      io $ hClose h -- IMPROVE: catch exception
+      Lib.fClose h
 
     let newServer = newServerT
     svGlobals.svServer .= newServer
@@ -100,7 +99,7 @@ shutdown finalmsg reconnect = do
     ssDemofile <- use $ svGlobals.svServerStatic.ssDemoFile
     when (isJust ssDemofile) $ do
       let Just h = ssDemofile
-      io $ hClose h -- IMPROVE: catch exception
+      Lib.fClose h
 
     svGlobals.svServerStatic .= newServerStaticT
 

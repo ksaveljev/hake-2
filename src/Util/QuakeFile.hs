@@ -20,7 +20,7 @@ open :: B.ByteString -> IO QuakeFile
 open name = QuakeFile <$> openFile (BC.unpack name) ReadWriteMode
 
 close :: QuakeFile -> IO ()
-close (QuakeFile h) = hClose h
+close (QuakeFile h) = hClose h -- IMPROVE: catch exception?
 
 writeString :: QuakeFile -> B.ByteString -> IO ()
 writeString (QuakeFile h) str =

@@ -41,7 +41,7 @@ fOpen name mode = do
           return $ Just h
 
 fClose :: Handle -> Quake ()
-fClose = io . hClose
+fClose h = io $ handle (\(_ :: IOException) -> return ()) (hClose h)
 
 rand :: Quake Int16
 rand = do

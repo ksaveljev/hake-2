@@ -31,7 +31,42 @@ import qualified Util.Lib as Lib
 - it.
 -}
 spawnServer :: B.ByteString -> B.ByteString -> Int -> Bool -> Bool -> Quake ()
-spawnServer = undefined -- TODO
+spawnServer server spawnPoint srvState attractLoop loadGame = do
+    when attractLoop $
+      void $ CVar.set "paused" "0"
+
+    Com.printf "------- Server Initialization -------\n"
+
+    Com.dprintf $ "SpawnServer: " `B.append` server `B.append` "\n"
+
+    demofile <- use $ svGlobals.svServer.sDemoFile
+
+    case demofile of
+      Nothing -> return ()
+      Just h -> Lib.fClose h
+
+    -- any partially connected client will be restarted
+    svGlobals.svServerStatic.ssSpawnCount %= (+ 1)
+
+    svGlobals.svServer.sState .= Constants.ssDead
+    globals.serverState .= Constants.ssDead
+
+    -- wipe the entire per-level structure
+    svGlobals.svServer .= newServerT
+
+    svGlobals.svServerStatic.ssRealTime .= 0
+    svGlobals.svServer.sLoadGame .= loadGame
+    svGlobals.svServer.sAttractLoop .= attractLoop
+
+    -- save name for levels that don't set message
+    svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
+
+    deathmatch <- CVar.variableValue "deathmatch"
+    if deathmatch /= 0
+      then undefined -- TODO
+      else undefined -- TODO
+
+    undefined -- TODO
 
 {-
 - SV_InitGame.

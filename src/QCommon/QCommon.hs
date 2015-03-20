@@ -7,7 +7,7 @@ import Data.Bits ((.|.))
 import Control.Lens (use, (.=), (^.))
 import Control.Monad (when, liftM, void)
 import Control.Exception (IOException, handle)
-import System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek), hClose, IOMode(WriteMode), openFile)
+import System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek), IOMode(WriteMode), openFile)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -27,6 +27,7 @@ import qualified Client.SCR as SCR
 import qualified Server.SVMain as SVMain
 import qualified Sys.NET as NET
 import qualified Sys.Timer as Timer
+import qualified Util.Lib as Lib
 
 init :: [String] -> Quake ()
 init args = do
@@ -203,7 +204,7 @@ frame msec = do
           case statsFile of
             Nothing -> return ()
             Just h -> do
-              io (handle (\(_ :: IOException) -> return ()) $ hClose h)
+              Lib.fClose h
               globals.logStatsFile .= Nothing
 
         openLogStatsFile :: B.ByteString -> Quake (Maybe Handle)
