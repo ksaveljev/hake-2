@@ -11,3 +11,6 @@ data CSurfaceT =
             }
 
 makeLenses ''CSurfaceT
+
+newCSurfaceT :: CSurfaceT
+newCSurfaceT = undefined -- TODO

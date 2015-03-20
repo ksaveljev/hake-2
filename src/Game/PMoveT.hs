@@ -3,9 +3,7 @@ module Game.PMoveT ( PMoveT(..)
                    , module Game.PMoveT
                    ) where
   
-import Linear.V3 (V3)
 import Control.Lens (makeLenses)
-import qualified Data.Vector.Unboxed as UV
 
 import Internal
 
@@ -21,3 +19,6 @@ PMF_NO_PREDICTION = 64
 -}
 
 makeLenses ''PMoveT
+
+newPMoveT :: PMoveT
+newPMoveT = undefined -- TODO

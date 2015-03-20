@@ -37,6 +37,7 @@ import Server.ClientFrameT
 import QCommon.FileLinkT
 import QCommon.NetAdrT
 import QCommon.NetChanT
+import QCommon.PmlT
 import QCommon.SearchPathT
 import QCommon.SizeBufT
 
@@ -54,6 +55,7 @@ data QuakeState =
              , _netChannelGlobals :: NetChannelGlobals
              , _svGlobals         :: SVGlobals
              , _gameBaseGlobals   :: GameBaseGlobals
+             , _pMoveGlobals      :: PMoveGlobals
              }
 
 data Globals =
@@ -586,3 +588,18 @@ data GameBaseGlobals =
                   , _gbFloodWaitDelay    :: CVarT
                   , _gbSvMapList         :: CVarT
                   }
+
+data PMoveGlobals =
+  PMoveGlobals { _pmPM              :: PMoveT
+               , _pmPML             :: PmlT
+               , _pmPlanes          :: V.Vector (V3 Float)
+               , _pmStopSpeed       :: Float
+               , _pmMaxSpeed        :: Float
+               , _pmDuckSpeed       :: Float
+               , _pmAccelerate      :: Float
+               , _pmAirAccelerate   :: Float
+               , _pmWaterAccelerate :: Float
+               , _pmFriction        :: Float
+               , _pmWaterFriction   :: Float
+               , _pmWaterSpeed      :: Float
+               }

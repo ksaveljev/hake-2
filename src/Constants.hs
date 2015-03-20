@@ -567,23 +567,23 @@ dfNoSpheres     = 0x00100000 :: Int
 -- Each config string can be at most MAX_QPATH characters.
 --
 csName      = 0 :: Int
-csCdtrack   = 1 :: Int
+csCdTrack   = 1 :: Int
 csSky       = 2 :: Int
-csSkyaxis   = 3 :: Int -- %f %f %f format 
-csSkyrotate = 4 :: Int
-csStatusbar = 5 :: Int --display program string 
+csSkyAxis   = 3 :: Int -- %f %f %f format 
+csSkyRotate = 4 :: Int
+csStatusBar = 5 :: Int --display program string 
 
-csAiraccel    = 29 :: Int -- air acceleration control 
-csMaxclients  = 30 :: Int
-csMapchecksum = 31 :: Int -- for catching cheater maps 
+csAirAccel    = 29 :: Int -- air acceleration control 
+csMaxClients  = 30 :: Int
+csMapChecksum = 31 :: Int -- for catching cheater maps 
 
 csModels         = 32 :: Int
 csSounds         = csModels + maxModels
 csImages         = csSounds + maxSounds
 csLights         = csImages + maxImages
 csItems          = csLights + maxLightStyles
-csPlayerskins    = csItems + maxItems
-csGeneral        = csPlayerskins + maxClients
+csPlayerSkins    = csItems + maxItems
+csGeneral        = csPlayerSkins + maxClients
 maxConfigStrings = maxGeneral + maxGeneral
 
 healthIgnoreMax = 1 :: Int

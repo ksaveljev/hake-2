@@ -3,6 +3,7 @@
 module Server.SVInit where
 
 import Data.Bits ((.|.))
+import Data.Foldable (forM_)
 import Control.Lens ((.=), use, (^.), (%=))
 import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
@@ -18,6 +19,7 @@ import qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.SZ as SZ
 import qualified Server.SVGame as SVGame
 import qualified Server.SVMain as SVMain
 import qualified Server.SVSend as SVSend
@@ -41,9 +43,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
 
     demofile <- use $ svGlobals.svServer.sDemoFile
 
-    case demofile of
-      Nothing -> return ()
-      Just h -> Lib.fClose h
+    forM_ demofile Lib.fClose
 
     -- any partially connected client will be restarted
     svGlobals.svServerStatic.ssSpawnCount %= (+ 1)
@@ -63,9 +63,28 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
 
     deathmatch <- CVar.variableValue "deathmatch"
     if deathmatch /= 0
-      then undefined -- TODO
-      else undefined -- TODO
+      then do
+        airAccelerateValue <- liftM (^.cvValue) svAirAccelerateCVar
+        svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csAirAccel, BC.pack $ show airAccelerateValue)]) -- IMPROVE: convert Float to ByteString using binary package?
+        pMoveGlobals.pmAirAccelerate .= airAccelerateValue
+      else do
+        svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csAirAccel, "0")])
+        pMoveGlobals.pmAirAccelerate .= 0
 
+    bufData <- use $ svGlobals.svServer.sMulticastBuf
+    SZ.init (svGlobals.svServer.sMulticast) bufData Constants.maxMsglen
+
+    svGlobals.svServer.sName .= server
+
+    -- leave slots at start for clients only
+    svGlobals.svServerStatic.ssClients %=
+      fmap (\client -> let updatedState = if (client^.cState) > Constants.csConnected
+                                           then Constants.csConnected
+                                           else client^.cState
+                      in client { _cState = updatedState, _cLastFrame = -1 })
+
+    svGlobals.svServer.sTime .= 1000
+    svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
     undefined -- TODO
 
 {-
@@ -120,7 +139,7 @@ initGame = do
 
     -- heartbeats will always be sent to the id master
     svGlobals.svServerStatic.ssLastHeartbeat .= -99999 -- send immediately
-    let idmaster = "192.246.40.37:" `B.append` (BC.pack $ show Constants.portMaster) -- IMPROVE: convert Int to ByteString using binary package?
+    let idmaster = "192.246.40.37:" `B.append` BC.pack (show Constants.portMaster) -- IMPROVE: convert Int to ByteString using binary package?
     idmasterNetAdr <- NET.stringToAdr idmaster
     case idmasterNetAdr of
       Nothing -> return () -- well, shouldn't happen really

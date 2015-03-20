@@ -9,6 +9,7 @@ module QuakeState ( QuakeState(..)
                   , netChannelGlobals
                   , svGlobals
                   , gameBaseGlobals
+                  , pMoveGlobals
                   , QuakeLens
                   , module Globals
                   , module QCommon.ComGlobals
@@ -18,6 +19,7 @@ module QuakeState ( QuakeState(..)
                   , module QCommon.NetChannelGlobals
                   , module Server.SVGlobals
                   , module Game.GameBaseGlobals
+                  , module QCommon.PMoveGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -31,6 +33,7 @@ import Server.SVGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.NetChannelGlobals
+import QCommon.PMoveGlobals
 
 makeLenses ''QuakeState
 
@@ -44,4 +47,5 @@ initialQuakeState =
              , _netChannelGlobals = initialNetChannelGlobals
              , _svGlobals         = initialSVGlobals
              , _gameBaseGlobals   = initialGameBaseGlobals
+             , _pMoveGlobals      = initialPMoveGlobals
              }
