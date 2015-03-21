@@ -184,7 +184,7 @@ markBaseSearchPaths = do
     fsGlobals.fsBaseSearchPaths .= searchPaths
 
 setGameDir :: B.ByteString -> Quake ()
-setGameDir = undefined -- TODO
+setGameDir _ = io (putStrLn "FS.setGameDir") >> undefined -- TODO
 
 pathF :: XCommandT
 pathF = do
@@ -251,10 +251,10 @@ dirF = do
 
     wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
 
-    undefined -- TODO
+    io (putStrLn "FS.dirF") >> undefined -- TODO
 
 execAutoexec :: Quake ()
-execAutoexec = undefined -- TODO
+execAutoexec = io (putStrLn "FS.execAutoexec") >> undefined -- TODO
 
 {-
 - LoadFile

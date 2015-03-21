@@ -110,11 +110,11 @@ shutdown finalmsg reconnect = do
 - totally exit after returning from this function.
 -}
 finalMessage :: B.ByteString -> Bool -> Quake ()
-finalMessage = undefined -- TODO
+finalMessage _ _ = io (putStrLn "SVMain.finalMessage") >> undefined -- TODO
 
 -- Master_Shutdown, Informs all masters that this server is going down.
 masterShutdown :: Quake ()
-masterShutdown = undefined -- TODO
+masterShutdown = io (putStrLn "SVMain.masterShutdown") >> undefined -- TODO
 
 {-
 - Called when the player is totally leaving the server, either willingly or
@@ -146,7 +146,7 @@ dropClient clientLens = do
  - Builds the string that is sent as heartbeats and status replies.
  -}
 statusString :: Quake B.ByteString
-statusString = undefined -- TODO
+statusString = io (putStrLn "SVMain.statusString") >> undefined -- TODO
 
 frame :: Int -> Quake ()
 frame msec = do
@@ -169,7 +169,7 @@ frame msec = do
       readPackets
 
       -- move autonomous things around if enough time has passed
-      undefined -- TODO
+      io (putStrLn "SVMain.frame") >> undefined -- TODO
 
       -- update ping based on the last known frame from all clients
       calcPings
@@ -202,15 +202,15 @@ frame msec = do
 - necessary.
 -}
 checkTimeouts :: Quake ()
-checkTimeouts = undefined -- TODO
+checkTimeouts = io (putStrLn "SVMain.checkTimeouts") >> undefined -- TODO
 
 -- Reads packets from the network or loopback
 readPackets :: Quake ()
-readPackets = undefined -- TODO
+readPackets = io (putStrLn "SVMain.readPackets") >> undefined -- TODO
 
 -- Updates the cl.ping variables
 calcPings :: Quake ()
-calcPings = undefined -- TODO
+calcPings = io (putStrLn "SVMain.calcPings") >> undefined -- TODO
 
 {-
 - Every few frames, gives all clients an allotment of milliseconds for
@@ -228,7 +228,7 @@ giveMsec = do
 
 
 runGameFrame :: Quake ()
-runGameFrame = undefined -- TODO
+runGameFrame = io (putStrLn "SVMain.runGameFrame") >> undefined -- TODO
 
 masterHeartbeat :: Quake ()
 masterHeartbeat = do
@@ -266,4 +266,4 @@ masterHeartbeat = do
 - happens outside RunWorldFrame.
 -}
 prepWorldFrame :: Quake ()
-prepWorldFrame = undefined -- TODO
+prepWorldFrame = io (putStrLn "SVMain.prepWorldFrame") >> undefined -- TODO

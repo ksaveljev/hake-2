@@ -3,4 +3,4 @@ module Sound.S where
 import Quake
 
 init :: Quake ()
-init = undefined -- TODO
+init = io (putStrLn "S.init") >> undefined -- TODO

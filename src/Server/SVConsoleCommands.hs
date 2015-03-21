@@ -303,7 +303,7 @@ SV_WriteServerFile
 ==============
 -}
 writeServerFile :: Bool -> Quake ()
-writeServerFile = undefined -- TODO
+writeServerFile _ = io (putStrLn "SVConsoleCommands.writeServerFile") >> undefined -- TODO
 
 {-
 ==============
@@ -312,7 +312,7 @@ SV_ReadServerFile
 ==============
 -}
 readServerFile :: Quake ()
-readServerFile = undefined -- TODO
+readServerFile = io (putStrLn "SVConsoleCommands.readServerFile") >> undefined -- TODO
 
 {-
 ==================
@@ -549,7 +549,7 @@ SV_Status_f
 ================
 -}
 statusF :: XCommandT
-statusF = undefined -- TODO
+statusF = io (putStrLn "SVConsoleCommands.statusF") >> undefined -- TODO
 
 {-
 ==================
@@ -626,7 +626,7 @@ recorded, but no playerinfo will be stored.  Primarily for demo merging.
 ==============
 -}
 serverRecordF :: XCommandT
-serverRecordF = undefined -- TODO
+serverRecordF = io (putStrLn "SVConsoleCommands.serverRecordF") >> undefined -- TODO
 
 {-
 ==============
@@ -636,7 +636,7 @@ Ends server demo recording
 ==============
 -}
 serverStopF :: XCommandT
-serverStopF = undefined -- TODO
+serverStopF = io (putStrLn "SVConsoleCommands.serverStopF") >> undefined -- TODO
 
 {-
 ===============

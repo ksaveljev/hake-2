@@ -26,7 +26,7 @@ import Game.CSurfaceT
 import Game.CVarT
 import Game.GItemT
 import Game.LinkT
-import Game.MonsterInfoT
+import Game.MMoveT
 import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
@@ -603,4 +603,33 @@ data PMoveGlobals =
                , _pmFriction        :: Float
                , _pmWaterFriction   :: Float
                , _pmWaterSpeed      :: Float
+               }
+
+data MonsterInfoT =
+  MonsterInfoT { _miCurrentMove     :: MMoveT
+               , _miAIFlags         :: Int
+               , _miNextFrame       :: Int
+               , _miScale           :: Float
+               , _miStand           :: Quake ()
+               , _miIdle            :: Quake ()
+               , _miSearch          :: Quake ()
+               , _miWalk            :: Quake ()
+               , _miRun             :: Quake ()
+               , _miDodge           :: Quake ()
+               , _miAttack          :: Quake ()
+               , _miMelee           :: Quake ()
+               , _miSight           :: Quake ()
+               , _miCheckAttack     :: Quake ()
+               , _miPauseTime       :: Float
+               , _miAttackFinished  :: Float
+               , _miSavedGoal       :: V3 Float
+               , _miSearchTime      :: Float
+               , _miTrailTime       :: Float
+               , _miLastSighting    :: V3 Float
+               , _miAttackState     :: Int
+               , _miLefty           :: Int
+               , _miIdleTime        :: Float
+               , _miLinkCount       :: Int
+               , _miPowerArmorType  :: Int
+               , _miPowerArmorPower :: Int
                }

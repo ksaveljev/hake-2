@@ -8,27 +8,27 @@ import Util.QuakeFile (QuakeFile)
 -- import qualified Util.QuakeFile as QuakeFile
 
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (CModelT, [Int])
-loadMap = undefined -- TODO
+loadMap _ _ _ = io (putStrLn "CM.loadMap") >> undefined -- TODO
 
 inlineModel :: B.ByteString -> Quake CModelT
-inlineModel = undefined -- TODO
+inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO
 
 numInlineModels :: Quake Int
-numInlineModels = undefined -- TODO
+numInlineModels = io (putStrLn "CM.numInlineModels") >> undefined -- TODO
 
 entityString :: Quake B.ByteString
-entityString = undefined -- TODO
+entityString = io (putStrLn "CM.entityString") >> undefined -- TODO
 
 -- CM_WritePortalState writes the portal state to a savegame file.
 writePortalState :: QuakeFile -> Quake ()
-writePortalState = undefined -- TODO
+writePortalState _ = io (putStrLn "CM.writePortalState") >> undefined -- TODO
 
 -- CM_ReadPortalState reads the portal state from a savegame file and recalculates the area connections.
 readPortalState :: QuakeFile -> Quake ()
-readPortalState = undefined -- TODO
+readPortalState _ = io (putStrLn "CM.readPortalState") >> undefined -- TODO
 
 setAreaPortalState :: Int -> Bool -> Quake ()
-setAreaPortalState = undefined -- TODO
+setAreaPortalState _ _ = io (putStrLn "CM.setAreaPortalState") >> undefined -- TODO
 
 areasConnected :: Int -> Int -> Quake Bool
-areasConnected = undefined -- TODO
+areasConnected _ _ = io (putStrLn "CM.areasConnected") >> undefined -- TODO

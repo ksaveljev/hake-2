@@ -22,7 +22,7 @@ Sends text across to be displayed if the level passes
 =================
 -}
 clientPrintf :: ClientT -> Int -> B.ByteString -> Quake ()
-clientPrintf = undefined -- TODO
+clientPrintf _ _ _ = io (putStrLn "SVSend.clientPrintf") >> undefined -- TODO
 
 {-
 =================
@@ -32,7 +32,7 @@ Sends text to all active clients
 =================
 -}
 broadcastPrintf :: Int -> B.ByteString -> Quake ()
-broadcastPrintf = undefined -- TODO
+broadcastPrintf _ _ = io (putStrLn "SVSend.broadcastPrintf") >> undefined -- TODO
 
 {-
 =================
@@ -42,7 +42,7 @@ Sends text to all active clients
 =================
 -}
 broadcastCommand :: B.ByteString -> Quake ()
-broadcastCommand = undefined -- TODO
+broadcastCommand _ = io (putStrLn "SVSend.broadcastCommand") >>undefined -- TODO
 
 {-
 =================
@@ -57,7 +57,7 @@ MULTICAST_PHS	send to clients potentially hearable from org
 =================
 -}
 multicast :: V3 Float -> Int -> Quake ()
-multicast = undefined -- TODO
+multicast _ _ = io (putStrLn "SVsend.multicast") >> undefined -- TODO
 
 {-
 ==================
@@ -86,7 +86,7 @@ or the midpoint of the entity box for bmodels.
 ==================
 -}
 startSound :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound = undefined -- TODO
+startSound _ _ _ _ _ _ _ = io (putStrLn "SVsend.startSound") >> undefined -- TODO
 
 {-
 =======================
@@ -94,4 +94,4 @@ SV_SendClientMessages
 =======================
 -}
 sendClientMessages :: Quake ()
-sendClientMessages = undefined -- TODO
+sendClientMessages = io (putStrLn "SVSend.sendClientMessages") >> undefined -- TODO

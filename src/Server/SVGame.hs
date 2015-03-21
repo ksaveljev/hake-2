@@ -13,7 +13,7 @@ import qualified Game.GameBase as GameBase
 - Sends the contents of the mutlicast buffer to a single client.
 -}
 unicast :: EdictT -> Bool -> Quake ()
-unicast = undefined -- TODO
+unicast _ _ = io (putStrLn "SVGame.unicast") >> undefined -- TODO
 
 {-
 - PF_dprintf
@@ -21,11 +21,11 @@ unicast = undefined -- TODO
 - Debug print to server console.
 -}
 dprintf :: B.ByteString -> Quake ()
-dprintf = undefined -- TODO
+dprintf _ = io (putStrLn "SVGame.dprintf") >> undefined -- TODO
 
 -- Centerprintf for critical messages.
 cprintfHigh :: EdictT -> B.ByteString -> Quake ()
-cprintfHigh = undefined -- TODO
+cprintfHigh _ _ = io (putStrLn "SVGame.cprintfHigh") >> undefined -- TODO
 
 {-
 - PF_cprintf
@@ -33,7 +33,7 @@ cprintfHigh = undefined -- TODO
 - Print to a single client.
 -}
 cprintf :: EdictT -> Int -> B.ByteString -> Quake ()
-cprintf = undefined -- TODO
+cprintf _ _ _ = io (putStrLn "SVGame.cprintf") >>  undefined -- TODO
 
 {-
 - PF_centerprintf
@@ -41,7 +41,7 @@ cprintf = undefined -- TODO
 - centerprint to a single client.
 -}
 centerPrintf :: EdictT -> B.ByteString -> Quake ()
-centerPrintf = undefined -- TODO
+centerPrintf _ _ = io (putStrLn "SVGame.centerPrintf") >> undefined -- TODO
 
 {-
 -  PF_error
@@ -49,10 +49,10 @@ centerPrintf = undefined -- TODO
 -  Abort the server with a game error. 
 -}
 pfError :: B.ByteString -> Quake ()
-pfError = undefined -- TODO
+pfError _ = io (putStrLn "SVGame.pfError") >> undefined -- TODO
 
 pfError2 :: Int -> B.ByteString -> Quake ()
-pfError2 = undefined -- TODO
+pfError2 _ _ = io (putStrLn "SVGame.pfError2") >> undefined -- TODO
 
 {-
 - PF_setmodel
@@ -60,37 +60,37 @@ pfError2 = undefined -- TODO
 - Also sets mins and maxs for inline bmodels.
 -}
 setModel :: EdictT -> B.ByteString -> Quake ()
-setModel = undefined -- TODO
+setModel _ _ = io (putStrLn "SVGame.setModel") >> undefined -- TODO
 
 configString :: Int -> B.ByteString -> Quake ()
-configString = undefined -- TODO
+configString _ _ = io (putStrLn "SVGame.configString") >> undefined -- TODO
 
 writeChar :: Int -> Quake ()
-writeChar = undefined -- TODO
+writeChar _ = io (putStrLn "SVGame.writeChar") >> undefined -- TODO
 
 writeByte :: Int -> Quake ()
-writeByte = undefined -- TODO
+writeByte _ = io (putStrLn "SVGame.writeByte") >> undefined -- TODO
 
 writeShort :: Int -> Quake ()
-writeShort = undefined -- TODO
+writeShort _ = io (putStrLn "SVGame.writeShort") >> undefined -- TODO
 
 writeLong :: Int -> Quake ()
-writeLong = undefined -- TODO
+writeLong _ = io (putStrLn "SVGame.writeLong") >> undefined -- TODO
 
 writeFloat :: Float -> Quake ()
-writeFloat = undefined -- TODO
+writeFloat _ = io (putStrLn "SVGame.writeFloat") >> undefined -- TODO
 
 writeString :: B.ByteString -> Quake ()
-writeString = undefined -- TODO
+writeString _ = io (putStrLn "SVGame.writeString") >> undefined -- TODO
 
 writePos :: V3 Float -> Quake ()
-writePos = undefined -- TODO
+writePos _ = io (putStrLn "SVGame.writePos") >> undefined -- TODO
 
 writeDir :: V3 Float -> Quake ()
-writeDir = undefined -- TODO
+writeDir _ = io (putStrLn "SVGame.writeDir") >> undefined -- TODO
 
 writeAngle :: Float -> Quake ()
-writeAngle = undefined -- TODO
+writeAngle _ = io (putStrLn "SVGame.writeAngle") >> undefined -- TODO
 
 {-
 - PF_inPVS
@@ -98,7 +98,7 @@ writeAngle = undefined -- TODO
 - Also checks portalareas so that doors block sight.
 -}
 inPVS :: V3 Float -> V3 Float -> Quake Bool
-inPVS = undefined -- TODO
+inPVS _ _ = io (putStrLn "SVGame.inPVS") >> undefined -- TODO
 
 {-
 - PF_inPHS.
@@ -106,10 +106,10 @@ inPVS = undefined -- TODO
 - Also checks portalareas so that doors block sound.
 -}
 inPHS :: V3 Float -> V3 Float -> Quake Bool
-inPHS = undefined -- TODO
+inPHS _ _ = io (putStrLn "SVGame.inPHS") >> undefined -- TODO
 
 startSound :: EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound = undefined -- TODO
+startSound _ _ _ _ _ _ = io (putStrLn "SVGame.startSound") >> undefined -- TODO
 
 {-
 -  SV_ShutdownGameProgs
@@ -126,4 +126,4 @@ shutdownGameProgs = GameBase.shutdownGame
 - Init the game subsystem for a new map. 
 -}
 initGameProgs :: Quake ()
-initGameProgs = undefined -- TODO
+initGameProgs = io (putStrLn "SVGame.initGameProgs") >> undefined -- TODO

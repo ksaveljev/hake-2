@@ -48,4 +48,4 @@ write bufLens bufData len = do
     bufLens.sbData .= updatedData
 
 print :: QuakeLens SizeBufT -> B.ByteString -> Quake ()
-print = undefined -- TODO
+print _ _ = io (putStrLn "SZ.print") >> undefined -- TODO

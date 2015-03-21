@@ -38,21 +38,21 @@ comError code fmt = do
       Sys.sysError ("recursive error after: " `B.append` msg)
 
     comGlobals.cgRecursive .= True
-    comGlobals.cgMsg .= fmt -- TODO: we do not have arguments for sprintf here like jake does
+    comGlobals.cgMsg .= fmt -- IMPROVE: we do not have arguments for sprintf here like jake does
 
     void $ errReact code
 
     Sys.sysError fmt
 
-  where errReact c | c == Constants.errDisconnect = undefined -- TODO
-        errReact c | c == Constants.errDrop = undefined -- TODO
-        errReact _ = undefined -- TODO
+  where errReact c | c == Constants.errDisconnect = io (putStrLn "Com.comError#errReact") >> undefined -- TODO
+        errReact c | c == Constants.errDrop = io (putStrLn "Com.comError#errReact") >> undefined -- TODO
+        errReact _ = io (putStrLn "Com.comError#errReact") >> undefined -- TODO
 
 printf :: B.ByteString -> Quake ()
-printf = io . B.putStr -- io.print -- TODO
+printf = io . B.putStr -- io.print -- TODO -- putStrLn for grep
 
 dprintf :: B.ByteString -> Quake ()
-dprintf = io . B.putStr -- io.print -- TODO
+dprintf = io . B.putStr -- io.print -- TODO -- putStrLn for grep
 
 argc :: Quake Int
 argc = use $ comGlobals.cgComArgc

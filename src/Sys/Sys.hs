@@ -4,4 +4,4 @@ import Quake
 import qualified Data.ByteString as B
 
 sysError :: B.ByteString -> Quake ()
-sysError = undefined -- TODO
+sysError _ = io (putStrLn "Sys.sysError") >> undefined -- TODO

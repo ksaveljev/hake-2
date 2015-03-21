@@ -82,10 +82,18 @@ imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 - only the fields that differ from the baseline will be transmitted.
 -}
 createBaseline :: Quake ()
-createBaseline = undefined -- TODO
+createBaseline = do
+    gEdicts <- use $ gameBaseGlobals.gbGEdicts
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+
+    updatedEdicts <- updateEdicts gEdicts 1 numEdicts []
+    io (putStrLn "SVInit.createBaseline") >> undefined -- TODO
+
+  where updateEdicts :: V.Vector EdictT -> Int -> Int -> [(Int, EdictT)] -> Quake [(Int, EdictT)]
+        updateEdicts _ _ _ _ = io (putStrLn "SVInit.createBaseline#updateEdicts") >> undefined -- TODO
 
 checkForSavegame :: Quake ()
-checkForSavegame = undefined -- TODO
+checkForSavegame = io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
 
 {-
 - SV_SpawnServer.

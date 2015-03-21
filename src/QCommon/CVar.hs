@@ -14,7 +14,7 @@ import System.IO (Handle, IOMode(ReadWriteMode), hSeek, hFileSize, SeekMode(Abso
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map as M
-import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -202,7 +202,7 @@ listF = do
 
     _ <- traverse printCVar vars
 
-    Com.printf $ BC.pack (show (M.size vars)) `B.append` " cvars\n" -- TODO: maybe use binary package for Int to ByteString conversion?
+    Com.printf $ BC.pack (show (M.size vars)) `B.append` " cvars\n" -- IMPROVE: maybe use binary package for Int to ByteString conversion?
 
   where printCVar var = do
           Com.printf $ if (var^.cvFlags .&. Constants.cvarArchive) /= 0 then "*" else " "
@@ -225,10 +225,10 @@ listF = do
 - networt "rate" string --> 10000 became "10000.0" and that wasn't right.
 -}
 setValueI :: B.ByteString -> Int -> Quake ()
-setValueI = undefined -- TODO
+setValueI _ _ = io (putStrLn "CVar.setValueI") >> undefined -- TODO
 
 setValueF :: B.ByteString -> Float -> Quake ()
-setValueF = undefined -- TODO
+setValueF _ _ = io (putStrLn "CVar.setValueF") >> undefined -- TODO
 
 -- Returns the float value of a variable
 variableValue :: B.ByteString -> Quake Float
@@ -239,10 +239,10 @@ variableValue varName = do
       Just cvar -> return $ Lib.atof (cvar^.cvString)
 
 command :: Quake Bool
-command = undefined -- TODO
+command = io (putStrLn "CVar.command") >> undefined -- TODO
 
 bitInfo :: Int -> Quake B.ByteString
-bitInfo = undefined -- TODO
+bitInfo _ = io (putStrLn "CVar.bitInfo") >> undefined -- TODO
 
 -- Returns an info string containing all the CVAR_SERVERINFO cvars.
 serverInfo :: Quake B.ByteString
@@ -250,7 +250,7 @@ serverInfo = bitInfo Constants.cvarServerInfo
 
 -- Any variables with latched values will be updated.
 getLatchedVars :: Quake ()
-getLatchedVars = undefined -- TODO
+getLatchedVars = io (putStrLn "CVar.getLatchedVars") >> undefined -- TODO
 
 -- Returns an info string containing all the CVAR_USERINFO cvars.
 userInfo :: Quake B.ByteString
@@ -279,8 +279,8 @@ writeVariables path = do
             io $ B.hPut handle $ "set " `B.append` (cvar^.cvName) `B.append` " \"" `B.append` (cvar^.cvString) `B.append` "\"\n"
 
 -- Variable typing auto completition.
-completeVariable :: B.ByteString -> UV.Vector B.ByteString
-completeVariable = undefined -- TODO
+completeVariable :: B.ByteString -> Quake (V.Vector B.ByteString)
+completeVariable _ = io (putStrLn "CVar.completeVariable") >> undefined -- TODO
 
 -- Some characters are invalid for info strings.
 infoValidate :: B.ByteString -> Bool
