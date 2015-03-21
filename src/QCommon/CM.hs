@@ -1,8 +1,23 @@
 module QCommon.CM where
 
+import qualified Data.ByteString as B
+
 import Quake
+import Game.CModelT
 import Util.QuakeFile (QuakeFile)
 -- import qualified Util.QuakeFile as QuakeFile
+
+loadMap :: B.ByteString -> Bool -> [Int] -> Quake (CModelT, [Int])
+loadMap = undefined -- TODO
+
+inlineModel :: B.ByteString -> Quake CModelT
+inlineModel = undefined -- TODO
+
+numInlineModels :: Quake Int
+numInlineModels = undefined -- TODO
+
+entityString :: Quake B.ByteString
+entityString = undefined -- TODO
 
 -- CM_WritePortalState writes the portal state to a savegame file.
 writePortalState :: QuakeFile -> Quake ()

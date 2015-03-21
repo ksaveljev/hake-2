@@ -18,3 +18,6 @@ areaEdicts = undefined -- TODO
 
 trace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
 trace = undefined -- TODO
+
+clearWorld :: Quake ()
+clearWorld = undefined -- TODO

@@ -16,7 +16,10 @@ import CVarVariables
 import qualified Constants
 import qualified Client.CL as CL
 import qualified Client.SCR as SCR
+import qualified Game.GameBase as GameBase
+import qualified Game.GameSpawn as GameSpawn
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
@@ -24,18 +27,19 @@ import qualified QCommon.SZ as SZ
 import qualified Server.SVGame as SVGame
 import qualified Server.SVMain as SVMain
 import qualified Server.SVSend as SVSend
+import qualified Server.SVWorld as SVWorld
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
 findIndex :: B.ByteString -> Int -> Int -> Bool -> Quake Int
-findIndex name start maxIdx create = do
+findIndex name start maxIdx create =
     if B.length name == 0
       then return 0
       else do
         configStrings <- use $ svGlobals.svServer.sConfigStrings
         case findConfigString configStrings 1 of
           (True, idx) -> return idx
-          (False, idx) -> do
+          (False, idx) ->
             if not create
               then return 0
               else do
@@ -70,6 +74,18 @@ soundIndex name = findIndex name Constants.csSounds Constants.maxSounds True
 
 imageIndex :: B.ByteString -> Quake Int
 imageIndex name = findIndex name Constants.csImages Constants.maxImages True
+
+{-
+- SV_CreateBaseline
+- 
+- Entity baselines are used to compress the update messages to the clients --
+- only the fields that differ from the baseline will be transmitted.
+-}
+createBaseline :: Quake ()
+createBaseline = undefined -- TODO
+
+checkForSavegame :: Quake ()
+checkForSavegame = undefined -- TODO
 
 {-
 - SV_SpawnServer.
@@ -130,7 +146,55 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
 
     svGlobals.svServer.sTime .= 1000
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
-    undefined -- TODO
+
+    (model, iw) <- if srvState /= Constants.ssGame
+                     then CM.loadMap "" False [0] -- no real map
+                     else do
+                       let mapName = "maps/" `B.append` server `B.append` ".bsp"
+                       svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
+                       CM.loadMap mapName False [0]
+
+    svGlobals.svServer.sModels %= (V.// [(1, model)])
+
+    let checksum = head iw
+    svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, BC.pack (show checksum))]) -- IMPROVE: convert Int to ByteString using binary package?
+
+    -- clear physics interaction links
+    SVWorld.clearWorld
+
+    modelsCount <- CM.numInlineModels
+    svGlobals.svServer.sConfigStrings %= (V.// fmap (\i -> (Constants.csModels + 1 + i, "*" `B.append` BC.pack (show i))) [1..modelsCount-1]) -- IMPROVE: convert Int to ByteString using binary package?
+    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \m -> return (i + 1, m)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
+    svGlobals.svServer.sModels %= (V.// updatedModels)
+
+    -- spawn the rest of the entities on the map
+    
+    -- precache and static commands can be issued during
+    -- map initialization
+
+    svGlobals.svServer.sState .= Constants.ssLoading
+    globals.serverState .= Constants.ssLoading
+
+    -- load and spawn all other entities
+    es <- CM.entityString
+    GameSpawn.spawnEntities server es spawnPoint
+
+    -- run two frames to allow everything to settle
+    GameBase.runFrame
+    GameBase.runFrame
+
+    -- all precaches are complete
+    svGlobals.svServer.sState .= srvState
+    globals.serverState .= srvState
+
+    -- create a baseline for more efficient communications
+    createBaseline
+
+    -- check for savegame
+    checkForSavegame
+
+    -- set serverinfo variable
+    void $ CVar.fullSet "mapname" server (Constants.cvarServerInfo .|. Constants.cvarNoSet)
 
 {-
 - SV_InitGame.
