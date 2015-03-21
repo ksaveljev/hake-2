@@ -41,7 +41,7 @@ init = do
       CBuf.execute
 
 initLocal :: Quake ()
-initLocal = undefined -- TODO
+initLocal = io (putStrLn "CL.initLocal") >> undefined -- TODO
 
 {-
 - WriteConfiguration
@@ -70,8 +70,8 @@ writeConfiguration = do
         CVar.writeVariables path
 
 frame :: Int -> Quake ()
-frame msec = return () -- undefined -- TODO
+frame _ = io (putStrLn "CL.frame") >> undefined -- TODO
 
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()
-drop = undefined -- TODO
+drop = io (putStrLn "CL.drop") >> undefined -- TODO

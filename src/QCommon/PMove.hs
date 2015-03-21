@@ -14,4 +14,4 @@ offset :: V3 Int
 offset = V3 0 (-1) 1
 
 pMove :: PMoveT -> Quake () -- TODO: it should probably return Quake PMoveT
-pMove = undefined -- TODO
+pMove _ = io (putStrLn "PMove.pMove") >> undefined -- TODO

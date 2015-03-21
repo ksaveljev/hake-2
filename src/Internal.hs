@@ -158,13 +158,13 @@ type QuakeLens a = Lens QuakeState QuakeState a a
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float
-               , _eaPrethink  :: Quake () -- TODO: ???
-               , _eaThink     :: Quake () -- TODO: ???
-               , _eaBlocked   :: Quake () -- TODO: ???
-               , _eaTouch     :: Quake () -- TODO: ???
-               , _eaUse       :: Quake () -- TODO: ???
-               , _eaPain      :: Quake () -- TODO: ???
-               , _eaDie       :: Quake () -- TODO: ???
+               , _eaPrethink  :: Quake ()
+               , _eaThink     :: Quake ()
+               , _eaBlocked   :: Quake ()
+               , _eaTouch     :: Quake ()
+               , _eaUse       :: Quake ()
+               , _eaPain      :: Quake ()
+               , _eaDie       :: Quake ()
                }
 
 data EdictOtherT =
@@ -542,8 +542,8 @@ data PMoveT =
          , _pmGroundEntity  :: EdictT
          , _pmWaterType     :: Int
          , _pmWaterLevel    :: Int
-         , _pmTrace         :: IO () -- TODO: ???
-         , _pmPointContents :: IO () -- TODO: ???
+         , _pmTrace         :: Quake ()
+         , _pmPointContents :: Quake ()
          }
 
 data GameBaseGlobals =

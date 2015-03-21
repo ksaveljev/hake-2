@@ -7,4 +7,4 @@ import Quake
 - footage for merged or assembled demos.
 -}
 recordDemoMessage :: Quake ()
-recordDemoMessage = undefined -- TODO
+recordDemoMessage = io (putStrLn "SVEnts.recordDemoMessage") >> undefined -- TODO
