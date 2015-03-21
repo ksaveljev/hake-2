@@ -19,6 +19,7 @@ import qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import qualified Server.SVGame as SVGame
 import qualified Server.SVMain as SVMain
@@ -27,16 +28,48 @@ import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
 findIndex :: B.ByteString -> Int -> Int -> Bool -> Quake Int
-findIndex = undefined -- TODO
+findIndex name start maxIdx create = do
+    if B.length name == 0
+      then return 0
+      else do
+        configStrings <- use $ svGlobals.svServer.sConfigStrings
+        case findConfigString configStrings 1 of
+          (True, idx) -> return idx
+          (False, idx) -> do
+            if not create
+              then return 0
+              else do
+                when (idx == maxIdx) $
+                  Com.comError Constants.errDrop "*Index: overflow"
+
+                svGlobals.svServer.sConfigStrings %= (V.// [(start + idx, name)])
+
+                state <- use $ svGlobals.svServer.sState
+
+                when (state /= Constants.ssLoading) $ do
+                  SZ.clear (svGlobals.svServer.sMulticast)
+                  MSG.writeCharI (svGlobals.svServer.sMulticast) Constants.svcConfigString
+                  MSG.writeShort (svGlobals.svServer.sMulticast) (start + idx)
+                  MSG.writeString (svGlobals.svServer.sMulticast) name
+                  origin <- use $ globals.vec3Origin
+                  SVSend.multicast origin Constants.multicastAllR
+
+                return idx
+
+  where findConfigString :: V.Vector B.ByteString -> Int -> (Bool, Int)
+        findConfigString configStrings i
+          | i >= maxIdx || configStrings V.! (start + i) == "" = (False, i)
+          | configStrings V.! (start + i) == name = (True, i)
+          | otherwise = findConfigString configStrings (i + 1)
 
 modelIndex :: B.ByteString -> Quake Int
-modelIndex = undefined -- TODO
+modelIndex name = findIndex name Constants.csModels Constants.maxModels True
 
 soundIndex :: B.ByteString -> Quake Int
-soundIndex = undefined -- TODO
+soundIndex name = findIndex name Constants.csSounds Constants.maxSounds True
 
 imageIndex :: B.ByteString -> Quake Int
-imageIndex = undefined -- TODO
+imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 
 {-
 - SV_SpawnServer.

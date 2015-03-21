@@ -1008,17 +1008,17 @@ svcSound               =  9 :: Int -- <see code>
 svcPrint               = 10 :: Int -- [byte] id [string] null terminated string 
 svcStufftext           = 11 :: Int
 -- [string] stuffed into client's console buffer, should be \n terminated
-svcServerdata          = 12 :: Int -- [long] protocol ... 
-svcConfigstring        = 13 :: Int -- [short] [string] 
+svcServerData          = 12 :: Int -- [long] protocol ... 
+svcConfigString        = 13 :: Int -- [short] [string] 
 svcSpawnBaseline       = 14 :: Int
-svcCenterprint         = 15 :: Int -- [string] to put in center of the screen 
+svcCenterPrint         = 15 :: Int -- [string] to put in center of the screen 
 svcDownload            = 16 :: Int -- [short] size [size bytes] 
 svcPlayerInfo          = 17 :: Int -- variable 
 svcPacketEntities      = 18 :: Int -- [...] 
 svcDeltaPacketEntities = 19 :: Int -- [...] 
 svcFrame               = 20 :: Int
 
-numvertexnormals =   162 :: Int
+numVertexNormals =   162 :: Int
 protocolVersion  =    34 :: Int
 portMaster       = 27900 :: Int
 portClient       = 27901 :: Int

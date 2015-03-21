@@ -95,6 +95,8 @@ data Globals =
           , _keyLinePos         :: Int
           , _editLine           :: Int
 
+          , _vec3Origin         :: V3 Float
+
           , _rnd                :: StdGen
           }
 

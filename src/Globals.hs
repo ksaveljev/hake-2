@@ -8,6 +8,7 @@ module Globals ( module Globals
                ) where
 
 import Control.Lens (makeLenses)
+import Linear.V3 (V3(..))
 import System.Random (mkStdGen)
 import qualified Data.Map as M
 import qualified Data.Sequence as Seq
@@ -60,6 +61,8 @@ initialGlobals =
           , _keyLines           = V.empty
           , _keyLinePos         = 0
           , _editLine           = 0
+
+          , _vec3Origin         = V3 0 0 0
 
           , _rnd                = mkStdGen 0 -- must be changed in initialization code
           }
