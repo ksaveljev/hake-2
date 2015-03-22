@@ -3,7 +3,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Internal where
 
-import Linear.V3 (V3)
+import Linear (V3, V4)
+import Data.Int (Int16)
+import Data.Word (Word8)
 import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State.Strict
@@ -17,6 +19,9 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
+import Client.DLightT
+import Client.FrameT
+import Client.LightStyleT
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.CmdAliasT
@@ -40,6 +45,11 @@ import QCommon.NetChanT
 import QCommon.PmlT
 import QCommon.SearchPathT
 import QCommon.SizeBufT
+import Render.MEdgeT
+import Render.MModelT
+import Render.MNodeT
+import Render.MVertexT
+import Sound.SfxT
 
 newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
                     deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
@@ -82,6 +92,7 @@ data Globals =
           , _logStatsFile       :: Maybe Handle
 
           , _cls                :: ClientStaticT
+          , _cl                 :: ClientStateT
 
           , _userInfoModified   :: Bool
 
@@ -633,3 +644,223 @@ data MonsterInfoT =
                , _miPowerArmorType  :: Int
                , _miPowerArmorPower :: Int
                }
+
+data ClientStateT =
+  ClientStateT { _csTimeOutCount           :: Int
+               , _csTimeDemoFrames         :: Int
+               , _csTimeDemoStart          :: Int
+               , _csRefreshPrepped         :: Bool
+               , _csSoundPrepped           :: Bool
+               , _csForceRefDef            :: Bool
+               , _csParseEntities          :: Int
+               , _csCmd                    :: UserCmdT
+               , _csCmds                   :: V.Vector UserCmdT
+               , _csCmdTime                :: UV.Vector Int
+               , _csPredictedOrigins       :: UV.Vector (V3 Int16)
+               , _csPredictedStep          :: Float
+               , _csPredictedStepTime      :: Int
+               , _csPredictedOrigin        :: V3 Float
+               , _csPredictedAngles        :: V3 Float
+               , _csPredictionError        :: V3 Float
+               , _csFrame                  :: FrameT
+               , _csSurpressCount          :: Int
+               , _csFrames                 :: V.Vector FrameT
+               , _csViewAngles             :: V3 Float
+               , _csTime                   :: Int
+               , _csLerpFrac               :: Float
+               , _csRefDef                 :: RefDefT
+               , _csVForward               :: V3 Float
+               , _csVRight                 :: V3 Float
+               , _csVUp                    :: V3 Float
+               , _csLayout                 :: B.ByteString
+               , _csInventory              :: UV.Vector Int
+               , _csCinematicFile          :: Quake ()
+               , _csCinematicTime          :: Int
+               , _csCinematicFrame         :: Int
+               , _csCinematicPalette       :: B.ByteString
+               , _csCinematicPaletteActive :: Bool
+               , _csAttractLoop            :: Bool
+               , _csServerCount            :: Int
+               , _csGameDir                :: B.ByteString
+               , _csPlayerNum              :: Int
+               , _csConfigStrings          :: V.Vector B.ByteString
+               , _csModelDraw              :: V.Vector ModelT
+               , _csModelClip              :: CModelT
+               , _csSoundPrecache          :: V.Vector SfxT
+               , _csImagePrecache          :: V.Vector ImageT
+               , _csClientInfo             :: V.Vector ClientInfoT
+               , _csBaseClientInfo         :: ClientInfoT
+               }
+
+data GLPolyT =
+  GLPolyT { _glpNext           :: GLPolyT
+          , _glpChain          :: GLPolyT
+          , _glpNumVerts       :: Int
+          , _glpFlags          :: Int
+          , _glpPos            :: Int
+          , _glpGetX           :: Int -> Quake Float
+          , _glpSetX           :: Int -> Float -> Quake ()
+          , _glpGetY           :: Int -> Quake Float
+          , _glpSetY           :: Int -> Float -> Quake ()
+          , _glpGetZ           :: Int -> Quake Float
+          , _glpSetZ           :: Int -> Float -> Quake ()
+          , _glpGetS1          :: Int -> Quake Float
+          , _glpSetS1          :: Int -> Float -> Quake ()
+          , _glpGetT1          :: Int -> Quake Float
+          , _glpSetT1          :: Int -> Float -> Quake ()
+          , _glpGetS2          :: Int -> Quake Float
+          , _glpSetS2          :: Int -> Float -> Quake ()
+          , _glpGetT2          :: Int -> Quake Float
+          , _glpSetT2          :: Int -> Float -> Quake ()
+          , _glpBeginScrolling :: Float -> Quake ()
+          , _glpEndScrolling   :: Quake ()
+          }
+
+data MTexInfoT =
+  MTexInfoT { _mtiVecs      :: (V4 Float, V4 Float)
+            , _mtiFlags     :: Int
+            , _mtiNumFrames :: Int
+            , _mtiNext      :: MTexInfoT
+            , _mtiImage     :: ImageT
+            }
+
+data ImageT =
+  ImageT { _iId                   :: Int
+         , _iName                 :: B.ByteString
+         , _iType                 :: Int
+         , _iWidth                :: Int
+         , _iHeight               :: Int
+         , _iUploadWidth          :: Int
+         , _iUploadHeight         :: Int
+         , _iRegistrationSequence :: Int
+         , _iTextureChain         :: MSurfaceT
+         , _iTexNum               :: Int
+         , _iSL                   :: Float
+         , _iTL                   :: Float
+         , _iSH                   :: Float
+         , _iTH                   :: Float
+         , _iScrap                :: Bool
+         , _iHasAlpha             :: Bool
+         , _iPaletted             :: Bool
+         }
+
+data RefDefT =
+  RefDefT { _rdX            :: Int
+          , _rdY            :: Int
+          , _rdWidth        :: Int
+          , _rdHeight       :: Int
+          , _rdFovX         :: Float
+          , _rdFovY         :: Float
+          , _rdViewOrg      :: V3 Float
+          , _rdViewAngles   :: V3 Float
+          , _rdBlend        :: V4 Float
+          , _rdTime         :: Float
+          , _rdRdFlags      :: Int
+          , _rdAreaBits     :: UV.Vector Word8
+          , _rdLightStyles  :: V.Vector LightStyleT
+          , _rdNumEntities  :: Int
+          , _rdEntities     :: V.Vector EntityT
+          , _rdNumDLights   :: Int
+          , _rdDLights      :: V.Vector DLightT
+          , _rdNumParticles :: Int
+          }
+
+data EntityT =
+  EntityT { _eModel      :: ModelT
+          , _eAngles     :: V3 Float
+          , _eOrigin     :: V3 Float
+          , _eFrame      :: Int
+          , _eOldOrigin  :: V3 Float
+          , _eOldFrame   :: Int
+          , _eBackLerp   :: Float
+          , _eSkinNum    :: Int
+          , _eLightStyle :: Int
+          , _eAlpha      :: Float
+          , _eSkin       :: ImageT
+          , _enFlags     :: Int -- name clash with EdictT._eFlags
+          }
+
+data ModelT =
+  ModelT { _mName                 :: B.ByteString
+         , _mRegistrationSequence :: Int
+         , _mType                 :: Int
+         , _mNumFrames            :: Int
+         , _mFlags                :: Int
+         , _mMins                 :: V3 Float
+         , _mMaxs                 :: V3 Float
+         , _mRadius               :: Float
+         , _mClipBox              :: Bool
+         , _mClipMins             :: V3 Float
+         , _mClipMaxs             :: V3 Float
+         , _mFirstModelSurface    :: Int
+         , _mNumModelSurfaces     :: Int
+         , _mLightmap             :: Int
+         , _mNumSubModels         :: Int
+         , _mSubModels            :: Seq MModelT
+         , _mNumPlanes            :: Int
+         , _mPlanes               :: Seq CPlaneT
+         , _mNumLeafs             :: Int
+         , _mLeafs                :: Seq MLeafT
+         , _mNumVertexes          :: Int
+         , _mVertexes             :: Seq MVertexT
+         , _mNumEdges             :: Int
+         , _mEdges                :: Seq MEdgeT
+         , _mNumNodes             :: Int
+         , _mFirstNode            :: Int
+         , _mNodes                :: Seq MNodeT
+         , _mNumTexInfo           :: Int
+         , _mTexInfo              :: Seq MTexInfoT
+         , _mNumSurfaces          :: Int
+         , _mSurfaces             :: Seq MSurfaceT
+         , _mNumSurfEdges         :: Int
+         , _mSurfEdges            :: Seq Int
+         , _mNumMarkSurfaces      :: Int
+         , _mMarkSurfaces         :: Seq MSurfaceT
+         -- TODO: qfiles.dvis_t vis
+         , _mLightdata            :: B.ByteString
+         , _mSkins                :: Seq ImageT
+         , _mExtraDataSize        :: Int
+         , _mExtraData            :: Maybe B.ByteString
+         }
+
+data MSurfaceT =
+  MSurfaceT { _msVisFrame           :: Int
+            , _msPlane              :: CPlaneT
+            , _msFlags              :: Int
+            , _msFirstEdge          :: Int
+            , _msNumEdges           :: Int
+            , _msTextureMins        :: (Int16, Int16)
+            , _msExtents            :: (Int16, Int16)
+            , _msLightS             :: Int
+            , _msLightT             :: Int
+            , _msDLightS            :: Int
+            , _msDLightT            :: Int
+            , _msPolys              :: GLPolyT
+            , _msTextureChain       :: MSurfaceT
+            , _msLightmapChain      :: MSurfaceT
+            , _msTexInfo            :: MTexInfoT
+            , _msDLightFrame        :: Int
+            , _msDLightBits         :: Int
+            , _msLightmapTextureNum :: Int
+            , _msStyles             :: B.ByteString
+            , _msCachedLight        :: UV.Vector Float
+            , _msSamples            :: B.ByteString
+            }
+
+data MLeafT =
+  MLeafT { _mlCluster         :: Int
+         , _mlArea            :: Int
+         , _mlNumMarkSurfaces :: Int
+         , _mlMarkIndex       :: Int
+         , _mlMarkSurfaces    :: Seq MSurfaceT
+         }
+
+data ClientInfoT =
+  ClientInfoT { _ciName        :: B.ByteString
+              , _ciCInfo       :: B.ByteString
+              , _ciSkin        :: ImageT
+              , _ciIcon        :: ImageT
+              , _ciIconName    :: B.ByteString
+              , _ciModel       :: ModelT
+              , _ciWeaponModel :: V.Vector ModelT
+              }

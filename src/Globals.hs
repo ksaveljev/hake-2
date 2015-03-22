@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
                , module Client.ClientStaticT
+               , module Client.ClientStateT
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
@@ -16,6 +17,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
+import Client.ClientStateT
 import Game.CmdAliasT
 import Game.CVarT
 import QCommon.SizeBufT
@@ -49,6 +51,7 @@ initialGlobals =
           , _logStatsFile       = Nothing
 
           , _cls                = newClientStaticT
+          , _cl                 = newClientStateT
 
           , _userInfoModified   = False
 

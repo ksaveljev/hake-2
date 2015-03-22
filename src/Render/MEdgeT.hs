@@ -10,3 +10,6 @@ data MEdgeT =
          }
 
 makeLenses ''MEdgeT
+
+newMEdgeT :: MEdgeT
+newMEdgeT = undefined -- TODO

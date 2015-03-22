@@ -74,4 +74,6 @@ frame _ = io (putStrLn "CL.frame") >> undefined -- TODO
 
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()
-drop = io (putStrLn "CL.drop") >> undefined -- TODO
+drop = do
+
+    io (putStrLn "CL.drop") >> undefined -- TODO

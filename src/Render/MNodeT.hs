@@ -19,3 +19,6 @@ data MNodeT =
          }
 
 makeLenses ''MNodeT
+
+newMNodeT :: MNodeT
+newMNodeT = undefined -- TODO

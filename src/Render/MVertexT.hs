@@ -9,3 +9,6 @@ data MVertexT =
            }
 
 makeLenses ''MVertexT
+
+newMVertexT :: MVertexT
+newMVertexT = undefined -- TODO

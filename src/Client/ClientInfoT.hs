@@ -1,20 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.ClientInfoT where
+module Client.ClientInfoT ( ClientInfoT(..)
+                          , module Client.ClientInfoT
+                          ) where
 
 import Control.Lens (makeLenses)
-import qualified Data.Vector as V
-import qualified Data.ByteString as B
 
-import Render.ImageT
-
-data ClientInfoT =
-  ClientInfoT { _ciName        :: B.ByteString
-              , _ciCInfo       :: B.ByteString
-              , _ciSkin        :: ImageT
-              , _ciIcon        :: ImageT
-              , _ciIconName    :: B.ByteString
-              , _ciModel       :: ModelT
-              , _ciWeaponModel :: V.Vector ModelT
-              }
+import Internal
 
 makeLenses ''ClientInfoT
+
+newClientInfoT :: ClientInfoT
+newClientInfoT = undefined -- TODO
