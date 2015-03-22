@@ -6,7 +6,7 @@ init :: Quake ()
 init = undefined -- TODO
 
 beginLoadingPlaque :: Quake ()
-beginLoadingPlaque = undefined -- TODO
+beginLoadingPlaque = io (putStrLn "SCR.beginLoadingPlaque") >> undefined -- TODO
 
 endLoadingPlaque :: Quake ()
-endLoadingPlaque = undefined -- TODO
+endLoadingPlaque = io (putStrLn "SCR.endLoadingPlaque") >> undefined -- TODO
