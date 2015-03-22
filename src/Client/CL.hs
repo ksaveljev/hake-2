@@ -2,13 +2,14 @@
 module Client.CL where
 
 import Control.Lens (use, (.=), (^.))
-import Control.Monad (unless, liftM)
+import Control.Monad (unless, liftM, when)
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import CVarVariables
+import qualified Constants
 import qualified Client.Console as Console
 import qualified Client.Key as Key
 import qualified Client.Menu as Menu
@@ -75,5 +76,22 @@ frame _ = io (putStrLn "CL.frame") >> undefined -- TODO
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()
 drop = do
+    clientStatic <- use $ globals.cls
+    let state = clientStatic^.csState
 
-    io (putStrLn "CL.drop") >> undefined -- TODO
+    when (state /= Constants.caUninitialized && state /= Constants.caDisconnected) $ do
+      disconnect
+
+      -- drop loading plaque unless this is the initial game start
+      when ((clientStatic^.csDisableServerCount) /= -1) $
+        SCR.endLoadingPlaque -- get rid of loading plaque
+
+{-
+- Disconnect
+- 
+- Goes from a connected state to full screen console state Sends a
+- disconnect message to the server This is also called on Com_Error, so it
+- shouldn't cause any errors.
+-}
+disconnect :: Quake ()
+disconnect = io (putStrLn "CL.disconnect") >> undefined -- TODO

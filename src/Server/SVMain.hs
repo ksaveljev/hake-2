@@ -222,9 +222,9 @@ giveMsec = do
 
     when (frameNum .&. 15 == 0) $
       svGlobals.svServerStatic.ssClients %=
-        fmap (\cl -> if (cl^.cState) == Constants.csFree
-                      then cl
-                      else cl { _cCommandMsec = 1800 }) -- 1600 + some slop
+        fmap (\client -> if (client^.cState) == Constants.csFree
+                      then client
+                      else client { _cCommandMsec = 1800 }) -- 1600 + some slop
 
 
 runGameFrame :: Quake ()
