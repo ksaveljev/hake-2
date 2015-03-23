@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.FS where
 
 import Data.Char (toLower)
@@ -25,14 +26,16 @@ import qualified Data.Map as M
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.XCommandT
 import QCommon.DPackHeaderT
 import QCommon.PackFileT
 import qualified Constants
-import qualified QCommon.FSConstants as FSConstants
 import qualified Game.Cmd as Cmd
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.FSConstants as FSConstants
 
 initFileSystem :: Quake ()
 initFileSystem = do
@@ -184,7 +187,46 @@ markBaseSearchPaths = do
     fsGlobals.fsBaseSearchPaths .= searchPaths
 
 setGameDir :: B.ByteString -> Quake ()
-setGameDir _ = io (putStrLn "FS.setGameDir") >> undefined -- TODO
+setGameDir dir = do
+    let invalidDir = or $ fmap (`B.isInfixOf` dir) ["..", "/", "\\", ":"]
+
+    if invalidDir
+      then Com.printf "Gamedir should be a single filename, not a path\n"
+      else do
+        -- free up any current game dir info
+        searchPaths <- use $ fsGlobals.fsSearchPaths
+        mapM_ freeSearchPath searchPaths
+        fsGlobals.fsSearchPaths .= []
+
+        -- flush all data, so it will be forced to reload
+        dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+        when (dedicatedValue == 0) $
+          CBuf.addText "vid_restart\nsnd_restart\n"
+
+        baseDir <- liftM (^.cvString) fsBaseDirCVar
+        fsGlobals.fsGameDir .= baseDir `B.append` "/" `B.append` dir
+
+        if dir == Constants.baseDirName || B.length dir == 0
+          then do
+            void $ CVar.fullSet "gamedir" "" (Constants.cvarServerInfo .|. Constants.cvarNoSet)
+            void $ CVar.fullSet "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
+          else do
+            void $ CVar.fullSet "gamedir" dir (Constants.cvarServerInfo .|. Constants.cvarNoSet)
+            cddir <- liftM (^.cvString) fsCdDirCVar
+            when (B.length cddir > 0) $
+              addGameDirectory (cddir `B.append` "/" `B.append` dir)
+            addGameDirectory (baseDir `B.append` "/" `B.append` dir)
+
+  where freeSearchPath :: SearchPathT -> Quake ()
+        freeSearchPath searchPath =
+          when (isJust (searchPath^.spPack)) $ do
+            let sp = fromJust (searchPath^.spPack)
+            when (isJust (sp^.pHandle)) $ do
+              let h = fromJust (sp^.pHandle)
+              err <- io $ handle (\(e :: IOException) -> return (Just e)) (hClose h >> return Nothing)
+              case err of
+                Nothing -> return ()
+                Just e -> Com.dprintf (BC.pack $ show e)
 
 pathF :: XCommandT
 pathF = do
