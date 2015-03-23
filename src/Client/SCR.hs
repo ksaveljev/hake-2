@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.SCR where
 
 import Control.Lens ((.=), use, (^.))
@@ -8,6 +10,7 @@ import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 
@@ -51,5 +54,33 @@ updateScreen = do
     renderer <- use $ globals.re
     (renderer^.reUpdateScreen) updateScreenF
 
+{-
+- ================== SCR_UpdateScreen
+- 
+- This is called every frame, and can also be called explicitly to flush
+- text to the screen. ==================
+-}
 updateScreen2 :: Quake ()
-updateScreen2 = io (putStrLn "SCR.updateScreen2") >> undefined -- TODO
+updateScreen2 = do
+    needToUpdate <- shouldUpdate
+
+    when needToUpdate $ do
+      io (putStrLn "SCR.updateScreen2") >> undefined -- TODO
+
+  where shouldUpdate :: Quake Bool
+        shouldUpdate = do
+          disableScreen <- use $ globals.cls.csDisableScreen
+          initialized <- use $ scrGlobals.scrInitialized
+          conInitialized <- use $ globals.con.cInitialized
+
+          -- if the screen is disabled (loading plaque is up, or vid mode
+          -- changing) do nothing at all
+          if | disableScreen /= 0 -> do
+                 msec <- Timer.milliseconds
+                 when (msec - truncate disableScreen > 120000) $ do
+                   globals.cls.csDisableScreen .= 0
+                   Com.printf "Loading plaque timed out.\n"
+                 return False
+               -- not initialized yet
+             | (not initialized) || (not conInitialized) -> return False
+             | otherwise -> return True

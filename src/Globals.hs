@@ -3,6 +3,7 @@
 module Globals ( module Globals
                , module Client.ClientStaticT
                , module Client.ClientStateT
+               , module Client.ConsoleT
                , module Client.RefExportT
                , module Game.CmdAliasT
                , module Game.CVarT
@@ -19,6 +20,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
 import Client.ClientStateT
+import Client.ConsoleT
 import Client.RefExportT
 import Game.CmdAliasT
 import Game.CVarT
@@ -58,6 +60,7 @@ initialGlobals =
           , _userInfoModified   = False
 
           , _cvarVars           = M.empty
+          , _con                = newConsoleT
           , _re                 = dummyRenderer
 
           , _keyBindings        = V.replicate 256 Nothing

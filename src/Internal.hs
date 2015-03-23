@@ -19,6 +19,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
+import Client.ConsoleT
 import Client.DirtyT
 import Client.DLightT
 import Client.FrameT
@@ -99,6 +100,7 @@ data Globals =
           , _userInfoModified   :: Bool
 
           , _cvarVars           :: M.Map B.ByteString CVarT
+          , _con                :: ConsoleT
           , _re                 :: RefExportT
 
           , _keyBindings        :: V.Vector (Maybe B.ByteString)
