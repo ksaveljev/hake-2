@@ -19,6 +19,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
+import Client.DirtyT
 import Client.DLightT
 import Client.FrameT
 import Client.LightStyleT
@@ -66,6 +67,7 @@ data QuakeState =
              , _svGlobals         :: SVGlobals
              , _gameBaseGlobals   :: GameBaseGlobals
              , _pMoveGlobals      :: PMoveGlobals
+             , _scrGlobals        :: SCRGlobals
              }
 
 data Globals =
@@ -864,3 +866,15 @@ data ClientInfoT =
               , _ciModel       :: ModelT
               , _ciWeaponModel :: V.Vector ModelT
               }
+
+data SCRGlobals =
+  SCRGlobals { _scrConCurrent      :: Float
+             , _scrConLines        :: Float
+             , _scrInitialized     :: Bool
+             , _scrDrawLoading     :: Int
+             , _scrDirty           :: DirtyT
+             , _scrOldDirty        :: (DirtyT, DirtyT)
+             , _scrCrosshairPic    :: B.ByteString
+             , _scrCrosshairWidth  :: Int
+             , _scrCrosshairHeight :: Int
+             }

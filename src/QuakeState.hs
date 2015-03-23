@@ -10,11 +10,13 @@ module QuakeState ( QuakeState(..)
                   , svGlobals
                   , gameBaseGlobals
                   , pMoveGlobals
+                  , scrGlobals
                   , QuakeLens
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals
                   , module Client.KeyGlobals
+                  , module Client.SCRGlobals
                   , module QCommon.FSGlobals
                   , module QCommon.NetChannelGlobals
                   , module Server.SVGlobals
@@ -29,6 +31,7 @@ import Globals
 import Game.CmdGlobals
 import Game.GameBaseGlobals
 import Client.KeyGlobals
+import Client.SCRGlobals
 import Server.SVGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
@@ -48,4 +51,5 @@ initialQuakeState =
              , _svGlobals         = initialSVGlobals
              , _gameBaseGlobals   = initialGameBaseGlobals
              , _pMoveGlobals      = initialPMoveGlobals
+             , _scrGlobals        = initialSCRGlobals
              }
