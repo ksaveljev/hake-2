@@ -18,3 +18,6 @@ data FrameT =
          }
 
 makeLenses ''FrameT
+
+newFrameT :: FrameT
+newFrameT = undefined -- TODO

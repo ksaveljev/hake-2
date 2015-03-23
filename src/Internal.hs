@@ -99,6 +99,7 @@ data Globals =
           , _userInfoModified   :: Bool
 
           , _cvarVars           :: M.Map B.ByteString CVarT
+          , _re                 :: RefExportT
 
           , _keyBindings        :: V.Vector (Maybe B.ByteString)
           , _keyDown            :: UV.Vector Bool
@@ -676,7 +677,7 @@ data ClientStateT =
                , _csVUp                    :: V3 Float
                , _csLayout                 :: B.ByteString
                , _csInventory              :: UV.Vector Int
-               , _csCinematicFile          :: Quake ()
+               , _csCinematicFile          :: B.ByteString
                , _csCinematicTime          :: Int
                , _csCinematicFrame         :: Int
                , _csCinematicPalette       :: B.ByteString
@@ -687,7 +688,7 @@ data ClientStateT =
                , _csPlayerNum              :: Int
                , _csConfigStrings          :: V.Vector B.ByteString
                , _csModelDraw              :: V.Vector ModelT
-               , _csModelClip              :: CModelT
+               , _csModelClip              :: V.Vector CModelT
                , _csSoundPrecache          :: V.Vector SfxT
                , _csImagePrecache          :: V.Vector ImageT
                , _csClientInfo             :: V.Vector ClientInfoT
@@ -877,4 +878,32 @@ data SCRGlobals =
              , _scrCrosshairPic    :: B.ByteString
              , _scrCrosshairWidth  :: Int
              , _scrCrosshairHeight :: Int
+             }
+
+data RefExportT =
+  RefExportT { _reInit                :: Int -> Int -> Quake Bool
+             , _reShutDown            :: Quake ()
+             , _reBeginRegistration   :: B.ByteString -> Quake ()
+             , _reRegisterModel       :: B.ByteString -> Quake (Maybe ModelT)
+             , _reRegisterSkin        :: B.ByteString -> Quake (Maybe ImageT)
+             , _reRegisterPic         :: B.ByteString -> Quake (Maybe ImageT)
+             , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
+             , _reEndRegistration     :: Quake ()
+             , _reRenderFrame         :: RefDefT -> Quake ()
+             , _reDrawGetPicSize      :: Int -> Int -> B.ByteString -> Quake ()
+             , _reDrawPic             :: Int -> Int -> B.ByteString -> Quake ()
+             , _reDrawStretchPic      :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+             , _reDrawChar            :: Int -> Int -> Char -> Quake ()
+             , _reDrawTileClear       :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+             , _reDrawFill            :: Int -> Int -> Int -> Int -> Int -> Quake ()
+             , _reDrawFadeScreen      :: Quake ()
+             , _reDrawStretchRaw      :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+             , _reCinematicSetPalette :: B.ByteString -> Quake ()
+             , _reBeginFrame          :: Float -> Quake ()
+             , _reEndFrame            :: Quake ()
+             , _reAppActivate         :: Bool -> Quake ()
+             , _reUpdateScreen        :: XCommandT -> Quake ()
+             , _reApiVersion          :: Int
+             , _reGetModeList         :: UV.Vector Int -- TODO: ???
+             , _reGetKeyboardHandler  :: Int -- TODO: ???
              }

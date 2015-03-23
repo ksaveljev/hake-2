@@ -3,6 +3,7 @@
 module Globals ( module Globals
                , module Client.ClientStaticT
                , module Client.ClientStateT
+               , module Client.RefExportT
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
@@ -18,6 +19,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Client.ClientStaticT
 import Client.ClientStateT
+import Client.RefExportT
 import Game.CmdAliasT
 import Game.CVarT
 import QCommon.SizeBufT
@@ -56,6 +58,7 @@ initialGlobals =
           , _userInfoModified   = False
 
           , _cvarVars           = M.empty
+          , _re                 = dummyRenderer
 
           , _keyBindings        = V.replicate 256 Nothing
           , _keyDown            = UV.empty

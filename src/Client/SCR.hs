@@ -6,6 +6,7 @@ import Control.Monad (liftM, when)
 import Quake
 import QuakeState
 import CVarVariables
+import QCommon.XCommandT
 import qualified Constants
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
@@ -42,5 +43,13 @@ beginLoadingPlaque = do
 endLoadingPlaque :: Quake ()
 endLoadingPlaque = io (putStrLn "SCR.endLoadingPlaque") >> undefined -- TODO
 
+updateScreenF :: XCommandT
+updateScreenF = updateScreen2
+
 updateScreen :: Quake ()
-updateScreen = io (putStrLn "SCR.updateScreen") >> undefined -- TODO
+updateScreen = do
+    renderer <- use $ globals.re
+    (renderer^.reUpdateScreen) updateScreenF
+
+updateScreen2 :: Quake ()
+updateScreen2 = io (putStrLn "SCR.updateScreen2") >> undefined -- TODO

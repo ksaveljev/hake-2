@@ -16,3 +16,6 @@ data SfxT =
        }
 
 makeLenses ''SfxT
+
+newSfxT :: SfxT
+newSfxT = undefined -- TODO
