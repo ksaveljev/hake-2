@@ -250,7 +250,25 @@ serverInfo = bitInfo Constants.cvarServerInfo
 
 -- Any variables with latched values will be updated.
 getLatchedVars :: Quake ()
-getLatchedVars = io (putStrLn "CVar.getLatchedVars") >> undefined -- TODO
+getLatchedVars = do
+    cvars <- use $ globals.cvarVars
+    let updatedCVars = M.map updateLatchedVar cvars
+    globals.cvarVars .= updatedCVars
+
+    case M.lookup "game" updatedCVars of
+      Nothing -> return ()
+      Just cvar -> do
+        FS.setGameDir (cvar^.cvString)
+        FS.execAutoexec
+
+  where updateLatchedVar :: CVarT -> CVarT
+        updateLatchedVar cvar =
+          let ls = cvar^.cvLatchedString
+              needToUpdate = not (isNothing ls || B.length (fromJust ls) == 0)
+          in if needToUpdate
+               then let newString = fromJust ls
+                    in cvar { _cvString = newString, _cvLatchedString = Nothing, _cvValue = Lib.atof newString }
+               else cvar
 
 -- Returns an info string containing all the CVAR_USERINFO cvars.
 userInfo :: Quake B.ByteString
