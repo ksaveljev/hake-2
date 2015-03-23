@@ -296,7 +296,21 @@ dirF = do
     io (putStrLn "FS.dirF") >> undefined -- TODO
 
 execAutoexec :: Quake ()
-execAutoexec = io (putStrLn "FS.execAutoexec") >> undefined -- TODO
+execAutoexec = do
+    dir <- use $ fsGlobals.fsUserDir
+
+    name <- if B.length dir > 0
+              then return (dir `B.append` "/autoexec.cfg")
+              else do
+                baseDir <- liftM (^.cvString) fsBaseDirCVar
+                return (baseDir `B.append` "/" `B.append` Constants.baseDirName `B.append` "/autoexec.cfg")
+
+    -- TODO: are we sure it is enough to check for file existance only?
+    -- let cantHave = Constants.sffSubDir .|. Constants.sffHidden .|. Constants.sffSystem
+    fileExists <- io $ doesFileExist (BC.unpack name)
+
+    when fileExists $
+      CBuf.addText "exec autoexec.cfg\n"
 
 {-
 - LoadFile
