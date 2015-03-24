@@ -7,7 +7,7 @@ import qualified Data.ByteString as B
 
 version = 3.21 :: Float
 
-__date__ = 2003 :: Int
+__date__ = "2003" :: B.ByteString
 
 baseDirName = "baseq2" :: B.ByteString
 

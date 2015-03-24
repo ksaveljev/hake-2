@@ -576,37 +576,6 @@ data GameBaseGlobals =
                   , _gbMeansOfDeath      :: Int
                   , _gbNumEdicts         :: Int
                   , _gbGEdicts           :: V.Vector EdictT
-                  , _gbDeathmatch        :: CVarT
-                  , _gbCoop              :: CVarT
-                  , _gbDMFlags           :: CVarT
-                  , _gbSkill             :: CVarT
-                  , _gbFragLimit         :: CVarT
-                  , _gbTimeLimit         :: CVarT
-                  , _gbPassword          :: CVarT
-                  , _gbSpectatorPassword :: CVarT
-                  , _gbNeedPass          :: CVarT
-                  , _gbMaxClients        :: CVarT
-                  , _gbMaxSpectators     :: CVarT
-                  , _gbMaxEntities       :: CVarT
-                  , _gbGSelectEmpty      :: CVarT
-                  , _gbFilterBan         :: CVarT
-                  , _gbSvMaxVelocity     :: CVarT
-                  , _gbSvGravity         :: CVarT
-                  , _gbSvRollSpeed       :: CVarT
-                  , _gbSvRollAngle       :: CVarT
-                  , _gbGunX              :: CVarT
-                  , _gbGunY              :: CVarT
-                  , _gbGunZ              :: CVarT
-                  , _gbRunPitch          :: CVarT
-                  , _gbRunRoll           :: CVarT
-                  , _gbBobUp             :: CVarT
-                  , _gbBobPitch          :: CVarT
-                  , _gbBolRoll           :: CVarT
-                  , _gbSvCheats          :: CVarT
-                  , _gbFloodMsgs         :: CVarT
-                  , _gbFloodPerSecond    :: CVarT
-                  , _gbFloodWaitDelay    :: CVarT
-                  , _gbSvMapList         :: CVarT
                   }
 
 data PMoveGlobals =
