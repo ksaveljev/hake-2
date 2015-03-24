@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Sys.NET where
 
+import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Control.Lens (use, (^.), _1, _2, (.=))
 import Control.Monad (when)
@@ -17,6 +18,7 @@ import QCommon.NetAdrT
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified Util.Lib as Lib
 
 init :: Quake ()
 init = return () -- nothing to do
@@ -87,7 +89,28 @@ socket ip port = do
 
 -- Creates an netadr_t from a string
 stringToAdr :: B.ByteString -> Quake (Maybe NetAdrT)
-stringToAdr _ = io (putStrLn "NET.stringToAdr") >> undefined -- TODO
+stringToAdr s = do
+    let sLow = BC.map toLower s
+        address = BC.split ':' s
+
+    if sLow == "localhost" || sLow == "loopback"
+      then do
+        netLocalAdr <- use $ netGlobals.ngNetLocalAdr
+        return $ Just netLocalAdr
+      else do
+        parsedData <- io $ handle (\(e :: IOException) -> return $ Left e) $ do
+          resolved <- NBSD.getHostByName (BC.unpack $ head address)
+          let ip = head $ NBSD.hostAddresses resolved -- IMPROVE: this is a bad head, isn't it?
+          return $ Right ip
+
+        case parsedData of
+          Left e -> do
+            Com.println $ BC.pack (show e)
+            return Nothing
+          Right ip -> if length address == 2
+                        then let port = Lib.atoi (last address)
+                             in return $ Just newNetAdrT { _naIP = Just ip, _naType = Constants.naIp, _naPort = port }
+                        else return $ Just newNetAdrT { _naIP = Just ip, _naType = Constants.naIp }
 
 -- Returns a string holding ip address and port like "ip0.ip1.ip2.ip3:port".
 adrToString :: NetAdrT -> B.ByteString

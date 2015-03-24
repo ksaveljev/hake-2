@@ -914,6 +914,7 @@ data RefExportT =
              }
 
 data NETGlobals =
-  NETGlobals { _ngLoopbacks :: (LoopbackT, LoopbackT)
-             , _ngIpSockets :: (Maybe Socket, Maybe Socket)
+  NETGlobals { _ngLoopbacks   :: (LoopbackT, LoopbackT)
+             , _ngIpSockets   :: (Maybe Socket, Maybe Socket)
+             , _ngNetLocalAdr :: NetAdrT
              }
