@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameBase where
 
-import Control.Lens (use, (^.))
+import Control.Lens (use, (^.), (.=))
 
 import Quake
 import QuakeState
@@ -24,4 +24,12 @@ runFrame = io (putStrLn "GameBase.runFrame") >> undefined -- TODO
 - variables. 
 -}
 getGameApi :: GameImportT -> Quake ()
-getGameApi _ = io (putStrLn "GameBase.getGameApi") >> undefined -- TODO
+getGameApi imp =
+    gameBaseGlobals.gbGameImport .= imp
+    {- TODO:
+        gi.pointcontents = new pmove_t.PointContentsAdapter() {
+            public int pointcontents(float[] o) {
+                return SV_WORLD.SV_PointContents(o);
+            }
+        };
+    -} 
