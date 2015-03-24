@@ -1,10 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Game.GameBase where
 
+import Control.Lens (use, (^.))
+
 import Quake
-import {-# SOURCE #-} Game.GameImportT
+import QuakeState
 
 shutdownGame :: Quake ()
-shutdownGame = io (putStrLn "GameBase.shutdownGame") >> undefined -- TODO
+shutdownGame = do
+    gameimport <- use $ gameBaseGlobals.gbGameImport
+    (gameimport^.giDprintf) "==== ShutdownGame ====\n"
 
 {-
 - G_RunFrame
