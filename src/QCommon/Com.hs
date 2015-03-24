@@ -51,6 +51,9 @@ comError code fmt = do
 printf :: B.ByteString -> Quake ()
 printf = io . B.putStr -- io.print -- TODO -- putStrLn for grep
 
+println :: B.ByteString -> Quake ()
+println str = printf $ str `B.append` "\n" -- TODO
+
 dprintf :: B.ByteString -> Quake ()
 dprintf = io . B.putStr -- io.print -- TODO -- putStrLn for grep
 

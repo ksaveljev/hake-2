@@ -1,17 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Sys.NET where
 
 import Data.Maybe (isJust, fromJust, isNothing)
 import Control.Lens (use, (^.), _1, _2, (.=))
 import Control.Monad (when)
+import Control.Exception (handle, IOException)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
 
 import Quake
 import QuakeState
 import QCommon.NetAdrT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 
 init :: Quake ()
@@ -51,7 +55,35 @@ openIP = do
           netGlobals.ngIpSockets._1 .= s
 
 socket :: B.ByteString -> Int -> Quake (Maybe NS.Socket)
-socket _ _ = io (putStrLn "NET.socket") >> undefined -- TODO
+socket ip port = do
+    openedSocket <-
+      io $ handle (\(e :: IOException) -> return (Left e)) $ do
+        newsocket <- NS.socket NS.AF_INET NS.Datagram NS.defaultProtocol
+        NS.setSocketOption newsocket NS.Broadcast 1
+        return (Right newsocket)
+
+    case openedSocket of
+      Left e -> do
+        Com.println $ "Error: " `B.append` (BC.pack $ show e)
+        return Nothing
+      Right s -> do
+        bindResult <- io $ handle (\(e :: IOException) -> return (Left e)) $ do
+          if B.length ip == 0 || ip == "localhost"
+            then if port == Constants.portAny
+                   then NS.bind s (NS.SockAddrInet (NS.PortNum 0) NS.iNADDR_ANY)
+                   else NS.bind s (NS.SockAddrInet (NS.PortNum (fromIntegral port)) NS.iNADDR_ANY)
+            else do
+              resolved <- NBSD.getHostByName (BC.unpack ip)
+              NS.bind s (NS.SockAddrInet (NS.PortNum (fromIntegral port)) (head $ NBSD.hostAddresses resolved)) -- this head is kinda bad, isn't it?
+          return $ Right () 
+
+        case bindResult of
+          Left e -> do
+            io $ NS.close s
+            Com.println $ "Error: " `B.append` (BC.pack $ show e)
+            return Nothing
+          Right _ ->
+            return $ Just s
 
 -- Creates an netadr_t from a string
 stringToAdr :: B.ByteString -> Quake (Maybe NetAdrT)
