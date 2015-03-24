@@ -8,6 +8,7 @@ import Game.EdictT
 import {-# SOURCE #-} Game.GameImportT
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSave as GameSave
+import qualified QCommon.Com as Com
 
 {-
 - PF_Unicast
@@ -23,7 +24,7 @@ unicast _ _ = io (putStrLn "SVGame.unicast") >> undefined -- TODO
 - Debug print to server console.
 -}
 dprintf :: B.ByteString -> Quake ()
-dprintf _ = io (putStrLn "SVGame.dprintf") >> undefined -- TODO
+dprintf = Com.printf
 
 -- Centerprintf for critical messages.
 cprintfHigh :: EdictT -> B.ByteString -> Quake ()
