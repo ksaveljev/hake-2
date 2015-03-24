@@ -5,7 +5,9 @@ import qualified Data.ByteString as B
 
 import Quake
 import Game.EdictT
+import {-# SOURCE #-} Game.GameImportT
 import qualified Game.GameBase as GameBase
+import qualified Game.GameSave as GameSave
 
 {-
 - PF_Unicast
@@ -126,4 +128,9 @@ shutdownGameProgs = GameBase.shutdownGame
 - Init the game subsystem for a new map. 
 -}
 initGameProgs :: Quake ()
-initGameProgs = io (putStrLn "SVGame.initGameProgs") >> undefined -- TODO
+initGameProgs = do
+    -- unload anything we have now
+    shutdownGameProgs
+    -- all functions set in game_export_t (rst)
+    GameBase.getGameApi newGameImportT
+    GameSave.initGame

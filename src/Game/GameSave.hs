@@ -5,7 +5,10 @@ import qualified Data.ByteString as B
 import Quake
 
 writeLevel :: B.ByteString -> Quake ()
-writeLevel = undefined -- TODO
+writeLevel _ = io (putStrLn "GameSave.writeLevel") >> undefined -- TODO
 
 readLevel :: B.ByteString -> Quake ()
-readLevel = undefined -- TODO
+readLevel _ = io (putStrLn "GameSave.readLevel") >> undefined -- TODO
+
+initGame :: Quake ()
+initGame = io (putStrLn "GameSave.initGame") >> undefined -- TODO
