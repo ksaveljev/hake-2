@@ -11,6 +11,7 @@ import Control.Applicative
 import Control.Monad.State.Strict
 import Control.Monad.Except
 import Control.Lens (Lens)
+import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
 import qualified Data.ByteString as B
@@ -39,8 +40,6 @@ import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
 import Game.UserCmdT
-import Server.ChallengeT
-import Server.ClientFrameT
 import QCommon.FileLinkT
 import QCommon.NetAdrT
 import QCommon.NetChanT
@@ -51,7 +50,10 @@ import Render.MEdgeT
 import Render.MModelT
 import Render.MNodeT
 import Render.MVertexT
+import Server.ChallengeT
+import Server.ClientFrameT
 import Sound.SfxT
+import Sys.LoopbackT
 
 newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
                     deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
@@ -69,6 +71,7 @@ data QuakeState =
              , _gameBaseGlobals   :: GameBaseGlobals
              , _pMoveGlobals      :: PMoveGlobals
              , _scrGlobals        :: SCRGlobals
+             , _netGlobals        :: NETGlobals
              }
 
 data Globals =
@@ -908,4 +911,9 @@ data RefExportT =
              , _reApiVersion          :: Int
              , _reGetModeList         :: UV.Vector Int -- TODO: ???
              , _reGetKeyboardHandler  :: Int -- TODO: ???
+             }
+
+data NETGlobals =
+  NETGlobals { _ngLoopbacks :: (LoopbackT, LoopbackT)
+             , _ngIpSockets :: (Maybe Socket, Maybe Socket)
              }
