@@ -18,6 +18,7 @@ import Game.GameLocalsT
 import {-# SOURCE #-} Game.GameImportT
 import Game.LevelLocalsT
 import Game.SpawnTempT
+import qualified Game.GameItemList as GameItemList
 
 makeLenses ''GameBaseGlobals
 
@@ -33,4 +34,5 @@ initialGameBaseGlobals =
                   , _gbMeansOfDeath      = 0
                   , _gbNumEdicts         = 0
                   , _gbGEdicts           = V.empty -- TODO
+                  , _gbItemList          = GameItemList.itemList
                   }

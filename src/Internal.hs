@@ -19,26 +19,26 @@ import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+
 import Client.ClientStaticT
 import Client.ConsoleT
 import Client.DirtyT
 import Client.DLightT
 import Client.FrameT
 import Client.LightStyleT
-import Game.ClientPersistantT
-import Game.ClientRespawnT
 import Game.CmdAliasT
 import Game.CModelT
 import Game.CPlaneT
 import Game.CSurfaceT
 import Game.CVarT
-import Game.GItemT
+import Game.GItemArmorT
 import Game.LinkT
 import Game.MMoveT
 import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
+import Game.SuperAdapter
 import Game.UserCmdT
 import QCommon.FileLinkT
 import QCommon.NetAdrT
@@ -576,6 +576,7 @@ data GameBaseGlobals =
                   , _gbMeansOfDeath      :: Int
                   , _gbNumEdicts         :: Int
                   , _gbGEdicts           :: V.Vector EdictT
+                  , _gbItemList          :: Seq GItemT
                   }
 
 data PMoveGlobals =
@@ -887,3 +888,91 @@ data NETGlobals =
              , _ngIpSockets   :: (Maybe Socket, Maybe Socket)
              , _ngNetLocalAdr :: NetAdrT
              }
+
+data GItemT =
+  GItemT { _giClassName       :: B.ByteString
+         , _giPickup          :: Maybe EntInteractAdapter
+         , _giUse             :: Maybe ItemUseAdapter
+         , _giDrop            :: Maybe ItemDropAdapter
+         , _giWeaponThink     :: Maybe EntThinkAdapter
+         , _giPickupSound     :: B.ByteString
+         , _giWorldModel      :: B.ByteString
+         , _giWorldModelFlags :: Int
+         , _giViewModel       :: Maybe B.ByteString
+         , _giIcon            :: B.ByteString
+         , _giPickupName      :: B.ByteString
+         , _giCountWidth      :: Int
+         , _giQuantity        :: Int
+         , _giAmmo            :: Maybe B.ByteString
+         , _giFlags           :: Int
+         , _giWeaponModel     :: Int
+         , _giInfo            :: Maybe GItemArmorT
+         , _giTag             :: Int
+         , _giPrecaches       :: B.ByteString
+         , _giIndex           :: Int
+         }
+
+data EntInteractAdapter =
+  EntInteractAdapter { _eiaId    :: B.ByteString
+                     , _interact :: QuakeLens EdictT -> QuakeLens EdictT -> Quake ()
+                     }
+
+instance SuperAdapter EntInteractAdapter where
+    getID = _eiaId
+
+data ItemUseAdapter =
+  ItemUseAdapter { _iuaId :: B.ByteString
+                 , _use   :: QuakeLens EdictT -> GItemT -> Quake ()
+                 }
+
+instance SuperAdapter ItemUseAdapter where
+    getID = _iuaId
+
+data ItemDropAdapter =
+  ItemDropAdapter { _idaId :: B.ByteString
+                  , _drop  :: QuakeLens EdictT -> GItemT -> Quake ()
+                  }
+
+instance SuperAdapter ItemDropAdapter where
+    getID = _idaId
+
+data EntThinkAdapter =
+  EntThinkAdapter { _etaId :: B.ByteString
+                  , _think :: QuakeLens EdictT -> Quake ()
+                  }
+
+instance SuperAdapter EntThinkAdapter where
+    getID = _etaId
+
+data ClientRespawnT =
+  ClientRespawnT { _crCoopRespawn :: ClientPersistantT
+                 , _crEnterFrame  :: Int
+                 , _crScore       :: Int
+                 , _crCmdAngles   :: V3 Float
+                 , _crSpectator   :: Bool
+                 }
+
+data ClientPersistantT = 
+  ClientPersistantT { _cpUserInfo        :: B.ByteString
+                    , _cpNetName         :: B.ByteString
+                    , _cpHand            :: Int
+                    , _cpConnected       :: Bool
+                    , _cpHealth          :: Int
+                    , _cpMaxHealth       :: Int
+                    , _cpSavedFlags      :: Int
+                    , _cpSelectedItem    :: Int
+                    , _cpInventory       :: UV.Vector Int
+                    , _cpMaxBullets      :: Int
+                    , _cpMaxShells       :: Int
+                    , _cpMaxRockets      :: Int
+                    , _cpMaxGrenades     :: Int
+                    , _cpMaxCells        :: Int
+                    , _cpMaxSlugs        :: Int
+                    , _cpWeapon          :: GItemT
+                    , _cpLastWeapon      :: GItemT
+                    , _cpPowerCubes      :: Int
+                    , _cpScore           :: Int
+                    , _cpGameHelpChanged :: Int
+                    , _cpHelpChanged     :: Int
+                    , _cpSpectator       :: Bool
+                    }

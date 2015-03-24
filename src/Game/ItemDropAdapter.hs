@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ImpredicativeTypes #-}
-module Game.EntThinkAdapter ( EntThinkAdapter(..)
-                            , module Game.EntThinkAdapter
+module Game.ItemDropAdapter ( ItemDropAdapter(..)
+                            , module Game.ItemDropAdapter
                             ) where
 
 import Control.Lens (makeLenses)
 
 import Internal
 
-makeLenses ''EntThinkAdapter
+makeLenses ''ItemDropAdapter
