@@ -1,91 +1,91 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
-import Game.EntInteractAdapter
-import Game.EntThinkAdapter
-import Game.ItemDropAdapter
-import Game.ItemUseAdapter
+import Game.EntInteract
+import Game.EntThink
+import Game.ItemDrop
+import Game.ItemUse
 
-useWeapon :: ItemUseAdapter
+useWeapon :: ItemUse
 useWeapon =
-  ItemUseAdapter { _iuaId = "Use_Weapon"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "Use_Weapon"
+                 , _giuUse = undefined -- TODO
                  }
 
-weaponBlaster :: EntThinkAdapter
+weaponBlaster :: EntThink
 weaponBlaster =
-  EntThinkAdapter { _etaId = "Weapon_Blaster"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Blaster"
+                  , _getThink = undefined -- TODO
                   }
 
-pickupWeapon :: EntInteractAdapter
+pickupWeapon :: EntInteract
 pickupWeapon =
-  EntInteractAdapter { _eiaId = "Pickup_Weapon"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "Pickup_Weapon"
+                     , _geiInteract = undefined -- TODO
                      }
 
-dropWeapon :: ItemDropAdapter
+dropWeapon :: ItemDrop
 dropWeapon =
-  ItemDropAdapter { _idaId = "Drop_Weapon"
-                  , _drop = undefined -- TODO
+  GenericItemDrop { _gidId = "Drop_Weapon"
+                  , _gidDrop = undefined -- TODO
                   }
 
-weaponShotgun :: EntThinkAdapter
+weaponShotgun :: EntThink
 weaponShotgun =
-  EntThinkAdapter { _etaId = "Weapon_Shotgun"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Shotgun"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponSuperShotgun :: EntThinkAdapter
+weaponSuperShotgun :: EntThink
 weaponSuperShotgun = 
-  EntThinkAdapter { _etaId = "Weapon_SuperShotgun"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_SuperShotgun"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponMachinegun :: EntThinkAdapter
+weaponMachinegun :: EntThink
 weaponMachinegun = 
-  EntThinkAdapter { _etaId = "Weapon_Machinegun"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Machinegun"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponChaingun :: EntThinkAdapter
+weaponChaingun :: EntThink
 weaponChaingun = 
-  EntThinkAdapter { _etaId = "Weapon_Chaingun"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Chaingun"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponGrenade :: EntThinkAdapter
+weaponGrenade :: EntThink
 weaponGrenade = 
-  EntThinkAdapter { _etaId = "Weapon_Grenade"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Grenade"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponGrenadeLauncher :: EntThinkAdapter
+weaponGrenadeLauncher :: EntThink
 weaponGrenadeLauncher = 
-  EntThinkAdapter { _etaId = "Weapon_GrenadeLauncher"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_GrenadeLauncher"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponRocketLauncher :: EntThinkAdapter
+weaponRocketLauncher :: EntThink
 weaponRocketLauncher = 
-  EntThinkAdapter { _etaId = "Weapon_RocketLauncher"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_RocketLauncher"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponHyperBlaster :: EntThinkAdapter
+weaponHyperBlaster :: EntThink
 weaponHyperBlaster = 
-  EntThinkAdapter { _etaId = "Weapon_HyperBlaster"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_HyperBlaster"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponRailgun :: EntThinkAdapter
+weaponRailgun :: EntThink
 weaponRailgun = 
-  EntThinkAdapter { _etaId = "Weapon_Railgun"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_Railgun"
+                  , _getThink = undefined -- TODO
                   }
 
-weaponBFG :: EntThinkAdapter
+weaponBFG :: EntThink
 weaponBFG = 
-  EntThinkAdapter { _etaId = "Weapon_BFG"
-                  , _think = undefined -- TODO
+  GenericEntThink { _getId = "Weapon_BFG"
+                  , _getThink = undefined -- TODO
                   }

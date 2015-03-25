@@ -38,7 +38,6 @@ import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
-import Game.SuperAdapter
 import Game.UserCmdT
 import QCommon.FileLinkT
 import QCommon.NetAdrT
@@ -891,10 +890,10 @@ data NETGlobals =
 
 data GItemT =
   GItemT { _giClassName       :: B.ByteString
-         , _giPickup          :: Maybe EntInteractAdapter
-         , _giUse             :: Maybe ItemUseAdapter
-         , _giDrop            :: Maybe ItemDropAdapter
-         , _giWeaponThink     :: Maybe EntThinkAdapter
+         , _giPickup          :: Maybe EntInteract
+         , _giUse             :: Maybe ItemUse
+         , _giDrop            :: Maybe ItemDrop
+         , _giWeaponThink     :: Maybe EntThink
          , _giPickupSound     :: Maybe B.ByteString
          , _giWorldModel      :: Maybe B.ByteString
          , _giWorldModelFlags :: Int
@@ -912,37 +911,52 @@ data GItemT =
          , _giIndex           :: Int
          }
 
-data EntInteractAdapter =
-  EntInteractAdapter { _eiaId    :: B.ByteString
-                     , _interact :: QuakeLens EdictT -> QuakeLens EdictT -> Quake ()
-                     }
+class SuperAdapter a where
+    getID :: a -> B.ByteString
 
-instance SuperAdapter EntInteractAdapter where
-    getID = _eiaId
+class EntInteractAdapter a where
+    interact :: a -> (QuakeLens EdictT -> QuakeLens EdictT -> Quake Bool)
 
-data ItemUseAdapter =
-  ItemUseAdapter { _iuaId :: B.ByteString
-                 , _use   :: QuakeLens EdictT -> GItemT -> Quake ()
-                 }
+class ItemUseAdapter a where
+    use :: a -> (QuakeLens EdictT -> GItemT -> Quake ())
 
-instance SuperAdapter ItemUseAdapter where
-    getID = _iuaId
+class ItemDropAdapter a where
+    drop :: a -> (QuakeLens EdictT -> GItemT -> Quake ())
 
-data ItemDropAdapter =
-  ItemDropAdapter { _idaId :: B.ByteString
-                  , _drop  :: QuakeLens EdictT -> GItemT -> Quake ()
-                  }
+class EntThinkAdapter a where
+    think :: a -> (QuakeLens EdictT -> Quake Bool)
 
-instance SuperAdapter ItemDropAdapter where
-    getID = _idaId
+data EntInteract = GenericEntInteract { _geiId :: B.ByteString, _geiInteract :: QuakeLens EdictT -> QuakeLens EdictT -> Quake Bool }
 
-data EntThinkAdapter =
-  EntThinkAdapter { _etaId :: B.ByteString
-                  , _think :: QuakeLens EdictT -> Quake ()
-                  }
+data ItemUse = GenericItemUse { _giuId :: B.ByteString, _giuUse :: QuakeLens EdictT -> GItemT -> Quake () }
 
-instance SuperAdapter EntThinkAdapter where
-    getID = _etaId
+data ItemDrop = GenericItemDrop { _gidId :: B.ByteString, _gidDrop :: QuakeLens EdictT -> GItemT -> Quake () }
+
+data EntThink = GenericEntThink { _getId :: B.ByteString, _getThink :: QuakeLens EdictT -> Quake Bool }
+
+instance SuperAdapter EntInteract where
+    getID (GenericEntInteract _id _) = _id
+
+instance SuperAdapter ItemUse where
+    getID (GenericItemUse _id _) = _id
+
+instance SuperAdapter ItemDrop where
+    getID (GenericItemDrop _id _) = _id
+
+instance SuperAdapter EntThink where
+    getID (GenericEntThink _id _) = _id
+
+instance EntInteractAdapter EntInteract where
+    interact (GenericEntInteract _ _interact) = _interact
+
+instance ItemUseAdapter ItemUse where
+    use (GenericItemUse _ _use) = _use
+
+instance ItemDropAdapter ItemDrop where
+    drop (GenericItemDrop _ _drop) = _drop
+
+instance EntThinkAdapter EntThink where
+    think (GenericEntThink _ _think) = _think
 
 data ClientRespawnT =
   ClientRespawnT { _crCoopRespawn :: ClientPersistantT

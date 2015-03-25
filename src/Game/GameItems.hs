@@ -2,10 +2,10 @@
 module Game.GameItems where
 
 import Quake
-import Game.EntInteractAdapter
+import Game.EntInteract
 import Game.GItemArmorT
-import Game.ItemDropAdapter
-import Game.ItemUseAdapter
+import Game.ItemDrop
+import Game.ItemUse
 import qualified Constants
 
 initItems :: Quake ()
@@ -38,116 +38,116 @@ bodyArmorInfo =
               , _giaArmor            = Constants.armorBody
               }
 
-pickupArmor :: EntInteractAdapter
+pickupArmor :: EntInteract
 pickupArmor =
-  EntInteractAdapter { _eiaId = "pickup_armor"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_armor"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupPowerArmor :: EntInteractAdapter
+pickupPowerArmor :: EntInteract
 pickupPowerArmor =
-  EntInteractAdapter { _eiaId = "pickup_powerarmor"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_powerarmor"
+                     , _geiInteract = undefined -- TODO
                      }
 
-usePowerArmor :: ItemUseAdapter
+usePowerArmor :: ItemUse
 usePowerArmor =
-  ItemUseAdapter { _iuaId = "use_powerarmor"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_powerarmor"
+                 , _giuUse = undefined -- TODO
                  }
 
-dropPowerArmor :: ItemDropAdapter
+dropPowerArmor :: ItemDrop
 dropPowerArmor =
-  ItemDropAdapter { _idaId = "drop_powerarmor"
-                  , _drop = undefined -- TODO
+  GenericItemDrop { _gidId = "drop_powerarmor"
+                  , _gidDrop = undefined -- TODO
                   }
 
-pickupAmmo :: EntInteractAdapter
+pickupAmmo :: EntInteract
 pickupAmmo =
-  EntInteractAdapter { _eiaId = "pickup_ammo"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_ammo"
+                     , _geiInteract = undefined -- TODO
                      }
 
-dropAmmo :: ItemDropAdapter
+dropAmmo :: ItemDrop
 dropAmmo =
-  ItemDropAdapter { _idaId = "drop_ammo"
-                  , _drop = undefined -- TODO
+  GenericItemDrop { _gidId = "drop_ammo"
+                  , _gidDrop = undefined -- TODO
                   }
 
-useQuad :: ItemUseAdapter
+useQuad :: ItemUse
 useQuad =
-  ItemUseAdapter { _iuaId = "use_quad"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_quad"
+                 , _giuUse = undefined -- TODO
                  }
 
-pickupPowerup :: EntInteractAdapter
+pickupPowerup :: EntInteract
 pickupPowerup =
-  EntInteractAdapter { _eiaId = "pickup_powerup"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_powerup"
+                     , _geiInteract = undefined -- TODO
                      }
 
-dropGeneral :: ItemDropAdapter
+dropGeneral :: ItemDrop
 dropGeneral =
-  ItemDropAdapter { _idaId = "drop_general"
-                  , _drop = undefined -- TODO
+  GenericItemDrop { _gidId = "drop_general"
+                  , _gidDrop = undefined -- TODO
                   }
 
-useInvulnerability :: ItemUseAdapter
+useInvulnerability :: ItemUse
 useInvulnerability =
-  ItemUseAdapter { _iuaId = "use_invulnerability"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_invulnerability"
+                 , _giuUse = undefined -- TODO
                  }
 
-useSilencer :: ItemUseAdapter
+useSilencer :: ItemUse
 useSilencer =
-  ItemUseAdapter { _iuaId = "use_silencer"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_silencer"
+                 , _giuUse = undefined -- TODO
                  }
 
-useBreather :: ItemUseAdapter
+useBreather :: ItemUse
 useBreather =
-  ItemUseAdapter { _iuaId = "use_breather"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_breather"
+                 , _giuUse = undefined -- TODO
                  }
 
-useEnviroSuit :: ItemUseAdapter
+useEnviroSuit :: ItemUse
 useEnviroSuit =
-  ItemUseAdapter { _iuaId = "use_envirosuit"
-                 , _use = undefined -- TODO
+  GenericItemUse { _giuId = "use_envirosuit"
+                 , _giuUse = undefined -- TODO
                  }
 
-pickupAncientHead :: EntInteractAdapter
+pickupAncientHead :: EntInteract
 pickupAncientHead =
-  EntInteractAdapter { _eiaId = "pickup_ancienthead"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_ancienthead"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupAdrenaline :: EntInteractAdapter
+pickupAdrenaline :: EntInteract
 pickupAdrenaline =
-  EntInteractAdapter { _eiaId = "pickup_adrenaline"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_adrenaline"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupBandolier :: EntInteractAdapter
+pickupBandolier :: EntInteract
 pickupBandolier =
-  EntInteractAdapter { _eiaId = "pickup_bandolier"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_bandolier"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupPack :: EntInteractAdapter
+pickupPack :: EntInteract
 pickupPack =
-  EntInteractAdapter { _eiaId = "pickup_pack"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_pack"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupKey :: EntInteractAdapter
+pickupKey :: EntInteract
 pickupKey =
-  EntInteractAdapter { _eiaId = "pickup_key"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_key"
+                     , _geiInteract = undefined -- TODO
                      }
 
-pickupHealth :: EntInteractAdapter
+pickupHealth :: EntInteract
 pickupHealth =
-  EntInteractAdapter { _eiaId = "pickup_health"
-                     , _interact = undefined -- TODO
+  GenericEntInteract { _geiId = "pickup_health"
+                     , _geiInteract = undefined -- TODO
                      }
