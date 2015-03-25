@@ -18,7 +18,7 @@ import Game.GameLocalsT
 import {-# SOURCE #-} Game.GameImportT
 import Game.LevelLocalsT
 import Game.SpawnTempT
-import qualified Game.GameItemList as GameItemList
+import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 
 makeLenses ''GameBaseGlobals
 

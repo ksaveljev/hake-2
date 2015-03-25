@@ -10,3 +10,6 @@ import Internal
 import Game.PlayerStateT
 
 makeLenses ''GClientT
+
+newGClientT :: GClientT
+newGClientT = undefined -- TODO

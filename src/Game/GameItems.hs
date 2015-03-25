@@ -1,15 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameItems where
 
+import Control.Lens ((.=))
+import qualified Data.Sequence as Seq
+
 import Quake
+import QuakeState
 import Game.EntInteract
 import Game.GItemArmorT
 import Game.ItemDrop
 import Game.ItemUse
 import qualified Constants
+import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 
 initItems :: Quake ()
-initItems = io (putStrLn "GameItems.initItems") >> undefined -- TODO
+initItems = do
+    gameBaseGlobals.gbGame.glNumItems .= Seq.length GameItemList.itemList -- TODO: jake2 has -1 here...
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =

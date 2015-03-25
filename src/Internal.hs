@@ -458,7 +458,7 @@ data GameLocalsT =
   GameLocalsT { _glHelpMessage1 :: B.ByteString
               , _glHelpMessage2 :: B.ByteString
               , _glHelpChanged  :: Int
-              , _glClients      :: UV.Vector GClientT
+              , _glClients      :: V.Vector GClientT
               , _glSpawnPoint   :: B.ByteString
               , _glMaxClients   :: Int
               , _glMaxEntities  :: Int
