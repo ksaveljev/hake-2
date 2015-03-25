@@ -1,10 +1,14 @@
 module Server.SVSend where
 
-import Linear.V3 (V3)
+import Control.Lens (use)
+import Control.Monad (when)
+import Linear.V3 (V3(..))
 import qualified Data.ByteString as B
 
 import Quake
-import Server.ClientT
+import QuakeState
+import qualified Constants
+import qualified QCommon.MSG as MSG
 
 {-
 =============================================================================
@@ -42,7 +46,12 @@ Sends text to all active clients
 =================
 -}
 broadcastCommand :: B.ByteString -> Quake ()
-broadcastCommand _ = io (putStrLn "SVSend.broadcastCommand") >>undefined -- TODO
+broadcastCommand s = do
+    state <- use $ svGlobals.svServer.sState
+    when (state /= 0) $ do
+      MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcStuffText
+      MSG.writeString (svGlobals.svServer.sMulticast) s
+      multicast (V3 0 0 0) Constants.multicastAllR -- TODO: we send V3 0 0 0 but there is NULL in jake2 
 
 {-
 =================

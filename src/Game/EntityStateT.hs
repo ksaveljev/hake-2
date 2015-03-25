@@ -13,7 +13,6 @@ makeLenses ''EntityStateT
 newEntityStateT :: EntityStateT
 newEntityStateT =
   EntityStateT { _esNumber         = 0
-               , _esSurroundingEnt = Nothing
                , _esOrigin         = V3 0 0 0
                , _esAngles         = V3 0 0 0
                , _esOldOrigin      = V3 0 0 0

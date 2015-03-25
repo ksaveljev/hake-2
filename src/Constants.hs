@@ -1006,7 +1006,7 @@ svcDisconnect          =  7 :: Int
 svcReconnect           =  8 :: Int
 svcSound               =  9 :: Int -- <see code> 
 svcPrint               = 10 :: Int -- [byte] id [string] null terminated string 
-svcStufftext           = 11 :: Int
+svcStuffText           = 11 :: Int
 -- [string] stuffed into client's console buffer, should be \n terminated
 svcServerData          = 12 :: Int -- [long] protocol ... 
 svcConfigString        = 13 :: Int -- [short] [string] 

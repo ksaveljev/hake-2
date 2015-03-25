@@ -5,6 +5,7 @@ import Data.Bits ((.|.))
 import Control.Lens (use, (^.), (.=))
 import Control.Monad (void, liftM)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -100,7 +101,13 @@ initGame = do
     gameBaseGlobals.gbNumEdicts .= maxClientsValue + 1
 
 createClients :: Quake ()
-createClients = io (putStrLn "GameSave.createClients") >> undefined -- TODO
+createClients = do
+    maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
+    io $ putStrLn "GameSave.createClients does not create actual clients!!! TODO"
+    gameBaseGlobals.gbGame.glClients .= V.generate maxClients undefined -- TODO
 
 createEdicts :: Quake ()
-createEdicts = io (putStrLn "GameSave.createEdicts") >> undefined -- TODO
+createEdicts = do
+    maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
+    io $ putStrLn "GameSave.createEdicts does not create actual edicts!!! TODO"
+    gameBaseGlobals.gbGEdicts .= V.generate maxEntities undefined -- TODO

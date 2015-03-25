@@ -315,7 +315,6 @@ data EdictT =
 
 data EntityStateT =
   EntityStateT { _esNumber         :: Int
-               , _esSurroundingEnt :: Maybe EdictT
                , _esOrigin         :: V3 Float
                , _esAngles         :: V3 Float
                , _esOldOrigin      :: V3 Float
