@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Sound.SfxT where
 
 import Control.Lens (makeLenses)
@@ -9,7 +10,7 @@ import Sound.SfxCacheT
 data SfxT =
   SfxT { _sfxName                 :: B.ByteString
        , _sfxRegistrationSequence :: Int
-       , _sfxCache                :: SfxCacheT
+       , _sfxCache                :: Maybe SfxCacheT
        , _sfxTrueName             :: B.ByteString
        , _sfxBufferId             :: Int
        , _sfxIsCached             :: Bool
@@ -18,4 +19,11 @@ data SfxT =
 makeLenses ''SfxT
 
 newSfxT :: SfxT
-newSfxT = undefined -- TODO
+newSfxT =
+  SfxT { _sfxName                 = ""
+       , _sfxRegistrationSequence = 0
+       , _sfxCache                = Nothing
+       , _sfxTrueName             = ""
+       , _sfxBufferId             = -1
+       , _sfxIsCached             = False
+       }
