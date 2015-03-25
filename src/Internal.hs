@@ -895,12 +895,12 @@ data GItemT =
          , _giUse             :: Maybe ItemUseAdapter
          , _giDrop            :: Maybe ItemDropAdapter
          , _giWeaponThink     :: Maybe EntThinkAdapter
-         , _giPickupSound     :: B.ByteString
-         , _giWorldModel      :: B.ByteString
+         , _giPickupSound     :: Maybe B.ByteString
+         , _giWorldModel      :: Maybe B.ByteString
          , _giWorldModelFlags :: Int
          , _giViewModel       :: Maybe B.ByteString
-         , _giIcon            :: B.ByteString
-         , _giPickupName      :: B.ByteString
+         , _giIcon            :: Maybe B.ByteString
+         , _giPickupName      :: Maybe B.ByteString
          , _giCountWidth      :: Int
          , _giQuantity        :: Int
          , _giAmmo            :: Maybe B.ByteString

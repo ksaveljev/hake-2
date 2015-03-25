@@ -891,13 +891,13 @@ itPowerup   = 32 :: Int
 -- gitem_t->weapmodel for weapons indicates model index
 weapBlaster         = 1 :: Int
 weapShotgun         = 2 :: Int
-weapSupershotgun    = 3 :: Int
+weapSuperShotgun    = 3 :: Int
 weapMachinegun      = 4 :: Int
 weapChaingun        = 5 :: Int
 weapGrenades        = 6 :: Int
 weapGrenadeLauncher = 7 :: Int
 weapRocketLauncher  = 8 :: Int
-weapHyperblaster    = 9 :: Int
+weapHyperBlaster    = 9 :: Int
 weapRailgun         = 10 :: Int
 weapBFG             = 11 :: Int
 
