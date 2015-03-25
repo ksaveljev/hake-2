@@ -10,6 +10,7 @@ import Game.PlayerStateT
 data FrameT =
   FrameT { _fValid         :: Bool
          , _fServerFrame   :: Int
+         , _fServerTime    :: Int
          , _fDeltaFrame    :: Int
          , _fAreaBits      :: UV.Vector Word8
          , _fPlayerState   :: PlayerStateT
@@ -20,4 +21,13 @@ data FrameT =
 makeLenses ''FrameT
 
 newFrameT :: FrameT
-newFrameT = undefined -- TODO
+newFrameT =
+  FrameT { _fValid         = False
+         , _fServerFrame   = 0
+         , _fServerTime    = 0
+         , _fDeltaFrame    = 0
+         , _fAreaBits      = UV.replicate 32 0 -- MAX_MAP_AREAS / 8 where MAX_MAP_AREAS = 256
+         , _fPlayerState   = newPlayerStateT
+         , _fNumEntities   = 0
+         , _fParseEntities = 0
+         }
