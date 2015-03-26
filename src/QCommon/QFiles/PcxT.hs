@@ -10,6 +10,14 @@ import Data.Word (Word16)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 
+{-
+========================================================================
+
+PCX files are used for as many images as possible
+
+========================================================================
+-}
+
 data PcxT =
   PcxT { _pcxManufacturer :: Int8
        , _pcxVersion      :: Int8
