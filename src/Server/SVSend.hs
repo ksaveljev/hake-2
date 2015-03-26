@@ -1,14 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVSend where
 
-import Control.Lens (use)
-import Control.Monad (when)
+import Data.Maybe (isJust)
+import Control.Exception (IOException, handle)
+import Control.Lens (use, (.=))
+import Control.Monad (when, unless)
 import Linear.V3 (V3(..))
+import System.IO (hClose)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
+import qualified Server.SVUser as SVUser
 
 {-
 =============================================================================
@@ -51,7 +58,7 @@ broadcastCommand s = do
     when (state /= 0) $ do
       MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcStuffText
       MSG.writeString (svGlobals.svServer.sMulticast) s
-      multicast (V3 0 0 0) Constants.multicastAllR -- TODO: we send V3 0 0 0 but there is NULL in jake2 
+      multicast (V3 0 0 0) Constants.multicastAllR -- TODO: we send V3 0 0 0 but there is NULL in jake2
 
 {-
 =================
@@ -96,6 +103,26 @@ or the midpoint of the entity box for bmodels.
 -}
 startSound :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = io (putStrLn "SVsend.startSound") >> undefined -- TODO
+
+{-
+==================
+SV_DemoCompleted
+==================
+-}
+demoCompleted :: Quake ()
+demoCompleted = do
+    demofile <- use $ svGlobals.svServer.sDemoFile
+
+    when (isJust demofile) $ do
+      let Just h = demofile
+      ok <- io $ handle (\(_ :: IOException) -> return False) (hClose h >> return True)
+
+      unless ok $
+        Com.printf "IOError closing demo file" -- IMPROVE: show exception as well
+
+      svGlobals.svServer.sDemoFile .= Nothing
+
+    SVUser.nextServer
 
 {-
 =======================
