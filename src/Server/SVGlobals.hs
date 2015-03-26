@@ -28,4 +28,5 @@ initialSVGlobals =
             , _svServerStatic         = newServerStaticT
             , _svPlayer               = newEdictT
             , _svFirstMap             = ""
+            , _svMsgBuf               = ""
             }

@@ -6,7 +6,7 @@ module Server.SVMain where
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
-import Control.Lens (use, (.=), (%=), (^.))
+import Control.Lens (use, preuse, (.=), (%=), (^.), Traversal')
 import Control.Monad (void, when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -26,7 +26,7 @@ import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts as SVEnts
 import qualified Server.SVGame as SVGame
-import qualified Server.SVSend as SVSend
+import {-# SOURCE #-} qualified Server.SVSend as SVSend
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
@@ -72,7 +72,7 @@ init = do
     void $ CVar.get "sv_reconnect_limit" "3" Constants.cvarArchive
 
     bufData <- use $ globals.netMessageBuffer
-    SZ.init (globals.netMessage) bufData Constants.maxMsglen
+    SZ.init (globals.netMessage) bufData Constants.maxMsgLen
 
 -- Called when each game quits, before Sys_Quit or Sys_Error.
 shutdown :: B.ByteString -> Bool -> Quake ()
@@ -121,9 +121,9 @@ masterShutdown = io (putStrLn "SVMain.masterShutdown") >> undefined -- TODO
 - unwillingly. This is NOT called if the entire server is quiting or
 - crashing.
 -}
-dropClient :: QuakeLens ClientT -> Quake ()
+dropClient :: Traversal' QuakeState ClientT -> Quake ()
 dropClient clientLens = do
-    client <- use $ clientLens
+    Just client <- preuse $ clientLens
 
     MSG.writeByteI (clientLens.cNetChan.ncMessage) Constants.svcDisconnect
 

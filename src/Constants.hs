@@ -1141,7 +1141,7 @@ caActive        = 4 :: Int
 maxAliasName = 32 :: Int
 maxNumArgvs  = 50 :: Int
 
-maxMsglen = 1400 :: Int
+maxMsgLen = 1400 :: Int
 
 -- ---------
 -- console.h
@@ -1254,7 +1254,7 @@ ssCinematic = 3 :: Int
 ssDemo      = 4 :: Int
 ssPic       = 5 :: Int
 
-svOutputbufLength = maxMsglen - 16
+svOutputbufLength = maxMsgLen - 16
 
 rdNone   = 0 :: Int
 rdClient = 1 :: Int

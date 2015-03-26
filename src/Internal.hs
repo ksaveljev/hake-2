@@ -10,7 +10,7 @@ import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State.Strict
 import Control.Monad.Except
-import Control.Lens (Lens)
+import Control.Lens (Lens')
 import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
@@ -165,14 +165,13 @@ data SVGlobals =
             , _svServerStatic         :: ServerStaticT
             , _svPlayer               :: EdictT
             , _svFirstMap             :: B.ByteString
+            , _svMsgBuf               :: B.ByteString
             }
 
 data CmdFunctionT =
   CmdFunctionT { _cfName     :: B.ByteString
                , _cfFunction :: Maybe XCommandT
                }
-
-type QuakeLens a = Lens QuakeState QuakeState a a
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float
@@ -914,24 +913,24 @@ class SuperAdapter a where
     getID :: a -> B.ByteString
 
 class EntInteractAdapter a where
-    interact :: a -> (QuakeLens EdictT -> QuakeLens EdictT -> Quake Bool)
+    interact :: a -> (Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool)
 
 class ItemUseAdapter a where
-    use :: a -> (QuakeLens EdictT -> GItemT -> Quake ())
+    use :: a -> (Lens' QuakeState EdictT -> GItemT -> Quake ())
 
 class ItemDropAdapter a where
-    drop :: a -> (QuakeLens EdictT -> GItemT -> Quake ())
+    drop :: a -> (Lens' QuakeState EdictT -> GItemT -> Quake ())
 
 class EntThinkAdapter a where
-    think :: a -> (QuakeLens EdictT -> Quake Bool)
+    think :: a -> (Lens' QuakeState EdictT -> Quake Bool)
 
-data EntInteract = GenericEntInteract { _geiId :: B.ByteString, _geiInteract :: QuakeLens EdictT -> QuakeLens EdictT -> Quake Bool }
+data EntInteract = GenericEntInteract { _geiId :: B.ByteString, _geiInteract :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool }
 
-data ItemUse = GenericItemUse { _giuId :: B.ByteString, _giuUse :: QuakeLens EdictT -> GItemT -> Quake () }
+data ItemUse = GenericItemUse { _giuId :: B.ByteString, _giuUse :: Lens' QuakeState EdictT -> GItemT -> Quake () }
 
-data ItemDrop = GenericItemDrop { _gidId :: B.ByteString, _gidDrop :: QuakeLens EdictT -> GItemT -> Quake () }
+data ItemDrop = GenericItemDrop { _gidId :: B.ByteString, _gidDrop :: Lens' QuakeState EdictT -> GItemT -> Quake () }
 
-data EntThink = GenericEntThink { _getId :: B.ByteString, _getThink :: QuakeLens EdictT -> Quake Bool }
+data EntThink = GenericEntThink { _getId :: B.ByteString, _getThink :: Lens' QuakeState EdictT -> Quake Bool }
 
 instance SuperAdapter EntInteract where
     getID (GenericEntInteract _id _) = _id

@@ -12,7 +12,6 @@ module QuakeState ( QuakeState(..)
                   , pMoveGlobals
                   , scrGlobals
                   , netGlobals
-                  , QuakeLens
                   , module Globals
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals

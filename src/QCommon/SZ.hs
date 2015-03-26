@@ -3,7 +3,7 @@
 module QCommon.SZ where
 
 import Control.Monad (when, unless)
-import Control.Lens ((^.), use, (.=))
+import Control.Lens (Lens', (^.), use, (.=), ASetter')
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -12,17 +12,17 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
 
-init :: QuakeLens SizeBufT -> B.ByteString -> Int -> Quake ()
+init :: Lens' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =
     bufLens .= newSizeBufT { _sbData = bufData, _sbMaxSize = len }
 
-clear :: QuakeLens SizeBufT -> Quake ()
+clear :: ASetter' QuakeState SizeBufT -> Quake ()
 clear bufLens = do
     bufLens.sbCurSize .= 0
     bufLens.sbOverflowed .= False
 
 -- ask for the pointer using sizebuf_t.cursize (RST)
-getSpace :: QuakeLens SizeBufT -> Int -> Quake Int
+getSpace :: Lens' QuakeState SizeBufT -> Int -> Quake Int
 getSpace bufLens len = do
     buf <- use bufLens
 
@@ -40,12 +40,12 @@ getSpace bufLens len = do
 
     return oldsize
 
-write :: QuakeLens SizeBufT -> B.ByteString -> Int -> Quake ()
+write :: Lens' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len = do
     idx <- getSpace bufLens len
     oldData <- use $ bufLens.sbData
     let updatedData = B.take idx oldData `B.append` bufData `B.append` B.drop (idx + len) oldData
     bufLens.sbData .= updatedData
 
-print :: QuakeLens SizeBufT -> B.ByteString -> Quake ()
+print :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()
 print _ _ = io (putStrLn "SZ.print") >> undefined -- TODO

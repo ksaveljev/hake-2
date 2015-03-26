@@ -141,7 +141,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
         pMoveGlobals.pmAirAccelerate .= 0
 
     bufData <- use $ svGlobals.svServer.sMulticastBuf
-    SZ.init (svGlobals.svServer.sMulticast) bufData Constants.maxMsglen
+    SZ.init (svGlobals.svServer.sMulticast) bufData Constants.maxMsgLen
 
     svGlobals.svServer.sName .= server
 
