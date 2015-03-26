@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.CM where
 
 import qualified Data.ByteString as B
@@ -6,10 +7,14 @@ import Quake
 import Game.CModelT
 import Util.QuakeFile (QuakeFile)
 -- import qualified Util.QuakeFile as QuakeFile
+import qualified QCommon.Com as Com
 
 -- Loads in the map and all submodels.
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (CModelT, [Int])
-loadMap name clientLoad checksum = io (putStrLn "CM.loadMap") >> undefined -- TODO
+loadMap name clientLoad checksum = do
+    Com.dprintf $ "CM_LoadMap(" `B.append` name `B.append` ")...\n"
+
+    io (putStrLn "CM.loadMap") >> undefined -- TODO
 
 inlineModel :: B.ByteString -> Quake CModelT
 inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO
