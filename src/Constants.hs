@@ -1095,11 +1095,11 @@ shellWhiteColor = 0xD7 :: Int
 maxTriangles = 4096 :: Int
 maxVerts     = 2048 :: Int
 maxFrames    =  512 :: Int
-maxMd2skins  =   32 :: Int
-maxSkinname  =   64 :: Int
+maxMd2Skins  =   32 :: Int
+maxSkinName  =   64 :: Int
 
-maxlightmaps = 4 :: Int
-miplevels    = 4 :: Int
+maxLightMaps = 4 :: Int
+mipLevels    = 4 :: Int
 
 clcBad       = 0 :: Int
 clcNop       = 1 :: Int

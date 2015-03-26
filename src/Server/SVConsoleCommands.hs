@@ -211,7 +211,7 @@ copySaveGame src dst = do
     svCopyFile s1 s2
 
     let name_ = gamedir `B.append` "/save/" `B.append` src `B.append` "/game.ssv"
-        name2_ = gamedir `B.append` "/save/" `B.append` dst `B.append` "/gamessv"
+        name2_ = gamedir `B.append` "/save/" `B.append` dst `B.append` "/game.ssv"
     svCopyFile name_ name2_
 
     let name = gamedir `B.append` "/save/" `B.append` src `B.append` "/*.sav"
