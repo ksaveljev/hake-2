@@ -8,7 +8,10 @@ import Game.CSurfaceT
 
 data MapSurfaceT =
   MapSurfaceT { _msCSurface :: CSurfaceT
-              , _msRName    :: B.ByteString
+              , _msRName    :: Maybe B.ByteString
               }
 
 makeLenses ''MapSurfaceT
+
+newMapSurfaceT :: MapSurfaceT
+newMapSurfaceT = MapSurfaceT newCSurfaceT Nothing

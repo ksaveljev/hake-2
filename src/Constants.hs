@@ -1161,7 +1161,7 @@ maxMapModels    =    1024 :: Int
 maxMapBrushes   =    8192 :: Int
 maxMapEntities  =    2048 :: Int
 maxMapEntstring = 0x40000 :: Int
-maxMapTexinfo   =    8192 :: Int
+maxMapTexInfo   =    8192 :: Int
 
 maxMapAreas       =      256 :: Int
 maxMapAreaPortals =     1024 :: Int

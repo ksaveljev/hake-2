@@ -33,12 +33,18 @@ import Game.CSurfaceT
 import Game.CVarT
 import Game.GItemArmorT
 import Game.LinkT
+import Game.MapSurfaceT
 import Game.MMoveT
 import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
 import Game.UserCmdT
+import QCommon.CAreaT
+import QCommon.CBrushSideT
+import QCommon.CBrushT
+import QCommon.CLeafT
+import QCommon.CNodeT
 import QCommon.FileLinkT
 import QCommon.NetAdrT
 import QCommon.NetChanT
@@ -71,6 +77,7 @@ data QuakeState =
              , _pMoveGlobals      :: PMoveGlobals
              , _scrGlobals        :: SCRGlobals
              , _netGlobals        :: NETGlobals
+             , _cmGlobals         :: CMGlobals
              }
 
 data Globals =
@@ -988,3 +995,42 @@ data ClientPersistantT =
                     , _cpHelpChanged     :: Int
                     , _cpSpectator       :: Bool
                     }
+
+data CMGlobals =
+  CMGlobals { _cmCheckCount      :: Int
+            , _cmMapName         :: B.ByteString
+            , _cmNumBrushSides   :: Int
+            , _cmMapBrushSides   :: V.Vector CBrushSideT
+            , _cmNumTexInfo      :: Int
+            , _cmMapSurfaces     :: V.Vector MapSurfaceT
+            , _cmNumPlanes       :: Int
+            , _cmMapPlanes       :: V.Vector CPlaneT
+            , _cmNumNodes        :: Int
+            , _cmMapNodes        :: V.Vector CNodeT
+            , _cmNumLeafs        :: Int
+            , _cmMapLeafs        :: V.Vector CLeafT
+            , _cmEmptyLeaf       :: Int
+            , _cmSolidLeaf       :: Int
+            , _cmNumLeafBrushes  :: Int
+            , _cmMapLeafBrushes  :: UV.Vector Int
+            , _cmNumCModels      :: Int
+            , _cmMapCModels      :: V.Vector CModelT
+            , _cmNumBrushes      :: Int
+            , _cmMapBrushes      :: V.Vector CBrushT
+            , _cmNumVisibility   :: Int
+            , _cmMapVisibility   :: B.ByteString
+            -- public static qfiles.dvis_t map_vis = new qfiles.dvis_t(ByteBuffer .wrap(map_visibility)); -- TODO?
+            , _cmNumEntityChars  :: Int
+            , _cmMapEntityString :: B.ByteString
+            , _cmNumAreas        :: Int
+            , _cmMapAreas        :: V.Vector CAreaT
+            , _cmNumAreaPortals  :: Int
+            --, _cmMapAreaPortals  :: -- TODO
+            , _cmNumClusters     :: Int
+            , _cmNullSurface     :: MapSurfaceT
+            , _cmFloodValid      :: Int
+            , _cmPortalOpen      :: UV.Vector Bool
+            , _cmCModBase        :: Maybe B.ByteString
+            , _cmChecksum        :: Int
+            , _cmLastChecksum    :: Int
+            }

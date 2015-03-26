@@ -7,8 +7,9 @@ import Game.CModelT
 import Util.QuakeFile (QuakeFile)
 -- import qualified Util.QuakeFile as QuakeFile
 
+-- Loads in the map and all submodels.
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (CModelT, [Int])
-loadMap _ _ _ = io (putStrLn "CM.loadMap") >> undefined -- TODO
+loadMap name clientLoad checksum = io (putStrLn "CM.loadMap") >> undefined -- TODO
 
 inlineModel :: B.ByteString -> Quake CModelT
 inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO
