@@ -26,7 +26,7 @@ data CVarT =
         , _cvFlags         :: Int
         , _cvModified      :: Bool
         , _cvValue         :: Float
-        }
+        } deriving (Eq)
 
 makeLenses ''CVarT
 

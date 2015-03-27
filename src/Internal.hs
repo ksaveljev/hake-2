@@ -15,6 +15,7 @@ import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -1030,7 +1031,7 @@ data CMGlobals =
             , _cmNullSurface     :: MapSurfaceT
             , _cmFloodValid      :: Int
             , _cmPortalOpen      :: UV.Vector Bool
-            , _cmCModBase        :: Maybe B.ByteString
+            , _cmCModBase        :: Maybe BL.ByteString
             , _cmChecksum        :: Int
             , _cmLastChecksum    :: Int
             }
