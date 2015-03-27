@@ -9,6 +9,9 @@ import Data.Functor ((<$>))
 import Linear (V3(..))
 import qualified Data.ByteString.Lazy as BL
 
+dModelTSize :: Int
+dModelTSize = 3 * 4 + 3 * 4 + 3 * 4 + 4 + 4 + 4
+
 data DModelT =
   DModelT { _dmMins      :: V3 Float
           , _dmMaxs      :: V3 Float

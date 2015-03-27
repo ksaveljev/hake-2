@@ -30,6 +30,7 @@ import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
+import QCommon.QFiles.BSP.DModelT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
@@ -144,7 +145,46 @@ loadMap name clientLoad checksum = do
            cmGlobals.cmMapName .= ""
 
 loadSubmodels :: LumpT -> Quake ()
-loadSubmodels _ = io (putStrLn "CM.loadSubmodels") >> undefined -- TODO
+loadSubmodels lump = do
+    Com.dprintf "CMod_LoadSubmodels()\n"
+
+    when ((lump^.lFileLen) `mod` dModelTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dModelTSize
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no models"
+
+    when (count > Constants.maxMapModels) $
+      Com.comError Constants.errDrop "Map has too many models"
+
+    Com.dprintf $ " numcmodels=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
+
+    cmGlobals.cmNumCModels .= count
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "submodles(headnode, <origin>, <mins>, <maxs>)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapCModels <- mapM (readMapCModel buf) [0..count-1]
+    cmGlobals.cmMapCModels %= (V.// updatedMapCModels)
+
+  where readMapCModel :: BL.ByteString -> Int -> Quake (Int, CModelT)
+        readMapCModel buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dModelTSize
+              model = newDModelT (BL.drop offset buf)
+              cmodel = CModelT { _cmMins     = fmap (\a -> a - 1) (model^.dmMins)
+                               , _cmMaxs     = fmap (+1) (model^.dmMaxs)
+                               , _cmOrigin   = model^.dmOrigin
+                               , _cmHeadNode = model^.dmHeadNode
+                               }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            io (putStrLn "CM.loadSubmodels#readMapCModel") >> undefined -- TODO
+
+          return (idx, cmodel)
 
 loadSurfaces :: LumpT -> Quake ()
 loadSurfaces lump = do
