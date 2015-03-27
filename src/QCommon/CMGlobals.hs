@@ -15,6 +15,8 @@ import QCommon.CBrushSideT
 import QCommon.CBrushT
 import QCommon.CLeafT
 import QCommon.CNodeT
+import QCommon.QFiles.BSP.DAreaPortalT
+import QCommon.QFiles.BSP.DVisT
 import qualified Constants
 
 makeLenses ''CMGlobals
@@ -43,13 +45,13 @@ initialCMGlobals =
             , _cmMapBrushes      = V.replicate Constants.maxMapBrushes newCBrushT
             , _cmNumVisibility   = 0
             , _cmMapVisibility   = "" -- size is Constants.maxMapVisibility
-            -- public static qfiles.dvis_t map_vis = new qfiles.dvis_t(ByteBuffer .wrap(map_visibility)); -- TODO?
+            , _cmMapVis          = emptyDVisT
             , _cmNumEntityChars  = 0
             , _cmMapEntityString = ""
             , _cmNumAreas        = 1
             , _cmMapAreas        = V.replicate Constants.maxMapAreas newCAreaT
             , _cmNumAreaPortals  = 0
-            --, _cmMapAreaPortals  :: -- TODO
+            , _cmMapAreaPortals  = V.replicate Constants.maxMapAreaPortals emptyDAreaPortalT
             , _cmNumClusters     = 1
             , _cmNullSurface     = newMapSurfaceT
             , _cmFloodValid      = 0

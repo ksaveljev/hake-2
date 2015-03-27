@@ -28,6 +28,7 @@ import QCommon.CBrushSideT
 import QCommon.CLeafT
 import QCommon.CNodeT
 import QCommon.LumpT
+import QCommon.QFiles.BSP.DAreaPortalT
 import QCommon.QFiles.BSP.DAreaT
 import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
@@ -36,6 +37,7 @@ import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DModelT
 import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
+import QCommon.QFiles.BSP.DVisT
 import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
@@ -387,7 +389,6 @@ loadLeafs lump = do
 
           return (idx, cleaf)
 
-
 loadPlanes :: LumpT -> Quake ()
 loadPlanes lump = do
     Com.dprintf "CMod_LoadPlanes()\n"
@@ -572,10 +573,57 @@ loadAreas lump = do
           return (idx, carea)
 
 loadAreaPortals :: LumpT -> Quake ()
-loadAreaPortals _ = io (putStrLn "CM.loadAreaPortals") >> undefined -- TODO
+loadAreaPortals lump = do
+    Com.dprintf "CMod_LoadAreaPortals()\n"
+
+    when ((lump^.lFileLen) `mod` dAreaPortalTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dAreaPortalTSize
+
+    when (count > Constants.maxMapAreas) $
+      Com.comError Constants.errDrop "Map has too many areas"
+
+    cmGlobals.cmNumAreaPortals .= count
+
+    Com.dprintf $ " numareaportals=" `B.append` BC.pack (show count) `B.append` "\n"
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "areaportals(portalnum, otherarea)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapAreaPortals <- mapM (readMapAreaPortal buf) [0..count-1]
+    cmGlobals.cmMapAreaPortals %= (V.// updatedMapAreaPortals)
+
+  where readMapAreaPortal :: BL.ByteString -> Int -> Quake (Int, DAreaPortalT)
+        readMapAreaPortal buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dAreaPortalTSize
+              areaPortal = newDAreaPortalT (BL.drop offset buf)
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            io (putStrLn "CM.loadAreaPortals#readMapAreaPortal") >> undefined -- TODO
+
+          return (idx, areaPortal)
+
 
 loadVisibility :: LumpT -> Quake ()
-loadVisibility _ = io (putStrLn "CM.loadVisibility") >> undefined -- TODO
+loadVisibility lump = do
+    Com.dprintf "CMod_LoadVisibility()\n"
+
+    cmGlobals.cmNumVisibility .= lump^.lFileLen
+
+    Com.dprintf $ " numvisibility=" `B.append` BC.pack (show (lump^.lFileLen)) `B.append` "\n"
+
+    when ((lump^.lFileLen) > Constants.maxMapVisibility) $
+      Com.comError Constants.errDrop "Map has too large visibility lump"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    let visData = BL.take (fromIntegral (lump^.lFileLen)) $ BL.drop (fromIntegral (lump^.lFileOfs)) buf
+
+    cmGlobals.cmMapVisibility .= visData
+    cmGlobals.cmMapVis .= newDVisT visData
 
 loadEntityString :: LumpT -> Quake ()
 loadEntityString _ = io (putStrLn "CM.loadEntityString") >> undefined -- TODO

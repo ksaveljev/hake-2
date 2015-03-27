@@ -7,12 +7,18 @@ import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
+dAreaPortalTSize :: Int
+dAreaPortalTSize = 8
+
 data DAreaPortalT =
   DAreaPortalT { _dapPortalNum :: Int
                , _dapOtherArea :: Int
                }
 
 makeLenses ''DAreaPortalT
+
+emptyDAreaPortalT :: DAreaPortalT
+emptyDAreaPortalT = DAreaPortalT 0 0
 
 newDAreaPortalT :: BL.ByteString -> DAreaPortalT
 newDAreaPortalT = runGet getDAreaPortalT

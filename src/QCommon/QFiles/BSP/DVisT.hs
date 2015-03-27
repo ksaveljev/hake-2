@@ -13,6 +13,9 @@ data DVisT =
         , _dvBitOfs      :: V.Vector (Int, Int)
         }
 
+emptyDVisT :: DVisT
+emptyDVisT = DVisT 0 V.empty
+
 makeLenses ''DVisT
 
 newDVisT :: BL.ByteString -> DVisT

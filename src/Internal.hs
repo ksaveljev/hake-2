@@ -50,6 +50,8 @@ import QCommon.FileLinkT
 import QCommon.NetAdrT
 import QCommon.NetChanT
 import QCommon.PmlT
+import QCommon.QFiles.BSP.DAreaPortalT
+import QCommon.QFiles.BSP.DVisT
 import QCommon.SearchPathT
 import QCommon.SizeBufT
 import Render.MEdgeT
@@ -1019,14 +1021,14 @@ data CMGlobals =
             , _cmNumBrushes      :: Int
             , _cmMapBrushes      :: V.Vector CBrushT
             , _cmNumVisibility   :: Int
-            , _cmMapVisibility   :: B.ByteString
-            -- public static qfiles.dvis_t map_vis = new qfiles.dvis_t(ByteBuffer .wrap(map_visibility)); -- TODO?
+            , _cmMapVisibility   :: BL.ByteString
+            , _cmMapVis          :: DVisT
             , _cmNumEntityChars  :: Int
             , _cmMapEntityString :: B.ByteString
             , _cmNumAreas        :: Int
             , _cmMapAreas        :: V.Vector CAreaT
             , _cmNumAreaPortals  :: Int
-            --, _cmMapAreaPortals  :: -- TODO
+            , _cmMapAreaPortals  :: V.Vector DAreaPortalT
             , _cmNumClusters     :: Int
             , _cmNullSurface     :: MapSurfaceT
             , _cmFloodValid      :: Int
