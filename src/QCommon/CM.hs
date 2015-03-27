@@ -23,8 +23,10 @@ import Game.CModelT
 import Game.CSurfaceT
 import Game.MapSurfaceT
 import QCommon.CBrushT
+import QCommon.CBrushSideT
 import QCommon.CLeafT
 import QCommon.LumpT
+import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
@@ -403,7 +405,51 @@ loadLeafBrushes lump = do
           return (idx, val)
 
 loadBrushSides :: LumpT -> Quake ()
-loadBrushSides _ = io (putStrLn "CM.loadBrushSides") >> undefined -- TODO
+loadBrushSides lump = do
+    Com.dprintf "CMod_LoadBrushSides()\n"
+
+    when ((lump^.lFileLen) `mod` dBrushSideTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dBrushSideTSize
+
+    when (count > Constants.maxMapBrushSides) $
+      Com.comError Constants.errDrop "Map has too many planes"
+
+    cmGlobals.cmNumBrushSides .= count
+
+    Com.dprintf $ " numbrushsides=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "brushside(planenum, surfacenum):\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapBrushSides <- mapM (readMapBrushSide buf) [0..count-1]
+    cmGlobals.cmMapBrushSides %= (V.// updatedMapBrushSides)
+
+  where readMapBrushSide :: BL.ByteString -> Int -> Quake (Int, CBrushSideT)
+        readMapBrushSide buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dBrushSideTSize
+              brushSide = newDBrushSideT (BL.drop offset buf)
+              num = fromIntegral $ brushSide^.dbsPlaneNum
+              j = fromIntegral $ brushSide^.dbsTexInfo
+
+          numTexInfo <- use $ cmGlobals.cmNumTexInfo
+
+          when (j >= numTexInfo) $
+            Com.comError Constants.errDrop "Bad brushside texinfo"
+
+          let cbrushside = CBrushSideT { cbsPlane   = Just num
+                                       , cbsSurface = Just j
+                                       }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` BC.pack (show num) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show j) `B.append` -- IMPROVE ?
+                          "|\n"
+
+          return (idx, cbrushside)
 
 loadAreas :: LumpT -> Quake ()
 loadAreas _ = io (putStrLn "CM.loadAreas") >> undefined -- TODO

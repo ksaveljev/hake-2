@@ -9,6 +9,9 @@ import Data.Int (Int16)
 import Data.Word (Word16)
 import qualified Data.ByteString.Lazy as BL
 
+dBrushSideTSize :: Int
+dBrushSideTSize = 4
+
 data DBrushSideT =
   DBrushSideT { _dbsPlaneNum :: Word16
               , _dbsTexInfo  :: Int16

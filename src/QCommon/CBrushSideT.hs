@@ -3,12 +3,9 @@ module QCommon.CBrushSideT where
 
 import Control.Lens (makeLenses)
 
-import Game.CPlaneT
-import Game.MapSurfaceT
-
 data CBrushSideT =
-  CBrushSideT { _cbsPlane   :: Maybe CPlaneT
-              , _cbsSurface :: Maybe MapSurfaceT
+  CBrushSideT { cbsPlane   :: Maybe Int -- index of cmGlobals.cmMapPlanes
+              , cbsSurface :: Maybe Int -- index of cmGlobals.cmMapSurfaces
               }
 
 makeLenses ''CBrushSideT

@@ -921,16 +921,16 @@ class SuperAdapter a where
     getID :: a -> B.ByteString
 
 class EntInteractAdapter a where
-    interact :: a -> (Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool)
+    interact :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool
 
 class ItemUseAdapter a where
-    use :: a -> (Lens' QuakeState EdictT -> GItemT -> Quake ())
+    use :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
 
 class ItemDropAdapter a where
-    drop :: a -> (Lens' QuakeState EdictT -> GItemT -> Quake ())
+    drop :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
 
 class EntThinkAdapter a where
-    think :: a -> (Lens' QuakeState EdictT -> Quake Bool)
+    think :: a -> Lens' QuakeState EdictT -> Quake Bool
 
 data EntInteract = GenericEntInteract { _geiId :: B.ByteString, _geiInteract :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool }
 
