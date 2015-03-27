@@ -5,7 +5,7 @@ module Internal where
 
 import Linear (V3, V4)
 import Data.Int (Int16)
-import Data.Word (Word8)
+import Data.Word (Word8, Word16)
 import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State.Strict
@@ -1013,7 +1013,7 @@ data CMGlobals =
             , _cmEmptyLeaf       :: Int
             , _cmSolidLeaf       :: Int
             , _cmNumLeafBrushes  :: Int
-            , _cmMapLeafBrushes  :: UV.Vector Int
+            , _cmMapLeafBrushes  :: UV.Vector Word16
             , _cmNumCModels      :: Int
             , _cmMapCModels      :: V.Vector CModelT
             , _cmNumBrushes      :: Int

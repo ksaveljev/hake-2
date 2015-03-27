@@ -4,8 +4,10 @@ module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), ix, preuse)
 import Control.Monad (void, when, unless, liftM)
+import Data.Binary.Get (runGet, getWord16le)
 import Data.Functor ((<$>))
 import Data.Maybe (isNothing)
+import Data.Word (Word16)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -21,6 +23,7 @@ import QCommon.CLeafT
 import QCommon.LumpT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
+import QCommon.QFiles.BSP.DPlaneT
 import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
@@ -262,7 +265,44 @@ loadPlanes :: LumpT -> Quake ()
 loadPlanes _ = io (putStrLn "CM.loadPlanes") >> undefined -- TODO
 
 loadLeafBrushes :: LumpT -> Quake ()
-loadLeafBrushes _ = io (putStrLn "CM.loadLeafBrushes") >> undefined -- TODO
+loadLeafBrushes lump = do
+    Com.dprintf "CMod_LoadLeafBrushes()\n"
+
+    when ((lump^.lFileLen) `mod` 2 /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` 2
+
+    Com.dprintf $ " numbrushes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no planes"
+
+    -- need to save space for box planes
+    when (count > Constants.maxMapLeafBrushes) $
+      Com.comError Constants.errDrop "Map has too many leafbrushes"
+
+    cmGlobals.cmNumLeafBrushes .= count
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "map_brushes:\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapLeafBrushes <- mapM (readMapLeafBrush buf) [0..count-1]
+    cmGlobals.cmMapLeafBrushes %= (UV.// updatedMapLeafBrushes)
+
+  where readMapLeafBrush :: BL.ByteString -> Int -> Quake (Int, Word16)
+        readMapLeafBrush buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * 2
+              val = runGet getWord16le (BL.drop offset buf)
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` BC.pack (show idx) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show val) `B.append` -- IMPROVE ?
+                          "|\n"
+
+          return (idx, val)
 
 loadBrushSides :: LumpT -> Quake ()
 loadBrushSides _ = io (putStrLn "CM.loadBrushSides") >> undefined -- TODO
