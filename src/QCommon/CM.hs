@@ -15,8 +15,11 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import Game.CModelT
+import Game.CSurfaceT
+import Game.MapSurfaceT
 import QCommon.LumpT
 import QCommon.QFiles.BSP.DHeaderT
+import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
 import qualified QCommon.Com as Com
@@ -132,7 +135,41 @@ loadSubmodels :: LumpT -> Quake ()
 loadSubmodels _ = io (putStrLn "CM.loadSubmodels") >> undefined -- TODO
 
 loadSurfaces :: LumpT -> Quake ()
-loadSurfaces _ = io (putStrLn "CM.loadSurfaces") >> undefined -- TODO
+loadSurfaces lump = do
+    Com.dprintf "CMod_LoadSurfaces()\n"
+
+    when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` texInfoTSize
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no surfaces"
+
+    when (count > Constants.maxMapTexInfo) $
+      Com.comError Constants.errDrop "Map has too many surfaces"
+
+    cmGlobals.cmNumTexInfo .= count
+    Com.dprintf $ " numtexinfo=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
+
+    debugLoadMap <- use $ cmGlobals.cmDebugLoadMap
+    when (debugLoadMap) $
+      Com.dprintf "surfaces:\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    mapSurfaces <- mapM (readMapSurface buf) [0..count-1]
+    cmGlobals.cmMapSurfaces %= (V.// mapSurfaces)
+
+  where readMapSurface :: BL.ByteString -> Int -> Quake (Int, MapSurfaceT)
+        readMapSurface buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * texInfoTSize
+              tex = newTexInfoT (BL.drop offset buf)
+              csurface = CSurfaceT { _csName = tex^.tiTexture
+                                   , _csFlags = tex^.tiFlags
+                                   , _csValue = tex^.tiValue
+                                   }
+          return (idx, MapSurfaceT { _msCSurface = csurface, _msRName = Just (tex^.tiTexture) })
 
 loadNodes :: LumpT -> Quake ()
 loadNodes _ = io (putStrLn "CM.loadNodes") >> undefined -- TODO

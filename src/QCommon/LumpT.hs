@@ -4,8 +4,8 @@ module QCommon.LumpT where
 import Control.Lens (makeLenses)
 
 data LumpT =
-  LumpT { _lFileofs :: Int
-        , _lFilelen :: Int
+  LumpT { _lFileOfs :: Int
+        , _lFileLen :: Int
         }
 
 makeLenses ''LumpT

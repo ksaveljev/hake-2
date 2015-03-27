@@ -57,4 +57,5 @@ initialCMGlobals =
             , _cmCModBase        = Nothing
             , _cmChecksum        = 0
             , _cmLastChecksum    = 0
+            , _cmDebugLoadMap    = False
             }

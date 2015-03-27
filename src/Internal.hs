@@ -1034,4 +1034,5 @@ data CMGlobals =
             , _cmCModBase        :: Maybe BL.ByteString
             , _cmChecksum        :: Int
             , _cmLastChecksum    :: Int
+            , _cmDebugLoadMap    :: Bool
             }
