@@ -22,11 +22,13 @@ import QuakeState
 import Game.CModelT
 import Game.CSurfaceT
 import Game.MapSurfaceT
+import QCommon.CAreaT
 import QCommon.CBrushT
 import QCommon.CBrushSideT
 import QCommon.CLeafT
 import QCommon.CNodeT
 import QCommon.LumpT
+import QCommon.QFiles.BSP.DAreaT
 import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
 import QCommon.QFiles.BSP.DHeaderT
@@ -531,7 +533,43 @@ loadBrushSides lump = do
           return (idx, cbrushside)
 
 loadAreas :: LumpT -> Quake ()
-loadAreas _ = io (putStrLn "CM.loadAreas") >> undefined -- TODO
+loadAreas lump = do
+    Com.dprintf "CMod_LoadAreas()\n"
+
+    when ((lump^.lFileLen) `mod` dAreaTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dAreaTSize
+
+    when (count > Constants.maxMapAreas) $
+      Com.comError Constants.errDrop "Map has too many areas"
+
+    Com.dprintf $ " numareas=" `B.append` BC.pack (show count) `B.append` "\n"
+
+    cmGlobals.cmNumAreas .= count
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "areas(numportals, firstportal)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapAreas <- mapM (readMapArea buf) [0..count-1]
+    cmGlobals.cmMapAreas %= (V.// updatedMapAreas)
+
+  where readMapArea :: BL.ByteString -> Int -> Quake (Int, CAreaT)
+        readMapArea buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dAreaTSize
+              area = newDAreaT (BL.drop offset buf)
+              carea = CAreaT { _caNumAreaPortals  = area^.daNumAreaPortals
+                             , _caFirstAreaPortal = area^.daFirstAreaPortal
+                             , _caFloodNum        = 0
+                             , _caFloodValid      = 0
+                             }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            io (putStrLn "CM.loadAreas#readMapArea") >> undefined -- TODO
+
+          return (idx, carea)
 
 loadAreaPortals :: LumpT -> Quake ()
 loadAreaPortals _ = io (putStrLn "CM.loadAreaPortals") >> undefined -- TODO

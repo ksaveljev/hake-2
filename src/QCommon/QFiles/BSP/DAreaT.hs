@@ -7,6 +7,9 @@ import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
+dAreaTSize :: Int
+dAreaTSize = 8
+
 data DAreaT =
   DAreaT { _daNumAreaPortals  :: Int
          , _daFirstAreaPortal :: Int
