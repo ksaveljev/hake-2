@@ -253,13 +253,16 @@ getLatchedVars :: Quake ()
 getLatchedVars = do
     cvars <- use $ globals.cvarVars
     let updatedCVars = M.map updateLatchedVar cvars
+        gameVarBefore = M.lookup "game" cvars
+        gameVarAfter = M.lookup "game" updatedCVars
     globals.cvarVars .= updatedCVars
 
-    case M.lookup "game" updatedCVars of
-      Nothing -> return ()
-      Just cvar -> do
-        FS.setGameDir (cvar^.cvString)
-        FS.execAutoexec
+    when (gameVarBefore /= gameVarAfter) $ do
+      case gameVarAfter of
+        Nothing -> return ()
+        Just cvar -> do
+          FS.setGameDir (cvar^.cvString)
+          FS.execAutoexec
 
   where updateLatchedVar :: CVarT -> CVarT
         updateLatchedVar cvar =
