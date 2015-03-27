@@ -10,6 +10,9 @@ import Data.Word (Word16)
 import Linear (V3(..))
 import qualified Data.ByteString.Lazy as BL
 
+dLeafTSize :: Int
+dLeafTSize = 4 + 8 * 2 + 4 * 2
+
 data DLeafT =
   DLeafT { _dlContents       :: Int
          , _dlCluster        :: Int16

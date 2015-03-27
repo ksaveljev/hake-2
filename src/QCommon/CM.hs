@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.))
+import Control.Lens (use, (%=), (.=), (^.), ix, preuse)
 import Control.Monad (void, when, unless, liftM)
 import Data.Functor ((<$>))
 import Data.Maybe (isNothing)
@@ -17,8 +17,10 @@ import QuakeState
 import Game.CModelT
 import Game.CSurfaceT
 import Game.MapSurfaceT
+import QCommon.CLeafT
 import QCommon.LumpT
 import QCommon.QFiles.BSP.DHeaderT
+import QCommon.QFiles.BSP.DLeafT
 import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
@@ -40,7 +42,7 @@ loadMap name clientLoad checksum = do
 
     if | mapName == name && (clientLoad || flushMapValue == 0) -> do
            lastChecksum <- use $ cmGlobals.cmLastChecksum
-           let updatedChecksum = lastChecksum : (tail checksum)
+           let updatedChecksum = lastChecksum : tail checksum
 
            unless clientLoad $ do
              cmGlobals.cmPortalOpen %= UV.map (const False)
@@ -51,13 +53,9 @@ loadMap name clientLoad checksum = do
            return (cModel, updatedChecksum)
 
        | B.length name == 0 -> do
+           resetSomeGlobals
            cmGlobals.cmNumNodes .= 0
            cmGlobals.cmNumLeafs .= 1
-           cmGlobals.cmNumCModels .= 0
-           cmGlobals.cmNumVisibility .= 0
-           cmGlobals.cmNumEntityChars .= 0
-           cmGlobals.cmMapEntityString .= ""
-           cmGlobals.cmMapName .= ""
            cmGlobals.cmNumClusters .= 1
            cmGlobals.cmNumAreas .= 1
 
@@ -67,13 +65,9 @@ loadMap name clientLoad checksum = do
            return (cModel, updatedChecksum)
 
        | otherwise -> do
+           resetSomeGlobals
            cmGlobals.cmNumNodes .= 0
            cmGlobals.cmNumLeafs .= 0
-           cmGlobals.cmNumCModels .= 0
-           cmGlobals.cmNumVisibility .= 0
-           cmGlobals.cmNumEntityChars .= 0
-           cmGlobals.cmMapEntityString .= ""
-           cmGlobals.cmMapName .= ""
 
            --
            -- load the file
@@ -86,7 +80,7 @@ loadMap name clientLoad checksum = do
            let Just buf = BL.fromStrict <$> loadedFile
                len = BL.length buf
                bufChecksum = MD4.blockChecksum buf len
-               updatedChecksum = bufChecksum : (tail checksum)
+               updatedChecksum = bufChecksum : tail checksum
 
            cmGlobals.cmLastChecksum .= bufChecksum
 
@@ -131,6 +125,14 @@ loadMap name clientLoad checksum = do
            cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
            return (cModel, updatedChecksum)
 
+  where resetSomeGlobals :: Quake ()
+        resetSomeGlobals = do
+           cmGlobals.cmNumCModels .= 0
+           cmGlobals.cmNumVisibility .= 0
+           cmGlobals.cmNumEntityChars .= 0
+           cmGlobals.cmMapEntityString .= ""
+           cmGlobals.cmMapName .= ""
+
 loadSubmodels :: LumpT -> Quake ()
 loadSubmodels _ = io (putStrLn "CM.loadSubmodels") >> undefined -- TODO
 
@@ -152,23 +154,30 @@ loadSurfaces lump = do
     cmGlobals.cmNumTexInfo .= count
     Com.dprintf $ " numtexinfo=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
 
-    debugLoadMap <- use $ cmGlobals.cmDebugLoadMap
-    when (debugLoadMap) $
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "surfaces:\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
 
-    mapSurfaces <- mapM (readMapSurface buf) [0..count-1]
-    cmGlobals.cmMapSurfaces %= (V.// mapSurfaces)
+    updatedMapSurfaces <- mapM (readMapSurface buf) [0..count-1]
+    cmGlobals.cmMapSurfaces %= (V.// updatedMapSurfaces)
 
   where readMapSurface :: BL.ByteString -> Int -> Quake (Int, MapSurfaceT)
         readMapSurface buf idx = do
           let offset = fromIntegral $ (lump^.lFileOfs) + idx * texInfoTSize
               tex = newTexInfoT (BL.drop offset buf)
-              csurface = CSurfaceT { _csName = tex^.tiTexture
+              csurface = CSurfaceT { _csName  = tex^.tiTexture
                                    , _csFlags = tex^.tiFlags
                                    , _csValue = tex^.tiValue
                                    }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` (tex^.tiTexture) `B.append`
+                          "| " `B.append` (tex^.tiTexture) `B.append`
+                          "| " `B.append` BC.pack (show (tex^.tiValue)) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
+                          "| " `B.append` BC.pack (show (tex^.tiFlags)) `B.append` -- IMPROVE: convert Bool to ByteString using binary package?
+                          "|\n"
+
           return (idx, MapSurfaceT { _msCSurface = csurface, _msRName = Just (tex^.tiTexture) })
 
 loadNodes :: LumpT -> Quake ()
@@ -178,7 +187,76 @@ loadBrushes :: LumpT -> Quake ()
 loadBrushes _ = io (putStrLn "CM.loadBrushes") >> undefined -- TODO
 
 loadLeafs :: LumpT -> Quake ()
-loadLeafs _ = io (putStrLn "CM.loadLeafs") >> undefined -- TODO
+loadLeafs lump = do
+    Com.dprintf "CMod_LoadLeafs()\n"
+
+    when ((lump^.lFileLen) `mod` dLeafTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dLeafTSize
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no leafs"
+
+    -- need to save space for box planes
+    when (count > Constants.maxMapPlanes) $
+      Com.comError Constants.errDrop "Map has too many planes"
+
+    Com.dprintf $ " numleafes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
+
+    cmGlobals.cmNumLeafs .= count
+    cmGlobals.cmNumClusters .= 0
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "cleaf-list:(contents, cluster, area, firstleafbrush, numleafbrushes)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapLeafs <- mapM (readMapLeaf buf) [0..count-1]
+    cmGlobals.cmMapLeafs %= (V.// updatedMapLeafs)
+
+    numClusters <- use $ cmGlobals.cmNumClusters
+    Com.dprintf $ " numclusters=" `B.append` BC.pack (show numClusters) `B.append` "\n" -- IMPROVE ?
+
+    Just leafContents <- preuse $ cmGlobals.cmMapLeafs.ix 0.clContents
+    when (leafContents /= Constants.contentsSolid) $
+      Com.comError Constants.errDrop "Map leaf 0 is not CONTENTS_SOLID"
+
+    cmGlobals.cmSolidLeaf .= 0
+    cmGlobals.cmEmptyLeaf .= (-1)
+
+    mapLeafs <- use $ cmGlobals.cmMapLeafs
+    let emptyLeaf = V.findIndex (\leaf -> leaf^.clContents == 0) mapLeafs
+
+    case emptyLeaf of
+      Nothing -> Com.comError Constants.errDrop "Map does not have an empty leaf"
+      Just idx -> cmGlobals.cmEmptyLeaf .= idx
+
+  where readMapLeaf :: BL.ByteString -> Int -> Quake (Int, CLeafT)
+        readMapLeaf buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dLeafTSize
+              leaf = newDLeafT (BL.drop offset buf)
+              cleaf = CLeafT { _clContents       = leaf^.dlContents
+                             , _clCluster        = fromIntegral $ leaf^.dlCluster
+                             , _clArea           = fromIntegral $ leaf^.dlArea
+                             , _clFirstLeafBrush = leaf^.dlFirstLeafBrush
+                             , _clNumLeafBrushes = leaf^.dlNumLeafBrushes
+                             }
+
+          numClusters <- use $ cmGlobals.cmNumClusters
+
+          when (fromIntegral (leaf^.dlCluster) >= numClusters) $
+            cmGlobals.cmNumClusters .= fromIntegral (leaf^.dlCluster) + 1
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` BC.pack (show (leaf^.dlContents)) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show (leaf^.dlCluster)) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show (leaf^.dlFirstLeafBrush)) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show (leaf^.dlNumLeafBrushes)) `B.append` -- IMPROVE ?
+                          "|\n"
+
+          return (idx, cleaf)
+
 
 loadPlanes :: LumpT -> Quake ()
 loadPlanes _ = io (putStrLn "CM.loadPlanes") >> undefined -- TODO

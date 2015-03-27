@@ -2,14 +2,14 @@
 module QCommon.CLeafT where
 
 import Control.Lens (makeLenses)
-import Data.Int (Int16)
+import Data.Word (Word16)
 
 data CLeafT =
   CLeafT { _clContents       :: Int
          , _clCluster        :: Int
          , _clArea           :: Int
-         , _clFirstLeafBrush :: Int16
-         , _clNumLeafBrushes :: Int16
+         , _clFirstLeafBrush :: Word16
+         , _clNumLeafBrushes :: Word16
          }
 
 makeLenses ''CLeafT
