@@ -10,6 +10,9 @@ import Data.Word (Word16)
 import Linear (V3(..))
 import qualified Data.ByteString.Lazy as BL
 
+dNodeTSize :: Int
+dNodeTSize = 4 + 8 + 6 + 6 + 2 + 2
+
 data DNodeT =
   DNodeT { _dnPlaneNum  :: Int
          , _dnChildren  :: (Int, Int)

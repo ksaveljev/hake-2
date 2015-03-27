@@ -3,10 +3,8 @@ module QCommon.CNodeT where
 
 import Control.Lens (makeLenses)
 
-import Game.CPlaneT
-
 data CNodeT =
-  CNodeT { _cnPlane    :: Maybe CPlaneT
+  CNodeT { _cnPlane    :: Maybe Int -- index of cmGlobals.cmMapPlanes
          , _cnChildren :: (Int, Int)
          }
 

@@ -25,12 +25,14 @@ import Game.MapSurfaceT
 import QCommon.CBrushT
 import QCommon.CBrushSideT
 import QCommon.CLeafT
+import QCommon.CNodeT
 import QCommon.LumpT
 import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DModelT
+import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.TexInfoT
 import Util.QuakeFile (QuakeFile)
@@ -231,7 +233,44 @@ loadSurfaces lump = do
           return (idx, MapSurfaceT { _msCSurface = csurface, _msRName = Just (tex^.tiTexture) })
 
 loadNodes :: LumpT -> Quake ()
-loadNodes _ = io (putStrLn "CM.loadNodes") >> undefined -- TODO
+loadNodes lump = do
+    Com.dprintf "CMod_LoadNodes()\n"
+
+    when ((lump^.lFileLen) `mod` dNodeTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dNodeTSize
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no nodes"
+
+    when (count > Constants.maxMapNodes) $
+      Com.comError Constants.errDrop "Map has too many nodes"
+
+    cmGlobals.cmNumNodes .= count
+
+    Com.dprintf $ " numnodes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "nodes(planenum, child[0], child[1])\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapNodes <- mapM (readMapNode buf) [0..count-1]
+    cmGlobals.cmMapNodes %= (V.// updatedMapNodes)
+
+  where readMapNode :: BL.ByteString -> Int -> Quake (Int, CNodeT)
+        readMapNode buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dNodeTSize
+              node = newDNodeT (BL.drop offset buf)
+              cnode = CNodeT { _cnPlane    = Just (node^.dnPlaneNum)
+                             , _cnChildren = node^.dnChildren
+                             }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            io (putStrLn "CM.loadNodes#readMapNode") >> undefined -- TODO
+
+          return (idx, cnode)
 
 loadBrushes :: LumpT -> Quake ()
 loadBrushes lump = do
