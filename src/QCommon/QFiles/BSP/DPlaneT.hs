@@ -9,6 +9,9 @@ import Data.Functor ((<$>))
 import Linear (V3(..))
 import qualified Data.ByteString.Lazy as BL
 
+dPlaneTSize :: Int
+dPlaneTSize = 3 * 4 + 4 + 4
+
 data DPlaneT =
   DPlaneT { _dpNormal :: V3 Float
           , _dpDist   :: Float
@@ -17,8 +20,8 @@ data DPlaneT =
 
 makeLenses ''DPlaneT
 
-newDPLaneT :: BL.ByteString -> DPlaneT
-newDPLaneT = runGet getDPlaneT
+newDPlaneT :: BL.ByteString -> DPlaneT
+newDPlaneT = runGet getDPlaneT
   where getDPlaneT :: Get DPlaneT
         getDPlaneT = DPlaneT <$> getV3Float
                              <*> getFloat32le

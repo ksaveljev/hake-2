@@ -5,9 +5,12 @@ module QCommon.CM where
 import Control.Lens (use, (%=), (.=), (^.), ix, preuse)
 import Control.Monad (void, when, unless, liftM)
 import Data.Binary.Get (runGet, getWord16le)
+import Data.Bits ((.|.))
 import Data.Functor ((<$>))
+import Data.Int (Int8)
 import Data.Maybe (isNothing)
 import Data.Word (Word16)
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -19,8 +22,10 @@ import QuakeState
 import Game.CModelT
 import Game.CSurfaceT
 import Game.MapSurfaceT
+import QCommon.CBrushT
 import QCommon.CLeafT
 import QCommon.LumpT
+import QCommon.QFiles.BSP.DBrushT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DPlaneT
@@ -187,7 +192,46 @@ loadNodes :: LumpT -> Quake ()
 loadNodes _ = io (putStrLn "CM.loadNodes") >> undefined -- TODO
 
 loadBrushes :: LumpT -> Quake ()
-loadBrushes _ = io (putStrLn "CM.loadBrushes") >> undefined -- TODO
+loadBrushes lump = do
+    Com.dprintf "CMod_LoadBrushes()\n"
+
+    when ((lump^.lFileLen) `mod` dBrushTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dBrushTSize
+
+    when (count > Constants.maxMapBrushes) $
+      Com.comError Constants.errDrop "Map has too many brushes"
+
+    cmGlobals.cmNumBrushes .= count
+
+    Com.dprintf $ " numbrushes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "brushes:(firstbrushside, numsides, contents)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapBrushes <- mapM (readMapBrush buf) [0..count-1]
+    cmGlobals.cmMapBrushes %= (V.// updatedMapBrushes)
+
+  where readMapBrush :: BL.ByteString -> Int -> Quake (Int, CBrushT)
+        readMapBrush buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dBrushTSize
+              brush = newDBrushT (BL.drop offset buf)
+              cbrush = CBrushT { _cbContents       = brush^.dbContents
+                               , _cbNumSides       = brush^.dbNumSides
+                               , _cbFirstBrushSide = brush^.dbFirstSide
+                               , _cbCheckCount     = 0
+                               }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` BC.pack (show $ brush^.dbFirstSide) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ brush^.dbNumSides) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ brush^.dbContents) `B.append` -- IMPROVE ?
+                          "|\n"
+
+          return (idx, cbrush)
 
 loadLeafs :: LumpT -> Quake ()
 loadLeafs lump = do
@@ -262,7 +306,61 @@ loadLeafs lump = do
 
 
 loadPlanes :: LumpT -> Quake ()
-loadPlanes _ = io (putStrLn "CM.loadPlanes") >> undefined -- TODO
+loadPlanes lump = do
+    Com.dprintf "CMod_LoadPlanes()\n"
+
+    when ((lump^.lFileLen) `mod` dPlaneTSize /= 0) $
+      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+
+    let count = (lump^.lFileLen) `div` dPlaneTSize
+
+    when (count < 1) $
+      Com.comError Constants.errDrop "Map with no planes"
+
+    -- need to save space for box planes
+    when (count > Constants.maxMapPlanes) $
+      Com.comError Constants.errDrop "Map has too many planes"
+
+    Com.dprintf $ " numplanes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
+
+    cmGlobals.cmNumPlanes .= count
+
+    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+      Com.dprintf "cplanes(normal[0],normal[1],normal[2], dist, type, signbits)\n"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    updatedMapPlanes <- mapM (readMapPlane buf) [0..count-1]
+    cmGlobals.cmMapPlanes %= (V.// updatedMapPlanes)
+
+  where readMapPlane :: BL.ByteString -> Int -> Quake (Int, CPlaneT)
+        readMapPlane buf idx = do
+          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dPlaneTSize
+              plane = newDPlaneT (BL.drop offset buf)
+              cplane = CPlaneT { _cpNormal   = plane^.dpNormal
+                               , _cpDist     = plane^.dpDist
+                               , _cpType     = fromIntegral (plane^.dpType)
+                               , _cpSignBits = getBits (plane^.dpNormal)
+                               , _cpPad      = Nothing
+                               }
+
+          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+            Com.dprintf $ "| " `B.append` BC.pack (show $ cplane^.cpNormal._x) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ cplane^.cpNormal._y) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ cplane^.cpNormal._z) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ cplane^.cpDist) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ cplane^.cpType) `B.append` -- IMPROVE ?
+                          "| " `B.append` BC.pack (show $ cplane^.cpSignBits) `B.append` -- IMPROVE ?
+                          "|\n"
+
+          return (idx, cplane)
+
+        getBits :: V3 Float -> Int8
+        getBits (V3 a b c) =
+          let a' = if a < 0 then 1 else 0
+              b' = if b < 0 then 2 else 0
+              c' = if c < 0 then 4 else 0
+          in a' .|. b' .|. c'
 
 loadLeafBrushes :: LumpT -> Quake ()
 loadLeafBrushes lump = do

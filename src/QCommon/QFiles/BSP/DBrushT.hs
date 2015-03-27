@@ -7,6 +7,9 @@ import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
+dBrushTSize :: Int
+dBrushTSize = 4 + 4 + 4
+
 data DBrushT =
   DBrushT { _dbFirstSide :: Int
           , _dbNumSides  :: Int
