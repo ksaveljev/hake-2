@@ -626,7 +626,22 @@ loadVisibility lump = do
     cmGlobals.cmMapVis .= newDVisT visData
 
 loadEntityString :: LumpT -> Quake ()
-loadEntityString _ = io (putStrLn "CM.loadEntityString") >> undefined -- TODO
+loadEntityString lump = do
+    Com.dprintf "CMod_LoadEntityString()\n"
+
+    cmGlobals.cmNumEntityChars .= (lump^.lFileLen)
+
+    when ((lump^.lFileLen) > Constants.maxMapEntString) $
+      Com.comError Constants.errDrop "Map has too large entity lump"
+
+    Just buf <- use $ cmGlobals.cmCModBase
+
+    let entitystring = B.takeWhile (/= 0) $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) (BL.toStrict buf))
+
+    cmGlobals.cmMapEntityString .= entitystring
+
+    Com.dprintf $ "entitystring=" `B.append` BC.pack (show $ B.length entitystring) `B.append`
+                  " bytes, [" `B.append` (B.take 15 entitystring) `B.append` "\n" -- TODO
 
 initBoxHull :: Quake ()
 initBoxHull = io (putStrLn "CM.initBoxHull") >> undefined -- TODO
