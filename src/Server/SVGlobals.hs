@@ -29,4 +29,5 @@ initialSVGlobals =
             , _svPlayer               = newEdictT
             , _svFirstMap             = ""
             , _svMsgBuf               = ""
+            , _svNumAreaNodes         = 0
             }

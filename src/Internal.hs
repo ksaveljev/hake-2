@@ -176,6 +176,7 @@ data SVGlobals =
             , _svPlayer               :: EdictT
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
+            , _svNumAreaNodes         :: Int
             }
 
 data CmdFunctionT =

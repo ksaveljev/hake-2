@@ -2,6 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.ServerT ( ServerT(..)
                       , module Server.ServerT
+                      , module Game.CModelT
+                      , module Game.EntityStateT
+                      , module QCommon.SizeBufT
                       ) where
 
 import Control.Lens (makeLenses)

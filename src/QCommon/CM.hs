@@ -19,7 +19,6 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
-import Game.CModelT
 import Game.CSurfaceT
 import Game.MapSurfaceT
 import QCommon.CAreaT
