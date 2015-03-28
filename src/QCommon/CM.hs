@@ -760,5 +760,30 @@ setAreaPortalState _ _ = io (putStrLn "CM.setAreaPortalState") >> undefined -- T
 areasConnected :: Int -> Int -> Quake Bool
 areasConnected _ _ = io (putStrLn "CM.areasConnected") >> undefined -- TODO
 
+floodAreaR :: Int -> Int -> Quake ()
+floodAreaR areaIdx floodNum = do
+    io (putStrLn "CM.floodAreaR") >> undefined -- TODO
+
 floodAreaConnections :: Quake ()
-floodAreaConnections = io (putStrLn "CM.floodAreaConnections") >> undefined -- TODO
+floodAreaConnections = do
+    Com.dprintf "FloodAreaConnections...\n"
+
+    -- all current floods are not invalid
+    cmGlobals.cmFloodValid %= (+1)
+
+    floodValid <- use $ cmGlobals.cmFloodValid
+    numAreas <- use $ cmGlobals.cmNumAreas
+
+    -- area 0 is not used
+    flood floodValid 1 (numAreas - 1) 0
+
+  where flood :: Int -> Int -> Int -> Int -> Quake ()
+        flood floodValid idx maxIdx floodNum
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just area <- preuse $ cmGlobals.cmMapAreas.ix idx
+              if (area^.caFloodValid) == floodValid
+                then flood floodValid (idx + 1) maxIdx floodNum
+                else do
+                  floodAreaR idx (floodNum + 1)
+                  flood floodValid (idx + 1) maxIdx (floodNum + 1)
