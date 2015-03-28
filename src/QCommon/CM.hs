@@ -762,7 +762,29 @@ areasConnected _ _ = io (putStrLn "CM.areasConnected") >> undefined -- TODO
 
 floodAreaR :: Int -> Int -> Quake ()
 floodAreaR areaIdx floodNum = do
-    io (putStrLn "CM.floodAreaR") >> undefined -- TODO
+    floodValid <- use $ cmGlobals.cmFloodValid
+    Just area <- preuse $ cmGlobals.cmMapAreas.ix areaIdx
+
+    if (area^.caFloodValid) == floodValid
+      then when ((area^.caFloodNum) == floodNum) $
+             Com.comError Constants.errDrop "FloodArea_r: reflooded"
+      else do
+        let updatedArea = area { _caFloodNum = floodNum, _caFloodValid = floodValid }
+        cmGlobals.cmMapAreas %= (V.// [(areaIdx, updatedArea)])
+
+        continueFlood area 0 ((area^.caNumAreaPortals)-1)
+
+  where continueFlood :: CAreaT -> Int -> Int -> Quake ()
+        continueFlood area idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              portalOpen <- use $ cmGlobals.cmPortalOpen
+              Just p <- preuse $ cmGlobals.cmMapAreaPortals.ix ((area^.caFirstAreaPortal) + idx)
+
+              when (portalOpen UV.! (p^.dapPortalNum)) $
+                floodAreaR (p^.dapOtherArea) floodNum
+
+              continueFlood area (idx + 1) maxIdx
 
 floodAreaConnections :: Quake ()
 floodAreaConnections = do
