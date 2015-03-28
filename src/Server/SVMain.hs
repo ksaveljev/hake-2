@@ -169,7 +169,7 @@ frame msec = do
       readPackets
 
       -- move autonomous things around if enough time has passed
-      io (putStrLn "SVMain.frame") >> undefined -- TODO
+      void $ io (putStrLn "SVMain.frame") >> undefined -- TODO
 
       -- update ping based on the last known frame from all clients
       calcPings

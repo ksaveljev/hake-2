@@ -60,4 +60,5 @@ initialCMGlobals =
             , _cmChecksum        = 0
             , _cmLastChecksum    = 0
             , _cmDebugLoadMap    = False
+            , _cmBoxHeadNode     = 0
             }

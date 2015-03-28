@@ -5,7 +5,7 @@ module QCommon.CM where
 import Control.Lens (use, (%=), (.=), (^.), ix, preuse)
 import Control.Monad (void, when, unless, liftM)
 import Data.Binary.Get (runGet, getWord16le)
-import Data.Bits ((.|.))
+import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
 import Data.Int (Int8)
 import Data.Maybe (isNothing)
@@ -425,7 +425,7 @@ loadPlanes lump = do
                                , _cpDist     = plane^.dpDist
                                , _cpType     = fromIntegral (plane^.dpType)
                                , _cpSignBits = getBits (plane^.dpNormal)
-                               , _cpPad      = Nothing
+                               , _cpPad      = (0, 0)
                                }
 
           whenQ (use $ cmGlobals.cmDebugLoadMap) $
@@ -641,10 +641,101 @@ loadEntityString lump = do
     cmGlobals.cmMapEntityString .= entitystring
 
     Com.dprintf $ "entitystring=" `B.append` BC.pack (show $ B.length entitystring) `B.append`
-                  " bytes, [" `B.append` (B.take 15 entitystring) `B.append` "\n" -- TODO
+                  " bytes, [" `B.append` B.take 15 entitystring `B.append` "\n" -- TODO
 
+{- Set up the planes and nodes so that the six floats of a bounding box can
+- just be stored out and get a proper clipping hull structure.
+-}
 initBoxHull :: Quake ()
-initBoxHull = io (putStrLn "CM.initBoxHull") >> undefined -- TODO
+initBoxHull = do
+    numNodes <- use $ cmGlobals.cmNumNodes
+    numBrushes <- use $ cmGlobals.cmNumBrushes
+    numLeafBrushes <- use $ cmGlobals.cmNumLeafBrushes
+    numBrushSides <- use $ cmGlobals.cmNumBrushSides
+    numPlanes <- use $ cmGlobals.cmNumPlanes
+
+    when ( numNodes + 6 > Constants.maxMapNodes
+        || numBrushes + 1 > Constants.maxMapBrushes
+        || numLeafBrushes + 1 > Constants.maxMapLeafBrushes
+        || numBrushSides + 6 > Constants.maxMapBrushSides
+        || numPlanes + 12 > Constants.maxMapPlanes
+        ) $
+      Com.comError Constants.errDrop "Not enough room for box tree"
+
+    cmGlobals.cmBoxHeadNode .= numNodes
+
+    let boxBrush = CBrushT { _cbContents       = Constants.contentsMonster
+                           , _cbNumSides       = 6
+                           , _cbFirstBrushSide = numBrushSides
+                           , _cbCheckCount     = 0
+                           }
+
+    cmGlobals.cmMapBrushes %= (V.// [(numBrushes, boxBrush)])
+
+    let boxLeaf = CLeafT { _clContents       = Constants.contentsMonster
+                         , _clCluster        = 0
+                         , _clArea           = 0
+                         , _clFirstLeafBrush = fromIntegral numLeafBrushes
+                         , _clNumLeafBrushes = 1
+                         }
+
+    numLeafs <- use $ cmGlobals.cmNumLeafs
+    cmGlobals.cmMapLeafs %= (V.// [(numLeafs, boxLeaf)])
+
+    cmGlobals.cmMapLeafBrushes %= (UV.// [(numLeafBrushes, fromIntegral numBrushes)])
+
+    mapM_ (setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs) [0..5]
+
+  where setBrushSidesNodesAndPlanes :: Int -> Int -> Int -> Int -> Quake ()
+        setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx = do
+          let side = idx .&. 1
+
+          -- brush sides
+          let s = CBrushSideT { cbsPlane   = Just (numPlanes + idx * 2 + side)
+                              , cbsSurface = Nothing
+                              }
+
+          cmGlobals.cmMapBrushSides %= (V.// [(numBrushSides + idx, s)])
+
+          -- nodes
+          emptyLeaf <- use $ cmGlobals.cmEmptyLeaf
+          boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
+
+          let c = CNodeT { _cnPlane    = Just (numPlanes + idx * 2)
+                         , _cnChildren = calcChildren idx side numLeafs emptyLeaf boxHeadNode
+                         }
+
+          cmGlobals.cmMapNodes %= (V.// [(boxHeadNode + idx, c)])
+
+          -- planes
+          let p1 = CPlaneT { _cpNormal   = getNormal idx 1
+                           , _cpDist     = 0
+                           , _cpType     = fromIntegral (idx `shiftR` 1)
+                           , _cpSignBits = 0
+                           , _cpPad      = (0, 0)
+                           }
+
+          let p2 = CPlaneT { _cpNormal   = getNormal idx (-1)
+                           , _cpDist     = 0
+                           , _cpType     = fromIntegral (3 + (idx `shiftR` 1))
+                           , _cpSignBits = 0
+                           , _cpPad      = (0, 0)
+                           }
+
+          cmGlobals.cmMapPlanes %= (V.// [(numPlanes + idx * 2, p1), (numPlanes + idx * 2 + 1, p2)])
+
+        calcChildren :: Int -> Int -> Int -> Int -> Int -> (Int, Int)
+        calcChildren idx side numLeafs emptyLeaf boxHeadNode =
+          let a = (-1) - emptyLeaf
+              b = if idx == 5 then (-1) - numLeafs else boxHeadNode + idx + 1
+          in if side == 0 then (a, b) else (b, a)
+
+        getNormal :: Int -> Float -> V3 Float
+        getNormal idx v =
+          let x = idx `shiftR` 1
+          in if | x == 0 -> V3 v 0 0
+                | x == 1 -> V3 0 v 0
+                | otherwise -> V3 0 0 v
 
 inlineModel :: B.ByteString -> Quake CModelT
 inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO

@@ -10,7 +10,7 @@ data CPlaneT =
           , _cpDist     :: Float
           , _cpType     :: Int8
           , _cpSignBits :: Int8
-          , _cpPad      :: Maybe (Int8, Int8)
+          , _cpPad      :: (Int8, Int8)
           }
 
 makeLenses ''CPlaneT
@@ -21,5 +21,5 @@ newCPlaneT =
           , _cpDist     = 0
           , _cpType     = 0
           , _cpSignBits = 0
-          , _cpPad      = Nothing
+          , _cpPad      = (0, 0)
           }

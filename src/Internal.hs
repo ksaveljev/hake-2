@@ -1037,4 +1037,5 @@ data CMGlobals =
             , _cmChecksum        :: Int
             , _cmLastChecksum    :: Int
             , _cmDebugLoadMap    :: Bool
+            , _cmBoxHeadNode     :: Int
             }
