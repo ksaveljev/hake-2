@@ -130,8 +130,8 @@ dropClient clientLens = do
     when ((client^.cState) == Constants.csSpawned) $
       PlayerClient.clientDisconnect (clientLens.cEdict)
 
-    when ((client^.cDownload) /= "") $
-      clientLens.cDownload .= ""
+    when (isJust (client^.cDownload)) $
+      clientLens.cDownload .= Just ""
 
     clientLens.cState .= Constants.csZombie
     clientLens.cName .= ""

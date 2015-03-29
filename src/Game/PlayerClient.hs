@@ -7,6 +7,5 @@ import Quake
 import QuakeState
 
 -- Called when a player drops from the server. Will not be called between levels. 
---clientDisconnect :: QuakeLens EdictT -> Quake ()
-clientDisconnect :: Traversal' QuakeState EdictT -> Quake ()
+clientDisconnect :: Traversal' QuakeState (Maybe Int) -> Quake ()
 clientDisconnect = undefined -- TODO

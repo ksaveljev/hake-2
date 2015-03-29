@@ -36,7 +36,6 @@ import Game.GItemArmorT
 import Game.LinkT
 import Game.MapSurfaceT
 import Game.MMoveT
-import Game.MoveInfoT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
@@ -170,10 +169,10 @@ data NetChannelGlobals =
 
 data SVGlobals =
   SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
-            , _svClient               :: ClientT
+            , _svClient               :: Maybe Int -- index of svGlobals.svServerStatic.ssClients
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
-            , _svPlayer               :: EdictT
+            , _svPlayer               :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: Int
@@ -186,13 +185,13 @@ data CmdFunctionT =
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: Float
-               , _eaPrethink  :: Quake ()
-               , _eaThink     :: Quake ()
-               , _eaBlocked   :: Quake ()
-               , _eaTouch     :: Quake ()
-               , _eaUse       :: Quake ()
-               , _eaPain      :: Quake ()
-               , _eaDie       :: Quake ()
+               , _eaPrethink  :: Maybe EntThink
+               , _eaThink     :: Maybe EntThink
+               , _eaBlocked   :: Maybe EntBlocked
+               , _eaTouch     :: Maybe EntTouch
+               , _eaUse       :: Maybe EntUse
+               , _eaPain      :: Maybe EntPain
+               , _eaDie       :: Maybe EntDie
                }
 
 data EdictOtherT =
@@ -224,17 +223,17 @@ data EdictMinMaxT =
                }
 
 data EdictInfoT =
-  EdictInfoT { _esModel        :: B.ByteString
-             , _esMessage      :: B.ByteString
+  EdictInfoT { _esModel        :: Maybe B.ByteString
+             , _esMessage      :: Maybe B.ByteString
              , _esClassName    :: B.ByteString
-             , _esTarget       :: B.ByteString
-             , _esTargetName   :: B.ByteString
-             , _esKillTarget   :: B.ByteString
-             , _esTeam         :: B.ByteString
-             , _esPathTarget   :: B.ByteString
-             , _esDeathTarget  :: B.ByteString
-             , _esCombatTarget :: B.ByteString
-             , _esMap          :: B.ByteString
+             , _esTarget       :: Maybe B.ByteString
+             , _esTargetName   :: Maybe B.ByteString
+             , _esKillTarget   :: Maybe B.ByteString
+             , _esTeam         :: Maybe B.ByteString
+             , _esPathTarget   :: Maybe B.ByteString
+             , _esDeathTarget  :: Maybe B.ByteString
+             , _esCombatTarget :: Maybe B.ByteString
+             , _esMap          :: Maybe B.ByteString
              }
 
 data EdictPhysicsT =
@@ -283,7 +282,7 @@ data EdictT =
          , _eAreaNum2              :: Int
          , _eSvFlags               :: Int
          , _eSolid                 :: Int
-         , _eSlipMask              :: Int
+         , _eClipMask              :: Int
          , _eMoveType              :: Int
          , _eFlags                 :: Int
          , _eFreeTime              :: Float
@@ -314,10 +313,10 @@ data EdictT =
          , _eMoveAngles            :: V3 Float
          , _eLightLevel            :: Int
          , _eStyle                 :: Int
-         , _eItem                  :: GItemT
+         , _eItem                  :: Maybe GItemT
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
-         , _eClient                :: GClientT
+         , _eClient                :: Maybe GClientT
          , _eOwner                 :: Maybe EdictT
          , _eIndex                 :: Int
          , _eEdictInfo             :: EdictInfoT
@@ -415,13 +414,13 @@ data ClientT =
           , _cMessageSize   :: UV.Vector Int
           , _cRate          :: Int
           , _cSurpressCount :: Int
-          , _cEdict         :: EdictT
+          , _cEdict         :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
           , _cName          :: B.ByteString
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
           , _cDatagramBuf   :: B.ByteString
           , _cFrames        :: V.Vector ClientFrameT
-          , _cDownload      :: B.ByteString
+          , _cDownload      :: Maybe B.ByteString
           , _cDownloadSize  :: Int
           , _cDownloadCount :: Int
           , _cLastMessage   :: Int
@@ -603,20 +602,20 @@ data PMoveGlobals =
                }
 
 data MonsterInfoT =
-  MonsterInfoT { _miCurrentMove     :: MMoveT
+  MonsterInfoT { _miCurrentMove     :: Maybe MMoveT
                , _miAIFlags         :: Int
                , _miNextFrame       :: Int
                , _miScale           :: Float
-               , _miStand           :: Quake ()
-               , _miIdle            :: Quake ()
-               , _miSearch          :: Quake ()
-               , _miWalk            :: Quake ()
-               , _miRun             :: Quake ()
-               , _miDodge           :: Quake ()
-               , _miAttack          :: Quake ()
-               , _miMelee           :: Quake ()
-               , _miSight           :: Quake ()
-               , _miCheckAttack     :: Quake ()
+               , _miStand           :: Maybe EntThink
+               , _miIdle            :: Maybe EntThink
+               , _miSearch          :: Maybe EntThink
+               , _miWalk            :: Maybe EntThink
+               , _miRun             :: Maybe EntThink
+               , _miDodge           :: Maybe EntDodge
+               , _miAttack          :: Maybe EntThink
+               , _miMelee           :: Maybe EntThink
+               , _miSight           :: Maybe EntInteract
+               , _miCheckAttack     :: Maybe EntThink
                , _miPauseTime       :: Float
                , _miAttackFinished  :: Float
                , _miSavedGoal       :: V3 Float
@@ -926,25 +925,106 @@ class SuperAdapter a where
 class EntInteractAdapter a where
     interact :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool
 
+class EntThinkAdapter a where
+    think :: a -> Lens' QuakeState EdictT -> Quake Bool
+
+class EntBlockedAdapter a where
+    blocked :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+
+class EntDodgeAdapter a where
+    dodge :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Quake ()
+
+class EntTouchAdapter a where
+    touch :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> CPlaneT -> CSurfaceT -> Quake ()
+
+class EntUseAdapter a where
+    use :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+
+class EntPainAdapter a where
+    pain :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Int -> Quake ()
+
+class EntDieAdapter a where
+    die :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Int -> V3 Float -> Quake ()
+
 class ItemUseAdapter a where
-    use :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
+    itemUse :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
 
 class ItemDropAdapter a where
     drop :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
 
-class EntThinkAdapter a where
-    think :: a -> Lens' QuakeState EdictT -> Quake Bool
+data EntInteract =
+  GenericEntInteract { _geiId :: B.ByteString
+                     , _geiInteract :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool
+                     }
 
-data EntInteract = GenericEntInteract { _geiId :: B.ByteString, _geiInteract :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool }
+data EntThink =
+  GenericEntThink { _gethId :: B.ByteString
+                  , _gethThink :: Lens' QuakeState EdictT -> Quake Bool
+                  }
 
-data ItemUse = GenericItemUse { _giuId :: B.ByteString, _giuUse :: Lens' QuakeState EdictT -> GItemT -> Quake () }
+data EntBlocked =
+  GenericEntBlocked { _gebId :: B.ByteString
+                    , _gebBlocked :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+                    }
 
-data ItemDrop = GenericItemDrop { _gidId :: B.ByteString, _gidDrop :: Lens' QuakeState EdictT -> GItemT -> Quake () }
+data EntDodge =
+  GenericEntDodge { _gedoId :: B.ByteString
+                  , _gedoDodge :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Quake ()
+                  }
 
-data EntThink = GenericEntThink { _getId :: B.ByteString, _getThink :: Lens' QuakeState EdictT -> Quake Bool }
+data EntTouch =
+  GenericEntTouch { _getId :: B.ByteString
+                  , _getTouch :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> CPlaneT -> CSurfaceT -> Quake ()
+                  }
+
+data EntUse =
+  GenericEntUse { _geuId :: B.ByteString
+                , _geuUse :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+                }
+
+data EntPain =
+  GenericEntPain { _gepId :: B.ByteString
+                 , _gepPain :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Int -> Quake ()
+                 }
+
+data EntDie =
+  GenericEntDie { _gedId :: B.ByteString
+                , _gedDie :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Int -> V3 Float -> Quake ()
+                }
+
+data ItemUse =
+  GenericItemUse { _giuId :: B.ByteString
+                 , _giuUse :: Lens' QuakeState EdictT -> GItemT -> Quake ()
+                 }
+
+data ItemDrop =
+  GenericItemDrop { _gidId :: B.ByteString
+                  , _gidDrop :: Lens' QuakeState EdictT -> GItemT -> Quake ()
+                  }
 
 instance SuperAdapter EntInteract where
     getID (GenericEntInteract _id _) = _id
+
+instance SuperAdapter EntThink where
+    getID (GenericEntThink _id _) = _id
+
+instance SuperAdapter EntBlocked where
+    getID (GenericEntBlocked _id _) = _id
+
+instance SuperAdapter EntDodge where
+    getID (GenericEntDodge _id _) = _id
+
+instance SuperAdapter EntTouch where
+    getID (GenericEntTouch _id _) = _id
+
+instance SuperAdapter EntUse where
+    getID (GenericEntUse _id _) = _id
+
+instance SuperAdapter EntPain where
+    getID (GenericEntPain _id _) = _id
+
+instance SuperAdapter EntDie where
+    getID (GenericEntDie _id _) = _id
 
 instance SuperAdapter ItemUse where
     getID (GenericItemUse _id _) = _id
@@ -952,20 +1032,35 @@ instance SuperAdapter ItemUse where
 instance SuperAdapter ItemDrop where
     getID (GenericItemDrop _id _) = _id
 
-instance SuperAdapter EntThink where
-    getID (GenericEntThink _id _) = _id
-
 instance EntInteractAdapter EntInteract where
     interact (GenericEntInteract _ _interact) = _interact
 
+instance EntThinkAdapter EntThink where
+    think (GenericEntThink _ _think) = _think
+
+instance EntBlockedAdapter EntBlocked where
+    blocked (GenericEntBlocked _ _blocked) = _blocked
+
+instance EntDodgeAdapter EntDodge where
+    dodge (GenericEntDodge _ _dodge) = _dodge
+
+instance EntTouchAdapter EntTouch where
+    touch (GenericEntTouch _ _touch) = _touch
+
+instance EntUseAdapter EntUse where
+    use (GenericEntUse _ _use) = _use
+
+instance EntPainAdapter EntPain where
+    pain (GenericEntPain _ _pain) = _pain
+
+instance EntDieAdapter EntDie where
+    die (GenericEntDie _ _die) = _die
+
 instance ItemUseAdapter ItemUse where
-    use (GenericItemUse _ _use) = _use
+    itemUse (GenericItemUse _ _itemUse) = _itemUse
 
 instance ItemDropAdapter ItemDrop where
     drop (GenericItemDrop _ _drop) = _drop
-
-instance EntThinkAdapter EntThink where
-    think (GenericEntThink _ _think) = _think
 
 data ClientRespawnT =
   ClientRespawnT { _crCoopRespawn :: ClientPersistantT
@@ -975,7 +1070,7 @@ data ClientRespawnT =
                  , _crSpectator   :: Bool
                  }
 
-data ClientPersistantT = 
+data ClientPersistantT =
   ClientPersistantT { _cpUserInfo        :: B.ByteString
                     , _cpNetName         :: B.ByteString
                     , _cpHand            :: Int
@@ -1039,4 +1134,27 @@ data CMGlobals =
             , _cmLastChecksum    :: Int
             , _cmDebugLoadMap    :: Bool
             , _cmBoxHeadNode     :: Int
+            }
+
+data MoveInfoT =
+  MoveInfoT { _miStartOrigin       :: V3 Float
+            , _miStartAngles       :: V3 Float
+            , _miEndOrigin         :: V3 Float
+            , _miEndAngles         :: V3 Float
+            , _miSoundStart        :: Int
+            , _miSoundMiddle       :: Int
+            , _miSoundEnd          :: Int
+            , _miAccel             :: Float
+            , _miSpeed             :: Float
+            , _miDecel             :: Float
+            , _miDistance          :: Float
+            , _miWait              :: Float
+            , _miState             :: Int
+            , _miDir               :: V3 Float
+            , _miCurrentSpeed      :: Float
+            , _miMoveSpeed         :: Float
+            , _miNextSpeed         :: Float
+            , _miRemainingDistance :: Float
+            , _miDecelDistance     :: Float
+            , _miEndFunc           :: Maybe EntThink
             }

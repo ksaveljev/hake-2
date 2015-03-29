@@ -23,10 +23,10 @@ makeLenses ''SVGlobals
 initialSVGlobals :: SVGlobals
 initialSVGlobals =
   SVGlobals { _svMasterAdr            = V.replicate Constants.maxMasters newNetAdrT
-            , _svClient               = newClientT
+            , _svClient               = Nothing
             , _svServer               = newServerT
             , _svServerStatic         = newServerStaticT
-            , _svPlayer               = newEdictT
+            , _svPlayer               = Nothing
             , _svFirstMap             = ""
             , _svMsgBuf               = ""
             , _svNumAreaNodes         = 0

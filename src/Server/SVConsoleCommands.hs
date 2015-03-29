@@ -131,7 +131,7 @@ setPlayer = do
               else do
                 clients <- use $ svGlobals.svServerStatic.ssClients
                 let client = clients V.! idnum
-                svGlobals.svClient .= client
+                svGlobals.svClient .= Just idnum
                 svGlobals.svPlayer .= (client^.cEdict)
 
                 if (client^.cState) == 0
@@ -141,15 +141,15 @@ setPlayer = do
                   else return True
           else do -- check for a name match
             clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
-            let found = find (clientNameMatch v1) clients
+            let found = V.findIndex (clientNameMatch v1) clients
 
             case found of
               Nothing -> do
                 Com.printf $ "Userid " `B.append` v1 `B.append` " is not on the server\n"
                 return False
-              Just client -> do
-                svGlobals.svClient .= client
-                svGlobals.svPlayer .= (client^.cEdict)
+              Just clientId -> do
+                svGlobals.svClient .= Just clientId
+                svGlobals.svPlayer .= ((clients V.! clientId)^.cEdict)
                 return True
 
   where clientNameMatch expectedName client =

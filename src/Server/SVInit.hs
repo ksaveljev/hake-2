@@ -266,8 +266,7 @@ initGame = do
     SVGame.initGameProgs
 
     clients <- use $ svGlobals.svServerStatic.ssClients
-    gEdicts <- use $ gameBaseGlobals.gbGEdicts
-    let updatedClients = V.imap (\idx client -> client { _cEdict = gEdicts V.! (idx + 1), _cLastCmd = newUserCmdT }) clients
+    let updatedClients = V.imap (\idx client -> client { _cEdict = Just (idx + 1), _cLastCmd = newUserCmdT }) clients
     svGlobals.svServerStatic.ssClients .= updatedClients
 
   where initClients :: Quake ()

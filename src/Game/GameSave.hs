@@ -110,4 +110,7 @@ createEdicts :: Quake ()
 createEdicts = do
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
     io $ putStrLn "GameSave.createEdicts does not create actual edicts!!! TODO"
-    gameBaseGlobals.gbGEdicts .= V.generate maxEntities undefined -- TODO
+    gameBaseGlobals.gbGEdicts .= V.generate maxEntities createEdictT
+
+  where createEdictT :: Int -> EdictT
+        createEdictT idx = undefined -- TODO

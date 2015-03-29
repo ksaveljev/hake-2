@@ -14,8 +14,8 @@ useWeapon =
 
 weaponBlaster :: EntThink
 weaponBlaster =
-  GenericEntThink { _getId = "Weapon_Blaster"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Blaster"
+                  , _gethThink = undefined -- TODO
                   }
 
 pickupWeapon :: EntInteract
@@ -32,60 +32,60 @@ dropWeapon =
 
 weaponShotgun :: EntThink
 weaponShotgun =
-  GenericEntThink { _getId = "Weapon_Shotgun"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Shotgun"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponSuperShotgun :: EntThink
 weaponSuperShotgun = 
-  GenericEntThink { _getId = "Weapon_SuperShotgun"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_SuperShotgun"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponMachinegun :: EntThink
 weaponMachinegun = 
-  GenericEntThink { _getId = "Weapon_Machinegun"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Machinegun"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponChaingun :: EntThink
 weaponChaingun = 
-  GenericEntThink { _getId = "Weapon_Chaingun"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Chaingun"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponGrenade :: EntThink
 weaponGrenade = 
-  GenericEntThink { _getId = "Weapon_Grenade"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Grenade"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponGrenadeLauncher :: EntThink
 weaponGrenadeLauncher = 
-  GenericEntThink { _getId = "Weapon_GrenadeLauncher"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_GrenadeLauncher"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponRocketLauncher :: EntThink
 weaponRocketLauncher = 
-  GenericEntThink { _getId = "Weapon_RocketLauncher"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_RocketLauncher"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponHyperBlaster :: EntThink
 weaponHyperBlaster = 
-  GenericEntThink { _getId = "Weapon_HyperBlaster"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_HyperBlaster"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponRailgun :: EntThink
 weaponRailgun = 
-  GenericEntThink { _getId = "Weapon_Railgun"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_Railgun"
+                  , _gethThink = undefined -- TODO
                   }
 
 weaponBFG :: EntThink
 weaponBFG = 
-  GenericEntThink { _getId = "Weapon_BFG"
-                  , _getThink = undefined -- TODO
+  GenericEntThink { _gethId = "Weapon_BFG"
+                  , _gethThink = undefined -- TODO
                   }

@@ -8,3 +8,18 @@ import Control.Lens (makeLenses)
 import Internal
 
 makeLenses ''EdictStatusT
+
+newEdictStatusT :: EdictStatusT
+newEdictStatusT =
+  EdictStatusT { _eHealth         = 0
+               , _eMaxHealth      = 0
+               , _eGibHealth      = 0
+               , _eDeadFlag       = 0
+               , _eShowHostile    = 0
+               , _ePowerArmorTime = 0
+               , _eViewHeight     = 0
+               , _eTakeDamage     = 0
+               , _eDmg            = 0
+               , _eRadiusDmg      = 0
+               , _eDmgRadius      = 0
+               }
