@@ -466,7 +466,7 @@ data ServerT =
           , _sTime          :: Int
           , _sFrameNum      :: Int
           , _sName          :: B.ByteString
-          , _sModels        :: V.Vector CModelT
+          , _sModels        :: UV.Vector Int -- index to cmGlobals.cmMapCModels
           , _sConfigStrings :: V.Vector B.ByteString
           , _sBaselines     :: V.Vector EntityStateT
           , _sMulticast     :: SizeBufT

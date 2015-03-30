@@ -71,6 +71,7 @@ clearWorld = do
 
     svGlobals.svNumAreaNodes .= 0
 
-    Just model <- preuse $ svGlobals.svServer.sModels.ix 1
+    Just modelIdx <- preuse $ svGlobals.svServer.sModels.ix 1
+    Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
     void $ createAreaNode 0 (model^.cmMins) (model^.cmMaxs)

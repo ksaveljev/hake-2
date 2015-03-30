@@ -9,6 +9,7 @@ import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -155,14 +156,15 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     svGlobals.svServer.sTime .= 1000
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
 
-    (model, iw) <- if srvState /= Constants.ssGame
-                     then CM.loadMap "" False [0] -- no real map
-                     else do
-                       let mapName = "maps/" `B.append` server `B.append` ".bsp"
-                       svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
-                       CM.loadMap mapName False [0]
+    (modelIdx, iw) <- if srvState /= Constants.ssGame
+                        then
+                          CM.loadMap "" False [0] -- no real map
+                        else do
+                          let mapName = "maps/" `B.append` server `B.append` ".bsp"
+                          svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
+                          CM.loadMap mapName False [0]
 
-    svGlobals.svServer.sModels %= (V.// [(1, model)])
+    svGlobals.svServer.sModels %= (UV.// [(1, modelIdx)])
 
     let checksum = head iw
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, BC.pack (show checksum))]) -- IMPROVE: convert Int to ByteString using binary package?
@@ -172,8 +174,9 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
 
     modelsCount <- CM.numInlineModels
     svGlobals.svServer.sConfigStrings %= (V.// fmap (\i -> (Constants.csModels + 1 + i, "*" `B.append` BC.pack (show i))) [1..modelsCount-1]) -- IMPROVE: convert Int to ByteString using binary package?
-    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \m -> return (i + 1, m)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
-    svGlobals.svServer.sModels %= (V.// updatedModels)
+    -- copy references
+    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \mIdx -> return (i + 1, mIdx)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
+    svGlobals.svServer.sModels %= (UV.// updatedModels)
 
     -- spawn the rest of the entities on the map
     

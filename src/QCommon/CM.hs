@@ -3,7 +3,7 @@
 module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse)
-import Control.Monad (void, when, unless, liftM)
+import Control.Monad (void, when, unless)
 import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
@@ -44,10 +44,10 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.MD4 as MD4
--- import qualified Util.QuakeFile as QuakeFile
+import qualified Util.Lib as Lib
 
 -- Loads in the map and all submodels.
-loadMap :: B.ByteString -> Bool -> [Int] -> Quake (CModelT, [Int])
+loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Int, [Int]) -- return model index (cmGlobals.cmMapCModels) and checksum
 loadMap name clientLoad checksum = do
     Com.dprintf $ "CM_LoadMap(" `B.append` name `B.append` ")...\n"
 
@@ -65,8 +65,8 @@ loadMap name clientLoad checksum = do
              floodAreaConnections
 
            -- still have the right version
-           cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (cModel, updatedChecksum)
+           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
+           return (0, updatedChecksum)
 
        | B.length name == 0 -> do
            resetSomeGlobals
@@ -77,8 +77,8 @@ loadMap name clientLoad checksum = do
 
            -- cinematic servers won't have anything at all
            let updatedChecksum = 0 : tail checksum
-           cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (cModel, updatedChecksum)
+           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
+           return (0, updatedChecksum)
 
        | otherwise -> do
            resetSomeGlobals
@@ -138,8 +138,8 @@ loadMap name clientLoad checksum = do
 
            cmGlobals.cmMapName .= name
 
-           cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (cModel, updatedChecksum)
+           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
+           return (0, updatedChecksum)
 
   where resetSomeGlobals :: Quake ()
         resetSomeGlobals = do
@@ -736,8 +736,18 @@ initBoxHull = do
                 | x == 1 -> V3 0 v 0
                 | otherwise -> V3 0 0 v
 
-inlineModel :: B.ByteString -> Quake CModelT
-inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO
+inlineModel :: B.ByteString -> Quake Int -- return index of cmGlobals.cmMapCModels
+inlineModel name = do
+    when (name == "" || BC.head name /= '*') $
+      Com.comError Constants.errDrop "CM_InlineModel: bad name"
+
+    let num = Lib.atoi (B.drop 1 name)
+    numCModels <- use $ cmGlobals.cmNumCModels
+
+    when (num < 1 || num >= numCModels) $
+      Com.comError Constants.errDrop "CM_InlineModel: bad number"
+
+    return num
 
 numInlineModels :: Quake Int
 numInlineModels = use $ cmGlobals.cmNumCModels
