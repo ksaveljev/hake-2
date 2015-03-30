@@ -355,7 +355,7 @@ data GClientT =
            , _gcOldButtons         :: Int
            , _gcLatchedButtons     :: Int
            , _gcWeaponThunk        :: Bool
-           , _gcNewWeapon          :: GItemT
+           , _gcNewWeapon          :: Maybe GItemT
            , _gcDamageArmor        :: Int
            , _gcDamagePArmor       :: Int
            , _gcDamageBlood        :: Int
@@ -398,7 +398,7 @@ data GClientT =
            , _gcFloodWhen          :: UV.Vector Float
            , _gcFloodWhenHead      :: Int
            , _gcRespawnTime        :: Float
-           , _gcChaseTarget        :: EdictT
+           , _gcChaseTarget        :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
            , _gcUpdateChase        :: Bool
            , _gcIndex              :: Int
            }
@@ -1086,8 +1086,8 @@ data ClientPersistantT =
                     , _cpMaxGrenades     :: Int
                     , _cpMaxCells        :: Int
                     , _cpMaxSlugs        :: Int
-                    , _cpWeapon          :: GItemT
-                    , _cpLastWeapon      :: GItemT
+                    , _cpWeapon          :: Maybe GItemT
+                    , _cpLastWeapon      :: Maybe GItemT
                     , _cpPowerCubes      :: Int
                     , _cpScore           :: Int
                     , _cpGameHelpChanged :: Int
