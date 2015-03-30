@@ -740,7 +740,7 @@ inlineModel :: B.ByteString -> Quake CModelT
 inlineModel _ = io (putStrLn "CM.inlineModel") >> undefined -- TODO
 
 numInlineModels :: Quake Int
-numInlineModels = io (putStrLn "CM.numInlineModels") >> undefined -- TODO
+numInlineModels = use $ cmGlobals.cmNumCModels
 
 entityString :: Quake B.ByteString
 entityString = io (putStrLn "CM.entityString") >> undefined -- TODO
