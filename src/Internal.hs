@@ -573,16 +573,16 @@ data PMoveT =
          , _pmCmd           :: UserCmdT
          , _pmSnapInitial   :: Bool
          , _pmNumTouch      :: Int
-         , _pmTouchEnts     :: UV.Vector EdictT
+         , _pmTouchEnts     :: UV.Vector Int -- index to gameBaseGlobals.gbGEdicts
          , _pmViewAngles    :: V3 Float
          , _pmViewHeight    :: Float
          , _pmMins          :: V3 Float
          , _pmMaxs          :: V3 Float
-         , _pmGroundEntity  :: EdictT
+         , _pmGroundEntity  :: Maybe Int -- index to gameBaseGlobals.gbGEdicts
          , _pmWaterType     :: Int
          , _pmWaterLevel    :: Int
-         , _pmTrace         :: Quake ()
-         , _pmPointContents :: Quake ()
+         , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
+         , _pmPointContents :: V3 Float -> Int
          }
 
 data GameBaseGlobals =
