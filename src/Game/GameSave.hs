@@ -29,7 +29,7 @@ initGame :: Quake ()
 initGame = do
     gi <- use $ gameBaseGlobals.gbGameImport
 
-    let cvar = gi^.giCvar -- CVar.get
+    let cvar = gi^.giCVar -- CVar.get
 
     void $ cvar "gun_x" "0" 0
     void $ cvar "gun_y" "0" 0

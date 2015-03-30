@@ -484,8 +484,9 @@ saveGameF = do
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
     Just (Just edictIdx) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
-    Just (Just gClient) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
-    let health = (gClient^.gcPlayerState.psStats) UV.! Constants.statHealth
+    Just (Just clientIdx) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
+    let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth
 
     if | state /= Constants.ssGame -> Com.printf "You must be in a game to save.\n"
        | c /= 2 -> Com.printf "USAGE: savegame <directory>\n"

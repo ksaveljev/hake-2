@@ -329,7 +329,7 @@ data EdictT =
          , _eItem                  :: Maybe GItemT
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
-         , _eClient                :: Maybe GClientT
+         , _eClient                :: Maybe Int -- index to gameBaseGlobals.gbGame.glClients
          , _eOwner                 :: Maybe EdictT
          , _eIndex                 :: Int
          , _eEdictInfo             :: EdictInfoT
@@ -499,12 +499,12 @@ data LevelLocalsT =
                , _llExitIntermission     :: Bool
                , _llIntermissionOrigin   :: V3 Float
                , _llIntermissionAngle    :: V3 Float
-               , _llSightClient          :: EdictT
-               , _llSightEntity          :: EdictT
+               , _llSightClient          :: Maybe EdictT
+               , _llSightEntity          :: Maybe EdictT
                , _llSightEntityFrameNum  :: Int
-               , _llSoundEntity          :: EdictT
+               , _llSoundEntity          :: Maybe EdictT
                , _llSoundEntityFrameNum  :: Int
-               , _llSound2Entity         :: EdictT
+               , _llSound2Entity         :: Maybe EdictT
                , _llSound2EntityFrameNum :: Int
                , _llPicHealth            :: Int
                , _llTotalSecrets         :: Int
@@ -513,7 +513,7 @@ data LevelLocalsT =
                , _llFoundGoals           :: Int
                , _llTotalMonsters        :: Int
                , _llKilledMonsters       :: Int
-               , _llCurrentEntity        :: EdictT
+               , _llCurrentEntity        :: Maybe EdictT
                , _llBodyQue              :: Int
                , _llPowerCubes           :: Int
                }
@@ -548,9 +548,9 @@ data GameImportT =
               , _giWriteString        :: B.ByteString -> Quake ()
               , _giWritePosition      :: V3 Float -> Quake ()
               , _giWriteDir           :: V3 Float -> Quake ()
-              , _giCvar               :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
-              , _giCvarSet            :: B.ByteString -> B.ByteString -> Quake CVarT
-              , _giCvarForceset       :: B.ByteString -> B.ByteString -> Quake CVarT
+              , _giCVar               :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
+              , _giCVarSet            :: B.ByteString -> B.ByteString -> Quake CVarT
+              , _giCVarForceSet       :: B.ByteString -> B.ByteString -> Quake CVarT
               , _giArgc               :: Quake Int
               , _giArgv               :: Int -> Quake B.ByteString
               , _giArgs               :: Quake B.ByteString

@@ -9,3 +9,6 @@ import QuakeState
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe Int) -> Quake ()
 clientDisconnect = undefined -- TODO
+
+saveClientData :: Quake ()
+saveClientData = io (putStrLn "PlayerClient.saveClientData") >> undefined -- TODO

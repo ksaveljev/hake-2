@@ -29,9 +29,9 @@ module Game.GameImportT ( GameImportT(..)
                         , giWriteString
                         , giWritePosition
                         , giWriteDir
-                        , giCvar
-                        , giCvarSet
-                        , giCvarForceset
+                        , giCVar
+                        , giCVarSet
+                        , giCVarForceSet
                         , giArgc
                         , giArgv
                         , giArgs
@@ -75,9 +75,9 @@ giWriteShort         :: Functor f => ((Int -> Quake ()) -> f (Int -> Quake ())) 
 giWriteString        :: Functor f => ((B.ByteString -> Quake ()) -> f (B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giWritePosition      :: Functor f => ((V3 Float -> Quake ()) -> f (V3 Float -> Quake ())) -> GameImportT -> f GameImportT
 giWriteDir           :: Functor f => ((V3 Float -> Quake ()) -> f (V3 Float -> Quake ())) -> GameImportT -> f GameImportT
-giCvar               :: Functor f => ((B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)) -> f (B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT))) -> GameImportT -> f GameImportT
-giCvarSet            :: Functor f => ((B.ByteString -> B.ByteString -> Quake CVarT) -> f (B.ByteString -> B.ByteString -> Quake CVarT)) -> GameImportT -> f GameImportT
-giCvarForceset       :: Functor f => ((B.ByteString -> B.ByteString -> Quake CVarT) -> f (B.ByteString -> B.ByteString -> Quake CVarT)) -> GameImportT -> f GameImportT
+giCVar               :: Functor f => ((B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)) -> f (B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT))) -> GameImportT -> f GameImportT
+giCVarSet            :: Functor f => ((B.ByteString -> B.ByteString -> Quake CVarT) -> f (B.ByteString -> B.ByteString -> Quake CVarT)) -> GameImportT -> f GameImportT
+giCVarForceSet       :: Functor f => ((B.ByteString -> B.ByteString -> Quake CVarT) -> f (B.ByteString -> B.ByteString -> Quake CVarT)) -> GameImportT -> f GameImportT
 giArgc               :: Functor f => (Quake Int -> f (Quake Int)) -> GameImportT -> f GameImportT
 giArgv               :: Functor f => ((Int -> Quake B.ByteString) -> f (Int -> Quake B.ByteString)) -> GameImportT -> f GameImportT
 giArgs               :: Functor f => (Quake B.ByteString -> f (Quake B.ByteString)) -> GameImportT -> f GameImportT
