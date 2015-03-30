@@ -46,6 +46,7 @@ spawnEntities mapName entities spawnPoint = do
     gameBaseGlobals.gbLevel.llMapName .= mapName
     gameBaseGlobals.gbGame.glSpawnPoint .= spawnPoint
 
+    -- set client fields on player ents
     maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
     edicts <- use $ gameBaseGlobals.gbGEdicts
     let updatedEdicts = V.imap (\idx edict -> if idx >= 1 && idx <= maxClients then edict { _eClient = Just (idx - 1) } else edict) edicts
