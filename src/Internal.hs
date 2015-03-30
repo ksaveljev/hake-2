@@ -856,11 +856,11 @@ data MLeafT =
 data ClientInfoT =
   ClientInfoT { _ciName        :: B.ByteString
               , _ciCInfo       :: B.ByteString
-              , _ciSkin        :: ImageT
-              , _ciIcon        :: ImageT
+              , _ciSkin        :: Maybe Int -- index to some imageT vector
+              , _ciIcon        :: Maybe Int -- index to some imageT vector
               , _ciIconName    :: B.ByteString
-              , _ciModel       :: ModelT
-              , _ciWeaponModel :: V.Vector ModelT
+              , _ciModel       :: Maybe Int -- index to some modelT vector
+              , _ciWeaponModel :: UV.Vector Int -- index to some modelT vector
               }
 
 data SCRGlobals =
