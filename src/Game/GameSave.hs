@@ -103,14 +103,9 @@ initGame = do
 createClients :: Quake ()
 createClients = do
     maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
-    io $ putStrLn "GameSave.createClients does not create actual clients!!! TODO"
-    gameBaseGlobals.gbGame.glClients .= V.generate maxClients undefined -- TODO
+    gameBaseGlobals.gbGame.glClients .= V.generate maxClients newGClientT
 
 createEdicts :: Quake ()
 createEdicts = do
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
-    io $ putStrLn "GameSave.createEdicts does not create actual edicts!!! TODO"
-    gameBaseGlobals.gbGEdicts .= V.generate maxEntities createEdictT
-
-  where createEdictT :: Int -> EdictT
-        createEdictT idx = undefined -- TODO
+    gameBaseGlobals.gbGEdicts .= V.generate maxEntities newEdictT
