@@ -5,9 +5,8 @@ module Server.SVConsoleCommands where
 
 import Data.Char (isDigit)
 import Data.Maybe (isJust)
-import Data.Foldable (find)
 import Data.Traversable (traverse)
-import Control.Lens (use, (.=), (^.), (%=))
+import Control.Lens (use, preuse, (.=), (^.), (%=))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
 import Control.Exception (handle, IOException)
@@ -251,7 +250,7 @@ writeLevelFile = do
     --     Com.Printf("Failed to open " + name + "\n");
     --     e.printStackTrace();
     -- }
-    -- 
+    --
     qf <- io $ QuakeFile.open sv2name
 
     configStrings <- liftM (V.take Constants.maxConfigStrings) (use $ svGlobals.svServer.sConfigStrings)
@@ -283,7 +282,7 @@ readLevelFile = do
     --     Com.Printf("Failed to open " + name + "\n");
     --     e.printStackTrace();
     -- }
-    -- 
+    --
     qf <- io $ QuakeFile.open sv2name
 
     configStrings <- io $ liftM V.fromList (mapM (const $ QuakeFile.readString qf) [0..Constants.maxConfigStrings-1])
@@ -292,7 +291,7 @@ readLevelFile = do
     CM.readPortalState qf
 
     io $ QuakeFile.close qf
-    
+
     let name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sav"
     GameSave.readLevel name
 
@@ -369,17 +368,20 @@ gameMapF = do
               -- at spawn points instead of occupying body shells
               maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
               clients <- use $ svGlobals.svServerStatic.ssClients
+              edicts <- use $ gameBaseGlobals.gbGEdicts
               savedInUse <- mapM (\i -> do
-                                        let inuse = (clients V.! i)^.cEdict.eInUse
-                                        svGlobals.svServerStatic.ssClients.ix i.cEdict.eInUse .= False
+                                        let Just edictIdx = (clients V.! i)^.cEdict
+                                            inuse = (edicts V.! edictIdx)^.eInUse
+                                        gameBaseGlobals.gbGEdicts.ix i.eInUse .= False
                                         return inuse
                                 ) [0..maxClientsValue-1]
 
               writeLevelFile
 
               -- we must restore these for clients to transfer over correctly
-              mapM_ (\(i, inuse) ->
-                      svGlobals.svServerStatic.ssClients.ix i.cEdict.eInUse .= inuse
+              mapM_ (\(i, inuse) -> do
+                                    let Just edictIdx = (clients V.! i)^.cEdict
+                                    gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inuse
                     ) ([0..] `zip` savedInUse)
 
         -- start up the next map
@@ -446,7 +448,7 @@ loadGameF = do
       then Com.printf "USAGE: loadgame <directory>\n"
       else do
         Com.printf "Loading game...\n"
-        
+
         dir <- Cmd.argv 1
 
         when (".." `B.isInfixOf` dir || "/" `B.isInfixOf` dir || "\\" `B.isInfixOf` dir) $
@@ -482,8 +484,9 @@ saveGameF = do
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
-    playerStats <- use $ svGlobals.svServerStatic.ssClients.ix 0.cEdict.eClient.gcPlayerState.psStats
-    let health = playerStats UV.! Constants.statHealth
+    Just (Just edictIdx) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
+    Just (Just gClient) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    let health = (gClient^.gcPlayerState.psStats) UV.! Constants.statHealth
 
     if | state /= Constants.ssGame -> Com.printf "You must be in a game to save.\n"
        | c /= 2 -> Com.printf "USAGE: savegame <directory>\n"
@@ -532,16 +535,17 @@ kickF = do
            sp <- setPlayer
 
            when sp $ do
-             client <- use $ svGlobals.svClient
+             Just clientIdx <- use $ svGlobals.svClient
+             Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
              let playerName = client^.cName
              SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
              -- print directly, because the dropped client won't get the
              -- SV_BroadcastPrintf message
              SVSend.clientPrintf client Constants.printHigh "You were kicked from the game\n"
-             SVMain.dropClient (svGlobals.svClient)
+             SVMain.dropClient (svGlobals.svServerStatic.ssClients.ix clientIdx)
              -- SV_INIT.svs.realtime
              realtime <- use $ svGlobals.svServerStatic.ssRealTime
-             svGlobals.svClient.cLastMessage .= realtime -- min case there is a funny zombie
+             svGlobals.svServerStatic.ssClients.ix clientIdx.cLastMessage .= realtime -- min case there is a funny zombie
 
 {-
 ================
@@ -614,7 +618,8 @@ dumpUserF = do
         when sp $ do
           Com.printf "userinfo\n"
           Com.printf "--------\n"
-          userInfo <- use $ svGlobals.svClient.cUserInfo
+          Just clientIdx <- use $ svGlobals.svClient
+          userInfo <- use $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
           Info.print userInfo
 
 {-
