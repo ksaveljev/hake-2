@@ -753,7 +753,7 @@ numInlineModels :: Quake Int
 numInlineModels = use $ cmGlobals.cmNumCModels
 
 entityString :: Quake B.ByteString
-entityString = io (putStrLn "CM.entityString") >> undefined -- TODO
+entityString = use $ cmGlobals.cmMapEntityString
 
 -- CM_WritePortalState writes the portal state to a savegame file.
 writePortalState :: QuakeFile -> Quake ()

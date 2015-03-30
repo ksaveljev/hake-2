@@ -11,4 +11,4 @@ import Quake
 - entity definitions out of an ent file.
 -}
 spawnEntities :: B.ByteString -> B.ByteString -> B.ByteString -> Quake ()
-spawnEntities = undefined -- TODO
+spawnEntities _ _ _ = io (putStrLn "GameSpawn.spawnEntities") >> undefined -- TODO
