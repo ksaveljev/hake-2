@@ -8,3 +8,6 @@ import Control.Lens (makeLenses)
 import Internal
 
 makeLenses ''TraceT
+
+newTraceT :: TraceT
+newTraceT = undefined -- TODO
