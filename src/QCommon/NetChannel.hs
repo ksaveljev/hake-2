@@ -10,7 +10,6 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
-import QCommon.NetAdrT
 import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified Sys.Timer as Timer

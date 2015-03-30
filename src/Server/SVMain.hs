@@ -6,7 +6,7 @@ module Server.SVMain where
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
-import Control.Lens (use, preuse, (.=), (%=), (^.), Traversal')
+import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal')
 import Control.Monad (void, when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -15,7 +15,6 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import CVarVariables
-import QCommon.NetAdrT
 import qualified Constants
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.Com as Com
@@ -157,7 +156,7 @@ frame msec = do
     initialized <- use $ svGlobals.svServerStatic.ssInitialized
 
     when initialized $ do
-      svGlobals.svServerStatic.ssRealTime %= (+ msec)
+      svGlobals.svServerStatic.ssRealTime += msec
 
       -- keep the random time dependent
       void Lib.rand

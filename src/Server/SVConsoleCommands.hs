@@ -21,7 +21,6 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import CVarVariables
-import QCommon.NetAdrT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Server.SVInit as SVInit

@@ -61,6 +61,7 @@ maxSounds      =  256 :: Int -- so they cannot be blindly increased
 maxImages      =  256 :: Int
 maxItems       =  256 :: Int
 maxGeneral     = maxClients * 2 -- general config strings
+maxLinks       = maxEdicts + areaNodes * 2
 
 -- game print flags
 printLow    = 0 :: Int -- pickup messages

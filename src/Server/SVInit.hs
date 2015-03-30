@@ -4,7 +4,7 @@ module Server.SVInit where
 
 import Data.Bits ((.|.))
 import Data.Foldable (forM_)
-import Control.Lens ((.=), use, (^.), (%=))
+import Control.Lens ((.=), use, (^.), (%=), (+=))
 import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -115,7 +115,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     forM_ demofile Lib.fClose
 
     -- any partially connected client will be restarted
-    svGlobals.svServerStatic.ssSpawnCount %= (+ 1)
+    svGlobals.svServerStatic.ssSpawnCount += 1
 
     svGlobals.svServer.sState .= Constants.ssDead
     globals.serverState .= Constants.ssDead

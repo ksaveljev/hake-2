@@ -1,6 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SVGlobals ( SVGlobals(..)
+                        , module Game.EdictT
+                        , module Game.LinkT
+                        , module QCommon.NetAdrT
+                        , module Server.AreaNodeT
                         , module Server.SVGlobals
                         , module Server.ClientT
                         , module Server.ServerT
@@ -45,5 +49,5 @@ initialSVGlobals =
             , _svClusters             = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
             , _svTouch                = UV.replicate Constants.maxEdicts (-1) -- index of gameBaseGlobals.gbGEdicts
             , _svTouchList            = UV.replicate Constants.maxEdicts (-1) -- index of gameBaseGlobals.gbGEdicts
-            , _svLinks                = V.generate (2 * Constants.areaNodes + Constants.maxEdicts) newLinkT
+            , _svLinks                = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (i - 2 * Constants.areaNodes) } else newLinkT i)
             }

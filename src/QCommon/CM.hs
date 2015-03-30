@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), ix, preuse)
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse)
 import Control.Monad (void, when, unless, liftM)
 import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
@@ -790,7 +790,7 @@ floodAreaConnections = do
     Com.dprintf "FloodAreaConnections...\n"
 
     -- all current floods are not invalid
-    cmGlobals.cmFloodValid %= (+1)
+    cmGlobals.cmFloodValid += 1
 
     floodValid <- use $ cmGlobals.cmFloodValid
     numAreas <- use $ cmGlobals.cmNumAreas

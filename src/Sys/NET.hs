@@ -14,7 +14,6 @@ import qualified Network.Socket as NS
 
 import Quake
 import QuakeState
-import QCommon.NetAdrT
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
