@@ -1,19 +1,21 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.CEntityT where
 
-import Linear.V3 (V3)
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 
+import Internal
 import Game.EntityStateT
 
-data CEntityT =
-  CEntityT { _ceBaseline    :: EntityStateT
-           , _ceCurrent     :: EntityStateT
-           , _cePrev        :: EntityStateT
-           , _ceServerFrame :: Int
-           , _ceTrailCount  :: Int
-           , _ceLerpOrigin  :: V3 Float
-           , _ceFlyStopTime :: Int
-           }
-
 makeLenses ''CEntityT
+
+newCEntityT :: CEntityT
+newCEntityT =
+  CEntityT { _ceBaseline    = newEntityStateT
+           , _ceCurrent     = newEntityStateT
+           , _cePrev        = newEntityStateT
+           , _ceServerFrame = 0
+           , _ceTrailCount  = 0
+           , _ceLerpOrigin  = V3 0 0 0
+           , _ceFlyStopTime = 0
+           }

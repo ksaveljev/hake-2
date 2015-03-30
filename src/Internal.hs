@@ -1171,3 +1171,13 @@ data MoveInfoT =
             , _miDecelDistance     :: Float
             , _miEndFunc           :: Maybe EntThink
             }
+
+data CEntityT =
+  CEntityT { _ceBaseline    :: EntityStateT
+           , _ceCurrent     :: EntityStateT
+           , _cePrev        :: EntityStateT
+           , _ceServerFrame :: Int
+           , _ceTrailCount  :: Int
+           , _ceLerpOrigin  :: V3 Float
+           , _ceFlyStopTime :: Int
+           }
