@@ -12,3 +12,10 @@ data ChallengeT =
              }
 
 makeLenses ''ChallengeT
+
+newChallengeT :: ChallengeT
+newChallengeT =
+  ChallengeT { _cAdr       = newNetAdrT
+             , _cChallenge = 0
+             , _cTime      = 0
+             }
