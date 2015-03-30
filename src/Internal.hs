@@ -764,7 +764,7 @@ data RefDefT =
           }
 
 data EntityT =
-  EntityT { _eModel      :: ModelT
+  EntityT { _eModel      :: Maybe Int -- index to some modelT vector
           , _eAngles     :: V3 Float
           , _eOrigin     :: V3 Float
           , _eFrame      :: Int
@@ -774,7 +774,7 @@ data EntityT =
           , _eSkinNum    :: Int
           , _eLightStyle :: Int
           , _eAlpha      :: Float
-          , _eSkin       :: ImageT
+          , _eSkin       :: Maybe Int -- index to some imageT vector
           , _enFlags     :: Int -- name clash with EdictT._eFlags
           }
 
