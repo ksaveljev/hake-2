@@ -14,11 +14,13 @@ import qualified Data.Vector as V
 import Internal
 import Game.CVarT
 import Game.CPlaneT
+import Game.EdictT
 import Game.GameLocalsT
 import {-# SOURCE #-} Game.GameImportT
 import Game.LevelLocalsT
 import Game.SpawnTempT
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
+import qualified Constants
 
 makeLenses ''GameBaseGlobals
 
@@ -33,6 +35,6 @@ initialGameBaseGlobals =
                   , _gbSndFry            = 0
                   , _gbMeansOfDeath      = 0
                   , _gbNumEdicts         = 0
-                  , _gbGEdicts           = V.empty -- TODO
+                  , _gbGEdicts           = V.generate Constants.maxEdicts newEdictT
                   , _gbItemList          = GameItemList.itemList
                   }

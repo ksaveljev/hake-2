@@ -25,7 +25,6 @@ import Game.EdictPhysicsT
 import Game.EdictStatusT
 import Game.EntityStateT
 import Game.GClientT
-import Game.LinkT
 import Game.MonsterInfoT
 import Game.MoveInfoT
 import qualified Constants
@@ -37,7 +36,7 @@ newEdictT idx =
   EdictT { _eEntityState           = newEntityStateT { _esNumber = idx }
          , _eInUse                 = False
          , _eLinkCount             = 0
-         , _eArea                  = LinkT Nothing Nothing
+         , _eArea                  = 2 * Constants.areaNodes + idx -- index to svGlobals.svLinks
          , _eNumClusters           = 0
          , _eClusterNums           = UV.replicate Constants.maxEntClusters 0
          , _eHeadNode              = 0

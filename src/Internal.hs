@@ -57,6 +57,7 @@ import Render.MEdgeT
 import Render.MModelT
 import Render.MNodeT
 import Render.MVertexT
+import Server.AreaNodeT
 import Server.ChallengeT
 import Server.ClientFrameT
 import Sound.SfxT
@@ -176,6 +177,18 @@ data SVGlobals =
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: Int
+            , _svAreaNodes            :: V.Vector AreaNodeT
+            , _svAreaMins             :: V3 Float
+            , _svAreaMaxs             :: V3 Float
+            , _svAreaList             :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
+            , _svAreaCount            :: Int
+            , _svAreaMaxCount         :: Int
+            , _svAreaType             :: Int
+            , _svLeafs                :: UV.Vector Int
+            , _svClusters             :: UV.Vector Int
+            , _svTouch                :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
+            , _svTouchList            :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
+            , _svLinks                :: V.Vector LinkT
             }
 
 data CmdFunctionT =
@@ -274,7 +287,7 @@ data EdictT =
   EdictT { _eEntityState           :: EntityStateT
          , _eInUse                 :: Bool
          , _eLinkCount             :: Int
-         , _eArea                  :: LinkT
+         , _eArea                  :: Int -- index to svGlobals.svLinks
          , _eNumClusters           :: Int
          , _eClusterNums           :: UV.Vector Int
          , _eHeadNode              :: Int
