@@ -6,6 +6,7 @@ import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
 import Game.PlayerStateT
+import qualified Constants
 
 data ClientFrameT =
   ClientFrameT { _cfAreaBytes   :: Int
@@ -17,3 +18,13 @@ data ClientFrameT =
                }
 
 makeLenses ''ClientFrameT
+
+newClientFrameT :: ClientFrameT
+newClientFrameT =
+  ClientFrameT { _cfAreaBytes   = 0
+               , _cfAreaBits    = UV.replicate (Constants.maxMapAreas `div` 8) 0
+               , _cfPlayerState = newPlayerStateT
+               , _cfNumEntities = 0
+               , _cfFirstEntity = 0
+               , _cfSentTime    = 0
+               }
