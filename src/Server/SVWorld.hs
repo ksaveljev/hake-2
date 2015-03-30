@@ -8,9 +8,11 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import Game.TraceT
+import Server.AreaNodeT
+import qualified Constants
 
 initNodes :: Quake ()
-initNodes = io (putStrLn "SVWorld.initNodes") >> undefined -- TODO
+initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
 
 {-
 - =============== SV_CreateAreaNode
