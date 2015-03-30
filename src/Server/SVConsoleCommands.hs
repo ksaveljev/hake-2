@@ -369,7 +369,7 @@ gameMapF = do
               clients <- use $ svGlobals.svServerStatic.ssClients
               edicts <- use $ gameBaseGlobals.gbGEdicts
               savedInUse <- mapM (\i -> do
-                                        let Just edictIdx = (clients V.! i)^.cEdict
+                                        let Just (EdictIndex edictIdx) = (clients V.! i)^.cEdict
                                             inuse = (edicts V.! edictIdx)^.eInUse
                                         gameBaseGlobals.gbGEdicts.ix i.eInUse .= False
                                         return inuse
@@ -379,7 +379,7 @@ gameMapF = do
 
               -- we must restore these for clients to transfer over correctly
               mapM_ (\(i, inuse) -> do
-                                    let Just edictIdx = (clients V.! i)^.cEdict
+                                    let Just (EdictIndex edictIdx) = (clients V.! i)^.cEdict
                                     gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inuse
                     ) ([0..] `zip` savedInUse)
 
@@ -483,7 +483,7 @@ saveGameF = do
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
-    Just (Just edictIdx) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
+    Just (Just (EdictIndex edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
     Just (Just clientIdx) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
     let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth

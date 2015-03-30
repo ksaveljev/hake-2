@@ -7,7 +7,6 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
-import Game.TraceT
 import qualified Constants
 
 initNodes :: Quake ()

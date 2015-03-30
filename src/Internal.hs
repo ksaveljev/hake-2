@@ -68,6 +68,12 @@ newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
 
 type XCommandT = Quake ()
 
+newtype EdictIndex = EdictIndex Int
+
+newtype ClientIndex = ClientIndex Int
+
+newtype GClientIndex = GClientIndex Int
+
 data QuakeState =
   QuakeState { _globals           :: Globals
              , _comGlobals        :: ComGlobals
@@ -173,21 +179,21 @@ data SVGlobals =
             , _svClient               :: Maybe Int -- index of svGlobals.svServerStatic.ssClients
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
-            , _svPlayer               :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
+            , _svPlayer               :: Maybe EdictIndex
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: Int
             , _svAreaNodes            :: V.Vector AreaNodeT
             , _svAreaMins             :: V3 Float
             , _svAreaMaxs             :: V3 Float
-            , _svAreaList             :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
+            , _svAreaList             :: V.Vector EdictIndex
             , _svAreaCount            :: Int
             , _svAreaMaxCount         :: Int
             , _svAreaType             :: Int
             , _svLeafs                :: UV.Vector Int
             , _svClusters             :: UV.Vector Int
-            , _svTouch                :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
-            , _svTouchList            :: UV.Vector Int -- index of gameBaseGlobals.gbGEdicts
+            , _svTouch                :: V.Vector EdictIndex
+            , _svTouchList            :: V.Vector EdictIndex
             , _svLinks                :: V.Vector LinkT
             }
 
@@ -208,15 +214,15 @@ data EdictActionT =
                }
 
 data EdictOtherT =
-  EdictOtherT { _eoChain        :: Maybe EdictT
-              , _eoEnemy        :: Maybe EdictT
-              , _eoOldEnemy     :: Maybe EdictT
-              , _eoActivator    :: Maybe EdictT
-              , _eoGroundEntity :: Maybe EdictT
-              , _eoTeamChain    :: Maybe EdictT
-              , _eoTeamMaster   :: Maybe EdictT
-              , _eoMyNoise      :: Maybe EdictT
-              , _eoMyNoise2     :: Maybe EdictT
+  EdictOtherT { _eoChain        :: Maybe EdictIndex
+              , _eoEnemy        :: Maybe EdictIndex
+              , _eoOldEnemy     :: Maybe EdictIndex
+              , _eoActivator    :: Maybe EdictIndex
+              , _eoGroundEntity :: Maybe EdictIndex
+              , _eoTeamChain    :: Maybe EdictIndex
+              , _eoTeamMaster   :: Maybe EdictIndex
+              , _eoMyNoise      :: Maybe EdictIndex
+              , _eoMyNoise2     :: Maybe EdictIndex
               }
 
 data EdictTimingT =
@@ -302,9 +308,9 @@ data EdictT =
          , _eSpawnFlags            :: Int
          , _eTimeStamp             :: Float
          , _eEdictPhysics          :: EdictPhysicsT
-         , _eTargetEnt             :: Maybe EdictT
-         , _eGoalEntity            :: Maybe EdictT
-         , _eMoveTarget            :: Maybe EdictT
+         , _eTargetEnt             :: Maybe EdictIndex
+         , _eGoalEntity            :: Maybe EdictIndex
+         , _eMoveTarget            :: Maybe EdictIndex
          , _eEdictAction           :: EdictActionT
          , _eEdictTiming           :: EdictTimingT
          , _eEdictStatus           :: EdictStatusT
@@ -330,7 +336,7 @@ data EdictT =
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
          , _eClient                :: Maybe Int -- index to gameBaseGlobals.gbGame.glClients
-         , _eOwner                 :: Maybe EdictT
+         , _eOwner                 :: Maybe EdictIndex
          , _eIndex                 :: Int
          , _eEdictInfo             :: EdictInfoT
          }
@@ -411,7 +417,7 @@ data GClientT =
            , _gcFloodWhen          :: UV.Vector Float
            , _gcFloodWhenHead      :: Int
            , _gcRespawnTime        :: Float
-           , _gcChaseTarget        :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
+           , _gcChaseTarget        :: Maybe EdictIndex
            , _gcUpdateChase        :: Bool
            , _gcIndex              :: Int
            }
@@ -427,7 +433,7 @@ data ClientT =
           , _cMessageSize   :: UV.Vector Int
           , _cRate          :: Int
           , _cSurpressCount :: Int
-          , _cEdict         :: Maybe Int -- index of gameBaseGlobals.gbGEdicts
+          , _cEdict         :: Maybe EdictIndex
           , _cName          :: B.ByteString
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
@@ -499,12 +505,12 @@ data LevelLocalsT =
                , _llExitIntermission     :: Bool
                , _llIntermissionOrigin   :: V3 Float
                , _llIntermissionAngle    :: V3 Float
-               , _llSightClient          :: Maybe EdictT
-               , _llSightEntity          :: Maybe EdictT
+               , _llSightClient          :: Maybe EdictIndex
+               , _llSightEntity          :: Maybe EdictIndex
                , _llSightEntityFrameNum  :: Int
-               , _llSoundEntity          :: Maybe EdictT
+               , _llSoundEntity          :: Maybe EdictIndex
                , _llSoundEntityFrameNum  :: Int
-               , _llSound2Entity         :: Maybe EdictT
+               , _llSound2Entity         :: Maybe EdictIndex
                , _llSound2EntityFrameNum :: Int
                , _llPicHealth            :: Int
                , _llTotalSecrets         :: Int
@@ -513,7 +519,7 @@ data LevelLocalsT =
                , _llFoundGoals           :: Int
                , _llTotalMonsters        :: Int
                , _llKilledMonsters       :: Int
-               , _llCurrentEntity        :: Maybe EdictT
+               , _llCurrentEntity        :: Maybe EdictIndex
                , _llBodyQue              :: Int
                , _llPowerCubes           :: Int
                }
@@ -565,7 +571,7 @@ data TraceT =
          , _tPlane      :: CPlaneT
          , _tSurface    :: CSurfaceT
          , _tContents   :: Int
-         , _tEnt        :: EdictT
+         , _tEnt        :: Maybe EdictIndex
          }
 
 data PMoveT =
@@ -573,12 +579,12 @@ data PMoveT =
          , _pmCmd           :: UserCmdT
          , _pmSnapInitial   :: Bool
          , _pmNumTouch      :: Int
-         , _pmTouchEnts     :: UV.Vector Int -- index to gameBaseGlobals.gbGEdicts
+         , _pmTouchEnts     :: V.Vector EdictIndex
          , _pmViewAngles    :: V3 Float
          , _pmViewHeight    :: Float
          , _pmMins          :: V3 Float
          , _pmMaxs          :: V3 Float
-         , _pmGroundEntity  :: Maybe Int -- index to gameBaseGlobals.gbGEdicts
+         , _pmGroundEntity  :: Maybe EdictIndex
          , _pmWaterType     :: Int
          , _pmWaterLevel    :: Int
          , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)

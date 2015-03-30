@@ -41,13 +41,13 @@ initialSVGlobals =
             , _svAreaNodes            = V.generate Constants.areaNodes newAreaNodeT
             , _svAreaMins             = V3 0 0 0
             , _svAreaMaxs             = V3 0 0 0
-            , _svAreaList             = UV.empty -- index of gameBaseGlobals.gbGEdicts
+            , _svAreaList             = V.empty
             , _svAreaCount            = 0
             , _svAreaMaxCount         = 0
             , _svAreaType             = 0
             , _svLeafs                = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
             , _svClusters             = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
-            , _svTouch                = UV.replicate Constants.maxEdicts (-1) -- index of gameBaseGlobals.gbGEdicts
-            , _svTouchList            = UV.replicate Constants.maxEdicts (-1) -- index of gameBaseGlobals.gbGEdicts
+            , _svTouch                = V.replicate Constants.maxEdicts (EdictIndex (-1))
+            , _svTouchList            = V.replicate Constants.maxEdicts (EdictIndex (-1))
             , _svLinks                = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (i - 2 * Constants.areaNodes) } else newLinkT i)
             }

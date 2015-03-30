@@ -13,6 +13,9 @@ module QuakeState ( QuakeState(..)
                   , scrGlobals
                   , netGlobals
                   , cmGlobals
+                  , EdictIndex(..)
+                  , ClientIndex(..)
+                  , GClientIndex(..)
                   , module Globals
                   , module QCommon.CMGlobals
                   , module QCommon.ComGlobals

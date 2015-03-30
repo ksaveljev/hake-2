@@ -7,7 +7,7 @@ module Game.PMoveT ( PMoveT(..)
   
 import Control.Lens (makeLenses)
 import Linear (V3(..))
-import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector as V
 
 import Internal
 import Game.PMoveStateT
@@ -34,7 +34,7 @@ newPMoveT =
          , _pmCmd           = newUserCmdT
          , _pmSnapInitial   = False
          , _pmNumTouch      = 0
-         , _pmTouchEnts     = UV.replicate Constants.maxTouch 0 -- index to gameBaseGlobals.gbGEdicts
+         , _pmTouchEnts     = V.replicate Constants.maxTouch (EdictIndex (-1))
          , _pmViewAngles    = V3 0 0 0
          , _pmViewHeight    = 0
          , _pmMins          = V3 0 0 0
@@ -42,6 +42,6 @@ newPMoveT =
          , _pmGroundEntity  = Nothing
          , _pmWaterType     = 0
          , _pmWaterLevel    = 0
-         , _pmTrace         = (\_ _ _ _ -> return Nothing)
-         , _pmPointContents = (\_ -> 0)
+         , _pmTrace         = \_ _ _ _ -> return Nothing
+         , _pmPointContents = const 0
          }
