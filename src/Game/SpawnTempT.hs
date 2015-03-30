@@ -1,15 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.SpawnTempT where
 
-import Linear.V3 (V3)
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 import qualified Data.ByteString as B
 
 data SpawnTempT =
   SpawnTempT { _stSky       :: B.ByteString
              , _stSkyRotate :: Float
              , _stSkyAxis   :: V3 Float
-             , _stMap       :: B.ByteString
+             , _stNextMap   :: B.ByteString
              , _stLip       :: Int
              , _stDistance  :: Int
              , _stHeight    :: Int
@@ -26,4 +27,20 @@ data SpawnTempT =
 makeLenses ''SpawnTempT
 
 newSpawnTempT :: SpawnTempT
-newSpawnTempT = undefined -- TODO
+newSpawnTempT =
+  SpawnTempT { _stSky       = ""
+             , _stSkyRotate = 0
+             , _stSkyAxis   = V3 0 0 0
+             , _stNextMap   = ""
+             , _stLip       = 0
+             , _stDistance  = 0
+             , _stHeight    = 0
+             , _stNoise     = ""
+             , _stPauseTime = 0
+             , _stItem      = ""
+             , _stGravity   = ""
+             , _stMinYaw    = 0
+             , _stMaxYaw    = 0
+             , _stMinPitch  = 0
+             , _stMaxPitch  = 0
+             }
