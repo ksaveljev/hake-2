@@ -1,14 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.LinkT where
+module Game.LinkT ( LinkT(..)
+                  , module Game.LinkT
+                  ) where
 
 import Control.Lens (makeLenses)
 
-data LinkT =
-  LinkT { _lIndex :: Int
-        , _lPrev  :: Maybe Int
-        , _lNext  :: Maybe Int
-        , _lEdict :: Maybe Int
-        }
+import Internal
 
 makeLenses ''LinkT
 

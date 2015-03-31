@@ -5,7 +5,7 @@ module Game.GameSpawn where
 
 import Control.Lens (use, (^.), (.=), (%=), preuse, ix)
 import Control.Monad (liftM, when, void, unless)
-import Data.Bits ((.&.), complement)
+import Data.Bits ((.&.), complement, (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3(..))
@@ -59,21 +59,22 @@ spawnEntities mapName entities spawnPoint = do
     let updatedEdicts = V.imap (\idx edict -> if idx >= 1 && idx <= maxClients then edict { _eClient = Just (GClientReference (idx - 1)) } else edict) edicts
     gameBaseGlobals.gbGEdicts .= updatedEdicts
 
-    parseEntities True 0
+    inhibited <- parseEntities True 0 0
+
+    Com.dprintf $ "player skill level:" `B.append` BC.pack (show skillValue) `B.append` "\n" -- IMPROVE
+    Com.dprintf $ BC.pack (show inhibited) `B.append` " entities inhibited.\n"
 
     io (putStrLn "GameSpawn.spawnEntities") >> undefined -- TODO
 
-  where parseEntities :: Bool -> Int -> Quake ()
-        parseEntities initial idx
-          | idx == B.length entities = return ()
+  where parseEntities :: Bool -> Int -> Int -> Quake Int
+        parseEntities initial idx inhibited
+          | idx == B.length entities = return inhibited
           | otherwise = do
               (comToken, newIdx) <- Com.parse entities (B.length entities) idx
 
               case comToken of
-                Nothing -> return ()
+                Nothing -> return inhibited
                 Just token -> do
-
-                  io $ print ("current token = " `B.append` token)
 
                   when (BC.head token /= '{') $ do
                     err <- use $ gameBaseGlobals.gbGameImport.giError
@@ -97,13 +98,47 @@ spawnEntities mapName entities spawnPoint = do
                         BC.map toLower (fromJust (edict^.eEdictInfo.eiModel)) == "*27") $
                     gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.&. (complement Constants.spawnFlagNotHard))
 
-                  when (edictIdx /= 0) $ do
-                    io (putStrLn "GameSpawn.spawnEntities#parseEntities") >> undefined -- TODO
+                  -- remove things (except the world) from different skill levels or deathmatch
+                  removed <- if edictIdx == 0
+                               then return False
+                               else do
+                                 deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
-                  callSpawn ent
-                  Com.dprintf "\n"
+                                 freed <- if deathmatchValue /= 0
+                                            then
+                                              if ((edict^.eSpawnFlags) .&. Constants.spawnFlagNotDeathmatch) /= 0
+                                                then do
+                                                  Com.dprintf "->inhibited.\n"
+                                                  GameUtil.freeEdict ent
+                                                  return True
+                                                else return False
+                                            else do
+                                              skillValue <- liftM (^.cvValue) skillCVar
+                                              if (skillValue == 0 && (edict^.eSpawnFlags .&. Constants.spawnFlagNotEasy) /= 0) ||
+                                                 (skillValue == 1 && (edict^.eSpawnFlags .&. Constants.spawnFlagNotMedium) /= 0) ||
+                                                 ((skillValue == 2 || skillValue == 3) && (edict^.eSpawnFlags .&. Constants.spawnFlagNotHard) /= 0)
+                                                 then do
+                                                   Com.dprintf "->inhibited.\n"
+                                                   GameUtil.freeEdict ent
+                                                   return True
+                                                 else return False
 
-                  io (putStrLn "GameSpawn.spawnEntities#parseEntities") >> undefined -- TODO
+                                 if freed
+                                   then do
+                                     let flags = Constants.spawnFlagNotEasy .|. Constants.spawnFlagNotMedium .|. Constants.spawnFlagNotHard .|. Constants.spawnFlagNotCoop .|. Constants.spawnFlagNotDeathmatch
+                                     gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.&. (complement flags))
+                                     return True
+                                   else do
+                                     return False
+
+
+                  if removed
+                    then parseEntities False updatedIdx (inhibited + 1)
+                    else do
+                      callSpawn ent
+                      Com.dprintf "\n"
+
+                      parseEntities False updatedIdx inhibited
 
 {-
 - ED_ParseEdict
@@ -263,4 +298,4 @@ callSpawn er@(EdictReference idx) = do
     --     return;
     -- }
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    undefined -- TODO
+    io (putStrLn "GameSpawn.callSpawn") >> undefined -- TODO

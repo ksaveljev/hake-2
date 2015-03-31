@@ -1,7 +1,8 @@
 module Server.SVWorld where
 
 import Control.Lens ((.=), (^.), (+=), use, preuse, ix, set)
-import Control.Monad (void)
+import Control.Monad (void, unless)
+import Data.Maybe (isNothing)
 import Linear.V3 (V3, _x, _y)
 import qualified Data.Vector as V
 
@@ -14,7 +15,7 @@ initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
 
 {-
 - =============== SV_CreateAreaNode
-- 
+-
 - Builds a uniformly subdivided tree for the given world size
 - ===============
 -}
@@ -47,13 +48,28 @@ createAreaNode depth mins maxs = do
     return numAreaNodes
 
 -- ClearLink is used for new headnodes
-clearLink :: Int -> Quake () -- int is index of areanode from svGlobals.svLinks
-clearLink idx = do
+clearLink :: LinkReference -> Quake ()
+clearLink lr@(LinkReference idx) = do
     Just link <- preuse $ svGlobals.svLinks.ix idx
-    svGlobals.svLinks.ix idx .= link { _lNext = Just idx, _lPrev = Just idx }
+    svGlobals.svLinks.ix idx .= link { _lNext = Just lr, _lPrev = Just lr }
 
-unlinkEdict :: EdictT -> Quake ()
-unlinkEdict _ = io (putStrLn "SVWorld.unlinkEdict") >> undefined -- TODO
+removeLink :: LinkReference -> Quake ()
+removeLink (LinkReference idx) = do
+    Just link <- preuse $ svGlobals.svLinks.ix idx
+    let Just (LinkReference nextLinkIdx) = link^.lNext
+        Just (LinkReference prevLinkIdx) = link^.lPrev
+    svGlobals.svLinks.ix nextLinkIdx.lPrev .= link^.lPrev
+    svGlobals.svLinks.ix prevLinkIdx.lNext .= link^.lNext
+
+unlinkEdict :: EdictReference -> Quake ()
+unlinkEdict (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let lr@(LinkReference linkIdx) = edict^.eArea
+
+    Just link <- preuse $ svGlobals.svLinks.ix linkIdx
+    unless (isNothing (link^.lPrev)) $ do
+      removeLink lr
+      svGlobals.svLinks.ix linkIdx .= link { _lNext = Nothing, _lPrev = Nothing }
 
 linkEdict :: EdictT -> Quake ()
 linkEdict _ = io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO

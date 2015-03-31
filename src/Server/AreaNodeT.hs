@@ -1,17 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Server.AreaNodeT where
+module Server.AreaNodeT ( AreaNodeT(..)
+                        , module Server.AreaNodeT
+                        ) where
 
 import Control.Lens (makeLenses)
 
+import Internal
 import qualified Constants
-
-data AreaNodeT =
-  AreaNodeT { _anAxis          :: Int
-            , _anDist          :: Float
-            , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes
-            , _anTriggerEdicts :: Int -- index to svGlobals.svLinks
-            , _anSolidEdicts   :: Int -- index to svGlobals.svLinks
-            }
 
 makeLenses ''AreaNodeT
 
@@ -20,6 +15,6 @@ newAreaNodeT idx =
   AreaNodeT { _anAxis          = 0
             , _anDist          = 0
             , _anChildren      = (Nothing, Nothing)
-            , _anTriggerEdicts = idx
-            , _anSolidEdicts   = Constants.areaNodes + idx
+            , _anTriggerEdicts = LinkReference idx
+            , _anSolidEdicts   = LinkReference (Constants.areaNodes + idx)
             }

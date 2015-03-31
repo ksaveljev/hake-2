@@ -32,7 +32,6 @@ import Game.CPlaneT
 import Game.CSurfaceT
 import Game.CVarT
 import Game.GItemArmorT
-import Game.LinkT
 import Game.MapSurfaceT
 import Game.MMoveT
 import Game.PMoveStateT
@@ -56,7 +55,6 @@ import Render.MEdgeT
 import Render.MModelT
 import Render.MNodeT
 import Render.MVertexT
-import Server.AreaNodeT
 import Server.ChallengeT
 import Server.ClientFrameT
 import Sound.SfxT
@@ -78,6 +76,9 @@ newtype GClientReference = GClientReference Int
 
 -- reference to cmGlobals.cmMapCModels
 newtype CModelReference = CModelReference Int
+
+-- reference to svGlobals.svLinks
+newtype LinkReference = LinkReference Int
 
 data QuakeState =
   QuakeState { _globals           :: Globals
@@ -298,7 +299,7 @@ data EdictT =
          , _eInUse                 :: Bool
          , _eClassName             :: B.ByteString
          , _eLinkCount             :: Int
-         , _eArea                  :: Int -- index to svGlobals.svLinks
+         , _eArea                  :: LinkReference
          , _eNumClusters           :: Int
          , _eClusterNums           :: UV.Vector Int
          , _eHeadNode              :: Int
@@ -550,7 +551,7 @@ data GameImportT =
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()
               , _giAreasConnected     :: Int -> Int -> Quake Bool
               , _giLinkEntity         :: EdictT -> Quake ()
-              , _giUnlinkEntity       :: EdictT -> Quake ()
+              , _giUnlinkEntity       :: EdictReference -> Quake ()
               , _giBoxEdicts          :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
               , _giPMove              :: PMoveT -> Quake ()
               , _giMulticast          :: V3 Float -> Int -> Quake ()
@@ -1193,3 +1194,18 @@ data CEntityT =
            , _ceLerpOrigin  :: V3 Float
            , _ceFlyStopTime :: Int
            }
+
+data AreaNodeT =
+  AreaNodeT { _anAxis          :: Int
+            , _anDist          :: Float
+            , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes
+            , _anTriggerEdicts :: LinkReference
+            , _anSolidEdicts   :: LinkReference
+            }
+
+data LinkT =
+  LinkT { _lIndex :: Int
+        , _lPrev  :: Maybe LinkReference
+        , _lNext  :: Maybe LinkReference
+        , _lEdict :: Maybe LinkReference
+        }

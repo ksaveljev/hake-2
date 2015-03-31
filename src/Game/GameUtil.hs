@@ -8,6 +8,7 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import CVarVariables
+import qualified Constants
 
 {-
 - Either finds a free edict, or allocates a new one. Try to avoid reusing
@@ -70,3 +71,15 @@ initEdict er@(EdictReference idx) = do
 -}
 clearEdict :: EdictReference -> Quake ()
 clearEdict (EdictReference idx) = gameBaseGlobals.gbGEdicts.ix idx .= newEdictT idx
+
+-- Marks the edict as free
+freeEdict :: EdictReference -> Quake ()
+freeEdict er@(EdictReference idx) = do
+    unlinkEntity <- use $ gameBaseGlobals.gbGameImport.giUnlinkEntity
+    unlinkEntity er
+
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    when (idx > maxClientsValue + Constants.bodyQueueSize) $ do
+      time <- use $ gameBaseGlobals.gbLevel.llTime
+      gameBaseGlobals.gbGEdicts.ix idx .= (newEdictT idx) { _eClassName = "freed", _eFreeTime = time, _eInUse = False }
