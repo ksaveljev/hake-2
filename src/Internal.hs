@@ -1210,3 +1210,8 @@ data LinkT =
         , _lNext  :: Maybe LinkReference
         , _lEdict :: Maybe LinkReference
         }
+
+data SpawnT =
+  SpawnT { _spName  :: B.ByteString
+         , _spSpawn :: EntThink
+         }

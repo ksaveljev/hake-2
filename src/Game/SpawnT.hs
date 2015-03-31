@@ -1,12 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.SpawnT where
+module Game.SpawnT ( SpawnT(..)
+                   , module Game.SpawnT
+                   ) where
 
 import Control.Lens (makeLenses)
-import qualified Data.ByteString as B
 
-data SpawnT =
-  SpawnT { _sName  :: B.ByteString
-         , _sSpawn :: IO () -- TODO: ???
-         }
+import Internal
 
 makeLenses ''SpawnT
