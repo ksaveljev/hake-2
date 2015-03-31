@@ -345,6 +345,7 @@ data EdictT =
          , _eOwner                 :: Maybe EdictReference
          , _eIndex                 :: Int
          , _eEdictInfo             :: EdictInfoT
+         , _eEdictMinMax           :: EdictMinMaxT
          }
 
 data EntityStateT =

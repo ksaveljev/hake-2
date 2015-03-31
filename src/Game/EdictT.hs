@@ -87,4 +87,5 @@ newEdictT idx =
          , _eOwner                 = Nothing
          , _eIndex                 = idx
          , _eEdictInfo             = newEdictInfoT
+         , _eEdictMinMax           = newEdictMinMaxT
          }
