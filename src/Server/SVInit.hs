@@ -83,14 +83,18 @@ imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 -}
 createBaseline :: Quake ()
 createBaseline = do
+    {-
     gEdicts <- use $ gameBaseGlobals.gbGEdicts
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
     updatedEdicts <- updateEdicts gEdicts 1 numEdicts []
+    -}
     io (putStrLn "SVInit.createBaseline") >> undefined -- TODO
 
+{-
   where updateEdicts :: V.Vector EdictT -> Int -> Int -> [(Int, EdictT)] -> Quake [(Int, EdictT)]
         updateEdicts _ _ _ _ = io (putStrLn "SVInit.createBaseline#updateEdicts") >> undefined -- TODO
+        -}
 
 checkForSavegame :: Quake ()
 checkForSavegame = io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
@@ -251,7 +255,7 @@ initGame = do
 
     let numClientEntities = maxClientsValue * Constants.updateBackup * 64
     svGlobals.svServerStatic.ssNumClientEntities .= numClientEntities
-    svGlobals.svServerStatic.ssClientEntities .= V.replicate numClientEntities newEntityStateT
+    svGlobals.svServerStatic.ssClientEntities .= V.replicate numClientEntities (newEntityStateT Nothing)
 
     -- init network stuff
     NET.config (maxClientsValue > 1)

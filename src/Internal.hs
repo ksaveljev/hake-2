@@ -247,17 +247,16 @@ data EdictMinMaxT =
                }
 
 data EdictInfoT =
-  EdictInfoT { _esModel        :: Maybe B.ByteString
-             , _esMessage      :: Maybe B.ByteString
-             , _esClassName    :: B.ByteString
-             , _esTarget       :: Maybe B.ByteString
-             , _esTargetName   :: Maybe B.ByteString
-             , _esKillTarget   :: Maybe B.ByteString
-             , _esTeam         :: Maybe B.ByteString
-             , _esPathTarget   :: Maybe B.ByteString
-             , _esDeathTarget  :: Maybe B.ByteString
-             , _esCombatTarget :: Maybe B.ByteString
-             , _esMap          :: Maybe B.ByteString
+  EdictInfoT { _eiModel        :: Maybe B.ByteString
+             , _eiMessage      :: Maybe B.ByteString
+             , _eiTarget       :: Maybe B.ByteString
+             , _eiTargetName   :: Maybe B.ByteString
+             , _eiKillTarget   :: Maybe B.ByteString
+             , _eiTeam         :: Maybe B.ByteString
+             , _eiPathTarget   :: Maybe B.ByteString
+             , _eiDeathTarget  :: Maybe B.ByteString
+             , _eiCombatTarget :: Maybe B.ByteString
+             , _eiMap          :: Maybe B.ByteString
              }
 
 data EdictPhysicsT =
@@ -297,6 +296,7 @@ data EdictStatusT =
 data EdictT =
   EdictT { _eEntityState           :: EntityStateT
          , _eInUse                 :: Bool
+         , _eClassName             :: B.ByteString
          , _eLinkCount             :: Int
          , _eArea                  :: Int -- index to svGlobals.svLinks
          , _eNumClusters           :: Int
@@ -362,6 +362,7 @@ data EntityStateT =
                , _esSolid          :: Int
                , _esSound          :: Int
                , _esEvent          :: Int
+               , _esSurroundingEnt :: Maybe EdictReference
                }
 
 data GClientT =

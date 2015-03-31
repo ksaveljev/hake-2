@@ -12,15 +12,14 @@ makeLenses ''EdictInfoT
 
 newEdictInfoT :: EdictInfoT
 newEdictInfoT =
-  EdictInfoT { _esModel        = Nothing
-             , _esMessage      = Nothing
-             , _esClassName    = ""
-             , _esTarget       = Nothing
-             , _esTargetName   = Nothing
-             , _esKillTarget   = Nothing
-             , _esTeam         = Nothing
-             , _esPathTarget   = Nothing
-             , _esDeathTarget  = Nothing
-             , _esCombatTarget = Nothing
-             , _esMap          = Nothing
+  EdictInfoT { _eiModel        = Nothing
+             , _eiMessage      = Nothing
+             , _eiTarget       = Nothing
+             , _eiTargetName   = Nothing
+             , _eiKillTarget   = Nothing
+             , _eiTeam         = Nothing
+             , _eiPathTarget   = Nothing
+             , _eiDeathTarget  = Nothing
+             , _eiCombatTarget = Nothing
+             , _eiMap          = Nothing
              }

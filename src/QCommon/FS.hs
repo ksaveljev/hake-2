@@ -289,9 +289,9 @@ linkF = do
 
 dirF :: XCommandT
 dirF = do
-    c <- Cmd.argc
+    --c <- Cmd.argc
 
-    wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
+    --wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
 
     io (putStrLn "FS.dirF") >> undefined -- TODO
 

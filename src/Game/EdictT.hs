@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.EdictT ( EdictT(..)
                    , module Game.EdictT
                    , module Game.EdictActionT
@@ -9,6 +10,9 @@ module Game.EdictT ( EdictT(..)
                    , module Game.EdictPhysicsT
                    , module Game.EdictStatusT
                    , module Game.GClientT
+                   , module Game.EntityStateT
+                   , module Game.MonsterInfoT
+                   , module Game.MoveInfoT
                    ) where
 
 import Control.Lens (makeLenses)
@@ -33,8 +37,9 @@ makeLenses ''EdictT
 
 newEdictT :: Int -> EdictT
 newEdictT idx =
-  EdictT { _eEntityState           = newEntityStateT { _esNumber = idx }
+  EdictT { _eEntityState           = newEntityStateT (Just (EdictReference idx))
          , _eInUse                 = False
+         , _eClassName             = ""
          , _eLinkCount             = 0
          , _eArea                  = 2 * Constants.areaNodes + idx -- index to svGlobals.svLinks
          , _eNumClusters           = 0

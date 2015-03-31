@@ -777,11 +777,11 @@ modFriendlyFire  = 0x8000000 :: Int
 
 -- edict->spawnflags
 -- these are set with checkboxes on each entity in the map editor
-spawnflagNotEasy       = 0x00000100 :: Int
-spawnflagNotMedium     = 0x00000200 :: Int
-spawnflagNotHard       = 0x00000400 :: Int
-spawnflagNotDeathmatch = 0x00000800 :: Int
-spawnflagNotCoop       = 0x00001000 :: Int
+spawnFlagNotEasy       = 0x00000100 :: Int
+spawnFlagNotMedium     = 0x00000200 :: Int
+spawnFlagNotHard       = 0x00000400 :: Int
+spawnFlagNotDeathmatch = 0x00000800 :: Int
+spawnFlagNotCoop       = 0x00001000 :: Int
 
 -- edict->flags
 flFly           = 0x00000001 :: Int
