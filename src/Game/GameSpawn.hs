@@ -19,12 +19,13 @@ import CVarVariables
 import qualified Constants
 import qualified Game.GameUtil as GameUtil
 import qualified Game.PlayerClient as PlayerClient
+import qualified Game.PlayerTrail as PlayerTrail
 import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 
 {-
 - SpawnEntities
-- 
+-
 - Creates a server's entity / program execution context by parsing textual
 - entity definitions out of an ent file.
 -}
@@ -64,7 +65,8 @@ spawnEntities mapName entities spawnPoint = do
     Com.dprintf $ "player skill level:" `B.append` BC.pack (show skillValue) `B.append` "\n" -- IMPROVE
     Com.dprintf $ BC.pack (show inhibited) `B.append` " entities inhibited.\n"
 
-    io (putStrLn "GameSpawn.spawnEntities") >> undefined -- TODO
+    findTeams
+    PlayerTrail.init
 
   where parseEntities :: Bool -> Int -> Int -> Quake Int
         parseEntities initial idx inhibited
@@ -142,7 +144,7 @@ spawnEntities mapName entities spawnPoint = do
 
 {-
 - ED_ParseEdict
-- 
+-
 - Parses an edict out of the given string, returning the new position ed
 - should be a properly initialized empty edict.
 -}
@@ -287,7 +289,7 @@ newString str = let len = B.length str
 
 {-
 - ED_CallSpawn
-- 
+-
 - Finds the spawn function for the entity and calls it.
 -}
 callSpawn :: EdictReference -> Quake ()
@@ -299,3 +301,6 @@ callSpawn er@(EdictReference idx) = do
     -- }
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
     io (putStrLn "GameSpawn.callSpawn") >> undefined -- TODO
+
+findTeams :: Quake ()
+findTeams = io (putStrLn "GameSpawn.findTeams") >> undefined -- TODO
