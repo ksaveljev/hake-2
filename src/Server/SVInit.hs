@@ -9,7 +9,6 @@ import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -164,7 +163,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
                           svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
                           CM.loadMap mapName False [0]
 
-    svGlobals.svServer.sModels %= (UV.// [(1, modelIdx)])
+    svGlobals.svServer.sModels %= (V.// [(1, CModelReference modelIdx)])
 
     let checksum = head iw
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, BC.pack (show checksum))]) -- IMPROVE: convert Int to ByteString using binary package?
@@ -175,8 +174,8 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     modelsCount <- CM.numInlineModels
     svGlobals.svServer.sConfigStrings %= (V.// fmap (\i -> (Constants.csModels + 1 + i, "*" `B.append` BC.pack (show i))) [1..modelsCount-1]) -- IMPROVE: convert Int to ByteString using binary package?
     -- copy references
-    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \mIdx -> return (i + 1, mIdx)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
-    svGlobals.svServer.sModels %= (UV.// updatedModels)
+    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \mIdx -> return (i + 1, CModelReference mIdx)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
+    svGlobals.svServer.sModels %= (V.// updatedModels)
 
     -- spawn the rest of the entities on the map
     
@@ -269,7 +268,7 @@ initGame = do
     SVGame.initGameProgs
 
     clients <- use $ svGlobals.svServerStatic.ssClients
-    let updatedClients = V.imap (\idx client -> client { _cEdict = Just (EdictIndex (idx + 1)), _cLastCmd = newUserCmdT }) clients
+    let updatedClients = V.imap (\idx client -> client { _cEdict = Just (EdictReference (idx + 1)), _cLastCmd = newUserCmdT }) clients
     svGlobals.svServerStatic.ssClients .= updatedClients
 
   where initClients :: Quake ()

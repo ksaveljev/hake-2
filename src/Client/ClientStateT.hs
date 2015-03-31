@@ -13,7 +13,6 @@ import Internal
 import Client.ClientInfoT
 import Client.FrameT
 import Client.RefDefT
-import Game.CModelT
 import Game.UserCmdT
 import Render.ImageT
 import Render.ModelT
@@ -63,7 +62,7 @@ newClientStateT =
                , _csPlayerNum              = 0
                , _csConfigStrings          = V.replicate Constants.maxConfigStrings ""
                , _csModelDraw              = V.replicate Constants.maxModels newModelT
-               , _csModelClip              = V.replicate Constants.maxModels newCModelT
+               , _csModelClip              = V.replicate Constants.maxModels (CModelReference (-1))
                , _csSoundPrecache          = V.replicate Constants.maxSounds newSfxT
                , _csImagePrecache          = V.replicate Constants.maxImages newImageT
                , _csClientInfo             = V.replicate Constants.maxClients newClientInfoT

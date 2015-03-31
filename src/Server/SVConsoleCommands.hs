@@ -129,7 +129,7 @@ setPlayer = do
               else do
                 clients <- use $ svGlobals.svServerStatic.ssClients
                 let client = clients V.! idnum
-                svGlobals.svClient .= Just idnum
+                svGlobals.svClient .= Just (ClientReference idnum)
                 svGlobals.svPlayer .= (client^.cEdict)
 
                 if (client^.cState) == 0
@@ -146,7 +146,7 @@ setPlayer = do
                 Com.printf $ "Userid " `B.append` v1 `B.append` " is not on the server\n"
                 return False
               Just clientId -> do
-                svGlobals.svClient .= Just clientId
+                svGlobals.svClient .= Just (ClientReference clientId)
                 svGlobals.svPlayer .= ((clients V.! clientId)^.cEdict)
                 return True
 
@@ -369,7 +369,7 @@ gameMapF = do
               clients <- use $ svGlobals.svServerStatic.ssClients
               edicts <- use $ gameBaseGlobals.gbGEdicts
               savedInUse <- mapM (\i -> do
-                                        let Just (EdictIndex edictIdx) = (clients V.! i)^.cEdict
+                                        let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
                                             inuse = (edicts V.! edictIdx)^.eInUse
                                         gameBaseGlobals.gbGEdicts.ix i.eInUse .= False
                                         return inuse
@@ -379,7 +379,7 @@ gameMapF = do
 
               -- we must restore these for clients to transfer over correctly
               mapM_ (\(i, inuse) -> do
-                                    let Just (EdictIndex edictIdx) = (clients V.! i)^.cEdict
+                                    let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
                                     gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inuse
                     ) ([0..] `zip` savedInUse)
 
@@ -483,8 +483,8 @@ saveGameF = do
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
-    Just (Just (EdictIndex edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
-    Just (Just clientIdx) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    Just (Just (EdictReference edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
+    Just (Just (GClientReference clientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
     let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth
 
@@ -535,7 +535,7 @@ kickF = do
            sp <- setPlayer
 
            when sp $ do
-             Just clientIdx <- use $ svGlobals.svClient
+             Just (ClientReference clientIdx) <- use $ svGlobals.svClient
              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
              let playerName = client^.cName
              SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
@@ -618,7 +618,7 @@ dumpUserF = do
         when sp $ do
           Com.printf "userinfo\n"
           Com.printf "--------\n"
-          Just clientIdx <- use $ svGlobals.svClient
+          Just (ClientReference clientIdx) <- use $ svGlobals.svClient
           userInfo <- use $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
           Info.print userInfo
 

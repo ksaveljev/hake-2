@@ -12,7 +12,7 @@ import CVarVariables
 import qualified Constants
 
 -- Called when a player drops from the server. Will not be called between levels. 
-clientDisconnect :: Traversal' QuakeState (Maybe EdictIndex) -> Quake ()
+clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
 clientDisconnect = undefined -- TODO
 
 {-

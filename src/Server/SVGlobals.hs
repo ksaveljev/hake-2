@@ -47,7 +47,7 @@ initialSVGlobals =
             , _svAreaType             = 0
             , _svLeafs                = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
             , _svClusters             = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
-            , _svTouch                = V.replicate Constants.maxEdicts (EdictIndex (-1))
-            , _svTouchList            = V.replicate Constants.maxEdicts (EdictIndex (-1))
+            , _svTouch                = V.replicate Constants.maxEdicts (EdictReference (-1))
+            , _svTouchList            = V.replicate Constants.maxEdicts (EdictReference (-1))
             , _svLinks                = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (i - 2 * Constants.areaNodes) } else newLinkT i)
             }

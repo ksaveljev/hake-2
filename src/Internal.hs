@@ -20,7 +20,6 @@ import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-
 import Client.ClientStaticT
 import Client.ConsoleT
 import Client.DirtyT
@@ -68,11 +67,17 @@ newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
 
 type XCommandT = Quake ()
 
-newtype EdictIndex = EdictIndex Int
+-- reference to gameBaseGlobals.gbGEdicts
+newtype EdictReference = EdictReference Int
 
-newtype ClientIndex = ClientIndex Int
+-- reference to svGlobals.svServerStatic.ssClients
+newtype ClientReference = ClientReference Int
 
-newtype GClientIndex = GClientIndex Int
+-- reference to gameBaseGlobals.gbGame.glClients
+newtype GClientReference = GClientReference Int
+
+-- reference to cmGlobals.cmMapCModels
+newtype CModelReference = CModelReference Int
 
 data QuakeState =
   QuakeState { _globals           :: Globals
@@ -176,24 +181,24 @@ data NetChannelGlobals =
 
 data SVGlobals =
   SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
-            , _svClient               :: Maybe Int -- index of svGlobals.svServerStatic.ssClients
+            , _svClient               :: Maybe ClientReference
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
-            , _svPlayer               :: Maybe EdictIndex
+            , _svPlayer               :: Maybe EdictReference
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: Int
             , _svAreaNodes            :: V.Vector AreaNodeT
             , _svAreaMins             :: V3 Float
             , _svAreaMaxs             :: V3 Float
-            , _svAreaList             :: V.Vector EdictIndex
+            , _svAreaList             :: V.Vector EdictReference
             , _svAreaCount            :: Int
             , _svAreaMaxCount         :: Int
             , _svAreaType             :: Int
             , _svLeafs                :: UV.Vector Int
             , _svClusters             :: UV.Vector Int
-            , _svTouch                :: V.Vector EdictIndex
-            , _svTouchList            :: V.Vector EdictIndex
+            , _svTouch                :: V.Vector EdictReference
+            , _svTouchList            :: V.Vector EdictReference
             , _svLinks                :: V.Vector LinkT
             }
 
@@ -214,15 +219,15 @@ data EdictActionT =
                }
 
 data EdictOtherT =
-  EdictOtherT { _eoChain        :: Maybe EdictIndex
-              , _eoEnemy        :: Maybe EdictIndex
-              , _eoOldEnemy     :: Maybe EdictIndex
-              , _eoActivator    :: Maybe EdictIndex
-              , _eoGroundEntity :: Maybe EdictIndex
-              , _eoTeamChain    :: Maybe EdictIndex
-              , _eoTeamMaster   :: Maybe EdictIndex
-              , _eoMyNoise      :: Maybe EdictIndex
-              , _eoMyNoise2     :: Maybe EdictIndex
+  EdictOtherT { _eoChain        :: Maybe EdictReference
+              , _eoEnemy        :: Maybe EdictReference
+              , _eoOldEnemy     :: Maybe EdictReference
+              , _eoActivator    :: Maybe EdictReference
+              , _eoGroundEntity :: Maybe EdictReference
+              , _eoTeamChain    :: Maybe EdictReference
+              , _eoTeamMaster   :: Maybe EdictReference
+              , _eoMyNoise      :: Maybe EdictReference
+              , _eoMyNoise2     :: Maybe EdictReference
               }
 
 data EdictTimingT =
@@ -308,9 +313,9 @@ data EdictT =
          , _eSpawnFlags            :: Int
          , _eTimeStamp             :: Float
          , _eEdictPhysics          :: EdictPhysicsT
-         , _eTargetEnt             :: Maybe EdictIndex
-         , _eGoalEntity            :: Maybe EdictIndex
-         , _eMoveTarget            :: Maybe EdictIndex
+         , _eTargetEnt             :: Maybe EdictReference
+         , _eGoalEntity            :: Maybe EdictReference
+         , _eMoveTarget            :: Maybe EdictReference
          , _eEdictAction           :: EdictActionT
          , _eEdictTiming           :: EdictTimingT
          , _eEdictStatus           :: EdictStatusT
@@ -335,8 +340,8 @@ data EdictT =
          , _eItem                  :: Maybe GItemT
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
-         , _eClient                :: Maybe Int -- index to gameBaseGlobals.gbGame.glClients
-         , _eOwner                 :: Maybe EdictIndex
+         , _eClient                :: Maybe GClientReference
+         , _eOwner                 :: Maybe EdictReference
          , _eIndex                 :: Int
          , _eEdictInfo             :: EdictInfoT
          }
@@ -417,7 +422,7 @@ data GClientT =
            , _gcFloodWhen          :: UV.Vector Float
            , _gcFloodWhenHead      :: Int
            , _gcRespawnTime        :: Float
-           , _gcChaseTarget        :: Maybe EdictIndex
+           , _gcChaseTarget        :: Maybe EdictReference
            , _gcUpdateChase        :: Bool
            , _gcIndex              :: Int
            }
@@ -433,7 +438,7 @@ data ClientT =
           , _cMessageSize   :: UV.Vector Int
           , _cRate          :: Int
           , _cSurpressCount :: Int
-          , _cEdict         :: Maybe EdictIndex
+          , _cEdict         :: Maybe EdictReference
           , _cName          :: B.ByteString
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
@@ -472,7 +477,7 @@ data ServerT =
           , _sTime          :: Int
           , _sFrameNum      :: Int
           , _sName          :: B.ByteString
-          , _sModels        :: UV.Vector Int -- index to cmGlobals.cmMapCModels
+          , _sModels        :: V.Vector CModelReference
           , _sConfigStrings :: V.Vector B.ByteString
           , _sBaselines     :: V.Vector EntityStateT
           , _sMulticast     :: SizeBufT
@@ -505,12 +510,12 @@ data LevelLocalsT =
                , _llExitIntermission     :: Bool
                , _llIntermissionOrigin   :: V3 Float
                , _llIntermissionAngle    :: V3 Float
-               , _llSightClient          :: Maybe EdictIndex
-               , _llSightEntity          :: Maybe EdictIndex
+               , _llSightClient          :: Maybe EdictReference
+               , _llSightEntity          :: Maybe EdictReference
                , _llSightEntityFrameNum  :: Int
-               , _llSoundEntity          :: Maybe EdictIndex
+               , _llSoundEntity          :: Maybe EdictReference
                , _llSoundEntityFrameNum  :: Int
-               , _llSound2Entity         :: Maybe EdictIndex
+               , _llSound2Entity         :: Maybe EdictReference
                , _llSound2EntityFrameNum :: Int
                , _llPicHealth            :: Int
                , _llTotalSecrets         :: Int
@@ -519,7 +524,7 @@ data LevelLocalsT =
                , _llFoundGoals           :: Int
                , _llTotalMonsters        :: Int
                , _llKilledMonsters       :: Int
-               , _llCurrentEntity        :: Maybe EdictIndex
+               , _llCurrentEntity        :: Maybe EdictReference
                , _llBodyQue              :: Int
                , _llPowerCubes           :: Int
                }
@@ -571,7 +576,7 @@ data TraceT =
          , _tPlane      :: CPlaneT
          , _tSurface    :: CSurfaceT
          , _tContents   :: Int
-         , _tEnt        :: Maybe EdictIndex
+         , _tEnt        :: Maybe EdictReference
          }
 
 data PMoveT =
@@ -579,12 +584,12 @@ data PMoveT =
          , _pmCmd           :: UserCmdT
          , _pmSnapInitial   :: Bool
          , _pmNumTouch      :: Int
-         , _pmTouchEnts     :: V.Vector EdictIndex
+         , _pmTouchEnts     :: V.Vector EdictReference
          , _pmViewAngles    :: V3 Float
          , _pmViewHeight    :: Float
          , _pmMins          :: V3 Float
          , _pmMaxs          :: V3 Float
-         , _pmGroundEntity  :: Maybe EdictIndex
+         , _pmGroundEntity  :: Maybe EdictReference
          , _pmWaterType     :: Int
          , _pmWaterLevel    :: Int
          , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
@@ -689,7 +694,7 @@ data ClientStateT =
                , _csPlayerNum              :: Int
                , _csConfigStrings          :: V.Vector B.ByteString
                , _csModelDraw              :: V.Vector ModelT
-               , _csModelClip              :: V.Vector CModelT
+               , _csModelClip              :: V.Vector CModelReference
                , _csSoundPrecache          :: V.Vector SfxT
                , _csImagePrecache          :: V.Vector ImageT
                , _csClientInfo             :: V.Vector ClientInfoT

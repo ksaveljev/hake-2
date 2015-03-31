@@ -9,7 +9,6 @@ module Server.ServerT ( ServerT(..)
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as UV
 
 import Internal
 import Game.CModelT
@@ -19,7 +18,6 @@ import qualified Constants
 
 makeLenses ''ServerT
 
--- configstrings must be initialized to full vector of values
 newServerT :: ServerT
 newServerT =
   ServerT { _sState         = 0
@@ -28,7 +26,7 @@ newServerT =
           , _sTime          = 0
           , _sFrameNum      = 0
           , _sName          = ""
-          , _sModels        = UV.replicate Constants.maxModels 0 -- index to cmGlobals.cmMapCModels
+          , _sModels        = V.replicate Constants.maxModels (CModelReference (-1))
           , _sConfigStrings = V.replicate Constants.maxConfigStrings ""
           , _sBaselines     = V.replicate Constants.maxEdicts newEntityStateT
           , _sMulticast     = newSizeBufT

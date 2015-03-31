@@ -13,9 +13,10 @@ module QuakeState ( QuakeState(..)
                   , scrGlobals
                   , netGlobals
                   , cmGlobals
-                  , EdictIndex(..)
-                  , ClientIndex(..)
-                  , GClientIndex(..)
+                  , EdictReference(..)
+                  , ClientReference(..)
+                  , GClientReference(..)
+                  , CModelReference(..)
                   , module Globals
                   , module QCommon.CMGlobals
                   , module QCommon.ComGlobals
