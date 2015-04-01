@@ -585,7 +585,7 @@ csLights         = csImages + maxImages
 csItems          = csLights + maxLightStyles
 csPlayerSkins    = csItems + maxItems
 csGeneral        = csPlayerSkins + maxClients
-maxConfigStrings = maxGeneral + maxGeneral
+maxConfigStrings = csGeneral + maxGeneral
 
 healthIgnoreMax = 1 :: Int
 healthTimed     = 2 :: Int

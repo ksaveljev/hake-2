@@ -1,14 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Server.SVGame where
 
+import Control.Lens (use, (.=), ix)
+import Control.Monad (when, unless)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
-import Game.EdictT
-import {-# SOURCE #-} Game.GameImportT
+import QuakeState
+import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSave as GameSave
 import qualified QCommon.Com as Com
+import qualified QCommon.MSG as MSG
+import qualified QCommon.SZ as SZ
+import {-# SOURCE #-} qualified Server.SVSend as SVSend
 
 {-
 - PF_Unicast
@@ -66,7 +73,24 @@ setModel :: EdictT -> B.ByteString -> Quake ()
 setModel _ _ = io (putStrLn "SVGame.setModel") >> undefined -- TODO
 
 configString :: Int -> B.ByteString -> Quake ()
-configString _ _ = io (putStrLn "SVGame.configString") >> undefined -- TODO
+configString index val = do
+    io (putStrLn ("index = " ++ show index))
+    io (putStrLn ("max = " ++ show Constants.maxConfigStrings))
+    when (index < 0 || index >= Constants.maxConfigStrings) $
+      Com.comError Constants.errDrop ("configstring: bad index " `B.append` BC.pack (show index) `B.append` "\n") -- IMPROVE?
+
+    svGlobals.svServer.sConfigStrings.ix index .= val
+
+    state <- use $ svGlobals.svServer.sState
+
+    unless (state == Constants.ssLoading) $ do
+      SZ.clear (svGlobals.svServer.sMulticast)
+      MSG.writeCharI (svGlobals.svServer.sMulticast) Constants.svcConfigString
+      MSG.writeShort (svGlobals.svServer.sMulticast) index
+      MSG.writeString (svGlobals.svServer.sMulticast) val
+
+      origin <- use $ globals.vec3Origin
+      SVSend.multicast origin Constants.multicastAllR
 
 writeChar :: Int -> Quake ()
 writeChar _ = io (putStrLn "SVGame.writeChar") >> undefined -- TODO
