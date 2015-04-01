@@ -2,8 +2,11 @@
 module Game.GameItems where
 
 import Control.Lens ((.=), (^.), use)
-import Data.Maybe (fromJust)
+import Control.Monad (when)
+import Data.Char (toLower)
+import Data.Maybe (fromJust, isNothing)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -14,6 +17,7 @@ import Game.ItemDrop
 import Game.ItemUse
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
+import qualified QCommon.Com as Com
 
 initItems :: Quake ()
 initItems = do
@@ -54,7 +58,23 @@ setItemNames = do
           configString (Constants.csItems + idx) (fromJust (item^.giPickupName))
 
 findItem :: B.ByteString -> Quake (Maybe Int) -- index of item from GameItemList.itemList
-findItem _ = io (putStrLn "GameItems.findItem") >> undefined -- TODO
+findItem pickupName = do
+    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+    let searchResult = searchByName (BC.map toLower pickupName) 1 numItems
+
+    when (isNothing searchResult) $
+      Com.printf ("Item not found:" `B.append` pickupName `B.append` "\n")
+
+    return searchResult
+
+  where searchByName :: B.ByteString -> Int -> Int -> Maybe Int
+        searchByName name idx maxIdx
+          | idx == maxIdx = Nothing
+          | otherwise =
+              let item = GameItemList.itemList V.! idx
+              in if name == BC.map toLower (fromJust $ item^.giPickupName) -- IMPROVE: this is actually bad, isn't it? what if pickup name is Nothing (in GItemT).. should be taken care of in all occasions
+                   then Just idx
+                   else searchByName name (idx + 1) maxIdx
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =

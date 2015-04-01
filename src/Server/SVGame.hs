@@ -74,8 +74,6 @@ setModel _ _ = io (putStrLn "SVGame.setModel") >> undefined -- TODO
 
 configString :: Int -> B.ByteString -> Quake ()
 configString index val = do
-    io (putStrLn ("index = " ++ show index))
-    io (putStrLn ("max = " ++ show Constants.maxConfigStrings))
     when (index < 0 || index >= Constants.maxConfigStrings) $
       Com.comError Constants.errDrop ("configstring: bad index " `B.append` BC.pack (show index) `B.append` "\n") -- IMPROVE?
 
