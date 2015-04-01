@@ -157,3 +157,15 @@ pickupHealth =
   GenericEntInteract { _geiId = "pickup_health"
                      , _geiInteract = undefined -- TODO
                      }
+
+spItemHealth :: EdictReference -> Quake ()
+spItemHealth _ = io (putStrLn "GameItems.spItemHealth") >> undefined -- TODO
+
+spItemHealthSmall :: EdictReference -> Quake ()
+spItemHealthSmall _ = io (putStrLn "GameItems.spItemHealthSmall") >> undefined -- TODO
+
+spItemHealthLarge :: EdictReference -> Quake ()
+spItemHealthLarge _ = io (putStrLn "GameItems.spItemHealthLarge") >> undefined -- TODO
+
+spItemHealthMega :: EdictReference -> Quake ()
+spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- TODO

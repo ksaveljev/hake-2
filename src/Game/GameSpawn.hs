@@ -19,7 +19,34 @@ import CVarVariables
 import Game.EntThink
 import Game.SpawnT
 import qualified Constants
+import qualified Game.GameFunc as GameFunc
+import qualified Game.GameItems as GameItems
+import qualified Game.GameMisc as GameMisc
+import qualified Game.GameTarget as GameTarget
+import qualified Game.GameTrigger as GameTrigger
+import qualified Game.GameTurret as GameTurret
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monsters.MActor as MActor
+import qualified Game.Monsters.MBerserk as MBerserk
+import qualified Game.Monsters.MBoss2 as MBoss2
+import qualified Game.Monsters.MBoss3 as MBoss3
+import qualified Game.Monsters.MBoss31 as MBoss31
+import qualified Game.Monsters.MBrain as MBrain
+import qualified Game.Monsters.MChick as MChick
+import qualified Game.Monsters.MFlipper as MFlipper
+import qualified Game.Monsters.MFloat as MFloat
+import qualified Game.Monsters.MFlyer as MFlyer
+import qualified Game.Monsters.MGladiator as MGladiator
+import qualified Game.Monsters.MGunner as MGunner
+import qualified Game.Monsters.MHover as MHover
+import qualified Game.Monsters.MInfantry as MInfantry
+import qualified Game.Monsters.MInsane as MInsane
+import qualified Game.Monsters.MMedic as MMedic
+import qualified Game.Monsters.MMutant as MMutant
+import qualified Game.Monsters.MParasite as MParasite
+import qualified Game.Monsters.MSoldier as MSoldier
+import qualified Game.Monsters.MSuperTank as MSuperTank
+import qualified Game.Monsters.MTank as MTank
 import qualified Game.PlayerClient as PlayerClient
 import qualified Game.PlayerTrail as PlayerTrail
 import qualified QCommon.Com as Com
@@ -421,7 +448,7 @@ spawns = V.fromList [ SpawnT "item_health" spItemHealth
 spItemHealth :: EntThink
 spItemHealth =
   GenericEntThink "SP_item_health" $ \edictReference -> do
-    GameItem.spItemHealth edictReference
+    GameItems.spItemHealth edictReference
     return True
 
 spItemHealthSmall :: EntThink
@@ -492,7 +519,7 @@ spFuncClock =
 
 {-
 - QUAKED worldspawn (0 0 0) ?
-- 
+-
 - Only used for the world. "sky" environment map name "skyaxis" vector axis
 - for rotating sky "skyrotate" speed of rotation in degrees/second "sounds"
 - music cd track number "gravity" 800 is default gravity "message" text to

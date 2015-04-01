@@ -1,4 +1,3 @@
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Internal where
@@ -10,7 +9,6 @@ import Data.Sequence (Seq)
 import Control.Applicative
 import Control.Monad.State.Strict
 import Control.Monad.Except
-import Control.Lens (Lens')
 import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
@@ -950,83 +948,83 @@ class SuperAdapter a where
     getID :: a -> B.ByteString
 
 class EntInteractAdapter a where
-    interact :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool
+    interact :: a -> EdictReference -> EdictReference -> Quake Bool
 
 class EntThinkAdapter a where
-    think :: a -> Lens' QuakeState EdictT -> Quake Bool
+    think :: a -> EdictReference -> Quake Bool
 
 class EntBlockedAdapter a where
-    blocked :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+    blocked :: a -> EdictReference -> EdictReference -> Quake ()
 
 class EntDodgeAdapter a where
-    dodge :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Quake ()
+    dodge :: a -> EdictReference -> EdictReference -> Float -> Quake ()
 
 class EntTouchAdapter a where
-    touch :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> CPlaneT -> CSurfaceT -> Quake ()
+    touch :: a -> EdictReference -> EdictReference -> CPlaneT -> CSurfaceT -> Quake ()
 
 class EntUseAdapter a where
-    use :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+    use :: a -> EdictReference -> EdictReference -> EdictReference -> Quake ()
 
 class EntPainAdapter a where
-    pain :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Int -> Quake ()
+    pain :: a -> EdictReference -> EdictReference -> Float -> Int -> Quake ()
 
 class EntDieAdapter a where
-    die :: a -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Int -> V3 Float -> Quake ()
+    die :: a -> EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
 
 class ItemUseAdapter a where
-    itemUse :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
+    itemUse :: a -> EdictReference -> GItemT -> Quake ()
 
 class ItemDropAdapter a where
-    drop :: a -> Lens' QuakeState EdictT -> GItemT -> Quake ()
+    drop :: a -> EdictReference   -> GItemT -> Quake ()
 
 data EntInteract =
   GenericEntInteract { _geiId :: B.ByteString
-                     , _geiInteract :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake Bool
+                     , _geiInteract :: EdictReference -> EdictReference -> Quake Bool
                      }
 
 data EntThink =
   GenericEntThink { _gethId :: B.ByteString
-                  , _gethThink :: Lens' QuakeState EdictT -> Quake Bool
+                  , _gethThink :: EdictReference -> Quake Bool
                   }
 
 data EntBlocked =
   GenericEntBlocked { _gebId :: B.ByteString
-                    , _gebBlocked :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+                    , _gebBlocked :: EdictReference -> EdictReference -> Quake ()
                     }
 
 data EntDodge =
   GenericEntDodge { _gedoId :: B.ByteString
-                  , _gedoDodge :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Quake ()
+                  , _gedoDodge :: EdictReference -> EdictReference -> Float -> Quake ()
                   }
 
 data EntTouch =
   GenericEntTouch { _getId :: B.ByteString
-                  , _getTouch :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> CPlaneT -> CSurfaceT -> Quake ()
+                  , _getTouch :: EdictReference -> EdictReference -> CPlaneT -> CSurfaceT -> Quake ()
                   }
 
 data EntUse =
   GenericEntUse { _geuId :: B.ByteString
-                , _geuUse :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Quake ()
+                , _geuUse :: EdictReference -> EdictReference -> EdictReference -> Quake ()
                 }
 
 data EntPain =
   GenericEntPain { _gepId :: B.ByteString
-                 , _gepPain :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Float -> Int -> Quake ()
+                 , _gepPain :: EdictReference -> EdictReference -> Float -> Int -> Quake ()
                  }
 
 data EntDie =
   GenericEntDie { _gedId :: B.ByteString
-                , _gedDie :: Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Lens' QuakeState EdictT -> Int -> V3 Float -> Quake ()
+                , _gedDie :: EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
                 }
 
 data ItemUse =
   GenericItemUse { _giuId :: B.ByteString
-                 , _giuUse :: Lens' QuakeState EdictT -> GItemT -> Quake ()
+                 , _giuUse :: EdictReference -> GItemT -> Quake ()
                  }
 
 data ItemDrop =
   GenericItemDrop { _gidId :: B.ByteString
-                  , _gidDrop :: Lens' QuakeState EdictT -> GItemT -> Quake ()
+                  , _gidDrop :: EdictReference -> GItemT -> Quake ()
                   }
 
 instance SuperAdapter EntInteract where

@@ -44,3 +44,15 @@ saveClientData = do
                               else updatedPers
             
             gameBaseGlobals.gbGame.glClients.ix idx.gcPers .= finalPers
+
+spInfoPlayerStart :: EdictReference -> Quake ()
+spInfoPlayerStart _ = io (putStrLn "PlayerClient.spInfoPlayerStart") >> undefined -- TODO
+
+spInfoPlayerDeathmatch :: EdictReference -> Quake ()
+spInfoPlayerDeathmatch _ = io (putStrLn "PlayerClient.spInfoPlayerDeathmatch") >> undefined -- TODO
+
+spInfoPlayerCoop :: EdictReference -> Quake ()
+spInfoPlayerCoop _ = io (putStrLn "PlayerClient.spInfoPlayerCoop") >> undefined -- TODO
+
+spInfoPlayerIntermission :: Quake ()
+spInfoPlayerIntermission = return ()
