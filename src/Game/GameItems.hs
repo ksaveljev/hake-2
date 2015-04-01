@@ -2,7 +2,8 @@
 module Game.GameItems where
 
 import Control.Lens ((.=))
-import qualified Data.Sequence as Seq
+import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -15,7 +16,30 @@ import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 
 initItems :: Quake ()
 initItems = do
-    gameBaseGlobals.gbGame.glNumItems .= Seq.length GameItemList.itemList -- TODO: jake2 has -1 here...
+    gameBaseGlobals.gbGame.glNumItems .= V.length GameItemList.itemList -- TODO: jake2 has -1 here...
+
+{-
+- ============ SpawnItem
+- 
+- Sets the clipping size and plants the object on the floor.
+- 
+- Items can't be immediately dropped to floor, because they might be on an
+- entity that hasn't spawned yet. ============
+-}
+spawnItem :: EdictReference -> Int -> Quake () -- second argument is index of GameItemList.itemList
+spawnItem er@(EdictReference edictIdx) itemIdx = do
+    io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
+
+{-
+- =============== SetItemNames
+- 
+- Called by worldspawn ===============
+-}
+setItemNames :: Quake ()
+setItemNames = io (putStrLn "GameItems.setItemNames") >> undefined -- TODO
+
+findItem :: B.ByteString -> Quake (Maybe Int) -- index of item from GameItemList.itemList
+findItem _ = io (putStrLn "GameItems.findItem") >> undefined -- TODO
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =

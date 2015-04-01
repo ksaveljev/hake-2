@@ -608,7 +608,7 @@ data GameBaseGlobals =
                   , _gbMeansOfDeath      :: Int
                   , _gbNumEdicts         :: Int
                   , _gbGEdicts           :: V.Vector EdictT
-                  , _gbItemList          :: Seq GItemT
+                  , _gbItemList          :: V.Vector GItemT
                   }
 
 data PMoveGlobals =

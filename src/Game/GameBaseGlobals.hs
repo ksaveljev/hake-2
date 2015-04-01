@@ -4,6 +4,7 @@ module Game.GameBaseGlobals ( module Game.GameBaseGlobals
                             , module Game.CPlaneT
                             , module Game.GameLocalsT
                             , module Game.GameImportT
+                            , module Game.GItemT
                             , module Game.LevelLocalsT
                             , module Game.SpawnTempT
                             ) where
@@ -17,6 +18,7 @@ import Game.CPlaneT
 import Game.EdictT
 import Game.GameLocalsT
 import {-# SOURCE #-} Game.GameImportT
+import Game.GItemT
 import Game.LevelLocalsT
 import Game.SpawnTempT
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList

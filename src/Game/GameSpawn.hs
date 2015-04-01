@@ -20,6 +20,7 @@ import Game.EntThink
 import Game.SpawnT
 import qualified Constants
 import qualified Game.GameFunc as GameFunc
+import qualified Game.GameItemList as GameItemList
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameTarget as GameTarget
@@ -322,14 +323,41 @@ newString str = let len = B.length str
 - Finds the spawn function for the entity and calls it.
 -}
 callSpawn :: EdictReference -> Quake ()
-callSpawn er@(EdictReference idx) = do
+callSpawn er@(EdictReference edictIdx) = do
+    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
     -- IMPROVE: does it apply to our code?
     -- if (null == ent.classname) {
     --     GameBase.gi.dprintf("ED_CallSpawn: null classname\n");
     --     return;
     -- }
-    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    io (putStrLn "GameSpawn.callSpawn") >> undefined -- TODO
+
+    -- check item spawn functions
+    let edictClassName = BC.map toLower (edict^.eClassName)
+        itemSpawnIndex = checkItemSpawn edictClassName 1 numItems
+
+    case itemSpawnIndex of
+      Just itemIdx -> GameItems.spawnItem er itemIdx
+      Nothing -> do
+        -- check normal spawn functions
+        let spawnIdx = V.findIndex (\s -> edictClassName == BC.map toLower (s^.spName)) spawns
+
+        case spawnIdx of
+          Just idx ->
+            void $ think ((spawns V.! idx)^.spSpawn) er
+          Nothing -> do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf $ edictClassName `B.append` " doesn't have a spawn function\n"
+
+  where checkItemSpawn :: B.ByteString -> Int -> Int -> Maybe Int
+        checkItemSpawn edictClassName idx maxIdx
+          | idx == maxIdx = Nothing
+          | otherwise =
+              let item = GameItemList.itemList V.! idx
+              in if edictClassName == BC.map toLower (item^.giClassName)
+                   then Just idx
+                   else checkItemSpawn edictClassName (idx + 1) maxIdx
 
 findTeams :: Quake ()
 findTeams = io (putStrLn "GameSpawn.findTeams") >> undefined -- TODO
@@ -527,7 +555,22 @@ spFuncClock =
 -}
 spWorldSpawn :: EntThink
 spWorldSpawn =
-  GenericEntThink "SP_worldspawn" $ \edictReference -> do
+  GenericEntThink "SP_worldspawn" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx .= edict { _eMoveType    = Constants.moveTypePush
+                                                   , _eSolid       = Constants.solidBsp
+                                                   -- since the world doesn't use G_Spawn()
+                                                   , _eInUse       = True
+                                                   -- world model is always index 1
+                                                   , _eEntityState = (edict^.eEntityState) { _esModelIndex = 1 }
+                                                   }
+
+    -- reserve some spots for dead player bodies for coop / deathmatch
+    PlayerClient.initBodyQue
+    -- set configstrings for items
+    GameItems.setItemNames
+
     io (putStrLn "GameSpawn.spWorldSpawn") >> undefined -- TODO
 
 spFuncWall :: EntThink

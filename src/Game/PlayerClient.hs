@@ -1,4 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerClient where
 
 import Control.Lens (Traversal', use, (^.), ix, preuse, (.=))
@@ -10,6 +11,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import qualified Game.GameUtil as GameUtil
 
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
@@ -44,6 +46,16 @@ saveClientData = do
                               else updatedPers
             
             gameBaseGlobals.gbGame.glClients.ix idx.gcPers .= finalPers
+
+initBodyQue :: Quake ()
+initBodyQue = do
+    gameBaseGlobals.gbLevel.llBodyQue .= 0
+    mapM_ spawnBodyQue [0..Constants.bodyQueueSize-1]
+
+  where spawnBodyQue :: Int -> Quake ()
+        spawnBodyQue _ = do
+          EdictReference idx <- GameUtil.spawn
+          gameBaseGlobals.gbGEdicts.ix idx.eClassName .= "bodyque"
 
 spInfoPlayerStart :: EdictReference -> Quake ()
 spInfoPlayerStart _ = io (putStrLn "PlayerClient.spInfoPlayerStart") >> undefined -- TODO

@@ -18,6 +18,7 @@ module QuakeState ( QuakeState(..)
                   , GClientReference(..)
                   , CModelReference(..)
                   , LinkReference(..)
+                  , EntThinkAdapter(..)
                   , module Globals
                   , module QCommon.CMGlobals
                   , module QCommon.ComGlobals

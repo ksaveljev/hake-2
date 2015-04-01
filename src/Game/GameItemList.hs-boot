@@ -1,7 +1,7 @@
 module Game.GameItemList where
 
-import Data.Sequence (Seq)
+import qualified Data.Vector as V
 
 import Game.GItemT
 
-itemList :: Seq GItemT
+itemList :: V.Vector GItemT

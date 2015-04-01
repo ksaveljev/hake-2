@@ -903,17 +903,17 @@ weapRailgun         = 10 :: Int
 weapBFG             = 11 :: Int
 
 -- edict->movetype values
-movetypeNone   = 0 :: Int -- never moves 
-movetypeNoclip = 1 :: Int -- origin and angles change with no interaction 
-movetypePush   = 2 :: Int -- no clip to world, push on box contact 
-movetypeStop   = 3 :: Int -- no clip to world, stops on box contact 
+moveTypeNone   = 0 :: Int -- never moves 
+moveTypeNoClip = 1 :: Int -- origin and angles change with no interaction 
+moveTypePush   = 2 :: Int -- no clip to world, push on box contact 
+moveTypeStop   = 3 :: Int -- no clip to world, stops on box contact 
 
-movetypeWalk       = 4 :: Int -- gravity 
-movetypeStep       = 5 :: Int -- gravity, special edge handling 
-movetypeFly        = 6 :: Int
-movetypeToss       = 7 :: Int -- gravity 
-movetypeFlymissile = 8 :: Int -- extra size to monsters 
-movetypeBounce     = 9 :: Int
+moveTypeWalk       = 4 :: Int -- gravity 
+moveTypeStep       = 5 :: Int -- gravity, special edge handling 
+moveTypeFly        = 6 :: Int
+moveTypeToss       = 7 :: Int -- gravity 
+moveTypeFlyMissile = 8 :: Int -- extra size to monsters 
+moveTypeBounce     = 9 :: Int
 
 multicastAll  = 0 :: Int
 multicastPhs  = 1 :: Int
