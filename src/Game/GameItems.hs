@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameItems where
 
-import Control.Lens ((.=))
+import Control.Lens ((.=), (^.), use)
+import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
@@ -20,7 +21,7 @@ initItems = do
 
 {-
 - ============ SpawnItem
-- 
+-
 - Sets the clipping size and plants the object on the floor.
 - 
 - Items can't be immediately dropped to floor, because they might be on an
@@ -36,7 +37,21 @@ spawnItem er@(EdictReference edictIdx) itemIdx = do
 - Called by worldspawn ===============
 -}
 setItemNames :: Quake ()
-setItemNames = io (putStrLn "GameItems.setItemNames") >> undefined -- TODO
+setItemNames = do
+    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+    mapM_ setConfigString [1..numItems-1]
+
+    findItem "Jacket Armor" >>= (gameItemsGlobals.giJacketArmorIndex .=) . fromJust
+    findItem "Combat Armor" >>= (gameItemsGlobals.giCombatArmorIndex .=) . fromJust
+    findItem "Body Armor"   >>= (gameItemsGlobals.giBodyArmorIndex .=)   . fromJust
+    findItem "Power Screen" >>= (gameItemsGlobals.giPowerScreenIndex .=) . fromJust
+    findItem "Power Shield" >>= (gameItemsGlobals.giPowerShieldIndex .=) . fromJust
+
+  where setConfigString :: Int -> Quake ()
+        setConfigString idx = do
+          let item = GameItemList.itemList V.! idx
+          configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
+          configString (Constants.csItems + idx) (fromJust (item^.giPickupName))
 
 findItem :: B.ByteString -> Quake (Maybe Int) -- index of item from GameItemList.itemList
 findItem _ = io (putStrLn "GameItems.findItem") >> undefined -- TODO

@@ -91,6 +91,7 @@ data QuakeState =
              , _scrGlobals        :: SCRGlobals
              , _netGlobals        :: NETGlobals
              , _cmGlobals         :: CMGlobals
+             , _gameItemsGlobals  :: GameItemsGlobals
              }
 
 data Globals =
@@ -1213,3 +1214,15 @@ data SpawnT =
   SpawnT { _spName  :: B.ByteString
          , _spSpawn :: EntThink
          }
+
+data GameItemsGlobals =
+  GameItemsGlobals { _giJacketArmorInfo      :: GItemArmorT
+                   , _giCombatArmorInfo      :: GItemArmorT
+                   , _giBodyArmorInfo        :: GItemArmorT
+                   , _giQuakeDropTimeoutHack :: Int
+                   , _giJacketArmorIndex     :: Int
+                   , _giCombatArmorIndex     :: Int
+                   , _giBodyArmorIndex       :: Int
+                   , _giPowerScreenIndex     :: Int
+                   , _giPowerShieldIndex     :: Int
+                   }
