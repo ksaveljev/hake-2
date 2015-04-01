@@ -579,6 +579,8 @@ spWorldSpawn =
     let configString = gameImport^.giConfigString
         imageIndex = gameImport^.giImageIndex
         soundIndex = gameImport^.giSoundIndex
+        modelIndex = gameImport^.giModelIndex
+        cvarSet = gameImport^.giCVarSet
 
     let msg = edict^.eEdictInfo.eiMessage
     if isJust msg && B.length (fromJust msg) > 0
@@ -613,8 +615,121 @@ spWorldSpawn =
     void $ imageIndex "help"
     void $ imageIndex "field_3"
 
+    if (spawnTemp^.stGravity) == ""
+      then void $ cvarSet "sv_gravity" "800"
+      else void $ cvarSet "sv_gravity" (spawnTemp^.stGravity)
 
-    io (putStrLn "GameSpawn.spWorldSpawn") >> undefined -- TODO
+    soundIndex "player/fry.wav" >>= (gameBaseGlobals.gbSndFry .=)
+
+    -- standing in lava / slime
+    GameItems.findItem "Blaster" >>= (GameItems.precacheItem) . fromJust
+    void $ soundIndex "player/lava1.wav"
+    void $ soundIndex "player/lava2.wav"
+    void $ soundIndex "misc/pc_up.wav"
+    void $ soundIndex "misc/talk1.wav"
+    void $ soundIndex "misc/udeath.wav"
+    -- gibs
+    void $ soundIndex "items/respawn1.wav"
+    -- sexed sounds
+    void $ soundIndex "*death1.wav"
+    void $ soundIndex "*death2.wav"
+    void $ soundIndex "*death3.wav"
+    void $ soundIndex "*death4.wav"
+    void $ soundIndex "*fall1.wav"
+    void $ soundIndex "*fall2.wav"
+    void $ soundIndex "*gurp1.wav"
+    -- drowning damage
+    void $ soundIndex "*gurp2.wav"
+    void $ soundIndex "*jump1.wav"
+    -- player jump
+    void $ soundIndex "*pain25_1.wav"
+    void $ soundIndex "*pain25_2.wav"
+    void $ soundIndex "*pain50_1.wav"
+    void $ soundIndex "*pain50_2.wav"
+    void $ soundIndex "*pain75_1.wav"
+    void $ soundIndex "*pain75_2.wav"
+    void $ soundIndex "*pain100_1.wav"
+    void $ soundIndex "*pain100_2.wav"
+    -- sexed models
+    -- THIS ORDER MUST MATCH THE DEFINES IN g_local.h
+    -- you can add more, max 15
+    void $ modelIndex "#w_blaster.md2"
+    void $ modelIndex "#w_shotgun.md2"
+    void $ modelIndex "#w_sshotgun.md2"
+    void $ modelIndex "#w_machinegun.md2"
+    void $ modelIndex "#w_chaingun.md2"
+    void $ modelIndex "#a_grenades.md2"
+    void $ modelIndex "#w_glauncher.md2"
+    void $ modelIndex "#w_rlauncher.md2"
+    void $ modelIndex "#w_hyperblaster.md2"
+    void $ modelIndex "#w_railgun.md2"
+    void $ modelIndex "#w_bfg.md2"
+    -- --------------
+    void $ soundIndex "player/gasp1.wav"
+    -- gasping for air
+    void $ soundIndex "player/gasp2.wav"
+    -- head breaking surface, not gasping
+    void $ soundIndex "player/watr_in.wav"
+    -- feet hitting water
+    void $ soundIndex "player/watr_out.wav"
+    -- feet leaving water
+    void $ soundIndex "player/watr_un.wav"
+    -- head going underwater
+    void $ soundIndex "player/u_breath1.wav"
+    void $ soundIndex "player/u_breath2.wav"
+    void $ soundIndex "items/pkup.wav"
+    -- bonus item pickup
+    void $ soundIndex "world/land.wav"
+    -- landing thud
+    void $ soundIndex "misc/h2ohit1.wav"
+    -- landing splash
+    void $ soundIndex "items/damage.wav"
+    void $ soundIndex "items/protect.wav"
+    void $ soundIndex "items/protect4.wav"
+    void $ soundIndex "weapons/noammo.wav"
+    void $ soundIndex "infantry/inflies1.wav"
+    modelIndex "models/objects/gibs/sm_meat/tris.md2" >>= (gameBaseGlobals.gbSmMeatIndex .=)
+    void $ modelIndex "models/objects/gibs/arm/tris.md2"
+    void $ modelIndex "models/objects/gibs/bone/tris.md2"
+    void $ modelIndex "models/objects/gibs/bone2/tris.md2"
+    void $ modelIndex "models/objects/gibs/chest/tris.md2"
+    void $ modelIndex "models/objects/gibs/skull/tris.md2"
+    void $ modelIndex "models/objects/gibs/head2/tris.md2"
+
+    --
+    -- Setup light animation tables. 'a' is total darkness, 'z' is
+    -- doublebright.
+    --
+    -- 0 normal
+    configString (Constants.csLights + 0) "m"
+    -- 1 FLICKER (first variety)
+    configString (Constants.csLights + 1) "mmnmmommommnonmmonqnmmo"
+    -- 2 SLOW STRONG PULSE
+    configString (Constants.csLights + 2) "abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcba"
+    -- 3 CANDLE (first variety)
+    configString (Constants.csLights + 3) "mmmmmaaaaammmmmaaaaaabcdefgabcdefg"
+    -- 4 FAST STROBE
+    configString (Constants.csLights + 4) "mamamamamama"
+    -- 5 GENTLE PULSE 1
+    configString (Constants.csLights + 5) "jklmnopqrstuvwxyzyxwvutsrqponmlkj"
+    -- 6 FLICKER (second variety)
+    configString (Constants.csLights + 6) "nmonqnmomnmomomno"
+    -- 7 CANDLE (second variety)
+    configString (Constants.csLights + 7) "mmmaaaabcdefgmmmmaaaammmaamm"
+    -- 8 CANDLE (third variety)
+    configString (Constants.csLights + 8) "mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa"
+    -- 9 SLOW STROBE (fourth variety)
+    configString (Constants.csLights + 9) "aaaaaaaazzzzzzzz"
+    -- 10 FLUORESCENT FLICKER
+    configString (Constants.csLights + 10) "mmamammmmammamamaaamammma"
+    -- 11 SLOW PULSE NOT FADE TO BLACK
+    configString (Constants.csLights + 11) "abcdefghijklmnopqrrqponmlkjihgfedcba"
+    -- styles 32-62 are assigned by the light program for switchable
+    -- lights
+    -- 63 testing
+    configString (Constants.csLights + 63) "a"
+
+    return True
 
 spFuncWall :: EntThink
 spFuncWall =

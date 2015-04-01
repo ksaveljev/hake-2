@@ -35,6 +35,9 @@ spawnItem :: EdictReference -> Int -> Quake () -- second argument is index of Ga
 spawnItem er@(EdictReference edictIdx) itemIdx = do
     io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
 
+precacheItem :: Int -> Quake () -- int is index of GameItemList.itemList
+precacheItem _ = io (putStrLn "GameItems.precacheItem") >> undefined -- TODO
+
 {-
 - =============== SetItemNames
 - 
