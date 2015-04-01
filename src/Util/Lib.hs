@@ -36,6 +36,9 @@ atov str = let strres = BC.split ' ' str
                c = if len > 2 then atof (head (tail (tail strres))) else 0
            in V3 a b c
 
+vtos :: V3 Float -> B.ByteString
+vtos (V3 a b c) = BC.pack $ show (truncate a :: Int) ++ " " ++ show (truncate b :: Int) ++ " " ++ show (truncate c :: Int) -- IMPROVE ?
+
 fOpen :: B.ByteString -> IOMode -> Quake (Maybe Handle)
 fOpen name mode = do
     result <- io $ tryToOpenFile name mode

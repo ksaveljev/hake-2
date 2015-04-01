@@ -571,6 +571,49 @@ spWorldSpawn =
     -- set configstrings for items
     GameItems.setItemNames
 
+    nextMap <- use $ gameBaseGlobals.gbSpawnTemp.stNextMap
+    gameBaseGlobals.gbLevel.llNextMap .= nextMap
+
+    -- make some data visible to the server
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let configString = gameImport^.giConfigString
+        imageIndex = gameImport^.giImageIndex
+        soundIndex = gameImport^.giSoundIndex
+
+    let msg = edict^.eEdictInfo.eiMessage
+    if isJust msg && B.length (fromJust msg) > 0
+      then do
+        configString Constants.csName (fromJust msg)
+        gameBaseGlobals.gbLevel.llLevelName .= fromJust msg
+      else do
+        mapName <- use $ gameBaseGlobals.gbLevel.llMapName
+        gameBaseGlobals.gbLevel.llLevelName .= mapName
+
+    spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+    if B.length (spawnTemp^.stSky) > 0
+      then configString Constants.csSky (spawnTemp^.stSky)
+      else configString Constants.csSky "unit1_"
+
+    configString Constants.csSkyRotate $ BC.pack (show (spawnTemp^.stSkyRotate)) -- IMPROVE ?
+    configString Constants.csSkyAxis $ Lib.vtos (spawnTemp^.stSkyAxis)
+    configString Constants.csCdTrack $ BC.pack (show (edict^.eSounds))
+
+    maxClientsValue :: Int <- liftM (truncate . (^.cvValue)) maxClientsCVar
+    configString Constants.csMaxClients $ BC.pack (show maxClientsValue) -- IMPROVE ?
+
+    -- status bar program
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    if deathmatchValue /= 0
+      then configString Constants.csStatusBar dmStatusBar
+      else configString Constants.csStatusBar singleStatusBar
+
+    -- help icon for statusbar
+    void $ imageIndex "i_help"
+    imageIndex "i_health" >>= (gameBaseGlobals.gbLevel.llPicHealth .=)
+    void $ imageIndex "help"
+    void $ imageIndex "field_3"
+
+
     io (putStrLn "GameSpawn.spWorldSpawn") >> undefined -- TODO
 
 spFuncWall :: EntThink
@@ -1029,3 +1072,48 @@ spTurretDriver =
   GenericEntThink "SP_turret_driver" $ \edictReference -> do
     GameTurret.spTurretDriver edictReference
     return True
+
+-- learned something new here... original source has tabs, so had to change them for \t
+-- http://vim.wikia.com/wiki/See_the_tabs_in_your_file
+singleStatusBar :: B.ByteString
+singleStatusBar = BC.pack $
+               "yb\t-24 " -- health
+            ++ "xv\t0 " ++ "hnum " ++ "xv\t50 " ++ "pic 0 " -- ammo
+            ++ "if 2 " ++ "\txv\t100 " ++ "\tanum " ++ "\txv\t150 " ++ "\tpic 2 "
+            ++ "endif " -- armor
+            ++ "if 4 " ++ "\txv\t200 " ++ "\trnum " ++ "\txv\t250 " ++ "\tpic 4 "
+            ++ "endif " -- selected item
+            ++ "if 6 " ++ "\txv\t296 " ++ "\tpic 6 " ++ "endif " ++ "yb\t-50 " -- picked
+            -- up
+            -- item
+            ++ "if 7 " ++ "\txv\t0 " ++ "\tpic 7 " ++ "\txv\t26 " ++ "\tyb\t-42 "
+            ++ "\tstat_string 8 " ++ "\tyb\t-50 " ++ "endif "
+            -- timer
+            ++ "if 9 " ++ "\txv\t262 " ++ "\tnum\t2\t10 " ++ "\txv\t296 " ++ "\tpic\t9 "
+            ++ "endif "
+            -- help / weapon icon
+            ++ "if 11 " ++ "\txv\t148 " ++ "\tpic\t11 " ++ "endif "
+
+dmStatusBar :: B.ByteString
+dmStatusBar = BC.pack $
+               "yb\t-24 " -- health
+            ++ "xv\t0 " ++ "hnum " ++ "xv\t50 " ++ "pic 0 " --  ammo
+            ++ "if 2 " ++ "\txv\t100 " ++ "\tanum " ++ "\txv\t150 " ++ "\tpic 2 "
+            ++ "endif " -- armor
+            ++ "if 4 " ++ "\txv\t200 " ++ "\trnum " ++ "\txv\t250 " ++ "\tpic 4 "
+            ++ "endif " -- selected item
+            ++ "if 6 " ++ "\txv\t296 " ++ "\tpic 6 " ++ "endif " ++ "yb\t-50 " -- picked
+            -- up
+            -- item
+            ++ "if 7 " ++ "\txv\t0 " ++ "\tpic 7 " ++ "\txv\t26 " ++ "\tyb\t-42 "
+            ++ "\tstat_string 8 " ++ "\tyb\t-50 " ++ "endif "
+            -- timer
+            ++ "if 9 " ++ "\txv\t246 " ++ "\tnum\t2\t10 " ++ "\txv\t296 " ++ "\tpic\t9 "
+            ++ "endif "
+            -- help / weapon icon
+            ++ "if 11 " ++ "\txv\t148 " ++ "\tpic\t11 " ++ "endif " -- frags
+            ++ "xr\t-50 " ++ "yt 2 " ++ "num 3 14 " -- spectator
+            ++ "if 17 " ++ "xv 0 " ++ "yb -58 " ++ "string2 \"SPECTATOR MODE\" "
+            ++ "endif " -- chase camera
+            ++ "if 16 " ++ "xv 0 " ++ "yb -68 " ++ "string \"Chasing\" " ++ "xv 64 "
+            ++ "stat_string 16 " ++ "endif "
