@@ -622,7 +622,7 @@ spWorldSpawn =
     soundIndex "player/fry.wav" >>= (gameBaseGlobals.gbSndFry .=)
 
     -- standing in lava / slime
-    GameItems.findItem "Blaster" >>= (GameItems.precacheItem) . fromJust
+    GameItems.findItem "Blaster" >>= GameItems.precacheItem
     void $ soundIndex "player/lava1.wav"
     void $ soundIndex "player/lava2.wav"
     void $ soundIndex "misc/pc_up.wav"

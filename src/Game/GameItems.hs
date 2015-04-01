@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameItems where
 
 import Control.Lens ((.=), (^.), use)
-import Control.Monad (when)
+import Control.Monad (when, void)
 import Data.Char (toLower)
-import Data.Maybe (fromJust, isNothing)
+import Data.Maybe (fromJust, isNothing, isJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -27,7 +28,7 @@ initItems = do
 - ============ SpawnItem
 -
 - Sets the clipping size and plants the object on the floor.
-- 
+-
 - Items can't be immediately dropped to floor, because they might be on an
 - entity that hasn't spawned yet. ============
 -}
@@ -35,12 +36,76 @@ spawnItem :: EdictReference -> Int -> Quake () -- second argument is index of Ga
 spawnItem er@(EdictReference edictIdx) itemIdx = do
     io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
 
-precacheItem :: Int -> Quake () -- int is index of GameItemList.itemList
-precacheItem _ = io (putStrLn "GameItems.precacheItem") >> undefined -- TODO
+{-
+- =============== PrecacheItem
+-
+- Precaches all data needed for a given item. This will be called for each
+- item spawned in a level, and for each item in each client's inventory.
+- ===============
+-}
+precacheItem :: Maybe Int -> Quake () -- int is index of GameItemList.itemList
+precacheItem it = do
+    when (isJust it) $ do
+      gameImport <- use $ gameBaseGlobals.gbGameImport
+
+      let Just itemIdx = it
+          item = GameItemList.itemList V.! itemIdx
+          soundIndex = gameImport^.giSoundIndex
+          modelIndex = gameImport^.giModelIndex
+          imageIndex = gameImport^.giImageIndex
+
+      when (isJust (item^.giPickupSound)) $
+        void (soundIndex $ fromJust (item^.giPickupSound))
+
+      when (isJust (item^.giWorldModel)) $
+        void (modelIndex $ fromJust (item^.giWorldModel))
+
+      when (isJust (item^.giViewModel)) $
+        void (modelIndex $ fromJust (item^.giViewModel))
+
+      when (isJust (item^.giIcon)) $
+        void (imageIndex $ fromJust (item^.giIcon))
+
+      -- parse everything for its ammo
+      when (isJust (item^.giAmmo) && B.length (fromJust $ item^.giAmmo) > 0) $ do
+        ammo <- findItem (fromJust $ item^.giAmmo)
+        when (ammo /= it) $
+          precacheItem ammo
+
+      when (B.length (item^.giPrecaches) > 0) $ do
+        let tokens = BC.split ' ' (item^.giPrecaches)
+        mapM_ (precacheToken (item^.giPrecaches)) tokens
+
+  where precacheToken :: B.ByteString -> B.ByteString -> Quake ()
+        precacheToken fullPrecachesString token = do
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+
+          let len = B.length token
+
+          if len >= Constants.maxQPath || len < 5
+            then do
+              let err = gameImport^.giError
+              err $ "PrecacheItem: it.classname has bad precache string: " `B.append` fullPrecachesString
+            else -- determine type based on extension
+              if | "md2" `BC.isSuffixOf` token -> do
+                     let modelIndex = gameImport^.giModelIndex
+                     void $ modelIndex token
+                 | "sp2" `BC.isSuffixOf` token -> do
+                     let modelIndex = gameImport^.giModelIndex
+                     void $ modelIndex token
+                 | "wav" `BC.isSuffixOf` token -> do
+                     let soundIndex = gameImport^.giSoundIndex
+                     void $ soundIndex token
+                 | "pcx" `BC.isSuffixOf` token -> do
+                     let imageIndex = gameImport^.giImageIndex
+                     void $ imageIndex token
+                 | otherwise -> do
+                     let err = gameImport^.giError
+                     err $ "PrecacheItem: bad precache string: " `B.append` token
 
 {-
 - =============== SetItemNames
-- 
+-
 - Called by worldspawn ===============
 -}
 setItemNames :: Quake ()
