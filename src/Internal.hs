@@ -92,6 +92,7 @@ data QuakeState =
              , _netGlobals        :: NETGlobals
              , _cmGlobals         :: CMGlobals
              , _gameItemsGlobals  :: GameItemsGlobals
+             , _mSoldierGlobals   :: MSoldierGlobals
              }
 
 data Globals =
@@ -1226,3 +1227,16 @@ data GameItemsGlobals =
                    , _giPowerScreenIndex     :: Int
                    , _giPowerShieldIndex     :: Int
                    }
+
+data MSoldierGlobals =
+  MSoldierGlobals { _msSoundIdle       :: Int
+                  , _msSoundSight1     :: Int
+                  , _msSoundSight2     :: Int
+                  , _msSoundPainLight  :: Int
+                  , _msSoundPain       :: Int
+                  , _msSoundPainSS     :: Int
+                  , _msSoundDeathLight :: Int
+                  , _msSoundDeath      :: Int
+                  , _msSoundDeathSS    :: Int
+                  , _msSoundCock       :: Int
+                  }
