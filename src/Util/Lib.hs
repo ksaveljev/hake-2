@@ -62,3 +62,10 @@ rand = do
     let (result, newG) = random g
     globals.rnd .= newG
     return result
+
+randomF :: Quake Float
+randomF = do
+    g <- use $ globals.rnd
+    let (result, newG) = random g
+    globals.rnd .= newG
+    return result

@@ -6,18 +6,52 @@ import Control.Monad (liftM, void)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import CVarVariables
 import Game.Adapters
+import Game.MMoveT
+import Game.MFrameT
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
 import qualified QCommon.Com as Com
+import qualified Util.Lib as Lib
 
 modelScale :: Float
 modelScale = 1.20000
+
+frameAttak101 :: Int
+frameAttak101 = 0
+
+frameAttak112 :: Int
+frameAttak112 = 11
+
+frameAttak201 :: Int
+frameAttak201 = 12
+
+frameAttak218 :: Int
+frameAttak218 = 29
+
+frameAttak301 :: Int
+frameAttak301 = 30
+
+frameAttak309 :: Int
+frameAttak309 = 38
+
+frameAttak401 :: Int
+frameAttak401 = 39
+
+frameAttak406 :: Int
+frameAttak406 = 44
+
+frameRuns01 :: Int
+frameRuns01 = 109
+
+frameRuns14 :: Int
+frameRuns14 = 122
 
 soldierPain :: EntPain
 soldierPain =
@@ -49,10 +83,179 @@ soldierDodge =
   GenericEntDodge "soldier_dodge" $ \_ _ _ -> do
     io (putStrLn "MSoldier.soldierDodge") >> undefined -- TODO
 
+soldierCock :: EntThink
+soldierCock =
+  GenericEntThink "soldier_cock" $ \_ -> do
+    io (putStrLn "MSoldier.soldierCock") >> undefined -- TODO
+
+soldierFire1 :: EntThink
+soldierFire1 =
+  GenericEntThink "soldier_fire1" $ \_ -> do
+    io (putStrLn "MSoldier.soldierFire1") >> undefined -- TODO
+
+soldierFire2 :: EntThink
+soldierFire2 =
+  GenericEntThink "soldier_fire2" $ \_ -> do
+    io (putStrLn "MSoldier.soldierFire2") >> undefined -- TODO
+
+soldierFire3 :: EntThink
+soldierFire3 =
+  GenericEntThink "soldier_fire3" $ \_ -> do
+    io (putStrLn "MSoldier.soldierFire3") >> undefined -- TODO
+
+soldierFire4 :: EntThink
+soldierFire4 =
+  GenericEntThink "soldier_fire4" $ \_ -> do
+    io (putStrLn "MSoldier.soldierFire4") >> undefined -- TODO
+
+soldierFire8 :: EntThink
+soldierFire8 =
+  GenericEntThink "soldier_fire8" $ \_ -> do
+    io (putStrLn "MSoldier.soldierFire8") >> undefined -- TODO
+
+soldierAttack1Refire1 :: EntThink
+soldierAttack1Refire1 =
+  GenericEntThink "soldier_attack1_refire1" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack1Refire1") >> undefined -- TODO
+
+soldierAttack1Refire2 :: EntThink
+soldierAttack1Refire2 =
+  GenericEntThink "soldier_attack1_refire2" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack1Refire2") >> undefined -- TODO
+
+soldierAttack2Refire1 :: EntThink
+soldierAttack2Refire1 =
+  GenericEntThink "soldier_attack2_refire1" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack2Refire1") >> undefined -- TODO
+
+soldierAttack2Refire2 :: EntThink
+soldierAttack2Refire2 =
+  GenericEntThink "soldier_attack2_refire2" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack2Refire2") >> undefined -- TODO
+
+soldierAttack3Refire :: EntThink
+soldierAttack3Refire =
+  GenericEntThink "soldier_attack3_refire" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack3Refire") >> undefined -- TODO
+
+soldierAttack6Refire :: EntThink
+soldierAttack6Refire =
+  GenericEntThink "soldier_attack6_refire" $ \_ -> do
+    io (putStrLn "MSoldier.soldierAttack6Refire") >> undefined -- TODO
+
+soldierDuckUp :: EntThink
+soldierDuckUp =
+  GenericEntThink "soldier_duck_up" $ \_ -> do
+    io (putStrLn "MSoldier.soldierDuckUp") >> undefined -- TODO
+
+soldierFramesAttack1 :: V.Vector MFrameT
+soldierFramesAttack1 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierFire1)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierAttack1Refire1)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierCock)
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierAttack1Refire2)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               ]
+
+soldierMoveAttack1 :: MMoveT
+soldierMoveAttack1 = MMoveT frameAttak101 frameAttak112 soldierFramesAttack1 (Just soldierRun)
+
+soldierFramesAttack2 :: V.Vector MFrameT
+soldierFramesAttack2 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierFire2)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierAttack2Refire1)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierCock)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierAttack2Refire2)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               ]
+
+soldierMoveAttack2 :: MMoveT
+soldierMoveAttack2 = MMoveT frameAttak201 frameAttak218 soldierFramesAttack2 (Just soldierRun)
+
+soldierFramesAttack3 :: V.Vector MFrameT
+soldierFramesAttack3 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierFire3)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierAttack3Refire)
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierDuckUp)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               ]
+
+soldierMoveAttack3 :: MMoveT
+soldierMoveAttack3 = MMoveT frameAttak301 frameAttak309 soldierFramesAttack3 (Just soldierRun)
+
+soldierFramesAttack4 :: V.Vector MFrameT
+soldierFramesAttack4 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just soldierFire4)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               ]
+
+soldierMoveAttack4 :: MMoveT
+soldierMoveAttack4 = MMoveT frameAttak401 frameAttak406 soldierFramesAttack4 (Just soldierRun)
+
+soldierFramesAttack6 :: V.Vector MFrameT
+soldierFramesAttack6 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 10 Nothing
+               , MFrameT (Just GameAI.aiCharge)  4 Nothing
+               , MFrameT (Just GameAI.aiCharge) 12 Nothing
+               , MFrameT (Just GameAI.aiCharge) 11 (Just soldierFire8)
+               , MFrameT (Just GameAI.aiCharge) 13 Nothing
+               , MFrameT (Just GameAI.aiCharge) 18 Nothing
+               , MFrameT (Just GameAI.aiCharge) 15 Nothing
+               , MFrameT (Just GameAI.aiCharge) 14 Nothing
+               , MFrameT (Just GameAI.aiCharge) 11 Nothing
+               , MFrameT (Just GameAI.aiCharge)  8 Nothing
+               , MFrameT (Just GameAI.aiCharge) 11 Nothing
+               , MFrameT (Just GameAI.aiCharge) 12 Nothing
+               , MFrameT (Just GameAI.aiCharge) 12 Nothing
+               , MFrameT (Just GameAI.aiCharge) 17 (Just soldierAttack6Refire)
+               ]
+
+soldierMoveAttack6 :: MMoveT
+soldierMoveAttack6 = MMoveT frameRuns01 frameRuns14 soldierFramesAttack6 (Just soldierRun)
+
 soldierAttack :: EntThink
 soldierAttack =
-  GenericEntThink "soldier_attack" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack") >> undefined -- TODO
+  GenericEntThink "soldier_attack" $ \er@(EdictReference edictIdx) -> do
+    Just skinNum <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum
+
+    nextMove <- if skinNum < 4
+                  then do
+                    v <- Lib.randomF
+                    return $ if v < 0.5 then soldierMoveAttack1 else soldierMoveAttack2
+                  else return soldierMoveAttack4
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+
+    return True
 
 soldierSight :: EntInteract
 soldierSight =
