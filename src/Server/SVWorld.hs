@@ -1,9 +1,13 @@
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVWorld where
 
-import Control.Lens ((.=), (^.), (+=), use, preuse, ix, set)
-import Control.Monad (void, unless)
-import Data.Maybe (isNothing)
-import Linear.V3 (V3, _x, _y)
+import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom)
+import Control.Monad (void, unless, when)
+import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Maybe (isNothing, isJust)
+import Linear.V3 (V3, _x, _y, _z)
+import qualified Data.Foldable as F
 import qualified Data.Vector as V
 
 import Quake
@@ -72,7 +76,78 @@ unlinkEdict (EdictReference edictIdx) = do
       svGlobals.svLinks.ix linkIdx .= link { _lNext = Nothing, _lPrev = Nothing }
 
 linkEdict :: EdictReference -> Quake ()
-linkEdict _ = io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
+linkEdict er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let LinkReference linkIdx = edict^.eArea
+    Just link <- preuse $ svGlobals.svLinks.ix linkIdx
+
+    when (isJust (link^.lPrev)) $
+      unlinkEdict er
+
+    -- don't add the world and the one not in use
+    unless (edictIdx == 0 || not (edict^.eInUse)) $ do
+      -- set the size
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax.eSize .= (edict^.eEdictMinMax.eMaxs) - (edict^.eEdictMinMax.eMins)
+
+      -- encode the size into the entity_state for client prediction
+      if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
+                 -- assume that x/y are equal and symetric
+             let i :: Int = truncate ((edict^.eEdictMinMax.eMaxs._x) / 8)
+                 -- z is not symetric
+                 j :: Int = truncate $ ((edict^.eEdictMinMax.eMins._z) / (-8))
+                 -- and z maxs can be negative
+                 k :: Int= truncate $ ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
+
+                 i' = if | i < 1 -> 1
+                         | i > 31 -> 31
+                         | otherwise -> i
+
+                 j' = if | j < 1 -> 1
+                         | j > 31 -> 31
+                         | otherwise -> j
+
+                 k' = if | k < 1 -> 1
+                         | k > 63 -> 63
+                         | otherwise -> k
+
+             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= (k' `shiftL` 10) .|. (j' `shiftL` 5) .|. i'
+         | (edict^.eSolid) == Constants.solidBsp ->
+             -- a solid _bbox will never create this value
+             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= 31
+         | otherwise ->
+             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= 0
+
+      -- set the abs box
+      if (edict^.eSolid) == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
+        then do
+          -- expand for rotation
+          let aMins = fmap abs (edict^.eEdictMinMax.eMins)
+              aMaxs = fmap abs (edict^.eEdictMinMax.eMaxs)
+              minMax = F.maximum aMins
+              maxMax = F.maximum aMaxs
+              m = F.maximum [minMax, maxMax]
+
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+            eAbsMin .= fmap ((-) m) (edict^.eEntityState.esOrigin)
+            eAbsMax .= fmap (+ m) (edict^.eEntityState.esOrigin)
+
+        else do
+          -- normal
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+            eAbsMin .= (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMins)
+            eAbsMax .= (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMaxs)
+
+      -- because movement is clipped an epsilon away from an actual edge,
+      -- we must fully check even when bouding boxes don't quite touch
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+        eEdictMinMax.eAbsMin -= 1
+        eEdictMinMax.eAbsMax += 1
+        -- link to PVS leafs
+        eNumClusters .= 0
+        eAreaNum .= 0
+        eAreaNum2 .= 0
+
+      io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
 
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
