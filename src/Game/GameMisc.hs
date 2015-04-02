@@ -3,7 +3,7 @@ module Game.GameMisc where
 
 import Quake
 import QuakeState
-import Game.EntThink
+import Game.Adapters
 
 spPathCorner :: EdictReference -> Quake ()
 spPathCorner _ = io (putStrLn "GameMisc.spPathCorner") >> undefined -- TODO

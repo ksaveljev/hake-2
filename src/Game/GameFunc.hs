@@ -3,7 +3,7 @@ module Game.GameFunc where
 
 import Quake
 import QuakeState
-import Game.EntThink
+import Game.Adapters
 
 spFuncButton :: EntThink
 spFuncButton =

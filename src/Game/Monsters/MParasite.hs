@@ -2,7 +2,7 @@
 module Game.Monsters.MParasite where
 
 import Quake
-import Game.EntThink
+import Game.Adapters
 
 spMonsterParasite :: EntThink
 spMonsterParasite =

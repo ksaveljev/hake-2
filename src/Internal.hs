@@ -568,7 +568,7 @@ data GameImportT =
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()
               , _giAreasConnected     :: Int -> Int -> Quake Bool
-              , _giLinkEntity         :: EdictT -> Quake ()
+              , _giLinkEntity         :: EdictReference -> Quake ()
               , _giUnlinkEntity       :: EdictReference -> Quake ()
               , _giBoxEdicts          :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
               , _giPMove              :: PMoveT -> Quake ()

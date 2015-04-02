@@ -16,7 +16,7 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import CVarVariables
-import Game.EntThink
+import Game.Adapters
 import Game.SpawnT
 import qualified Constants
 import qualified Game.GameFunc as GameFunc

@@ -71,7 +71,7 @@ unlinkEdict (EdictReference edictIdx) = do
       removeLink lr
       svGlobals.svLinks.ix linkIdx .= link { _lNext = Nothing, _lPrev = Nothing }
 
-linkEdict :: EdictT -> Quake ()
+linkEdict :: EdictReference -> Quake ()
 linkEdict _ = io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
 
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int

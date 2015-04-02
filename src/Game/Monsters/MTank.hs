@@ -2,7 +2,7 @@
 module Game.Monsters.MTank where
 
 import Quake
-import Game.EntThink
+import Game.Adapters
 
 spMonsterTank :: EntThink
 spMonsterTank =

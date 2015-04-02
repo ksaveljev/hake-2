@@ -1,10 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
-import Game.EntInteract
-import Game.EntThink
-import Game.ItemDrop
-import Game.ItemUse
+import Game.Adapters
 
 useWeapon :: ItemUse
 useWeapon =
