@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSoldier where
 
 import Control.Lens ((^.), (.=), use, ix, zoom, preuse)
-import Control.Monad (liftM, void)
+import Control.Monad (liftM, void, when)
+import Data.Maybe (isNothing)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -47,6 +49,12 @@ frameAttak401 = 39
 frameAttak406 :: Int
 frameAttak406 = 44
 
+frameDuck01 :: Int
+frameDuck01 = 45
+
+frameDuck05 :: Int
+frameDuck05 = 49
+
 frameRuns01 :: Int
 frameRuns01 = 109
 
@@ -80,8 +88,35 @@ soldierRun =
 
 soldierDodge :: EntDodge
 soldierDodge =
-  GenericEntDodge "soldier_dodge" $ \_ _ _ -> do
-    io (putStrLn "MSoldier.soldierDodge") >> undefined -- TODO
+  GenericEntDodge "soldier_dodge" $ \(EdictReference selfIdx) attacker eta -> do
+    r <- Lib.randomF
+
+    when (r > 0.25) $ do
+      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy
+
+      when (isNothing enemy) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just attacker
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      nextMove <- if skillValue == 0
+                    then return soldierMoveDuck
+                    else do
+                      time <- use $ gameBaseGlobals.gbLevel.llTime
+                      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= time + eta + 0.3
+                      r' <- Lib.randomF
+
+                      return $ if | skillValue == 1 ->
+                                      if r' > 0.33
+                                        then soldierMoveDuck
+                                        else soldierMoveAttack3
+                                  | skillValue >= 2 ->
+                                      if r' > 0.66
+                                        then soldierMoveDuck
+                                        else soldierMoveAttack3
+                                  | otherwise -> soldierMoveAttack3
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
 
 soldierCock :: EntThink
 soldierCock =
@@ -147,6 +182,16 @@ soldierDuckUp :: EntThink
 soldierDuckUp =
   GenericEntThink "soldier_duck_up" $ \_ -> do
     io (putStrLn "MSoldier.soldierDuckUp") >> undefined -- TODO
+
+soldierDuckDown :: EntThink
+soldierDuckDown =
+  GenericEntThink "soldier_duck_down" $ \_ -> do
+    io (putStrLn "MSoldier.soldierDuckDown") >> undefined -- TODO
+
+soldierDuckHold :: EntThink
+soldierDuckHold =
+  GenericEntThink "soldier_duck_hold" $ \_ -> do
+    io (putStrLn "MSoldier.soldierDuckHold") >> undefined -- TODO
 
 soldierFramesAttack1 :: V.Vector MFrameT
 soldierFramesAttack1 =
@@ -241,6 +286,18 @@ soldierFramesAttack6 =
 
 soldierMoveAttack6 :: MMoveT
 soldierMoveAttack6 = MMoveT frameRuns01 frameRuns14 soldierFramesAttack6 (Just soldierRun)
+
+soldierFramesDuck :: V.Vector MFrameT
+soldierFramesDuck =
+    V.fromList [ MFrameT (Just GameAI.aiMove)   5  (Just soldierDuckDown)
+               , MFrameT (Just GameAI.aiMove) (-1) (Just soldierDuckHold)
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  (Just soldierDuckUp)
+               , MFrameT (Just GameAI.aiMove)   5  Nothing
+               ]
+
+soldierMoveDuck :: MMoveT
+soldierMoveDuck = MMoveT frameDuck01 frameDuck05 soldierFramesDuck (Just soldierRun)
 
 soldierAttack :: EntThink
 soldierAttack =
