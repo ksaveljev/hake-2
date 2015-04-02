@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE Rank2Types #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse)
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens')
 import Control.Monad (void, when, unless)
 import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
@@ -818,3 +819,7 @@ floodAreaConnections = do
                 else do
                   floodAreaR idx (floodNum + 1)
                   flood floodValid (idx + 1) maxIdx (floodNum + 1)
+
+-- fills in a list of all the leafs touched
+boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> [Int] -> Quake (Int, [Int])
+boxLeafNums = undefined -- TODO

@@ -13,6 +13,7 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.CM as CM
 
 initNodes :: Quake ()
 initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
@@ -90,35 +91,37 @@ linkEdict er@(EdictReference edictIdx) = do
       gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax.eSize .= (edict^.eEdictMinMax.eMaxs) - (edict^.eEdictMinMax.eMins)
 
       -- encode the size into the entity_state for client prediction
-      if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
-                 -- assume that x/y are equal and symetric
-             let i :: Int = truncate ((edict^.eEdictMinMax.eMaxs._x) / 8)
-                 -- z is not symetric
-                 j :: Int = truncate $ ((edict^.eEdictMinMax.eMins._z) / (-8))
-                 -- and z maxs can be negative
-                 k :: Int= truncate $ ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
+      solid <- if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
+                          -- assume that x/y are equal and symetric
+                      let i :: Int = truncate ((edict^.eEdictMinMax.eMaxs._x) / 8)
+                          -- z is not symetric
+                          j :: Int = truncate $ ((edict^.eEdictMinMax.eMins._z) / (-8))
+                          -- and z maxs can be negative
+                          k :: Int= truncate $ ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
 
-                 i' = if | i < 1 -> 1
-                         | i > 31 -> 31
-                         | otherwise -> i
+                          i' = if | i < 1 -> 1
+                                  | i > 31 -> 31
+                                  | otherwise -> i
 
-                 j' = if | j < 1 -> 1
-                         | j > 31 -> 31
-                         | otherwise -> j
+                          j' = if | j < 1 -> 1
+                                  | j > 31 -> 31
+                                  | otherwise -> j
 
-                 k' = if | k < 1 -> 1
-                         | k > 63 -> 63
-                         | otherwise -> k
+                          k' = if | k < 1 -> 1
+                                  | k > 63 -> 63
+                                  | otherwise -> k
 
-             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= (k' `shiftL` 10) .|. (j' `shiftL` 5) .|. i'
-         | (edict^.eSolid) == Constants.solidBsp ->
-             -- a solid _bbox will never create this value
-             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= 31
-         | otherwise ->
-             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= 0
+                      return $ (k' `shiftL` 10) .|. (j' `shiftL` 5) .|. i'
+                  | (edict^.eSolid) == Constants.solidBsp ->
+                      -- a solid _bbox will never create this value
+                      return 31
+                  | otherwise ->
+                      return  0
+
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= solid
 
       -- set the abs box
-      if (edict^.eSolid) == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
+      if solid == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
         then do
           -- expand for rotation
           let aMins = fmap abs (edict^.eEdictMinMax.eMins)
@@ -146,6 +149,17 @@ linkEdict er@(EdictReference edictIdx) = do
         eNumClusters .= 0
         eAreaNum .= 0
         eAreaNum2 .= 0
+
+      Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      (numLeafs, iw) <- CM.boxLeafNums (updatedEdict^.eEdictMinMax.eAbsMin)
+                                      (updatedEdict^.eEdictMinMax.eAbsMax)
+                                      (svGlobals.svLeafs)
+                                      128
+                                      [0]
+
+      let topnode = head iw
+
+      -- set areas
 
       io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
 
