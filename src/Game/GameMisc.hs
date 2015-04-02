@@ -1,12 +1,50 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameMisc where
 
+import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
+import Data.Bits ((.|.))
+import Data.Maybe (isNothing)
+import Linear (V3(..))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+
 import Quake
 import QuakeState
 import Game.Adapters
+import qualified Constants
+import qualified Game.GameUtil as GameUtil
 
 spPathCorner :: EdictReference -> Quake ()
-spPathCorner _ = io (putStrLn "GameMisc.spPathCorner") >> undefined -- TODO
+spPathCorner er@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        linkEntity = gameImport^.giLinkEntity
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if isNothing (edict^.eEdictInfo.eiTargetName)
+      then do
+        dprintf $ "path_corner with no targetname at " `B.append` BC.pack (show (edict^.eEntityState.esOrigin)) `B.append` "\n"
+        GameUtil.freeEdict er
+      else do
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSolid .= Constants.solidTrigger
+          eEdictAction.eaTouch .= Just pathCornerTouch
+          eEdictMinMax.eMins .= V3 (-8) (-8) (-8)
+          eEdictMinMax.eMaxs .= V3 8 8 8
+          eSvFlags %= (.|. Constants.svfNoClient)
+
+        linkEntity er
+
+{-
+- QUAKED path_corner (.5 .3 0) (-8 -8 -8) (8 8 8) TELEPORT Target: next
+- path corner Pathtarget: gets used when an entity that has this
+- path_corner targeted touches it
+-}
+pathCornerTouch :: EntTouch
+pathCornerTouch =
+  GenericEntTouch "path_corner_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameMisc.pathCornerTouch") >> undefined -- TODO
 
 spPointCombat :: EdictReference -> Quake ()
 spPointCombat _ = io (putStrLn "GameMisc.spPointCombat") >> undefined -- TODO

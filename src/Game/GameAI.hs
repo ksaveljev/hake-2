@@ -4,6 +4,11 @@ module Game.GameAI where
 import Quake
 import Game.Adapters
 
+aiStand :: AI
+aiStand =
+  GenericAI "ai_stand" $ \_ _ -> do
+    io (putStrLn "GameAI.aiStand") >> undefined -- TODO
+
 walkMonsterStart :: EntThink
 walkMonsterStart =
   GenericEntThink "walkmonster_start" $ \_ -> do

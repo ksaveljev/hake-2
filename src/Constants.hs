@@ -933,8 +933,8 @@ solidBsp     = 3 :: Int -- bsp clip, touch on edge
 gameApiVersion = 3 :: Int
 
 -- edict->svflags
-svfNoclient    = 0x00000001 :: Int -- don't send entity to clients, even if it has effects 
-svfDeadmonster = 0x00000002 :: Int -- treat as CONTENTS_DEADMONSTER for collision 
+svfNoClient    = 0x00000001 :: Int -- don't send entity to clients, even if it has effects 
+svfDeadMonster = 0x00000002 :: Int -- treat as CONTENTS_DEADMONSTER for collision 
 svfMonster     = 0x00000004 :: Int -- treat as CONTENTS_MONSTER for collision 
 
 maxEntClusters = 16 :: Int

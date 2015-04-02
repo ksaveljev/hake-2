@@ -36,7 +36,6 @@ import Game.CSurfaceT
 import Game.CVarT
 import Game.GItemArmorT
 import Game.MapSurfaceT
-import Game.MMoveT
 import Game.PMoveStateT
 import Game.PlayerStateT
 import Game.SpawnTempT
@@ -110,6 +109,7 @@ data QuakeState =
              , _cmGlobals         :: CMGlobals
              , _gameItemsGlobals  :: GameItemsGlobals
              , _mSoldierGlobals   :: MSoldierGlobals
+             , _mInfantryGlobals  :: MInfantryGlobals
              }
 
 data Globals =
@@ -996,6 +996,9 @@ class ItemUseAdapter a where
 class ItemDropAdapter a where
     drop :: a -> EdictReference   -> GItemT -> Quake ()
 
+class AIAdapter a where
+    ai :: a -> EdictReference -> Float -> Quake ()
+
 data EntInteract =
   GenericEntInteract { _geiId :: B.ByteString
                      , _geiInteract :: EdictReference -> EdictReference -> Quake Bool
@@ -1046,6 +1049,11 @@ data ItemDrop =
                   , _gidDrop :: EdictReference -> GItemT -> Quake ()
                   }
 
+data AI =
+  GenericAI { _gaiId :: B.ByteString
+            , _gaiAi :: EdictReference -> Float -> Quake ()
+            }
+
 instance SuperAdapter EntInteract where
     getID (GenericEntInteract _id _) = _id
 
@@ -1076,6 +1084,9 @@ instance SuperAdapter ItemUse where
 instance SuperAdapter ItemDrop where
     getID (GenericItemDrop _id _) = _id
 
+instance SuperAdapter AI where
+    getID (GenericAI _id _) = _id
+
 instance EntInteractAdapter EntInteract where
     interact (GenericEntInteract _ _interact) = _interact
 
@@ -1105,6 +1116,9 @@ instance ItemUseAdapter ItemUse where
 
 instance ItemDropAdapter ItemDrop where
     drop (GenericItemDrop _ _drop) = _drop
+
+instance AIAdapter AI where
+    ai (GenericAI _ _ai) = _ai
 
 data ClientRespawnT =
   ClientRespawnT { _crCoopRespawn :: ClientPersistantT
@@ -1257,3 +1271,30 @@ data MSoldierGlobals =
                   , _msSoundDeathSS    :: Int
                   , _msSoundCock       :: Int
                   }
+
+data MInfantryGlobals =
+  MInfantryGlobals { _miSoundPain1      :: Int
+                   , _miSoundPain2      :: Int
+                   , _miSoundDie1       :: Int
+                   , _miSoundDie2       :: Int
+                   , _miSoundGunShot    :: Int
+                   , _miSoundWeaponCock :: Int
+                   , _miSoundPunchSwing :: Int
+                   , _miSoundPunchHit   :: Int
+                   , _miSoundSight      :: Int
+                   , _miSoundSearch     :: Int
+                   , _miSoundIdle       :: Int
+                   }
+
+data MFrameT =
+  MFrameT { _mfAI    :: Maybe AI
+          , _mfDist  :: Float
+          , _mfThink :: Maybe EntThink
+          }
+
+data MMoveT =
+  MMoveT { _mmFirstFrame :: Int
+         , _mmLastFrame  :: Int
+         , _mmFrame      :: V.Vector MFrameT
+         , _mmEndFunc    :: Maybe EntThink
+         }

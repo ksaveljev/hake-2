@@ -8,6 +8,7 @@ module Game.Adapters ( EntThink(..)
                      , EntTouch(..)
                      , ItemUse(..)
                      , ItemDrop(..)
+                     , AI(..)
                      ) where
 
 import Internal

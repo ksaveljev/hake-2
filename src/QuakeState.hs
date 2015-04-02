@@ -15,6 +15,7 @@ module QuakeState ( QuakeState(..)
                   , cmGlobals
                   , gameItemsGlobals
                   , mSoldierGlobals
+                  , mInfantryGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -35,6 +36,7 @@ module QuakeState ( QuakeState(..)
                   , module Sys.NETGlobals
                   , module Game.GameItemsGlobals
                   , module Game.Monsters.MSoldierGlobals
+                  , module Game.Monsters.MInfantryGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -44,6 +46,7 @@ import Globals
 import Game.CmdGlobals
 import Game.GameBaseGlobals
 import Game.GameItemsGlobals
+import Game.Monsters.MInfantryGlobals
 import Game.Monsters.MSoldierGlobals
 import Client.KeyGlobals
 import Client.SCRGlobals
@@ -73,4 +76,5 @@ initialQuakeState =
              , _cmGlobals         = initialCMGlobals
              , _gameItemsGlobals  = initialGameItemsGlobals
              , _mSoldierGlobals   = initialMSoldierGlobals
+             , _mInfantryGlobals  = initialMInfantryGlobals
              }
