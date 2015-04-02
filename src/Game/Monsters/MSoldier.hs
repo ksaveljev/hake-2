@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MSoldier where
 
-import Control.Lens ((^.), (.=), use, zoom, ix)
+import Control.Lens ((^.), (.=), use, ix)
 import Control.Monad (liftM, void)
 
 import Quake
@@ -45,12 +45,16 @@ spMonsterSoldierLight =
         void $ soundIndex "misc/lasfly.wav"
         void $ soundIndex "soldier/solatck2.wav"
 
-        io (putStrLn "spMonsterSoldierLight") >> undefined -- TODO
-        {- ZOOM DOESN'T WORK FOR ME RIGHT NOW
+        {- IMPROVE: ZOOM
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 0
           eEdictStatus.eHealth .= 20
           eEdictStatus.eGibHealth .= (-30)
           -}
+
+        let edictLens = gameBaseGlobals.gbGEdicts.ix edictIdx
+        edictLens.eEntityState.esSkinNum .= 0
+        edictLens.eEdictStatus.eHealth .= 20
+        edictLens.eEdictStatus.eGibHealth .= (-30)
 
     return True
