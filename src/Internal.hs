@@ -1,14 +1,19 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Internal where
 
-import Linear (V3, V4)
-import Data.Int (Int16)
-import Data.Word (Word8, Word16)
-import Data.Sequence (Seq)
 import Control.Applicative
-import Control.Monad.State.Strict
+import Control.Lens (Zoom, zoom)
+import Control.Lens.Internal.Zoom (Zoomed, Focusing)
 import Control.Monad.Except
+import Control.Monad.State.Strict
+import Data.Int (Int16)
+import Data.Sequence (Seq)
+import Data.Word (Word8, Word16)
+import Linear (V3, V4)
 import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
@@ -58,8 +63,20 @@ import Server.ClientFrameT
 import Sound.SfxT
 import Sys.LoopbackT
 
-newtype Quake a = Quake (StateT QuakeState (ExceptT B.ByteString IO) a)
-                    deriving (Functor, Applicative, Monad, MonadIO, MonadError B.ByteString, MonadState QuakeState)
+newtype QuakeS s a = Quake { unQuake :: StateT s (ExceptT B.ByteString IO) a }
+                       deriving ( Functor
+                                , Applicative
+                                , Monad
+                                , MonadIO
+                                , MonadError B.ByteString
+                                , MonadState s)
+
+type Quake = QuakeS QuakeState
+
+type instance Zoomed (QuakeS s) = Focusing (ExceptT B.ByteString IO)
+
+instance Zoom (QuakeS s) (QuakeS t) s t where
+    zoom l (Quake m) = Quake (zoom l m)
 
 type XCommandT = Quake ()
 
