@@ -41,6 +41,12 @@ frameAttak112 = 11
 frameAttak201 :: Int
 frameAttak201 = 12
 
+frameAttak204 :: Int
+frameAttak204 = 15
+
+frameAttak216 :: Int
+frameAttak216 = 27
+
 frameAttak218 :: Int
 frameAttak218 = 29
 
@@ -240,8 +246,22 @@ soldierAttack1Refire2 =
 
 soldierAttack2Refire1 :: EntThink
 soldierAttack2Refire1 =
-  GenericEntThink "soldier_attack2_refire1" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack2Refire1") >> undefined -- TODO
+  GenericEntThink "soldier_attack2_refire1" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+      r <- Lib.randomF
+
+      let nextFrame = if (skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee
+                        then frameAttak204
+                        else frameAttak216
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= nextFrame
+
+    return True
 
 soldierAttack2Refire2 :: EntThink
 soldierAttack2Refire2 =
