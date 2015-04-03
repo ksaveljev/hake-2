@@ -5,7 +5,7 @@ module Game.Monsters.MSoldier where
 import Control.Lens ((^.), (.=), (%=), (+=), (-=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.|.), (.&.), complement)
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -104,8 +104,20 @@ frameRuns03 = 111
 frameRuns14 :: Int
 frameRuns14 = 122
 
+frameStand101 :: Int
+frameStand101 = 146
+
+frameStand130 :: Int
+frameStand130 = 175
+
+frameStand301 :: Int
+frameStand301 = 176
+
 frameStand322 :: Int
 frameStand322 = 197
+
+frameStand339 :: Int
+frameStand339 = 214
 
 soldierDead :: EntThink
 soldierDead =
@@ -253,10 +265,105 @@ soldierPain =
 
               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
 
+soldierFramesStand1 :: V.Vector MFrameT
+soldierFramesStand1 =
+    V.fromList [ MFrameT (Just GameAI.aiStand) 0 (Just soldierIdle)
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               ]
+
+soldierMoveStand1 :: MMoveT
+soldierMoveStand1 = MMoveT "soldierMoveStand1" frameStand101 frameStand130 soldierFramesStand1 (Just soldierStand)
+
+soldierFramesStand3 :: V.Vector MFrameT
+soldierFramesStand3 =
+    V.fromList [ MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 (Just soldierCock)
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               , MFrameT (Just GameAI.aiStand) 0 Nothing
+               ]
+
+soldierMoveStand3 :: MMoveT
+soldierMoveStand3 = MMoveT "soldierMoveStand3" frameStand301 frameStand339 soldierFramesStand3 (Just soldierStand)
+
 soldierStand :: EntThink
 soldierStand =
-  GenericEntThink "soldier_stand" $ \_ -> do
-    io (putStrLn "MSoldier.soldierStand") >> undefined -- TODO
+  GenericEntThink "soldier_stand" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    r <- Lib.randomF
+    let currentMove = self^.eMonsterInfo.miCurrentMove
+
+
+    let nextMove = if isJust currentMove && ((fromJust currentMove)^.mmId) == "soldierMoveStand3" || r < 0.8
+                     then soldierMoveStand1
+                     else soldierMoveStand3
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+
+    return True
 
 soldierWalk :: EntThink
 soldierWalk =
