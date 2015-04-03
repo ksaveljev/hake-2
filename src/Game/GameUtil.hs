@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameUtil where
 
 import Control.Lens ((^.), use, (.=), ix, preuse, (+=))
 import Control.Monad (liftM, when)
+import Linear (norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -83,3 +85,18 @@ freeEdict er@(EdictReference idx) = do
     when (idx > maxClientsValue + Constants.bodyQueueSize) $ do
       time <- use $ gameBaseGlobals.gbLevel.llTime
       gameBaseGlobals.gbGEdicts.ix idx .= (newEdictT idx) { _eClassName = "freed", _eFreeTime = time, _eInUse = False }
+
+{-
+- Returns the range catagorization of an entity reletive to self 0 melee
+- range, will become hostile even if back is turned 1 visibility and
+- infront, or visibility and show hostile 2 infront and show hostile 3 only
+- triggered by damage.
+-}
+range :: EdictT -> EdictT -> Int
+range self other =
+    let v = (self^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)
+        len = norm v
+    in if | len < (fromIntegral Constants.meleeDistance) -> Constants.rangeMelee
+          | len < 500 -> Constants.rangeNear
+          | len < 1000 -> Constants.rangeMid
+          | otherwise -> Constants.rangeFar

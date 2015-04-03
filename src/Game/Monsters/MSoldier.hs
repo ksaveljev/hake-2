@@ -3,7 +3,7 @@
 module Game.Monsters.MSoldier where
 
 import Control.Lens ((^.), (.=), (%=), use, ix, zoom, preuse)
-import Control.Monad (liftM, void, when)
+import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.|.))
 import Data.Maybe (isNothing)
 import Linear (V3(..))
@@ -28,6 +28,12 @@ modelScale = 1.20000
 
 frameAttak101 :: Int
 frameAttak101 = 0
+
+frameAttak102 :: Int
+frameAttak102 = 1
+
+frameAttak110 :: Int
+frameAttak110 = 9
 
 frameAttak112 :: Int
 frameAttak112 = 11
@@ -199,8 +205,22 @@ soldierFire _ _ = io (putStrLn "MSoldier.soldierFire") >> undefined -- TODO
 
 soldierAttack1Refire1 :: EntThink
 soldierAttack1Refire1 =
-  GenericEntThink "soldier_attack1_refire1" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack1Refire1") >> undefined -- TODO
+  GenericEntThink "soldier_attack1_refire1" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+      r <- Lib.randomF
+
+      let nextFrame = if (skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee
+                        then frameAttak102
+                        else frameAttak110
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= nextFrame
+
+    return True
 
 soldierAttack1Refire2 :: EntThink
 soldierAttack1Refire2 =
