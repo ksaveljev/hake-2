@@ -53,6 +53,9 @@ frameAttak218 = 29
 frameAttak301 :: Int
 frameAttak301 = 30
 
+frameAttak303 :: Int
+frameAttak303 = 32
+
 frameAttak309 :: Int
 frameAttak309 = 38
 
@@ -281,8 +284,14 @@ soldierAttack2Refire2 =
 
 soldierAttack3Refire :: EntThink
 soldierAttack3Refire =
-  GenericEntThink "soldier_attack3_refire" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack3Refire") >> undefined -- TODO
+  GenericEntThink "soldier_attack3_refire" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    when ((time + 0.4) < (self^.eMonsterInfo.miPauseTime)) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameAttak303
+
+    return True
 
 soldierAttack6Refire :: EntThink
 soldierAttack6Refire =
