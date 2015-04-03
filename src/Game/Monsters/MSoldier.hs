@@ -74,6 +74,9 @@ frameDuck05 = 49
 frameRuns01 :: Int
 frameRuns01 = 109
 
+frameRuns03 :: Int
+frameRuns03 = 111
+
 frameRuns14 :: Int
 frameRuns14 = 122
 
@@ -295,8 +298,18 @@ soldierAttack3Refire =
 
 soldierAttack6Refire :: EntThink
 soldierAttack6Refire =
-  GenericEntThink "soldier_attack6_refire" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack6Refire") >> undefined -- TODO
+  GenericEntThink "soldier_attack6_refire" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    unless (enemy^.eEdictStatus.eHealth <= 0 || GameUtil.range self enemy < Constants.rangeMid) $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      when (skillValue == 3) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameRuns03
+
+    return True
 
 soldierDuckUp :: EntThink
 soldierDuckUp =
