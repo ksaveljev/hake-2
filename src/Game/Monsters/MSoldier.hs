@@ -2,11 +2,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSoldier where
 
-import Control.Lens ((^.), (.=), (%=), use, ix, zoom, preuse)
+import Control.Lens ((^.), (.=), (%=), (+=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when, unless)
-import Data.Bits ((.|.))
+import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing)
-import Linear (V3(..))
+import Linear (V3(..), _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -313,8 +313,17 @@ soldierAttack6Refire =
 
 soldierDuckUp :: EntThink
 soldierDuckUp =
-  GenericEntThink "soldier_duck_up" $ \_ -> do
-    io (putStrLn "MSoldier.soldierDuckUp") >> undefined -- TODO
+  GenericEntThink "soldier_duck_up" $ \self@(EdictReference selfIdx) -> do
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
+      eEdictMinMax.eMaxs._z += 32
+      eEdictStatus.eTakeDamage .= Constants.damageAim
+
+    linkEntity self
+
+    return True
 
 soldierDuckDown :: EntThink
 soldierDuckDown =
