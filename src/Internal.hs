@@ -1293,7 +1293,8 @@ data MFrameT =
           }
 
 data MMoveT =
-  MMoveT { _mmFirstFrame :: Int
+  MMoveT { _mmId         :: B.ByteString -- to check for equality
+         , _mmFirstFrame :: Int
          , _mmLastFrame  :: Int
          , _mmFrame      :: V.Vector MFrameT
          , _mmEndFunc    :: Maybe EntThink

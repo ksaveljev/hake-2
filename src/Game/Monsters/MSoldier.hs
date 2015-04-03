@@ -5,7 +5,7 @@ module Game.Monsters.MSoldier where
 import Control.Lens ((^.), (.=), (%=), (+=), (-=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.|.), (.&.), complement)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Linear (V3(..), _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -71,6 +71,30 @@ frameDuck01 = 45
 frameDuck05 :: Int
 frameDuck05 = 49
 
+framePain101 :: Int
+framePain101 = 50
+
+framePain105 :: Int
+framePain105 = 54
+
+framePain201 :: Int
+framePain201 = 55
+
+framePain207 :: Int
+framePain207 = 61
+
+framePain301 :: Int
+framePain301 = 62
+
+framePain318 :: Int
+framePain318 = 79
+
+framePain401 :: Int
+framePain401 = 80
+
+framePain417 :: Int
+framePain417  = 96
+
 frameRuns01 :: Int
 frameRuns01 = 109
 
@@ -104,10 +128,130 @@ soldierDie =
   GenericEntDie "soldier_die" $ \_ _ _ _ _ -> do
     io (putStrLn "MSoldier.soldierDie") >> undefined -- TODO
 
+soldierFramesPain1 :: V.Vector MFrameT
+soldierFramesPain1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove)   4  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+soldierMovePain1 :: MMoveT
+soldierMovePain1 = MMoveT "soldierMovePain1" framePain101 framePain105 soldierFramesPain1 (Just soldierRun)
+
+soldierFramesPain2 :: V.Vector MFrameT
+soldierFramesPain2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-13) Nothing
+               , MFrameT (Just GameAI.aiMove)  (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               , MFrameT (Just GameAI.aiMove)    4  Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               , MFrameT (Just GameAI.aiMove)    3  Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               ]
+
+soldierMovePain2 :: MMoveT
+soldierMovePain2 = MMoveT "soldierMovePain2" framePain201 framePain207 soldierFramesPain2 (Just soldierRun)
+
+soldierFramesPain3 :: V.Vector MFrameT
+soldierFramesPain3 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-8) Nothing
+               , MFrameT (Just GameAI.aiMove)  10  Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   4  Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               ]
+
+soldierMovePain3 :: MMoveT
+soldierMovePain3 = MMoveT "soldierMovePain3" framePain301 framePain318 soldierFramesPain3 (Just soldierRun)
+
+soldierFramesPain4 :: V.Vector MFrameT
+soldierFramesPain4 =
+    V.fromList [ MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-10) Nothing
+               , MFrameT (Just GameAI.aiMove)  (-6) Nothing
+               , MFrameT (Just GameAI.aiMove)    8  Nothing
+               , MFrameT (Just GameAI.aiMove)    4  Nothing
+               , MFrameT (Just GameAI.aiMove)    1  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               , MFrameT (Just GameAI.aiMove)    5  Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               , MFrameT (Just GameAI.aiMove)  (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)  (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)    3  Nothing
+               , MFrameT (Just GameAI.aiMove)    2  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               ]
+
+soldierMovePain4 :: MMoveT
+soldierMovePain4 = MMoveT "soldierMovePain4" framePain401 framePain417 soldierFramesPain4 (Just soldierRun)
+
 soldierPain :: EntPain
 soldierPain =
-  GenericEntPain "soldier_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MSoldier.soldierPain") >> undefined -- TODO
+  GenericEntPain "soldier_pain" $ \self@(EdictReference selfIdx) _ _ _ -> do
+    Just selfEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((selfEdict^.eEdictStatus.eHealth) < ((selfEdict^.eEdictStatus.eMaxHealth) `div` 2)) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum %= (.|. 1)
+
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if time < (selfEdict^.eEdictTiming.etPainDebounceTime)
+      then
+        when ((selfEdict^.eEdictPhysics.eVelocity._z) > 100 && isJust (selfEdict^.eMonsterInfo.miCurrentMove)) $ do
+          let Just move = selfEdict^.eMonsterInfo.miCurrentMove
+              moveId = move^.mmId
+
+          when (any (== moveId) ["soldierMovePain1", "soldierMovePain2", "soldierMovePain3"]) $
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMovePain4
+
+      else do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictTiming.etPainDebounceTime .= time + 3
+
+        let n = (selfEdict^.eEntityState.esSkinNum) .|. 1
+
+        soundPainLight <- use $ mSoldierGlobals.msSoundPainLight
+        soundPain <- use $ mSoldierGlobals.msSoundPain
+        soundPainSS <- use $ mSoldierGlobals.msSoundPainSS
+
+        let s = if | n == 1 -> soundPainLight
+                   | n == 3 -> soundPain
+                   | otherwise -> soundPainSS
+
+        sound self Constants.chanVoice s 1 (fromIntegral Constants.attnNorm) 0
+
+        if (selfEdict^.eEdictPhysics.eVelocity._z) > 100
+          then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMovePain4
+          else do
+            skillValue <- liftM (^.cvValue) skillCVar
+
+            -- no pain anims in nightmare
+            unless (skillValue == 3) $ do
+              r <- Lib.randomF
+
+              let nextMove = if | r < 0.33 -> soldierMovePain1
+                                | r < 0.66 -> soldierMovePain2
+                                | otherwise -> soldierMovePain3
+
+              gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
 
 soldierStand :: EntThink
 soldierStand =
@@ -375,7 +519,7 @@ soldierFramesAttack1 =
                ]
 
 soldierMoveAttack1 :: MMoveT
-soldierMoveAttack1 = MMoveT frameAttak101 frameAttak112 soldierFramesAttack1 (Just soldierRun)
+soldierMoveAttack1 = MMoveT "soldierMoveAttack1" frameAttak101 frameAttak112 soldierFramesAttack1 (Just soldierRun)
 
 soldierFramesAttack2 :: V.Vector MFrameT
 soldierFramesAttack2 =
@@ -400,7 +544,7 @@ soldierFramesAttack2 =
                ]
 
 soldierMoveAttack2 :: MMoveT
-soldierMoveAttack2 = MMoveT frameAttak201 frameAttak218 soldierFramesAttack2 (Just soldierRun)
+soldierMoveAttack2 = MMoveT "soldierMoveAttack2" frameAttak201 frameAttak218 soldierFramesAttack2 (Just soldierRun)
 
 soldierFramesAttack3 :: V.Vector MFrameT
 soldierFramesAttack3 =
@@ -416,7 +560,7 @@ soldierFramesAttack3 =
                ]
 
 soldierMoveAttack3 :: MMoveT
-soldierMoveAttack3 = MMoveT frameAttak301 frameAttak309 soldierFramesAttack3 (Just soldierRun)
+soldierMoveAttack3 = MMoveT "soldierMoveAttack3" frameAttak301 frameAttak309 soldierFramesAttack3 (Just soldierRun)
 
 soldierFramesAttack4 :: V.Vector MFrameT
 soldierFramesAttack4 =
@@ -429,7 +573,7 @@ soldierFramesAttack4 =
                ]
 
 soldierMoveAttack4 :: MMoveT
-soldierMoveAttack4 = MMoveT frameAttak401 frameAttak406 soldierFramesAttack4 (Just soldierRun)
+soldierMoveAttack4 = MMoveT "soldierMoveAttack4" frameAttak401 frameAttak406 soldierFramesAttack4 (Just soldierRun)
 
 soldierFramesAttack6 :: V.Vector MFrameT
 soldierFramesAttack6 =
@@ -450,7 +594,7 @@ soldierFramesAttack6 =
                ]
 
 soldierMoveAttack6 :: MMoveT
-soldierMoveAttack6 = MMoveT frameRuns01 frameRuns14 soldierFramesAttack6 (Just soldierRun)
+soldierMoveAttack6 = MMoveT "soldierMoveAttack6" frameRuns01 frameRuns14 soldierFramesAttack6 (Just soldierRun)
 
 soldierFramesDuck :: V.Vector MFrameT
 soldierFramesDuck =
@@ -462,7 +606,7 @@ soldierFramesDuck =
                ]
 
 soldierMoveDuck :: MMoveT
-soldierMoveDuck = MMoveT frameDuck01 frameDuck05 soldierFramesDuck (Just soldierRun)
+soldierMoveDuck = MMoveT "soldierMoveDuck" frameDuck01 frameDuck05 soldierFramesDuck (Just soldierRun)
 
 soldierAttack :: EntThink
 soldierAttack =

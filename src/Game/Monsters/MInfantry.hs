@@ -97,7 +97,7 @@ infantryFidget =
     io (putStrLn "MInfantry.infantryFidget") >> undefined -- TODO
 
 infantryMoveStand :: MMoveT
-infantryMoveStand = MMoveT frameStand50 frameStand71 infantryFramesStand Nothing
+infantryMoveStand = MMoveT "infantryMoveStand" frameStand50 frameStand71 infantryFramesStand Nothing
 
 {-
 - QUAKED monster_infantry (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
