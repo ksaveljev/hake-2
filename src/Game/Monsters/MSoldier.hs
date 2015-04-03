@@ -235,7 +235,7 @@ soldierAttack1Refire2 =
     let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eEdictStatus.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
@@ -265,8 +265,19 @@ soldierAttack2Refire1 =
 
 soldierAttack2Refire2 :: EntThink
 soldierAttack2Refire2 =
-  GenericEntThink "soldier_attack2_refire2" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack2Refire2") >> undefined -- TODO
+  GenericEntThink "soldier_attack2_refire2" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eEdictStatus.eHealth <= 0) $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+      r <- Lib.randomF
+
+      when ((skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameAttak204
+
+    return True
 
 soldierAttack3Refire :: EntThink
 soldierAttack3Refire =
