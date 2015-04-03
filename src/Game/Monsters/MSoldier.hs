@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSoldier where
 
-import Control.Lens ((^.), (.=), (%=), (+=), use, ix, zoom, preuse)
+import Control.Lens ((^.), (.=), (%=), (+=), (-=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing)
@@ -327,8 +327,22 @@ soldierDuckUp =
 
 soldierDuckDown :: EntThink
 soldierDuckDown =
-  GenericEntThink "soldier_duck_down" $ \_ -> do
-    io (putStrLn "MSoldier.soldierDuckDown") >> undefined -- TODO
+  GenericEntThink "soldier_duck_down" $ \self@(EdictReference selfIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((edict^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $ do
+      linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+      time <- use $ gameBaseGlobals.gbLevel.llTime
+
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+        eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
+        eEdictMinMax.eMaxs._z -= 32
+        eEdictStatus.eTakeDamage .= Constants.damageYes
+        eMonsterInfo.miPauseTime .= time + 1
+
+      linkEntity self
+
+    return True
 
 soldierDuckHold :: EntThink
 soldierDuckHold =
