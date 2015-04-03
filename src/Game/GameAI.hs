@@ -19,6 +19,11 @@ aiMove =
   GenericAI "ai_move" $ \_ _ -> do
     io (putStrLn "GameAI.aiMove") >> undefined -- TODO
 
+aiWalk :: AI
+aiWalk =
+  GenericAI "ai_walk" $ \_ _ -> do
+    io (putStrLn "GameAI.aiWalk") >> undefined -- TODO
+
 walkMonsterStart :: EntThink
 walkMonsterStart =
   GenericEntThink "walkmonster_start" $ \_ -> do

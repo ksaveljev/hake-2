@@ -119,6 +119,18 @@ frameStand322 = 197
 frameStand339 :: Int
 frameStand339 = 214
 
+frameWalk101 :: Int
+frameWalk101 = 215
+
+frameWalk133 :: Int
+frameWalk133 = 247
+
+frameWalk209 :: Int
+frameWalk209 = 256
+
+frameWalk218 :: Int
+frameWalk218 = 265
+
 soldierDead :: EntThink
 soldierDead =
   GenericEntThink "soldier_dead" $ \self@(EdictReference selfIdx) -> do
@@ -365,10 +377,85 @@ soldierStand =
 
     return True
 
+soldierFramesWalk1 :: V.Vector MFrameT
+soldierFramesWalk1 =
+    V.fromList [ MFrameT (Just GameAI.aiWalk)   3  Nothing
+               , MFrameT (Just GameAI.aiWalk)   6  Nothing
+               , MFrameT (Just GameAI.aiWalk)   2  Nothing
+               , MFrameT (Just GameAI.aiWalk)   2  Nothing
+               , MFrameT (Just GameAI.aiWalk)   2  Nothing
+               , MFrameT (Just GameAI.aiWalk)   1  Nothing
+               , MFrameT (Just GameAI.aiWalk)   6  Nothing
+               , MFrameT (Just GameAI.aiWalk)   5  Nothing
+               , MFrameT (Just GameAI.aiWalk)   3  Nothing
+               , MFrameT (Just GameAI.aiWalk) (-1) (Just soldierWalk1Random)
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               , MFrameT (Just GameAI.aiWalk)   0  Nothing
+               ]
+
+soldierMoveWalk1 :: MMoveT
+soldierMoveWalk1 = MMoveT "soldierMoveWalk1" frameWalk101 frameWalk133 soldierFramesWalk1 Nothing
+
+soldierFramesWalk2 :: V.Vector MFrameT
+soldierFramesWalk2 =
+    V.fromList [ MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 9 Nothing
+               , MFrameT (Just GameAI.aiWalk) 8 Nothing
+               , MFrameT (Just GameAI.aiWalk) 5 Nothing
+               , MFrameT (Just GameAI.aiWalk) 1 Nothing
+               , MFrameT (Just GameAI.aiWalk) 3 Nothing
+               , MFrameT (Just GameAI.aiWalk) 7 Nothing
+               , MFrameT (Just GameAI.aiWalk) 6 Nothing
+               , MFrameT (Just GameAI.aiWalk) 7 Nothing
+               ]
+
+soldierMoveWalk2 :: MMoveT
+soldierMoveWalk2 = MMoveT "soldierMoveWalk2" frameWalk209 frameWalk218 soldierFramesWalk2 Nothing
+
+soldierWalk1Random :: EntThink
+soldierWalk1Random =
+  GenericEntThink "soldier_walk1_random" $ \(EdictReference selfIdx) -> do
+    r <- Lib.randomF
+
+    when (r > 0.1) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameWalk101
+
+    return True
+
 soldierWalk :: EntThink
 soldierWalk =
-  GenericEntThink "soldier_walk" $ \_ -> do
-    io (putStrLn "MSoldier.soldierWalk") >> undefined -- TODO
+  GenericEntThink "soldier_walk" $ \(EdictReference selfIdx) -> do
+    r <- Lib.randomF
+
+    let nextMove = if r < 0.5
+                     then soldierMoveWalk1
+                     else soldierMoveWalk2
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+
+    return True
 
 soldierRun :: EntThink
 soldierRun =
