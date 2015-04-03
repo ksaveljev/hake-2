@@ -139,7 +139,7 @@ soldierDodge =
       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
 
 soldierCock :: EntThink
-soldierCock = 
+soldierCock =
   GenericEntThink "soldier_cock" $ \self@(EdictReference selfIdx) -> do
     Just frame <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
@@ -360,6 +360,18 @@ soldierAttack =
                   else return soldierMoveAttack4
 
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+
+    return True
+
+soldierIdle :: EntThink
+soldierIdle =
+  GenericEntThink "soldier_idle" $ \self -> do
+    r <- Lib.randomF
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundIdle <- use $ mSoldierGlobals.msSoundIdle
+
+    when (r > 0.8) $
+      sound self Constants.chanVoice soundIdle 1 (fromIntegral Constants.attnIdle) 0
 
     return True
 
