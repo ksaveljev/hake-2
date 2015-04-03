@@ -346,8 +346,17 @@ soldierDuckDown =
 
 soldierDuckHold :: EntThink
 soldierDuckHold =
-  GenericEntThink "soldier_duck_hold" $ \_ -> do
-    io (putStrLn "MSoldier.soldierDuckHold") >> undefined -- TODO
+  GenericEntThink "soldier_duck_hold" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let updateMI = if time >= self^.eMonsterInfo.miPauseTime
+                     then (.&. (complement Constants.aiHoldFrame))
+                     else (.|. Constants.aiHoldFrame)
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= updateMI
+
+    return True
 
 soldierFramesAttack1 :: V.Vector MFrameT
 soldierFramesAttack1 =
