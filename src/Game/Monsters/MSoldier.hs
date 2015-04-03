@@ -2,8 +2,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSoldier where
 
-import Control.Lens ((^.), (.=), use, ix, zoom, preuse)
+import Control.Lens ((^.), (.=), (%=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when)
+import Data.Bits ((.|.))
 import Data.Maybe (isNothing)
 import Linear (V3(..))
 import qualified Data.ByteString as B
@@ -60,6 +61,22 @@ frameRuns01 = 109
 
 frameRuns14 :: Int
 frameRuns14 = 122
+
+soldierDead :: EntThink
+soldierDead =
+  GenericEntThink "soldier_dead" $ \self@(EdictReference selfIdx) -> do
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
+      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfDeadMonster)
+      eEdictAction.eaNextThink .= 0
+
+    linkEntity self
+
+    return True
 
 soldierPain :: EntPain
 soldierPain =
