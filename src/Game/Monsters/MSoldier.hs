@@ -224,8 +224,19 @@ soldierAttack1Refire1 =
 
 soldierAttack1Refire2 :: EntThink
 soldierAttack1Refire2 =
-  GenericEntThink "soldier_attack1_refire2" $ \_ -> do
-    io (putStrLn "MSoldier.soldierAttack1Refire2") >> undefined -- TODO
+  GenericEntThink "soldier_attack1_refire2" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+      r <- Lib.randomF
+
+      when ((skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameAttak102
+
+    return True
 
 soldierAttack2Refire1 :: EntThink
 soldierAttack2Refire1 =
