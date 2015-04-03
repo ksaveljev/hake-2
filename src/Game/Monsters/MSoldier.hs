@@ -95,6 +95,18 @@ framePain401 = 80
 framePain417 :: Int
 framePain417  = 96
 
+frameRun01 :: Int
+frameRun01 = 97
+
+frameRun02 :: Int
+frameRun02 = 98
+
+frameRun03 :: Int
+frameRun03 = 99
+
+frameRun08 :: Int
+frameRun08 = 104
+
 frameRuns01 :: Int
 frameRuns01 = 109
 
@@ -457,10 +469,47 @@ soldierWalk =
 
     return True
 
+soldierFramesRun :: V.Vector MFrameT
+soldierFramesRun =
+    V.fromList [ MFrameT (Just GameAI.aiRun) 10 Nothing
+               , MFrameT (Just GameAI.aiRun) 11 Nothing
+               , MFrameT (Just GameAI.aiRun) 11 Nothing
+               , MFrameT (Just GameAI.aiRun) 16 Nothing
+               , MFrameT (Just GameAI.aiRun) 10 Nothing
+               , MFrameT (Just GameAI.aiRun) 15 Nothing
+               ]
+
+soldierMoveRun :: MMoveT
+soldierMoveRun = MMoveT "soldierMoveRun" frameRun03 frameRun08 soldierFramesRun Nothing
+
+soldierFramesStartRun :: V.Vector MFrameT
+soldierFramesStartRun =
+    V.fromList [ MFrameT (Just GameAI.aiRun) 7 Nothing
+               , MFrameT (Just GameAI.aiRun) 5 Nothing
+               ]
+
+soldierMoveStartRun :: MMoveT
+soldierMoveStartRun = MMoveT "soldierMoveStartRun" frameRun01 frameRun02 soldierFramesStartRun (Just soldierRun)
+
 soldierRun :: EntThink
 soldierRun =
-  GenericEntThink "soldier_run" $ \_ -> do
-    io (putStrLn "MSoldier.soldierRun") >> undefined -- TODO
+  GenericEntThink "soldier_run" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let currentMove = self^.eMonsterInfo.miCurrentMove
+
+    let nextMove = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+                     then soldierMoveStand1
+                     else if isJust currentMove
+                            then do
+                              let moveId = (fromJust currentMove)^.mmId
+                              if any (== moveId) ["soldierMoveWalk1", "soldierMoveWalk2", "soldierMoveStartRun"]
+                                then soldierMoveRun
+                                else soldierMoveStartRun
+                            else soldierMoveStartRun
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+
+    return True
 
 soldierDodge :: EntDodge
 soldierDodge =
