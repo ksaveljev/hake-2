@@ -133,7 +133,7 @@ inPVS _ _ = io (putStrLn "SVGame.inPVS") >> undefined -- TODO
 inPHS :: V3 Float -> V3 Float -> Quake Bool
 inPHS _ _ = io (putStrLn "SVGame.inPHS") >> undefined -- TODO
 
-startSound :: EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ = io (putStrLn "SVGame.startSound") >> undefined -- TODO
 
 {-

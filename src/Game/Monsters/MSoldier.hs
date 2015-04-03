@@ -62,6 +62,9 @@ frameRuns01 = 109
 frameRuns14 :: Int
 frameRuns14 = 122
 
+frameStand322 :: Int
+frameStand322 = 197
+
 soldierDead :: EntThink
 soldierDead =
   GenericEntThink "soldier_dead" $ \self@(EdictReference selfIdx) -> do
@@ -78,15 +81,15 @@ soldierDead =
 
     return True
 
-soldierPain :: EntPain
-soldierPain =
-  GenericEntPain "soldier_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MSoldier.soldierPain") >> undefined -- TODO
-
 soldierDie :: EntDie
 soldierDie =
   GenericEntDie "soldier_die" $ \_ _ _ _ _ -> do
     io (putStrLn "MSoldier.soldierDie") >> undefined -- TODO
+
+soldierPain :: EntPain
+soldierPain =
+  GenericEntPain "soldier_pain" $ \_ _ _ _ -> do
+    io (putStrLn "MSoldier.soldierPain") >> undefined -- TODO
 
 soldierStand :: EntThink
 soldierStand =
@@ -136,34 +139,63 @@ soldierDodge =
       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
 
 soldierCock :: EntThink
-soldierCock =
-  GenericEntThink "soldier_cock" $ \_ -> do
-    io (putStrLn "MSoldier.soldierCock") >> undefined -- TODO
+soldierCock = 
+  GenericEntThink "soldier_cock" $ \self@(EdictReference selfIdx) -> do
+    Just frame <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundCock <- use $ mSoldierGlobals.msSoundCock
+
+    if frame == frameStand322
+      then sound self Constants.chanWeapon soundCock 1 (fromIntegral Constants.attnIdle) 0
+      else sound self Constants.chanWeapon soundCock 1 (fromIntegral Constants.attnNorm) 0
+
+    return True
 
 soldierFire1 :: EntThink
 soldierFire1 =
-  GenericEntThink "soldier_fire1" $ \_ -> do
-    io (putStrLn "MSoldier.soldierFire1") >> undefined -- TODO
+  GenericEntThink "soldier_fire1" $ \self -> do
+    soldierFire self 0
+    return True
 
 soldierFire2 :: EntThink
 soldierFire2 =
-  GenericEntThink "soldier_fire2" $ \_ -> do
-    io (putStrLn "MSoldier.soldierFire2") >> undefined -- TODO
+  GenericEntThink "soldier_fire2" $ \self -> do
+    soldierFire self 1
+    return True
 
 soldierFire3 :: EntThink
 soldierFire3 =
-  GenericEntThink "soldier_fire3" $ \_ -> do
-    io (putStrLn "MSoldier.soldierFire3") >> undefined -- TODO
+  GenericEntThink "soldier_fire3" $ \self -> do
+    void $ think soldierDuckDown self
+    soldierFire self 2
+    return True
 
 soldierFire4 :: EntThink
 soldierFire4 =
-  GenericEntThink "soldier_fire4" $ \_ -> do
-    io (putStrLn "MSoldier.soldierFire4") >> undefined -- TODO
+  GenericEntThink "soldier_fire4" $ \self -> do
+    soldierFire self 3
+    return True
+
+soldierFire6 :: EntThink
+soldierFire6 =
+  GenericEntThink "soldier_fire6" $ \self -> do
+    soldierFire self 5
+    return True
+
+soldierFire7 :: EntThink
+soldierFire7 =
+  GenericEntThink "soldier_fire7" $ \self -> do
+    soldierFire self 6
+    return True
 
 soldierFire8 :: EntThink
 soldierFire8 =
-  GenericEntThink "soldier_fire8" $ \_ -> do
-    io (putStrLn "MSoldier.soldierFire8") >> undefined -- TODO
+  GenericEntThink "soldier_fire8" $ \self -> do
+    soldierFire self 7
+    return True
+
+soldierFire :: EdictReference -> Int -> Quake ()
+soldierFire _ _ = io (putStrLn "MSoldier.soldierFire") >> undefined -- TODO
 
 soldierAttack1Refire1 :: EntThink
 soldierAttack1Refire1 =
