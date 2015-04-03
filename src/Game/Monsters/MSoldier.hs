@@ -466,7 +466,7 @@ soldierMoveDuck = MMoveT frameDuck01 frameDuck05 soldierFramesDuck (Just soldier
 
 soldierAttack :: EntThink
 soldierAttack =
-  GenericEntThink "soldier_attack" $ \er@(EdictReference edictIdx) -> do
+  GenericEntThink "soldier_attack" $ \(EdictReference edictIdx) -> do
     Just skinNum <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum
 
     nextMove <- if skinNum < 4
@@ -493,8 +493,25 @@ soldierIdle =
 
 soldierSight :: EntInteract
 soldierSight =
-  GenericEntInteract "soldier_sight" $ \_ _ -> do
-    io (putStrLn "MSoldier.soldierSight") >> undefined -- TODO
+  GenericEntInteract "soldier_sight" $ \self@(EdictReference selfIdx) _ -> do
+    Just selfEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = selfEdict^.eEdictOther.eoEnemy
+    Just enemyEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    r <- Lib.randomF
+    skillValue <- liftM (^.cvValue) skillCVar
+    soundSight1 <- use $ mSoldierGlobals.msSoundSight1
+    soundSight2 <- use $ mSoldierGlobals.msSoundSight2
+
+    if r < 0.5
+      then sound self Constants.chanVoice soundSight1 1 (fromIntegral Constants.attnNorm) 0
+      else sound self Constants.chanVoice soundSight2 1 (fromIntegral Constants.attnNorm) 0
+
+    when (skillValue > 0 && GameUtil.range selfEdict enemyEdict >= Constants.rangeMid) $
+      when (r > 0.5) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMoveAttack6
+
+    return True
 
 spMonsterSoldierX :: EntThink
 spMonsterSoldierX =
