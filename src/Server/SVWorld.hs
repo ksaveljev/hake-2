@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Server.SVWorld where
 
 import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom)
@@ -9,11 +10,14 @@ import Data.Maybe (isNothing, isJust)
 import Linear.V3 (V3, _x, _y, _z)
 import qualified Data.Foldable as F
 import qualified Data.Vector as V
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
 import qualified Constants
 import qualified QCommon.CM as CM
+import qualified QCommon.Com as Com
 
 initNodes :: Quake ()
 initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
@@ -160,8 +164,31 @@ linkEdict er@(EdictReference edictIdx) = do
       let topnode = head iw
 
       -- set areas
+      mapM_ setAreas [0..numLeafs-1]
 
       io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
+
+  where setAreas :: Int -> Quake ()
+        setAreas idx = do
+          leafCluster <- CM.leafCluster idx
+          svGlobals.svClusters.ix idx .= leafCluster
+
+          area <- CM.leafArea idx
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when (area /= 0) $ do
+            -- doors may legally straggle two areas,
+            -- but nothing should ever need more than that
+            if (edict^.eAreaNum) /= 0 && (edict^.eAreaNum) /= area
+              then do
+                state <- use $ svGlobals.svServer.sState
+
+                when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
+                  Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eEdictMinMax.eAbsMin)) `B.append` "\n"
+
+                gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
+              else 
+                gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum .= area
 
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO

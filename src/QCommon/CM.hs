@@ -350,8 +350,8 @@ loadLeafs lump = do
     numClusters <- use $ cmGlobals.cmNumClusters
     Com.dprintf $ " numclusters=" `B.append` BC.pack (show numClusters) `B.append` "\n" -- IMPROVE ?
 
-    Just leafContents <- preuse $ cmGlobals.cmMapLeafs.ix 0.clContents
-    when (leafContents /= Constants.contentsSolid) $
+    Just lContents <- preuse $ cmGlobals.cmMapLeafs.ix 0.clContents
+    when (lContents /= Constants.contentsSolid) $
       Com.comError Constants.errDrop "Map leaf 0 is not CONTENTS_SOLID"
 
     cmGlobals.cmSolidLeaf .= 0
@@ -823,3 +823,12 @@ floodAreaConnections = do
 -- fills in a list of all the leafs touched
 boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> [Int] -> Quake (Int, [Int])
 boxLeafNums = undefined -- TODO
+
+leafContents :: Int -> Quake Int
+leafContents _ = io (putStrLn "CM.leafContents") >> undefined -- TODO
+
+leafCluster :: Int -> Quake Int
+leafCluster _ = io (putStrLn "CM.leafCluster") >> undefined -- TODO
+
+leafArea :: Int -> Quake Int
+leafArea _ = io (putStrLn "CM.leafArea") >> undefined -- TODO
