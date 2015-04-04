@@ -3,10 +3,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SVWorld where
 
-import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom)
+import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2)
 import Control.Monad (void, unless, when)
 import Data.Bits ((.&.), (.|.), shiftL)
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import Linear.V3 (V3, _x, _y, _z)
 import qualified Data.Foldable as F
 import qualified Data.Vector as V
@@ -184,7 +184,12 @@ linkEdict er@(EdictReference edictIdx) = do
 
       unless ((updatedEdict^.eSolid) == Constants.solidNot) $ do
         -- find the first node that the ent's box crosses
-        io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
+        node <- findCrossingNode updatedEdict 0
+
+        -- link it in
+        if (updatedEdict^.eSolid) == Constants.solidTrigger
+          then insertLinkBefore (updatedEdict^.eArea) (node^.anTriggerEdicts)
+          else insertLinkBefore (updatedEdict^.eArea) (node^.anSolidEdicts)
 
   where setAreas :: Int -> Quake ()
         setAreas idx = do
@@ -239,6 +244,23 @@ linkEdict er@(EdictReference edictIdx) = do
 
                     else setHeadNode topnode (idx + 1) maxIdx
 
+        findCrossingNode :: EdictT -> Int -> Quake AreaNodeT
+        findCrossingNode edict idx = do
+          Just node <- preuse $ svGlobals.svAreaNodes.ix idx
+
+          let v3f = case (node^.anAxis) of
+                      0 -> _x
+                      1 -> _y
+                      2 -> _z
+                      _ -> undefined -- should never be here
+
+          if | (node^.anAxis) == -1 -> return node
+             | (edict^.eEdictMinMax.eAbsMin.v3f) > (node^.anDist) ->
+                 findCrossingNode edict (fromJust (node^.anChildren._1))
+             | (edict^.eEdictMinMax.eAbsMax.v3f) < (node^.anDist) ->
+                 findCrossingNode edict (fromJust (node^.anChildren._2))
+             | otherwise -> return node -- crosses the node
+
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
 
@@ -255,3 +277,6 @@ clearWorld = do
     Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
     void $ createAreaNode 0 (model^.cmMins) (model^.cmMaxs)
+
+insertLinkBefore :: LinkReference -> LinkReference -> Quake ()
+insertLinkBefore _ _ = io (putStrLn "SVWorld.insertLinkBefore") >> undefined -- TODO
