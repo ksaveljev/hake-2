@@ -3,7 +3,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens')
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom)
 import Control.Monad (void, when, unless)
 import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
@@ -822,7 +822,31 @@ floodAreaConnections = do
 
 -- fills in a list of all the leafs touched
 boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> [Int] -> Quake (Int, [Int])
-boxLeafNums _ _ _ _ _ = io (putStrLn "CM.boxLeafNums") >> undefined -- TODO
+boxLeafNums mins maxs list listSize topnode = do
+    Just headnode <- preuse $ cmGlobals.cmMapCModels.ix 0.cmHeadNode
+    boxLeafNumsHeadnode mins maxs list listSize headnode topnode
+
+-- fills in a list of all the leafs touched and starts with the head node
+boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> [Int] -> Quake (Int, [Int])
+boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
+    zoom cmGlobals $ do
+      cmLeafCount .= 0
+      cmLeafMaxCount .= listSize
+      cmLeafMins .= mins
+      cmLeafMaxs .= maxs
+      cmLeafTopNode .= (-1)
+
+    boxLeafNumsR list headnode
+
+    leafCount <- use $ cmGlobals.cmLeafCount
+    leafTopNode <- use $ cmGlobals.cmLeafTopNode
+
+    return (leafCount, leafTopNode : tail topnode)
+
+-- recursively fills in a list of all the leafs touched
+boxLeafNumsR :: Lens' QuakeState (UV.Vector Int) -> Int -> Quake ()
+boxLeafNumsR leafList nodenum = do
+    io (putStrLn "CM.boxLeafNumsR") >> undefined -- TODO
 
 leafContents :: Int -> Quake Int
 leafContents _ = io (putStrLn "CM.leafContents") >> undefined -- TODO

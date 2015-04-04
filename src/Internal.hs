@@ -1192,6 +1192,11 @@ data CMGlobals =
             , _cmLastChecksum    :: Int
             , _cmDebugLoadMap    :: Bool
             , _cmBoxHeadNode     :: Int
+            , _cmLeafCount       :: Int
+            , _cmLeafMaxCount    :: Int
+            , _cmLeafMins        :: V3 Float
+            , _cmLeafMaxs        :: V3 Float
+            , _cmLeafTopNode     :: Int
             }
 
 data MoveInfoT =

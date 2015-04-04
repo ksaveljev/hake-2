@@ -3,6 +3,7 @@
 module QCommon.CMGlobals where
 
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -61,4 +62,9 @@ initialCMGlobals =
             , _cmLastChecksum    = 0
             , _cmDebugLoadMap    = False
             , _cmBoxHeadNode     = 0
+            , _cmLeafCount       = 0
+            , _cmLeafMaxCount    = 0
+            , _cmLeafMins        = V3 0 0 0
+            , _cmLeafMaxs        = V3 0 0 0
+            , _cmLeafTopNode     = 0
             }
