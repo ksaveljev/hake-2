@@ -10,6 +10,7 @@ import Data.Maybe (isNothing, isJust)
 import Linear.V3 (V3, _x, _y, _z)
 import qualified Data.Foldable as F
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -99,9 +100,9 @@ linkEdict er@(EdictReference edictIdx) = do
                           -- assume that x/y are equal and symetric
                       let i :: Int = truncate ((edict^.eEdictMinMax.eMaxs._x) / 8)
                           -- z is not symetric
-                          j :: Int = truncate $ ((edict^.eEdictMinMax.eMins._z) / (-8))
+                          j :: Int = truncate ((edict^.eEdictMinMax.eMins._z) / (-8))
                           -- and z maxs can be negative
-                          k :: Int= truncate $ ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
+                          k :: Int= truncate ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
 
                           i' = if | i < 1 -> 1
                                   | i > 31 -> 31
@@ -135,10 +136,10 @@ linkEdict er@(EdictReference edictIdx) = do
               m = F.maximum [minMax, maxMax]
 
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
-            eAbsMin .= fmap ((-) m) (edict^.eEntityState.esOrigin)
+            eAbsMin .= fmap (`subtract` m) (edict^.eEntityState.esOrigin)
             eAbsMax .= fmap (+ m) (edict^.eEntityState.esOrigin)
 
-        else do
+        else
           -- normal
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
             eAbsMin .= (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMins)
@@ -166,7 +167,24 @@ linkEdict er@(EdictReference edictIdx) = do
       -- set areas
       mapM_ setAreas [0..numLeafs-1]
 
-      io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
+      if numLeafs >= 128
+        then -- assume we missed some leafs, and mark by headnode
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eNumClusters .= (-1)
+            eHeadNode .= topnode
+        else do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eNumClusters .= 0
+          setHeadNode topnode 0 numLeafs
+
+      -- if first time, make sure old_origin is valid
+      when ((updatedEdict^.eLinkCount) == 0) $
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOldOrigin .= (updatedEdict^.eEntityState.esOrigin)
+
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eLinkCount += 1
+
+      unless ((updatedEdict^.eSolid) == Constants.solidNot) $ do
+        -- find the first node that the ent's box crosses
+        io (putStrLn "SVWorld.linkEdict") >> undefined -- TODO
 
   where setAreas :: Int -> Quake ()
         setAreas idx = do
@@ -176,7 +194,7 @@ linkEdict er@(EdictReference edictIdx) = do
           area <- CM.leafArea idx
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-          when (area /= 0) $ do
+          when (area /= 0) $
             -- doors may legally straggle two areas,
             -- but nothing should ever need more than that
             if (edict^.eAreaNum) /= 0 && (edict^.eAreaNum) /= area
@@ -189,6 +207,37 @@ linkEdict er@(EdictReference edictIdx) = do
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
               else 
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum .= area
+
+        setHeadNode :: Int -> Int -> Int -> Quake ()
+        setHeadNode topnode idx maxIdx
+          | idx == maxIdx = return ()
+          | otherwise = do
+              clusters <- use $ svGlobals.svClusters
+              let c = clusters UV.! idx
+
+              if c == -1 -- not a visible leaf
+                then setHeadNode topnode (idx + 1) maxIdx
+                else do
+                  let foundIndex = UV.findIndex (\v -> v == c) (UV.take idx clusters)
+
+                  if isNothing foundIndex
+                    then do
+                      Just numClusters <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eNumClusters
+
+                      if numClusters == Constants.maxEntClusters
+                        then do
+                          -- assume we missed some leafs, and mark by headnode
+                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+                            eNumClusters .= (-1)
+                            eHeadNode .= topnode
+                        else do
+                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+                            eClusterNums.ix numClusters .= c
+                            eNumClusters += 1
+
+                          setHeadNode topnode (idx + 1) maxIdx
+
+                    else setHeadNode topnode (idx + 1) maxIdx
 
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO

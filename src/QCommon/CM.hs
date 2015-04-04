@@ -822,7 +822,7 @@ floodAreaConnections = do
 
 -- fills in a list of all the leafs touched
 boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> [Int] -> Quake (Int, [Int])
-boxLeafNums = undefined -- TODO
+boxLeafNums _ _ _ _ _ = io (putStrLn "CM.boxLeafNums") >> undefined -- TODO
 
 leafContents :: Int -> Quake Int
 leafContents _ = io (putStrLn "CM.leafContents") >> undefined -- TODO
