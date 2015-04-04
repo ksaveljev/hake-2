@@ -3,13 +3,13 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom)
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2)
 import Control.Monad (void, when, unless)
 import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
 import Data.Int (Int8)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromJust)
 import Data.Word (Word16)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
@@ -46,6 +46,7 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.MD4 as MD4
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 -- Loads in the map and all submodels.
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Int, [Int]) -- return model index (cmGlobals.cmMapCModels) and checksum
@@ -831,12 +832,9 @@ boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) 
 boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
     zoom cmGlobals $ do
       cmLeafCount .= 0
-      cmLeafMaxCount .= listSize
-      cmLeafMins .= mins
-      cmLeafMaxs .= maxs
       cmLeafTopNode .= (-1)
 
-    boxLeafNumsR list headnode
+    boxLeafNumsR mins maxs list listSize headnode
 
     leafCount <- use $ cmGlobals.cmLeafCount
     leafTopNode <- use $ cmGlobals.cmLeafTopNode
@@ -844,9 +842,36 @@ boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
     return (leafCount, leafTopNode : tail topnode)
 
 -- recursively fills in a list of all the leafs touched
-boxLeafNumsR :: Lens' QuakeState (UV.Vector Int) -> Int -> Quake ()
-boxLeafNumsR leafList nodenum = do
-    io (putStrLn "CM.boxLeafNumsR") >> undefined -- TODO
+boxLeafNumsR :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Quake ()
+boxLeafNumsR mins maxs leafList leafMaxCount nodenum
+  | nodenum < 0 = do
+      leafCount <- use $ cmGlobals.cmLeafCount
+
+      if leafCount >= leafMaxCount
+        then Com.dprintf "CM_BoxLeafnums_r: overflow\n"
+        else do
+          leafList.ix leafCount .= (-1) - nodenum
+          cmGlobals.cmLeafCount += 1
+
+  | otherwise = do
+      io (putStrLn $ "nodenum = " ++ show nodenum)
+      mapNodes <- use $ cmGlobals.cmMapNodes
+      io (putStrLn $ "size = " ++ show (V.length mapNodes))
+      Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
+      let planeIdx = fromJust (node^.cnPlane)
+
+      s <- Math3D.boxOnPlaneSize mins maxs planeIdx
+
+      if | s == 1 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
+         | s == 2 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
+         | otherwise -> do
+             leafTopNode <- use $ cmGlobals.cmLeafTopNode
+
+             when (leafTopNode == -1) $ do
+               cmGlobals.cmLeafTopNode .= nodenum
+
+             boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
+             boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
 
 leafContents :: Int -> Quake Int
 leafContents _ = io (putStrLn "CM.leafContents") >> undefined -- TODO
