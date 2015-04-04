@@ -279,4 +279,10 @@ clearWorld = do
     void $ createAreaNode 0 (model^.cmMins) (model^.cmMaxs)
 
 insertLinkBefore :: LinkReference -> LinkReference -> Quake ()
-insertLinkBefore _ _ = io (putStrLn "SVWorld.insertLinkBefore") >> undefined -- TODO
+insertLinkBefore v@(LinkReference vIdx) before@(LinkReference beforeIdx) = do
+    Just beforePrev <- preuse $ svGlobals.svLinks.ix beforeIdx.lPrev
+    svGlobals.svLinks.ix vIdx.lNext .= Just before
+    svGlobals.svLinks.ix vIdx.lPrev .= beforePrev
+    let Just (LinkReference beforePrevIdx) = beforePrev
+    svGlobals.svLinks.ix beforePrevIdx.lNext .= Just v
+    svGlobals.svLinks.ix beforeIdx.lPrev .= Just v
