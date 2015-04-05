@@ -871,7 +871,14 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
              boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
 
 leafContents :: Int -> Quake Int
-leafContents _ = io (putStrLn "CM.leafContents") >> undefined -- TODO
+leafContents leafNum = do
+    numLeafs <- use $ cmGlobals.cmNumLeafs
+
+    when (leafNum < 0 || leafNum >= numLeafs) $
+      Com.comError Constants.errDrop "CM_LeafContents: bad number"
+
+    Just contents <- preuse $ cmGlobals.cmMapLeafs.ix leafNum.clContents
+    return contents
 
 leafCluster :: Int -> Quake Int
 leafCluster _ = io (putStrLn "CM.leafCluster") >> undefined -- TODO
