@@ -891,4 +891,11 @@ leafCluster leafNum = do
     return cluster
 
 leafArea :: Int -> Quake Int
-leafArea _ = io (putStrLn "CM.leafArea") >> undefined -- TODO
+leafArea leafNum = do
+    numLeafs <- use $ cmGlobals.cmNumLeafs
+
+    when (leafNum < 0 || leafNum >= numLeafs) $
+      Com.comError Constants.errDrop "CM_LeafArea: bad number"
+
+    Just area <- preuse $ cmGlobals.cmMapLeafs.ix leafNum.clArea
+    return area
