@@ -352,8 +352,25 @@ pickupHealth = PickupHealth "pickup_health" undefined -- TODO
 spItemHealth :: EdictReference -> Quake ()
 spItemHealth _ = io (putStrLn "GameItems.spItemHealth") >> undefined -- TODO
 
+-- QUAKED item_health_small (.3 .3 1) (-16 -16 -16) (16 16 16)
 spItemHealthSmall :: EdictReference -> Quake ()
-spItemHealthSmall _ = io (putStrLn "GameItems.spItemHealthSmall") >> undefined -- TODO
+spItemHealthSmall er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    dmflags :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    if deathmatchValue /= 0 && (dmflags .&. Constants.dfNoHealth) /= 0
+      then GameUtil.freeEdict er
+      else do
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictInfo.eiModel .= Just "models/items/healing/stimpack/tris.md2"
+          eCount .= 2
+
+        findItem "Health" >>= (spawnItem er) . fromJust
+
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eStyle .= Constants.healthIgnoreMax
+
+        soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+        void $ soundIndex "items/s_health.wav"
 
 spItemHealthLarge :: EdictReference -> Quake ()
 spItemHealthLarge _ = io (putStrLn "GameItems.spItemHealthLarge") >> undefined -- TODO
