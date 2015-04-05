@@ -1,7 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Game.GameTarget where
+
+import Control.Lens (ix, (.=), zoom)
 
 import Quake
 import QuakeState
+import Game.Adapters
+import qualified Constants
 
 spTargetTempEntity :: EdictReference -> Quake ()
 spTargetTempEntity _ = io (putStrLn "GameTarget.spTargetTempEntity") >> undefined -- TODO
@@ -19,7 +24,10 @@ spTargetGoal :: EdictReference -> Quake ()
 spTargetGoal _ = io (putStrLn "GameTarget.spTargetGoal") >> undefined -- TODO
 
 spTargetExplosion :: EdictReference -> Quake ()
-spTargetExplosion _ = io (putStrLn "GameTarget.spTargetExplosion") >> undefined -- TODO
+spTargetExplosion (EdictReference edictIdx) = do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaUse .= Just useTargetExplosion
+      eSvFlags .= Constants.svfNoClient
 
 spTargetChangeLevel :: EdictReference -> Quake ()
 spTargetChangeLevel _ = io (putStrLn "GameTarget.spTargetChangeLevel") >> undefined -- TODO
@@ -47,3 +55,8 @@ spTargetLightRamp _ = io (putStrLn "GameTarget.spTargetLightRamp") >> undefined 
 
 spTargetEarthquake :: EdictReference -> Quake ()
 spTargetEarthquake _ = io (putStrLn "GameTarget.spTargetEarthquake") >> undefined -- TODO
+
+useTargetExplosion :: EntUse
+useTargetExplosion =
+  GenericEntUse "use_target_explosion" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.useTargetExplosion") >> undefined -- TODO
