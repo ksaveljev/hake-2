@@ -3,7 +3,7 @@
 module Game.GameMisc where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
-import Control.Monad (liftM)
+import Control.Monad (liftM, when)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isNothing)
 import Linear (V3(..))
@@ -16,6 +16,20 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameUtil as GameUtil
+
+{-
+- QUAKED light (0 1 0) (-8 -8 -8) (8 8 8) START_OFF Non-displayed light.
+- Default light value is 300. Default style is 0. If targeted, will toggle
+- between on and off. Default _cone value is 10 (used to set size of light
+- for spotlights)
+-}
+startOff :: Int
+startOff = 1
+
+lightUse :: EntUse
+lightUse =
+  GenericEntUse "light_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.lightUse") >> undefined -- TODO
 
 spPathCorner :: EdictReference -> Quake ()
 spPathCorner er@(EdictReference edictIdx) = do
@@ -62,7 +76,22 @@ spInfoNotNull :: EdictReference -> Quake ()
 spInfoNotNull _ = io (putStrLn "GameMisc.spInfoNotNull") >> undefined -- TODO
 
 spLight :: EdictReference -> Quake ()
-spLight _ = io (putStrLn "GameMisc.spLight") >> undefined -- TODO
+spLight er@(EdictReference edictIdx) = do
+    -- no targeted lights in deathmatch, because they cause global messages
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if isNothing (edict^.eEdictInfo.eiTargetName) || deathmatchValue /= 0
+      then GameUtil.freeEdict er
+      else 
+        when ((edict^.eStyle) >= 32) $ do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just lightUse
+
+          configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
+
+          if (edict^.eSpawnFlags) .&. startOff /= 0
+            then configString (Constants.csLights + (edict^.eStyle)) "a"
+            else configString (Constants.csLights + (edict^.eStyle)) "m"
 
 spFuncWall :: EdictReference -> Quake ()
 spFuncWall _ = io (putStrLn "GameMisc.spFuncWall") >> undefined -- TODO
