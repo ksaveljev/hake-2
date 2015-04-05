@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameItems where
 
-import Control.Lens ((.=), (^.), use)
-import Control.Monad (when, void)
+import Control.Lens ((.=), (^.), use, preuse, ix)
+import Control.Monad (when, void, liftM)
+import Data.Bits ((.&.))
 import Data.Char (toLower)
 import Data.Maybe (fromJust, isNothing, isJust)
 import qualified Data.ByteString as B
@@ -12,13 +14,16 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.EntInteract
 import Game.GItemArmorT
 import Game.ItemDrop
 import Game.ItemUse
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
+import qualified Game.GameUtil as GameUtil
 import qualified QCommon.Com as Com
+import qualified Util.Lib as Lib
 
 initItems :: Quake ()
 initItems = do
@@ -34,7 +39,61 @@ initItems = do
 -}
 spawnItem :: EdictReference -> Int -> Quake () -- second argument is index of GameItemList.itemList
 spawnItem er@(EdictReference edictIdx) itemIdx = do
-    io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
+    precacheItem (Just itemIdx)
+
+    let item = GameItemList.itemList V.! itemIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        modelIndex = gameImport^.giModelIndex
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eSpawnFlags) /= 0 && (edict^.eClassName) == "key_power_cube") $ do
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags .= 0
+      dprintf $ (edict^.eClassName) `B.append` " at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " has invalid spawnflags set\n"
+      
+    -- some items will be prevented in deathmatch
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    done <- if deathmatchValue /= 0
+              then do
+                dmFlagsValue :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+                let a = if dmFlagsValue .&. Constants.dfNoArmor /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupArmor _ _) -> True
+                                 Just (PickupPowerArmor _ _) -> True
+                                 _ -> False
+                          else False
+
+                    b = if dmFlagsValue .&. Constants.dfNoItems /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupArmor _ _) -> True
+                                 _ -> False
+                          else False
+
+                    c = if dmFlagsValue .&. Constants.dfNoHealth /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupHealth _ _) -> True
+                                 Just (PickupAdrenaline _ _) -> True
+                                 Just (PickupAncientHead _ _) -> True
+                                 _ -> False
+                          else False
+
+                    d = if dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0
+                          then if (item^.giFlags) == Constants.itAmmo || (edict^.eClassName) == "weapon_bfg"
+                                 then True
+                                 else False
+                          else False
+
+                return $ or [a, b, c, d]
+              else return False
+
+    if done
+      then GameUtil.freeEdict er
+      else do
+        coopValue <- liftM (^.cvValue) coopCVar
+        io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
 
 {-
 - =============== PrecacheItem
@@ -172,16 +231,10 @@ bodyArmorInfo =
               }
 
 pickupArmor :: EntInteract
-pickupArmor =
-  GenericEntInteract { _geiId = "pickup_armor"
-                     , _geiInteract = undefined -- TODO
-                     }
+pickupArmor = PickupArmor "pickup_armor" undefined -- TODO
 
 pickupPowerArmor :: EntInteract
-pickupPowerArmor =
-  GenericEntInteract { _geiId = "pickup_powerarmor"
-                     , _geiInteract = undefined -- TODO
-                     }
+pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" undefined -- TODO
 
 usePowerArmor :: ItemUse
 usePowerArmor =
@@ -250,16 +303,10 @@ useEnviroSuit =
                  }
 
 pickupAncientHead :: EntInteract
-pickupAncientHead =
-  GenericEntInteract { _geiId = "pickup_ancienthead"
-                     , _geiInteract = undefined -- TODO
-                     }
+pickupAncientHead = PickupAncientHead "pickup_ancienthead" undefined -- TODO
 
 pickupAdrenaline :: EntInteract
-pickupAdrenaline =
-  GenericEntInteract { _geiId = "pickup_adrenaline"
-                     , _geiInteract = undefined -- TODO
-                     }
+pickupAdrenaline = PickupAdrenaline "pickup_adrenaline" undefined -- TODO
 
 pickupBandolier :: EntInteract
 pickupBandolier =
@@ -280,10 +327,7 @@ pickupKey =
                      }
 
 pickupHealth :: EntInteract
-pickupHealth =
-  GenericEntInteract { _geiId = "pickup_health"
-                     , _geiInteract = undefined -- TODO
-                     }
+pickupHealth = PickupHealth "pickup_health" undefined -- TODO
 
 spItemHealth :: EdictReference -> Quake ()
 spItemHealth _ = io (putStrLn "GameItems.spItemHealth") >> undefined -- TODO

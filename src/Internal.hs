@@ -1000,9 +1000,14 @@ class AIAdapter a where
     ai :: a -> EdictReference -> Float -> Quake ()
 
 data EntInteract =
-  GenericEntInteract { _geiId :: B.ByteString
-                     , _geiInteract :: EdictReference -> EdictReference -> Quake Bool
-                     }
+    PickupArmor B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+  | PickupPowerArmor B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+  | PickupHealth B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+  | PickupAdrenaline B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+  | PickupAncientHead B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+  | GenericEntInteract { _geiId :: B.ByteString
+                       , _geiInteract :: EdictReference -> EdictReference -> Quake Bool
+                       }
 
 data EntThink =
   GenericEntThink { _gethId :: B.ByteString
@@ -1055,6 +1060,11 @@ data AI =
             }
 
 instance SuperAdapter EntInteract where
+    getID (PickupArmor _id _) = _id
+    getID (PickupPowerArmor _id _) = _id
+    getID (PickupHealth _id _) = _id
+    getID (PickupAdrenaline _id _) = _id
+    getID (PickupAncientHead _id _) = _id
     getID (GenericEntInteract _id _) = _id
 
 instance SuperAdapter EntThink where
@@ -1088,6 +1098,11 @@ instance SuperAdapter AI where
     getID (GenericAI _id _) = _id
 
 instance EntInteractAdapter EntInteract where
+    interact (PickupArmor _ _interact) = _interact
+    interact (PickupPowerArmor _ _interact) = _interact
+    interact (PickupHealth _ _interact) = _interact
+    interact (PickupAdrenaline _ _interact) = _interact
+    interact (PickupAncientHead _ _interact) = _interact
     interact (GenericEntInteract _ _interact) = _interact
 
 instance EntThinkAdapter EntThink where

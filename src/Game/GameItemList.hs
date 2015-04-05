@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Game.GameItemList where
+module Game.GameItemList ( itemList
+                         , module Game.GItemT
+                         ) where
 
 import Data.Bits ((.|.))
 import qualified Data.Vector as V
