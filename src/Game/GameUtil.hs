@@ -100,3 +100,21 @@ range self other =
           | len < 500 -> Constants.rangeNear
           | len < 1000 -> Constants.rangeMid
           | otherwise -> Constants.rangeFar
+
+{-
+- Use the targets.
+- 
+- The global "activator" should be set to the entity that initiated the
+- firing.
+- 
+- If self.delay is set, a DelayedUse entity will be created that will
+- actually do the SUB_UseTargets after that many seconds have passed.
+- 
+- Centerprints any self.message to the activator.
+- 
+- Search for (string)targetname in all entities that match
+- (string)self.target and call their .use function
+-}
+useTargets :: EdictReference -> EdictReference -> Quake ()
+useTargets (EdictReference edictIdx) (EdictReference activatorIdx) = do
+    io (putStrLn "GameUtil.useTargets") >> undefined -- TODO

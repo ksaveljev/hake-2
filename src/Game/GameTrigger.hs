@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameTrigger where
 
-import Control.Lens ((.=), ix)
+import Control.Lens ((.=), ix, preuse, (^.))
+import Control.Monad (when)
 
 import Quake
 import QuakeState
 import Game.Adapters
+import qualified Game.GameUtil as GameUtil
 
 spTriggerMultiple :: EdictReference -> Quake ()
 spTriggerMultiple _ = io (putStrLn "GameTrigger.spTriggerMultiple") >> undefined -- TODO
@@ -24,7 +26,13 @@ spTriggerCounter :: EdictReference -> Quake ()
 spTriggerCounter _ = io (putStrLn "GameTrigger.spTriggerCounter") >> undefined -- TODO
 
 spTriggerAlways :: EdictReference -> Quake ()
-spTriggerAlways _ = io (putStrLn "GameTrigger.spTriggerAlways") >> undefined -- TODO
+spTriggerAlways er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eDelay) < 0.2) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eDelay .= 0.2
+
+    GameUtil.useTargets er er
 
 spTriggerPush :: EdictReference -> Quake ()
 spTriggerPush _ = io (putStrLn "GameTrigger.spTriggerPush") >> undefined -- TODO
