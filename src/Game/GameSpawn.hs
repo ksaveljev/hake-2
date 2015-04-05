@@ -554,7 +554,7 @@ spFuncClock =
 -}
 spWorldSpawn :: EntThink
 spWorldSpawn =
-  GenericEntThink "SP_worldspawn" $ \er@(EdictReference edictIdx) -> do
+  GenericEntThink "SP_worldspawn" $ \(EdictReference edictIdx) -> do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     gameBaseGlobals.gbGEdicts.ix edictIdx .= edict { _eMoveType    = Constants.moveTypePush

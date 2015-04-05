@@ -5,11 +5,14 @@ module Game.PlayerClient where
 import Control.Lens (Traversal', use, (^.), ix, preuse, (.=))
 import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.))
+import Data.Char (toLower)
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import CVarVariables
+import Game.Adapters
 import qualified Constants
 import qualified Game.GameUtil as GameUtil
 
@@ -64,7 +67,28 @@ spInfoPlayerDeathmatch :: EdictReference -> Quake ()
 spInfoPlayerDeathmatch _ = io (putStrLn "PlayerClient.spInfoPlayerDeathmatch") >> undefined -- TODO
 
 spInfoPlayerCoop :: EdictReference -> Quake ()
-spInfoPlayerCoop _ = io (putStrLn "PlayerClient.spInfoPlayerCoop") >> undefined -- TODO
+spInfoPlayerCoop er@(EdictReference edictIdx) = do
+    coopValue <- liftM (^.cvValue) coopCVar
+
+    if coopValue == 0
+      then GameUtil.freeEdict er
+      else do
+        mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
+
+        let names = [ "jail2", "jail4", "mine1", "mine2", "mine3", "mine4" , "lab"
+                    , "boss1", "fact3", "biggun", "space", "command", "power2", "strike" ]
+
+        when (any (== mapName) names) $ do
+          -- invoke one of our gross, ugly, disgusting hacks
+          time <- use $ gameBaseGlobals.gbLevel.llTime
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaThink .= Just spFixCoopSpots
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= time + Constants.frameTime
 
 spInfoPlayerIntermission :: Quake ()
 spInfoPlayerIntermission = return ()
+
+spFixCoopSpots :: EntThink
+spFixCoopSpots =
+  GenericEntThink "SP_FixCoopSpots" $ \_ -> do
+    io (putStrLn "PlayerClient.spFixCoopSpots") >> undefined -- TODO
