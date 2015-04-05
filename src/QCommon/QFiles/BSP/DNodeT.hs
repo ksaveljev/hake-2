@@ -3,12 +3,13 @@ module QCommon.QFiles.BSP.DNodeT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import Data.Int (Int16)
 import Data.Word (Word16)
-import Linear (V3(..))
+import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 dNodeTSize :: Int
 dNodeTSize = 4 + 8 + 6 + 6 + 2 + 2
@@ -33,17 +34,3 @@ newDNodeT = runGet getDNodeT
                            <*> getV3Int16
                            <*> getWord16le
                            <*> getWord16le
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getInt2 :: Get (Int, Int)
-        getInt2 = (,) <$> getInt <*> getInt
-
-        getV3Int16 :: Get (V3 Int16)
-        getV3Int16 = V3 <$> getInt16
-                        <*> getInt16
-                        <*> getInt16
-
-        getInt16 :: Get Int16
-        getInt16 = fromIntegral <$> getWord16le

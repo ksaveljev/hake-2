@@ -3,12 +3,13 @@ module QCommon.QFiles.PcxT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import Data.Int (Int8)
 import Data.Word (Word16)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 {-
 ========================================================================
@@ -47,22 +48,16 @@ newPcxT = runGet getPcx
                       <*> getInt8
                       <*> getInt8
                       <*> getInt8
-                      <*> getWord16
-                      <*> getWord16
-                      <*> getWord16
-                      <*> getWord16
-                      <*> getWord16
-                      <*> getWord16
+                      <*> getWord16le
+                      <*> getWord16le
+                      <*> getWord16le
+                      <*> getWord16le
+                      <*> getWord16le
+                      <*> getWord16le
                       <*> getByteString 48
                       <*> getInt8
                       <*> getInt8
-                      <*> getWord16
-                      <*> getWord16
+                      <*> getWord16le
+                      <*> getWord16le
                       <*> getByteString 58
                       <*> getRemainingLazyByteString
-
-        getInt8 :: Get Int8
-        getInt8 = fromIntegral <$> getWord8
-
-        getWord16 :: Get Word16
-        getWord16 = getWord16le

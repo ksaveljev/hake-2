@@ -3,7 +3,6 @@ module QCommon.QFiles.MD2.DMdlT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -13,6 +12,7 @@ import qualified Data.Vector.Unboxed as UV
 import QCommon.QFiles.MD2.DAliasFrameT
 import QCommon.QFiles.MD2.DSTVertT
 import QCommon.QFiles.MD2.DTriangleT
+import Util.Binary
 
 data DMdlT =
   DMdlT { _dmIdent       :: Int
@@ -66,6 +66,3 @@ newDMdlT = runGet getDMdlT
                          <*> return Nothing
                          <*> return Nothing
                          <*> return Nothing
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le

@@ -3,11 +3,11 @@ module QCommon.QFiles.BSP.DModelT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
-import Data.Binary.IEEE754 (getFloat32le)
 import Data.Functor ((<$>))
-import Linear (V3(..))
+import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 dModelTSize :: Int
 dModelTSize = 3 * 4 + 3 * 4 + 3 * 4 + 4 + 4 + 4
@@ -32,11 +32,3 @@ newDModelT = runGet getDModelT
                              <*> getInt
                              <*> getInt
                              <*> getInt
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getV3Float :: Get (V3 Float)
-        getV3Float = V3 <$> getFloat32le
-                        <*> getFloat32le
-                        <*> getFloat32le

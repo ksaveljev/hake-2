@@ -4,13 +4,13 @@ module QCommon.QFiles.BSP.DHeaderT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
 import QCommon.LumpT
+import Util.Binary
 import qualified Constants
 
 idBSPHeader :: B.ByteString
@@ -30,9 +30,6 @@ newDHeaderT = runGet getDHeaderT
         getDHeaderT = DHeaderT <$> getInt
                                <*> getInt
                                <*> getLumps
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
 
         getLumps :: Get (V.Vector LumpT)
         getLumps = V.sequence $ V.replicate Constants.headerLumps getLumpT

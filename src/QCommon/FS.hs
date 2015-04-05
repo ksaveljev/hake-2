@@ -6,7 +6,6 @@ module QCommon.FS where
 import Data.Char (toLower)
 import Data.Bits ((.|.))
 import Data.Maybe (isJust, fromJust)
-import Data.Binary.Get (Get, getWord32le, runGet, getByteString)
 import Data.Functor ((<$>))
 import Data.Foldable (find)
 import Data.Traversable (traverse)
@@ -30,6 +29,7 @@ import CVarVariables
 import QCommon.XCommandT
 import QCommon.DPackHeaderT
 import QCommon.PackFileT
+import Util.Binary
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
@@ -152,10 +152,7 @@ loadPackFile packfile = do
 
     return $ Just pack
 
-  where getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getDPackHeader :: Get DPackHeaderT
+  where getDPackHeader :: Get DPackHeaderT
         getDPackHeader = DPackHeaderT <$> getInt <*> getInt <*> getInt 
 
         getPackFile :: Get PackFileT

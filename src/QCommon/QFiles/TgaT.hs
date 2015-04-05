@@ -3,10 +3,11 @@ module QCommon.QFiles.TgaT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import Data.Word (Word8, Word16)
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 data TgaT =
   TgaT { _tgaIdLength       :: Word8
@@ -32,16 +33,13 @@ newTgaT = runGet getTgaT
         getTgaT = TgaT <$> getWord8
                        <*> getWord8
                        <*> getWord8
-                       <*> getWord16
-                       <*> getWord16
+                       <*> getWord16le
+                       <*> getWord16le
                        <*> getWord8
-                       <*> getWord16
-                       <*> getWord16
-                       <*> getWord16
-                       <*> getWord16
+                       <*> getWord16le
+                       <*> getWord16le
+                       <*> getWord16le
+                       <*> getWord16le
                        <*> getWord8
                        <*> getWord8
                        <*> getRemainingLazyByteString
-
-        getWord16 :: Get Word16
-        getWord16 = getWord16le

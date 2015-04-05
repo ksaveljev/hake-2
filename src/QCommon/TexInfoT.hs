@@ -3,12 +3,12 @@ module QCommon.TexInfoT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
-import Data.Binary.IEEE754 (getFloat32le)
 import Data.Functor ((<$>))
-import Linear.V4 (V4(..))
+import Linear.V4 (V4)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 texInfoTSize :: Int
 texInfoTSize = 32 + 4 + 4 + 32 + 4
@@ -31,12 +31,3 @@ newTexInfoT = runGet getTexInfoT
                                <*> getInt
                                <*> (B.takeWhile (/= 0) <$> getByteString 32)
                                <*> getInt
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getV4Float :: Get (V4 Float)
-        getV4Float = V4 <$> getFloat32le
-                        <*> getFloat32le
-                        <*> getFloat32le
-                        <*> getFloat32le

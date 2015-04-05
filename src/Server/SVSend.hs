@@ -4,8 +4,6 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVSend where
 
-import Data.Binary.Get (Get, runGet, getWord32le)
-import Data.Functor ((<$>))
 import Data.Traversable (traverse)
 import Data.Maybe (isJust)
 import Control.Exception (IOException, handle)
@@ -19,6 +17,7 @@ import qualified Data.ByteString.Lazy as BL
 import Quake
 import QuakeState
 import CVarVariables
+import Util.Binary
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
@@ -201,10 +200,7 @@ sendClientMessages = do
       maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
       void $ traverse (\idx -> sendMessage (svGlobals.svServerStatic.ssClients.ix idx)) [0..maxClientsValue-1]
 
-  where getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        sendMessage :: Traversal' QuakeState ClientT -> Quake ()
+  where sendMessage :: Traversal' QuakeState ClientT -> Quake ()
         sendMessage clientLens = do
           Just client <- preuse clientLens
 

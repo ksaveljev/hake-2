@@ -3,12 +3,13 @@ module QCommon.QFiles.BSP.DLeafT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import Data.Int (Int16)
 import Data.Word (Word16)
-import Linear (V3(..))
+import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 dLeafTSize :: Int
 dLeafTSize = 4 + 8 * 2 + 4 * 2
@@ -39,14 +40,3 @@ newDLeafT = runGet getDLeafT
                            <*> getWord16le
                            <*> getWord16le
                            <*> getWord16le
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getInt16 :: Get Int16
-        getInt16 = fromIntegral <$> getWord16le
-
-        getV3Int16 :: Get (V3 Int16)
-        getV3Int16 = V3 <$> getInt16
-                        <*> getInt16
-                        <*> getInt16

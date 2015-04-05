@@ -5,7 +5,6 @@ module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2)
 import Control.Monad (void, when, unless)
-import Data.Binary.Get (runGet, getWord16le)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
 import Data.Int (Int8)
@@ -39,6 +38,7 @@ import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.BSP.DVisT
 import QCommon.TexInfoT
+import Util.Binary
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
 import qualified QCommon.Com as Com
@@ -854,9 +854,6 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
           cmGlobals.cmLeafCount += 1
 
   | otherwise = do
-      io (putStrLn $ "nodenum = " ++ show nodenum)
-      mapNodes <- use $ cmGlobals.cmMapNodes
-      io (putStrLn $ "size = " ++ show (V.length mapNodes))
       Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
       let planeIdx = fromJust (node^.cnPlane)
 

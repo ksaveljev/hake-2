@@ -3,13 +3,13 @@ module QCommon.QFiles.BSP.DFaceT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import Data.Int (Int16)
 import Data.Word (Word16)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 
+import Util.Binary
 import qualified Constants
 
 data DFaceT =
@@ -34,10 +34,3 @@ newDFaceT = runGet getDFaceT
                            <*> getInt16
                            <*> getByteString Constants.maxLightMaps
                            <*> getInt
-
-        getInt16 :: Get Int16
-        getInt16 = fromIntegral <$> getWord16le
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-

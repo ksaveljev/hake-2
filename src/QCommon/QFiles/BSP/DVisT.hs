@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.QFiles.BSP.DVisT where
 
-import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+
+import Util.Binary
 
 data DVisT =
   DVisT { _dvNumClusters :: Int
@@ -24,9 +24,3 @@ newDVisT = runGet getDVisT
         getDVisT = do
           numClusters <- getInt
           DVisT numClusters <$> V.sequence (V.replicate numClusters getInt2)
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
-
-        getInt2 :: Get (Int, Int)
-        getInt2 = (,) <$> getInt <*> getInt

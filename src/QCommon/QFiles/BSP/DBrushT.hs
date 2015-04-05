@@ -3,9 +3,10 @@ module QCommon.QFiles.BSP.DBrushT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Binary.Get
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 dBrushTSize :: Int
 dBrushTSize = 4 + 4 + 4
@@ -24,6 +25,3 @@ newDBrushT = runGet getDBrushT
         getDBrushT = DBrushT <$> getInt
                              <*> getInt
                              <*> getInt
-
-        getInt :: Get Int
-        getInt = fromIntegral <$> getWord32le
