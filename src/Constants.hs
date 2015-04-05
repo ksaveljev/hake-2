@@ -799,7 +799,7 @@ flNoKnockback   = 0x00000800 :: Int
 flPowerArmor    = 0x00001000 :: Int -- power armor (if any) is active 
 flRespawn       = 0x80000000 :: Int -- used for item respawning 
 
-frametime = 0.1 :: Float
+frameTime = 0.1 :: Float
 
 -- memory tags to allow dynamic memory to be cleaned up
 tagGame  = 765 :: Int -- clear when unloading the dll 

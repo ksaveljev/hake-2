@@ -20,7 +20,6 @@ import Game.Adapters
 import Game.SpawnT
 import qualified Constants
 import qualified Game.GameFunc as GameFunc
-import qualified Game.GameItemList as GameItemList
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameTarget as GameTarget
@@ -335,10 +334,10 @@ callSpawn er@(EdictReference edictIdx) = do
 
     -- check item spawn functions
     let edictClassName = BC.map toLower (edict^.eClassName)
-        itemSpawnIndex = checkItemSpawn edictClassName 1 numItems
+    itemSpawnIndex <- checkItemSpawn edictClassName 1 numItems
 
     case itemSpawnIndex of
-      Just itemIdx -> GameItems.spawnItem er itemIdx
+      Just gItemReference -> GameItems.spawnItem er gItemReference
       Nothing -> do
         -- check normal spawn functions
         let spawnIdx = V.findIndex (\s -> edictClassName == BC.map toLower (s^.spName)) spawns
@@ -350,14 +349,14 @@ callSpawn er@(EdictReference edictIdx) = do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ edictClassName `B.append` " doesn't have a spawn function\n"
 
-  where checkItemSpawn :: B.ByteString -> Int -> Int -> Maybe Int
+  where checkItemSpawn :: B.ByteString -> Int -> Int -> Quake (Maybe GItemReference)
         checkItemSpawn edictClassName idx maxIdx
-          | idx == maxIdx = Nothing
-          | otherwise =
-              let item = GameItemList.itemList V.! idx
-              in if edictClassName == BC.map toLower (item^.giClassName)
-                   then Just idx
-                   else checkItemSpawn edictClassName (idx + 1) maxIdx
+          | idx == maxIdx = return Nothing
+          | otherwise = do
+              Just item <- preuse $ gameBaseGlobals.gbItemList.ix idx
+              if edictClassName == BC.map toLower (item^.giClassName)
+                then return (Just $ GItemReference idx)
+                else checkItemSpawn edictClassName (idx + 1) maxIdx
 
 findTeams :: Quake ()
 findTeams = io (putStrLn "GameSpawn.findTeams") >> undefined -- TODO

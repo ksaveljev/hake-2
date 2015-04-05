@@ -94,6 +94,9 @@ newtype CModelReference = CModelReference Int
 -- reference to svGlobals.svLinks
 newtype LinkReference = LinkReference Int
 
+-- reference to gameBaseGlobals.gbItemList
+newtype GItemReference = GItemReference Int deriving (Eq)
+
 data QuakeState =
   QuakeState { _globals           :: Globals
              , _comGlobals        :: ComGlobals
@@ -355,7 +358,7 @@ data EdictT =
          , _eMoveAngles            :: V3 Float
          , _eLightLevel            :: Int
          , _eStyle                 :: Int
-         , _eItem                  :: Maybe GItemT
+         , _eItem                  :: Maybe GItemReference
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
          , _eClient                :: Maybe GClientReference
@@ -1272,11 +1275,11 @@ data GameItemsGlobals =
                    , _giCombatArmorInfo      :: GItemArmorT
                    , _giBodyArmorInfo        :: GItemArmorT
                    , _giQuakeDropTimeoutHack :: Int
-                   , _giJacketArmorIndex     :: Int
-                   , _giCombatArmorIndex     :: Int
-                   , _giBodyArmorIndex       :: Int
-                   , _giPowerScreenIndex     :: Int
-                   , _giPowerShieldIndex     :: Int
+                   , _giJacketArmorIndex     :: GItemReference
+                   , _giCombatArmorIndex     :: GItemReference
+                   , _giBodyArmorIndex       :: GItemReference
+                   , _giPowerScreenIndex     :: GItemReference
+                   , _giPowerShieldIndex     :: GItemReference
                    }
 
 data MSoldierGlobals =

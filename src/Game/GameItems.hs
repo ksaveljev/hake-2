@@ -3,9 +3,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameItems where
 
-import Control.Lens ((.=), (^.), use, preuse, ix)
+import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), zoom)
 import Control.Monad (when, void, liftM)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Char (toLower)
 import Data.Maybe (fromJust, isNothing, isJust)
 import qualified Data.ByteString as B
@@ -15,10 +15,8 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import CVarVariables
-import Game.EntInteract
+import Game.Adapters
 import Game.GItemArmorT
-import Game.ItemDrop
-import Game.ItemUse
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import qualified Game.GameUtil as GameUtil
@@ -37,11 +35,11 @@ initItems = do
 - Items can't be immediately dropped to floor, because they might be on an
 - entity that hasn't spawned yet. ============
 -}
-spawnItem :: EdictReference -> Int -> Quake () -- second argument is index of GameItemList.itemList
-spawnItem er@(EdictReference edictIdx) itemIdx = do
-    precacheItem (Just itemIdx)
+spawnItem :: EdictReference -> GItemReference -> Quake ()
+spawnItem er@(EdictReference edictIdx) gir@(GItemReference itemIdx) = do
+    precacheItem (Just gir)
 
-    let item = GameItemList.itemList V.! itemIdx
+    Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let dprintf = gameImport^.giDprintf
@@ -93,7 +91,28 @@ spawnItem er@(EdictReference edictIdx) itemIdx = do
       then GameUtil.freeEdict er
       else do
         coopValue <- liftM (^.cvValue) coopCVar
-        io (putStrLn "GameItems.spawnItem") >> undefined -- TODO
+
+        when (coopValue /= 0 && (edict^.eClassName) == "key_power_cube") $ do
+          powerCubes <- use $ gameBaseGlobals.gbLevel.llPowerCubes
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. (1 `shiftL` (8 + powerCubes)))
+          gameBaseGlobals.gbLevel.llPowerCubes += 1
+
+        -- don't let them drop items that stay in a coop game
+        when (coopValue /= 0 && ((item^.giFlags) .&. Constants.itStayCoop) /= 0) $
+          gameBaseGlobals.gbItemList.ix itemIdx.giDrop .= Nothing
+
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eItem .= Just gir
+          eEdictAction.eaNextThink .= time + 2 * Constants.frameTime
+          -- items start after other solids
+          eEdictAction.eaThink .= Just dropToFloor
+          eEntityState.esEffects .= (item^.giWorldModelFlags)
+          eEntityState.esRenderFx .= Constants.rfGlow
+
+        when (isJust (edict^.eEdictInfo.eiModel)) $
+          void (modelIndex (fromJust $ edict^.eEdictInfo.eiModel))
 
 {-
 - =============== PrecacheItem
@@ -102,16 +121,17 @@ spawnItem er@(EdictReference edictIdx) itemIdx = do
 - item spawned in a level, and for each item in each client's inventory.
 - ===============
 -}
-precacheItem :: Maybe Int -> Quake () -- int is index of GameItemList.itemList
+precacheItem :: Maybe GItemReference -> Quake ()
 precacheItem it = do
     when (isJust it) $ do
       gameImport <- use $ gameBaseGlobals.gbGameImport
 
-      let Just itemIdx = it
-          item = GameItemList.itemList V.! itemIdx
+      let Just (GItemReference itemIdx) = it
           soundIndex = gameImport^.giSoundIndex
           modelIndex = gameImport^.giModelIndex
           imageIndex = gameImport^.giImageIndex
+
+      Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
 
       when (isJust (item^.giPickupSound)) $
         void (soundIndex $ fromJust (item^.giPickupSound))
@@ -180,28 +200,28 @@ setItemNames = do
 
   where setConfigString :: Int -> Quake ()
         setConfigString idx = do
-          let item = GameItemList.itemList V.! idx
+          Just item <- preuse $ gameBaseGlobals.gbItemList.ix idx
           configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
           configString (Constants.csItems + idx) (fromJust (item^.giPickupName))
 
-findItem :: B.ByteString -> Quake (Maybe Int) -- index of item from GameItemList.itemList
+findItem :: B.ByteString -> Quake (Maybe GItemReference)
 findItem pickupName = do
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    let searchResult = searchByName (BC.map toLower pickupName) 1 numItems
+    searchResult <- searchByName (BC.map toLower pickupName) 1 numItems
 
     when (isNothing searchResult) $
       Com.printf ("Item not found:" `B.append` pickupName `B.append` "\n")
 
     return searchResult
 
-  where searchByName :: B.ByteString -> Int -> Int -> Maybe Int
+  where searchByName :: B.ByteString -> Int -> Int -> Quake (Maybe GItemReference)
         searchByName name idx maxIdx
-          | idx == maxIdx = Nothing
-          | otherwise =
-              let item = GameItemList.itemList V.! idx
-              in if name == BC.map toLower (fromJust $ item^.giPickupName) -- IMPROVE: this is actually bad, isn't it? what if pickup name is Nothing (in GItemT).. should be taken care of in all occasions
-                   then Just idx
-                   else searchByName name (idx + 1) maxIdx
+          | idx == maxIdx = return Nothing
+          | otherwise = do
+              Just item <- preuse $ gameBaseGlobals.gbItemList.ix idx
+              if name == BC.map toLower (fromJust $ item^.giPickupName) -- IMPROVE: this is actually bad, isn't it? what if pickup name is Nothing (in GItemT).. should be taken care of in all occasions
+                then return (Just $ GItemReference idx)
+                else searchByName name (idx + 1) maxIdx
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =
@@ -340,3 +360,8 @@ spItemHealthLarge _ = io (putStrLn "GameItems.spItemHealthLarge") >> undefined -
 
 spItemHealthMega :: EdictReference -> Quake ()
 spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- TODO
+
+dropToFloor :: EntThink
+dropToFloor =
+  GenericEntThink "drop_to_floor" $ \_ -> do
+    io (putStrLn "GameItems.dropToFloor") >> undefined -- TODO
