@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameMisc where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
-import Data.Bits ((.|.))
+import Control.Monad (liftM)
+import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isNothing)
 import Linear (V3(..))
 import qualified Data.ByteString as B
@@ -10,6 +12,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameUtil as GameUtil
@@ -92,7 +95,45 @@ spMiscBanner :: EdictReference -> Quake ()
 spMiscBanner _ = io (putStrLn "GameMisc.spMiscBanner") >> undefined -- TODO
 
 spMiscDeadSoldier :: EdictReference -> Quake ()
-spMiscDeadSoldier _ = io (putStrLn "GameMisc.spMiscDeadSoldier") >> undefined -- TODO
+spMiscDeadSoldier er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0 -- auto-remove for deathmatch
+      then GameUtil.freeEdict er
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        let modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        tris <- modelIndex "models/deadbods/dude/tris.md2"
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eMoveType .= Constants.moveTypeNone
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= tris
+
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        let spawnFlags = edict^.eSpawnFlags
+
+        -- defaults to frame 0
+        let frame = if | spawnFlags .&. 2 /= 0 -> 1
+                       | spawnFlags .&. 4 /= 0 -> 2
+                       | spawnFlags .&. 8 /= 0 -> 3
+                       | spawnFlags .&. 16 /= 0 -> 4
+                       | spawnFlags .&. 32 /= 0 -> 5
+                       | otherwise -> 0
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEntityState.esFrame .= frame
+          eEdictMinMax.eMins .= V3 (-16) (-16) 0
+          eEdictMinMax.eMaxs .= V3 16 16 16
+          eEdictStatus.eDeadFlag .= Constants.deadDead
+          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eSvFlags %= (.|. (Constants.svfMonster .|. Constants.svfDeadMonster))
+          eEdictAction.eaDie .= Just miscDeadSoldierDie
+          eMonsterInfo.miAIFlags %= (.|. Constants.aiGoodGuy)
+
+        linkEntity er
 
 spMiscViper :: EdictReference -> Quake ()
 spMiscViper _ = io (putStrLn "GameMisc.spMiscViper") >> undefined -- TODO
@@ -145,3 +186,8 @@ spMiscTeleporterDest :: EntThink
 spMiscTeleporterDest =
   GenericEntThink "SP_misc_teleporter_dest" $ \_ -> do
     io (putStrLn "GameMisc.spMiscTeleporterDest") >> undefined -- TODO
+
+miscDeadSoldierDie :: EntDie
+miscDeadSoldierDie =
+  GenericEntDie "misc_deadsoldier_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameMisc.miscDeadSoldierDie") >> undefined -- TODO
