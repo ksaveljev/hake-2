@@ -1,7 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Game.GameTrigger where
+
+import Control.Lens ((.=), ix)
 
 import Quake
 import QuakeState
+import Game.Adapters
 
 spTriggerMultiple :: EdictReference -> Quake ()
 spTriggerMultiple _ = io (putStrLn "GameTrigger.spTriggerMultiple") >> undefined -- TODO
@@ -10,7 +14,8 @@ spTriggerOnce :: EdictReference -> Quake ()
 spTriggerOnce _ = io (putStrLn "GameTrigger.spTriggerOnce") >> undefined -- TODO
 
 spTriggerRelay :: EdictReference -> Quake ()
-spTriggerRelay _ = io (putStrLn "GameTrigger.spTriggerRelay") >> undefined -- TODO
+spTriggerRelay (EdictReference edictIdx) =
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just triggerRelayUse
 
 spTriggerKey :: EdictReference -> Quake ()
 spTriggerKey _ = io (putStrLn "GameTrigger.spTriggerKey") >> undefined -- TODO
@@ -32,3 +37,8 @@ spTriggerGravity _ = io (putStrLn "GameTrigger.spTriggerGravity") >> undefined -
 
 spTriggerMonsterJump :: EdictReference -> Quake ()
 spTriggerMonsterJump _ = io (putStrLn "GameTrigger.spTriggerMonsterJump") >> undefined -- TODO
+
+triggerRelayUse :: EntUse
+triggerRelayUse =
+  GenericEntUse "trigger_relay_use" $ \_ _ _ -> do
+    io (putStrLn "GameTrigger.triggerRelayUse") >> undefined -- TODO
