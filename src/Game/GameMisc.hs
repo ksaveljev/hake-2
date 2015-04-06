@@ -211,10 +211,27 @@ spFuncAreaPortal =
   GenericEntThink "sp_func_areaportal" $ \_ -> do
     io (putStrLn "GameMisc.spFuncAreaPortal") >> undefined -- TODO
 
+{-
+- QUAKED misc_teleporter_dest (1 0 0) (-32 -32 -24) (32 32 -16) Point
+- teleporters at these.
+-}
 spMiscTeleporterDest :: EntThink
 spMiscTeleporterDest =
-  GenericEntThink "SP_misc_teleporter_dest" $ \_ -> do
-    io (putStrLn "GameMisc.spMiscTeleporterDest") >> undefined -- TODO
+  GenericEntThink "SP_misc_teleporter_dest" $ \er@(EdictReference edictIdx) -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    setModel er (Just "models/objects/dmspot/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEntityState.esSkinNum .= 0
+      eSolid .= Constants.solidBbox
+      eEdictMinMax.eMins .= V3 (-32) (-32) (-24)
+      eEdictMinMax.eMaxs .= V3 32 32 (-16)
+
+    linkEntity er
+    return True
 
 miscDeadSoldierDie :: EntDie
 miscDeadSoldierDie =
