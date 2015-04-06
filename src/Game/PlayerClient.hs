@@ -3,7 +3,7 @@
 module Game.PlayerClient where
 
 import Control.Lens (Traversal', use, (^.), ix, preuse, (.=))
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, void)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower)
 import qualified Data.ByteString.Char8 as BC
@@ -14,6 +14,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 
 -- Called when a player drops from the server. Will not be called between levels. 
@@ -63,9 +64,22 @@ initBodyQue = do
 spInfoPlayerStart :: EdictReference -> Quake ()
 spInfoPlayerStart _ = io (putStrLn "PlayerClient.spInfoPlayerStart") >> undefined -- TODO
 
+{-
+- QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) potential
+- spawning position for deathmatch games.
+-}
 spInfoPlayerDeathmatch :: EdictReference -> Quake ()
-spInfoPlayerDeathmatch _ = io (putStrLn "PlayerClient.spInfoPlayerDeathmatch") >> undefined -- TODO
+spInfoPlayerDeathmatch er = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
+    if deathmatchValue == 0
+      then GameUtil.freeEdict er
+      else void $ think GameMisc.spMiscTeleporterDest er
+
+{-
+- QUAKED info_player_coop (1 0 1) (-16 -16 -24) (16 16 32) potential
+- spawning position for coop games.
+-}
 spInfoPlayerCoop :: EdictReference -> Quake ()
 spInfoPlayerCoop er@(EdictReference edictIdx) = do
     coopValue <- liftM (^.cvValue) coopCVar
