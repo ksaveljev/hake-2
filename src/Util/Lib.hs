@@ -69,3 +69,9 @@ randomF = do
     let (result, newG) = random g
     globals.rnd .= newG
     return result
+
+-- Like in libc
+crandom :: Quake Float
+crandom = do
+    f <- randomF
+    return $ (f - 0.5) * 2

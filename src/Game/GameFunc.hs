@@ -1,9 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameFunc where
 
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom)
+import Control.Monad (when)
+import Data.Bits ((.&.))
+import qualified Data.ByteString as B
+
 import Quake
 import QuakeState
 import Game.Adapters
+import qualified Constants
+import qualified Util.Lib as Lib
 
 spFuncButton :: EntThink
 spFuncButton =
@@ -55,4 +62,37 @@ spFuncTrain :: EdictReference -> Quake ()
 spFuncTrain _ = io (putStrLn "GameFunc.spFuncTrain") >> undefined -- TODO
 
 spFuncTimer :: EdictReference -> Quake ()
-spFuncTimer _ = io (putStrLn "GameFunc.spFuncTimer") >> undefined -- TODO
+spFuncTimer er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eWait) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 1
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaUse .= Just funcTimerUse
+      eEdictAction.eaThink .= Just funcTimerThink
+
+    when ((edict^.eRandom) >= (edict^.eWait)) $ do
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eRandom .= (edict^.eWait) - Constants.frameTime
+      dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+      dprintf $ "func_timer at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " has random >= wait\n"
+    
+    when (((edict^.eSpawnFlags) .&. 1) /= 0) $ do
+      time <- use $ gameBaseGlobals.gbLevel.llTime
+      pauseTime <- use $ gameBaseGlobals.gbSpawnTemp.stPauseTime
+      cr <- Lib.crandom
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+        eEdictAction.eaNextThink .= time + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
+        eEdictOther.eoActivator .= Just er
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient
+
+funcTimerUse :: EntUse
+funcTimerUse =
+  GenericEntUse "func_timer_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.funcTimerUse") >> undefined -- TODO
+
+funcTimerThink :: EntThink
+funcTimerThink =
+  GenericEntThink "func_timer_think" $ \_ -> do
+    io (putStrLn "GameFunc.funcTimerThink") >> undefined -- TODO

@@ -3,7 +3,7 @@
 module Game.GameUtil where
 
 import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom)
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, unless)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (norm)
@@ -166,7 +166,9 @@ useTargets (EdictReference edictIdx) activatorReference = do
                   then killKillTargets Nothing (fromJust $ edict^.eEdictInfo.eiKillTarget)
                   else return False
 
-        io (putStrLn "GameUtil.useTargets") >> undefined -- TODO
+        unless done $ do
+          -- fire targets
+          io (putStrLn "GameUtil.useTargets") >> undefined -- TODO
 
   where killKillTargets :: Maybe EdictReference -> B.ByteString -> Quake Bool
         killKillTargets edictRef killTarget = do
