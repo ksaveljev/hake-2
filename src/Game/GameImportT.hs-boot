@@ -49,7 +49,7 @@ newGameImportT       :: GameImportT
 giBprintf            :: Functor f => ((Int -> B.ByteString -> Quake ()) -> f (Int -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giDprintf            :: Functor f => ((B.ByteString -> Quake ()) -> f (B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giCprintf            :: Functor f => ((EdictT -> Int -> B.ByteString -> Quake ()) -> f (EdictT -> Int -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
-giCenterPrintf       :: Functor f => ((EdictT -> B.ByteString -> Quake ()) -> f (EdictT -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
+giCenterPrintf       :: Functor f => ((EdictReference -> B.ByteString -> Quake ()) -> f (EdictReference -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giSound              :: Functor f => ((EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()) -> f (EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ())) -> GameImportT -> f GameImportT
 giPositionedSound    :: Functor f => ((V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()) -> f (V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ())) -> GameImportT -> f GameImportT
 giConfigString       :: Functor f => ((Int -> B.ByteString -> Quake ()) -> f (Int -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT

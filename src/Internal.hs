@@ -556,7 +556,7 @@ data GameImportT =
   GameImportT { _giBprintf            :: Int -> B.ByteString -> Quake ()
               , _giDprintf            :: B.ByteString -> Quake ()
               , _giCprintf            :: EdictT -> Int -> B.ByteString -> Quake ()
-              , _giCenterPrintf       :: EdictT -> B.ByteString -> Quake ()
+              , _giCenterPrintf       :: EdictReference -> B.ByteString -> Quake ()
               , _giSound              :: EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
               , _giPositionedSound    :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
               , _giConfigString       :: Int -> B.ByteString -> Quake ()

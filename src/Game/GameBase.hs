@@ -2,6 +2,10 @@
 module Game.GameBase where
 
 import Control.Lens (use, (^.), (.=))
+import Data.Char (toLower)
+import Data.Maybe (isNothing)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -33,3 +37,13 @@ getGameApi imp =
             }
         };
     -} 
+
+findByTarget :: EdictT -> B.ByteString -> Bool
+findByTarget e s =
+    if isNothing (e^.eEdictInfo.eiTargetName)
+      then False
+      else let Just targetName = e^.eEdictInfo.eiTargetName
+           in BC.map toLower targetName == BC.map toLower s
+
+gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
+gFind _ _ _ = io (putStrLn "GameBase.gFind") >> undefined -- TODO

@@ -32,7 +32,7 @@ spTriggerAlways er@(EdictReference edictIdx) = do
     when ((edict^.eDelay) < 0.2) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eDelay .= 0.2
 
-    GameUtil.useTargets er er
+    GameUtil.useTargets er (Just er)
 
 spTriggerPush :: EdictReference -> Quake ()
 spTriggerPush _ = io (putStrLn "GameTrigger.spTriggerPush") >> undefined -- TODO

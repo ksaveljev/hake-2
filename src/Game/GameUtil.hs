@@ -2,15 +2,20 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameUtil where
 
-import Control.Lens ((^.), use, (.=), ix, preuse, (+=))
+import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom)
 import Control.Monad (liftM, when)
+import Data.Bits ((.&.))
+import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (norm)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import CVarVariables
+import Game.Adapters
 import qualified Constants
+import qualified Game.GameBase as GameBase
 
 {-
 - Either finds a free edict, or allocates a new one. Try to avoid reusing
@@ -115,6 +120,75 @@ range self other =
 - Search for (string)targetname in all entities that match
 - (string)self.target and call their .use function
 -}
-useTargets :: EdictReference -> EdictReference -> Quake ()
-useTargets (EdictReference edictIdx) (EdictReference activatorIdx) = do
-    io (putStrLn "GameUtil.useTargets") >> undefined -- TODO
+useTargets :: EdictReference -> Maybe EdictReference -> Quake ()
+useTargets (EdictReference edictIdx) activatorReference = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+        centerPrintf = gameImport^.giCenterPrintf
+    
+    -- check for a delay
+    if (edict^.eDelay) /= 0
+      then do
+        -- create a temp object to fire at a later time
+        EdictReference tmpIdx <- spawn
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        when (isNothing activatorReference) $ do
+          dprintf "Think_Delay with no activator\n"
+
+        zoom (gameBaseGlobals.gbGEdicts.ix tmpIdx) $ do
+          eClassName .= "DelayedUse"
+          eEdictAction.eaNextThink .= time + (edict^.eDelay)
+          eEdictAction.eaThink .= Just thinkDelay
+          eEdictOther.eoActivator .= activatorReference
+          eEdictInfo.eiMessage .= (edict^.eEdictInfo.eiMessage)
+          eEdictInfo.eiTarget .= (edict^.eEdictInfo.eiTarget)
+          eEdictInfo.eiKillTarget .= (edict^.eEdictInfo.eiKillTarget)
+
+      else do
+        let ar@(EdictReference activatorIdx) = fromJust activatorReference
+        Just activator <- preuse $ gameBaseGlobals.gbGEdicts.ix activatorIdx
+
+        -- print the message
+        when (isJust (edict^.eEdictInfo.eiMessage) && ((activator^.eSvFlags) .&. Constants.svfMonster) == 0) $ do
+          centerPrintf ar (fromJust (edict^.eEdictInfo.eiMessage))
+          if (edict^.eNoiseIndex) /= 0
+            then sound ar Constants.chanAuto (edict^.eNoiseIndex) 1 (fromIntegral Constants.attnNorm) 0
+            else do
+              talkIdx <- soundIndex "misc/talk1.wav"
+              sound ar Constants.chanAuto talkIdx 1 (fromIntegral Constants.attnNorm) 0
+
+        done <- if (isJust (edict^.eEdictInfo.eiKillTarget))
+                  then killKillTargets Nothing (fromJust $ edict^.eEdictInfo.eiKillTarget)
+                  else return False
+
+        io (putStrLn "GameUtil.useTargets") >> undefined -- TODO
+
+  where killKillTargets :: Maybe EdictReference -> B.ByteString -> Quake Bool
+        killKillTargets edictRef killTarget = do
+          nextRef <- GameBase.gFind edictRef GameBase.findByTarget killTarget
+          if isJust nextRef
+            then do
+              let Just newReference = nextRef
+              freeEdict newReference
+              Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+              if inUse
+                then killKillTargets nextRef killTarget
+                else do
+                  dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+                  dprintf "entity was removed while using killtargets\n"
+                  return True
+            else return False
+
+thinkDelay :: EntThink
+thinkDelay =
+  GenericEntThink "Think_Delay" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    useTargets er (edict^.eEdictOther.eoActivator)
+    freeEdict er
+    return True
+

@@ -50,7 +50,7 @@ cprintf _ _ _ = io (putStrLn "SVGame.cprintf") >>  undefined -- TODO
 - 
 - centerprint to a single client.
 -}
-centerPrintf :: EdictT -> B.ByteString -> Quake ()
+centerPrintf :: EdictReference -> B.ByteString -> Quake ()
 centerPrintf _ _ = io (putStrLn "SVGame.centerPrintf") >> undefined -- TODO
 
 {-
