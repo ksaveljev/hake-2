@@ -26,7 +26,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import qualified Server.SVGame as SVGame
 import qualified Server.SVMain as SVMain
-import qualified Server.SVSend as SVSend
+import {-# SOURCE #-} qualified Server.SVSend as SVSend
 import qualified Server.SVWorld as SVWorld
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib

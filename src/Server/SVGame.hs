@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SVGame where
 
-import Control.Lens (use, (.=), ix)
+import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
 import Control.Monad (when, unless)
+import Data.Maybe (isNothing, fromJust)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -12,10 +13,13 @@ import QuakeState
 import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSave as GameSave
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
+import {-# SOURCE #-} qualified Server.SVInit as SVInit
 import {-# SOURCE #-} qualified Server.SVSend as SVSend
+import qualified Server.SVWorld as SVWorld
 
 {-
 - PF_Unicast
@@ -70,7 +74,25 @@ pfError2 _ _ = io (putStrLn "SVGame.pfError2") >> undefined -- TODO
 - Also sets mins and maxs for inline bmodels.
 -}
 setModel :: EdictReference -> Maybe B.ByteString -> Quake ()
-setModel _ _ = io (putStrLn "SVGame.setModel") >> undefined -- TODO
+setModel er@(EdictReference edictIdx) name = do
+    when (isNothing name) $
+      Com.comError Constants.errDrop "PF_setmodel: NULL"
+
+    let modelName = fromJust name
+    idx <- SVInit.modelIndex modelName
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esModelIndex .= idx
+
+    -- if it is an inline model, get the size information for it
+    when (BC.head modelName == '*') $ do
+      modelIdx <- CM.inlineModel modelName
+      Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
+
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+        eMins .= (model^.cmMins)
+        eMaxs .= (model^.cmMaxs)
+
+      SVWorld.linkEdict er
 
 configString :: Int -> B.ByteString -> Quake ()
 configString index val = do
