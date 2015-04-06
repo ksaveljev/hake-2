@@ -58,7 +58,7 @@ giError2             :: Functor f => ((Int -> B.ByteString -> Quake ()) -> f (In
 giModelIndex         :: Functor f => ((B.ByteString -> Quake Int) -> f (B.ByteString -> Quake Int)) -> GameImportT -> f GameImportT
 giSoundIndex         :: Functor f => ((B.ByteString -> Quake Int) -> f (B.ByteString -> Quake Int)) -> GameImportT -> f GameImportT
 giImageIndex         :: Functor f => ((B.ByteString -> Quake Int) -> f (B.ByteString -> Quake Int)) -> GameImportT -> f GameImportT
-giSetModel           :: Functor f => ((EdictT -> B.ByteString -> Quake ()) -> f (EdictT -> B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
+giSetModel           :: Functor f => ((EdictReference -> Maybe B.ByteString -> Quake ()) -> f (EdictReference -> Maybe B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giTrace              :: Functor f => ((V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT) -> f (V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT)) -> GameImportT -> f GameImportT
 --, pmove_t.PointContentsAdapter -- TODO: ???
 giInPHS              :: Functor f => ((V3 Float -> V3 Float -> Quake Bool) -> f (V3 Float -> V3 Float -> Quake Bool)) -> GameImportT -> f GameImportT

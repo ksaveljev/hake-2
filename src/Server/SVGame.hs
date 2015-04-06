@@ -69,7 +69,7 @@ pfError2 _ _ = io (putStrLn "SVGame.pfError2") >> undefined -- TODO
 - 
 - Also sets mins and maxs for inline bmodels.
 -}
-setModel :: EdictT -> B.ByteString -> Quake ()
+setModel :: EdictReference -> Maybe B.ByteString -> Quake ()
 setModel _ _ = io (putStrLn "SVGame.setModel") >> undefined -- TODO
 
 configString :: Int -> B.ByteString -> Quake ()

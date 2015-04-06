@@ -565,7 +565,7 @@ data GameImportT =
               , _giModelIndex         :: B.ByteString -> Quake Int
               , _giSoundIndex         :: B.ByteString -> Quake Int
               , _giImageIndex         :: B.ByteString -> Quake Int
-              , _giSetModel           :: EdictT -> B.ByteString -> Quake ()
+              , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
               , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
               --, pmove_t.PointContentsAdapter -- TODO: ???
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool

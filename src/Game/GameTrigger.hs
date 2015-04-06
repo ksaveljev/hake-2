@@ -1,19 +1,64 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameTrigger where
 
 import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isJust)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import Game.Adapters
+import qualified Constants
+import qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 spTriggerMultiple :: EdictReference -> Quake ()
-spTriggerMultiple _ = io (putStrLn "GameTrigger.spTriggerMultiple") >> undefined -- TODO
+spTriggerMultiple er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+        soundIndex = gameImport^.giSoundIndex
+
+    let noiseIndex = if | (edict^.eSounds) == 1 -> Just "misc/secret.wav"
+                        | (edict^.eSounds) == 2 -> Just "misc/talk.wav"
+                        | (edict^.eSounds) == 3 -> Just "misc/trigger1.wav"
+                        | otherwise -> Nothing
+
+    when (isJust noiseIndex) $ do
+      let Just idx = noiseIndex
+      si <- soundIndex idx
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .= si
+
+    when ((edict^.eWait) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 0.2
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaTouch .= Just touchMulti
+      eMoveType .= Constants.moveTypeNone
+      eSvFlags %= (.|. Constants.svfNoClient)
+    
+    if (edict^.eSpawnFlags) .&. 4 /= 0
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSolid .= Constants.solidNot
+          eEdictAction.eaUse .= Just triggerEnable
+      else
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSolid .= Constants.solidTrigger
+          eEdictAction.eaUse .= Just useMulti
+
+    origin <- use $ globals.vec3Origin
+
+    unless ((edict^.eEntityState.esAngles) == origin) $
+      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+
+    setModel er (edict^.eEdictInfo.eiModel)
+    linkEntity er
 
 {-
 - QUAKED trigger_once (.5 .5 .5) ? x x TRIGGERED Triggers once, then
@@ -81,3 +126,18 @@ triggerRelayUse :: EntUse
 triggerRelayUse =
   GenericEntUse "trigger_relay_use" $ \_ _ _ -> do
     io (putStrLn "GameTrigger.triggerRelayUse") >> undefined -- TODO
+
+touchMulti :: EntTouch
+touchMulti =
+  GenericEntTouch "Touch_Multi" $ \_ _ _ _ -> do
+    io (putStrLn "GameTrigger.touchMulti") >> undefined -- TODO
+
+triggerEnable :: EntUse
+triggerEnable =
+  GenericEntUse "trigger_enable" $ \_ _ _ -> do
+    io (putStrLn "GameTrigger.triggerEnable") >> undefined -- TODO
+
+useMulti :: EntUse
+useMulti =
+  GenericEntUse "Use_Multi" $ \_ _ _ -> do
+    io (putStrLn "GameTrigger.useMulti") >> undefined -- TODO
