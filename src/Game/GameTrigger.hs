@@ -89,8 +89,6 @@ spTriggerOnce er@(EdictReference edictIdx) = do
     gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= -1
     spTriggerMultiple er
 
-    io (putStrLn "GameTrigger.spTriggerOnce") >> undefined -- TODO
-
 spTriggerRelay :: EdictReference -> Quake ()
 spTriggerRelay (EdictReference edictIdx) =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just triggerRelayUse

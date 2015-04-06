@@ -1,12 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameTarget where
 
-import Control.Lens (ix, (.=), zoom)
+import Control.Lens (ix, (.=), zoom, (^.), (+=), use)
+import Control.Monad (liftM)
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameUtil as GameUtil
 
 spTargetTempEntity :: EdictReference -> Quake ()
 spTargetTempEntity _ = io (putStrLn "GameTarget.spTargetTempEntity") >> undefined -- TODO
@@ -21,7 +24,22 @@ spTargetSecret :: EdictReference -> Quake ()
 spTargetSecret _ = io (putStrLn "GameTarget.spTargetSecret") >> undefined -- TODO
 
 spTargetGoal :: EdictReference -> Quake ()
-spTargetGoal _ = io (putStrLn "GameTarget.spTargetGoal") >> undefined -- TODO
+spTargetGoal er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0 -- auto-remove for deathmatch
+      then GameUtil.freeEdict er
+      else do
+        soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetGoal
+        -- TODO:
+        -- if (GameBase.st.noise == null)
+        --     GameBase.st.noise = "misc/secret.wav";
+        noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
+        soundIndex noise >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .=)
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient
+        gameBaseGlobals.gbLevel.llTotalGoals += 1
 
 spTargetExplosion :: EdictReference -> Quake ()
 spTargetExplosion (EdictReference edictIdx) = do
@@ -60,3 +78,8 @@ useTargetExplosion :: EntUse
 useTargetExplosion =
   GenericEntUse "use_target_explosion" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetExplosion") >> undefined -- TODO
+
+useTargetGoal :: EntUse
+useTargetGoal =
+  GenericEntUse "use_target_goal" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.useTargetGoal") >> undefined -- TODO
