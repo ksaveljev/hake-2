@@ -194,3 +194,8 @@ thinkDelay =
     freeEdict er
     return True
 
+freeEdictA :: EntThink
+freeEdictA =
+  GenericEntThink "G_FreeEdictA" $ \er -> do
+    freeEdict er
+    return False

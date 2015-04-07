@@ -17,6 +17,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameUtil as GameUtil
+import qualified Util.Lib as Lib
 
 {-
 - QUAKED light (0 1 0) (-8 -8 -8) (8 8 8) START_OFF Non-displayed light.
@@ -236,8 +237,38 @@ spMiscGibArm _ = io (putStrLn "GameMisc.spMiscGibArm") >> undefined -- TODO
 spMiscGibLeg :: EdictReference -> Quake ()
 spMiscGibLeg _ = io (putStrLn "GameMisc.spMiscGibLeg") >> undefined -- TODO
 
+{-
+- QUAKED misc_gib_head (1 0 0) (-8 -8 -8) (8 8 8) Intended for use with the
+- target_spawner
+-}
 spMiscGibHead :: EdictReference -> Quake ()
-spMiscGibHead _ = io (putStrLn "GameMisc.spMiscGibHead") >> undefined -- TODO
+spMiscGibHead er@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    setModel er (Just "models/objects/gibs/head/tris.md2")
+
+    -- IMPROVE? :)
+    r1 <- Lib.randomF
+    r2 <- Lib.randomF
+    r3 <- Lib.randomF
+
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eSolid .= Constants.solidNot
+      eEntityState.esEffects %= (.|. Constants.efGib)
+      eEdictStatus.eTakeDamage .= Constants.damageYes
+      eEdictAction.eaDie .= Just gibDie
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfMonster)
+      eEdictStatus.eDeadFlag .= Constants.deadDead
+      eEdictPhysics.eAVelocity .= V3 (r1 * 200) (r2 * 200) (r3 * 200)
+      eEdictAction.eaThink .= Just GameUtil.freeEdictA
+      eEdictAction.eaNextThink .= time + 30
+
+    linkEntity er
 
 spTargetCharacter :: EdictReference -> Quake ()
 spTargetCharacter _ = io (putStrLn "GameMisc.spTargetCharacter") >> undefined -- TODO
@@ -298,3 +329,8 @@ barrelTouch :: EntTouch
 barrelTouch =
   GenericEntTouch "barrel_touch" $ \_ _ _ _ -> do
     io (putStrLn "GameMisc.barrelTouch") >> undefined -- TODO
+
+gibDie :: EntDie
+gibDie =
+  GenericEntDie "gib_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameMisc.gibDie") >> undefined -- TODO
