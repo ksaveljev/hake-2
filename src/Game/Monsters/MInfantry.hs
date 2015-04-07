@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MInfantry where
 
-import Control.Lens ((^.), use, (.=), ix, zoom, preuse)
+import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=))
 import Control.Monad (liftM, void, when, unless)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
 
@@ -14,6 +14,7 @@ import Game.Adapters
 import Game.MFrameT
 import Game.MMoveT
 import qualified Constants
+import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
@@ -277,6 +278,21 @@ infantrySight =
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundSight <- use $ mInfantryGlobals.miSoundSight
     sound er Constants.chanBody soundSight 1 (fromIntegral Constants.attnNorm) 0
+    return True
+
+infantryDead :: EntThink
+infantryDead =
+  GenericEntThink "infantry_dead" $ \er@(EdictReference edictIdx) -> do
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
+      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfDeadMonster)
+
+    linkEntity er
+    void $ think M.flyCheck er
     return True
 
 infantryDie :: EntDie
