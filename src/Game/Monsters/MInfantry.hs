@@ -2,7 +2,7 @@
 module Game.Monsters.MInfantry where
 
 import Control.Lens ((^.), use, (.=), ix, zoom, preuse)
-import Control.Monad (liftM, void)
+import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.))
 import Linear (V3(..))
 import qualified Data.Vector as V
@@ -16,6 +16,7 @@ import Game.MMoveT
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
+import qualified Util.Lib as Lib
 
 modelScale :: Float
 modelScale = 1
@@ -43,6 +44,18 @@ frameRun01 = 92
 
 frameRun08 :: Int
 frameRun08 = 99
+
+framePain101 :: Int
+framePain101 = 100
+
+framePain110 :: Int
+framePain110 = 109
+
+framePain201 :: Int
+framePain201 = 110
+
+framePain210 :: Int
+framePain210 = 119
 
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
@@ -196,10 +209,67 @@ infantryRun =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just nextMove
     return True
 
+infantryFramesPain1 :: V.Vector MFrameT
+infantryFramesPain1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   6  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               ]
+
+infantryMovePain1 :: MMoveT
+infantryMovePain1 = MMoveT "infantryMovePain1" framePain101 framePain110 infantryFramesPain1 (Just infantryRun)
+
+infantryFramesPain2 :: V.Vector MFrameT
+infantryFramesPain2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   5  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               ]
+
+infantryMovePain2 :: MMoveT
+infantryMovePain2 = MMoveT "infantryMovePain2" framePain201 framePain210 infantryFramesPain2 (Just infantryRun)
+
 infantryPain :: EntPain
 infantryPain =
-  GenericEntPain "infantry_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MInfantry.infantryPain") >> undefined -- TODO
+  GenericEntPain "infantry_pain" $ \er@(EdictReference edictIdx) _ _ _ -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    when ((edict^.eEdictStatus.eHealth) < (edict^.eEdictStatus.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= 1
+
+    unless (time < (edict^.eEdictTiming.etPainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= time + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        n <- (liftM (`mod` 2) Lib.rand)
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+
+        if n == 0
+          then do
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain1
+            soundPain1 <- use $ mInfantryGlobals.miSoundPain1
+            sound er Constants.chanVoice soundPain1 1 (fromIntegral Constants.attnNorm) 0
+          else do
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain2
+            soundPain2 <- use $ mInfantryGlobals.miSoundPain2
+            sound er Constants.chanVoice soundPain2 1 (fromIntegral Constants.attnNorm) 0
 
 infantryDie :: EntDie
 infantryDie =
