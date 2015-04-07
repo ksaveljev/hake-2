@@ -113,31 +113,31 @@ configString index val = do
       SVSend.multicast origin Constants.multicastAllR
 
 writeChar :: Int -> Quake ()
-writeChar _ = io (putStrLn "SVGame.writeChar") >> undefined -- TODO
+writeChar c = MSG.writeCharI (svGlobals.svServer.sMulticast) c
 
 writeByte :: Int -> Quake ()
-writeByte _ = io (putStrLn "SVGame.writeByte") >> undefined -- TODO
+writeByte c = MSG.writeByteI (svGlobals.svServer.sMulticast) c
 
 writeShort :: Int -> Quake ()
-writeShort _ = io (putStrLn "SVGame.writeShort") >> undefined -- TODO
+writeShort c = MSG.writeShort (svGlobals.svServer.sMulticast) c
 
 writeLong :: Int -> Quake ()
-writeLong _ = io (putStrLn "SVGame.writeLong") >> undefined -- TODO
+writeLong c = MSG.writeLong (svGlobals.svServer.sMulticast) c
 
 writeFloat :: Float -> Quake ()
-writeFloat _ = io (putStrLn "SVGame.writeFloat") >> undefined -- TODO
+writeFloat f = MSG.writeFloat (svGlobals.svServer.sMulticast) f
 
 writeString :: B.ByteString -> Quake ()
-writeString _ = io (putStrLn "SVGame.writeString") >> undefined -- TODO
+writeString s = MSG.writeString (svGlobals.svServer.sMulticast) s
 
 writePos :: V3 Float -> Quake ()
-writePos _ = io (putStrLn "SVGame.writePos") >> undefined -- TODO
+writePos pos = MSG.writePos (svGlobals.svServer.sMulticast) pos
 
 writeDir :: V3 Float -> Quake ()
-writeDir _ = io (putStrLn "SVGame.writeDir") >> undefined -- TODO
+writeDir dir = MSG.writeDir (svGlobals.svServer.sMulticast) dir
 
 writeAngle :: Float -> Quake ()
-writeAngle _ = io (putStrLn "SVGame.writeAngle") >> undefined -- TODO
+writeAngle f = MSG.writeAngle (svGlobals.svServer.sMulticast) f
 
 {-
 - PF_inPVS

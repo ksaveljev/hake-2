@@ -41,6 +41,9 @@ writeCoord _ _ = io (putStrLn "MSG.writeCoord") >> undefined -- TODO
 writePos :: ASetter' QuakeState SizeBufT -> V3 Float -> Quake ()
 writePos _ _ = io (putStrLn "MSG.writePos") >> undefined -- TODO
 
+writeDir :: ASetter' QuakeState SizeBufT -> V3 Float -> Quake ()
+writeDir _ _ = io (putStrLn "MSG.writeDir") >> undefined -- TODO
+
 writeAngle :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle _ _ = io (putStrLn "MSG.writeAngle") >> undefined -- TODO
 
