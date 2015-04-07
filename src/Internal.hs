@@ -576,7 +576,7 @@ data GameImportT =
               , _giBoxEdicts          :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
               , _giPMove              :: PMoveT -> Quake ()
               , _giMulticast          :: V3 Float -> Int -> Quake ()
-              , _giUnicast            :: EdictT -> Bool -> Quake ()
+              , _giUnicast            :: EdictReference -> Bool -> Quake ()
               , _giWriteByte          :: Int -> Quake ()
               , _giWriteShort         :: Int -> Quake ()
               , _giWriteString        :: B.ByteString -> Quake ()

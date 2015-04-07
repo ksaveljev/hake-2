@@ -2,7 +2,7 @@
 module Server.SVGame where
 
 import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
-import Control.Monad (when, unless)
+import Control.Monad (when, unless, liftM)
 import Data.Maybe (isNothing, fromJust)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSave as GameSave
@@ -26,8 +27,19 @@ import qualified Server.SVWorld as SVWorld
 - 
 - Sends the contents of the mutlicast buffer to a single client.
 -}
-unicast :: EdictT -> Bool -> Quake ()
-unicast _ _ = io (putStrLn "SVGame.unicast") >> undefined -- TODO
+unicast :: EdictReference -> Bool -> Quake ()
+unicast (EdictReference edictIdx) reliable = do
+    Just p <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eIndex
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    unless (p < 1 || p > maxClientsValue) $ do
+      buf <- use $ svGlobals.svServer.sMulticast.sbData
+
+      if reliable
+        then SZ.write (svGlobals.svServerStatic.ssClients.ix (p - 1).cNetChan.ncMessage) buf (B.length buf)
+        else SZ.write (svGlobals.svServerStatic.ssClients.ix (p - 1).cDatagram) buf (B.length buf)
+
+      SZ.clear (svGlobals.svServer.sMulticast)
 
 {-
 - PF_dprintf

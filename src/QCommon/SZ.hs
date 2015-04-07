@@ -3,7 +3,7 @@
 module QCommon.SZ where
 
 import Control.Monad (when, unless)
-import Control.Lens (Lens', (^.), use, (.=), ASetter')
+import Control.Lens (Lens', (^.), use, (.=), ASetter', Traversal', preuse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -22,9 +22,9 @@ clear bufLens = do
     bufLens.sbOverflowed .= False
 
 -- ask for the pointer using sizebuf_t.cursize (RST)
-getSpace :: Lens' QuakeState SizeBufT -> Int -> Quake Int
+getSpace :: Traversal' QuakeState SizeBufT -> Int -> Quake Int
 getSpace bufLens len = do
-    buf <- use bufLens
+    Just buf <- preuse bufLens
 
     when (buf^.sbCurSize + len > buf^.sbMaxSize) $
       do
@@ -40,7 +40,7 @@ getSpace bufLens len = do
 
     return oldsize
 
-write :: Lens' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
+write :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len = do
     idx <- getSpace bufLens len
     oldData <- use $ bufLens.sbData
