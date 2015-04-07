@@ -31,6 +31,12 @@ frameStand50 = 50
 frameStand71 :: Int
 frameStand71 = 71
 
+frameWalk03 :: Int
+frameWalk03 = 74
+
+frameWalk14 :: Int
+frameWalk14 = 85
+
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
     V.fromList [ MFrameT (Just GameAI.aiStand) 0 Nothing
@@ -131,6 +137,31 @@ infantryFidget =
     sound er Constants.chanVoice soundIdle 1 (fromIntegral Constants.attnIdle) 0
     return True
 
+infantryFramesWalk :: V.Vector MFrameT
+infantryFramesWalk =
+    V.fromList [ MFrameT (Just GameAI.aiWalk) 5 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 5 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 5 Nothing
+               , MFrameT (Just GameAI.aiWalk) 6 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 4 Nothing
+               , MFrameT (Just GameAI.aiWalk) 5 Nothing
+               ]
+
+infantryMoveWalk :: MMoveT
+infantryMoveWalk = MMoveT "infantryMoveWalk" frameWalk03 frameWalk14 infantryFramesWalk Nothing
+
+infantryWalk :: EntThink
+infantryWalk =
+  GenericEntThink "infantry_walk" $ \(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveWalk
+    return True
+
 infantryPain :: EntPain
 infantryPain =
   GenericEntPain "infantry_pain" $ \_ _ _ _ -> do
@@ -140,11 +171,6 @@ infantryDie :: EntDie
 infantryDie =
   GenericEntDie "infantry_die" $ \_ _ _ _ _ -> do
     io (putStrLn "MInfantry.infantryDie") >> undefined -- TODO
-
-infantryWalk :: EntThink
-infantryWalk =
-  GenericEntThink "infantry_walk" $ \_ -> do
-    io (putStrLn "MInfantry.infantryWalk") >> undefined -- TODO
 
 infantryRun :: EntThink
 infantryRun =
