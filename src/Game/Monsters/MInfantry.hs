@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MInfantry where
 
-import Control.Lens ((^.), use, (.=), ix, zoom)
+import Control.Lens ((^.), use, (.=), ix, zoom, preuse)
 import Control.Monad (liftM, void)
+import Data.Bits ((.&.))
 import Linear (V3(..))
 import qualified Data.Vector as V
 
@@ -36,6 +37,12 @@ frameWalk03 = 74
 
 frameWalk14 :: Int
 frameWalk14 = 85
+
+frameRun01 :: Int
+frameRun01 = 92
+
+frameRun08 :: Int
+frameRun08 = 99
 
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
@@ -162,6 +169,33 @@ infantryWalk =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveWalk
     return True
 
+infantryFramesRun :: V.Vector MFrameT
+infantryFramesRun =
+    V.fromList [ MFrameT (Just GameAI.aiRun) 10 Nothing
+               , MFrameT (Just GameAI.aiRun) 20 Nothing
+               , MFrameT (Just GameAI.aiRun)  5 Nothing
+               , MFrameT (Just GameAI.aiRun)  7 Nothing
+               , MFrameT (Just GameAI.aiRun) 30 Nothing
+               , MFrameT (Just GameAI.aiRun) 35 Nothing
+               , MFrameT (Just GameAI.aiRun)  2 Nothing
+               , MFrameT (Just GameAI.aiRun)  6 Nothing
+               ]
+
+infantryMoveRun :: MMoveT
+infantryMoveRun = MMoveT "infantryMoveRun" frameRun01 frameRun08 infantryFramesRun Nothing
+
+infantryRun :: EntThink
+infantryRun =
+  GenericEntThink "infantry_run" $ \(EdictReference edictIdx) -> do
+    Just aiFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miAIFlags
+
+    let nextMove = if aiFlags .&. Constants.aiStandGround /= 0
+                     then infantryMoveStand
+                     else infantryMoveRun
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+    return True
+
 infantryPain :: EntPain
 infantryPain =
   GenericEntPain "infantry_pain" $ \_ _ _ _ -> do
@@ -171,11 +205,6 @@ infantryDie :: EntDie
 infantryDie =
   GenericEntDie "infantry_die" $ \_ _ _ _ _ -> do
     io (putStrLn "MInfantry.infantryDie") >> undefined -- TODO
-
-infantryRun :: EntThink
-infantryRun =
-  GenericEntThink "infantry_run" $ \_ -> do
-    io (putStrLn "MInfantry.infantryRun") >> undefined -- TODO
 
 infantryDodge :: EntDodge
 infantryDodge =
