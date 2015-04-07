@@ -19,6 +19,12 @@ import qualified Game.GameUtil as GameUtil
 modelScale :: Float
 modelScale = 1
 
+frameStand01 :: Int
+frameStand01 = 1
+
+frameStand49 :: Int
+frameStand49 = 49
+
 frameStand50 :: Int
 frameStand50 = 50
 
@@ -51,6 +57,80 @@ infantryFramesStand =
                , MFrameT (Just GameAI.aiStand) 0 Nothing
                ]
 
+infantryMoveStand :: MMoveT
+infantryMoveStand = MMoveT "infantryMoveStand" frameStand50 frameStand71 infantryFramesStand Nothing
+
+infantryStand :: EntThink
+infantryStand =
+  GenericEntThink "infantry_stand" $ \(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveStand
+    return True
+
+infantryFramesFidget :: V.Vector MFrameT
+infantryFramesFidget =
+    V.fromList [ MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   3  Nothing
+               , MFrameT (Just GameAI.aiStand)   6  Nothing
+               , MFrameT (Just GameAI.aiStand)   3  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-2) Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   1  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand) (-1) Nothing
+               , MFrameT (Just GameAI.aiStand)   0  Nothing
+               , MFrameT (Just GameAI.aiStand) (-3) Nothing
+               , MFrameT (Just GameAI.aiStand) (-2) Nothing
+               , MFrameT (Just GameAI.aiStand) (-3) Nothing
+               , MFrameT (Just GameAI.aiStand) (-3) Nothing
+               , MFrameT (Just GameAI.aiStand) (-2) Nothing
+               ]
+
+infantryMoveFidget :: MMoveT
+infantryMoveFidget = MMoveT "infantryMoveFidget" frameStand01 frameStand49 infantryFramesFidget (Just infantryStand)
+
+infantryFidget :: EntThink
+infantryFidget =
+  GenericEntThink "infantry_fidget" $ \er@(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveFidget
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundIdle <- use $ mInfantryGlobals.miSoundIdle
+    sound er Constants.chanVoice soundIdle 1 (fromIntegral Constants.attnIdle) 0
+    return True
+
 infantryPain :: EntPain
 infantryPain =
   GenericEntPain "infantry_pain" $ \_ _ _ _ -> do
@@ -60,11 +140,6 @@ infantryDie :: EntDie
 infantryDie =
   GenericEntDie "infantry_die" $ \_ _ _ _ _ -> do
     io (putStrLn "MInfantry.infantryDie") >> undefined -- TODO
-
-infantryStand :: EntThink
-infantryStand =
-  GenericEntThink "infantry_stand" $ \_ -> do
-    io (putStrLn "MInfantry.infantryStand") >> undefined -- TODO
 
 infantryWalk :: EntThink
 infantryWalk =
@@ -90,14 +165,6 @@ infantrySight :: EntInteract
 infantrySight =
   GenericEntInteract "infantry_sight" $ \_ _ -> do
     io (putStrLn "MInfantry.infantrySight") >> undefined -- TODO
-
-infantryFidget :: EntThink
-infantryFidget =
-  GenericEntThink "infantry_fidget" $ \_ -> do
-    io (putStrLn "MInfantry.infantryFidget") >> undefined -- TODO
-
-infantryMoveStand :: MMoveT
-infantryMoveStand = MMoveT "infantryMoveStand" frameStand50 frameStand71 infantryFramesStand Nothing
 
 {-
 - QUAKED monster_infantry (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
