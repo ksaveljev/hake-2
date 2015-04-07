@@ -271,6 +271,14 @@ infantryPain =
             soundPain2 <- use $ mInfantryGlobals.miSoundPain2
             sound er Constants.chanVoice soundPain2 1 (fromIntegral Constants.attnNorm) 0
 
+infantrySight :: EntInteract
+infantrySight =
+  GenericEntInteract "infantry_sight" $ \er _ -> do
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundSight <- use $ mInfantryGlobals.miSoundSight
+    sound er Constants.chanBody soundSight 1 (fromIntegral Constants.attnNorm) 0
+    return True
+
 infantryDie :: EntDie
 infantryDie =
   GenericEntDie "infantry_die" $ \_ _ _ _ _ -> do
@@ -285,11 +293,6 @@ infantryAttack :: EntThink
 infantryAttack =
   GenericEntThink "infantry_attack" $ \_ -> do
     io (putStrLn "MInfantry.infantryAttack") >> undefined -- TODO
-
-infantrySight :: EntInteract
-infantrySight =
-  GenericEntInteract "infantry_sight" $ \_ _ -> do
-    io (putStrLn "MInfantry.infantrySight") >> undefined -- TODO
 
 {-
 - QUAKED monster_infantry (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
