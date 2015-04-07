@@ -282,10 +282,21 @@ spFuncClock _ = io (putStrLn "GameMisc.spFuncClock") >> undefined -- TODO
 spMiscTeleporter :: EdictReference -> Quake ()
 spMiscTeleporter _ = io (putStrLn "GameMisc.spMiscTeleporter") >> undefined -- TODO
 
+{-
+- QUAKED func_areaportal (0 0 0) ?
+- 
+- This is a non-visible object that divides the world into areas that are
+- seperated when this portal is not activated. Usually enclosed in the
+- middle of a door.
+-}
 spFuncAreaPortal :: EntThink
 spFuncAreaPortal =
-  GenericEntThink "sp_func_areaportal" $ \_ -> do
-    io (putStrLn "GameMisc.spFuncAreaPortal") >> undefined -- TODO
+  GenericEntThink "sp_func_areaportal" $ \(EdictReference edictIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaUse .= Just useAreaPortal
+      eCount .= 0 -- always start closed
+
+    return True
 
 {-
 - QUAKED misc_teleporter_dest (1 0 0) (-32 -32 -24) (32 32 -16) Point
@@ -334,3 +345,8 @@ gibDie :: EntDie
 gibDie =
   GenericEntDie "gib_die" $ \_ _ _ _ _ -> do
     io (putStrLn "GameMisc.gibDie") >> undefined -- TODO
+
+useAreaPortal :: EntUse
+useAreaPortal =
+  GenericEntUse "use_areaportal" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.useAreaPortal") >> undefined -- TODO
