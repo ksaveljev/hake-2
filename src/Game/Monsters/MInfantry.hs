@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MInfantry where
 
 import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=))
@@ -16,6 +17,7 @@ import Game.MMoveT
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -57,6 +59,24 @@ framePain201 = 110
 
 framePain210 :: Int
 framePain210 = 119
+
+frameDeath101 :: Int
+frameDeath101 = 125
+
+frameDeath120 :: Int
+frameDeath120 = 144
+
+frameDeath201 :: Int
+frameDeath201 = 145
+
+frameDeath225 :: Int
+frameDeath225 = 169
+
+frameDeath301 :: Int
+frameDeath301 = 170
+
+frameDeath309 :: Int
+frameDeath309 = 178
 
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
@@ -295,10 +315,148 @@ infantryDead =
     void $ think M.flyCheck er
     return True
 
+aimAngles :: V.Vector (V3 Float)
+aimAngles =
+    V.fromList [ V3  0  5 0
+               , V3 10 15 0
+               , V3 20 25 0
+               , V3 25 35 0
+               , V3 30 40 0
+               , V3 30 45 0
+               , V3 25 50 0
+               , V3 20 40 0
+               , V3 15 35 0
+               , V3 40 35 0
+               , V3 70 35 0
+               , V3 90 35 0
+               ]
+
+infantryMachineGun :: EntThink
+infantryMachineGun =
+  GenericEntThink "InfantryMachineGun" $ \_ -> do
+    io (putStrLn "MInfantry.infantryMachineGun") >> undefined -- TODO
+
+infantryFramesDeath1 :: V.Vector MFrameT
+infantryFramesDeath1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   9  Nothing
+               , MFrameT (Just GameAI.aiMove)   9  Nothing
+               , MFrameT (Just GameAI.aiMove)   5  Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) Nothing
+               ]
+
+infantryMoveDeath1 :: MMoveT
+infantryMoveDeath1 = MMoveT "infantryMoveDeath1" frameDeath101 frameDeath120 infantryFramesDeath1 (Just infantryDead)
+
+-- Off with his head
+infantryFramesDeath2 :: V.Vector MFrameT
+infantryFramesDeath2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    1  Nothing
+               , MFrameT (Just GameAI.aiMove)    5  Nothing
+               , MFrameT (Just GameAI.aiMove)  (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    1  Nothing
+               , MFrameT (Just GameAI.aiMove)    1  Nothing
+               , MFrameT (Just GameAI.aiMove)    4  Nothing
+               , MFrameT (Just GameAI.aiMove)    3  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)  (-2) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-2) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-3) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-1) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-2) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)    0  (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)    2  (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)    2  (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)    3  (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove) (-10) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-7) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-8) (Just infantryMachineGun)
+               , MFrameT (Just GameAI.aiMove)  (-6) Nothing
+               , MFrameT (Just GameAI.aiMove)    4  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               ]
+
+infantryMoveDeath2 :: MMoveT
+infantryMoveDeath2 = MMoveT "infantryMoveDeath2" frameDeath201 frameDeath225 infantryFramesDeath2 (Just infantryDead)
+
+infantryFramesDeath3 :: V.Vector MFrameT
+infantryFramesDeath3 =
+    V.fromList [ MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)  (-6) Nothing
+               , MFrameT (Just GameAI.aiMove) (-11) Nothing
+               , MFrameT (Just GameAI.aiMove)  (-3) Nothing
+               , MFrameT (Just GameAI.aiMove) (-11) Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               ]
+
+infantryMoveDeath3 :: MMoveT
+infantryMoveDeath3 = MMoveT "infantryMoveDeath3" frameDeath301 frameDeath309 infantryFramesDeath3 (Just infantryDead)
+
 infantryDie :: EntDie
 infantryDie =
-  GenericEntDie "infantry_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MInfantry.infantryDie") >> undefined -- TODO
+  GenericEntDie "infantry_die" $ \er@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+
+    -- check for gib
+    if (self^.eEdictStatus.eHealth) <= (self^.eEdictStatus.eGibHealth)
+      then do
+        udeath <- soundIndex "misc/udeath.wav"
+        sound er Constants.chanVoice udeath 1 (fromIntegral Constants.attnNorm) 0
+
+        -- IMPROVE? repetition here
+        GameMisc.throwGib er "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib er "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+        -- IMPROVE? repetition here
+        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+        GameMisc.throwHead er "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus.eDeadFlag .= Constants.deadDead
+
+      else
+        unless ((self^.eEdictStatus.eDeadFlag) == Constants.deadDead) $ do
+          -- regular death
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus) $ do
+            eDeadFlag .= Constants.deadDead
+            eTakeDamage .= Constants.damageYes
+
+          n <- liftM (`mod` 3) Lib.rand
+          soundDie1 <- use $ mInfantryGlobals.miSoundDie1
+          soundDie2 <- use $ mInfantryGlobals.miSoundDie2
+
+          let (nextMove, nextSound) = if | n == 0 -> (infantryMoveDeath1, soundDie2)
+                                         | n == 1 -> (infantryMoveDeath2, soundDie1)
+                                         | otherwise -> (infantryMoveDeath3, soundDie2)
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+          sound er Constants.chanVoice nextSound 1 (fromIntegral Constants.attnNorm) 0
 
 infantryDodge :: EntDodge
 infantryDodge =

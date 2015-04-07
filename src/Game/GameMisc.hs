@@ -237,3 +237,9 @@ miscDeadSoldierDie :: EntDie
 miscDeadSoldierDie =
   GenericEntDie "misc_deadsoldier_die" $ \_ _ _ _ _ -> do
     io (putStrLn "GameMisc.miscDeadSoldierDie") >> undefined -- TODO
+
+throwGib :: EdictReference -> B.ByteString -> Int -> Int -> Quake ()
+throwGib _ _ _ _ = io (putStrLn "GameMisc.throwGib") >> undefined -- TODO
+
+throwHead :: EdictReference -> B.ByteString -> Int -> Int -> Quake ()
+throwHead _ _ _ _ = io (putStrLn "GameMisc.throwHead") >> undefined -- TODO
