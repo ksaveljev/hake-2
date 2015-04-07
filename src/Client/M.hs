@@ -5,6 +5,7 @@ import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=))
 import Control.Monad (unless)
 import Data.Bits ((.|.), (.&.), complement)
 
+import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
@@ -56,3 +57,8 @@ flyCheck =
         eaNextThink .= time + 5 + 10 * nf
 
     return True
+
+dropToFloor :: EntThink
+dropToFloor =
+  GenericEntThink "m_drop_to_floor" $ \_ -> do
+    io (putStrLn "M.dropToFloor") >> undefined -- TODO

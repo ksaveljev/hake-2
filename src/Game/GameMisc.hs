@@ -3,7 +3,7 @@
 module Game.GameMisc where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, void)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isNothing)
 import Linear (V3(..))
@@ -15,6 +15,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Client.M as M
 import qualified Game.GameUtil as GameUtil
 
 {-
@@ -103,7 +104,51 @@ spFuncExplosive :: EdictReference -> Quake ()
 spFuncExplosive _ = io (putStrLn "GameMisc.spFuncExplosive") >> undefined -- TODO
 
 spMiscExploBox :: EdictReference -> Quake ()
-spMiscExploBox _ = io (putStrLn "GameMisc.spMiscExploBox") >> undefined -- TODO
+spMiscExploBox er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0 -- auto-remove for deathmatch
+      then GameUtil.freeEdict er
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        let modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        void $ modelIndex "models/objects/debris1/tris.md2"
+        void $ modelIndex "models/objects/debris2/tris.md2"
+        void $ modelIndex "models/objects/debris3/tris.md2"
+
+        let trisModel = "models/objects/barrels/tris.md2"
+        tris <- modelIndex trisModel
+
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSolid .= Constants.solidBbox
+          eMoveType .= Constants.moveTypeStep
+          eEdictInfo.eiModel .= Just trisModel
+          eEntityState.esModelIndex .= tris
+          eEdictMinMax.eMins .= V3 (-16) (-16) 0
+          eEdictMinMax.eMaxs .= V3 16 16 40
+          eEdictAction.eaDie .= Just barrelDelay
+          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eMonsterInfo.miAIFlags .= Constants.aiNoStep
+          eEdictAction.eaTouch .= Just barrelTouch
+          eEdictAction.eaThink .= Just M.dropToFloor
+          eEdictAction.eaNextThink .= time + 2 * Constants.frameTime
+
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+        when ((edict^.eEdictPhysics.eMass) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMass .= 400
+
+        when ((edict^.eEdictStatus.eHealth) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eHealth .= 10
+
+        when ((edict^.eEdictStatus.eDmg) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 150
+
+        linkEntity er
 
 spMiscBlackHole :: EdictReference -> Quake ()
 spMiscBlackHole _ = io (putStrLn "GameMisc.spMiscBlackHole") >> undefined -- TODO
@@ -243,3 +288,13 @@ throwGib _ _ _ _ = io (putStrLn "GameMisc.throwGib") >> undefined -- TODO
 
 throwHead :: EdictReference -> B.ByteString -> Int -> Int -> Quake ()
 throwHead _ _ _ _ = io (putStrLn "GameMisc.throwHead") >> undefined -- TODO
+
+barrelDelay :: EntDie
+barrelDelay =
+  GenericEntDie "barrel_delay" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameMisc.barrelDelay") >> undefined -- TODO
+
+barrelTouch :: EntTouch
+barrelTouch =
+  GenericEntTouch "barrel_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameMisc.barrelTouch") >> undefined -- TODO
