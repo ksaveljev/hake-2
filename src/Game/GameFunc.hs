@@ -4,7 +4,7 @@ module Game.GameFunc where
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom)
 import Control.Monad (when)
 import Data.Bits ((.&.))
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 
@@ -94,12 +94,9 @@ spFuncTrain er@(EdictReference edictIdx) = do
     setModel er (edict^.eEdictInfo.eiModel)
 
     noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
-    -- TODO: if (GameBase.st.noise != null)
-    {-
     when (isJust noise) $ do
-    -}
-    noiseIdx <- soundIndex noise
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .= noiseIdx
+      noiseIdx <- soundIndex (fromJust noise)
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .= noiseIdx
 
     when ((edict^.eEdictPhysics.eSpeed) == 0) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 100

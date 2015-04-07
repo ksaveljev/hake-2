@@ -14,7 +14,7 @@ data SpawnTempT =
              , _stLip       :: Int
              , _stDistance  :: Int
              , _stHeight    :: Int
-             , _stNoise     :: B.ByteString
+             , _stNoise     :: Maybe B.ByteString
              , _stPauseTime :: Float
              , _stItem      :: B.ByteString
              , _stGravity   :: B.ByteString
@@ -35,7 +35,7 @@ newSpawnTempT =
              , _stLip       = 0
              , _stDistance  = 0
              , _stHeight    = 0
-             , _stNoise     = ""
+             , _stNoise     = Just ""
              , _stPauseTime = 0
              , _stItem      = ""
              , _stGravity   = ""
