@@ -1,17 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameFunc where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom)
-import Control.Monad (when)
-import Data.Bits ((.&.))
-import Data.Maybe (isJust, fromJust)
-import Linear (V3(..))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=))
+import Control.Monad (when, liftM, void)
+import Data.Bits ((.&.), (.|.))
+import Data.Maybe (isJust, fromJust, isNothing)
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameBase as GameBase
 import qualified Util.Lib as Lib
 
 trainStartOn :: Int
@@ -23,6 +25,59 @@ trainToggle = 2
 trainBlockStops :: Int
 trainBlockStops = 4
 
+{-
+- PLATS
+- 
+- movement options:
+- 
+- linear smooth start, hard stop smooth start, smooth stop
+- 
+- start end acceleration speed deceleration begin sound end sound target
+- fired when reaching end wait at end
+- 
+- object characteristics that use move segments
+- --------------------------------------------- movetype_push, or
+- movetype_stop action when touched action when blocked action when used
+- disabled? auto trigger spawning
+- 
+-}
+
+platLowTrigger :: Int
+platLowTrigger = 1
+
+stateTop :: Int
+stateTop = 0
+
+stateBottom :: Int
+stateBottom = 1
+
+stateUp :: Int
+stateUp = 2
+
+stateDown :: Int
+stateDown = 3
+
+doorStartOpen :: Int
+doorStartOpen = 1
+
+doorReverse :: Int
+doorReverse = 2
+
+doorCrusher :: Int
+doorCrusher = 4
+
+doorNoMonster :: Int
+doorNoMonster = 8
+
+doorToggle :: Int
+doorToggle = 32
+
+doorXAxis :: Int
+doorXAxis = 64
+
+doorYAxis :: Int
+doorYAxis = 128
+
 spFuncButton :: EntThink
 spFuncButton =
   GenericEntThink "sp_func_button" $ \_ -> do
@@ -30,8 +85,128 @@ spFuncButton =
 
 spFuncDoor :: EntThink
 spFuncDoor =
-  GenericEntThink "sp_func_door" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncDoor") >> undefined -- TODO
+  GenericEntThink "sp_func_door" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let soundIndex = gameImport^.giSoundIndex
+        setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    when ((edict^.eSounds) /= 1) $ do
+      soundIndex "doors/dr1_strt.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
+      soundIndex "doors/dr1_mid.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .=)
+      soundIndex "doors/dr1_end.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundEnd .=)
+
+    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypePush
+      eSolid .= Constants.solidBsp
+
+    setModel er (edict^.eEdictInfo.eiModel)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+      eaBlocked .= Just doorBlocked
+      eaUse .= Just doorUse
+
+    when ((edict^.eEdictPhysics.eSpeed) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 100
+
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    when (deathmatchValue /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed %= (* 2)
+
+    Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed
+
+    when ((edict^.eEdictPhysics.eAccel) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAccel .= speed
+
+    when ((edict^.eEdictPhysics.eDecel) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eDecel .= speed
+
+    when ((edict^.eWait) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 3
+
+    when ((edict^.eEdictStatus.eDmg) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 2
+    
+    lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
+    when (lip == 0) $
+      gameBaseGlobals.gbSpawnTemp.stLip .= 8
+
+    -- calculate second position
+    let origin = edict^.eEntityState.esOrigin
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.ePos1 .= origin
+
+    lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
+    let moveDir = edict^.eEdictPhysics.eMoveDir
+        absMoveDir = fmap abs moveDir
+        size = edict^.eEdictMinMax.eSize
+        dist = (absMoveDir^._x) * (size^._x)
+             + (absMoveDir^._y) * (size^._y)
+             + (absMoveDir^._z) * (size^._z)
+             - (fromIntegral lip')
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miDistance .= dist
+
+    let pos2 = origin + fmap (* dist) moveDir
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.ePos2 .= pos2
+
+    -- if it starts open, switch the positions
+    when ((edict^.eSpawnFlags) .&. doorStartOpen /= 0) $ do
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+        eEntityState.esOrigin .= pos2
+        eEdictPhysics.ePos2 .= origin
+        eEdictPhysics.ePos1 .= pos2
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miState .= stateBottom
+
+    if (edict^.eEdictStatus.eHealth) /= 0
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eEdictStatus.eMaxHealth .= (edict^.eEdictStatus.eHealth)
+          eEdictAction.eaDie .= Just doorKilled
+      else
+        when (isJust (edict^.eEdictInfo.eiTargetName) && isJust (edict^.eEdictInfo.eiMessage)) $ do
+          void $ soundIndex "misc/talk.wav"
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaTouch .= Just doorTouch
+
+    Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
+      miSpeed .= (updatedEdict^.eEdictPhysics.eSpeed)
+      miAccel .= (updatedEdict^.eEdictPhysics.eAccel)
+      miDecel .= (updatedEdict^.eEdictPhysics.eDecel)
+      miWait .= (updatedEdict^.eWait)
+      miStartOrigin .= (updatedEdict^.eEdictPhysics.ePos1)
+      miStartAngles .= (updatedEdict^.eEntityState.esAngles)
+      miEndOrigin .= (updatedEdict^.eEdictPhysics.ePos2)
+      miEndAngles .= (updatedEdict^.eEntityState.esAngles)
+
+    when ((updatedEdict^.eSpawnFlags) .&. 16 /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+
+    when ((updatedEdict^.eSpawnFlags) .&. 64 /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+
+    -- to simplify logic elsewhere, make non-teamed doors into a team of one
+    when (isNothing (updatedEdict^.eEdictInfo.eiTeam)) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoTeamMaster .= Just er
+
+    linkEntity er
+
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= time + Constants.frameTime
+
+    let nextThink = if (updatedEdict^.eEdictStatus.eHealth) /= 0 || isJust (updatedEdict^.eEdictInfo.eiTargetName)
+                      then thinkCalcMoveSpeed
+                      else thinkSpawnDoorTrigger
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaThink .= Just nextThink
+
+    return True
 
 spFuncDoorSecret :: EntThink
 spFuncDoorSecret =
@@ -171,3 +346,33 @@ funcTrainFind :: EntThink
 funcTrainFind =
   GenericEntThink "func_train_find" $ \_ -> do
     io (putStrLn "GameFunc.funcTrainFind") >> undefined -- TODO
+
+doorUse :: EntUse
+doorUse =
+  GenericEntUse "door_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.doorUse") >> undefined -- TODO
+
+doorBlocked :: EntBlocked
+doorBlocked =
+  GenericEntBlocked "door_blocked" $ \_ _ -> do
+    io (putStrLn "GameFunc.doorBlocked") >> undefined -- TODO
+
+doorKilled :: EntDie
+doorKilled =
+  GenericEntDie "door_killed" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameFunc.doorKilled") >> undefined -- TODO
+
+doorTouch :: EntTouch
+doorTouch =
+  GenericEntTouch "door_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameFunc.doorTouch") >> undefined -- TODO
+
+thinkCalcMoveSpeed :: EntThink
+thinkCalcMoveSpeed =
+  GenericEntThink "think_calc_movespeed" $ \_ -> do
+    io (putStrLn "GameFunc.thinkCalcMoveSpeed") >> undefined -- TODO
+
+thinkSpawnDoorTrigger :: EntThink
+thinkSpawnDoorTrigger =
+  GenericEntThink "think_spawn_door_trigger" $ \_ -> do
+    io (putStrLn "GameFunc.thinkSpawnDoorTrigger") >> undefined -- TODO
