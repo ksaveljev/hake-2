@@ -60,8 +60,26 @@ spTargetSpeaker er@(EdictReference edictIdx) = do
         -- the server can determine who to send updates to
         linkEntity er
 
+{-
+- QUAKED target_help (1 0 1) (-16 -16 -24) (16 16 24) help1 When fired, the
+- "message" key becomes the current personal computer string, and the
+- message light will be set on all clients status bars.
+-}
 spTargetHelp :: EdictReference -> Quake ()
-spTargetHelp _ = io (putStrLn "GameTarget.spTargetHelp") >> undefined -- TODO
+spTargetHelp er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0 -- auto-remove for deathmatch
+      then GameUtil.freeEdict er
+      else do
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+        if isNothing (edict^.eEdictInfo.eiMessage)
+          then do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf $ (edict^.eClassName) `B.append` " with no message at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
+            GameUtil.freeEdict er
+          else gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetHelp
 
 spTargetSecret :: EdictReference -> Quake ()
 spTargetSecret er@(EdictReference edictIdx) = do
@@ -86,8 +104,12 @@ spTargetSecret er@(EdictReference edictIdx) = do
 
         gameBaseGlobals.gbLevel.llTotalSecrets += 1
 
+        -- map bug hack
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
 
-        io (putStrLn "GameTarget.spTargetSecret") >> undefined -- TODO
+        when ("mine3" == mapName && (edict^.eEntityState.esOrigin) == V3 280 (-2048) (-624)) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMessage .= Just "You have found a secret area."
 
 spTargetGoal :: EdictReference -> Quake ()
 spTargetGoal er@(EdictReference edictIdx) = do
@@ -105,13 +127,6 @@ spTargetGoal er@(EdictReference edictIdx) = do
         soundIndex noise >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .=)
         gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient
         gameBaseGlobals.gbLevel.llTotalGoals += 1
-
-        -- map bug hack
-        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-        mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
-
-        when ("mine3" == mapName && (edict^.eEntityState.esOrigin) == V3 280 (-2048) (-624)) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMessage .= Just "You have found a secret area."
 
 spTargetExplosion :: EdictReference -> Quake ()
 spTargetExplosion (EdictReference edictIdx) = do
@@ -165,3 +180,8 @@ useTargetSecret :: EntUse
 useTargetSecret =
   GenericEntUse "use_target_secret" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetSecret") >> undefined -- TODO
+
+useTargetHelp :: EntUse
+useTargetHelp =
+  GenericEntUse "Use_Target_Help" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.useTargetHelp") >> undefined -- TODO
