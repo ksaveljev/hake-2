@@ -4,6 +4,8 @@ module Game.GameFunc where
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom)
 import Control.Monad (when)
 import Data.Bits ((.&.))
+import Data.Maybe (isJust)
+import Linear (V3(..))
 import qualified Data.ByteString as B
 
 import Quake
@@ -11,6 +13,15 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Util.Lib as Lib
+
+trainStartOn :: Int
+trainStartOn = 1
+
+trainToggle :: Int
+trainToggle = 2
+
+trainBlockStops :: Int
+trainBlockStops = 4
 
 spFuncButton :: EntThink
 spFuncButton =
@@ -59,7 +70,59 @@ spFuncWater :: EdictReference -> Quake ()
 spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
 
 spFuncTrain :: EdictReference -> Quake ()
-spFuncTrain _ = io (putStrLn "GameFunc.spFuncTrain") >> undefined -- TODO
+spFuncTrain er@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+        dprintf = gameImport^.giDprintf
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypePush
+      eEntityState.esAngles .= V3 0 0 0
+      eEdictAction.eaBlocked .= Just trainBlocked
+      eSolid .= Constants.solidBsp
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if (edict^.eSpawnFlags) .&. trainBlockStops /= 0
+      then gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 0
+      else
+        when ((edict^.eEdictStatus.eDmg) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 100
+
+    setModel er (edict^.eEdictInfo.eiModel)
+
+    noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
+    -- TODO: if (GameBase.st.noise != null)
+    {-
+    when (isJust noise) $ do
+    -}
+    noiseIdx <- soundIndex noise
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .= noiseIdx
+
+    when ((edict^.eEdictPhysics.eSpeed) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 100
+
+    Just selfSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveInfo.miSpeed .= selfSpeed
+      eMoveInfo.miAccel .= selfSpeed
+      eMoveInfo.miDecel .= selfSpeed
+      eEdictAction.eaUse .= Just trainUse
+
+    linkEntity er
+
+    if isJust (edict^.eEdictInfo.eiTarget)
+      then do
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+        -- start trains on the second frame, to make sure their targets
+        -- have had a chance to spawn
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+          eaThink .= Just funcTrainFind
+          eaNextThink .= time + Constants.frameTime
+      else
+        dprintf $ "func_train without a target at " `B.append` Lib.vtos (edict^.eEdictMinMax.eAbsMin) `B.append` "\n"
 
 spFuncTimer :: EdictReference -> Quake ()
 spFuncTimer er@(EdictReference edictIdx) = do
@@ -96,3 +159,18 @@ funcTimerThink :: EntThink
 funcTimerThink =
   GenericEntThink "func_timer_think" $ \_ -> do
     io (putStrLn "GameFunc.funcTimerThink") >> undefined -- TODO
+
+trainBlocked :: EntBlocked
+trainBlocked =
+  GenericEntBlocked "train_blocked" $ \_ _ -> do
+    io (putStrLn "GameFunc.trainBlocked") >> undefined -- TODO
+
+trainUse :: EntUse
+trainUse =
+  GenericEntUse "train_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.trainUse") >> undefined -- TODO
+
+funcTrainFind :: EntThink
+funcTrainFind =
+  GenericEntThink "func_train_find" $ \_ -> do
+    io (putStrLn "GameFunc.funcTrainFind") >> undefined -- TODO
