@@ -67,7 +67,14 @@ cprintf _ _ _ = io (putStrLn "SVGame.cprintf") >>  undefined -- TODO
 - centerprint to a single client.
 -}
 centerPrintf :: EdictReference -> B.ByteString -> Quake ()
-centerPrintf _ _ = io (putStrLn "SVGame.centerPrintf") >> undefined -- TODO
+centerPrintf er@(EdictReference edictIdx) str = do
+    Just n <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eIndex
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    unless (n < 1 || n > maxClientsValue) $ do
+      MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcCenterPrint
+      MSG.writeString (svGlobals.svServer.sMulticast) str
+      unicast er True
 
 {-
 -  PF_error
