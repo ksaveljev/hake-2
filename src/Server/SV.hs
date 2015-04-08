@@ -4,12 +4,13 @@ module Server.SV where
 import Control.Lens (use, preuse, ix, (^.), (.=), (+=))
 import Control.Monad (unless, when, void)
 import Data.Bits ((.&.))
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3, _x, _y, _z)
 
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
 
 {-
@@ -104,5 +105,24 @@ physicsToss _ = io (putStrLn "SV.physicsToss") >> undefined -- TODO
 push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
 push _ _ _ = io (putStrLn "SV.push") >> undefined -- TODO
 
+{-
+- Runs thinking code for this frame if necessary.
+-}
 runThink :: EdictReference -> Quake Bool
-runThink _ = io (putStrLn "SV.runThink") >> undefined -- TODO
+runThink er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let thinktime = edict^.eEdictAction.eaNextThink
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if thinktime <= 0 || thinktime > time + 0.001
+      then return True
+      else do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= 0
+
+        when (isNothing (edict^.eEdictAction.eaThink)) $
+          Com.comError Constants.errFatal "NULL ent.think"
+
+        void $ think (fromJust $ edict^.eEdictAction.eaThink) er
+
+        return False
