@@ -4,10 +4,10 @@
 module Game.GameBase where
 
 import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix)
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -19,6 +19,7 @@ import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.PlayerClient as PlayerClient
+import qualified Server.SV as SV
 import qualified Util.Math3D as Math3D
 
 vecUp :: V3 Float
@@ -151,4 +152,19 @@ clientEndServerFrames :: Quake ()
 clientEndServerFrames = io (putStrLn "GameBase.clientEndServerFrames") >> undefined -- TODO
 
 runEntity :: EdictReference -> Quake ()
-runEntity _ = io (putStrLn "GameBase.runEntity") >> undefined -- TODO
+runEntity er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when (isJust (edict^.eEdictAction.eaPrethink)) $
+      void (think (fromJust $ edict^.eEdictAction.eaPrethink) er)
+
+    let moveType = edict^.eMoveType
+
+    if | any (== moveType) [Constants.moveTypePush, Constants.moveTypeStop] -> SV.physicsPusher er
+       | moveType == Constants.moveTypeNone -> SV.physicsNone er
+       | moveType == Constants.moveTypeNoClip -> SV.physicsNoClip er
+       | moveType == Constants.moveTypeStep -> SV.physicsStep er
+       | any (== moveType) [Constants.moveTypeToss, Constants.moveTypeBounce, Constants.moveTypeFly, Constants.moveTypeFlyMissile] -> SV.physicsToss er
+       | otherwise -> do
+           err <- use $ gameBaseGlobals.gbGameImport.giError
+           err $ "SV_Physics: bad movetype " `B.append` BC.pack (show moveType) -- IMPROVE?

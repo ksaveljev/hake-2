@@ -1345,3 +1345,6 @@ sizeOfInt    = 4 :: Int
 sizeOfLong   = 8 :: Int
 sizeOfFloat  = 4 :: Int
 sizeOfDouble = 8 :: Int
+
+-- move from Server/SV.hs
+maxClipPlanes = 5 :: Int

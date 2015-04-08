@@ -11,7 +11,7 @@ import qualified Data.Vector as V
 import Internal
 import Game.PMoveT
 import QCommon.PmlT
-import qualified Server.SV as SV
+import qualified Constants
 
 makeLenses ''PMoveGlobals
 
@@ -19,7 +19,7 @@ initialPMoveGlobals :: PMoveGlobals
 initialPMoveGlobals =
   PMoveGlobals { _pmPM              = newPMoveT
                , _pmPML             = newPmlT
-               , _pmPlanes          = V.replicate SV.maxClipPlanes (V3 0 0 0)
+               , _pmPlanes          = V.replicate Constants.maxClipPlanes (V3 0 0 0)
                , _pmStopSpeed       = 100
                , _pmMaxSpeed        = 300
                , _pmDuckSpeed       = 100
