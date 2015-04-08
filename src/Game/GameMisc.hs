@@ -85,11 +85,24 @@ spPointCombat er@(EdictReference edictIdx) = do
 spViewThing :: EdictReference -> Quake ()
 spViewThing _ = io (putStrLn "GameMisc.spViewThing") >> undefined -- TODO
 
+{-
+- QUAKED info_null (0 0.5 0) (-4 -4 -4) (4 4 4) Used as a positional target
+- for spotlights, etc.
+-}
 spInfoNull :: EdictReference -> Quake ()
-spInfoNull _ = io (putStrLn "GameMisc.spInfoNull") >> undefined -- TODO
+spInfoNull = GameUtil.freeEdict
 
+{-
+- QUAKED info_notnull (0 0.5 0) (-4 -4 -4) (4 4 4) Used as a positional
+- target for lightning.
+-}
 spInfoNotNull :: EdictReference -> Quake ()
-spInfoNotNull _ = io (putStrLn "GameMisc.spInfoNotNull") >> undefined -- TODO
+spInfoNotNull (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+      eAbsMin .= (edict^.eEntityState.esOrigin)
+      eAbsMax .= (edict^.eEntityState.esOrigin)
 
 spLight :: EdictReference -> Quake ()
 spLight er@(EdictReference edictIdx) = do
