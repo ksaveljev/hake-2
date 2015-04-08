@@ -66,7 +66,21 @@ pathCornerTouch =
     io (putStrLn "GameMisc.pathCornerTouch") >> undefined -- TODO
 
 spPointCombat :: EdictReference -> Quake ()
-spPointCombat _ = io (putStrLn "GameMisc.spPointCombat") >> undefined -- TODO
+spPointCombat er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then GameUtil.freeEdict er
+      else do
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSolid .= Constants.solidTrigger
+          eEdictAction.eaTouch .= Just pointCombatTouch
+          eEdictMinMax.eMins .= V3 (-8) (-8) (-16)
+          eEdictMinMax.eMaxs .= V3 8 8 16
+          eSvFlags .= Constants.svfNoClient
+
+        linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+        linkEntity er
 
 spViewThing :: EdictReference -> Quake ()
 spViewThing _ = io (putStrLn "GameMisc.spViewThing") >> undefined -- TODO
@@ -413,3 +427,8 @@ funcExplosiveExplode :: EntDie
 funcExplosiveExplode =
   GenericEntDie "func_explosive_explode" $ \_ _ _ _ _ -> do
     io (putStrLn "GameMisc.funcExplosiveExplode") >> undefined -- TODO
+
+pointCombatTouch :: EntTouch
+pointCombatTouch =
+  GenericEntTouch "point_combat_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameMisc.pointCombatTouch") >> undefined -- TODO
