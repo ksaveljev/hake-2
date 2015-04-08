@@ -6,6 +6,7 @@ module Game.GameBaseGlobals ( module Game.GameBaseGlobals
                             , module Game.GameImportT
                             , module Game.GItemT
                             , module Game.LevelLocalsT
+                            , module Game.PushedT
                             , module Game.SpawnTempT
                             ) where
 
@@ -20,6 +21,7 @@ import Game.GameLocalsT
 import {-# SOURCE #-} Game.GameImportT
 import Game.GItemT
 import Game.LevelLocalsT
+import Game.PushedT
 import Game.SpawnTempT
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import qualified Constants
@@ -39,4 +41,9 @@ initialGameBaseGlobals =
                   , _gbNumEdicts         = 0
                   , _gbGEdicts           = V.generate Constants.maxEdicts newEdictT
                   , _gbItemList          = GameItemList.itemList
+                  , _gbPushed            = V.replicate Constants.maxEdicts newPushedT
+                  , _gbPushedP           = 0
+                  , _gbObstacle          = Nothing
+                  , _gbCYes              = 0
+                  , _gbCNo               = 0
                   }

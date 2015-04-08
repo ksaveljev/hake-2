@@ -1,16 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.PushedT where
 
-import Linear.V3 (V3)
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 
-import Game.EdictT
-
-data PushedT =
-  PushedT { _pEnt      :: EdictT
-          , _pOrigin   :: V3 Float
-          , _pAngles   :: V3 Float
-          , _pDeltaYaw :: Float
-          }
+import Internal
 
 makeLenses ''PushedT
+
+newPushedT :: PushedT
+newPushedT =
+  PushedT { _pEnt      = Nothing
+          , _pOrigin   = V3 0 0 0
+          , _pAngles   = V3 0 0 0
+          , _pDeltaYaw = 0
+          }

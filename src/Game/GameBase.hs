@@ -19,7 +19,7 @@ import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.PlayerClient as PlayerClient
-import qualified Server.SV as SV
+import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Math3D as Math3D
 
 vecUp :: V3 Float

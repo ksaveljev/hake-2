@@ -632,6 +632,11 @@ data GameBaseGlobals =
                   , _gbNumEdicts         :: Int
                   , _gbGEdicts           :: V.Vector EdictT
                   , _gbItemList          :: V.Vector GItemT
+                  , _gbPushed            :: V.Vector PushedT
+                  , _gbPushedP           :: Int
+                  , _gbObstacle          :: Maybe EdictReference
+                  , _gbCYes              :: Int
+                  , _gbCNo               :: Int
                   }
 
 data PMoveGlobals =
@@ -1332,3 +1337,10 @@ data PlayerTrailGlobals =
                      , _ptTrailHead   :: Int
                      , _ptTrailActive :: Bool
                      }
+
+data PushedT =
+  PushedT { _pEnt      :: Maybe EdictReference
+          , _pOrigin   :: V3 Float
+          , _pAngles   :: V3 Float
+          , _pDeltaYaw :: Float
+          }
