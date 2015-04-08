@@ -15,6 +15,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -138,7 +139,16 @@ spTargetChangeLevel :: EdictReference -> Quake ()
 spTargetChangeLevel _ = io (putStrLn "GameTarget.spTargetChangeLevel") >> undefined -- TODO
 
 spTargetSplash :: EdictReference -> Quake ()
-spTargetSplash _ = io (putStrLn "GameTarget.spTargetSplash") >> undefined -- TODO
+spTargetSplash (EdictReference edictIdx) = do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetSplash
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+
+    when ((edict^.eCount) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eCount .= 32
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient
 
 spTargetSpawner :: EdictReference -> Quake ()
 spTargetSpawner _ = io (putStrLn "GameTarget.spTargetSpawner") >> undefined -- TODO
@@ -185,3 +195,8 @@ useTargetHelp :: EntUse
 useTargetHelp =
   GenericEntUse "Use_Target_Help" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetHelp") >> undefined -- TODO
+
+useTargetSplash :: EntUse
+useTargetSplash =
+  GenericEntUse "use_target_splash" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.useTargetSplash") >> undefined -- TODO
