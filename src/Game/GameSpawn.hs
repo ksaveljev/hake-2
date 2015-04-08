@@ -7,7 +7,7 @@ import Control.Lens (use, (^.), (.=), (%=), preuse, ix)
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, (.|.))
 import Data.Char (toLower)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -358,8 +358,48 @@ callSpawn er@(EdictReference edictIdx) = do
                 then return (Just $ GItemReference idx)
                 else checkItemSpawn edictClassName (idx + 1) maxIdx
 
+{-
+- G_FindTeams
+- 
+- Chain together all entities with a matching team field.
+- 
+- All but the first will have the FL_TEAMSLAVE flag set. All but the last
+- will have the teamchain field set to the next one.
+-}
 findTeams :: Quake ()
-findTeams = io (putStrLn "GameSpawn.findTeams") >> undefined -- TODO
+findTeams = do
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+
+    (teamsNumber, entitiesNumber) <- findNextTeam numEdicts 1 0 0
+    dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+    dprintf $ BC.pack (show teamsNumber) `B.append` " teams with " `B.append` BC.pack (show entitiesNumber) `B.append` " entities\n"
+
+  where findNextTeam :: Int -> Int -> Int -> Int -> Quake (Int, Int)
+        findNextTeam maxIdx idx c c2
+          | idx == maxIdx = return (c, c2)
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+
+              if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
+                then findNextTeam maxIdx (idx + 1) c c2
+                else do
+                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoTeamMaster .= Just (EdictReference idx)
+                  c2' <- findTeamMembers (fromJust $ edict^.eEdictInfo.eiTeam) (EdictReference idx) (EdictReference idx) maxIdx (idx + 1) c2
+                  findNextTeam maxIdx (idx + 1) (c + 1) c2'
+
+        findTeamMembers :: B.ByteString -> EdictReference -> EdictReference -> Int -> Int -> Int -> Quake Int
+        findTeamMembers teamName master chain@(EdictReference chainIdx) maxIdx idx c2
+          | idx == maxIdx = return c2
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+
+              if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eEdictInfo.eiTeam)
+                then findTeamMembers teamName master chain maxIdx idx c2
+                else do
+                  gameBaseGlobals.gbGEdicts.ix chainIdx.eEdictOther.eoTeamChain .= Just (EdictReference idx)
+                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoTeamMaster .= Just master
+                  gameBaseGlobals.gbGEdicts.ix idx.eFlags %= (.|. Constants.flTeamSlave)
+                  findTeamMembers teamName master (EdictReference idx) maxIdx (idx + 1) (c2 + 1)
 
 spawns :: V.Vector SpawnT
 spawns = V.fromList [ SpawnT "item_health" spItemHealth
