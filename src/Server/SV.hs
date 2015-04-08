@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.SV where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (+=))
+import Control.Lens (use, preuse, ix, (^.), (.=), (+=), zoom)
 import Control.Monad (unless, when, void)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -10,6 +10,7 @@ import Linear (V3, _x, _y, _z)
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
 
@@ -100,8 +101,128 @@ physicsNoClip _ = io (putStrLn "SV.physicsNoClip") >> undefined -- TODO
 physicsStep :: EdictReference -> Quake ()
 physicsStep _ = io (putStrLn "SV.physicsStep") >> undefined -- TODO
 
+-- Toss, bounce, and fly movement. When onground, do nothing
 physicsToss :: EdictReference -> Quake ()
-physicsToss _ = io (putStrLn "SV.physicsToss") >> undefined -- TODO
+physicsToss er@(EdictReference edictIdx) = do
+    -- regular thinking
+    void $ runThink er
+
+    Just edictFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags
+
+    -- if not a team captain, so movement will be handled elsewhere
+    unless (edictFlags .&. Constants.flTeamSlave /= 0) $ do
+      onGround <- checkGroundEntity
+
+      -- if onground, return without moving
+      unless onGround $ do
+        Just oldOrigin <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
+
+        checkVelocity er
+
+        -- add gravity
+        Just moveType <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType
+        addGravityBasedOnMoveType moveType
+
+        -- move angles
+        moveAngles
+
+        -- move origin
+        move <- moveOrigin
+        trace <- pushEntity er move
+
+        Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+
+        when inUse $ do
+          when (trace^.tFraction < 1) $ do
+            let backoff = if moveType == Constants.moveTypeBounce
+                            then 1.5
+                            else 1
+
+            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+            void $ GameBase.clipVelocity velocity (trace^.tPlane.cpNormal) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity) backoff
+
+            -- stop if on ground
+            stopIfOnGround moveType trace
+
+          -- check for water transition
+          (wasInWater, isInWater) <- checkWaterTransition
+
+          let waterLevel = if isInWater then 1 else 0
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= waterLevel
+
+          io (putStrLn "SV.physicsToss") >> undefined -- TODO
+
+  where addGravityBasedOnMoveType :: Int -> Quake ()
+        addGravityBasedOnMoveType moveType = do
+          when (moveType /= Constants.moveTypeFly && moveType /= Constants.moveTypeFlyMissile) $
+            addGravity er
+
+        checkGroundEntity :: Quake Bool
+        checkGroundEntity = do
+          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+
+          when ((velocity^._z) > 0 ) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+
+          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity
+
+          -- check for the groundentity going away
+          if isJust groundEntity
+            then do
+              let Just (EdictReference groundEntityIdx) = groundEntity
+              Just groundEntityInUse <- preuse $ gameBaseGlobals.gbGEdicts.ix groundEntityIdx.eInUse
+              if not groundEntityInUse
+                then do
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+                  return False
+                else return True
+            else return False
+            
+        moveAngles :: Quake ()
+        moveAngles = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          let angles = edict^.eEntityState.esAngles
+              avelocity = edict^.eEdictPhysics.eAVelocity
+              result = angles + fmap (* Constants.frameTime) avelocity
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles .= result
+
+        moveOrigin :: Quake (V3 Float)
+        moveOrigin = do
+          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+          return $ fmap (* Constants.frameTime) velocity
+
+        stopIfOnGround :: Int -> TraceT -> Quake ()
+        stopIfOnGround moveType trace = do
+          when ((trace^.tPlane.cpNormal._z) > 0.7) $ do
+            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+
+            when ((velocity^._z) < 60 || moveType /= Constants.moveTypeBounce) $ do
+              let Just (EdictReference traceIdx) = trace^.tEnt
+              Just linkCount <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx.eLinkCount
+              origin <- use $ globals.vec3Origin
+
+              zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+                eEdictOther.eoGroundEntity .= (trace^.tEnt)
+                eGroundEntityLinkCount .= linkCount
+                eEdictPhysics.eVelocity .= origin
+                eEdictPhysics.eAVelocity .= origin
+
+        checkWaterTransition :: Quake (Bool, Bool)
+        checkWaterTransition = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          let waterType = edict^.eWaterType
+              wasInWater = (waterType .&. Constants.maskWater) /= 0
+              origin = edict^.eEntityState.esOrigin
+
+          pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
+          newWaterType <- pointContents origin
+
+          let isInWater = (newWaterType .&. Constants.maskWater) /= 0
+
+          return (wasInWater, isInWater)
 
 push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
 push _ _ _ = io (putStrLn "SV.push") >> undefined -- TODO
@@ -127,3 +248,12 @@ runThink er@(EdictReference edictIdx) = do
         void $ think (fromJust $ edict^.eEdictAction.eaThink) er
 
         return False
+
+checkVelocity :: EdictReference -> Quake ()
+checkVelocity _ = io (putStrLn "SV.checkVelocity") >> undefined -- TODO
+
+addGravity :: EdictReference -> Quake ()
+addGravity _ = io (putStrLn "SV.addGravity") >> undefined -- TODO
+
+pushEntity :: EdictReference -> V3 Float -> Quake TraceT
+pushEntity _ _ = io (putStrLn "SV.pushEntity") >> undefined -- TODO

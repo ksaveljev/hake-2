@@ -14,7 +14,7 @@ module Game.GameImportT ( GameImportT(..)
                         , giImageIndex
                         , giSetModel
                         , giTrace
-                        --, pmove_t.PointContentsAdapter -- TODO: ???
+                        , giPointContents
                         , giInPHS
                         , giSetAreaPortalState
                         , giAreasConnected
@@ -60,7 +60,7 @@ giSoundIndex         :: Functor f => ((B.ByteString -> Quake Int) -> f (B.ByteSt
 giImageIndex         :: Functor f => ((B.ByteString -> Quake Int) -> f (B.ByteString -> Quake Int)) -> GameImportT -> f GameImportT
 giSetModel           :: Functor f => ((EdictReference -> Maybe B.ByteString -> Quake ()) -> f (EdictReference -> Maybe B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giTrace              :: Functor f => ((V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT) -> f (V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT)) -> GameImportT -> f GameImportT
---, pmove_t.PointContentsAdapter -- TODO: ???
+giPointContents      :: Functor f => ((V3 Float -> Quake Int) -> f (V3 Float -> Quake Int)) -> GameImportT -> f GameImportT
 giInPHS              :: Functor f => ((V3 Float -> V3 Float -> Quake Bool) -> f (V3 Float -> V3 Float -> Quake Bool)) -> GameImportT -> f GameImportT
 giSetAreaPortalState :: Functor f => ((Int -> Bool -> Quake ()) -> f (Int -> Bool -> Quake ())) -> GameImportT -> f GameImportT
 giAreasConnected     :: Functor f => ((Int -> Int -> Quake Bool) -> f (Int -> Int -> Quake Bool)) -> GameImportT -> f GameImportT

@@ -234,3 +234,6 @@ pickTarget targetName = do
                 else do
                   let Just foundEdictRef = edictRef
                   searchForTargets edictRef findBy (foundEdictRef : foundRefs) (num + 1)
+
+clipVelocity :: V3 Float -> V3 Float -> Traversal' QuakeState (V3 Float) -> Float -> Quake Int
+clipVelocity _ _ _ _ = io (putStrLn "GameBase.clipVelocity") >> undefined -- TODO

@@ -568,7 +568,7 @@ data GameImportT =
               , _giImageIndex         :: B.ByteString -> Quake Int
               , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
               , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
-              --, pmove_t.PointContentsAdapter -- TODO: ???
+              , _giPointContents      :: V3 Float -> Quake Int
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()
               , _giAreasConnected     :: Int -> Int -> Quake Bool

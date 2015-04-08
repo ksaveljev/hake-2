@@ -36,7 +36,7 @@ newGameImportT =
               , _giImageIndex         = SVInit.imageIndex
               , _giSetModel           = SVGame.setModel
               , _giTrace              = SVWorld.trace
-              --, pmove_t.PointContentsAdapter -- TODO: ???
+              , _giPointContents      = (\_ -> return 0) 
               , _giInPHS              = SVGame.inPHS
               , _giSetAreaPortalState = CM.setAreaPortalState
               , _giAreasConnected     = CM.areasConnected
