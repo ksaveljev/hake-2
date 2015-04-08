@@ -98,21 +98,22 @@ newtype LinkReference = LinkReference Int
 newtype GItemReference = GItemReference Int deriving (Eq)
 
 data QuakeState =
-  QuakeState { _globals           :: Globals
-             , _comGlobals        :: ComGlobals
-             , _cmdGlobals        :: CmdGlobals
-             , _keyGlobals        :: KeyGlobals
-             , _fsGlobals         :: FSGlobals
-             , _netChannelGlobals :: NetChannelGlobals
-             , _svGlobals         :: SVGlobals
-             , _gameBaseGlobals   :: GameBaseGlobals
-             , _pMoveGlobals      :: PMoveGlobals
-             , _scrGlobals        :: SCRGlobals
-             , _netGlobals        :: NETGlobals
-             , _cmGlobals         :: CMGlobals
-             , _gameItemsGlobals  :: GameItemsGlobals
-             , _mSoldierGlobals   :: MSoldierGlobals
-             , _mInfantryGlobals  :: MInfantryGlobals
+  QuakeState { _globals            :: Globals
+             , _comGlobals         :: ComGlobals
+             , _cmdGlobals         :: CmdGlobals
+             , _keyGlobals         :: KeyGlobals
+             , _fsGlobals          :: FSGlobals
+             , _netChannelGlobals  :: NetChannelGlobals
+             , _svGlobals          :: SVGlobals
+             , _gameBaseGlobals    :: GameBaseGlobals
+             , _pMoveGlobals       :: PMoveGlobals
+             , _scrGlobals         :: SCRGlobals
+             , _netGlobals         :: NETGlobals
+             , _cmGlobals          :: CMGlobals
+             , _gameItemsGlobals   :: GameItemsGlobals
+             , _mSoldierGlobals    :: MSoldierGlobals
+             , _mInfantryGlobals   :: MInfantryGlobals
+             , _playerTrailGlobals :: PlayerTrailGlobals
              }
 
 data Globals =
@@ -1325,3 +1326,9 @@ data MMoveT =
          , _mmFrame      :: V.Vector MFrameT
          , _mmEndFunc    :: Maybe EntThink
          }
+
+data PlayerTrailGlobals =
+  PlayerTrailGlobals { _ptTrail       :: V.Vector EdictReference
+                     , _ptTrailHead   :: Int
+                     , _ptTrailActive :: Bool
+                     }

@@ -16,6 +16,7 @@ module QuakeState ( QuakeState(..)
                   , gameItemsGlobals
                   , mSoldierGlobals
                   , mInfantryGlobals
+                  , playerTrailGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -38,6 +39,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.GameItemsGlobals
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.Monsters.MInfantryGlobals
+                  , module Game.PlayerTrailGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -49,6 +51,7 @@ import Game.GameBaseGlobals
 import Game.GameItemsGlobals
 import Game.Monsters.MInfantryGlobals
 import Game.Monsters.MSoldierGlobals
+import Game.PlayerTrailGlobals
 import Client.KeyGlobals
 import Client.SCRGlobals
 import Server.SVGlobals
@@ -63,19 +66,20 @@ makeLenses ''QuakeState
 
 initialQuakeState :: QuakeState
 initialQuakeState =
-  QuakeState { _globals           = initialGlobals
-             , _comGlobals        = initialComGlobals
-             , _cmdGlobals        = initialCmdGlobals
-             , _keyGlobals        = initialKeyGlobals
-             , _fsGlobals         = initialFSGlobals
-             , _netChannelGlobals = initialNetChannelGlobals
-             , _svGlobals         = initialSVGlobals
-             , _gameBaseGlobals   = initialGameBaseGlobals
-             , _pMoveGlobals      = initialPMoveGlobals
-             , _scrGlobals        = initialSCRGlobals
-             , _netGlobals        = initialNETGlobals
-             , _cmGlobals         = initialCMGlobals
-             , _gameItemsGlobals  = initialGameItemsGlobals
-             , _mSoldierGlobals   = initialMSoldierGlobals
-             , _mInfantryGlobals  = initialMInfantryGlobals
+  QuakeState { _globals            = initialGlobals
+             , _comGlobals         = initialComGlobals
+             , _cmdGlobals         = initialCmdGlobals
+             , _keyGlobals         = initialKeyGlobals
+             , _fsGlobals          = initialFSGlobals
+             , _netChannelGlobals  = initialNetChannelGlobals
+             , _svGlobals          = initialSVGlobals
+             , _gameBaseGlobals    = initialGameBaseGlobals
+             , _pMoveGlobals       = initialPMoveGlobals
+             , _scrGlobals         = initialSCRGlobals
+             , _netGlobals         = initialNETGlobals
+             , _cmGlobals          = initialCMGlobals
+             , _gameItemsGlobals   = initialGameItemsGlobals
+             , _mSoldierGlobals    = initialMSoldierGlobals
+             , _mInfantryGlobals   = initialMInfantryGlobals
+             , _playerTrailGlobals = initialPlayerTrailGlobals
              }
