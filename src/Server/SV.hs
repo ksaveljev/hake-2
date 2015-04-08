@@ -90,8 +90,9 @@ physicsPusher er@(EdictReference edictIdx) = do
 
           backOutTeamChain (edict^.eEdictOther.eoTeamChain)
 
+-- Non moving objects can only think
 physicsNone :: EdictReference -> Quake ()
-physicsNone _ = io (putStrLn "SV.physicsNone") >> undefined -- TODO
+physicsNone = void . runThink -- regular thinking
 
 physicsNoClip :: EdictReference -> Quake ()
 physicsNoClip _ = io (putStrLn "SV.physicsNoClip") >> undefined -- TODO
