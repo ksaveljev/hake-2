@@ -12,6 +12,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import qualified Util.Math3D as Math3D
 
 vecUp :: V3 Float
 vecUp = V3 0 (-1) 0
@@ -67,10 +68,10 @@ gFind _ _ _ = io (putStrLn "GameBase.gFind") >> undefined -- TODO
 setMoveDir :: Traversal' QuakeState (V3 Float) -> Traversal' QuakeState (V3 Float) -> Quake ()
 setMoveDir anglesLens moveDirLens = do
     Just angles <- preuse anglesLens
-    --Just movedir <- preuse moveDirLens
 
     if | angles == vecUp -> moveDirLens .= moveDirUp
        | angles == vecDown -> moveDirLens .= moveDirDown
-       | otherwise -> io (putStrLn "GameBase.setMoveDir") >> undefined -- TODO
+       | otherwise -> let (Just updatedMoveDir, _, _) = Math3D.angleVectors angles True False False
+                     in moveDirLens .= updatedMoveDir
 
     anglesLens .= V3 0 0 0

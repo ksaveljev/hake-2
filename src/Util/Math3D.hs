@@ -1,22 +1,30 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Util.Math3D where
 
-import Control.Lens (preuse, ix, (^.))
+import Control.Lens (preuse, ix, (^.), Const)
 import Linear (V3(..), _x, _y, _z)
 
 import Quake
 import QuakeState
+import qualified Constants
+
+piRatio :: Float
+piRatio = pi / 360
+
+v3Access :: Int -> (a -> Const Float a) -> V3 a -> Const Float (V3 a)
+v3Access v = case v of
+               0 -> _x
+               1 -> _y
+               2 -> _z
+               _ -> undefined -- shouldn't happen
+
                                           -- index of cmGlobals.cmMapPlanes
 boxOnPlaneSize :: V3 Float -> V3 Float -> Int -> Quake Int
 boxOnPlaneSize emins emaxs pIdx = do
     Just p <- preuse $ cmGlobals.cmMapPlanes.ix pIdx
 
-    let ptype = case p^.cpType of
-                  0 -> _x
-                  1 -> _y
-                  2 -> _z
-                  _ -> undefined -- shouldn't happen
-                   
+    let ptype = v3Access (fromIntegral $ p^.cpType)
 
     if (p^.cpType) < 3
       then -- fast axial cases
@@ -62,3 +70,26 @@ boxOnPlaneSize emins emaxs pIdx = do
         -- assert(sides != 0) : "BoxOnPlaneSide(): sides == 0 bug";
 
         return sides
+
+angleVectors :: V3 Float -> Bool -> Bool -> Bool -> (Maybe (V3 Float), Maybe (V3 Float), Maybe (V3 Float))
+angleVectors angles setForward setRight setUp =
+    let cr = 2 * piRatio
+        angle = (angles^.(v3Access Constants.yaw)) * cr
+        sy = sin angle
+        cy = cos angle
+        angle' = (angles^.(v3Access Constants.pitch)) * cr
+        sp = sin angle'
+        cp = cos angle'
+        forward = if setForward
+                    then Just $ V3 (cp * cy) (cp * sy) (-sp)
+                    else Nothing
+        angle'' = (angles^.(v3Access Constants.roll)) * cr
+        sr = sin angle''
+        cr' = cos angle''
+        right = if setRight
+                  then Just $ V3 ((-sr) * sp * cy + cr' * sy) ((-sr) * sp * sy + (-cr') * cy) ((-sr) * cp)
+                  else Nothing
+        up = if setUp
+               then Just $ V3 (cr' * sp * cy + sr * sy) (cr' * sp * sy + (-sr) * cy) (cr' * cp)
+               else Nothing
+    in (forward, right, up)
