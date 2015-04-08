@@ -80,25 +80,104 @@ doorYAxis = 128
 
 spFuncButton :: EntThink
 spFuncButton =
-  GenericEntThink "sp_func_button" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncButton") >> undefined -- TODO
-
-spFuncDoor :: EntThink
-spFuncDoor =
-  GenericEntThink "sp_func_door" $ \er@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-
+  GenericEntThink "sp_func_button" $ \er@(EdictReference edictIdx) -> do
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let soundIndex = gameImport^.giSoundIndex
         setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
+    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeStop
+      eSolid .= Constants.solidBsp
+
+    setModel er (edict^.eEdictInfo.eiModel)
+
+    when ((edict^.eSounds) /= 1) $ do
+      soundIndex "switches/butn2.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
+
+    when ((edict^.eEdictPhysics.eSpeed) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 40
+
+    Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed
+
+    when ((edict^.eEdictPhysics.eAccel) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAccel .= speed
+
+    when ((edict^.eEdictPhysics.eDecel) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eDecel .= speed
+
+    when ((edict^.eWait) == 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 3
+    
+    lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
+    when (lip == 0) $
+      gameBaseGlobals.gbSpawnTemp.stLip .= 4
+
+    let origin = edict^.eEntityState.esOrigin
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.ePos1 .= origin
+
+    lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
+    let moveDir = edict^.eEdictPhysics.eMoveDir
+        absMoveDir = fmap abs moveDir
+        size = edict^.eEdictMinMax.eSize
+        dist = (absMoveDir^._x) * (size^._x)
+             + (absMoveDir^._y) * (size^._y)
+             + (absMoveDir^._z) * (size^._z)
+             - (fromIntegral lip')
+
+    let pos2 = origin + fmap (* dist) moveDir
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.ePos2 .= pos2
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaUse .= Just buttonUse
+      eEntityState.esEffects %= (.|. Constants.efAnim01)
+
+    if (edict^.eEdictStatus.eHealth) /= 0
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictStatus.eMaxHealth .= (edict^.eEdictStatus.eHealth)
+          eEdictAction.eaDie .= Just buttonKilled
+          eEdictStatus.eTakeDamage .= Constants.damageYes
+      else
+        when (isNothing (edict^.eEdictInfo.eiTargetName)) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaTouch .= Just buttonTouch
+
+    Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
+      miState .= stateBottom
+      miSpeed .= (updatedEdict^.eEdictPhysics.eSpeed)
+      miAccel .= (updatedEdict^.eEdictPhysics.eAccel)
+      miDecel .= (updatedEdict^.eEdictPhysics.eDecel)
+      miWait .= (updatedEdict^.eWait)
+      miStartOrigin .= (updatedEdict^.eEdictPhysics.ePos1)
+      miStartAngles .= (updatedEdict^.eEntityState.esAngles)
+      miEndOrigin .= (updatedEdict^.eEdictPhysics.ePos2)
+      miEndAngles .= (updatedEdict^.eEntityState.esAngles)
+
+    linkEntity er
+    return True
+
+spFuncDoor :: EntThink
+spFuncDoor =
+  GenericEntThink "sp_func_door" $ \er@(EdictReference edictIdx) -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let soundIndex = gameImport^.giSoundIndex
+        setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
     when ((edict^.eSounds) /= 1) $ do
       soundIndex "doors/dr1_strt.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
       soundIndex "doors/dr1_mid.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .=)
       soundIndex "doors/dr1_end.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundEnd .=)
-
-    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eMoveType .= Constants.moveTypePush
@@ -376,3 +455,18 @@ thinkSpawnDoorTrigger :: EntThink
 thinkSpawnDoorTrigger =
   GenericEntThink "think_spawn_door_trigger" $ \_ -> do
     io (putStrLn "GameFunc.thinkSpawnDoorTrigger") >> undefined -- TODO
+
+buttonUse :: EntUse
+buttonUse =
+  GenericEntUse "button_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.buttonUse") >> undefined -- TODO
+
+buttonTouch :: EntTouch
+buttonTouch =
+  GenericEntTouch "button_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameFunc.buttonTouch") >> undefined -- TODO
+
+buttonKilled :: EntDie
+buttonKilled =
+  GenericEntDie "button_killed" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameFunc.buttonKilled") >> undefined -- TODO
