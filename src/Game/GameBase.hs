@@ -20,6 +20,7 @@ import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.PlayerClient as PlayerClient
 import {-# SOURCE #-} qualified Server.SV as SV
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 vecUp :: V3 Float
@@ -34,6 +35,8 @@ vecDown = V3 0 (-2) 0
 moveDirDown :: V3 Float
 moveDirDown = V3 0 0 (-1)
 
+maxChoices :: Int
+maxChoices = 8
 
 shutdownGame :: Quake ()
 shutdownGame = do
@@ -169,5 +172,41 @@ runEntity er@(EdictReference edictIdx) = do
            err <- use $ gameBaseGlobals.gbGameImport.giError
            err $ "SV_Physics: bad movetype " `B.append` BC.pack (show moveType) -- IMPROVE?
 
+{-
+- Searches all active entities for the next one that holds the matching
+- string at fieldofs (use the FOFS() macro) in the structure.
+- 
+- Searches beginning at the edict after from, or the beginning if null null
+- will be returned if the end of the list is reached.
+-}
 pickTarget :: B.ByteString -> Quake (Maybe EdictReference)
-pickTarget _ = io (putStrLn "GameBase.pickTarget") >> undefined -- TODO
+pickTarget targetName = do
+    -- TODO: do we need this?
+{-
+    if (targetname == null) {
+        gi.dprintf("G_PickTarget called with null targetname\n");
+        return null;
+    }
+-}
+    (foundRefs, numChoices) <- searchForTargets Nothing findByTarget [] 0
+
+    if numChoices == 0
+      then do
+        dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+        dprintf $ "G_PickTarget: target " `B.append` targetName `B.append` " not found\n"
+        return Nothing
+      else do
+        r <- Lib.rand
+        return $ Just $ foundRefs !! (fromIntegral r `mod` numChoices)
+
+  where searchForTargets :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> [EdictReference] -> Int -> Quake ([EdictReference], Int)
+        searchForTargets ref findBy foundRefs num
+          | num == maxChoices = return (foundRefs, num)
+          | otherwise = do
+              edictRef <- gFind ref findBy targetName
+
+              if isNothing edictRef
+                then return (foundRefs, num)
+                else do
+                  let Just foundEdictRef = edictRef
+                  searchForTargets edictRef findBy (foundEdictRef : foundRefs) (num + 1)
