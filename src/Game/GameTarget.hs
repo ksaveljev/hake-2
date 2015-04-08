@@ -136,7 +136,23 @@ spTargetExplosion (EdictReference edictIdx) = do
       eSvFlags .= Constants.svfNoClient
 
 spTargetChangeLevel :: EdictReference -> Quake ()
-spTargetChangeLevel _ = io (putStrLn "GameTarget.spTargetChangeLevel") >> undefined -- TODO
+spTargetChangeLevel er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if isNothing (edict^.eEdictInfo.eiMap)
+      then do
+        dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+        dprintf $ "target_changelevel with no map at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
+        GameUtil.freeEdict er
+      else do
+        -- ugly hack because *SOMEBODY* screwed up their map
+        mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
+        when (mapName == "fact1" && BC.map toLower (fromJust $ edict^.eEdictInfo.eiMap) == "fact3") $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMap .= Just "fact3$secret1"
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictAction.eaUse .= Just useTargetChangeLevel
+          eSvFlags .= Constants.svfNoClient
 
 spTargetSplash :: EdictReference -> Quake ()
 spTargetSplash (EdictReference edictIdx) = do
@@ -200,3 +216,8 @@ useTargetSplash :: EntUse
 useTargetSplash =
   GenericEntUse "use_target_splash" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetSplash") >> undefined -- TODO
+
+useTargetChangeLevel :: EntUse
+useTargetChangeLevel =
+  GenericEntUse "use_target_changelevel" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.useTargetChangeLevel") >> undefined -- TODO
