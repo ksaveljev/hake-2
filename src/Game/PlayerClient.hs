@@ -2,8 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerClient where
 
-import Control.Lens (Traversal', use, (^.), ix, preuse, (.=))
-import Control.Monad (when, liftM, void)
+import Control.Lens (Traversal', use, (^.), ix, preuse, (.=), zoom)
+import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower)
 import qualified Data.ByteString.Char8 as BC
@@ -62,7 +62,18 @@ initBodyQue = do
           gameBaseGlobals.gbGEdicts.ix idx.eClassName .= "bodyque"
 
 spInfoPlayerStart :: EdictReference -> Quake ()
-spInfoPlayerStart _ = io (putStrLn "PlayerClient.spInfoPlayerStart") >> undefined -- TODO
+spInfoPlayerStart (EdictReference edictIdx) = do
+    coopValue <- liftM (^.cvValue) coopCVar
+
+    unless (coopValue == 0) $ do
+      mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
+
+      when (mapName == "security") $ do
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+        -- invoke one of our gross, ugly, disgusting hacks
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+          eaThink .= Just spCreateCoopSpots
+          eaNextThink .= time + Constants.frameTime
 
 {-
 - QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) potential
@@ -106,3 +117,8 @@ spFixCoopSpots :: EntThink
 spFixCoopSpots =
   GenericEntThink "SP_FixCoopSpots" $ \_ -> do
     io (putStrLn "PlayerClient.spFixCoopSpots") >> undefined -- TODO
+
+spCreateCoopSpots :: EntThink
+spCreateCoopSpots =
+  GenericEntThink "SP_CreateCoopSpots" $ \_ -> do
+    io (putStrLn "PlayerClient.spCreateCoopSpots") >> undefined -- TODO
