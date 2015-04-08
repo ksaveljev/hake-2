@@ -11,6 +11,9 @@ import Game.Adapters
 import qualified Constants
 import qualified Util.Lib as Lib
 
+checkGround :: EdictReference -> Quake ()
+checkGround _ = io (putStrLn "M.checkGround") >> undefined -- TODO
+
 -- Stops the Flies.
 fliesOff :: EntThink
 fliesOff =

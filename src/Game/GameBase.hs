@@ -3,15 +3,22 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameBase where
 
-import Control.Lens (use, (^.), (.=), Traversal', preuse)
+import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix)
+import Control.Monad (when, liftM)
+import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
+import qualified Constants
+import qualified Client.M as M
+import qualified Game.GameAI as GameAI
+import qualified Game.PlayerClient as PlayerClient
 import qualified Util.Math3D as Math3D
 
 vecUp :: V3 Float
@@ -38,7 +45,62 @@ shutdownGame = do
 - Advances the world by Defines.FRAMETIME (0.1) seconds.
 -}
 runFrame :: Quake ()
-runFrame = io (putStrLn "GameBase.runFrame") >> undefined -- TODO
+runFrame = do
+    level <- use $ gameBaseGlobals.gbLevel
+
+    zoom (gameBaseGlobals.gbLevel) $ do
+      llFrameNum .= (level^.llFrameNum) + 1
+      llTime .= (fromIntegral (level^.llFrameNum) + 1) * Constants.frameTime
+
+    -- choose a client for monsters to target this frame
+    GameAI.aiSetSightClient
+
+    -- exit intermissions
+    if level^.llExitIntermission
+      then exitLevel
+      else do
+        -- treat each object in turn
+        -- even the world gets a chance to think
+        numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+        treatObjects numEdicts 0
+
+        -- see if it is time to end a deathmatch
+        checkDMRules
+
+        -- see if needpass needs updated
+        checkNeedPass
+          
+        -- build the playerstate_t structures for all players
+        clientEndServerFrames
+
+  where treatObjects :: Int -> Int -> Quake ()
+        treatObjects maxIdx idx = do
+          let er = EdictReference idx
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+
+          if not (edict^.eInUse)
+            then treatObjects maxIdx (idx + 1)
+            else do
+              gameBaseGlobals.gbLevel.llCurrentEntity .= Just er
+              gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
+
+              -- if the ground entity moved, make sure we are still on it
+              when (isJust (edict^.eEdictOther.eoGroundEntity)) $ do
+                let Just (EdictReference groundIdx) = edict^.eEdictOther.eoGroundEntity
+                Just groundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix groundIdx
+
+                when (groundEdict^.eLinkCount /= (edict^.eGroundEntityLinkCount)) $ do
+                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity .= Nothing
+                  when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
+                    M.checkGround er
+
+              maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+              if idx > 0 && idx <= maxClientsValue
+                then PlayerClient.clientBeginServerFrame er
+                else runEntity er
+
+              treatObjects maxIdx (idx + 1)
 
 {-
 - This return a pointer to the structure with all entry points and global
@@ -75,3 +137,18 @@ setMoveDir anglesLens moveDirLens = do
                      in moveDirLens .= updatedMoveDir
 
     anglesLens .= V3 0 0 0
+
+exitLevel :: Quake ()
+exitLevel = io (putStrLn "GameBase.exitLevel") >> undefined -- TODO
+
+checkDMRules :: Quake ()
+checkDMRules = io (putStrLn "GameBase.checkDMRules") >> undefined -- TODO
+
+checkNeedPass :: Quake ()
+checkNeedPass = io (putStrLn "GameBase.checkNeedPass") >> undefined -- TODO
+
+clientEndServerFrames :: Quake ()
+clientEndServerFrames = io (putStrLn "GameBase.clientEndServerFrames") >> undefined -- TODO
+
+runEntity :: EdictReference -> Quake ()
+runEntity _ = io (putStrLn "GameBase.runEntity") >> undefined -- TODO

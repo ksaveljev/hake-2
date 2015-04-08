@@ -122,3 +122,6 @@ spCreateCoopSpots :: EntThink
 spCreateCoopSpots =
   GenericEntThink "SP_CreateCoopSpots" $ \_ -> do
     io (putStrLn "PlayerClient.spCreateCoopSpots") >> undefined -- TODO
+
+clientBeginServerFrame :: EdictReference -> Quake ()
+clientBeginServerFrame _ = io (putStrLn "PlayerClient.clientBeginServerFrame") >> undefined -- TODO

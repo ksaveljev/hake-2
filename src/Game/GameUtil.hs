@@ -15,7 +15,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
-import qualified Game.GameBase as GameBase
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 
 {-
 - Either finds a free edict, or allocates a new one. Try to avoid reusing

@@ -33,3 +33,6 @@ walkMonsterStart :: EntThink
 walkMonsterStart =
   GenericEntThink "walkmonster_start" $ \_ -> do
     io (putStrLn "GameAI.walkMonsterStart") >> undefined -- TODO
+
+aiSetSightClient :: Quake ()
+aiSetSightClient = io (putStrLn "GameAI.aiSetSightClient") >> undefined -- TODO
