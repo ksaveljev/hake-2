@@ -168,3 +168,6 @@ runEntity er@(EdictReference edictIdx) = do
        | otherwise -> do
            err <- use $ gameBaseGlobals.gbGameImport.giError
            err $ "SV_Physics: bad movetype " `B.append` BC.pack (show moveType) -- IMPROVE?
+
+pickTarget :: B.ByteString -> Quake (Maybe EdictReference)
+pickTarget _ = io (putStrLn "GameBase.pickTarget") >> undefined -- TODO

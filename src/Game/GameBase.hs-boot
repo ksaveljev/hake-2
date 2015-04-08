@@ -29,3 +29,5 @@ checkNeedPass :: Quake ()
 clientEndServerFrames :: Quake ()
 
 runEntity :: EdictReference -> Quake ()
+
+pickTarget :: B.ByteString -> Quake (Maybe EdictReference)

@@ -423,8 +423,51 @@ trainUse =
 
 funcTrainFind :: EntThink
 funcTrainFind =
-  GenericEntThink "func_train_find" $ \_ -> do
-    io (putStrLn "GameFunc.funcTrainFind") >> undefined -- TODO
+  GenericEntThink "func_train_find" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        linkEntity = gameImport^.giLinkEntity
+
+    if isNothing (edict^.eEdictInfo.eiTarget)
+      then
+        dprintf "train_find: no target\n"
+      else do
+        let target = fromJust (edict^.eEdictInfo.eiTarget)
+        entRef <- GameBase.pickTarget target
+
+        if isNothing entRef
+          then
+            dprintf $ "train_find: target " `B.append` target `B.append` " not found\n"
+          else do
+            let Just (EdictReference entIdx) = entRef
+            Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+
+            let origin = edict^.eEntityState.esOrigin
+                mins = edict^.eEdictMinMax.eMins
+
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eEdictInfo.eiTarget .= (ent^.eEdictInfo.eiTarget)
+              eEntityState.esOrigin .= (origin - mins)
+
+            linkEntity er
+
+            -- if not triggered, start immediately
+            when (isNothing (edict^.eEdictInfo.eiTargetName)) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. trainStartOn)
+
+            Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+            when ((updatedEdict^.eSpawnFlags) .&. trainStartOn /= 0) $ do
+              time <- use $ gameBaseGlobals.gbLevel.llTime
+
+              zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+                eEdictAction.eaNextThink .= time + Constants.frameTime
+                eEdictAction.eaThink .= Just trainNext
+                eEdictOther.eoActivator .= Just er
+
+    return True
+
 
 doorUse :: EntUse
 doorUse =
@@ -470,3 +513,8 @@ buttonKilled :: EntDie
 buttonKilled =
   GenericEntDie "button_killed" $ \_ _ _ _ _ -> do
     io (putStrLn "GameFunc.buttonKilled") >> undefined -- TODO
+
+trainNext :: EntThink
+trainNext =
+  GenericEntThink "train_next" $ \_ -> do
+    io (putStrLn "GameFunc.trainNext") >> undefined -- TODO
