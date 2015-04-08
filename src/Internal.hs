@@ -1033,7 +1033,8 @@ data EntTouch =
                   }
 
 data EntUse =
-  GenericEntUse { _geuId :: B.ByteString
+    FuncExplosiveUse B.ByteString (EdictReference -> EdictReference -> EdictReference -> Quake ())
+  | GenericEntUse { _geuId :: B.ByteString
                 , _geuUse :: EdictReference -> EdictReference -> EdictReference -> Quake ()
                 }
 
@@ -1083,6 +1084,7 @@ instance SuperAdapter EntTouch where
     getID (GenericEntTouch _id _) = _id
 
 instance SuperAdapter EntUse where
+    getID (FuncExplosiveUse _id _) = _id
     getID (GenericEntUse _id _) = _id
 
 instance SuperAdapter EntPain where
@@ -1121,6 +1123,7 @@ instance EntTouchAdapter EntTouch where
     touch (GenericEntTouch _ _touch) = _touch
 
 instance EntUseAdapter EntUse where
+    use (FuncExplosiveUse _ _use) = _use
     use (GenericEntUse _ _use) = _use
 
 instance EntPainAdapter EntPain where

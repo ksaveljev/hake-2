@@ -5,7 +5,7 @@ module Game.GameMisc where
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
 import Control.Monad (liftM, when, void)
 import Data.Bits ((.|.), (.&.))
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -102,7 +102,55 @@ spFuncObject :: EdictReference -> Quake ()
 spFuncObject _ = io (putStrLn "GameMisc.spFuncObject") >> undefined -- TODO
 
 spFuncExplosive :: EdictReference -> Quake ()
-spFuncExplosive _ = io (putStrLn "GameMisc.spFuncExplosive") >> undefined -- TODO
+spFuncExplosive er@(EdictReference edictIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0 -- auto-remove for deathmatch
+      then GameUtil.freeEdict er
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        let modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+            setModel = gameImport^.giSetModel
+
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= Constants.moveTypePush
+
+        void $ modelIndex "models/objects/debris1/tris.md2"
+        void $ modelIndex "models/objects/debris2/tris.md2"
+
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+        setModel er (edict^.eEdictInfo.eiModel)
+
+        if (edict^.eSpawnFlags) .&. 1 /= 0
+          then
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eSvFlags %= (.|. Constants.svfNoClient)
+              eSolid .= Constants.solidNot
+              eEdictAction.eaUse .= Just funcExplosiveSpawn
+          else do
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
+            when (isJust (edict^.eEdictInfo.eiTargetName)) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just funcExplosiveUse
+
+        when ((edict^.eSpawnFlags) .&. 2 /= 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+
+        when ((edict^.eSpawnFlags) .&. 4 /= 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+
+        Just edictUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse
+        case edictUse of
+          Just (FuncExplosiveUse _ _) -> return ()
+          _ -> do
+            when ((edict^.eEdictStatus.eHealth) == 0) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eHealth .= 100
+
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eEdictAction.eaDie .= Just funcExplosiveExplode
+              eEdictStatus.eTakeDamage .= Constants.damageYes
+
+        linkEntity er
 
 spMiscExploBox :: EdictReference -> Quake ()
 spMiscExploBox er@(EdictReference edictIdx) = do
@@ -350,3 +398,18 @@ useAreaPortal :: EntUse
 useAreaPortal =
   GenericEntUse "use_areaportal" $ \_ _ _ -> do
     io (putStrLn "GameMisc.useAreaPortal") >> undefined -- TODO
+
+funcExplosiveUse :: EntUse
+funcExplosiveUse =
+  FuncExplosiveUse "func_explosive_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.funcExplosiveUse") >> undefined -- TODO
+
+funcExplosiveSpawn :: EntUse
+funcExplosiveSpawn =
+  GenericEntUse "func_explosive_spawn" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.funcExplosiveSpawn") >> undefined -- TODO
+
+funcExplosiveExplode :: EntDie
+funcExplosiveExplode =
+  GenericEntDie "func_explosive_explode" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameMisc.funcExplosiveExplode") >> undefined -- TODO
