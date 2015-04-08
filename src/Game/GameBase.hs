@@ -129,7 +129,31 @@ findByTarget e s =
            in BC.map toLower targetName == BC.map toLower s
 
 gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
-gFind _ _ _ = io (putStrLn "GameBase.gFind") >> undefined -- TODO
+gFind ref findBy str = do
+    let (EdictReference edictIdx) = case ref of
+                                      Nothing -> EdictReference 0
+                                      Just (EdictReference refIdx) -> EdictReference (refIdx + 1)
+
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+
+    findEdict edictIdx numEdicts
+
+  where findEdict :: Int -> Int -> Quake (Maybe EdictReference)
+        findEdict idx maxIdx
+          | idx == maxIdx = return Nothing
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+
+              -- TODO: do we need this?
+              {-
+              if (from.o.classname == null) {
+                  Com.Printf("edict with classname = null" + from.o.index);
+              }
+              -}
+
+              if | not (edict^.eInUse) -> findEdict (idx + 1) maxIdx
+                 | findBy edict str -> return $ Just (EdictReference idx)
+                 | otherwise -> findEdict (idx + 1) maxIdx
 
 setMoveDir :: Traversal' QuakeState (V3 Float) -> Traversal' QuakeState (V3 Float) -> Quake ()
 setMoveDir anglesLens moveDirLens = do
