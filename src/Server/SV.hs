@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SV where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (+=), zoom)
+import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), zoom)
 import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -267,7 +267,11 @@ checkVelocity (EdictReference edictIdx) = do
                                   | otherwise -> v
 
 addGravity :: EdictReference -> Quake ()
-addGravity _ = io (putStrLn "SV.addGravity") >> undefined -- TODO
+addGravity (EdictReference edictIdx) = do
+    Just edictGravity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eGravity
+    gravityValue <- liftM (^.cvValue) svGravityCVar
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z -= edictGravity * gravityValue * Constants.frameTime
 
 pushEntity :: EdictReference -> V3 Float -> Quake TraceT
 pushEntity _ _ = io (putStrLn "SV.pushEntity") >> undefined -- TODO
