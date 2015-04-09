@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Server.SV where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (+=), zoom)
-import Control.Monad (unless, when, void)
+import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3, _x, _y, _z)
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
@@ -250,7 +252,19 @@ runThink er@(EdictReference edictIdx) = do
         return False
 
 checkVelocity :: EdictReference -> Quake ()
-checkVelocity _ = io (putStrLn "SV.checkVelocity") >> undefined -- TODO
+checkVelocity (EdictReference edictIdx) = do
+    -- bound velocity
+    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+    maxVelocityValue <- liftM (^.cvValue) svMaxVelocityCVar
+
+    let boundedVelocity = fmap (boundVelocity maxVelocityValue) velocity
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= boundedVelocity
+
+  where boundVelocity :: Float -> Float -> Float
+        boundVelocity maxV v = if | v > maxV -> maxV
+                                  | v < (-maxV) -> (-maxV)
+                                  | otherwise -> v
 
 addGravity :: EdictReference -> Quake ()
 addGravity _ = io (putStrLn "SV.addGravity") >> undefined -- TODO
