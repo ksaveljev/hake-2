@@ -16,7 +16,7 @@ data MoveClipT =
             , _mcStart       :: V3 Float
             , _mcEnd         :: V3 Float
             , _mcTrace       :: TraceT
-            , _mcPassEdict   :: Maybe EdictIndex
+            , _mcPassEdict   :: Maybe EdictReference
             , _mcContentMask :: Int
             }
 

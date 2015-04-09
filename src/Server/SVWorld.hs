@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import Server.MoveClipT
 import qualified Constants
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
@@ -264,8 +265,35 @@ linkEdict er@(EdictReference edictIdx) = do
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
 
-trace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictReference -> Int -> Quake TraceT
-trace _ _ _ _ _ _ = io (putStrLn "SVWorld.trace") >> undefined -- TODO
+{-
+- ================== SV_Trace
+- 
+- Moves the given mins/maxs volume through the world from start to end.
+- 
+- Passedict and edicts owned by passedict are explicitly not checked.
+- 
+- ==================
+-}
+trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
+trace start maybeMins maybeMaxs end (EdictReference passEdictIdx) contentMask = do
+    vec3origin <- use $ globals.vec3Origin
+
+    let clip = newMoveClipT
+
+        mins = if isNothing maybeMins
+                 then vec3origin
+                 else fromJust maybeMins
+
+        maxs = if isNothing maybeMaxs
+                 then vec3origin
+                 else fromJust maybeMaxs
+
+    -- clip to world
+    boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
+
+    let updatedClip = clip { _mcTrace = boxTraceT
+                           }
+    io (putStrLn "SVWorld.trace") >> undefined -- TODO
 
 clearWorld :: Quake ()
 clearWorld = do

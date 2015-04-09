@@ -303,7 +303,7 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
           let trace = gameImport^.giTrace
               linkEntity = gameImport^.giLinkEntity
 
-          traceT <- trace start (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs) end er mask
+          traceT <- trace start (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end er mask
 
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (traceT^.tEndPos)
           linkEntity er
@@ -334,7 +334,7 @@ impact er@(EdictReference edictIdx) traceT = do
     Just traceEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx
 
     when (isJust (edict^.eEdictAction.eaTouch) && (edict^.eSolid) /= Constants.solidNot) $
-      touch (fromJust $ edict^.eEdictAction.eaTouch) er tr (traceT^.tPlane) (Just $ traceT^.tSurface)
+      touch (fromJust $ edict^.eEdictAction.eaTouch) er tr (traceT^.tPlane) (traceT^.tSurface)
 
     dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
 

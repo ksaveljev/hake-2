@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2)
-import Control.Monad (void, when, unless)
+import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
 import Data.Int (Int8)
 import Data.Maybe (isNothing, fromJust)
 import Data.Word (Word16)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -47,6 +48,13 @@ import qualified QCommon.FS as FS
 import qualified QCommon.MD4 as MD4
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+-- 1/32 epsilon to keep floating point happy
+distEpsilon :: Float
+distEpsilon = 0.03125
+
+nullSurface :: MapSurfaceT
+nullSurface = newMapSurfaceT
 
 -- Loads in the map and all submodels.
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Int, [Int]) -- return model index (cmGlobals.cmMapCModels) and checksum
@@ -899,3 +907,213 @@ leafArea leafNum = do
 
     Just area <- preuse $ cmGlobals.cmMapLeafs.ix leafNum.clArea
     return area
+
+boxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Quake TraceT
+boxTrace start end mins maxs headNode brushMask = do
+    -- for multi-check avoidance
+    cmGlobals.cmCheckCount += 1
+
+    -- for statistics, may be zeroed
+    globals.cTraces += 1
+
+    -- fill in a default trace
+    -- was: memset(& trace_trace, 0, sizeof(trace_trace));
+    cmGlobals.cmTraceTrace .= newTraceT { _tFraction = 1
+                                        , _tSurface  = Just (nullSurface^.msCSurface)
+                                        }
+
+    numNodes <- use $ cmGlobals.cmNumNodes
+
+    if numNodes == 0
+      -- map no loaded
+      then do
+        traceTrace <- use $ cmGlobals.cmTraceTrace
+        return traceTrace
+      else do
+        zoom (cmGlobals) $ do
+          cmTraceContents .= brushMask
+          cmTraceStart .= start
+          cmTraceEnd .= end
+          cmTraceMins .= mins
+          cmTraceMaxs .= maxs
+
+        if start == end
+          then do
+            -- check for position test special case
+            let c1 = fmap (subtract 1) (start + mins)
+                c2 = fmap (+ 1) (start + maxs)
+
+            (numLeafs, _) <- boxLeafNumsHeadnode c1 c2 (cmGlobals.cmLeafs) 1024 headNode [0]
+
+            checkLeafs 0 numLeafs
+
+            cmGlobals.cmTraceTrace.tEndPos .= start
+
+            traceTrace <- use $ cmGlobals.cmTraceTrace
+            return traceTrace
+          else do
+            -- check for point special case
+            let nullV3 :: V3 Float = V3 0 0 0
+
+            if (mins == nullV3) && (maxs == nullV3)
+              then do
+                cmGlobals.cmTraceIsPoint .= True
+                cmGlobals.cmTraceExtents .= nullV3
+              else do
+                cmGlobals.cmTraceIsPoint .= False
+                let a = if (- (mins^._x)) > (maxs^._x) then (- (mins^._x)) else maxs^._x
+                    b = if (- (mins^._y)) > (maxs^._y) then (- (mins^._y)) else maxs^._y
+                    c = if (- (mins^._z)) > (maxs^._z) then (- (mins^._z)) else maxs^._z
+                cmGlobals.cmTraceExtents .= V3 a b c
+
+            -- general sweeping through world
+            recursiveHullCheck headNode 0 1 start end
+
+            traceFraction <- use $ cmGlobals.cmTraceTrace.tFraction
+
+            if traceFraction == 1
+              then cmGlobals.cmTraceTrace.tEndPos .= end
+              else cmGlobals.cmTraceTrace.tEndPos .= start + fmap (* traceFraction) (end - start)
+
+            traceTrace <- use $ cmGlobals.cmTraceTrace
+            return traceTrace
+
+  where checkLeafs :: Int -> Int -> Quake ()
+        checkLeafs idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just leafIdx <- preuse $ cmGlobals.cmLeafs.ix idx
+              testInLeaf leafIdx
+
+              allSolid <- use $ cmGlobals.cmTraceTrace.tAllSolid
+
+              unless allSolid $
+                checkLeafs (idx + 1) maxIdx
+
+testInLeaf :: Int -> Quake ()
+testInLeaf _ = io (putStrLn "CM.testInLeaf") >> undefined -- TODO
+
+recursiveHullCheck :: Int -> Float -> Float -> V3 Float -> V3 Float -> Quake ()
+recursiveHullCheck num p1f p2f p1 p2 = do
+    traceFraction <- use $ cmGlobals.cmTraceTrace.tFraction
+
+    -- do nothing if we already hit something nearer
+    unless (traceFraction <= p1f) $ do
+
+      -- if < 0, we are in a leaf node
+      if num < 0
+        then traceToLeaf ((-1) - num)
+        else do
+          -- find the point distances to the separating plane
+          -- and the offset for the size of the box
+          Just node <- preuse $ cmGlobals.cmMapNodes.ix num
+          let Just planeIdx = node^.cnPlane
+          Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+
+          (t1, t2, offset) <- findDistancesAndOffset plane
+
+          -- see which sides we need to consider
+          if | t1 >= offset && t2 >= offset -> recursiveHullCheck (node^.cnChildren._1) p1f p2f p1 p2
+             | t1 < (-offset) && t2 < (-offset) -> recursiveHullCheck (node^.cnChildren._2) p1f p2f p1 p2
+             | otherwise -> do
+                 -- put the crosspoint DIST_EPSILON pixels on the near side
+                 let (idist, side, tmpFrac, tmpFrac2) = if | t1 < t2 -> let idist' = 1 / (t1 - t2)
+                                                                            side' :: Int = 1
+                                                                            frac2' = (t1 + offset + distEpsilon) * idist'
+                                                                            frac' = (t1 - offset + distEpsilon) * idist'
+                                                                        in (idist', side', frac', frac2')
+                                                           | t1 > t2 -> let idist' = 1 / (t1 - t2)
+                                                                            side' :: Int = 0
+                                                                            frac2' = (t1 - offset - distEpsilon) * idist'
+                                                                            frac' = (t1 + offset + distEpsilon) * idist'
+                                                                        in (idist', side', frac', frac2')
+                                                           | otherwise -> (0, 0, 1, 0)
+
+                     -- move up to the node
+                     frac = if | tmpFrac < 0 -> 0
+                               | tmpFrac > 1 -> 1
+                               | otherwise -> tmpFrac
+
+                 moveUpTheNode side frac node
+                 
+                 -- go past the node
+                 let frac2 = if | tmpFrac2 < 0 -> 0
+                                | tmpFrac2 > 1 -> 1
+                                | otherwise -> tmpFrac2
+
+                 goPastTheNode side frac2 node
+
+  where findDistancesAndOffset :: CPlaneT -> Quake (Float, Float, Float)
+        findDistancesAndOffset plane = do
+          let pType :: Int = fromIntegral $ plane^.cpType
+          traceIsPoint <- use $ cmGlobals.cmTraceIsPoint
+          traceExtents <- use $ cmGlobals.cmTraceExtents
+
+          if pType < 3
+            then do
+              let t1 = p1^.(Math3D.v3Access pType) - (plane^.cpDist)
+                  t2 = p2^.(Math3D.v3Access pType) - (plane^.cpDist)
+                  offset = traceExtents^.(Math3D.v3Access pType)
+              return (t1, t2, offset)
+            else do
+              let t1 = dot (plane^.cpNormal) p1 - (plane^.cpDist)
+                  t2 = dot (plane^.cpNormal) p2 - (plane^.cpDist)
+                  offset = if traceIsPoint
+                             then 0
+                             else dot (fmap abs traceExtents) (fmap abs (plane^.cpNormal))
+              return (t1, t2, offset)
+
+        moveUpTheNode :: Int -> Float -> CNodeT -> Quake ()
+        moveUpTheNode side frac node = do
+          let midf = p1f + (p2f - p1f) * frac
+              mid = p1 + fmap (* frac) (p2 - p1)
+
+          recursiveHullCheck (node^.cnChildren.(if side == 0 then _1 else _2)) p1f midf p1 mid
+
+        goPastTheNode :: Int -> Float -> CNodeT -> Quake ()
+        goPastTheNode side frac2 node = do
+          let midf = p1f + (p2f - p1f) * frac2
+              mid = p1 + fmap (* frac2) (p2 - p1)
+
+          recursiveHullCheck (node^.cnChildren.(if side == 0 then _2 else _1)) midf p2f mid p2
+
+traceToLeaf :: Int -> Quake ()
+traceToLeaf leafNum = do
+    Just leaf <- preuse $ cmGlobals.cmMapLeafs.ix leafNum
+    traceContents <- use $ cmGlobals.cmTraceContents
+
+    unless ((leaf^.clContents) .&. traceContents == 0) $ do
+      -- trace line against all brushes in the leaf
+      traceLineAgainstAllBrushes (fromIntegral $ leaf^.clFirstLeafBrush) 0 (fromIntegral $ leaf^.clNumLeafBrushes)
+
+  where traceLineAgainstAllBrushes :: Int -> Int -> Int -> Quake ()
+        traceLineAgainstAllBrushes firstLeafBrush idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just brushNum <- liftM (fmap fromIntegral) (preuse $ cmGlobals.cmMapLeafBrushes.ix (firstLeafBrush + idx))
+              Just b <- preuse $ cmGlobals.cmMapBrushes.ix brushNum
+              checkCount <- use $ cmGlobals.cmCheckCount
+
+              if (b^.cbCheckCount) == checkCount
+                then -- already checked this brush in another leaf
+                  traceLineAgainstAllBrushes firstLeafBrush (idx + 1) maxIdx
+                else do
+                  cmGlobals.cmMapBrushes.ix brushNum.cbCheckCount .= checkCount
+                  traceContents <- use $ cmGlobals.cmTraceContents
+
+                  if (b^.cbContents) .&. traceContents == 0
+                    then traceLineAgainstAllBrushes firstLeafBrush (idx + 1) maxIdx
+                    else do
+                      traceMins <- use $ cmGlobals.cmTraceMins
+                      traceMaxs <- use $ cmGlobals.cmTraceMaxs
+                      traceStart <- use $ cmGlobals.cmTraceStart
+                      traceEnd <- use $ cmGlobals.cmTraceEnd
+
+                      clipBoxToBrush traceMins traceMaxs traceStart traceEnd (cmGlobals.cmTraceTrace) b
+                      traceTraceFraction <- use $ cmGlobals.cmTraceTrace.tFraction
+
+                      unless (traceTraceFraction == 0) $
+                        traceLineAgainstAllBrushes firstLeafBrush (idx + 1) maxIdx
+
+clipBoxToBrush :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
+clipBoxToBrush _ _ _ _ _ _ = io (putStrLn "CM.clipBoxToBrush") >> undefined -- TODO

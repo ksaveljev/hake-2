@@ -11,6 +11,7 @@ import Internal
 import Game.CModelT
 import Game.CPlaneT
 import Game.MapSurfaceT
+import Game.TraceT
 import QCommon.CAreaT
 import QCommon.CBrushSideT
 import QCommon.CBrushT
@@ -54,7 +55,6 @@ initialCMGlobals =
             , _cmNumAreaPortals  = 0
             , _cmMapAreaPortals  = V.replicate Constants.maxMapAreaPortals emptyDAreaPortalT
             , _cmNumClusters     = 1
-            , _cmNullSurface     = newMapSurfaceT
             , _cmFloodValid      = 0
             , _cmPortalOpen      = UV.replicate Constants.maxMapAreaPortals False
             , _cmCModBase        = Nothing
@@ -67,4 +67,13 @@ initialCMGlobals =
             , _cmLeafMins        = V3 0 0 0
             , _cmLeafMaxs        = V3 0 0 0
             , _cmLeafTopNode     = 0
+            , _cmTraceStart      = V3 0 0 0
+            , _cmTraceEnd        = V3 0 0 0
+            , _cmTraceMins       = V3 0 0 0
+            , _cmTraceMaxs       = V3 0 0 0
+            , _cmTraceExtents    = V3 0 0 0
+            , _cmTraceTrace      = newTraceT
+            , _cmTraceContents   = 0
+            , _cmTraceIsPoint    = False
+            , _cmLeafs           = UV.replicate 1024 0
             }

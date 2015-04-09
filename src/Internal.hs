@@ -567,7 +567,7 @@ data GameImportT =
               , _giSoundIndex         :: B.ByteString -> Quake Int
               , _giImageIndex         :: B.ByteString -> Quake Int
               , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
-              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictReference -> Int -> Quake TraceT
+              , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
               , _giPointContents      :: V3 Float -> Quake Int
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()
@@ -598,7 +598,7 @@ data TraceT =
          , _tFraction   :: Float
          , _tEndPos     :: V3 Float
          , _tPlane      :: CPlaneT
-         , _tSurface    :: CSurfaceT
+         , _tSurface    :: Maybe CSurfaceT
          , _tContents   :: Int
          , _tEnt        :: Maybe EdictReference
          }
@@ -1211,7 +1211,6 @@ data CMGlobals =
             , _cmNumAreaPortals  :: Int
             , _cmMapAreaPortals  :: V.Vector DAreaPortalT
             , _cmNumClusters     :: Int
-            , _cmNullSurface     :: MapSurfaceT
             , _cmFloodValid      :: Int
             , _cmPortalOpen      :: UV.Vector Bool
             , _cmCModBase        :: Maybe BL.ByteString
@@ -1224,6 +1223,15 @@ data CMGlobals =
             , _cmLeafMins        :: V3 Float
             , _cmLeafMaxs        :: V3 Float
             , _cmLeafTopNode     :: Int
+            , _cmTraceStart      :: V3 Float
+            , _cmTraceEnd        :: V3 Float
+            , _cmTraceMins       :: V3 Float
+            , _cmTraceMaxs       :: V3 Float
+            , _cmTraceExtents    :: V3 Float
+            , _cmTraceTrace      :: TraceT
+            , _cmTraceContents   :: Int
+            , _cmTraceIsPoint    :: Bool
+            , _cmLeafs           :: UV.Vector Int -- tmp for CM.boxTrace
             }
 
 data MoveInfoT =
