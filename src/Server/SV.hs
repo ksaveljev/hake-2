@@ -325,5 +325,18 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
                 else return traceT
             else return traceT
 
+-- Two entites have touched, so run their touch functions
 impact :: EdictReference -> TraceT -> Quake ()
-impact _ _ = io (putStrLn "SV.impact") >> undefined -- TODO
+impact er@(EdictReference edictIdx) traceT = do
+    let Just tr@(EdictReference traceIdx) = traceT^.tEnt
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    Just traceEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx
+
+    when (isJust (edict^.eEdictAction.eaTouch) && (edict^.eSolid) /= Constants.solidNot) $
+      touch (fromJust $ edict^.eEdictAction.eaTouch) er tr (traceT^.tPlane) (Just $ traceT^.tSurface)
+
+    dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
+
+    when (isJust (traceEdict^.eEdictAction.eaTouch) && (traceEdict^.eSolid) /= Constants.solidNot) $
+      touch (fromJust $ traceEdict^.eEdictAction.eaTouch) tr er dummyPlane Nothing

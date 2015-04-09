@@ -988,7 +988,7 @@ class EntDodgeAdapter a where
     dodge :: a -> EdictReference -> EdictReference -> Float -> Quake ()
 
 class EntTouchAdapter a where
-    touch :: a -> EdictReference -> EdictReference -> CPlaneT -> CSurfaceT -> Quake ()
+    touch :: a -> EdictReference -> EdictReference -> CPlaneT -> Maybe CSurfaceT -> Quake ()
 
 class EntUseAdapter a where
     use :: a -> EdictReference -> EdictReference -> EdictReference -> Quake ()
@@ -1035,7 +1035,7 @@ data EntDodge =
 
 data EntTouch =
   GenericEntTouch { _getId :: B.ByteString
-                  , _getTouch :: EdictReference -> EdictReference -> CPlaneT -> CSurfaceT -> Quake ()
+                  , _getTouch :: EdictReference -> EdictReference -> CPlaneT -> Maybe CSurfaceT -> Quake ()
                   }
 
 data EntUse =
