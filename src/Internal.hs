@@ -81,7 +81,7 @@ instance Zoom (QuakeS s) (QuakeS t) s t where
 type XCommandT = Quake ()
 
 -- reference to gameBaseGlobals.gbGEdicts
-newtype EdictReference = EdictReference Int
+newtype EdictReference = EdictReference Int deriving (Eq)
 
 -- reference to svGlobals.svServerStatic.ssClients
 newtype ClientReference = ClientReference Int

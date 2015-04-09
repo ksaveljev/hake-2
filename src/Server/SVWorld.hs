@@ -346,4 +346,46 @@ traceBounds start mins maxs end =
     in (V3 minsa minsb minsc, V3 maxsa maxsb maxsc)
 
 clipMoveToEntities :: MoveClipT -> Quake MoveClipT
-clipMoveToEntities _ = io (putStrLn "SVWorld.clipMoveToEntities") >> undefined -- TODO
+clipMoveToEntities initialClip = do
+    num <- areaEdicts (initialClip^.mcBoxMins) (initialClip^.mcBoxMaxs) (svGlobals.svTouchList) Constants.maxEdicts Constants.areaSolid
+
+    -- be careful, it is possible to have an entity in this
+    -- list removed before we get to it (killtriggered)
+    tryClipping 0 num initialClip
+
+  where tryClipping :: Int -> Int -> MoveClipT -> Quake MoveClipT
+        tryClipping idx maxIdx clip
+          | idx >= maxIdx = return clip
+          | otherwise = do
+              Just touchRef@(EdictReference touchIdx) <- preuse $ svGlobals.svTouchList.ix idx
+              Just touchEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix touchIdx
+
+              skip <- shouldSkip touchRef touchEdict clip
+
+              if skip
+                then tryClipping (idx + 1) maxIdx clip
+                else do
+                  -- might intersect, so do an exact clip
+                  headNode <- hullForEntity touchEdict
+                  vec3origin <- use $ globals.vec3Origin
+                  let angles = if (touchEdict^.eSolid) /= Constants.solidBsp
+                                 then vec3origin -- boxes don't rotate
+                                 else touchEdict^.eEntityState.esAngles
+                  io (putStrLn "SVWorld.tryClipping") >> undefined -- TODO
+
+        shouldSkip :: EdictReference -> EdictT -> MoveClipT -> Quake Bool
+        shouldSkip touchRef touchEdict clip =
+          if | (touchEdict^.eSolid) == Constants.solidNot -> return True
+             | (Just touchRef) == (clip^.mcPassEdict) -> return True
+             | clip^.mcTrace.tAllSolid -> return True
+             | ((clip^.mcContentMask) .&. Constants.contentsDeadMonster == 0) && ((touchEdict^.eSvFlags) .&. Constants.svfDeadMonster /= 0) -> return True
+             | isJust (clip^.mcPassEdict) -> do
+                 if (touchEdict^.eOwner) == (clip^.mcPassEdict)
+                   then return True -- don't clip against own missiles
+                   else do
+                     let Just (EdictReference passEdictIdx) = clip^.mcPassEdict
+                     Just passEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix passEdictIdx
+                     if passEdict^.eOwner == (Just touchRef)
+                       then return True -- don't clip against owner
+                       else return False
+             | otherwise -> return False
