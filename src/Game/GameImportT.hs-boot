@@ -1,3 +1,5 @@
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Game.GameImportT ( GameImportT(..)
                         , newGameImportT
                         , giBprintf
@@ -38,6 +40,7 @@ module Game.GameImportT ( GameImportT(..)
                         , giAddCommandString
                         ) where
 
+import Control.Lens (Lens')
 import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -66,7 +69,7 @@ giSetAreaPortalState :: Functor f => ((Int -> Bool -> Quake ()) -> f (Int -> Boo
 giAreasConnected     :: Functor f => ((Int -> Int -> Quake Bool) -> f (Int -> Int -> Quake Bool)) -> GameImportT -> f GameImportT
 giLinkEntity         :: Functor f => ((EdictReference -> Quake ()) -> f (EdictReference -> Quake ())) -> GameImportT -> f GameImportT
 giUnlinkEntity       :: Functor f => ((EdictReference -> Quake ()) -> f (EdictReference -> Quake ())) -> GameImportT -> f GameImportT
-giBoxEdicts          :: Functor f => ((V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int) -> f (V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int)) -> GameImportT -> f GameImportT
+giBoxEdicts          :: Functor f => ((V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int) -> f (V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int)) -> GameImportT -> f GameImportT
 giPMove              :: Functor f => ((PMoveT -> Quake ()) -> f (PMoveT -> Quake ())) -> GameImportT -> f GameImportT
 giMulticast          :: Functor f => ((V3 Float -> Int -> Quake ()) -> f (V3 Float -> Int -> Quake ())) -> GameImportT -> f GameImportT
 giUnicast            :: Functor f => ((EdictReference -> Bool -> Quake ()) -> f (EdictReference -> Bool -> Quake ())) -> GameImportT -> f GameImportT

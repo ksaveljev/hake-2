@@ -1017,17 +1017,17 @@ recursiveHullCheck num p1f p2f p1 p2 = do
              | t1 < (-offset) && t2 < (-offset) -> recursiveHullCheck (node^.cnChildren._2) p1f p2f p1 p2
              | otherwise -> do
                  -- put the crosspoint DIST_EPSILON pixels on the near side
-                 let (idist, side, tmpFrac, tmpFrac2) = if | t1 < t2 -> let idist' = 1 / (t1 - t2)
-                                                                            side' :: Int = 1
-                                                                            frac2' = (t1 + offset + distEpsilon) * idist'
-                                                                            frac' = (t1 - offset + distEpsilon) * idist'
-                                                                        in (idist', side', frac', frac2')
-                                                           | t1 > t2 -> let idist' = 1 / (t1 - t2)
-                                                                            side' :: Int = 0
-                                                                            frac2' = (t1 - offset - distEpsilon) * idist'
-                                                                            frac' = (t1 + offset + distEpsilon) * idist'
-                                                                        in (idist', side', frac', frac2')
-                                                           | otherwise -> (0, 0, 1, 0)
+                 let (side, tmpFrac, tmpFrac2) = if | t1 < t2 -> let idist' = 1 / (t1 - t2)
+                                                                     side' :: Int = 1
+                                                                     frac2' = (t1 + offset + distEpsilon) * idist'
+                                                                     frac' = (t1 - offset + distEpsilon) * idist'
+                                                                 in (side', frac', frac2')
+                                                    | t1 > t2 -> let idist' = 1 / (t1 - t2)
+                                                                     side' :: Int = 0
+                                                                     frac2' = (t1 - offset - distEpsilon) * idist'
+                                                                     frac' = (t1 + offset + distEpsilon) * idist'
+                                                                 in (side', frac', frac2')
+                                                    | otherwise -> (0, 1, 0)
 
                      -- move up to the node
                      frac = if | tmpFrac < 0 -> 0

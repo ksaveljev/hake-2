@@ -3,10 +3,11 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE Rank2Types #-}
 module Internal where
 
 import Control.Applicative
-import Control.Lens (Zoom, zoom)
+import Control.Lens (Zoom, zoom, Lens')
 import Control.Lens.Internal.Zoom (Zoomed, Focusing)
 import Control.Monad.Except
 import Control.Monad.State.Strict
@@ -574,7 +575,7 @@ data GameImportT =
               , _giAreasConnected     :: Int -> Int -> Quake Bool
               , _giLinkEntity         :: EdictReference -> Quake ()
               , _giUnlinkEntity       :: EdictReference -> Quake ()
-              , _giBoxEdicts          :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
+              , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
               , _giPMove              :: PMoveT -> Quake ()
               , _giMulticast          :: V3 Float -> Int -> Quake ()
               , _giUnicast            :: EdictReference -> Bool -> Quake ()

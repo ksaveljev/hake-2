@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Game.GameImportT ( GameImportT(..)
                         , module Game.GameImportT
                         ) where

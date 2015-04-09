@@ -1,13 +1,14 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 module Server.SVWorld where
 
-import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2)
+import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2, Lens')
 import Control.Monad (void, unless, when)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear.V3 (V3, _x, _y, _z)
+import Linear.V3 (V3(..), _x, _y, _z)
 import qualified Data.Foldable as F
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -262,7 +263,7 @@ linkEdict er@(EdictReference edictIdx) = do
                  findCrossingNode edict (fromJust (node^.anChildren._2))
              | otherwise -> return node -- crosses the node
 
-areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
+areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
 
 {-
@@ -275,7 +276,7 @@ areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
 - ==================
 -}
 trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
-trace start maybeMins maybeMaxs end (EdictReference passEdictIdx) contentMask = do
+trace start maybeMins maybeMaxs end passEdict@(EdictReference passEdictIdx) contentMask = do
     vec3origin <- use $ globals.vec3Origin
 
     let clip = newMoveClipT
@@ -291,9 +292,28 @@ trace start maybeMins maybeMaxs end (EdictReference passEdictIdx) contentMask = 
     -- clip to world
     boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
 
-    let updatedClip = clip { _mcTrace = boxTraceT
-                           }
-    io (putStrLn "SVWorld.trace") >> undefined -- TODO
+    if (boxTraceT^.tFraction) == 0 -- blocked by the world
+      then return $ boxTraceT { _tEnt = Just (EdictReference 0) }
+      else do
+        let updatedClip = clip { _mcTrace = boxTraceT { _tEnt = Just (EdictReference 0) }
+                               , _mcContentMask = contentMask
+                               , _mcStart = start
+                               , _mcEnd = end
+                               , _mcMins = mins
+                               , _mcMaxs = maxs
+                               , _mcPassEdict = Just passEdict
+                               , _mcMins2 = mins
+                               , _mcMaxs2 = maxs
+                               }
+
+        -- create the bounding box of the entire move
+        let (boxMins, boxMaxs) = traceBounds start mins maxs end
+
+        -- clip to other solid entities
+        finalClip <- clipMoveToEntities $ clip { _mcBoxMins = boxMins, _mcBoxMaxs = boxMaxs }
+
+        return (finalClip^.mcTrace)
+
 
 clearWorld :: Quake ()
 clearWorld = do
@@ -314,3 +334,16 @@ insertLinkBefore v@(LinkReference vIdx) before@(LinkReference beforeIdx) = do
     let Just (LinkReference beforePrevIdx) = beforePrev
     svGlobals.svLinks.ix beforePrevIdx.lNext .= Just v
     svGlobals.svLinks.ix beforeIdx.lPrev .= Just v
+
+traceBounds :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
+traceBounds start mins maxs end =
+    let minsa = if (end^._x) > (start^._x) then (start^._x) + (mins^._x) - 1 else (end^._x) + (mins^._x) - 1
+        minsb = if (end^._y) > (start^._y) then (start^._y) + (mins^._y) - 1 else (end^._y) + (mins^._y) - 1
+        minsc = if (end^._z) > (start^._z) then (start^._z) + (mins^._z) - 1 else (end^._z) + (mins^._z) - 1
+        maxsa = if (end^._x) > (start^._x) then (end^._x) + (maxs^._x) + 1 else (start^._x) + (maxs^._x) + 1
+        maxsb = if (end^._y) > (start^._y) then (end^._y) + (maxs^._y) + 1 else (start^._y) + (maxs^._y) + 1
+        maxsc = if (end^._z) > (start^._z) then (end^._z) + (maxs^._z) + 1 else (start^._z) + (maxs^._z) + 1
+    in (V3 minsa minsb minsc, V3 maxsa maxsb maxsc)
+
+clipMoveToEntities :: MoveClipT -> Quake MoveClipT
+clipMoveToEntities _ = io (putStrLn "SVWorld.clipMoveToEntities") >> undefined -- TODO
