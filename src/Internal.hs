@@ -567,7 +567,7 @@ data GameImportT =
               , _giSoundIndex         :: B.ByteString -> Quake Int
               , _giImageIndex         :: B.ByteString -> Quake Int
               , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
-              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
+              , _giTrace              :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictReference -> Int -> Quake TraceT
               , _giPointContents      :: V3 Float -> Quake Int
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()

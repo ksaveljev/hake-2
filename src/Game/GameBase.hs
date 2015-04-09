@@ -237,3 +237,6 @@ pickTarget targetName = do
 
 clipVelocity :: V3 Float -> V3 Float -> Traversal' QuakeState (V3 Float) -> Float -> Quake Int
 clipVelocity _ _ _ _ = io (putStrLn "GameBase.clipVelocity") >> undefined -- TODO
+
+touchTriggers :: EdictReference -> Quake ()
+touchTriggers _ = io (putStrLn "GameBase.touchTriggers") >> undefined -- TODO

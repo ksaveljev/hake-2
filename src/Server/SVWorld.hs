@@ -264,7 +264,7 @@ linkEdict er@(EdictReference edictIdx) = do
 areaEdicts :: V3 Float -> V3 Float -> V.Vector EdictT -> Int -> Int -> Quake Int
 areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
 
-trace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictT -> Int -> Quake TraceT
+trace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> EdictReference -> Int -> Quake TraceT
 trace _ _ _ _ _ _ = io (putStrLn "SVWorld.trace") >> undefined -- TODO
 
 clearWorld :: Quake ()

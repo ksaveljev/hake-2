@@ -273,5 +273,57 @@ addGravity (EdictReference edictIdx) = do
 
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z -= edictGravity * gravityValue * Constants.frameTime
 
+-- Does not change the entities velocity at all
 pushEntity :: EdictReference -> V3 Float -> Quake TraceT
-pushEntity _ _ = io (putStrLn "SV.pushEntity") >> undefined -- TODO
+pushEntity er@(EdictReference edictIdx) pushV3 = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let start = edict^.eEntityState.esOrigin
+        end = start + pushV3
+
+    -- FIXME: test this
+    -- a goto statement was replaced
+    traceT <- tryToPush start end
+
+    when (edict^.eInUse) $
+      GameBase.touchTriggers er
+
+    return traceT
+
+  where tryToPush :: V3 Float -> V3 Float -> Quake TraceT
+        tryToPush start end = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          let mask = if edict^.eClipMask /= 0
+                       then edict^.eClipMask
+                       else Constants.maskSolid
+
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+
+          let trace = gameImport^.giTrace
+              linkEntity = gameImport^.giLinkEntity
+
+          traceT <- trace start (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs) end er mask
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (traceT^.tEndPos)
+          linkEntity er
+
+          if traceT^.tFraction /= 1.0
+            then do
+              impact er traceT
+
+              -- if the pushed entity went away and the pusher is still there
+              let Just (EdictReference traceIdx) = traceT^.tEnt
+              Just traceEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx
+
+              if not(traceEdict^.eInUse) && (edict^.eInUse)
+                then do
+                  -- move the pusher back and try again
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= start
+                  linkEntity er
+                  tryToPush start end
+                else return traceT
+            else return traceT
+
+impact :: EdictReference -> TraceT -> Quake ()
+impact _ _ = io (putStrLn "SV.impact") >> undefined -- TODO
