@@ -389,3 +389,25 @@ clipMoveToEntities initialClip = do
                        then return True -- don't clip against owner
                        else return False
              | otherwise -> return False
+
+{-
+- ================ SV_HullForEntity
+- 
+- Returns a headnode that can be used for testing or clipping an object of
+- mins/maxs size. Offset is filled in to contain the adjustment that must
+- be added to the testing object's origin to get a point to use with the
+- returned hull. ================
+-}
+hullForEntity :: EdictT -> Quake Int
+hullForEntity edict = do
+    -- decide which clipping hull to use, based on the size
+    if (edict^.eSolid) == Constants.solidBsp
+      then do
+        -- explicit hulls in the BSP model
+        Just (CModelReference modelIdx) <- preuse $ svGlobals.svServer.sModels.ix (edict^.eEntityState.esModelIndex)
+        when (modelIdx == -1) $
+          Com.comError Constants.errFatal "MOVETYPE_PUSH with a non bsp model"
+        Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
+        return (model^.cmHeadNode)
+      -- create a temp hull from bounding box sizes
+      else CM.headnodeForBox (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs)

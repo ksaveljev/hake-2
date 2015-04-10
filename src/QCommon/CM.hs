@@ -1117,3 +1117,25 @@ traceToLeaf leafNum = do
 
 clipBoxToBrush :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
 clipBoxToBrush _ _ _ _ _ _ = io (putStrLn "CM.clipBoxToBrush") >> undefined -- TODO
+
+-- To keep everything totally uniform, bounding boxes are turned into small
+-- BSP trees instead of being compared directly
+headnodeForBox :: V3 Float -> V3 Float -> Quake Int
+headnodeForBox mins maxs = do
+    boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
+
+    zoom (cmGlobals.cmMapPlanes) $ do
+      ix (boxHeadNode +  0).cpDist .= (maxs^._x)
+      ix (boxHeadNode +  1).cpDist .= (- (maxs^._x))
+      ix (boxHeadNode +  2).cpDist .= (mins^._x)
+      ix (boxHeadNode +  3).cpDist .= (- (mins^._x))
+      ix (boxHeadNode +  4).cpDist .= (maxs^._y)
+      ix (boxHeadNode +  5).cpDist .= (- (maxs^._y))
+      ix (boxHeadNode +  6).cpDist .= (mins^._y)
+      ix (boxHeadNode +  7).cpDist .= (- (mins^._y))
+      ix (boxHeadNode +  8).cpDist .= (maxs^._z)
+      ix (boxHeadNode +  9).cpDist .= (- (maxs^._z))
+      ix (boxHeadNode + 10).cpDist .= (mins^._z)
+      ix (boxHeadNode + 11).cpDist .= (- (mins^._z))
+
+    return boxHeadNode
