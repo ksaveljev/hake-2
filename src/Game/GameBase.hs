@@ -172,7 +172,41 @@ exitLevel :: Quake ()
 exitLevel = io (putStrLn "GameBase.exitLevel") >> undefined -- TODO
 
 checkDMRules :: Quake ()
-checkDMRules = io (putStrLn "GameBase.checkDMRules") >> undefined -- TODO
+checkDMRules = do
+    intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    unless (intermissionTime /= 0 || deathmatchValue == 0) $ do
+      timeLimitValue <- liftM (^.cvValue) timeLimitCVar
+      fragLimitValue <- liftM (truncate . (^.cvValue)) fragLimitCVar
+      time <- use $ gameBaseGlobals.gbLevel.llTime
+      bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
+
+      if timeLimitValue /= 0 && time >= timeLimitValue * 60
+        then do
+          bprintf Constants.printHigh "Timelimit hit.\n"
+          endDMLevel
+        else do
+          when (fragLimitValue /= 0) $ do
+            maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+            shouldEnd <- checkFragLimit fragLimitValue 0 maxClientsValue
+            when (shouldEnd) $ do
+              bprintf Constants.printHigh "Fraglimit hit.\n"
+              endDMLevel
+
+  where checkFragLimit :: Int -> Int -> Int -> Quake Bool
+        checkFragLimit fragLimit idx maxIdx
+          | idx >= maxIdx = return False
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix (idx + 1)
+
+              if edict^.eInUse
+                then do
+                  Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix idx
+                  if (client^.gcResp.crScore) >= fragLimit
+                    then return True
+                    else checkFragLimit fragLimit (idx + 1) maxIdx
+                else checkFragLimit fragLimit (idx + 1) maxIdx
 
 checkNeedPass :: Quake ()
 checkNeedPass = io (putStrLn "GameBase.checkNeedPass") >> undefined -- TODO
@@ -275,3 +309,7 @@ addPointToBound v mins maxs =
         maxb = if (v^._y) > (maxs^._y) then v^._y else maxs^._y
         maxc = if (v^._z) > (maxs^._z) then v^._z else maxs^._z
     in (V3 mina minb minc, V3 maxa maxb maxc)
+
+-- The timelimit or fraglimit has been exceeded.
+endDMLevel :: Quake ()
+endDMLevel = io (putStrLn "GameBase.endDMLevel") >> undefined -- TODO
