@@ -2,7 +2,7 @@
 module Game.GameFunc where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=))
-import Control.Monad (when, liftM, void)
+import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z)
@@ -14,6 +14,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameBase as GameBase
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 trainStartOn :: Int
@@ -468,7 +469,6 @@ funcTrainFind =
 
     return True
 
-
 doorUse :: EntUse
 doorUse =
   GenericEntUse "door_use" $ \_ _ _ -> do
@@ -496,8 +496,46 @@ thinkCalcMoveSpeed =
 
 thinkSpawnDoorTrigger :: EntThink
 thinkSpawnDoorTrigger =
-  GenericEntThink "think_spawn_door_trigger" $ \_ -> do
-    io (putStrLn "GameFunc.thinkSpawnDoorTrigger") >> undefined -- TODO
+  GenericEntThink "think_spawn_door_trigger" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    -- only the team leader spawns a trigger
+    unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+      let mins = edict^.eEdictMinMax.eMins
+          maxs = edict^.eEdictMinMax.eMaxs
+
+      (mins', maxs') <- teamChainAddPointToBound (edict^.eEdictOther.eoTeamChain) mins maxs
+
+      let expandedMins = (V3 (-60) (-60) 0) + mins'
+          expandedMaxs = (V3 60 60 0) + maxs'
+
+      otherRef@(EdictReference otherIdx) <- GameUtil.spawn
+
+      zoom (gameBaseGlobals.gbGEdicts.ix otherIdx) $ do
+        eEdictMinMax.eMins .= expandedMins
+        eEdictMinMax.eMaxs .= expandedMaxs
+        eOwner .= Just er
+        eSolid .= Constants.solidTrigger
+        eMoveType .= Constants.moveTypeNone
+        eEdictAction.eaTouch .= Just touchDoorTrigger
+
+      linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+      linkEntity otherRef
+
+      when ((edict^.eSpawnFlags) .&. doorStartOpen /= 0) $
+        doorUseAreaPortals er True
+        
+      void $ think thinkCalcMoveSpeed er
+
+    return True
+
+  where teamChainAddPointToBound :: Maybe EdictReference -> V3 Float -> V3 Float -> Quake (V3 Float, V3 Float)
+        teamChainAddPointToBound Nothing mins maxs = return (mins, maxs)
+        teamChainAddPointToBound (Just (EdictReference otherIdx)) mins maxs = do
+          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+          let (mins', maxs') = GameBase.addPointToBound (other^.eEdictMinMax.eAbsMin) mins maxs
+              (mins'', maxs'') = GameBase.addPointToBound (other^.eEdictMinMax.eAbsMax) mins' maxs'
+          teamChainAddPointToBound (other^.eEdictOther.eoTeamChain) mins'' maxs''
 
 buttonUse :: EntUse
 buttonUse =
@@ -518,3 +556,37 @@ trainNext :: EntThink
 trainNext =
   GenericEntThink "train_next" $ \_ -> do
     io (putStrLn "GameFunc.trainNext") >> undefined -- TODO
+
+touchDoorTrigger :: EntTouch
+touchDoorTrigger =
+  GenericEntTouch "touch_door_trigger" $ \_ _ _ _ -> do
+    io (putStrLn "GameFunc.touchDoorTrigger") >> undefined -- TODO
+
+{-
+- DOORS
+- 
+- spawn a trigger surrounding the entire team unless it is already targeted
+- by another.
+- 
+-}
+
+{-
+- QUAKED func_door (0 .5 .8) ? START_OPEN x CRUSHER NOMONSTER ANIMATED
+- TOGGLE ANIMATED_FAST TOGGLE wait in both the start and end states for a
+- trigger event. START_OPEN the door to moves to its destination when
+- spawned, and operate in reverse. It is used to temporarily or permanently
+- close off an area when triggered (not useful for touch or takedamage
+- doors). NOMONSTER monsters will not trigger this door
+- 
+- "message" is printed when the door is touched if it is a trigger door and
+- it hasn't been fired yet "angle" determines the opening direction
+- "targetname" if set, no touch field will be spawned and a remote button
+- or trigger field activates the door. "health" if set, door must be shot
+- open "speed" movement speed (100 default) "wait" wait before returning (3
+- default, -1 = never return) "lip" lip remaining at end of move (8
+- default) "dmg" damage to inflict when blocked (2 default) "sounds" 1)
+- silent 2) light 3) medium 4) heavy
+-}
+
+doorUseAreaPortals :: EdictReference -> Bool -> Quake ()
+doorUseAreaPortals _ _ = io (putStrLn "GameFunc.doorUseAreaPortals") >> undefined -- TODO

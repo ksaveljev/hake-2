@@ -8,7 +8,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..))
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -263,3 +263,13 @@ touchTriggers er@(EdictReference edictIdx) = do
                 else do
                   dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
                   touch (fromJust $ hit^.eEdictAction.eaTouch) hitRef er dummyPlane Nothing
+
+addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
+addPointToBound v mins maxs =
+    let mina = if (v^._x) < (mins^._x) then v^._x else mins^._x
+        minb = if (v^._y) < (mins^._y) then v^._z else mins^._z
+        minc = if (v^._y) < (mins^._y) then v^._z else mins^._z
+        maxa = if (v^._x) > (maxs^._x) then v^._x else maxs^._x
+        maxb = if (v^._y) > (maxs^._y) then v^._y else maxs^._y
+        maxc = if (v^._z) > (maxs^._z) then v^._z else maxs^._z
+    in (V3 mina minb minc, V3 maxa maxb maxc)
