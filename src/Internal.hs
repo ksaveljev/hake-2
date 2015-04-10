@@ -638,6 +638,7 @@ data GameBaseGlobals =
                   , _gbObstacle          :: Maybe EdictReference
                   , _gbCYes              :: Int
                   , _gbCNo               :: Int
+                  , _gbTouch             :: V.Vector EdictReference
                   }
 
 data PMoveGlobals =

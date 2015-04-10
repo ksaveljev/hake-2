@@ -4,7 +4,7 @@
 module Game.GameBase where
 
 import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix)
-import Control.Monad (when, liftM, void)
+import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -239,4 +239,27 @@ clipVelocity :: V3 Float -> V3 Float -> Traversal' QuakeState (V3 Float) -> Floa
 clipVelocity _ _ _ _ = io (putStrLn "GameBase.clipVelocity") >> undefined -- TODO
 
 touchTriggers :: EdictReference -> Quake ()
-touchTriggers _ = io (putStrLn "GameBase.touchTriggers") >> undefined -- TODO
+touchTriggers er@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    -- dead things don't activate triggers!
+    unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eEdictStatus.eHealth <= 0)) $ do
+      boxEdicts <- use $ gameBaseGlobals.gbGameImport.giBoxEdicts
+      num <- boxEdicts (edict^.eEdictMinMax.eAbsMin) (edict^.eEdictMinMax.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
+
+      -- be careful, it is possible to have an entity in this
+      -- list removed before we got to it (killtriggered)
+      touchEdicts 0 num
+
+  where touchEdicts :: Int -> Int -> Quake ()
+        touchEdicts idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just hitRef@(EdictReference hitIdx) <- preuse $ gameBaseGlobals.gbTouch.ix idx
+              Just hit <- preuse $ gameBaseGlobals.gbGEdicts.ix hitIdx
+
+              if not (hit^.eInUse) || isNothing (hit^.eEdictAction.eaTouch)
+                then touchEdicts (idx + 1) maxIdx
+                else do
+                  dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
+                  touch (fromJust $ hit^.eEdictAction.eaTouch) hitRef er dummyPlane Nothing

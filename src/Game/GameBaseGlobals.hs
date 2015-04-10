@@ -46,4 +46,5 @@ initialGameBaseGlobals =
                   , _gbObstacle          = Nothing
                   , _gbCYes              = 0
                   , _gbCNo               = 0
+                  , _gbTouch             = V.replicate Constants.maxEdicts (EdictReference (-1))
                   }
