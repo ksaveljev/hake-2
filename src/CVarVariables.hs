@@ -92,3 +92,5 @@ svMaxVelocityCVar        = CVar.getExisting "sv_maxvelocity"
 svGravityCVar            = CVar.getExisting "sv_gravity"
 timeLimitCVar            = CVar.getExisting "timelimit"
 fragLimitCVar            = CVar.getExisting "fraglimit"
+passwordCVar             = CVar.getExisting "password" -- do we need this? we have infoPasswordCVar
+spectatorPasswordCVar    = CVar.getExisting "spectator_password"

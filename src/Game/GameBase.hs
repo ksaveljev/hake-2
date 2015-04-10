@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameBase where
 
 import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix)
@@ -19,6 +20,7 @@ import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.PlayerClient as PlayerClient
+import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -209,7 +211,21 @@ checkDMRules = do
                 else checkFragLimit fragLimit (idx + 1) maxIdx
 
 checkNeedPass :: Quake ()
-checkNeedPass = io (putStrLn "GameBase.checkNeedPass") >> undefined -- TODO
+checkNeedPass = do
+    -- if password or spectator_password has changed, update needpass as needed
+    password <- passwordCVar
+    spectatorPassword <- spectatorPasswordCVar
+
+    when ((password^.cvModified) || (spectatorPassword^.cvModified)) $ do
+      CVar.update password { _cvModified = False }
+      CVar.update spectatorPassword { _cvModified = False }
+
+      let need :: Int = 0
+          need' = if BC.map toLower (password^.cvString) /= "none" then (need .|. 1) else need
+          need'' = if BC.map toLower (spectatorPassword^.cvString) /= "none" then (need' .|. 2) else need'
+
+      cVarSet <- use $ gameBaseGlobals.gbGameImport.giCVarSet
+      void $ cVarSet "needpass" (BC.pack (show need'')) -- IMPROVE ?
 
 clientEndServerFrames :: Quake ()
 clientEndServerFrames = io (putStrLn "GameBase.clientEndServerFrames") >> undefined -- TODO
