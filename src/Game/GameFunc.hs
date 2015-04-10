@@ -491,8 +491,49 @@ doorTouch =
 
 thinkCalcMoveSpeed :: EntThink
 thinkCalcMoveSpeed =
-  GenericEntThink "think_calc_movespeed" $ \_ -> do
-    io (putStrLn "GameFunc.thinkCalcMoveSpeed") >> undefined -- TODO
+  GenericEntThink "think_calc_movespeed" $ \er@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    -- only the team master does this
+    unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+      -- find the smallest distance any member of the team will be moving
+      minDist <- findSmallestDistance (edict^.eEdictOther.eoTeamChain) (abs $ edict^.eMoveInfo.miDistance)
+
+      let time = minDist / (edict^.eMoveInfo.miSpeed)
+
+      -- adjust speeds so they will all complete at the same time
+      adjustSpeeds (Just er) time
+
+    return True
+
+  where findSmallestDistance :: Maybe EdictReference -> Float -> Quake Float
+        findSmallestDistance Nothing minDist = return minDist
+        findSmallestDistance (Just (EdictReference entIdx)) minDist = do
+          Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+          let dist = abs (ent^.eMoveInfo.miDistance)
+              minDist' = if dist < minDist then dist else minDist
+          findSmallestDistance (ent^.eEdictOther.eoTeamChain) minDist'
+
+        adjustSpeeds :: Maybe EdictReference -> Float -> Quake ()
+        adjustSpeeds Nothing _ = return ()
+        adjustSpeeds (Just (EdictReference entIdx)) time = do
+          Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+
+          let newspeed = (abs $ ent^.eMoveInfo.miSpeed) / time
+              ratio = newspeed / (ent^.eMoveInfo.miSpeed)
+              accel = if (ent^.eMoveInfo.miAccel) == (ent^.eMoveInfo.miSpeed)
+                        then newspeed
+                        else (ent^.eMoveInfo.miAccel) * ratio
+              decel = if (ent^.eMoveInfo.miDecel) == (ent^.eMoveInfo.miSpeed)
+                        then newspeed
+                        else (ent^.eMoveInfo.miDecel) * ratio
+
+          zoom (gameBaseGlobals.gbGEdicts.ix entIdx.eMoveInfo) $ do
+            miAccel .= accel
+            miDecel .= decel
+            miSpeed .= newspeed
+
+          adjustSpeeds (ent^.eEdictOther.eoTeamChain) time
 
 thinkSpawnDoorTrigger :: EntThink
 thinkSpawnDoorTrigger =

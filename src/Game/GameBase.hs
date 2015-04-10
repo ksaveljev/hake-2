@@ -78,33 +78,35 @@ runFrame = do
         clientEndServerFrames
 
   where treatObjects :: Int -> Int -> Quake ()
-        treatObjects maxIdx idx = do
-          let er = EdictReference idx
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+        treatObjects maxIdx idx
+         | idx >= maxIdx = return ()
+         | otherwise = do
+             let er = EdictReference idx
+             Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
-          if not (edict^.eInUse)
-            then treatObjects maxIdx (idx + 1)
-            else do
-              gameBaseGlobals.gbLevel.llCurrentEntity .= Just er
-              gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
+             if not (edict^.eInUse)
+               then treatObjects maxIdx (idx + 1)
+               else do
+                 gameBaseGlobals.gbLevel.llCurrentEntity .= Just er
+                 gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
 
-              -- if the ground entity moved, make sure we are still on it
-              when (isJust (edict^.eEdictOther.eoGroundEntity)) $ do
-                let Just (EdictReference groundIdx) = edict^.eEdictOther.eoGroundEntity
-                Just groundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix groundIdx
+                 -- if the ground entity moved, make sure we are still on it
+                 when (isJust (edict^.eEdictOther.eoGroundEntity)) $ do
+                   let Just (EdictReference groundIdx) = edict^.eEdictOther.eoGroundEntity
+                   Just groundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix groundIdx
 
-                when (groundEdict^.eLinkCount /= (edict^.eGroundEntityLinkCount)) $ do
-                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity .= Nothing
-                  when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
-                    M.checkGround er
+                   when (groundEdict^.eLinkCount /= (edict^.eGroundEntityLinkCount)) $ do
+                     gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity .= Nothing
+                     when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
+                       M.checkGround er
 
-              maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+                 maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
-              if idx > 0 && idx <= maxClientsValue
-                then PlayerClient.clientBeginServerFrame er
-                else runEntity er
+                 if idx > 0 && idx <= maxClientsValue
+                   then PlayerClient.clientBeginServerFrame er
+                   else runEntity er
 
-              treatObjects maxIdx (idx + 1)
+                 treatObjects maxIdx (idx + 1)
 
 {-
 - This return a pointer to the structure with all entry points and global
