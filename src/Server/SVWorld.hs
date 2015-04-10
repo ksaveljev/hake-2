@@ -21,6 +21,7 @@ import Server.MoveClipT
 import qualified Constants
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
+import qualified Util.Math3D as Math3D
 
 initNodes :: Quake ()
 initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
@@ -263,8 +264,89 @@ linkEdict er@(EdictReference edictIdx) = do
                  findCrossingNode edict (fromJust (node^.anChildren._2))
              | otherwise -> return node -- crosses the node
 
+areaEdictsR :: Int -> Quake () -- Int is reference to svGlobals.svAreaNodes
+areaEdictsR nodeIdx = do
+    areaType <- use $ svGlobals.svAreaType
+    Just node <- preuse $ svGlobals.svAreaNodes.ix nodeIdx
+
+    -- touch linked edicts
+    let LinkReference linkIdx = if areaType == Constants.areaSolid
+                                  then node^.anSolidEdicts
+                                  else node^.anTriggerEdicts
+
+    Just link <- preuse $ svGlobals.svLinks.ix linkIdx
+    let linkNextRef = fromJust $ link^.lNext
+
+    findTouching linkIdx linkNextRef
+
+    -- if not terminal node
+    unless ((node^.anAxis) == -1) $ do
+      -- recurse down both sides
+      areaMaxs <- use $ svGlobals.svAreaMaxs
+      areaMins <- use $ svGlobals.svAreaMins
+
+      when ((areaMaxs^.(Math3D.v3Access (node^.anAxis))) > node^.anDist) $
+        areaEdictsR (fromJust $ node^.anChildren._1)
+
+      when ((areaMins^.(Math3D.v3Access (node^.anAxis))) < node^.anDist) $
+        areaEdictsR (fromJust $ node^.anChildren._2)
+
+  where findTouching :: Int -> LinkReference -> Quake ()
+        findTouching startIdx (LinkReference linkIdx)
+          | startIdx == linkIdx = return ()
+          | otherwise = do
+              Just link <- preuse $ svGlobals.svLinks.ix linkIdx
+              let Just (EdictReference edictIdx) = link^.lEdict
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              areaMaxs <- use $ svGlobals.svAreaMaxs
+              areaMins <- use $ svGlobals.svAreaMins
+              areaCount <- use $ svGlobals.svAreaCount
+              areaMaxCount <- use $ svGlobals.svAreaMaxCount
+
+              if | (edict^.eSolid) == Constants.solidNot -> findTouching startIdx (fromJust $ link^.lNext)
+                 | notTouching edict areaMins areaMaxs -> findTouching startIdx (fromJust $ link^.lNext)
+                 | areaCount == areaMaxCount -> do
+                     Com.printf "SV_areaEdicts: MAXCOUNT\n"
+                     return ()
+                 | otherwise -> do
+                     zoom (svGlobals) $ do
+                       svAreaList.ix areaCount .= EdictReference edictIdx
+                       svAreaCount += 1
+
+                     findTouching startIdx (fromJust $ link^.lNext)
+
+        notTouching :: EdictT -> V3 Float -> V3 Float -> Bool
+        notTouching edict mins maxs =
+          let absmin = edict^.eEdictMinMax.eAbsMin
+              absmax = edict^.eEdictMinMax.eAbsMax
+          in if (absmin^._x) > (maxs^._x) ||
+                (absmin^._y) > (maxs^._y) ||
+                (absmin^._z) > (maxs^._z) ||
+                (absmax^._x) > (mins^._x) ||
+                (absmax^._y) > (mins^._y) ||
+                (absmax^._z) > (mins^._z)
+                then True
+                else False
+
 areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
-areaEdicts _ _ _ _ _ = io (putStrLn "SVWorld.areaEdicts") >> undefined -- TODO
+areaEdicts mins maxs listLens maxCount areaType = do
+    list <- use listLens
+
+    zoom (svGlobals) $ do
+      svAreaMins .= mins
+      svAreaMaxs .= maxs
+      svAreaList .= list
+      svAreaCount .= 0
+      svAreaMaxCount .= maxCount
+      svAreaType .= areaType
+
+    areaEdictsR 0
+
+    updatedList <- use $ svGlobals.svAreaList
+    listLens .= updatedList
+
+    areaCount <- use $ svGlobals.svAreaCount
+    return areaCount
 
 {-
 - ================== SV_Trace
@@ -310,7 +392,7 @@ trace start maybeMins maybeMaxs end passEdict@(EdictReference passEdictIdx) cont
         let (boxMins, boxMaxs) = traceBounds start mins maxs end
 
         -- clip to other solid entities
-        finalClip <- clipMoveToEntities $ clip { _mcBoxMins = boxMins, _mcBoxMaxs = boxMaxs }
+        finalClip <- clipMoveToEntities $ updatedClip { _mcBoxMins = boxMins, _mcBoxMaxs = boxMaxs }
 
         return (finalClip^.mcTrace)
 
