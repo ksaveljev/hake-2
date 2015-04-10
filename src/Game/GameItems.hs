@@ -5,9 +5,10 @@ module Game.GameItems where
 
 import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), zoom)
 import Control.Monad (when, void, liftM)
-import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Char (toLower)
 import Data.Maybe (fromJust, isNothing, isJust)
+import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -410,5 +411,85 @@ spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- 
 
 dropToFloor :: EntThink
 dropToFloor =
-  GenericEntThink "drop_to_floor" $ \_ -> do
-    io (putStrLn "GameItems.dropToFloor") >> undefined -- TODO
+  GenericEntThink "drop_to_floor" $ \er@(EdictReference edictIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+      eMins .= V3 (-15) (-15) (-15)
+      eMaxs .= V3 15 15 15
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        dprintf = gameImport^.giDprintf
+        linkEntity = gameImport^.giLinkEntity
+        trace = gameImport^.giTrace
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if isJust (edict^.eEdictInfo.eiModel)
+      then setModel er (edict^.eEdictInfo.eiModel)
+      else do
+        let GItemReference itemIdx = fromJust $ edict^.eItem
+        Just worldModel <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giWorldModel
+        setModel er worldModel
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eSolid .= Constants.solidTrigger
+      eMoveType .= Constants.moveTypeToss
+      eEdictAction.eaTouch .= Just touchItem
+
+    let dest = (V3 0 0 (-128)) + (edict^.eEntityState.esOrigin)
+
+    tr <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) dest er Constants.maskSolid
+
+    if tr^.tStartSolid
+      then do
+        dprintf $ "droptofloor: " `B.append` (edict^.eClassName) `B.append` " startsolid at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
+        GameUtil.freeEdict er
+      else do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (tr^.tEndPos)
+
+        when (isJust $ edict^.eEdictInfo.eiTeam) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eFlags %= (.&. (complement Constants.flTeamSlave))
+            eEdictOther.eoChain .= (edict^.eEdictOther.eoTeamChain)
+            eEdictOther.eoTeamChain .= Nothing
+            eSvFlags %= (.|. Constants.svfNoClient)
+            eSolid .= Constants.solidNot
+
+          when ((Just er) == (edict^.eEdictOther.eoTeamMaster)) $ do
+            time <- use $ gameBaseGlobals.gbLevel.llTime
+
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+              eaNextThink .= time + Constants.frameTime
+              eaThink .= Just doRespawn
+            
+        when ((edict^.eSpawnFlags) .&. Constants.itemNoTouch /= 0) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eSolid .= Constants.solidBbox
+            eEdictAction.eaTouch .= Nothing
+            eEntityState.esEffects %= (.&. (complement Constants.efRotate))
+            eEntityState.esRenderFx %= (.&. (complement Constants.rfGlow))
+
+        when ((edict^.eSpawnFlags) .&. Constants.itemTriggerSpawn /= 0) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eSvFlags %= (.|. Constants.svfNoClient)
+            eSolid .= Constants.solidNot
+            eEdictAction.eaUse .= Just useItem
+
+        linkEntity er
+
+    return True
+
+touchItem :: EntTouch
+touchItem =
+  GenericEntTouch "touch_item" $ \_ _ _ _ -> do
+    io (putStrLn "GameItems.touchItem") >> undefined -- TODO
+
+doRespawn :: EntThink
+doRespawn =
+  GenericEntThink "do_respawn" $ \_ -> do
+    io (putStrLn "GameItems.doRespawn") >> undefined -- TODO
+
+useItem :: EntUse
+useItem =
+  GenericEntUse "use_item" $ \_ _ _ -> do
+    io (putStrLn "GameItems.useItem") >> undefined -- TODO
