@@ -531,8 +531,8 @@ loadBrushSides lump = do
           when (j >= numTexInfo) $
             Com.comError Constants.errDrop "Bad brushside texinfo"
 
-          let cbrushside = CBrushSideT { cbsPlane   = Just num
-                                       , cbsSurface = Just j
+          let cbrushside = CBrushSideT { _cbsPlane   = Just num
+                                       , _cbsSurface = Just j
                                        }
 
           whenQ (use $ cmGlobals.cmDebugLoadMap) $
@@ -700,8 +700,8 @@ initBoxHull = do
           let side = idx .&. 1
 
           -- brush sides
-          let s = CBrushSideT { cbsPlane   = Just (numPlanes + idx * 2 + side)
-                              , cbsSurface = Nothing
+          let s = CBrushSideT { _cbsPlane   = Just (numPlanes + idx * 2 + side)
+                              , _cbsSurface = Nothing
                               }
 
           cmGlobals.cmMapBrushSides %= (V.// [(numBrushSides + idx, s)])
@@ -1035,7 +1035,7 @@ recursiveHullCheck num p1f p2f p1 p2 = do
                                | otherwise -> tmpFrac
 
                  moveUpTheNode side frac node
-                 
+
                  -- go past the node
                  let frac2 = if | tmpFrac2 < 0 -> 0
                                 | tmpFrac2 > 1 -> 1
@@ -1116,7 +1116,78 @@ traceToLeaf leafNum = do
                         traceLineAgainstAllBrushes firstLeafBrush (idx + 1) maxIdx
 
 clipBoxToBrush :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
-clipBoxToBrush _ _ _ _ _ _ = io (putStrLn "CM.clipBoxToBrush") >> undefined -- TODO
+clipBoxToBrush mins maxs p1 p2 traceLens brush = do
+    unless ((brush^.cbNumSides) == 0) $ do
+      globals.cBrushTraces += 1
+
+      (enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide) <- findIntersections (-1) 1 Nothing False False Nothing 0 (brush^.cbNumSides)
+
+      if not startOut -- origin point was inside brush
+        then do
+          traceLens.tStartSolid .= True
+          unless getOut $ traceLens.tAllSolid .= True
+        else
+          when (enterFrac < leaveFrac) $ do
+            traceT <- use $ traceLens
+
+            when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
+              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ clipPlane)
+              Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
+              let Just surfaceIdx = brushSide^.cbsSurface
+              Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
+
+              traceLens.tFraction .= if enterFrac < 0 then 0 else enterFrac
+              traceLens.tPlane .= plane
+              traceLens.tSurface .= Just (surface^.msCSurface) -- TODO: this might be an issue! maybe hold the reference to mapSurfaceT ?
+              traceLens.tContents .= (brush^.cbContents)
+        
+        -- 3rd argument is index of cmGlobals.cmMapPlanes
+        -- 6th argument is index of cmGlobals.cmMapBrushSides
+  where findIntersections :: Float -> Float -> Maybe Int -> Bool -> Bool -> Maybe Int -> Int -> Int -> Quake (Float, Float, Maybe Int, Bool, Bool, Maybe Int)
+        findIntersections enterFrac leaveFrac clipPlane getOut startOut leadSide idx maxIdx
+          | idx >= maxIdx = return (enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
+          | otherwise = do
+              Just side <- preuse $ cmGlobals.cmMapBrushSides.ix ((brush^.cbFirstBrushSide) + idx)
+              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ side^.cbsPlane)
+
+              -- FIXME: special case for axial
+              traceIsPoint <- use $ cmGlobals.cmTraceIsPoint
+
+              let dist = if traceIsPoint
+                           -- special point case
+                           then plane^.cpDist
+                           -- general box case
+                           else
+                             -- push the plane out apropriately for mins/maxs
+                             -- FIXME: use signbits into 8 way lookup for each mins/maxs
+                             let a = if (plane^.cpNormal._x) < 0 then maxs^._x else mins^._x
+                                 b = if (plane^.cpNormal._y) < 0 then maxs^._y else mins^._y
+                                 c = if (plane^.cpNormal._z) < 0 then maxs^._z else mins^._z
+                                 ofs = V3 a b c
+                                 distance = dot ofs (plane^.cpNormal)
+                             in plane^.cpDist - distance
+
+                  d1 = (dot p1 (plane^.cpNormal)) - dist
+                  d2 = (dot p2 (plane^.cpNormal)) - dist
+                  getOut' = if d2 > 0
+                              then True -- endpoint is not in solid
+                              else getOut
+                  startOut' = if d1 > 0
+                                then True
+                                else startOut
+
+              if | d1 > 0 && d2 >= d1 -> return (enterFrac, leaveFrac, clipPlane, getOut', startOut', leadSide) -- completely in front of face, no intersection
+                 | d1 <= 0 && d2 <= 0 -> findIntersections enterFrac leaveFrac clipPlane getOut' startOut' leadSide (idx + 1) maxIdx
+                 | d1 > d2 -> do -- crosses face
+                     let f = (d1 - distEpsilon) / (d1 - d2)
+                         enterFrac' = if f > enterFrac then f else enterFrac
+                         clipPlane' = if f > enterFrac then side^.cbsPlane else clipPlane
+                         leadSide' = if f > enterFrac then Just ((brush^.cbFirstBrushSide) + idx) else leadSide
+                     findIntersections enterFrac' leaveFrac clipPlane' getOut' startOut' leadSide' (idx + 1) maxIdx
+                 | otherwise -> do
+                     let f = (d1 + distEpsilon) / (d1 - d2)
+                         leaveFrac' = if f < leaveFrac then f else leaveFrac
+                     findIntersections enterFrac leaveFrac' clipPlane getOut' startOut' leadSide (idx + 1) maxIdx
 
 -- To keep everything totally uniform, bounding boxes are turned into small
 -- BSP trees instead of being compared directly
