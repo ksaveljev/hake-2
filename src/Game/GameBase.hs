@@ -20,6 +20,7 @@ import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.PlayerClient as PlayerClient
+import qualified Game.PlayerView as PlayerView
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
@@ -228,7 +229,22 @@ checkNeedPass = do
       void $ cVarSet "needpass" (BC.pack (show need'')) -- IMPROVE ?
 
 clientEndServerFrames :: Quake ()
-clientEndServerFrames = io (putStrLn "GameBase.clientEndServerFrames") >> undefined -- TODO
+clientEndServerFrames = do
+    -- calc the player views now that all pushing
+    -- and damage has been added
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+    calcPlayerViews 0 maxClientsValue
+
+  where calcPlayerViews :: Int -> Int -> Quake ()
+        calcPlayerViews idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix (idx + 1)
+
+              unless (not (edict^.eInUse) || isNothing (edict^.eClient)) $
+                PlayerView.clientEndServerFrame (EdictReference (idx + 1))
+
+              calcPlayerViews (idx + 1) maxIdx
 
 runEntity :: EdictReference -> Quake ()
 runEntity er@(EdictReference edictIdx) = do
