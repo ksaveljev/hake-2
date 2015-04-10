@@ -152,7 +152,12 @@ physicsToss er@(EdictReference edictIdx) = do
           let waterLevel = if isInWater then 1 else 0
           gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= waterLevel
 
-          io (putStrLn "SV.physicsToss") >> undefined -- TODO
+          playWaterSound oldOrigin wasInWater isInWater
+
+          -- move teamslaves
+          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoTeamChain
+          Just origin <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
+          moveTeamSlaves origin teamChain
 
   where addGravityBasedOnMoveType :: Int -> Quake ()
         addGravityBasedOnMoveType moveType = do
@@ -225,6 +230,33 @@ physicsToss er@(EdictReference edictIdx) = do
           let isInWater = (newWaterType .&. Constants.maskWater) /= 0
 
           return (wasInWater, isInWater)
+
+        playWaterSound :: V3 Float -> Bool -> Bool -> Quake ()
+        playWaterSound oldOrigin wasInWater isInWater = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+
+          let positionedSound = gameImport^.giPositionedSound
+              soundIndex = gameImport^.giSoundIndex
+
+          hitwav <- soundIndex "misc/h2ohit1.wav"
+
+          if | not wasInWater && isInWater ->
+                 positionedSound oldOrigin er Constants.chanAuto hitwav 1 1 0
+             | wasInWater && not isInWater ->
+                 positionedSound (edict^.eEntityState.esOrigin) er Constants.chanAuto hitwav 1 1 0
+             | otherwise -> return ()
+
+        moveTeamSlaves :: V3 Float -> Maybe EdictReference -> Quake ()
+        moveTeamSlaves _ Nothing = return ()
+        moveTeamSlaves origin (Just sr@(EdictReference slaveIdx)) = do
+          gameBaseGlobals.gbGEdicts.ix slaveIdx.eEntityState.esOrigin .= origin
+
+          linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+          linkEntity sr
+
+          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix slaveIdx.eEdictOther.eoTeamChain
+          moveTeamSlaves origin teamChain
 
 push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
 push _ _ _ = io (putStrLn "SV.push") >> undefined -- TODO

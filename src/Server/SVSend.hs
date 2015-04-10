@@ -110,7 +110,7 @@ If origin is null, the origin is determined from the entity origin
 or the midpoint of the entity box for bmodels.
 ==================
 -}
-startSound :: V3 Float -> EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: V3 Float -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = io (putStrLn "SVsend.startSound") >> undefined -- TODO
 
 {-

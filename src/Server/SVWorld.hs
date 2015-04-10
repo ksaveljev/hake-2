@@ -358,7 +358,7 @@ areaEdicts mins maxs listLens maxCount areaType = do
 - ==================
 -}
 trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
-trace start maybeMins maybeMaxs end passEdict@(EdictReference passEdictIdx) contentMask = do
+trace start maybeMins maybeMaxs end passEdict contentMask = do
     vec3origin <- use $ globals.vec3Origin
 
     let clip = newMoveClipT
