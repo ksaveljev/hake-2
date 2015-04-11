@@ -3,7 +3,7 @@ module Game.GameFunc where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=))
 import Control.Monad (when, liftM, void, unless)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
@@ -419,8 +419,22 @@ trainBlocked =
 
 trainUse :: EntUse
 trainUse =
-  GenericEntUse "train_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.trainUse") >> undefined -- TODO
+  GenericEntUse "train_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoActivator .= activatorRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. trainStartOn /= 0
+      then
+        unless ((self^.eSpawnFlags) .&. trainToggle == 0) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+            eSpawnFlags %= (.&. (complement trainStartOn))
+            eEdictPhysics.eVelocity .= V3 0 0 0
+            eEdictAction.eaNextThink .= 0
+      else
+        if isJust (self^.eTargetEnt)
+          then trainResume selfRef
+          else void $ think trainNext selfRef
 
 funcTrainFind :: EntThink
 funcTrainFind =
@@ -631,3 +645,6 @@ touchDoorTrigger =
 
 doorUseAreaPortals :: EdictReference -> Bool -> Quake ()
 doorUseAreaPortals _ _ = io (putStrLn "GameFunc.doorUseAreaPortals") >> undefined -- TODO
+
+trainResume :: EdictReference -> Quake ()
+trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
