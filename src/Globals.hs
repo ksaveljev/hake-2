@@ -44,6 +44,7 @@ initialGlobals =
           , _netMessage         = newSizeBufT
           , _netMessageBuffer   = ""
           , _cmdText            = newSizeBufT
+          , _deferTextBuf       = ""
           , _cmdTextBuf         = ""
           , _cmdAlias           = Seq.empty
 

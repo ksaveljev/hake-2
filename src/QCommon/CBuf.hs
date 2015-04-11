@@ -143,4 +143,9 @@ insertText text = do
     when (templen /= 0) $ SZ.write (globals.cmdText) tmp templen
 
 copyToDefer :: Quake ()
-copyToDefer = io (putStrLn "CBuf.copyToDefer") >> undefined -- TODO
+copyToDefer = do
+    buf <- use $ globals.cmdTextBuf
+    curSize <- use $ globals.cmdText.sbCurSize
+
+    globals.deferTextBuf .= B.take curSize buf
+    globals.cmdText.sbCurSize .= 0

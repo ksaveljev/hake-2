@@ -130,7 +130,8 @@ data Globals =
           , _netMessage         :: SizeBufT
           , _netMessageBuffer   :: B.ByteString
           , _cmdText            :: SizeBufT
-          , _cmdTextBuf         :: B.ByteString
+          , _deferTextBuf       :: B.ByteString -- length 8192
+          , _cmdTextBuf         :: B.ByteString -- length 8192
           , _cmdAlias           :: Seq CmdAliasT
 
           , _timeBeforeGame     :: Int
