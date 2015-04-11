@@ -355,7 +355,7 @@ loadFile path = do
 gameDir :: Quake B.ByteString
 gameDir = do
     userDir <- use $ fsGlobals.fsUserDir
-    -- TODO: dedice if fsUserDir should be Maybe B.ByteString...
+    -- TODO: decide if fsUserDir should be Maybe B.ByteString...
     return $ if userDir /= ""
                then userDir
                else Constants.baseDirName

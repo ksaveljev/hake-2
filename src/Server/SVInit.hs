@@ -22,6 +22,7 @@ import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import qualified Server.SVGame as SVGame
@@ -103,7 +104,16 @@ createBaseline = do
                   svGlobals.svServer.sBaselines.ix idx .= entityState
 
 checkForSavegame :: Quake ()
-checkForSavegame = io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
+checkForSavegame = do
+    noReloadValue <- liftM (^.cvValue) svNoReloadCVar
+    deathmatchValue <- CVar.variableValue "deathmatch"
+
+    unless (noReloadValue /= 0 || deathmatchValue /= 0) $ do
+      gamedir <- FS.gameDir
+      name <- use $ svGlobals.svServer.sName
+      -- let filename = gamedir `B.append` "/save/current/" `B.append` name `B.append` ".sav"
+
+      io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
 
 {-
 - SV_SpawnServer.
