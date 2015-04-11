@@ -609,8 +609,77 @@ buttonKilled =
 
 trainNext :: EntThink
 trainNext =
-  GenericEntThink "train_next" $ \_ -> do
-    io (putStrLn "GameFunc.trainNext") >> undefined -- TODO
+  GenericEntThink "train_next" $ \er@(EdictReference edictIdx) -> do
+    (done, entRef) <- pickNextTarget er True
+
+    unless done $ do
+      let Just (EdictReference entIdx) = entRef
+      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+        eMoveInfo.miWait .= (ent^.eMoveInfo.miWait)
+        eTargetEnt .= entRef
+
+      when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+        when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
+          sound <- use $ gameBaseGlobals.gbGameImport.giSound
+          sound er (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 (fromIntegral Constants.attnStatic) 0
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= (edict^.eMoveInfo.miSoundMiddle)
+
+      let dest = (ent^.eEntityState.esOrigin) - (edict^.eEdictMinMax.eMins)
+
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
+        miState .= stateTop
+        miStartOrigin .= (edict^.eEntityState.esOrigin)
+        miEndOrigin .= dest
+
+      moveCalc er dest trainWait
+
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. trainStartOn)
+
+    return True
+
+  where pickNextTarget :: EdictReference -> Bool -> Quake (Bool, Maybe EdictReference)
+        pickNextTarget er@(EdictReference edictIdx) first = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+          let dprintf = gameImport^.giDprintf
+              linkEntity = gameImport^.giLinkEntity
+
+          if isNothing (self^.eEdictInfo.eiTarget)
+            then return (True, Nothing)
+            else do
+              entRef <- GameBase.pickTarget (fromJust $ self^.eEdictInfo.eiTarget)
+
+              if isNothing entRef
+                then do
+                  dprintf $ "train_next: bad target " `B.append` (fromJust $ self^.eEdictInfo.eiTarget) `B.append` "\n"
+                  return (True, Nothing)
+                else do
+                  let Just (EdictReference entIdx) = entRef
+                  Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiTarget .= (ent^.eEdictInfo.eiTarget)
+
+                  -- check for a teleport path_corner
+                  if (ent^.eSpawnFlags) .&. 1 /= 0
+                    then
+                      if not first
+                        then do
+                          dprintf $ "connected teleport path_corner, see " `B.append` (ent^.eClassName) `B.append` " at " `B.append` (Lib.vtos (ent^.eEntityState.esOrigin)) `B.append` "\n"
+                          return (True, entRef)
+                        else do
+                          let origin = ((ent^.eEntityState.esOrigin) - (self^.eEdictMinMax.eMins))
+                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+                            esOrigin .= origin
+                            esOldOrigin .= origin
+                            esEvent .= Constants.evOtherTeleport
+
+                          linkEntity er
+
+                          pickNextTarget er False
+
+                    else return (False, entRef)
 
 touchDoorTrigger :: EntTouch
 touchDoorTrigger =
@@ -648,3 +717,11 @@ doorUseAreaPortals _ _ = io (putStrLn "GameFunc.doorUseAreaPortals") >> undefine
 
 trainResume :: EdictReference -> Quake ()
 trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
+
+trainWait :: EntThink
+trainWait =
+  GenericEntThink "train_wait" $ \_ -> do
+    io (putStrLn "GameFunc.trainWait") >> undefined -- TODO
+
+moveCalc :: EdictReference -> V3 Float -> EntThink -> Quake ()
+moveCalc _ _ _ = io (putStrLn "GameFunc.moveCalc") >> undefined -- TODO
