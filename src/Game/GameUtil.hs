@@ -5,9 +5,11 @@ module Game.GameUtil where
 import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom)
 import Control.Monad (liftM, when, unless)
 import Data.Bits ((.&.))
+import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (norm)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -122,7 +124,7 @@ range self other =
 - (string)self.target and call their .use function
 -}
 useTargets :: EdictReference -> Maybe EdictReference -> Quake ()
-useTargets (EdictReference edictIdx) activatorReference = do
+useTargets er@(EdictReference edictIdx) activatorReference = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -163,13 +165,15 @@ useTargets (EdictReference edictIdx) activatorReference = do
               talkIdx <- soundIndex "misc/talk1.wav"
               sound ar Constants.chanAuto talkIdx 1 (fromIntegral Constants.attnNorm) 0
 
+        -- kill killtargets
         done <- if (isJust (edict^.eEdictInfo.eiKillTarget))
                   then killKillTargets Nothing (fromJust $ edict^.eEdictInfo.eiKillTarget)
                   else return False
 
         unless done $ do
           -- fire targets
-          io (putStrLn "GameUtil.useTargets") >> undefined -- TODO
+          when (isJust $ edict^.eEdictInfo.eiTarget) $ do
+            fireTargets (BC.map toLower (edict^.eClassName)) Nothing GameBase.findByTarget (fromJust $ edict^.eEdictInfo.eiTarget)
 
   where killKillTargets :: Maybe EdictReference -> B.ByteString -> Quake Bool
         killKillTargets edictRef killTarget = do
@@ -186,6 +190,33 @@ useTargets (EdictReference edictIdx) activatorReference = do
                   dprintf "entity was removed while using killtargets\n"
                   return True
             else return False
+
+        fireTargets :: B.ByteString -> Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake ()
+        fireTargets edictClassName ref findBy targetName = do
+          edictRef <- GameBase.gFind ref findBy targetName
+
+          when (isJust edictRef) $ do
+            let Just fr@(EdictReference foundEdictIdx) = edictRef
+            Just foundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix foundEdictIdx
+
+            -- doors fire area portals in a specific way
+            let foundEdictClassName = BC.map toLower (foundEdict^.eClassName)
+            if foundEdictClassName == "func_areaportal" && (any (== edictClassName) ["func_door", "func_door_rotating"])
+              then fireTargets edictClassName edictRef findBy targetName
+              else do
+                dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+
+                if foundEdictIdx == edictIdx
+                  then dprintf "WARNING: Entity used iteself.\n"
+                  else 
+                    when (isJust $ foundEdict^.eEdictAction.eaUse) $
+                      entUse (fromJust $ foundEdict^.eEdictAction.eaUse) fr er activatorReference
+
+                Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+
+                if not inUse
+                  then dprintf "entity was removed while using targets\n"
+                  else fireTargets edictClassName edictRef findBy targetName
 
 thinkDelay :: EntThink
 thinkDelay =
