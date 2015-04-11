@@ -5,7 +5,7 @@ import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, normalize, quadrance)
 import qualified Data.ByteString as B
 
 import Quake
@@ -724,4 +724,47 @@ trainWait =
     io (putStrLn "GameFunc.trainWait") >> undefined -- TODO
 
 moveCalc :: EdictReference -> V3 Float -> EntThink -> Quake ()
-moveCalc _ _ _ = io (putStrLn "GameFunc.moveCalc") >> undefined -- TODO
+moveCalc er@(EdictReference edictIdx) dest func = do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= V3 0 0 0
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let dir = dest - (edict^.eEntityState.esOrigin)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
+      miDir .= normalize dir
+      miRemainingDistance .= sqrt (quadrance dir) -- TODO: make sure we are correct here
+      miEndFunc .= Just func
+
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miAccel) && (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miDecel)
+      then do
+        currentEntity <- use $ gameBaseGlobals.gbLevel.llCurrentEntity
+
+        let comparedEntity = if (edict^.eFlags) .&. Constants.flTeamSlave /= 0
+                               then edict^.eEdictOther.eoTeamMaster
+                               else Just er
+
+        if currentEntity == comparedEntity
+          then void $ think moveBegin er
+          else
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+              eaNextThink .= time + Constants.frameTime
+              eaThink .= Just moveBegin
+      else do
+        -- aceelerative
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eMoveInfo.miCurrentSpeed .= 0
+          eEdictAction.eaThink .= Just thinkAccelMove
+          eEdictAction.eaNextThink .= time + Constants.frameTime
+
+moveBegin :: EntThink
+moveBegin =
+  GenericEntThink "move_begin" $ \_ -> do
+    io (putStrLn "GameFun.moveBegin") >> undefined -- TODO
+
+thinkAccelMove :: EntThink
+thinkAccelMove =
+  GenericEntThink "think_accelmove" $ \_ -> do
+    io (putStrLn "GameFunc.thinkAccelMove") >> undefined -- TODO
