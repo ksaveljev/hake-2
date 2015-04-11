@@ -4,7 +4,7 @@ module Server.SVInit where
 
 import Data.Bits ((.|.))
 import Data.Foldable (forM_)
-import Control.Lens ((.=), use, (^.), (%=), (+=))
+import Control.Lens ((.=), use, (^.), (%=), (+=), preuse, ix)
 import Control.Monad (when, void, unless, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -83,18 +83,24 @@ imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 -}
 createBaseline :: Quake ()
 createBaseline = do
-    {-
-    gEdicts <- use $ gameBaseGlobals.gbGEdicts
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
-    updatedEdicts <- updateEdicts gEdicts 1 numEdicts []
-    -}
-    io (putStrLn "SVInit.createBaseline") >> undefined -- TODO
+    edictBaseline 1 numEdicts
 
-{-
-  where updateEdicts :: V.Vector EdictT -> Int -> Int -> [(Int, EdictT)] -> Quake [(Int, EdictT)]
-        updateEdicts _ _ _ _ = io (putStrLn "SVInit.createBaseline#updateEdicts") >> undefined -- TODO
-        -}
+  where edictBaseline :: Int -> Int -> Quake ()
+        edictBaseline idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              if not (edict^.eInUse) || (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0
+                then edictBaseline (idx + 1) maxIdx
+                else do
+                  gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esNumber .= idx
+
+                  -- take current state as baseline
+                  gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
+                  Just entityState <- preuse $ gameBaseGlobals.gbGEdicts.ix idx.eEntityState
+                  svGlobals.svServer.sBaselines.ix idx .= entityState
 
 checkForSavegame :: Quake ()
 checkForSavegame = io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
