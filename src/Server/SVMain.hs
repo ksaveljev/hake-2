@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVMain where
 
+import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal', ix)
+import Control.Monad (void, when, liftM)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
-import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal')
-import Control.Monad (void, when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -201,7 +202,40 @@ frame msec = do
 - necessary.
 -}
 checkTimeouts :: Quake ()
-checkTimeouts = io (putStrLn "SVMain.checkTimeouts") >> undefined -- TODO
+checkTimeouts = do
+    realTime <- use $ svGlobals.svServerStatic.ssRealTime
+    timeoutValue <- liftM (^.cvValue) timeoutCVar
+    zombieTimeValue <- liftM (^.cvValue) zombieTimeCVar
+
+    let dropPoint = realTime - truncate (1000 * timeoutValue)
+        zombiePoint = realTime - truncate (1000 * zombieTimeValue)
+
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    checkClientTimeout realTime dropPoint zombiePoint 0 maxClientsValue
+
+  where checkClientTimeout :: Int -> Int -> Int -> Int -> Int -> Quake ()
+        checkClientTimeout realTime dropPoint zombiePoint idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just lastMessage <- preuse $ svGlobals.svServerStatic.ssClients.ix idx.cLastMessage
+
+              -- message times may be wrong across a changelevel
+              when (lastMessage > realTime) $
+                svGlobals.svServerStatic.ssClients.ix idx.cLastMessage .= realTime
+
+              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
+
+              if (client^.cState) == Constants.csZombie && (client^.cLastMessage) < zombiePoint
+                then
+                  svGlobals.svServerStatic.ssClients.ix idx.cState .= Constants.csFree -- can now be reused
+                else
+                  when (((client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned) && (client^.cLastMessage) < dropPoint) $ do
+                    SVSend.broadcastPrintf Constants.printHigh $ (client^.cName) `B.append` " timed out\n"
+                    dropClient (svGlobals.svServerStatic.ssClients.ix idx)
+                    svGlobals.svServerStatic.ssClients.ix idx.cState .= Constants.csFree -- don't bother with zombie state
+
+              checkClientTimeout realTime dropPoint zombiePoint (idx + 1) maxIdx
 
 -- Reads packets from the network or loopback
 readPackets :: Quake ()
