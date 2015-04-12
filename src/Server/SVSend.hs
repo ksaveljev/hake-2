@@ -4,11 +4,12 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVSend where
 
-import Data.Traversable (traverse)
-import Data.Maybe (isJust)
 import Control.Exception (IOException, handle)
 import Control.Lens (use, preuse, (.=), (^.), ix, Traversal')
 import Control.Monad (when, unless, liftM, void)
+import Data.Bits ((.&.), shiftR, shiftL)
+import Data.Maybe (isJust)
+import Data.Traversable (traverse)
 import Linear.V3 (V3(..))
 import System.IO (hClose)
 import qualified Data.ByteString as B
@@ -85,12 +86,12 @@ MULTICAST_PHS	send to clients potentially hearable from org
 -}
 multicast :: V3 Float -> Int -> Quake ()
 multicast origin to = do
-    (lNum, area1) <- if to /= Constants.multicastAllR && to /= Constants.multicastAll
-                       then do
-                         ln <- CM.pointLeafNum origin
-                         a1 <- CM.leafArea ln
-                         return (ln, a1)
-                       else return (0, 0)
+    area1 <- if to /= Constants.multicastAllR && to /= Constants.multicastAll
+               then do
+                 ln <- CM.pointLeafNum origin
+                 a1 <- CM.leafArea ln
+                 return a1
+               else return 0
 
     -- if doing a serverrecord, store everything
     demoFile <- use $ svGlobals.svServerStatic.ssDemoFile
@@ -129,11 +130,47 @@ multicast origin to = do
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
     sendDataToRelevantClients reliable area1 mask 0 maxClientsValue
 
+    SZ.clear (svGlobals.svServer.sMulticast)
+
   where sendDataToRelevantClients :: Bool -> Int -> Maybe B.ByteString -> Int -> Int -> Quake ()
         sendDataToRelevantClients reliable area1 mask idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              io (putStrLn "SVSend.multicast#sendDataToRelevantClients") >> undefined -- TODO
+              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
+
+              let shouldSkip = (client^.cState) == Constants.csFree || (client^.cState) == Constants.csZombie || ((client^.cState) /= Constants.csSpawned && not reliable)
+
+              done <- if shouldSkip
+                        then return True
+                        else
+                          if isJust mask
+                            then do
+                              let Just (EdictReference edictIdx) = client^.cEdict
+                              Just orig <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
+                              leafNum <- CM.pointLeafNum orig
+                              cluster <- CM.leafCluster leafNum
+                              area2 <- CM.leafArea leafNum
+                              connected <- CM.areasConnected area1 area2
+
+                              let maskStuff = if isJust mask
+                                                then let Just m = mask
+                                                     in (B.index m (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) == 0
+                                                else False
+
+                              if not connected || cluster == -1 {- quake2 bugfix -} || maskStuff
+                                then return True
+                                else return False
+                            else return False
+
+              unless done $ do
+                buf <- use $ svGlobals.svServer.sMulticast.sbData
+                len <- use $ svGlobals.svServer.sMulticast.sbCurSize
+
+                if reliable
+                  then SZ.write (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage) buf len
+                  else SZ.write (svGlobals.svServerStatic.ssClients.ix idx.cDatagram) buf len
+
+              sendDataToRelevantClients reliable area1 mask (idx + 1) maxIdx
 
 {-
 ==================
