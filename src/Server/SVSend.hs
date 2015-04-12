@@ -12,6 +12,7 @@ import Control.Monad (when, unless, liftM, void)
 import Linear.V3 (V3(..))
 import System.IO (hClose)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
 import Quake
@@ -19,6 +20,7 @@ import QuakeState
 import CVarVariables
 import Util.Binary
 import qualified Constants
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
@@ -82,7 +84,56 @@ MULTICAST_PHS	send to clients potentially hearable from org
 =================
 -}
 multicast :: V3 Float -> Int -> Quake ()
-multicast _ _ = io (putStrLn "SVsend.multicast") >> undefined -- TODO
+multicast origin to = do
+    (lNum, area1) <- if to /= Constants.multicastAllR && to /= Constants.multicastAll
+                       then do
+                         ln <- CM.pointLeafNum origin
+                         a1 <- CM.leafArea ln
+                         return (ln, a1)
+                       else return (0, 0)
+
+    -- if doing a serverrecord, store everything
+    demoFile <- use $ svGlobals.svServerStatic.ssDemoFile
+    when (isJust demoFile) $ do
+      buf <- use $ svGlobals.svServer.sMulticast.sbData
+      len <- use $ svGlobals.svServer.sMulticast.sbCurSize
+      SZ.write (svGlobals.svServerStatic.ssDemoMulticast) buf len
+
+    (reliable, mask) <- if | to == Constants.multicastAllR -> return (True, Nothing)
+                           | to == Constants.multicastAll -> return (False, Nothing)
+                           | to == Constants.multicastPhsR -> do
+                               ln <- CM.pointLeafNum origin
+                               c <- CM.leafCluster ln
+                               m <- CM.clusterPHS c
+                               return (True, Just m)
+                           | to == Constants.multicastPhs -> do
+                               ln <- CM.pointLeafNum origin
+                               c <- CM.leafCluster ln
+                               m <- CM.clusterPHS c
+                               return (False, Just m)
+                           | to == Constants.multicastPvsR -> do
+                               ln <- CM.pointLeafNum origin
+                               c <- CM.leafCluster ln
+                               m <- CM.clusterPVS c
+                               return (True, Just m)
+                           | to == Constants.multicastPvs -> do
+                               ln <- CM.pointLeafNum origin
+                               c <- CM.leafCluster ln
+                               m <- CM.clusterPVS c
+                               return (False, Just m)
+                           | otherwise -> do
+                               Com.comError Constants.errFatal ("SV_Multicast: bad to:" `B.append` (BC.pack $ show to) `B.append` "\n") -- IMPROVE
+                               return (False, Nothing)
+
+    -- send the data to all relevant clients
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+    sendDataToRelevantClients reliable area1 mask 0 maxClientsValue
+
+  where sendDataToRelevantClients :: Bool -> Int -> Maybe B.ByteString -> Int -> Int -> Quake ()
+        sendDataToRelevantClients reliable area1 mask idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              io (putStrLn "SVSend.multicast#sendDataToRelevantClients") >> undefined -- TODO
 
 {-
 ==================

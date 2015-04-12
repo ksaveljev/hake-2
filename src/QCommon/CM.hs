@@ -1210,3 +1210,12 @@ headnodeForBox mins maxs = do
       ix (boxHeadNode + 11).cpDist .= (- (mins^._z))
 
     return boxHeadNode
+
+pointLeafNum :: V3 Float -> Quake Int
+pointLeafNum _ = io (putStrLn "CM.pointLeafNum") >> undefined -- TODO
+
+clusterPVS :: Int -> Quake B.ByteString
+clusterPVS _ = io (putStrLn "CM.clusterPVS") >> undefined -- TODO
+
+clusterPHS :: Int -> Quake B.ByteString
+clusterPHS _ = io (putStrLn "CM.clusterPHS") >> undefined -- TODO
