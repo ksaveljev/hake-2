@@ -1,15 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.MSG where
 
-import Control.Lens (ASetter', Traversal')
-import Data.Bits ((.&.), shiftR)
+import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
+import Data.Bits ((.&.), shiftR, shiftL, (.|.))
+import Data.Int (Int16, Int32)
 import Data.Word (Word8)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
+import qualified QCommon.Com as Com
 import qualified QCommon.SZ as SZ
 
 -- IMPROVE: use binary package for conversion to ByteString?
@@ -62,3 +65,48 @@ writeAngle _ _ = io (putStrLn "MSG.writeAngle") >> undefined -- TODO
 
 writeAngle16 :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle16 _ _ = io (putStrLn "MSG.writeAngle16") >> undefined -- TODO
+
+--
+-- reading functions
+--
+
+beginReading :: Lens' QuakeState SizeBufT -> Quake ()
+beginReading sizeBufLens =
+    sizeBufLens.sbReadCount .= 0
+
+-- IMPROVE: convert bytestring to int using binary package?
+readLong :: Lens' QuakeState SizeBufT -> Quake Int
+readLong sizeBufLens = do
+    sizeBuf <- use $ sizeBufLens
+
+    if (sizeBuf^.sbReadCount) + 4 > (sizeBuf^.sbCurSize)
+      then do
+        Com.printf "buffer underrun in ReadLong!"
+        return (-1)
+      else do
+        let buf = sizeBuf^.sbData
+            readCount = sizeBuf^.sbReadCount
+            a :: Int32 = fromIntegral $ B.index buf readCount
+            b :: Int32 = fromIntegral $ B.index buf (readCount + 1)
+            c :: Int32 = fromIntegral $ B.index buf (readCount + 2)
+            d :: Int32 = fromIntegral $ B.index buf (readCount + 3)
+            result = a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)
+        sizeBufLens.sbReadCount += 4
+        return $ fromIntegral result 
+
+readShort :: Lens' QuakeState SizeBufT -> Quake Int16
+readShort sizeBufLens = do
+    sizeBuf <- use $ sizeBufLens
+
+    if (sizeBuf^.sbReadCount) + 2 > (sizeBuf^.sbCurSize)
+      then do
+        Com.printf "buffer underrun in ReadLong!"
+        return (-1)
+      else do
+        let buf = sizeBuf^.sbData
+            readCount = sizeBuf^.sbReadCount
+            a :: Int16 = fromIntegral $ B.index buf readCount
+            b :: Int16 = fromIntegral $ B.index buf (readCount + 1)
+            result = a .|. (b `shiftL` 8)
+        sizeBufLens.sbReadCount += 2
+        return $ fromIntegral result 

@@ -5,7 +5,7 @@
 module Server.SVMain where
 
 import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal', ix)
-import Control.Monad (void, when, liftM)
+import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
@@ -27,6 +27,7 @@ import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts as SVEnts
 import qualified Server.SVGame as SVGame
 import {-# SOURCE #-} qualified Server.SVSend as SVSend
+import qualified Server.SVUser as SVUser
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
@@ -239,7 +240,56 @@ checkTimeouts = do
 
 -- Reads packets from the network or loopback
 readPackets :: Quake ()
-readPackets = io (putStrLn "SVMain.readPackets") >> undefined -- TODO
+readPackets = do
+    readSomething <- NET.getPacket Constants.nsServer (globals.netFrom) (globals.netMessage)
+
+    when readSomething $ do
+      -- check for connectionless packet (0xffffffff) first
+      netMessageData <- liftM (B.take 4) (use $ globals.netMessage.sbData)
+      if netMessageData == B.pack [0xFF, 0xFF, 0xFF, 0xFF]
+        then do
+          connectionlessPacket
+          readPackets
+        else do
+          -- read the qport out of the message so we can fix up
+          -- stupid address translating routers
+          MSG.beginReading (globals.netMessage)
+          void $ MSG.readLong (globals.netMessage) -- sequence number
+          void $ MSG.readLong (globals.netMessage) -- sequence number
+          qport <- MSG.readShort (globals.netMessage)
+
+          -- check for packets from connected clients
+          maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+          idx <- checkClientPackets (fromIntegral qport) 0 maxClientsValue
+
+          unless (idx >= maxClientsValue) $
+            readPackets
+
+  where checkClientPackets :: Int -> Int -> Int -> Quake Int
+        checkClientPackets qport idx maxIdx
+          | idx >= maxIdx = return idx
+          | otherwise = do
+              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
+              netAdr <- use $ globals.netFrom
+
+              -- IMPROVE: first 3 statements can be squashed into one?
+              if | (client^.cState) == Constants.csFree -> checkClientPackets qport (idx + 1) maxIdx
+                 | not (NET.compareBaseAdr netAdr (client^.cNetChan.ncRemoteAddress)) -> checkClientPackets qport (idx + 1) maxIdx
+                 | (client^.cNetChan.ncRemoteQPort) /= qport -> checkClientPackets qport (idx + 1) maxIdx
+                 | otherwise -> do
+                     when ((client^.cNetChan.ncRemoteAddress.naPort) /= (netAdr^.naPort)) $ do
+                       Com.printf "SV_ReadPackets: fixing up a translated port\n"
+                       svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncRemoteAddress.naPort .= (netAdr^.naPort)
+
+                     ok <- NetChannel.process (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) (globals.netMessage)
+                     when ok $
+                       -- this is a valid, sequenced packet, so process it
+                       when ((client^.cState) /= Constants.csZombie) $ do
+                         realTime <- use $ svGlobals.svServerStatic.ssRealTime
+                         svGlobals.svServerStatic.ssClients.ix idx.cLastMessage .= realTime -- don't timeout
+                         SVUser.executeClientMessage idx
+
+                     return idx
 
 -- Updates the cl.ping variables
 calcPings :: Quake ()
@@ -300,3 +350,6 @@ masterHeartbeat = do
 -}
 prepWorldFrame :: Quake ()
 prepWorldFrame = io (putStrLn "SVMain.prepWorldFrame") >> undefined -- TODO
+
+connectionlessPacket :: Quake ()
+connectionlessPacket = io (putStrLn "SVMain.connectionlessPacket") >> undefined -- TODO

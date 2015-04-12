@@ -158,6 +158,8 @@ data Globals =
           , _keyLinePos         :: Int
           , _editLine           :: Int
 
+          , _netFrom            :: NetAdrT
+
           , _vec3Origin         :: V3 Float
 
           , _rnd                :: StdGen

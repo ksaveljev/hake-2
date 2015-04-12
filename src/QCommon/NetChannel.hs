@@ -2,7 +2,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.NetChannel where
 
-import Control.Lens (Traversal')
+import Control.Lens (Traversal', Lens')
 import Control.Monad (void)
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
@@ -36,3 +36,10 @@ outOfBandPrint = undefined -- TODO
 -}
 transmit :: Traversal' QuakeState NetChanT -> Int -> B.ByteString -> Quake ()
 transmit _ _ _ = io (putStrLn "NetChannel.transmit") >> undefined -- TODO
+
+{-
+- Netchan_Process is called when the current net_message is from remote_address modifies
+- net_message so that it points to the packet payload.
+-}
+process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
+process _ _ = io (putStrLn "NetChannel.process") >> undefined -- TODO

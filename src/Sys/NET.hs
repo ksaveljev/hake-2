@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE MultiWayIf #-}
 module Sys.NET where
 
+import Control.Exception (handle, IOException)
+import Control.Lens (use, (^.), _1, _2, (.=), Lens')
+import Control.Monad (when)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Control.Lens (use, (^.), _1, _2, (.=))
-import Control.Monad (when)
-import Control.Exception (handle, IOException)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
@@ -114,3 +116,14 @@ stringToAdr s = do
 -- Returns a string holding ip address and port like "ip0.ip1.ip2.ip3:port".
 adrToString :: NetAdrT -> B.ByteString
 adrToString _ = undefined -- TODO -- putStrLn for grep
+
+getPacket :: Int -> Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Quake Bool
+getPacket _ _ _ = io (putStrLn "NET.getPacket") >> undefined -- TODO
+
+-- Compares ip address without the port
+compareBaseAdr :: NetAdrT -> NetAdrT -> Bool
+compareBaseAdr a b =
+    if | (a^.naType) /= (b^.naType) -> False
+       | (a^.naType) == Constants.naLoopback -> True
+       | (a^.naType) == Constants.naIp -> (a^.naIP) == (b^.naIP) -- TODO: verify it works?
+       | otherwise -> False

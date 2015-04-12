@@ -24,6 +24,7 @@ import Client.ConsoleT
 import Client.RefExportT
 import Game.CmdAliasT
 import Game.CVarT
+import QCommon.NetAdrT
 import QCommon.SizeBufT
 
 import Internal
@@ -71,6 +72,8 @@ initialGlobals =
           , _keyLines           = V.empty
           , _keyLinePos         = 0
           , _editLine           = 0
+
+          , _netFrom            = newNetAdrT
 
           , _vec3Origin         = V3 0 0 0
 
