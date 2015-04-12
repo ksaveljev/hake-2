@@ -44,7 +44,7 @@ write :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len = do
     idx <- getSpace bufLens len
     oldData <- use $ bufLens.sbData
-    let updatedData = B.take idx oldData `B.append` bufData `B.append` B.drop (idx + len) oldData
+    let updatedData = B.take idx oldData `B.append` bufData --`B.append` B.drop (idx + len) oldData
     bufLens.sbData .= updatedData
 
 print :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()

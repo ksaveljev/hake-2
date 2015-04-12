@@ -1,27 +1,39 @@
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.MSG where
 
-import Control.Lens (ASetter')
+import Control.Lens (ASetter', Traversal')
+import Data.Bits ((.&.), shiftR)
+import Data.Word (Word8)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
+import qualified QCommon.SZ as SZ
 
-writeCharI :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
-writeCharI _ _ = io (putStrLn "MSG.writeCharI") >> undefined -- TODO
+-- IMPROVE: use binary package for conversion to ByteString?
 
-writeCharF :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
-writeCharF _ _ = io (putStrLn "MSG.writeCharF") >> undefined -- TODO
+writeCharI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeCharI = writeByteI
 
-writeByteI :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
-writeByteI _ _ = io (putStrLn "MSG.writeByteI") >> undefined -- TODO
+writeCharF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeCharF = writeByteF
 
-writeByteF :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
-writeByteF _ _ = io (putStrLn "MSG.writeByteF") >> undefined -- TODO
+writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeByteI sizeBufLens c = do
+    let cw8 :: Word8 = fromIntegral (c .&. 0xFF)
+    SZ.write sizeBufLens (B.pack [cw8]) 1
 
-writeShort :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
-writeShort _ _ = io (putStrLn "MSG.writeShort") >> undefined -- TODO
+writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeByteF sizeBufLens c = do
+    writeByteI sizeBufLens (truncate c)
+
+writeShort :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeShort sizeBufLens c = do
+    let a :: Word8 = fromIntegral (c .&. 0xFF)
+        b :: Word8 = fromIntegral ((c `shiftR` 8) .&. 0xFF)
+    SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeInt :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
 writeInt _ _ = io (putStrLn "MSG.writeInt") >> undefined -- TODO
@@ -32,8 +44,9 @@ writeLong _ _ = io (putStrLn "MSG.writeLong") >> undefined -- TODO
 writeFloat :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeFloat _ _ = io (putStrLn "MSG.writeFloat") >> undefined -- TODO
 
-writeString :: ASetter' QuakeState SizeBufT -> B.ByteString -> Quake ()
-writeString _ _ = io (putStrLn "MSG.writeString") >> undefined -- TODO
+writeString :: Traversal' QuakeState SizeBufT -> B.ByteString -> Quake ()
+writeString sizeBufLens s = do
+    SZ.write sizeBufLens s (B.length s)
 
 writeCoord :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeCoord _ _ = io (putStrLn "MSG.writeCoord") >> undefined -- TODO
