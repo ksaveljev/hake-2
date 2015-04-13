@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sys.LoopbackT where
+module Sys.LoopbackT ( module Sys.LoopbackT
+                     , module Sys.LoopMsgT
+                     ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V

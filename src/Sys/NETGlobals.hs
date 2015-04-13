@@ -6,14 +6,14 @@ module Sys.NETGlobals ( module Sys.NETGlobals
 import Control.Lens (makeLenses)
 
 import Internal
-import QCommon.NetAdrT
 import Sys.LoopbackT
 
 makeLenses ''NETGlobals
 
 initialNETGlobals :: NETGlobals
 initialNETGlobals =
-  NETGlobals { _ngLoopbacks   = (newLoopbackT, newLoopbackT)
-             , _ngIpSockets   = (Nothing, Nothing)
-             , _ngNetLocalAdr = newNetAdrT
+  NETGlobals { _ngLoopbackClient = newLoopbackT
+             , _ngLoopbackServer = newLoopbackT
+             , _ngIpSocketClient = Nothing
+             , _ngIpSocketServer = Nothing
              }

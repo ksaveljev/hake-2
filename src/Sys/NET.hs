@@ -5,14 +5,16 @@
 module Sys.NET where
 
 import Control.Exception (handle, IOException)
-import Control.Lens (use, (^.), _1, _2, (.=), Lens')
-import Control.Monad (when)
+import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
+import Control.Monad (when, void)
+import Data.Bits ((.&.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
+import qualified Network.Socket.ByteString as NSB
 
 import Quake
 import QuakeState
@@ -20,6 +22,13 @@ import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Util.Lib as Lib
+
+maxLoopback :: Int
+maxLoopback = 4
+
+-- local loopback address
+netLocalAdr :: NetAdrT
+netLocalAdr = newNetAdrT
 
 init :: Quake ()
 init = return () -- nothing to do
@@ -30,12 +39,17 @@ config multiplayer =
     if multiplayer
       then openIP
       else do
-        ipSockets <- use $ netGlobals.ngIpSockets
-        when (isJust (ipSockets^._1)) $
-          io $ NS.close (fromJust $ ipSockets^._1) -- IMPROVE: catch exceptions if any?
-        when (isJust (ipSockets^._2)) $
-          io $ NS.close (fromJust $ ipSockets^._2) -- IMPROVE: catch exceptions if any?
-        netGlobals.ngIpSockets .= (Nothing, Nothing)
+        -- shut down any existing sockets
+        ipSocketClient <- use $ netGlobals.ngIpSocketClient
+        ipSocketServer <- use $ netGlobals.ngIpSocketServer
+
+        when (isJust (ipSocketClient)) $ do
+          io $ NS.close (fromJust $ ipSocketClient) -- IMPROVE: catch exceptions if any?
+          netGlobals.ngIpSocketClient .= Nothing
+
+        when (isJust (ipSocketServer)) $ do
+          io $ NS.close (fromJust $ ipSocketServer) -- IMPROVE: catch exceptions if any?
+          netGlobals.ngIpSocketServer .= Nothing
 
 openIP :: Quake ()
 openIP = do
@@ -43,19 +57,21 @@ openIP = do
     Just ip <- CVar.get "ip" "localhost" Constants.cvarNoSet
     Just clientport <- CVar.get "clientport" (BC.pack $ show Constants.portClient) Constants.cvarNoSet -- IMPROVE: convert Int to ByteString using binary package?
 
-    ipSockets <- use $ netGlobals.ngIpSockets
+    ipSocketClient <- use $ netGlobals.ngIpSocketClient
+    ipSocketServer <- use $ netGlobals.ngIpSocketServer
 
-    when (isNothing (ipSockets^._2)) $ do -- _2 corresponds to Constants.nsServer
+    when (isNothing (ipSocketServer)) $ do
       s <- socket (ip^.cvString) (truncate (port^.cvValue))
-      netGlobals.ngIpSockets._2 .= s
-    when (isNothing (ipSockets^._1)) $ do -- _1 corresponds to Constants.nsClient
+      netGlobals.ngIpSocketServer .= s
+
+    when (isNothing (ipSocketClient)) $ do
       s <- socket (ip^.cvString) (truncate (clientport^.cvValue))
       if isNothing s
         then do
           newS <- socket (ip^.cvString) (Constants.portAny)
-          netGlobals.ngIpSockets._1 .= newS
+          netGlobals.ngIpSocketClient .= newS
         else
-          netGlobals.ngIpSockets._1 .= s
+          netGlobals.ngIpSocketClient .= s
 
 socket :: B.ByteString -> Int -> Quake (Maybe NS.Socket)
 socket ip port = do
@@ -95,8 +111,7 @@ stringToAdr s = do
         address = BC.split ':' s
 
     if sLow == "localhost" || sLow == "loopback"
-      then do
-        netLocalAdr <- use $ netGlobals.ngNetLocalAdr
+      then
         return $ Just netLocalAdr
       else do
         parsedData <- io $ handle (\(e :: IOException) -> return $ Left e) $ do
@@ -117,8 +132,24 @@ stringToAdr s = do
 adrToString :: NetAdrT -> B.ByteString
 adrToString _ = undefined -- TODO -- putStrLn for grep
 
+-- Gets a packet from a network channel
 getPacket :: Int -> Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Quake Bool
-getPacket _ _ _ = io (putStrLn "NET.getPacket") >> undefined -- TODO
+getPacket sock netFromLens netMessageLens = do
+    done <- if sock == Constants.nsClient
+              then getLoopPacket (netGlobals.ngLoopbackClient) netFromLens netMessageLens
+              else getLoopPacket (netGlobals.ngLoopbackServer) netFromLens netMessageLens
+
+    if sock == Constants.nsClient
+      then getNetworkPacket done (netGlobals.ngIpSocketClient)
+      else getNetworkPacket done (netGlobals.ngIpSocketServer)
+
+  where getNetworkPacket :: Bool -> Lens' QuakeState (Maybe NS.Socket) -> Quake Bool
+        getNetworkPacket done socketLens = do
+          s <- use socketLens
+          if | done -> return True
+             | isNothing s -> return False
+             | otherwise -> do
+                 return False -- io (putStrLn "NET.getPacket") >> undefined -- TODO
 
 -- Compares ip address without the port
 compareBaseAdr :: NetAdrT -> NetAdrT -> Bool
@@ -127,3 +158,32 @@ compareBaseAdr a b =
        | (a^.naType) == Constants.naLoopback -> True
        | (a^.naType) == Constants.naIp -> (a^.naIP) == (b^.naIP) -- TODO: verify it works?
        | otherwise -> False
+
+-- Gets a packet from internal loopback.
+getLoopPacket :: Lens' QuakeState LoopbackT -> Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Quake Bool
+getLoopPacket loopbackLens netFromLens netMessageLens = do
+    checkLoopbackSendGet
+
+    loop <- use loopbackLens
+
+    if (loop^.lGet >= loop^.lSend)
+      then return False
+      else do
+        let idx = (loop^.lGet) .&. (maxLoopback - 1)
+        loopbackLens.lGet += 1
+
+        Just msg <- preuse $ loopbackLens.lMsgs.ix idx
+        let buf = B.take (msg^.lmDataLen) (msg^.lmData)
+        netMessageLens.sbData .= buf
+        netMessageLens.sbCurSize .= (msg^.lmDataLen)
+
+        netFromLens .= netLocalAdr
+        return True
+
+  where checkLoopbackSendGet :: Quake ()
+        checkLoopbackSendGet = do
+          loop <- use loopbackLens
+
+          when ((loop^.lSend) - (loop^.lGet) > maxLoopback) $
+            loopbackLens.lGet .= (loop^.lSend) - maxLoopback
+
