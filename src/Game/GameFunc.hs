@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameFunc where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -761,10 +762,34 @@ moveCalc er@(EdictReference edictIdx) dest func = do
 
 moveBegin :: EntThink
 moveBegin =
-  GenericEntThink "move_begin" $ \_ -> do
-    io (putStrLn "GameFun.moveBegin") >> undefined -- TODO
+  GenericEntThink "move_begin" $ \edictRef@(EdictReference edictIdx) -> do
+    Just moveInfo <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo
+
+    if (moveInfo^.miSpeed) * Constants.frameTime >= (moveInfo^.miRemainingDistance)
+      then do
+        void $ think moveFinal edictRef
+        return True
+      else do
+        let velocity = fmap (* (moveInfo^.miSpeed)) (moveInfo^.miDir)
+            frames :: Int = floor $ ((moveInfo^.miRemainingDistance) / (moveInfo^.miSpeed)) / Constants.frameTime
+            framesF :: Float = fromIntegral frames
+
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictPhysics.eVelocity .= velocity
+          eMoveInfo.miRemainingDistance -= framesF * (moveInfo^.miSpeed) * Constants.frameTime
+          eEdictAction.eaNextThink .= time + (framesF * Constants.frameTime)
+          eEdictAction.eaThink .= Just moveFinal
+
+        return True
 
 thinkAccelMove :: EntThink
 thinkAccelMove =
   GenericEntThink "think_accelmove" $ \_ -> do
     io (putStrLn "GameFunc.thinkAccelMove") >> undefined -- TODO
+
+moveFinal :: EntThink
+moveFinal =
+  GenericEntThink "move_final" $ \_ -> do
+    io (putStrLn "GameFunc.moveFinal") >> undefined -- TODO
