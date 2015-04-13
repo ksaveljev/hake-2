@@ -442,7 +442,17 @@ masterHeartbeat = do
 - happens outside RunWorldFrame.
 -}
 prepWorldFrame :: Quake ()
-prepWorldFrame = io (putStrLn "SVMain.prepWorldFrame") >> undefined -- TODO
+prepWorldFrame = do
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+    resetEdictEvent 0 numEdicts
+
+  where resetEdictEvent :: Int -> Int -> Quake ()
+        resetEdictEvent idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              -- events only last for a single message
+              gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esEvent .= 0
+              resetEdictEvent (idx + 1) maxIdx
 
 connectionlessPacket :: Quake ()
 connectionlessPacket = io (putStrLn "SVMain.connectionlessPacket") >> undefined -- TODO
