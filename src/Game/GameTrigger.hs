@@ -6,6 +6,7 @@ import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom)
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
+import Linear (dot)
 import qualified Data.ByteString as B
 
 import Quake
@@ -15,6 +16,7 @@ import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 spTriggerMultiple :: EdictReference -> Quake ()
 spTriggerMultiple er@(EdictReference edictIdx) = do
@@ -127,8 +129,35 @@ triggerRelayUse =
 
 touchMulti :: EntTouch
 touchMulti =
-  GenericEntTouch "Touch_Multi" $ \_ _ _ _ -> do
-    io (putStrLn "GameTrigger.touchMulti") >> undefined -- TODO
+  GenericEntTouch "Touch_Multi" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    done <- shouldReturn edictRef otherRef
+
+    unless done $ do
+      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+      vec3origin <- use $ globals.vec3Origin
+
+      done' <- if (edict^.eEdictPhysics.eMoveDir) /= vec3origin
+                 then do
+                   let (Just forward, _, _) = Math3D.angleVectors (other^.eEntityState.esAngles) True False False
+                   if dot forward (edict^.eEdictPhysics.eMoveDir) < 0
+                     then return True
+                     else return False
+                 else
+                   return False
+
+      unless done' $ do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoActivator .= Just otherRef
+        multiTrigger edictRef
+
+  where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
+        shouldReturn (EdictReference edictIdx) (EdictReference otherIdx) = do
+          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          if | isJust (other^.eClient) -> return $ if spawnFlags .&. 2 /= 0 then True else False
+             | (other^.eSvFlags) .&. Constants.svfMonster /= 0 -> return $ if spawnFlags .&. 1 == 0 then True else False
+             | otherwise -> return True
 
 triggerEnable :: EntUse
 triggerEnable =
@@ -139,3 +168,9 @@ useMulti :: EntUse
 useMulti =
   GenericEntUse "Use_Multi" $ \_ _ _ -> do
     io (putStrLn "GameTrigger.useMulti") >> undefined -- TODO
+
+-- the trigger was just activated
+-- ent.activator should be set to the activator so it can be held through a
+-- delay so wait for the delay time before firing
+multiTrigger :: EdictReference -> Quake ()
+multiTrigger _ = io (putStrLn "GameTrigger.multiTrigger") >> undefined -- TODO
