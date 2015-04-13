@@ -7,7 +7,7 @@ module Sys.NET where
 import Control.Concurrent (threadDelay)
 import Control.Exception (handle, IOException)
 import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
-import Control.Monad (when, void, liftM, unless)
+import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -15,7 +15,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
-import qualified Network.Socket.ByteString as NSB
 
 import Quake
 import QuakeState

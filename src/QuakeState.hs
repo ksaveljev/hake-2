@@ -27,6 +27,7 @@ module QuakeState ( QuakeState(..)
                   , EntBlockedAdapter(..)
                   , EntTouchAdapter(..)
                   , EntUseAdapter(..)
+                  , EntInteractAdapter(..)
                   , module Globals
                   , module QCommon.CMGlobals
                   , module QCommon.ComGlobals

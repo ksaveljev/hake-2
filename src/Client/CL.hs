@@ -71,7 +71,7 @@ writeConfiguration = do
         CVar.writeVariables path
 
 frame :: Int -> Quake ()
-frame msec = do
+frame _ = do
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     unless (dedicatedValue /= 0) $ do

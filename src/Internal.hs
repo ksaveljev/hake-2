@@ -982,7 +982,7 @@ class SuperAdapter a where
     getID :: a -> B.ByteString
 
 class EntInteractAdapter a where
-    interact :: a -> EdictReference -> EdictReference -> Quake Bool
+    entInteract :: a -> EdictReference -> EdictReference -> Quake Bool
 
 class EntThinkAdapter a where
     think :: a -> EdictReference -> Quake Bool
@@ -1115,12 +1115,12 @@ instance SuperAdapter AI where
     getID (GenericAI _id _) = _id
 
 instance EntInteractAdapter EntInteract where
-    interact (PickupArmor _ _interact) = _interact
-    interact (PickupPowerArmor _ _interact) = _interact
-    interact (PickupHealth _ _interact) = _interact
-    interact (PickupAdrenaline _ _interact) = _interact
-    interact (PickupAncientHead _ _interact) = _interact
-    interact (GenericEntInteract _ _interact) = _interact
+    entInteract (PickupArmor _ _interact) = _interact
+    entInteract (PickupPowerArmor _ _interact) = _interact
+    entInteract (PickupHealth _ _interact) = _interact
+    entInteract (PickupAdrenaline _ _interact) = _interact
+    entInteract (PickupAncientHead _ _interact) = _interact
+    entInteract (GenericEntInteract _ _interact) = _interact
 
 instance EntThinkAdapter EntThink where
     think (GenericEntThink _ _think) = _think

@@ -4,7 +4,7 @@
 module Game.GameItems where
 
 import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), zoom)
-import Control.Monad (when, void, liftM)
+import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Char (toLower)
 import Data.Maybe (fromJust, isNothing, isJust)
@@ -481,8 +481,94 @@ dropToFloor =
 
 touchItem :: EntTouch
 touchItem =
-  GenericEntTouch "touch_item" $ \_ _ _ _ -> do
-    io (putStrLn "GameItems.touchItem") >> undefined -- TODO
+  GenericEntTouch "touch_item" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let imageIndex = gameImport^.giImageIndex
+        sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+
+    done <- shouldReturn edictRef otherRef
+
+    unless done $ do
+      taken <- runItemInteract edictRef otherRef
+
+      when taken $ do
+        -- flash the screen
+        Just otherClientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eClient
+        let Just (GClientReference otherClientIdx) = otherClientRef
+        gameBaseGlobals.gbGame.glClients.ix otherClientIdx.gcBonusAlpha .= 0.25
+
+        -- show icon and name on status bar
+        Just itemRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eItem
+        let Just (GItemReference itemIdx) = itemRef
+        Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
+        icon <- imageIndex (fromJust $ item^.giIcon)
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGame.glClients.ix otherClientIdx) $ do
+          gcPlayerState.psStats.ix (Constants.statPickupIcon) .= fromIntegral icon
+          gcPlayerState.psStats.ix (Constants.statPickupString) .= fromIntegral (Constants.csItems + (item^.giIndex))
+          gcPickupMsgTime .= time + 3
+
+        -- change selected item
+        when (isJust $ item^.giUse) $ do
+          zoom (gameBaseGlobals.gbGame.glClients.ix otherClientIdx) $ do
+            gcPers.cpSelectedItem .= (item^.giIndex)
+            gcPlayerState.psStats.ix (Constants.statSelectedItem) .= fromIntegral (item^.giIndex)
+
+        case item^.giPickup of
+          Just (PickupHealth _ _) -> do
+            Just count <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eCount
+
+            soundIdx <- if | count == 2 -> soundIndex "items/s_health.wav"
+                           | count == 10 -> soundIndex "items/n_health.wav"
+                           | count == 25 -> soundIndex "items/l_health.wav"
+                           | otherwise -> soundIndex "items/m_health.wav"
+
+            sound otherRef Constants.chanItem soundIdx 1 (fromIntegral Constants.attnNorm) 0
+
+          _ -> do
+            when (isJust $ item^.giPickupSound) $ do
+              pickupSound <- soundIndex (fromJust $ item^.giPickupSound)
+              sound otherRef Constants.chanItem pickupSound 1 (fromIntegral Constants.attnNorm) 0
+
+      Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+      when ((spawnFlags .&. Constants.itemTargetsUsed) == 0) $ do
+        GameUtil.useTargets edictRef (Just otherRef)
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. Constants.itemTargetsUsed)
+
+      when (taken) $ do
+        coopValue <- liftM (^.cvValue) coopCVar
+        Just itemRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eItem
+        let Just (GItemReference itemIdx) = itemRef
+        Just itemFlags <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giFlags
+        Just updatedSpawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+        when (not (coopValue /= 0 && (itemFlags .&. Constants.itStayCoop) /= 0) || (updatedSpawnFlags .&. (Constants.droppedItem .|. Constants.droppedPlayerItem)) /= 0) $ do
+          Just flags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags
+          if flags .&. Constants.flRespawn /= 0
+            then gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flRespawn))
+            else GameUtil.freeEdict edictRef
+
+  where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
+        shouldReturn (EdictReference edictIdx) (EdictReference otherIdx) = do
+          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+          Just itemRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eItem
+          let Just (GItemReference itemIdx) = itemRef
+          Just pickup <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giPickup
+                                           -- dead people can't pickup          -- not a grabbable item?
+          if isNothing (other^.eClient) || (other^.eEdictStatus.eHealth) < 1 || isNothing pickup
+            then return True
+            else return False
+
+        runItemInteract :: EdictReference -> EdictReference -> Quake Bool
+        runItemInteract edictRef@(EdictReference edictIdx) otherRef = do
+          Just itemRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eItem
+          let Just (GItemReference itemIdx) = itemRef
+          Just pickup <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giPickup
+
+          entInteract (fromJust pickup) edictRef otherRef
 
 doRespawn :: EntThink
 doRespawn =
