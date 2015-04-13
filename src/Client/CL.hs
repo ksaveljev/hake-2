@@ -71,7 +71,11 @@ writeConfiguration = do
         CVar.writeVariables path
 
 frame :: Int -> Quake ()
-frame _ = io (putStrLn "CL.frame") >> undefined -- TODO
+frame msec = do
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+
+    unless (dedicatedValue /= 0) $ do
+      io (putStrLn "CL.frame") >> undefined -- TODO
 
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()

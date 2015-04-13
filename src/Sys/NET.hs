@@ -4,9 +4,10 @@
 {-# LANGUAGE MultiWayIf #-}
 module Sys.NET where
 
+import Control.Concurrent (threadDelay)
 import Control.Exception (handle, IOException)
 import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
-import Control.Monad (when, void)
+import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -18,6 +19,7 @@ import qualified Network.Socket.ByteString as NSB
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -187,3 +189,12 @@ getLoopPacket loopbackLens netFromLens netMessageLens = do
           when ((loop^.lSend) - (loop^.lGet) > maxLoopback) $
             loopbackLens.lGet .= (loop^.lSend) - maxLoopback
 
+-- Sleeps msec or until net socket is ready
+sleep :: Int -> Quake ()
+sleep msec = do
+    ipSocketServer <- use $ netGlobals.ngIpSocketServer
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+
+    -- when we are not a server, just run full speed
+    unless (isNothing ipSocketServer || dedicatedValue == 0) $
+      io (threadDelay $ msec * 1000)

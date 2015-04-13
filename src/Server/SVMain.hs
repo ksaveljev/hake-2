@@ -170,28 +170,43 @@ frame msec = do
       readPackets
 
       -- move autonomous things around if enough time has passed
-      void $ io (putStrLn "SVMain.frame") >> undefined -- TODO
+      timeDemoValue <- liftM (^.cvValue) svTimeDemoCVar
+      realTime <- use $ svGlobals.svServerStatic.ssRealTime
+      time <- use $ svGlobals.svServer.sTime
 
-      -- update ping based on the last known frame from all clients
-      calcPings
+      if timeDemoValue == 0 && realTime < time
+        then do
+          when (time - realTime > 100) $ do
+            showClampValue <- liftM (^.cvValue) svShowClampCVar
 
-      -- give the clients some timeslices
-      giveMsec
+            when (showClampValue /= 0) $
+              Com.printf "sv lowclamp\n"
+            svGlobals.svServerStatic.ssRealTime .= time - 100
 
-      -- let everything in the world think and move
-      runGameFrame
+          updatedRealTime <- use $ svGlobals.svServerStatic.ssRealTime
+          NET.sleep (time - updatedRealTime)
 
-      -- send messages back to the clients that had packets read this frame
-      SVSend.sendClientMessages
+        else do
+          -- update ping based on the last known frame from all clients
+          calcPings
 
-      -- save the entire world state if recording a serverdemo
-      SVEnts.recordDemoMessage
+          -- give the clients some timeslices
+          giveMsec
 
-      -- send a heartbeat to the master if needed
-      masterHeartbeat
+          -- let everything in the world think and move
+          runGameFrame
 
-      -- clear teleport flags, etc for next frame
-      prepWorldFrame
+          -- send messages back to the clients that had packets read this frame
+          SVSend.sendClientMessages
+
+          -- save the entire world state if recording a serverdemo
+          SVEnts.recordDemoMessage
+
+          -- send a heartbeat to the master if needed
+          masterHeartbeat
+
+          -- clear teleport flags, etc for next frame
+          prepWorldFrame
 
 {-
 - If a packet has not been received from a client for timeout.value
