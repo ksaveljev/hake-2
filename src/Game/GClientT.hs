@@ -14,7 +14,6 @@ import Internal
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.PlayerStateT
-import Game.PMoveStateT
 
 makeLenses ''GClientT
 

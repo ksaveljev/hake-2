@@ -12,7 +12,7 @@ import qualified Constants
 piRatio :: Float
 piRatio = pi / 360
 
-v3Access :: Int -> (a -> Const Float a) -> V3 a -> Const Float (V3 a)
+v3Access :: Int -> (a -> Const b a) -> V3 a -> Const b (V3 a)
 v3Access v = case v of
                0 -> _x
                1 -> _y

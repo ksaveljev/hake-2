@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.PlayerStateT where
+module Game.PlayerStateT ( module Game.PlayerStateT
+                         , module Game.PMoveStateT
+                         ) where
 
 import Data.Int (Int16)
 import Linear (V3(..), V4(..))

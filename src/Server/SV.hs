@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server.SV where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), zoom)
+import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom)
 import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -15,6 +16,7 @@ import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
+import qualified Util.Math3D as Math3D
 
 {-
 - 
@@ -258,8 +260,97 @@ physicsToss er@(EdictReference edictIdx) = do
           Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix slaveIdx.eEdictOther.eoTeamChain
           moveTeamSlaves origin teamChain
 
+{-
+- Objects need to be moved back on a failed push, otherwise riders would
+- continue to slide.
+-}
 push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
-push _ _ _ = io (putStrLn "SV.push") >> undefined -- TODO
+push pusherRef@(EdictReference pusherIdx) move amove = do
+    -- clamp the move to 1/8 units, so the position will
+    -- be accurate for client side prediction
+    let updatedMove = fmap clampMove move
+
+    -- find the bounding box
+    (mins, maxs) <- findBoundingBox pusherRef updatedMove
+
+    -- we need this for pushing things later
+    vec3origin <- use $ globals.vec3Origin
+    let org = vec3origin - amove
+        (forward, right, up) = Math3D.angleVectors org True True True
+
+    -- save the pusher's origin position
+    savePusherPosition pusherRef
+
+    -- move the pusher to it's final position
+    movePusherToFinalPosition pusherRef updatedMove
+    
+    -- see if any solid entities are inside the final position
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+    done <- checkForSolidEntities 1 numEdicts
+
+    if done
+      then return False
+      else do
+        -- FIXME: is there a better way to handle this?
+        -- see if anything we moved has touched a trigger
+        pushedP <- use $ gameBaseGlobals.gbPushedP
+        checkTriggerTouch (pushedP - 1) 0
+
+        return True
+
+  where clampMove :: Float -> Float
+        clampMove v =
+          let temp = v * 8
+              temp' = if temp > 0 then temp + 0.5 else temp - 0.5
+              temp'' :: Int = truncate temp'
+              temp''' :: Float = fromIntegral temp''
+          in temp''' * 0.125
+
+        findBoundingBox :: EdictReference -> V3 Float -> Quake (V3 Float, V3 Float)
+        findBoundingBox (EdictReference edictIdx) updatedMove = do
+          Just eMinMax <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax
+          return ((eMinMax^.eAbsMin) + updatedMove, (eMinMax^.eAbsMax) + updatedMove)
+
+        savePusherPosition :: EdictReference -> Quake ()
+        savePusherPosition (EdictReference edictIdx) = do
+          pushedP <- use $ gameBaseGlobals.gbPushedP
+          Just pusherEntityState <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState
+
+          zoom (gameBaseGlobals.gbPushed.ix pushedP) $ do
+            pEnt .= Just pusherRef
+            pOrigin .= (pusherEntityState^.esOrigin)
+            pAngles .= (pusherEntityState^.esAngles)
+
+          Just clientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+
+          when (isJust clientRef) $ do
+            let Just (GClientReference clientIdx) = clientRef
+            Just deltaAngles <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx.gcPlayerState.psPMoveState.pmsDeltaAngles
+            gameBaseGlobals.gbPushed.ix pushedP.pDeltaYaw .= fromIntegral (deltaAngles^.(Math3D.v3Access Constants.yaw))
+
+          gameBaseGlobals.gbPushedP += 1
+
+        movePusherToFinalPosition :: EdictReference -> V3 Float -> Quake ()
+        movePusherToFinalPosition er@(EdictReference edictIdx) updatedMove = do
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+            esOrigin %= (+ updatedMove)
+            esAngles %= (+ amove)
+
+          linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+          linkEntity er
+
+        checkForSolidEntities :: Int -> Int -> Quake Bool
+        checkForSolidEntities idx maxIdx
+          | idx >= maxIdx = return False
+          | otherwise = do
+              io (putStrLn "SV.push#checkForSolidEntities") >> undefined -- TODO
+
+        checkTriggerTouch :: Int -> Int -> Quake ()
+        checkTriggerTouch idx minIdx
+          | idx >= minIdx = do
+              Just edictRef <- preuse $ gameBaseGlobals.gbPushed.ix idx.pEnt
+              GameBase.touchTriggers (fromJust edictRef)
+          | otherwise = return ()
 
 {-
 - Runs thinking code for this frame if necessary.
