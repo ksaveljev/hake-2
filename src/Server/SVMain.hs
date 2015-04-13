@@ -308,7 +308,38 @@ readPackets = do
 
 -- Updates the cl.ping variables
 calcPings :: Quake ()
-calcPings = io (putStrLn "SVMain.calcPings") >> undefined -- TODO
+calcPings = do
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+    updateClientPing 0 maxClientsValue
+
+  where updateClientPing :: Int -> Int -> Quake ()
+        updateClientPing idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
+
+              when ((client^.cState) == Constants.csSpawned) $ do
+                (count, total) <- calcFrameLatency idx 0 0 0 Constants.latencyCounts
+
+                let ping = if count == 0 then 0 else total `div` count
+                svGlobals.svServerStatic.ssClients.ix idx.cPing .= ping
+                
+                -- let the game dll know about the ping
+                let Just (EdictReference edictIdx) = client^.cEdict
+                Just gclient <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+                let Just (GClientReference gclientIdx) = gclient
+                gameBaseGlobals.gbGame.glClients.ix gclientIdx.gcPing .= ping
+
+              updateClientPing (idx + 1) maxIdx
+
+        calcFrameLatency :: Int -> Int -> Int -> Int -> Int -> Quake (Int, Int)
+        calcFrameLatency clientIdx count total idx maxIdx
+          | idx >= maxIdx = return (count, total)
+          | otherwise = do
+              Just frameLatency <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cFrameLatency.ix idx
+              if frameLatency > 0
+                then calcFrameLatency clientIdx (count + 1) (total + frameLatency) (idx + 1) maxIdx
+                else calcFrameLatency clientIdx count total (idx + 1) maxIdx
 
 {-
 - Every few frames, gives all clients an allotment of milliseconds for
