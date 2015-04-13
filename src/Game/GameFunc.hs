@@ -449,12 +449,11 @@ funcTrainFind =
       then
         dprintf "train_find: no target\n"
       else do
-        let target = fromJust (edict^.eEdictInfo.eiTarget)
-        entRef <- GameBase.pickTarget target
+        entRef <- GameBase.pickTarget (edict^.eEdictInfo.eiTarget)
 
         if isNothing entRef
           then
-            dprintf $ "train_find: target " `B.append` target `B.append` " not found\n"
+            dprintf $ "train_find: target " `B.append` (fromJust $ edict^.eEdictInfo.eiTarget) `B.append` " not found\n"
           else do
             let Just (EdictReference entIdx) = entRef
             Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
@@ -651,7 +650,7 @@ trainNext =
           if isNothing (self^.eEdictInfo.eiTarget)
             then return (True, Nothing)
             else do
-              entRef <- GameBase.pickTarget (fromJust $ self^.eEdictInfo.eiTarget)
+              entRef <- GameBase.pickTarget (self^.eEdictInfo.eiTarget)
 
               if isNothing entRef
                 then do

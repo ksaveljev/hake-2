@@ -30,4 +30,4 @@ clientEndServerFrames :: Quake ()
 
 runEntity :: EdictReference -> Quake ()
 
-pickTarget :: B.ByteString -> Quake (Maybe EdictReference)
+pickTarget :: Maybe B.ByteString -> Quake (Maybe EdictReference)

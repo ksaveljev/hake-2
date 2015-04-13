@@ -2,11 +2,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameMisc where
 
-import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=))
-import Control.Monad (liftM, when, void)
+import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~))
+import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.))
-import Data.Maybe (isNothing, isJust)
-import Linear (V3(..))
+import Data.Maybe (isNothing, isJust, fromJust)
+import Linear (V3(..), _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -16,6 +16,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -62,8 +63,81 @@ spPathCorner er@(EdictReference edictIdx) = do
 -}
 pathCornerTouch :: EntTouch
 pathCornerTouch =
-  GenericEntTouch "path_corner_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameMisc.pathCornerTouch") >> undefined -- TODO
+  GenericEntTouch "path_corner_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    done <- shouldReturn selfRef otherRef
+
+    unless done $ do
+      saveTarget selfRef otherRef
+      target <- pickTarget selfRef
+
+      nextTarget <- if isJust target
+                      then pickNextTarget (fromJust target) otherRef
+                      else return Nothing
+
+      zoom (gameBaseGlobals.gbGEdicts.ix otherIdx) $ do
+        eGoalEntity .= nextTarget
+        eMoveTarget .= nextTarget
+
+      Just wait <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eWait
+      if wait /= 0
+        then do
+          time <- use $ gameBaseGlobals.gbLevel.llTime
+          Just stand <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miStand
+          gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miPauseTime .= time + wait
+          void $ think (fromJust stand) otherRef
+        else do
+          Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMoveTarget
+
+          if isNothing moveTarget
+            then do
+              time <- use $ gameBaseGlobals.gbLevel.llTime
+              Just stand <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miStand
+              gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miPauseTime .= time + 100000000
+              void $ think (fromJust stand) otherRef
+            else do
+              io (putStrLn "GameMisc.pathCornerTouch") >> undefined -- TODO
+
+  where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
+        shouldReturn selfRef (EdictReference otherIdx) = do
+          Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMoveTarget
+          Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eEdictOther.eoEnemy
+
+          if moveTarget /= (Just selfRef) || isJust enemy
+            then return True
+            else return False
+
+        saveTarget :: EdictReference -> EdictReference -> Quake ()
+        saveTarget selfRef@(EdictReference selfIdx) otherRef = do
+          Just edictInfo <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo
+          let target = edictInfo^.eiTarget
+          
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= edictInfo^.eiPathTarget
+          GameUtil.useTargets selfRef (Just otherRef)
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= target
+
+        pickTarget :: EdictReference -> Quake (Maybe EdictReference)
+        pickTarget (EdictReference selfIdx) = do
+          Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget
+          if isJust target
+            then GameBase.pickTarget target
+            else return Nothing
+
+        pickNextTarget :: EdictReference -> EdictReference -> Quake (Maybe EdictReference)
+        pickNextTarget edictRef@(EdictReference edictIdx) (EdictReference otherIdx) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          if (edict^.eSpawnFlags) .&. 1 /= 0
+            then do
+              Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+              let v = edict^.eEntityState.esOrigin
+                  -- v[2] += next.mins[2];
+                  -- v[2] -= other.mins[2];
+                  v' = v & _z +~ ((edict^.eEdictMinMax.eMins._z) - (other^.eEdictMinMax.eMins._z))
+              gameBaseGlobals.gbGEdicts.ix otherIdx.eEntityState.esOrigin .= v'
+              next <- GameBase.pickTarget (edict^.eEdictInfo.eiTarget)
+              gameBaseGlobals.gbGEdicts.ix otherIdx.eEntityState.esEvent .= Constants.evOtherTeleport
+              return next
+            else return (Just edictRef)
 
 spPointCombat :: EdictReference -> Quake ()
 spPointCombat er@(EdictReference edictIdx) = do

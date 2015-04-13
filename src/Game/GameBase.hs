@@ -274,31 +274,30 @@ runEntity er@(EdictReference edictIdx) = do
 - Searches beginning at the edict after from, or the beginning if null null
 - will be returned if the end of the list is reached.
 -}
-pickTarget :: B.ByteString -> Quake (Maybe EdictReference)
+pickTarget :: Maybe B.ByteString -> Quake (Maybe EdictReference)
 pickTarget targetName = do
-    -- TODO: do we need this?
-{-
-    if (targetname == null) {
-        gi.dprintf("G_PickTarget called with null targetname\n");
-        return null;
-    }
--}
-    (foundRefs, numChoices) <- searchForTargets Nothing findByTarget [] 0
+    dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
 
-    if numChoices == 0
+    if isNothing targetName
       then do
-        dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
-        dprintf $ "G_PickTarget: target " `B.append` targetName `B.append` " not found\n"
+        dprintf "G_PickTarget called with null targetname\n"
         return Nothing
       else do
-        r <- Lib.rand
-        return $ Just $ foundRefs !! (fromIntegral r `mod` numChoices)
+        (foundRefs, numChoices) <- searchForTargets Nothing findByTarget [] 0
+
+        if numChoices == 0
+          then do
+            dprintf $ "G_PickTarget: target " `B.append` (fromJust targetName) `B.append` " not found\n"
+            return Nothing
+          else do
+            r <- Lib.rand
+            return $ Just $ foundRefs !! (fromIntegral r `mod` numChoices)
 
   where searchForTargets :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> [EdictReference] -> Int -> Quake ([EdictReference], Int)
         searchForTargets ref findBy foundRefs num
           | num == maxChoices = return (foundRefs, num)
           | otherwise = do
-              edictRef <- gFind ref findBy targetName
+              edictRef <- gFind ref findBy (fromJust targetName)
 
               if isNothing edictRef
                 then return (foundRefs, num)
