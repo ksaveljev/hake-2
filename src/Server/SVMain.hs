@@ -17,6 +17,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import qualified Game.GameBase as GameBase
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -29,6 +30,7 @@ import qualified Server.SVGame as SVGame
 import {-# SOURCE #-} qualified Server.SVSend as SVSend
 import qualified Server.SVUser as SVUser
 import qualified Sys.NET as NET
+import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
 {-
@@ -357,7 +359,52 @@ giveMsec = do
 
 
 runGameFrame :: Quake ()
-runGameFrame = io (putStrLn "SVMain.runGameFrame") >> undefined -- TODO
+runGameFrame = do
+    setTimeBeforeGame
+
+    -- we always need to bump framenum, even if we
+    -- don't run the world, otherwise the delta
+    -- compression can get confused when a client
+    -- has the "current" frame
+    svGlobals.svServer.sFrameNum += 1
+    frameNum <- use $ svGlobals.svServer.sFrameNum
+    svGlobals.svServer.sTime .= frameNum * 100
+
+    -- don't run if paused
+    pausedValue <- liftM (^.cvValue) svPausedCVar
+    maxClientsValue <- liftM (^.cvValue) maxClientsCVar
+
+    when (pausedValue == 0 || maxClientsValue > 1) $ do
+      GameBase.runFrame
+
+      -- never get more than one tic behind
+      time <- use $ svGlobals.svServer.sTime
+      realTime <- use $ svGlobals.svServerStatic.ssRealTime
+      when (time < realTime) $ do
+        showClampValue <- liftM (^.cvValue) svShowClampCVar
+
+        when (showClampValue /= 0) $
+          Com.printf "sv highclamp\n"
+
+        svGlobals.svServerStatic.ssRealTime .= time
+
+    setTimeAfterGame
+
+  where setTimeBeforeGame :: Quake ()
+        setTimeBeforeGame = do
+          hostSpeedsValue <- liftM (^.cvValue) hostSpeedsCVar
+
+          when (hostSpeedsValue /= 0) $ do
+            t <- Timer.milliseconds
+            globals.timeBeforeGame .= t
+
+        setTimeAfterGame :: Quake ()
+        setTimeAfterGame = do
+          hostSpeedsValue <- liftM (^.cvValue) hostSpeedsCVar
+
+          when (hostSpeedsValue /= 0) $ do
+            t <- Timer.milliseconds
+            globals.timeAfterGame .= t
 
 masterHeartbeat :: Quake ()
 masterHeartbeat = do
