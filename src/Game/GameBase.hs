@@ -9,7 +9,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -40,6 +40,9 @@ moveDirDown = V3 0 0 (-1)
 
 maxChoices :: Int
 maxChoices = 8
+
+stopEpsilon :: Float
+stopEpsilon = 0.1
 
 shutdownGame :: Quake ()
 shutdownGame = do
@@ -304,7 +307,18 @@ pickTarget targetName = do
                   searchForTargets edictRef findBy (foundEdictRef : foundRefs) (num + 1)
 
 clipVelocity :: V3 Float -> V3 Float -> Traversal' QuakeState (V3 Float) -> Float -> Quake Int
-clipVelocity _ _ _ _ = io (putStrLn "GameBase.clipVelocity") >> undefined -- TODO
+clipVelocity v3in normal v3outLens overbounce = do
+    let isBlocked = if | normal^._z > 0 -> 1 -- floor
+                       | normal^._z == 0 -> 2 -- step
+                       | otherwise -> 0
+
+        backoff = (dot v3in normal) * overbounce
+        change = fmap (* backoff) normal
+        out = v3in - change
+
+    v3outLens .= fmap (\v -> if v > (-stopEpsilon) && v < stopEpsilon then 0 else v) out
+
+    return isBlocked
 
 touchTriggers :: EdictReference -> Quake ()
 touchTriggers er@(EdictReference edictIdx) = do
