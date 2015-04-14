@@ -991,7 +991,41 @@ boxTrace start end mins maxs headNode brushMask = do
                 checkLeafs (idx + 1) maxIdx
 
 testInLeaf :: Int -> Quake ()
-testInLeaf _ = io (putStrLn "CM.testInLeaf") >> undefined -- TODO
+testInLeaf leafNum = do
+    Just leaf <- preuse $ cmGlobals.cmMapLeafs.ix leafNum
+    traceContents <- use $ cmGlobals.cmTraceContents
+
+    when ((leaf^.clContents) .&. traceContents /= 0) $
+      -- trace line against all brushes in the leaf
+      traceLine (fromIntegral $ leaf^.clFirstLeafBrush) 0 (fromIntegral $ leaf^.clNumLeafBrushes)
+
+  where traceLine :: Int -> Int -> Int -> Quake ()
+        traceLine firstLeafBrush idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just brushNum <- liftM (fmap fromIntegral) (preuse $ cmGlobals.cmMapLeafBrushes.ix (firstLeafBrush + idx))
+              Just brush <- preuse $ cmGlobals.cmMapBrushes.ix brushNum
+
+              checkCount <- use $ cmGlobals.cmCheckCount
+              if (brush^.cbCheckCount) == checkCount
+                     -- already checked this brush in another leaf
+                then traceLine firstLeafBrush (idx + 1) maxIdx
+                else do
+                  cmGlobals.cmMapBrushes.ix brushNum.cbCheckCount .= checkCount
+
+                  traceContents <- use $ cmGlobals.cmTraceContents
+                  if (brush^.cbContents) .&. traceContents == 0
+                    then traceLine firstLeafBrush (idx + 1) maxIdx
+                    else do
+                      traceMins <- use $ cmGlobals.cmTraceMins
+                      traceMaxs <- use $ cmGlobals.cmTraceMaxs
+                      traceStart <- use $ cmGlobals.cmTraceStart
+
+                      testBoxInBrush traceMins traceMaxs traceStart (cmGlobals.cmTraceTrace) brush
+
+                      fraction <- use $ cmGlobals.cmTraceTrace.tFraction
+                      unless (fraction == 0) $
+                        traceLine firstLeafBrush (idx + 1) maxIdx
 
 recursiveHullCheck :: Int -> Float -> Float -> V3 Float -> V3 Float -> Quake ()
 recursiveHullCheck num p1f p2f p1 p2 = do
@@ -1219,3 +1253,7 @@ clusterPVS _ = io (putStrLn "CM.clusterPVS") >> undefined -- TODO
 
 clusterPHS :: Int -> Quake B.ByteString
 clusterPHS _ = io (putStrLn "CM.clusterPHS") >> undefined -- TODO
+
+testBoxInBrush :: V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
+testBoxInBrush mins maxs p1 traceLens brush = do
+    io (putStrLn "CM.testBoxInBrush") >> undefined -- TODO
