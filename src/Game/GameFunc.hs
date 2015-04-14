@@ -647,7 +647,7 @@ trainNext =
       when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
         when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
           sound <- use $ gameBaseGlobals.gbGameImport.giSound
-          sound er (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 (fromIntegral Constants.attnStatic) 0
+          sound er (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
         gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= (edict^.eMoveInfo.miSoundMiddle)
 
       let dest = (ent^.eEntityState.esOrigin) - (edict^.eEdictMinMax.eMins)

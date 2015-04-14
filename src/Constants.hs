@@ -509,10 +509,10 @@ chanNoPhsAdd =  8 :: Int
 chanReliable = 16 :: Int -- send by reliable message, not datagram 
 
 -- sound attenuation values
-attnNone   = 0 :: Int -- full volume the entire level 
-attnNorm   = 1 :: Int
-attnIdle   = 2 :: Int
-attnStatic = 3 :: Int -- diminish very rapidly with distance 
+attnNone   = 0 :: Float -- full volume the entire level 
+attnNorm   = 1 :: Float 
+attnIdle   = 2 :: Float
+attnStatic = 3 :: Float -- diminish very rapidly with distance 
 
 -- player_state->stats[] indexes
 statHealthIcon   =  0 :: Int

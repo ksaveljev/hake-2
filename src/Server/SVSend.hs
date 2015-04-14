@@ -7,7 +7,7 @@ module Server.SVSend where
 import Control.Exception (IOException, handle)
 import Control.Lens (use, preuse, (.=), (^.), ix, Traversal')
 import Control.Monad (when, unless, liftM, void)
-import Data.Bits ((.&.), shiftR, shiftL)
+import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
 import Linear.V3 (V3(..))
@@ -199,7 +199,100 @@ or the midpoint of the entity box for bmodels.
 ==================
 -}
 startSound :: V3 Float -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound _ _ _ _ _ _ _ = io (putStrLn "SVsend.startSound") >> undefined -- TODO
+startSound origin (EdictReference edictIdx) channel soundIndex volume attenuation timeOfs = do
+    when (volume < 0 || volume > 1) $
+      Com.comError Constants.errFatal ("SV_StartSound: volume = " `B.append` BC.pack (show volume)) -- IMPROVE?
+
+    when (attenuation < 0 || attenuation > 4) $
+      Com.comError Constants.errFatal ("SV_StartSound: attenuation = " `B.append` BC.pack (show attenuation)) -- IMPROVE?
+
+    when (timeOfs < 0 || timeOfs > 0.255) $
+      Com.comError Constants.errFatal ("SV_StartSound: timeofs = " `B.append` BC.pack (show timeOfs)) -- IMPROVE?
+
+    let ent = edictIdx
+
+    -- no PHS flag
+    let (usePHS, updatedChannel) = if channel .&. 8 /= 0
+                                     then (False, channel .&. 7)
+                                     else (True, channel)
+
+        sendChan = (ent `shiftL` 3) .|. (updatedChannel .&. 7)
+
+    flags <- composeFlags
+
+    -- TODO: do we need this?
+    {-
+      // use the entity origin unless it is a bmodel or explicitly specified
+      if (origin == null) {
+              origin = origin_v;
+              if (entity.solid == Defines.SOLID_BSP) {
+                      for (i = 0; i < 3; i++)
+                              origin_v[i] = entity.s.origin[i] + 0.5f * (entity.mins[i] + entity.maxs[i]);
+              }
+              else {
+                      Math3D.VectorCopy(entity.s.origin, origin_v);
+              }
+      }
+    -}
+
+    MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcSound
+    MSG.writeByteI (svGlobals.svServer.sMulticast) flags
+    MSG.writeByteI (svGlobals.svServer.sMulticast) soundIndex
+
+    when (flags .&. Constants.sndVolume /= 0) $
+      MSG.writeByteF (svGlobals.svServer.sMulticast) (volume * 255)
+
+    when (flags .&. Constants.sndAttenuation /= 0) $
+      MSG.writeByteF (svGlobals.svServer.sMulticast) (attenuation * 64)
+
+    when (flags .&. Constants.sndOffset /= 0) $
+      MSG.writeByteF (svGlobals.svServer.sMulticast) (timeOfs * 1000)
+
+    when (flags .&. Constants.sndEnt /= 0) $
+      MSG.writeShort (svGlobals.svServer.sMulticast) sendChan
+
+    when (flags .&. Constants.sndPos /= 0) $
+      MSG.writePos (svGlobals.svServer.sMulticast) origin
+
+    -- if the sound doesn't attenuate, send it to everyone
+    -- (global radio chatter, voiceovers, etc)
+    let usePHS' = if attenuation == Constants.attnNone
+                    then False else usePHS
+
+    if updatedChannel .&. Constants.chanReliable /= 0
+      then if usePHS'
+             then multicast origin Constants.multicastPhsR
+             else multicast origin Constants.multicastAllR
+      else if usePHS'
+             then multicast origin Constants.multicastPhs
+             else multicast origin Constants.multicastAll
+
+  where composeFlags :: Quake Int
+        composeFlags = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          let a = if volume /= Constants.defaultSoundPacketVolume
+                    then Constants.sndVolume
+                    else 0
+
+              b = if attenuation /= Constants.defaultSoundPacketAttenuation
+                    then Constants.sndAttenuation
+                    else 0
+
+              -- the client doesn't know that bmodels have weird origins
+              -- the origin can also be explicitly set
+              c = if (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 || (edict^.eSolid) == Constants.solidBsp -- TODO: do we need this? || origin != null
+                    then Constants.sndPos
+                    else 0
+
+              -- always send the entity number for channel overrides
+              d = Constants.sndEnt
+
+              e = if timeOfs /= 0
+                    then Constants.sndOffset
+                    else 0
+
+          return (a .|. b .|. c .|. d .|. e)
 
 {-
 =======================

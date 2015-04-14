@@ -272,7 +272,7 @@ soldierPain =
                    | n == 3 -> soundPain
                    | otherwise -> soundPainSS
 
-        sound self Constants.chanVoice s 1 (fromIntegral Constants.attnNorm) 0
+        sound self Constants.chanVoice s 1 Constants.attnNorm 0
 
         if (selfEdict^.eEdictPhysics.eVelocity._z) > 100
           then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMovePain4
@@ -551,8 +551,8 @@ soldierCock =
     soundCock <- use $ mSoldierGlobals.msSoundCock
 
     if frame == frameStand322
-      then sound self Constants.chanWeapon soundCock 1 (fromIntegral Constants.attnIdle) 0
-      else sound self Constants.chanWeapon soundCock 1 (fromIntegral Constants.attnNorm) 0
+      then sound self Constants.chanWeapon soundCock 1 Constants.attnIdle 0
+      else sound self Constants.chanWeapon soundCock 1 Constants.attnNorm 0
 
     return True
 
@@ -874,7 +874,7 @@ soldierIdle =
     soundIdle <- use $ mSoldierGlobals.msSoundIdle
 
     when (r > 0.8) $
-      sound self Constants.chanVoice soundIdle 1 (fromIntegral Constants.attnIdle) 0
+      sound self Constants.chanVoice soundIdle 1 Constants.attnIdle 0
 
     return True
 
@@ -891,8 +891,8 @@ soldierSight =
     soundSight2 <- use $ mSoldierGlobals.msSoundSight2
 
     if r < 0.5
-      then sound self Constants.chanVoice soundSight1 1 (fromIntegral Constants.attnNorm) 0
-      else sound self Constants.chanVoice soundSight2 1 (fromIntegral Constants.attnNorm) 0
+      then sound self Constants.chanVoice soundSight1 1 Constants.attnNorm 0
+      else sound self Constants.chanVoice soundSight2 1 Constants.attnNorm 0
 
     when (skillValue > 0 && GameUtil.range selfEdict enemyEdict >= Constants.rangeMid) $
       when (r > 0.5) $

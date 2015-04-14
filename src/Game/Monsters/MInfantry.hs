@@ -175,7 +175,7 @@ infantryFidget =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveFidget
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundIdle <- use $ mInfantryGlobals.miSoundIdle
-    sound er Constants.chanVoice soundIdle 1 (fromIntegral Constants.attnIdle) 0
+    sound er Constants.chanVoice soundIdle 1 Constants.attnIdle 0
     return True
 
 infantryFramesWalk :: V.Vector MFrameT
@@ -286,18 +286,18 @@ infantryPain =
           then do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain1
             soundPain1 <- use $ mInfantryGlobals.miSoundPain1
-            sound er Constants.chanVoice soundPain1 1 (fromIntegral Constants.attnNorm) 0
+            sound er Constants.chanVoice soundPain1 1 Constants.attnNorm 0
           else do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain2
             soundPain2 <- use $ mInfantryGlobals.miSoundPain2
-            sound er Constants.chanVoice soundPain2 1 (fromIntegral Constants.attnNorm) 0
+            sound er Constants.chanVoice soundPain2 1 Constants.attnNorm 0
 
 infantrySight :: EntInteract
 infantrySight =
   GenericEntInteract "infantry_sight" $ \er _ -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundSight <- use $ mInfantryGlobals.miSoundSight
-    sound er Constants.chanBody soundSight 1 (fromIntegral Constants.attnNorm) 0
+    sound er Constants.chanBody soundSight 1 Constants.attnNorm 0
     return True
 
 infantryDead :: EntThink
@@ -424,7 +424,7 @@ infantryDie =
     if (self^.eEdictStatus.eHealth) <= (self^.eEdictStatus.eGibHealth)
       then do
         udeath <- soundIndex "misc/udeath.wav"
-        sound er Constants.chanVoice udeath 1 (fromIntegral Constants.attnNorm) 0
+        sound er Constants.chanVoice udeath 1 Constants.attnNorm 0
 
         -- IMPROVE? repetition here
         GameMisc.throwGib er "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
@@ -456,7 +456,7 @@ infantryDie =
                                          | otherwise -> (infantryMoveDeath3, soundDie2)
 
           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
-          sound er Constants.chanVoice nextSound 1 (fromIntegral Constants.attnNorm) 0
+          sound er Constants.chanVoice nextSound 1 Constants.attnNorm 0
 
 infantryDodge :: EntDodge
 infantryDodge =
