@@ -122,10 +122,14 @@ spTriggerGravity _ = io (putStrLn "GameTrigger.spTriggerGravity") >> undefined -
 spTriggerMonsterJump :: EdictReference -> Quake ()
 spTriggerMonsterJump _ = io (putStrLn "GameTrigger.spTriggerMonsterJump") >> undefined -- TODO
 
+{-
+- QUAKED trigger_relay (.5 .5 .5) (-8 -8 -8) (8 8 8) This fixed size
+- trigger cannot be touched, it can only be fired by other events.
+-}
 triggerRelayUse :: EntUse
 triggerRelayUse =
-  GenericEntUse "trigger_relay_use" $ \_ _ _ -> do
-    io (putStrLn "GameTrigger.triggerRelayUse") >> undefined -- TODO
+  GenericEntUse "trigger_relay_use" $ \selfRef _ activatorRef -> do
+    GameUtil.useTargets selfRef activatorRef
 
 touchMulti :: EntTouch
 touchMulti =
