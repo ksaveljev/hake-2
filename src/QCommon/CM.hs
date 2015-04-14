@@ -1293,6 +1293,19 @@ clusterPVS cluster = do
         mapVisibility <- use $ cmGlobals.cmMapVisibility
         decompressVis mapVisibility offset
 
+-- IMPROVE: 99% the same with clusterPVS, refactor
+clusterPHS :: Int -> Quake B.ByteString
+clusterPHS cluster = do
+    if cluster == -1
+      then do
+        numClusters <- use $ cmGlobals.cmNumClusters
+        return $ B.replicate ((numClusters + 7) `shiftR` 3) 0
+      else do
+        let access = if Constants.dvisPhs == 0 then _1 else _2
+        Just offset <- preuse $ cmGlobals.cmMapVis.dvBitOfs.ix cluster.(access)
+        mapVisibility <- use $ cmGlobals.cmMapVisibility
+        decompressVis mapVisibility offset
+
 decompressVis :: BL.ByteString -> Int -> Quake B.ByteString
 decompressVis mapVisibility offset = do
     numClusters <- use $ cmGlobals.cmNumClusters
@@ -1322,9 +1335,6 @@ decompressVis mapVisibility offset = do
                           else return c
 
                   decompress row (inp + 2) (outp + c') (acc `B.append` (B.replicate c' 0))
-
-clusterPHS :: Int -> Quake B.ByteString
-clusterPHS _ = io (putStrLn "CM.clusterPHS") >> undefined -- TODO
 
 testBoxInBrush :: V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
 testBoxInBrush mins maxs p1 traceLens brush = do
