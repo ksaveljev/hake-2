@@ -408,10 +408,33 @@ funcTimerUse =
   GenericEntUse "func_timer_use" $ \_ _ _ -> do
     io (putStrLn "GameFunc.funcTimerUse") >> undefined -- TODO
 
+{-
+- QUAKED func_timer (0.3 0.1 0.6) (-8 -8 -8) (8 8 8) START_ON "wait" base
+- time between triggering all targets, default is 1 "random" wait variance,
+- default is 0
+- 
+- so, the basic time between firing is a random time between (wait -
+- random) and (wait + random)
+- 
+- "delay" delay before first firing when turned on, default is 0
+- 
+- "pausetime" additional delay used only the very first time and only if
+- spawned with START_ON
+- 
+- These can used but not touched.
+-}
 funcTimerThink :: EntThink
 funcTimerThink =
-  GenericEntThink "func_timer_think" $ \_ -> do
-    io (putStrLn "GameFunc.funcTimerThink") >> undefined -- TODO
+  GenericEntThink "func_timer_think" $ \edictRef@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    GameUtil.useTargets edictRef (edict^.eEdictOther.eoActivator)
+
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+    r <- Lib.crandom
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= time + (edict^.eWait) + r * (edict^.eRandom)
+
+    return True
 
 trainBlocked :: EntBlocked
 trainBlocked =
