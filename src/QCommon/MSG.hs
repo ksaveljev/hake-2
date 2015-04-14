@@ -7,7 +7,7 @@ import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int16, Int32)
 import Data.Word (Word8)
-import Linear.V3 (V3)
+import Linear.V3 (V3, _x, _y, _z)
 import qualified Data.ByteString as B
 
 import Quake
@@ -54,8 +54,11 @@ writeString sizeBufLens s = do
 writeCoord :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeCoord _ _ = io (putStrLn "MSG.writeCoord") >> undefined -- TODO
 
-writePos :: ASetter' QuakeState SizeBufT -> V3 Float -> Quake ()
-writePos _ _ = io (putStrLn "MSG.writePos") >> undefined -- TODO
+writePos :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
+writePos sizeBufLens pos = do
+    writeShort sizeBufLens (truncate ((pos^._x) * 8))
+    writeShort sizeBufLens (truncate ((pos^._y) * 8))
+    writeShort sizeBufLens (truncate ((pos^._z) * 8))
 
 writeDir :: ASetter' QuakeState SizeBufT -> V3 Float -> Quake ()
 writeDir _ _ = io (putStrLn "MSG.writeDir") >> undefined -- TODO
