@@ -196,4 +196,4 @@ sleep msec = do
 
     -- when we are not a server, just run full speed
     unless (isNothing ipSocketServer || dedicatedValue == 0) $
-      io (threadDelay $ msec * 1000)
+      io (putStrLn $ "sleeping " ++ show msec ++ " msec") >> io (threadDelay $ msec * 1000)

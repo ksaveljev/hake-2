@@ -1256,4 +1256,33 @@ clusterPHS _ = io (putStrLn "CM.clusterPHS") >> undefined -- TODO
 
 testBoxInBrush :: V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
 testBoxInBrush mins maxs p1 traceLens brush = do
-    io (putStrLn "CM.testBoxInBrush") >> undefined -- TODO
+    unless ((brush^.cbNumSides) == 0) $ do
+      done <- checkIntersection (brush^.cbFirstBrushSide) 0 (brush^.cbNumSides)
+
+      unless done $ do
+        zoom traceLens $ do
+          tStartSolid .= True
+          tAllSolid .= True
+          tFraction .= 0
+          tContents .= brush^.cbContents
+
+  where checkIntersection :: Int -> Int -> Int -> Quake Bool
+        checkIntersection firstBrushSide idx maxIdx
+          | idx >= maxIdx = return False
+          | otherwise = do
+              Just side <- preuse $ cmGlobals.cmMapBrushSides.ix (firstBrushSide + idx)
+              let Just planeIdx = side^.cbsPlane
+              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+
+              -- FIXME: special case for axial
+              -- general box case
+              -- push the plane out apropriately for mins/maxs
+              -- FIXME: use signbits into 8 way lookup for each mins/maxs
+              let a = if plane^.cpNormal._x < 0 then maxs^._x else mins^._x
+                  b = if plane^.cpNormal._y < 0 then maxs^._y else mins^._y
+                  c = if plane^.cpNormal._z < 0 then maxs^._z else mins^._z
+                  ofs = V3 a b c
+                  dist = (plane^.cpDist) - dot ofs (plane^.cpNormal)
+                  d1 = dot p1 (plane^.cpNormal) - dist
+
+              return (d1 > 0)
