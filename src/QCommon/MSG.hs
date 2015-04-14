@@ -7,11 +7,13 @@ import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int16, Int32)
 import Data.Word (Word8)
-import Linear.V3 (V3, _x, _y, _z)
+import Linear (V3, _x, _y, _z, dot)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.SZ as SZ
 
@@ -60,8 +62,26 @@ writePos sizeBufLens pos = do
     writeShort sizeBufLens (truncate ((pos^._y) * 8))
     writeShort sizeBufLens (truncate ((pos^._z) * 8))
 
-writeDir :: ASetter' QuakeState SizeBufT -> V3 Float -> Quake ()
-writeDir _ _ = io (putStrLn "MSG.writeDir") >> undefined -- TODO
+writeDir :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
+writeDir sizeBufLens dir = do
+    -- do we need this?
+    {-
+        if (dir == null) {
+            WriteByte(sb, 0);
+            return;
+        }
+    -}
+    let best = calcBest 0 0 0 Constants.numVertexNormals
+    writeByteI sizeBufLens best
+
+  where calcBest :: Float -> Int -> Int -> Int -> Int
+        calcBest bestd best idx maxIdx
+          | idx >= maxIdx = best
+          | otherwise =
+              let d = dot dir (Constants.byteDirs V.! idx)
+              in if d > bestd
+                   then calcBest d idx (idx + 1) maxIdx
+                   else calcBest bestd best (idx + 1) maxIdx
 
 writeAngle :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle _ _ = io (putStrLn "MSG.writeAngle") >> undefined -- TODO
