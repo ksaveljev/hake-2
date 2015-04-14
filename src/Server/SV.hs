@@ -7,7 +7,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom)
 import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.))
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3, _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, dot)
 
 import Quake
 import QuakeState
@@ -271,22 +271,22 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
     let updatedMove = fmap clampMove move
 
     -- find the bounding box
-    (mins, maxs) <- findBoundingBox pusherRef updatedMove
+    (mins, maxs) <- findPusherBoundingBox updatedMove
 
     -- we need this for pushing things later
     vec3origin <- use $ globals.vec3Origin
     let org = vec3origin - amove
-        (forward, right, up) = Math3D.angleVectors org True True True
+        (Just forward, Just right, Just up) = Math3D.angleVectors org True True True
 
     -- save the pusher's origin position
-    savePusherPosition pusherRef
+    savePusherPosition
 
     -- move the pusher to it's final position
-    movePusherToFinalPosition pusherRef updatedMove
+    movePusherToFinalPosition updatedMove
     
     -- see if any solid entities are inside the final position
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
-    done <- checkForSolidEntities 1 numEdicts
+    done <- checkForSolidEntities (shouldSkip maxs mins) updatedMove (figureMovement forward right up) 1 numEdicts
 
     if done
       then return False
@@ -306,22 +306,22 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
               temp''' :: Float = fromIntegral temp''
           in temp''' * 0.125
 
-        findBoundingBox :: EdictReference -> V3 Float -> Quake (V3 Float, V3 Float)
-        findBoundingBox (EdictReference edictIdx) updatedMove = do
-          Just eMinMax <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax
+        findPusherBoundingBox :: V3 Float -> Quake (V3 Float, V3 Float)
+        findPusherBoundingBox updatedMove = do
+          Just eMinMax <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eEdictMinMax
           return ((eMinMax^.eAbsMin) + updatedMove, (eMinMax^.eAbsMax) + updatedMove)
 
-        savePusherPosition :: EdictReference -> Quake ()
-        savePusherPosition (EdictReference edictIdx) = do
+        savePusherPosition :: Quake ()
+        savePusherPosition = do
           pushedP <- use $ gameBaseGlobals.gbPushedP
-          Just pusherEntityState <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState
+          Just pusherEntityState <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eEntityState
 
           zoom (gameBaseGlobals.gbPushed.ix pushedP) $ do
             pEnt .= Just pusherRef
             pOrigin .= (pusherEntityState^.esOrigin)
             pAngles .= (pusherEntityState^.esAngles)
 
-          Just clientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+          Just clientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eClient
 
           when (isJust clientRef) $ do
             let Just (GClientReference clientIdx) = clientRef
@@ -330,20 +330,173 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
 
           gameBaseGlobals.gbPushedP += 1
 
-        movePusherToFinalPosition :: EdictReference -> V3 Float -> Quake ()
-        movePusherToFinalPosition er@(EdictReference edictIdx) updatedMove = do
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+        movePusherToFinalPosition :: V3 Float -> Quake ()
+        movePusherToFinalPosition updatedMove = do
+          zoom (gameBaseGlobals.gbGEdicts.ix pusherIdx.eEntityState) $ do
             esOrigin %= (+ updatedMove)
             esAngles %= (+ amove)
 
           linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
-          linkEntity er
+          linkEntity pusherRef
 
-        checkForSolidEntities :: Int -> Int -> Quake Bool
-        checkForSolidEntities idx maxIdx
+        checkForSolidEntities :: (EdictReference -> Quake Bool) -> V3 Float -> (EdictReference -> Quake ()) -> Int -> Int -> Quake Bool
+        checkForSolidEntities shouldSkip' updatedMove figureMovement' idx maxIdx
           | idx >= maxIdx = return False
           | otherwise = do
-              io (putStrLn "SV.push#checkForSolidEntities") >> undefined -- TODO
+              let ref = EdictReference idx
+              skip <- shouldSkip' ref
+
+              if not skip
+                then do
+                  Just pusherMovetype <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eMoveType
+                  Just edictGroundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity
+
+                  nextEntity <- if pusherMovetype == Constants.moveTypePush || edictGroundEntity == Just pusherRef
+                                  then do
+                                    -- move this entity
+                                    moveEntity ref
+
+                                    -- try moving the contacted entity
+                                    tryMovingContactedEntity updatedMove ref
+
+                                    -- figure movement due to the pusher's amove
+                                    figureMovement' ref
+
+                                    -- may have pushed them off an edge
+                                    nullifyGroundEntity ref
+
+                                    block <- testEntityPosition ref
+
+                                    if not block
+                                      then do -- pushed ok
+                                        linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+                                        linkEntity ref
+                                        -- impact?
+                                        return True
+                                      else do
+                                        -- if it is ok to leave in the old position, do it
+                                        -- this is only relevant for riding entities, not pushed
+                                        -- FIXME: this doesn't account for rotation
+                                        gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOrigin -= updatedMove
+                                        block' <- testEntityPosition ref
+
+                                        if not block'
+                                          then do
+                                            gameBaseGlobals.gbPushedP -= 1
+                                            return True
+                                          else return False
+
+                                  else return False
+
+                  if nextEntity
+                    then 
+                      checkForSolidEntities shouldSkip' updatedMove figureMovement' (idx + 1) maxIdx
+                    else do
+                      -- save off the obstacle so we can call the block function
+                      gameBaseGlobals.gbObstacle .= Just ref
+
+                      -- move back any entities we already moved
+                      -- go backwards, so if the same entity was pushed
+                      -- twice, it goes back to the original position
+                      pushedP <- use $ gameBaseGlobals.gbPushedP
+                      moveBackEntity (pushedP - 1) 0
+
+                      return True
+                else 
+                  checkForSolidEntities shouldSkip' updatedMove figureMovement' (idx + 1) maxIdx
+
+        moveBackEntity :: Int -> Int -> Quake ()
+        moveBackEntity idx minIdx
+          | idx >= minIdx = do
+              Just p <- preuse $ gameBaseGlobals.gbPushed.ix idx
+              let Just edictRef@(EdictReference edictIdx) = p^.pEnt
+
+              zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+                esOrigin .= (p^.pOrigin)
+                esAngles .= (p^.pAngles)
+
+              Just clientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+              when (isJust clientRef) $ do
+                let Just (GClientReference clientIdx) = clientRef
+                    -- ugly :( i know i know
+                    access = if | Constants.yaw == 0 -> _x
+                                | Constants.yaw == 1 -> _y
+                                | otherwise -> _z
+                gameBaseGlobals.gbGame.glClients.ix clientIdx.gcPlayerState.psPMoveState.pmsDeltaAngles.(access) .= truncate (p^.pDeltaYaw)
+
+              linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+              linkEntity edictRef
+          | otherwise = return ()
+
+        nullifyGroundEntity :: EdictReference -> Quake ()
+        nullifyGroundEntity (EdictReference edictIdx) = do
+          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity
+          when (groundEntity /= Just pusherRef) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+
+        figureMovement :: V3 Float -> V3 Float -> V3 Float -> EdictReference -> Quake ()
+        figureMovement forward right up (EdictReference edictIdx) = do
+          Just edictOrigin <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
+          Just pusherOrigin <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eEntityState.esOrigin
+          
+          let org = edictOrigin - pusherOrigin
+              org2 = V3 (dot org forward) (dot org right) (dot org up)
+              move2 = org2 - org
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin += move2
+
+        tryMovingContactedEntity :: V3 Float -> EdictReference -> Quake ()
+        tryMovingContactedEntity updatedMove (EdictReference edictIdx) = do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin += updatedMove
+          Just clientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+
+          when (isJust clientRef) $ do -- FIXME: doesn't rotate monsters?
+            let Just (GClientReference clientIdx) = clientRef
+                -- ugly :( i know i know
+                access = if | Constants.yaw == 0 -> _x
+                            | Constants.yaw == 1 -> _y
+                            | otherwise -> _z
+            gameBaseGlobals.gbGame.glClients.ix clientIdx.gcPlayerState.psPMoveState.pmsDeltaAngles.(access) += (truncate $ amove^.(Math3D.v3Access Constants.yaw))
+
+        moveEntity :: EdictReference -> Quake ()
+        moveEntity edictRef@(EdictReference edictIdx) = do
+          pushedP <- use $ gameBaseGlobals.gbPushedP
+          Just entityState <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState
+
+          zoom (gameBaseGlobals.gbPushed.ix pushedP) $ do
+            pEnt .= Just edictRef
+            pOrigin .= (entityState^.esOrigin)
+            pAngles .= (entityState^.esAngles)
+
+          gameBaseGlobals.gbPushedP += 1
+
+        shouldSkip :: V3 Float -> V3 Float -> EdictReference -> Quake Bool
+        shouldSkip maxs mins (EdictReference edictIdx) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          linked <- isLinkedAnywhere (edict^.eArea)
+
+          if | not (edict^.eInUse) -> return True
+             | any (== (edict^.eMoveType)) [Constants.moveTypePush, Constants.moveTypeStop, Constants.moveTypeNone, Constants.moveTypeNoClip] -> return True
+               -- not linked in anywhere
+             | not linked -> return True
+               -- if the entity is standing on the pusher, it will definetly be moved
+             | (edict^.eEdictOther.eoGroundEntity) /= Just (EdictReference edictIdx) -> do
+                 -- see if the ent needs to be tested
+                 let absmin = edict^.eEdictMinMax.eAbsMin
+                     absmax = edict^.eEdictMinMax.eAbsMax
+
+                 if absmin^._x >= maxs^._x || absmin^._y >= maxs^._y || absmin^._z >= maxs^._z ||
+                    absmax^._x <= mins^._x || absmax^._y <= mins^._y || absmax^._z <= mins^._z
+                    then return True
+                    else
+                      -- see if the ent's bbox is inside the pusher's final position
+                      liftM not (testEntityPosition (EdictReference edictIdx))
+             | otherwise -> return False
+        
+        isLinkedAnywhere :: LinkReference -> Quake Bool
+        isLinkedAnywhere (LinkReference linkIdx) = do
+          Just link <- preuse $ svGlobals.svLinks.ix linkIdx
+          return $ isJust (link^.lPrev)
 
         checkTriggerTouch :: Int -> Int -> Quake ()
         checkTriggerTouch idx minIdx
@@ -463,3 +616,16 @@ impact er@(EdictReference edictIdx) traceT = do
 
     when (isJust (traceEdict^.eEdictAction.eaTouch) && (traceEdict^.eSolid) /= Constants.solidNot) $
       touch (fromJust $ traceEdict^.eEdictAction.eaTouch) tr er dummyPlane Nothing
+
+testEntityPosition :: EdictReference -> Quake Bool
+testEntityPosition (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let mask = if (edict^.eClipMask) /= 0
+                 then edict^.eClipMask
+                 else Constants.maskSolid
+
+    trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+    traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) (edict^.eEntityState.esOrigin) (EdictReference edictIdx) mask
+
+    return (traceT^.tStartSolid)
