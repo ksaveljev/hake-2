@@ -16,6 +16,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameBase as GameBase
+import qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -212,10 +213,37 @@ useTargetHelp =
   GenericEntUse "Use_Target_Help" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetHelp") >> undefined -- TODO
 
+{-
+- QUAKED target_splash (1 0 0) (-8 -8 -8) (8 8 8) Creates a particle splash
+- effect when used.
+- 
+- Set "sounds" to one of the following: 1) sparks 2) blue water 3) brown
+- water 4) slime 5) lava 6) blood
+- 
+- "count" how many pixels in the splash "dmg" if set, does a radius damage
+- at this location when it splashes useful for lava/sparks
+-}
 useTargetSplash :: EntUse
 useTargetSplash =
-  GenericEntUse "use_target_splash" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetSplash") >> undefined -- TODO
+  GenericEntUse "use_target_splash" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writePosition = gameImport^.giWritePosition
+        writeDir = gameImport^.giWriteDir
+        multicast = gameImport^.giMulticast
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    writeByte Constants.svcTempEntity
+    writeByte Constants.teSplash
+    writeByte (self^.eCount)
+    writePosition (self^.eEntityState.esOrigin)
+    writeDir (self^.eEdictPhysics.eMoveDir)
+    writeByte (self^.eSounds)
+    multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
+
+    when ((self^.eEdictStatus.eDmg) /= 0) $
+      GameCombat.radiusDamage selfRef (fromJust activatorRef) (fromIntegral $ self^.eEdictStatus.eDmg) Nothing (fromIntegral (self^.eEdictStatus.eDmg) + 40) Constants.modSplash
 
 useTargetChangeLevel :: EntUse
 useTargetChangeLevel =
