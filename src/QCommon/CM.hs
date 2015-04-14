@@ -1245,8 +1245,41 @@ headnodeForBox mins maxs = do
 
     return boxHeadNode
 
+-- Searches the leaf number that contains the 3d point
 pointLeafNum :: V3 Float -> Quake Int
-pointLeafNum _ = io (putStrLn "CM.pointLeafNum") >> undefined -- TODO
+pointLeafNum p = do
+    -- sound may call this without map loaded
+    numPlanes <- use $ cmGlobals.cmNumPlanes
+
+    if numPlanes == 0
+      then return 0
+      else pointLeafNumR p 0
+
+--  Recursively searches the leaf number that contains the 3d point
+pointLeafNumR :: V3 Float -> Int -> Quake Int
+pointLeafNumR p num = do
+    num' <- findNum num
+    globals.cPointContents += 1 -- optimize counter
+
+    return $ (-1) - num'
+
+  where findNum :: Int -> Quake Int
+        findNum n
+          | n >= 0 = do
+              Just node <- preuse $ cmGlobals.cmMapNodes.ix n
+              let Just planeIdx = node^.cnPlane
+              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+
+              let d = if plane^.cpType < 3
+                        then p^.(Math3D.v3Access (fromIntegral $ plane^.cpType)) - (plane^.cpDist)
+                        else dot (plane^.cpNormal) p - (plane^.cpDist)
+
+              let n' = if d < 0
+                         then node^.cnChildren._2
+                         else node^.cnChildren._1
+
+              findNum n'
+          | otherwise = return n
 
 clusterPVS :: Int -> Quake B.ByteString
 clusterPVS _ = io (putStrLn "CM.clusterPVS") >> undefined -- TODO
