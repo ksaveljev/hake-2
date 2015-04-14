@@ -3,7 +3,7 @@ module Game.GameTarget where
 
 import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (+=))
 import Control.Monad (liftM, when)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..))
@@ -198,10 +198,38 @@ useTargetGoal =
   GenericEntUse "use_target_goal" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetGoal") >> undefined -- TODO
 
+{-
+- QUAKED target_speaker (1 0 0) (-8 -8 -8) (8 8 8) looped-on looped-off
+- reliable "noise" wav file to play "attenuation" -1 = none, send to whole
+- level 1 = normal fighting sounds 2 = idle sound level 3 = ambient sound
+- level "volume" 0.0 to 1.0
+- 
+- Normal sounds play each time the target is used. The reliable flag can be
+- set for crucial voiceovers.
+- 
+- Looped sounds are always atten 3 / vol 1, and the use function toggles it
+- on/off. Multiple identical looping sounds will just increase volume
+- without any speed cost.
+-}
 useTargetSpeaker :: EntUse
 useTargetSpeaker =
-  GenericEntUse "Use_Target_Speaker" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetSpeaker") >> undefined -- TODO
+  GenericEntUse "Use_Target_Speaker" $ \edictRef@(EdictReference edictIdx) _ _ -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if (edict^.eSpawnFlags) .&. 3 /= 0 -- looping sound toggles
+      then
+        if (edict^.eEntityState.esSound) /= 0
+          then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= 0 -- turn it off
+          else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= (edict^.eNoiseIndex) -- start it
+      else do -- normal sound
+        let chan = if (edict^.eSpawnFlags) .&. 4 /= 0
+                     then Constants.chanVoice .|. Constants.chanReliable
+                     else Constants.chanVoice
+
+        -- use a positioned_sound, because this entity won't normally be
+        -- sent to any clients because it is invisible
+        positionedSound <- use $ gameBaseGlobals.gbGameImport.giPositionedSound
+        positionedSound (edict^.eEntityState.esOrigin) edictRef chan (edict^.eNoiseIndex) (edict^.eVolume) (edict^.eAttenuation) 0
 
 useTargetSecret :: EntUse
 useTargetSecret =
