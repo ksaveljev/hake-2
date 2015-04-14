@@ -813,5 +813,30 @@ thinkAccelMove =
 
 moveFinal :: EntThink
 moveFinal =
-  GenericEntThink "move_final" $ \_ -> do
-    io (putStrLn "GameFunc.moveFinal") >> undefined -- TODO
+  GenericEntThink "move_final" $ \edictRef@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if (edict^.eMoveInfo.miRemainingDistance) == 0
+      then do
+        void $ think moveDone edictRef
+        return True
+      else do
+        let velocity = fmap (* ((edict^.eMoveInfo.miRemainingDistance) / Constants.frameTime)) (edict^.eMoveInfo.miDir)
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+        
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eEdictPhysics.eVelocity .= velocity
+          eEdictAction.eaThink .= Just moveDone
+          eEdictAction.eaNextThink .= time + Constants.frameTime
+
+        return True
+
+moveDone :: EntThink
+moveDone =
+  GenericEntThink "move_done" $ \edictRef@(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= V3 0 0 0
+    Just endFunc <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miEndFunc
+
+    void $ think (fromJust endFunc) edictRef
+
+    return True
