@@ -8,7 +8,7 @@ import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
-import Data.Int (Int8)
+import Data.Int (Int8, Int64)
 import Data.Maybe (isNothing, fromJust)
 import Data.Word (Word16)
 import Linear (V3(..), _x, _y, _z, dot)
@@ -1282,7 +1282,46 @@ pointLeafNumR p num = do
           | otherwise = return n
 
 clusterPVS :: Int -> Quake B.ByteString
-clusterPVS _ = io (putStrLn "CM.clusterPVS") >> undefined -- TODO
+clusterPVS cluster = do
+    if cluster == -1
+      then do
+        numClusters <- use $ cmGlobals.cmNumClusters
+        return $ B.replicate ((numClusters + 7) `shiftR` 3) 0
+      else do
+        let access = if Constants.dvisPvs == 0 then _1 else _2
+        Just offset <- preuse $ cmGlobals.cmMapVis.dvBitOfs.ix cluster.(access)
+        mapVisibility <- use $ cmGlobals.cmMapVisibility
+        decompressVis mapVisibility offset
+
+decompressVis :: BL.ByteString -> Int -> Quake B.ByteString
+decompressVis mapVisibility offset = do
+    numClusters <- use $ cmGlobals.cmNumClusters
+    numVisibility <- use $ cmGlobals.cmNumVisibility
+
+    let row = (numClusters + 7) `shiftR` 3
+
+    -- no vis info, so make all visible
+    if mapVisibility == "" || numVisibility == 0
+      then return $ B.replicate row 0xFF
+      else decompress row (fromIntegral offset) 0 ""
+
+        -- IMPROVE: performance? is it needed? are we decompressing often?
+  where decompress :: Int -> Int64 -> Int -> B.ByteString -> Quake B.ByteString
+        decompress row inp outp acc
+          | outp >= row = return acc
+          | otherwise = do
+              let b = BL.index mapVisibility inp
+              if b /= 0
+                then decompress row (inp + 1) (outp + 1) (acc `B.snoc` b)
+                else do
+                  let c = fromIntegral $ BL.index mapVisibility (inp + 1)
+                  c' <- if outp + c > row
+                          then do
+                            Com.dprintf "warning: Vis decompression overrun\n"
+                            return $ row - outp
+                          else return c
+
+                  decompress row (inp + 2) (outp + c') (acc `B.append` (B.replicate c' 0))
 
 clusterPHS :: Int -> Quake B.ByteString
 clusterPHS _ = io (putStrLn "CM.clusterPHS") >> undefined -- TODO
