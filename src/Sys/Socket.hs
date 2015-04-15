@@ -1,5 +1,11 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-module Sys.Socket where
+module Sys.Socket ( Socket
+                  , socket
+                  , bind
+                  , close
+                  , sendTo
+                  , recvFrom
+                  ) where
 
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Foreign (Ptr, alloca, allocaBytes, peek)

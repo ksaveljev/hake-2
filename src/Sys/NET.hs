@@ -22,6 +22,7 @@ import CVarVariables
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified Sys.Socket as S
 import qualified Util.Lib as Lib
 
 maxLoopback :: Int
@@ -45,11 +46,11 @@ config multiplayer =
         ipSocketServer <- use $ netGlobals.ngIpSocketServer
 
         when (isJust (ipSocketClient)) $ do
-          io $ NS.close (fromJust $ ipSocketClient) -- IMPROVE: catch exceptions if any?
+          io $ S.close (fromJust $ ipSocketClient) -- IMPROVE: catch exceptions if any?
           netGlobals.ngIpSocketClient .= Nothing
 
         when (isJust (ipSocketServer)) $ do
-          io $ NS.close (fromJust $ ipSocketServer) -- IMPROVE: catch exceptions if any?
+          io $ S.close (fromJust $ ipSocketServer) -- IMPROVE: catch exceptions if any?
           netGlobals.ngIpSocketServer .= Nothing
 
 openIP :: Quake ()
@@ -74,13 +75,14 @@ openIP = do
         else
           netGlobals.ngIpSocketClient .= s
 
-socket :: B.ByteString -> Int -> Quake (Maybe NS.Socket)
+socket :: B.ByteString -> Int -> Quake (Maybe S.Socket)
 socket ip port = do
     openedSocket <-
       io $ handle (\(e :: IOException) -> return (Left e)) $ do
-        newsocket <- NS.socket NS.AF_INET NS.Datagram NS.defaultProtocol
-        NS.setSocketOption newsocket NS.Broadcast 1
-        return (Right newsocket)
+        newsocket <- S.socket
+        when (isNothing newsocket) $
+          ioError (userError "socket creation failed")
+        return $ Right (fromJust newsocket)
 
     case openedSocket of
       Left e -> do
@@ -90,16 +92,16 @@ socket ip port = do
         bindResult <- io $ handle (\(e :: IOException) -> return (Left e)) $ do
           if B.length ip == 0 || ip == "localhost"
             then if port == Constants.portAny
-                   then NS.bind s (NS.SockAddrInet (NS.PortNum 0) NS.iNADDR_ANY)
-                   else NS.bind s (NS.SockAddrInet (NS.PortNum (fromIntegral port)) NS.iNADDR_ANY)
+                   then S.bind s NS.iNADDR_ANY (NS.PortNum 0)
+                   else S.bind s NS.iNADDR_ANY (NS.PortNum (fromIntegral port))
             else do
               resolved <- NBSD.getHostByName (BC.unpack ip)
-              NS.bind s (NS.SockAddrInet (NS.PortNum (fromIntegral port)) (head $ NBSD.hostAddresses resolved)) -- this head is kinda bad, isn't it?
+              S.bind s (head $ NBSD.hostAddresses resolved) (NS.PortNum (fromIntegral port)) -- this head is kinda bad, isn't it?
           return $ Right () 
 
         case bindResult of
           Left e -> do
-            io $ NS.close s
+            io $ S.close s
             Com.println $ "Error: " `B.append` (BC.pack $ show e)
             return Nothing
           Right _ ->
@@ -150,7 +152,7 @@ getPacket sock netFromLens netMessageLens = do
       then getNetworkPacket done (netGlobals.ngIpSocketClient)
       else getNetworkPacket done (netGlobals.ngIpSocketServer)
 
-  where getNetworkPacket :: Bool -> Lens' QuakeState (Maybe NS.Socket) -> Quake Bool
+  where getNetworkPacket :: Bool -> Lens' QuakeState (Maybe S.Socket) -> Quake Bool
         getNetworkPacket done socketLens = do
           s <- use socketLens
           if | done -> return True

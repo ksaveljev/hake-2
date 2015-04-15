@@ -15,7 +15,6 @@ import Data.Int (Int16)
 import Data.Sequence (Seq)
 import Data.Word (Word8, Word16)
 import Linear (V3, V4)
-import Network.Socket (Socket)
 import System.IO (Handle)
 import System.Random (StdGen)
 import qualified Data.ByteString as B
@@ -62,6 +61,7 @@ import Server.ChallengeT
 import Server.ClientFrameT
 import Sound.SfxT
 import Sys.LoopbackT
+import Sys.Socket
 
 newtype QuakeS s a = Quake { unQuake :: StateT s (ExceptT B.ByteString IO) a }
                        deriving ( Functor
