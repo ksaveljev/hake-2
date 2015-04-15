@@ -2,6 +2,8 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Info where
 
+import Control.Monad (when)
+import Data.Maybe (isJust, fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -9,8 +11,26 @@ import Quake
 import qualified Constants
 import qualified QCommon.Com as Com
 
+fillSpaces :: B.ByteString
+fillSpaces = "                     "
+
 print :: B.ByteString -> Quake ()
-print = undefined -- TODO
+print str = do
+    let tokens = BC.split '\\' str
+                  -- ulgy hack for BC.split because
+                  -- BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+    printString <- composePrintString (if null tokens then tokens else tail tokens) ""
+
+    when (isJust printString) $
+      Com.printf (fromJust printString)
+
+  where composePrintString :: [B.ByteString] -> B.ByteString -> Quake (Maybe B.ByteString)
+        composePrintString [] acc = return (Just acc)
+        composePrintString (k:v:xs) acc =
+          composePrintString xs (acc `B.append` k `B.append` (if B.length k < 20 then B.drop (B.length k) fillSpaces else "") `B.append` "=" `B.append` v `B.append` "\n")
+        composePrintString _ _ = do
+          Com.printf "MISSING VALUE\n"
+          return Nothing
 
 -- Sets a value for a key in the user info string.
 setValueForKey :: B.ByteString -> B.ByteString -> B.ByteString -> Quake B.ByteString
@@ -46,14 +66,16 @@ removeKey str key = do
         return str
       else do
         let tokens = BC.split '\\' str
-        composeTokens tokens ""
+                      -- ulgy hack for BC.split because
+                      -- BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+        composeTokens (if null tokens then tokens else tail tokens) ""
 
   where composeTokens :: [B.ByteString] -> B.ByteString -> Quake B.ByteString
         composeTokens [] acc = return acc
-        composeTokens (a:b:xs) acc = do
-          if a == key
+        composeTokens (k:v:xs) acc = do
+          if k == key
             then composeTokens xs acc
-            else composeTokens xs (acc `B.append` "\\" `B.append` a `B.append` "\\" `B.append` b)
+            else composeTokens xs (acc `B.append` "\\" `B.append` k `B.append` "\\" `B.append` v)
         composeTokens _ _ = do
           Com.printf "MISSING VALUE\n"
           return str
