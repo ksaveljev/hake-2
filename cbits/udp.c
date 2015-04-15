@@ -5,7 +5,7 @@
 
 typedef int socket_t;
 
-socket_t socket_open (unsigned int port)
+socket_t socket_open ()
 {
     int s, broadcastValue = 1;
 
