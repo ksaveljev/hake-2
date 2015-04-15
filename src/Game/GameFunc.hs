@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameFunc where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=))
@@ -743,8 +744,62 @@ trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
 
 trainWait :: EntThink
 trainWait =
-  GenericEntThink "train_wait" $ \_ -> do
-    io (putStrLn "GameFunc.trainWait") >> undefined -- TODO
+  GenericEntThink "train_wait" $ \edictRef@(EdictReference edictIdx) -> do
+    done <- checkPathTarget edictRef
+
+    unless done $ do
+      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+      if edict^.eMoveInfo.miWait /= 0
+        then do
+          if | edict^.eMoveInfo.miWait > 0 -> do
+                 time <- use $ gameBaseGlobals.gbLevel.llTime
+
+                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+                   eaNextThink .= time + (edict^.eMoveInfo.miWait)
+                   eaThink .= Just trainNext
+
+             | (edict^.eSpawnFlags) .&. trainToggle /= 0 -> do
+                 void $ think trainNext edictRef
+
+                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+                   eSpawnFlags %= (.&. (complement trainStartOn))
+                   eEdictPhysics.eVelocity .= V3 0 0 0
+                   eEdictAction.eaNextThink .= 0
+
+             | otherwise -> return ()
+
+          when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+            when ((edict^.eMoveInfo.miSoundEnd) /= 0) $ do
+              sound <- use $ gameBaseGlobals.gbGameImport.giSound
+              sound edictRef (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= 0
+
+        else void $ think trainNext edictRef
+
+    return True
+
+  where checkPathTarget :: EdictReference -> Quake Bool
+        checkPathTarget (EdictReference edictIdx) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          let Just targetRef@(EdictReference targetIdx) = edict^.eTargetEnt
+          Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
+
+          if isJust $ target^.eEdictInfo.eiPathTarget
+            then do
+              let saveTarget = target^.eEdictInfo.eiTarget
+              gameBaseGlobals.gbGEdicts.ix targetIdx.eEdictInfo.eiTarget .= (target^.eEdictInfo.eiPathTarget)
+
+              GameUtil.useTargets targetRef (edict^.eEdictOther.eoActivator)
+
+              gameBaseGlobals.gbGEdicts.ix targetIdx.eEdictInfo.eiTarget .= saveTarget
+
+              -- make sure we didn't get killed by a killtarget
+              Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+              return $ if inUse then False else True
+
+            else return False
 
 moveCalc :: EdictReference -> V3 Float -> EntThink -> Quake ()
 moveCalc er@(EdictReference edictIdx) dest func = do
