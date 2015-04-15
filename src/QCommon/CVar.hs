@@ -5,21 +5,22 @@ module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
 
-import Data.Maybe (isJust, isNothing, fromJust)
-import Data.Bits ((.&.), (.|.))
 import Control.Lens ((^.), (%=), (.=), use)
 import Control.Monad (void, when, liftM)
+import Data.Bits ((.&.), (.|.))
+import Data.Maybe (isJust, isNothing, fromJust)
 import Data.Traversable (traverse)
 import System.IO (Handle, IOMode(ReadWriteMode), hSeek, hFileSize, SeekMode(AbsoluteSeek))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Map as M
+import qualified Data.Map as Map
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Game.CVarT as CVarT
+import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Constants
@@ -53,12 +54,12 @@ get varName varValue flags = do
                                             , _cvFlags    = flags
                                             }
 
-               globals.cvarVars %= M.insert varName newCVar
+               globals.cvarVars %= Map.insert varName newCVar
 
                return $ Just newCVar
 
 update :: CVarT -> Quake ()
-update cvar = globals.cvarVars %= M.insert (cvar^.cvName) cvar
+update cvar = globals.cvarVars %= Map.insert (cvar^.cvName) cvar
 
 init :: Quake ()
 init = do
@@ -76,7 +77,7 @@ variableString varName = do
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar varName = do
     vars <- use $ globals.cvarVars
-    return $ M.lookup varName vars
+    return $ Map.lookup varName vars
 
 getExisting :: B.ByteString -> Quake CVarT
 getExisting = liftM fromJust . findVar
@@ -202,7 +203,7 @@ listF = do
 
     _ <- traverse printCVar vars
 
-    Com.printf $ BC.pack (show (M.size vars)) `B.append` " cvars\n" -- IMPROVE: maybe use binary package for Int to ByteString conversion?
+    Com.printf $ BC.pack (show (Map.size vars)) `B.append` " cvars\n" -- IMPROVE: maybe use binary package for Int to ByteString conversion?
 
   where printCVar var = do
           Com.printf $ if (var^.cvFlags .&. Constants.cvarArchive) /= 0 then "*" else " "
@@ -242,7 +243,14 @@ command :: Quake Bool
 command = io (putStrLn "CVar.command") >> undefined -- TODO
 
 bitInfo :: Int -> Quake B.ByteString
-bitInfo _ = io (putStrLn "CVar.bitInfo") >> undefined -- TODO
+bitInfo bit = do
+    cvars <- liftM (filter (\e -> (e^.cvFlags) .&. bit /= 0) . Map.elems) (use $ globals.cvarVars)
+    collectInfo cvars ""
+
+  where collectInfo :: [CVarT] -> B.ByteString -> Quake B.ByteString
+        collectInfo [] info = return info
+        collectInfo (x:xs) info = do
+          Info.setValueForKey info (x^.cvName) (x^.cvString) >>= collectInfo xs
 
 -- Returns an info string containing all the CVAR_SERVERINFO cvars.
 serverInfo :: Quake B.ByteString
@@ -252,9 +260,9 @@ serverInfo = bitInfo Constants.cvarServerInfo
 getLatchedVars :: Quake ()
 getLatchedVars = do
     cvars <- use $ globals.cvarVars
-    let updatedCVars = M.map updateLatchedVar cvars
-        gameVarBefore = M.lookup "game" cvars
-        gameVarAfter = M.lookup "game" updatedCVars
+    let updatedCVars = Map.map updateLatchedVar cvars
+        gameVarBefore = Map.lookup "game" cvars
+        gameVarAfter = Map.lookup "game" updatedCVars
     globals.cvarVars .= updatedCVars
 
     when (gameVarBefore /= gameVarAfter) $ do
