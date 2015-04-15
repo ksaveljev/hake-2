@@ -12,6 +12,7 @@ import Data.Traversable (traverse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -149,7 +150,35 @@ dropClient clientLens = do
  - Builds the string that is sent as heartbeats and status replies.
  -}
 statusString :: Quake B.ByteString
-statusString = io (putStrLn "SVMain.statusString") >> undefined -- TODO
+statusString = do
+    status <- liftM (`B.append` "\n") CVar.serverInfo
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    collectStatusString 0 maxClientsValue status
+
+  where collectStatusString :: Int -> Int -> B.ByteString -> Quake B.ByteString
+        collectStatusString idx maxIdx acc
+          | idx >= maxIdx = return acc
+          | otherwise = do
+              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
+              if (client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned
+                then do
+                  let Just (EdictReference edictIdx) = client^.cEdict
+                  Just gclientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+                  let Just (GClientReference gclientIdx) = gclientRef
+                  Just clientStats <- preuse $ gameBaseGlobals.gbGame.glClients.ix gclientIdx.gcPlayerState.psStats
+
+                  let player = BC.pack (show $ clientStats UV.! Constants.statFrags) `B.append`
+                               " " `B.append` BC.pack (show $ client^.cPing) `B.append`
+                               "\"" `B.append` (client^.cName) `B.append` "\"\n"
+
+                  if B.length acc + B.length player >= 1024
+                    then -- can't hold any more
+                      return acc
+                    else
+                      collectStatusString (idx + 1) maxIdx (acc `B.append` player)
+
+                else collectStatusString (idx + 1) maxIdx acc
 
 frame :: Int -> Quake ()
 frame msec = do
