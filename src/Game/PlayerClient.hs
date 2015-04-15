@@ -19,7 +19,7 @@ import qualified Game.GameUtil as GameUtil
 
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
-clientDisconnect = undefined -- TODO
+clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined -- TODO
 
 {-
 - Some information that should be persistant, like health, is still stored

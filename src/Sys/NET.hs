@@ -8,7 +8,7 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (handle, IOException)
 import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
 import Control.Monad (when, liftM, unless)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import qualified Data.ByteString as B
@@ -23,6 +23,8 @@ import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Util.Lib as Lib
+
+import qualified Debug.Trace as DT
 
 maxLoopback :: Int
 maxLoopback = 4
@@ -131,7 +133,13 @@ stringToAdr s = do
 
 -- Returns a string holding ip address and port like "ip0.ip1.ip2.ip3:port".
 adrToString :: NetAdrT -> B.ByteString
-adrToString _ = undefined -- TODO -- putStrLn for grep
+adrToString adr =
+    let Just hostAddress = adr^.naIP
+        a = (hostAddress `shiftR` 24) .&. 0xFF
+        b = (hostAddress `shiftR` 16) .&. 0xFF
+        c = (hostAddress `shiftR` 8) .&. 0xFF
+        d = hostAddress .&. 0xFF
+    in BC.pack $ show a ++ "." ++ show b ++ "." ++ show c ++ "." ++ show d ++ ":" ++ show (adr^.naPort) -- IMPROVE
 
 -- Gets a packet from a network channel
 getPacket :: Int -> Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Quake Bool

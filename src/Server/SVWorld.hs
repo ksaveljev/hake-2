@@ -23,6 +23,8 @@ import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
+import qualified Debug.Trace as DT
+
 initNodes :: Quake ()
 initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
 
@@ -255,7 +257,7 @@ linkEdict er@(EdictReference edictIdx) = do
                       0 -> _x
                       1 -> _y
                       2 -> _z
-                      _ -> undefined -- should never be here
+                      _ -> DT.trace "HOLYMOLY" $ undefined -- should never be here
 
           if | (node^.anAxis) == -1 -> return node
              | (edict^.eEdictMinMax.eAbsMin.v3f) > (node^.anDist) ->

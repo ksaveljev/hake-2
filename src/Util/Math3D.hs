@@ -9,6 +9,8 @@ import Quake
 import QuakeState
 import qualified Constants
 
+import qualified Debug.Trace as DT
+
 piRatio :: Float
 piRatio = pi / 360
 
@@ -17,11 +19,11 @@ v3Access v = case v of
                0 -> _x
                1 -> _y
                2 -> _z
-               _ -> undefined -- shouldn't happen
+               _ -> DT.trace "OHNO" $ undefined -- shouldn't happen
 
                                           -- index of cmGlobals.cmMapPlanes
-boxOnPlaneSize :: V3 Float -> V3 Float -> Int -> Quake Int
-boxOnPlaneSize emins emaxs pIdx = do
+boxOnPlaneSide :: V3 Float -> V3 Float -> Int -> Quake Int
+boxOnPlaneSide emins emaxs pIdx = do
     Just p <- preuse $ cmGlobals.cmMapPlanes.ix pIdx
 
     let ptype = v3Access (fromIntegral $ p^.cpType)
@@ -60,7 +62,7 @@ boxOnPlaneSize emins emaxs pIdx = do
                             7 -> let d1 = a * mina + b * minb + c * minc
                                      d2 = a * maxa + b * maxb + c * maxc
                                  in return (d1, d2)
-                            _ -> undefined -- TODO: throw error
+                            _ -> io (putStrLn "Math3D.boxOnPlaneSide") >> undefined -- TODO: throw error
 
         let sides = if | dist1 >= (p^.cpDist) -> 1
                        | dist2 < (p^.cpDist) -> 2

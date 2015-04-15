@@ -865,7 +865,7 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
       Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
       let planeIdx = fromJust (node^.cnPlane)
 
-      s <- Math3D.boxOnPlaneSize mins maxs planeIdx
+      s <- Math3D.boxOnPlaneSide mins maxs planeIdx
 
       if | s == 1 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
          | s == 2 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
