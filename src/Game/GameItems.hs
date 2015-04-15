@@ -252,103 +252,94 @@ bodyArmorInfo =
               }
 
 pickupArmor :: EntInteract
-pickupArmor = PickupArmor "pickup_armor" undefined -- TODO
+pickupArmor = PickupArmor "pickup_armor" $ \_ _ -> do
+  io (putStrLn "GameItems.pickupArmor") >> undefined -- TODO
 
 pickupPowerArmor :: EntInteract
-pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" undefined -- TODO
+pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" $ \_ _ -> do
+  io (putStrLn "GameItems.pickupPowerArmor") >> undefined -- TODO
 
 usePowerArmor :: ItemUse
 usePowerArmor =
-  GenericItemUse { _giuId = "use_powerarmor"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_powerarmor" $ \_ _ -> do
+    io (putStrLn "GameItems.usePowerArmor") >> undefined -- TODO
 
 dropPowerArmor :: ItemDrop
 dropPowerArmor =
-  GenericItemDrop { _gidId = "drop_powerarmor"
-                  , _gidDrop = undefined -- TODO
-                  }
+  GenericItemDrop "drop_powerarmor" $ \_ _ -> do
+    io (putStrLn "GameItems.dropPowerArmor") >> undefined -- TODO
 
 pickupAmmo :: EntInteract
 pickupAmmo =
-  GenericEntInteract { _geiId = "pickup_ammo"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "pickup_ammo" $ \_ _ -> do
+    io (putStrLn "GameItems.pickupAmmo") >> undefined -- TODO
 
 dropAmmo :: ItemDrop
 dropAmmo =
-  GenericItemDrop { _gidId = "drop_ammo"
-                  , _gidDrop = undefined -- TODO
-                  }
+  GenericItemDrop "drop_ammo" $ \_ _ -> do
+    io (putStrLn "GameItems.dropAmmo") >> undefined -- TODO
 
 useQuad :: ItemUse
 useQuad =
-  GenericItemUse { _giuId = "use_quad"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_quad" $ \_ _ -> do
+    io (putStrLn "GameItems.useQuad") >> undefined -- TODO
 
 pickupPowerup :: EntInteract
 pickupPowerup =
-  GenericEntInteract { _geiId = "pickup_powerup"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "pickup_powerup" $ \_ _ -> do
+    io (putStrLn "GameItems.pickupPowerup") >> undefined -- TODO
 
 dropGeneral :: ItemDrop
 dropGeneral =
-  GenericItemDrop { _gidId = "drop_general"
-                  , _gidDrop = undefined -- TODO
-                  }
+  GenericItemDrop "drop_general" $ \_ _ -> do
+    io (putStrLn "GameItems.dropGeneral") >> undefined -- TODO
 
 useInvulnerability :: ItemUse
 useInvulnerability =
-  GenericItemUse { _giuId = "use_invulnerability"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_invulnerability" $ \_ _ -> do
+    io (putStrLn "GameItems.useInvulnerability") >> undefined -- TODO
 
 useSilencer :: ItemUse
 useSilencer =
-  GenericItemUse { _giuId = "use_silencer"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_silencer" $ \_ _ -> do
+    io (putStrLn "GameItems.useSilencer") >> undefined -- TODO
 
 useBreather :: ItemUse
 useBreather =
-  GenericItemUse { _giuId = "use_breather"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_breather" $ \_ _ -> do
+    io (putStrLn "GameItems.useBreather") >> undefined -- TODO
 
 useEnviroSuit :: ItemUse
 useEnviroSuit =
-  GenericItemUse { _giuId = "use_envirosuit"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "use_envirosuit" $ \_ _ -> do
+    io (putStrLn "GameItems.useEnviroSuit") >> undefined -- TODO
 
 pickupAncientHead :: EntInteract
-pickupAncientHead = PickupAncientHead "pickup_ancienthead" undefined -- TODO
+pickupAncientHead = PickupAncientHead "pickup_ancienthead" $ \_ _ -> do
+  io (putStrLn "GameItems.pickupAncientHead") >> undefined -- TODO
 
 pickupAdrenaline :: EntInteract
-pickupAdrenaline = PickupAdrenaline "pickup_adrenaline" undefined -- TODO
+pickupAdrenaline = PickupAdrenaline "pickup_adrenaline" $ \_ _ -> do
+  io (putStrLn "GameItems.pickupAdrenaline") >> undefined -- TODO
 
 pickupBandolier :: EntInteract
 pickupBandolier =
-  GenericEntInteract { _geiId = "pickup_bandolier"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "pickup_bandolier" $ \_ _ -> do
+    io (putStrLn "GameItems.pickupBandolier") >> undefined -- TODO
 
 pickupPack :: EntInteract
 pickupPack =
-  GenericEntInteract { _geiId = "pickup_pack"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "pickup_pack" $ \_ _ -> do
+    io (putStrLn "GameItems.pickupPack") >> undefined -- TODO
 
 pickupKey :: EntInteract
 pickupKey =
-  GenericEntInteract { _geiId = "pickup_key"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "pickup_key" $ \_ _ -> do
+    io (putStrLn "GameItems.pickupKey") >> undefined -- TODO
 
 pickupHealth :: EntInteract
-pickupHealth = PickupHealth "pickup_health" undefined -- TODO
+pickupHealth = PickupHealth "pickup_health" $ \_ _ -> do
+  io (putStrLn "GameItems.pickupHealth") >> undefined -- TODO
 
 -- QUAKED item_health (.3 .3 1) (-16 -16 -16) (16 16 16)
 spItemHealth :: EdictReference -> Quake ()

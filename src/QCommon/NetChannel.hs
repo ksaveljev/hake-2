@@ -25,7 +25,7 @@ init = do
     void $ CVar.get "qport" (BC.pack $ show port) Constants.cvarNoSet
 
 outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
-outOfBandPrint = undefined -- TODO
+outOfBandPrint _ _ _ = io (putStrLn "NetChannel.outOfBandPrint") >> undefined -- TODO
 
 {-
 - Netchan_Transmit tries to send an unreliable message to a connection, 

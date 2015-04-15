@@ -196,7 +196,7 @@ frame msec = do
           cl -= rf;
           -}
 
-      Com.printf undefined -- TODO
+      io (putStrLn "QCommon.frame") >> undefined -- TODO
 
   where closeLogStatsFile :: Quake ()
         closeLogStatsFile = do

@@ -15,7 +15,7 @@ import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 
 init :: Quake ()
-init = undefined -- TODO
+init = io (putStrLn "SCR.init") >> undefined -- TODO
 
 beginLoadingPlaque :: Quake ()
 beginLoadingPlaque = do

@@ -1,88 +1,75 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
+import Quake
 import Game.Adapters
 
 useWeapon :: ItemUse
 useWeapon =
-  GenericItemUse { _giuId = "Use_Weapon"
-                 , _giuUse = undefined -- TODO
-                 }
+  GenericItemUse "Use_Weapon" $ \_ _ -> do
+    io (putStrLn "PlayerWeapon.useWeapon") >> undefined -- TODO
 
 weaponBlaster :: EntThink
 weaponBlaster =
-  GenericEntThink { _gethId = "Weapon_Blaster"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Blaster" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponBlaster") >> undefined -- TODO
 
 pickupWeapon :: EntInteract
 pickupWeapon =
-  GenericEntInteract { _geiId = "Pickup_Weapon"
-                     , _geiInteract = undefined -- TODO
-                     }
+  GenericEntInteract "Pickup_Weapon" $ \_ _ -> do
+    io (putStrLn "PlayerWeapon.pickupWeapon") >> undefined -- TODO
 
 dropWeapon :: ItemDrop
 dropWeapon =
-  GenericItemDrop { _gidId = "Drop_Weapon"
-                  , _gidDrop = undefined -- TODO
-                  }
+  GenericItemDrop "Drop_Weapon" $ \_ _ -> do
+    io (putStrLn "PlayerWeapon.dropWeapon") >> undefined -- TODO
 
 weaponShotgun :: EntThink
 weaponShotgun =
-  GenericEntThink { _gethId = "Weapon_Shotgun"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Shotgun" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponShotgun") >> undefined -- TODO
 
 weaponSuperShotgun :: EntThink
 weaponSuperShotgun = 
-  GenericEntThink { _gethId = "Weapon_SuperShotgun"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_SuperShotgun" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponSuperShotgun") >> undefined -- TODO
 
 weaponMachinegun :: EntThink
 weaponMachinegun = 
-  GenericEntThink { _gethId = "Weapon_Machinegun"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Machinegun" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponMachinegun") >> undefined -- TODO
 
 weaponChaingun :: EntThink
 weaponChaingun = 
-  GenericEntThink { _gethId = "Weapon_Chaingun"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Chaingun" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponChaingun") >> undefined -- TODO
 
 weaponGrenade :: EntThink
 weaponGrenade = 
-  GenericEntThink { _gethId = "Weapon_Grenade"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Grenade" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponGrenade") >> undefined -- TODO
 
 weaponGrenadeLauncher :: EntThink
 weaponGrenadeLauncher = 
-  GenericEntThink { _gethId = "Weapon_GrenadeLauncher"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_GrenadeLauncher" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponGrenadeLauncher") >> undefined -- TODO
 
 weaponRocketLauncher :: EntThink
 weaponRocketLauncher = 
-  GenericEntThink { _gethId = "Weapon_RocketLauncher"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_RocketLauncher" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponRocketLauncher") >> undefined -- TODO
 
 weaponHyperBlaster :: EntThink
 weaponHyperBlaster = 
-  GenericEntThink { _gethId = "Weapon_HyperBlaster"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_HyperBlaster" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponHyperBlaster") >> undefined -- TODO
 
 weaponRailgun :: EntThink
 weaponRailgun = 
-  GenericEntThink { _gethId = "Weapon_Railgun"
-                  , _gethThink = undefined -- TODO
-                  }
+  GenericEntThink "Weapon_Railgun" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponRailgun") >> undefined -- TODO
 
 weaponBFG :: EntThink
-weaponBFG = 
-  GenericEntThink { _gethId = "Weapon_BFG"
-                  , _gethThink = undefined -- TODO
-                  }
+weaponBFG =
+  GenericEntThink "Weapon_BFG" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponBFG") >> undefined -- TODO

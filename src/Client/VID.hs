@@ -3,4 +3,4 @@ module Client.VID where
 import Quake
 
 init :: Quake ()
-init = undefined -- TODO
+init = io (putStrLn "VID.init") >> undefined -- TODO

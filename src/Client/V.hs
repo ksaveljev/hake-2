@@ -3,4 +3,4 @@ module Client.V where
 import Quake
 
 init :: Quake ()
-init = undefined -- TODO
+init = io (putStrLn "V.init") >> undefined -- TODO
