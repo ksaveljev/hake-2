@@ -29,4 +29,31 @@ setValueForKey str key value = do
            Com.printf "Keys and values must be < 64 characters.\n"
            return str
        | otherwise -> do
-           undefined -- TODO
+           strippedStr <- removeKey str key
+
+           if B.length strippedStr + 2 + B.length key + B.length value > Constants.maxInfoString
+             then do
+               Com.printf "Info string length exceeded\n"
+               return str
+             else
+               return $ strippedStr `B.append` "\\" `B.append` key `B.append` "\\" `B.append` value
+
+removeKey :: B.ByteString -> B.ByteString -> Quake B.ByteString
+removeKey str key = do
+    if BC.elem '\\' key
+      then do
+        Com.printf "Can't use a key with a \\\n"
+        return str
+      else do
+        let tokens = BC.split '\\' str
+        composeTokens tokens ""
+
+  where composeTokens :: [B.ByteString] -> B.ByteString -> Quake B.ByteString
+        composeTokens [] acc = return acc
+        composeTokens (a:b:xs) acc = do
+          if a == key
+            then composeTokens xs acc
+            else composeTokens xs (acc `B.append` "\\" `B.append` a `B.append` "\\" `B.append` b)
+        composeTokens _ _ = do
+          Com.printf "MISSING VALUE\n"
+          return str
