@@ -24,8 +24,6 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Util.Lib as Lib
 
-import qualified Debug.Trace as DT
-
 maxLoopback :: Int
 maxLoopback = 4
 
@@ -135,10 +133,10 @@ stringToAdr s = do
 adrToString :: NetAdrT -> B.ByteString
 adrToString adr =
     let Just hostAddress = adr^.naIP
-        a = (hostAddress `shiftR` 24) .&. 0xFF
-        b = (hostAddress `shiftR` 16) .&. 0xFF
-        c = (hostAddress `shiftR` 8) .&. 0xFF
-        d = hostAddress .&. 0xFF
+        d = (hostAddress `shiftR` 24) .&. 0xFF
+        c = (hostAddress `shiftR` 16) .&. 0xFF
+        b = (hostAddress `shiftR` 8) .&. 0xFF
+        a = hostAddress .&. 0xFF
     in BC.pack $ show a ++ "." ++ show b ++ "." ++ show c ++ "." ++ show d ++ ":" ++ show (adr^.naPort) -- IMPROVE
 
 -- Gets a packet from a network channel
