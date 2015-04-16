@@ -29,6 +29,7 @@ import Client.DirtyT
 import Client.DLightT
 import Client.FrameT
 import Client.LightStyleT
+import Client.VidDefT
 import Game.CmdAliasT
 import Game.CModelT
 import Game.CPlaneT
@@ -147,6 +148,7 @@ data Globals =
 
           , _cvarVars           :: !(M.Map B.ByteString CVarT)
           , _con                :: !ConsoleT
+          , _vidDef             :: VidDefT
           , _re                 :: !RefExportT
 
           , _keyBindings        :: !(V.Vector (Maybe B.ByteString))

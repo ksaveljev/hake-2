@@ -5,6 +5,7 @@ module Globals ( module Globals
                , module Client.ClientStateT
                , module Client.ConsoleT
                , module Client.RefExportT
+               , module Client.VidDefT
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
@@ -22,6 +23,7 @@ import Client.ClientStaticT
 import Client.ClientStateT
 import Client.ConsoleT
 import Client.RefExportT
+import Client.VidDefT
 import Game.CmdAliasT
 import Game.CVarT
 import QCommon.NetAdrT
@@ -63,6 +65,7 @@ initialGlobals =
 
           , _cvarVars           = M.empty
           , _con                = newConsoleT
+          , _vidDef             = newVidDefT
           , _re                 = dummyRenderer
 
           , _keyBindings        = V.replicate 256 Nothing

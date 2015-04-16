@@ -1150,7 +1150,7 @@ maxMsgLen = 1400 :: Int
 -- console.h
 
 numConTimes =     4 :: Int
-conTextsize = 32768 :: Int
+conTextSize = 32768 :: Int
 
 bspVersion = 38 :: Int
 
