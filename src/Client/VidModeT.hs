@@ -11,5 +11,4 @@ data VidModeT =
            , _vmMode        :: Int
            }
 
-
 makeLenses ''VidModeT

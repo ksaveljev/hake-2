@@ -94,3 +94,6 @@ timeLimitCVar            = CVar.getExisting "timelimit"
 fragLimitCVar            = CVar.getExisting "fraglimit"
 passwordCVar             = CVar.getExisting "password" -- do we need this? we have infoPasswordCVar
 spectatorPasswordCVar    = CVar.getExisting "spectator_password"
+vidWidthCVar             = CVar.getExisting "vid_width"
+vidHeightCVar            = CVar.getExisting "vid_height"
+vidRefCVar               = CVar.getExisting "vid_ref"

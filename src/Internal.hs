@@ -30,6 +30,7 @@ import Client.DLightT
 import Client.FrameT
 import Client.LightStyleT
 import Client.VidDefT
+import Client.VidModeT
 import Game.CmdAliasT
 import Game.CModelT
 import Game.CPlaneT
@@ -115,6 +116,7 @@ data QuakeState =
              , _mSoldierGlobals    :: !MSoldierGlobals
              , _mInfantryGlobals   :: !MInfantryGlobals
              , _playerTrailGlobals :: !PlayerTrailGlobals
+             , _vidGlobals         :: !VIDGlobals
              }
 
 data Globals =
@@ -1356,3 +1358,7 @@ data PushedT =
           , _pAngles   :: !(V3 Float)
           , _pDeltaYaw :: !Float
           }
+
+data VIDGlobals =
+  VIDGlobals { _vgVidModes :: V.Vector VidModeT
+             }

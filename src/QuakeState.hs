@@ -16,6 +16,7 @@ module QuakeState ( QuakeState(..)
                   , mSoldierGlobals
                   , mInfantryGlobals
                   , playerTrailGlobals
+                  , vidGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -42,6 +43,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.Monsters.MInfantryGlobals
                   , module Game.PlayerTrailGlobals
+                  , module Client.VIDGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -56,6 +58,7 @@ import Game.Monsters.MSoldierGlobals
 import Game.PlayerTrailGlobals
 import Client.KeyGlobals
 import Client.SCRGlobals
+import Client.VIDGlobals
 import Server.SVGlobals
 import QCommon.CMGlobals
 import QCommon.ComGlobals
@@ -82,4 +85,5 @@ initialQuakeState =
              , _mSoldierGlobals    = initialMSoldierGlobals
              , _mInfantryGlobals   = initialMInfantryGlobals
              , _playerTrailGlobals = initialPlayerTrailGlobals
+             , _vidGlobals         = initialVIDGlobals
              }
