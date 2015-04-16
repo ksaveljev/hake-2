@@ -256,7 +256,7 @@ sendPacket sock len buf adr =
 
 -- Sends a packet via internal loopback.
 sendLoopPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
-sendLoopPacket sock len buf adr =
+sendLoopPacket sock len buf adr = do
     if sock == Constants.nsServer
       then sendLoopPacket' (netGlobals.ngLoopbackServer)
       else sendLoopPacket' (netGlobals.ngLoopbackClient)

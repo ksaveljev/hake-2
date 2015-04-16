@@ -40,12 +40,12 @@ writeShort sizeBufLens c = do
         b :: Word8 = fromIntegral ((c `shiftR` 8) .&. 0xFF)
     SZ.write sizeBufLens (B.pack [a, b]) 2
 
-writeInt :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
-writeInt sizeBufLens c = do
-    let a :: Word8 = fromIntegral (c .&. 0xFF)
-        b :: Word8 = fromIntegral ((c `shiftR` 8) .&. 0xFF)
-        c :: Word8 = fromIntegral ((c `shiftR` 16) .&. 0xFF)
-        d :: Word8 = fromIntegral ((c `shiftR` 24) .&. 0xFF)
+writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeInt sizeBufLens v = do
+    let a :: Word8 = fromIntegral (v .&. 0xFF)
+        b :: Word8 = fromIntegral ((v `shiftR` 8) .&. 0xFF)
+        c :: Word8 = fromIntegral ((v `shiftR` 16) .&. 0xFF)
+        d :: Word8 = fromIntegral ((v `shiftR` 24) .&. 0xFF)
     SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
 
 writeLong :: ASetter' QuakeState SizeBufT -> Int -> Quake ()

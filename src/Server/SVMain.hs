@@ -440,7 +440,6 @@ masterHeartbeat = do
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
     publicServerValue <- liftM (^.cvValue) publicServerCVar
 
-
     -- only dedicated servers send heartbeats
     -- no need if it is a private dedicated game
     when (dedicatedValue /= 0 || publicServerValue == 0) $ do
@@ -457,7 +456,7 @@ masterHeartbeat = do
 
              -- send to group master
              masterAdr <- use $ svGlobals.svMasterAdr
-             void $ traverse (sendToNetAdr str) masterAdr
+             void $ traverse (sendToNetAdr str) (V.filter (\a -> (a^.naPort) /= 0) masterAdr)
 
   where sendToNetAdr :: B.ByteString -> NetAdrT -> Quake ()
         sendToNetAdr strToSend netAdr = do
