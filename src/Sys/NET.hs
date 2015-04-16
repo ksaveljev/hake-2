@@ -158,7 +158,33 @@ getPacket sock netFromLens netMessageLens = do
           if | done -> return True
              | isNothing s -> return False
              | otherwise -> do
-                 return False -- io (putStrLn "NET.getPacket") >> undefined -- TODO
+                 -- TODO: catch exception?
+                 packet <- io $ S.recvFrom (fromJust s) 2048
+
+                 if isJust packet
+                   then do
+                     let Just (buf, host, NS.PortNum port) = packet
+
+                     netFromLens.naIP .= Just host
+                     netFromLens.naPort .= fromIntegral port
+                     netFromLens.naType .= Constants.naIp
+
+                     let packetLen = B.length buf
+                     netMsg <- use netMessageLens
+
+                     if packetLen > (netMsg^.sbMaxSize)
+                       then do
+                         adr <- use $ netFromLens
+                         Com.printf $ "Oversize packet from " `B.append` adrToString adr `B.append` "\n"
+                         return False
+                       else do
+                         -- set the size
+                         netMessageLens.sbCurSize .= packetLen
+                         -- set data
+                         netMessageLens.sbData .= buf
+                         return True
+
+                   else return False
 
 -- Compares ip address without the port
 compareBaseAdr :: NetAdrT -> NetAdrT -> Bool
