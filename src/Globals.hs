@@ -66,7 +66,7 @@ initialGlobals =
           , _cvarVars           = M.empty
           , _con                = newConsoleT
           , _vidDef             = newVidDefT
-          , _re                 = dummyRenderer
+          , _re                 = Just dummyRenderer
 
           , _keyBindings        = V.replicate 256 Nothing
           , _keyDown            = UV.empty

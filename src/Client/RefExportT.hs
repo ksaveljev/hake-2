@@ -1,12 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.RefExportT ( RefExportT(..)
                          , module Client.RefExportT
+                         , module Sys.KBD
                          ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
+import Sys.KBD
 
 makeLenses ''RefExportT
 
@@ -36,5 +38,5 @@ dummyRenderer =
              , _reUpdateScreen        = (\callback -> callback)
              , _reApiVersion          = 0
              , _reGetModeList         = UV.empty
-             , _reGetKeyboardHandler  = 0
+             , _reGetKeyboardHandler  = Nothing
              }

@@ -151,7 +151,7 @@ data Globals =
           , _cvarVars           :: !(M.Map B.ByteString CVarT)
           , _con                :: !ConsoleT
           , _vidDef             :: VidDefT
-          , _re                 :: !RefExportT
+          , _re                 :: !(Maybe RefExportT)
 
           , _keyBindings        :: !(V.Vector (Maybe B.ByteString))
           , _keyDown            :: !(UV.Vector Bool)
@@ -944,7 +944,7 @@ data RefExportT =
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
              , _reGetModeList         :: UV.Vector Int -- TODO: ???
-             , _reGetKeyboardHandler  :: Int -- TODO: ???
+             , _reGetKeyboardHandler  :: Maybe KBD
              }
 
 data NETGlobals =
@@ -1363,3 +1363,16 @@ data VIDGlobals =
   VIDGlobals { _vgVidModes     :: V.Vector VidModeT
              , _vgRefLibActive :: Bool
              }
+
+data KBD =
+  KBD { _kbdWinX           :: Int
+      , _kbdWinY           :: Int
+      , _kbdMX             :: Int
+      , _kbdMY             :: Int
+      , _kbdInit           :: Quake ()
+      , _kbdUpdate         :: Quake ()
+      , _kbdClose          :: Quake ()
+      , _kbdDoKeyEvent     :: Int -> Bool -> Quake ()
+      , _kbdInstallGrabs   :: Quake ()
+      , _kbdUninstallGrabs :: Quake ()
+      }

@@ -16,6 +16,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Render.Renderer as Renderer
 import qualified Sound.S as S
+import qualified Sys.IN as IN
 
 init :: Quake ()
 init = do
@@ -135,4 +136,23 @@ checkChanges = do
 
 loadRefresh :: B.ByteString -> Bool -> Quake Bool
 loadRefresh name fast = do
+    refLibActive <- use $ vidGlobals.vgRefLibActive
+
+    when refLibActive $ do
+      Just renderer <- use $ globals.re
+      let Just kbd = renderer^.reGetKeyboardHandler
+      kbd^.kbdClose
+
+      IN.shutdown
+
+      renderer^.reShutDown
+
+      freeRefLib
+
+    Com.printf $ "------- Loading " `B.append` name `B.append` " -------\n"
+
     io (putStrLn "VID.loadRefresh") >> undefined -- TODO
+
+freeRefLib :: Quake ()
+freeRefLib = do
+    io (putStrLn "VID.freeRefLib") >> undefined -- TODO

@@ -51,7 +51,7 @@ updateScreenF = updateScreen2
 
 updateScreen :: Quake ()
 updateScreen = do
-    renderer <- use $ globals.re
+    Just renderer <- use $ globals.re
     (renderer^.reUpdateScreen) updateScreenF
 
 {-
