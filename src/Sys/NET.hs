@@ -236,7 +236,7 @@ sleep msec = do
 sendPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
 sendPacket sock len buf adr =
     if (adr^.naType) == Constants.naLoopback
-      then sendLoopPacket sock len buf adr
+      then sendLoopPacket sock len buf
       else if sock == Constants.nsServer
              then sendPacket' (netGlobals.ngIpSocketServer)
              else sendPacket' (netGlobals.ngIpSocketClient)
@@ -255,8 +255,8 @@ sendPacket sock len buf adr =
                  void $ io $ S.sendTo ss buf (fromJust $ adr^.naIP) (NS.PortNum (fromIntegral $ adr^.naPort))
 
 -- Sends a packet via internal loopback.
-sendLoopPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
-sendLoopPacket sock len buf adr = do
+sendLoopPacket :: Int -> Int -> B.ByteString -> Quake ()
+sendLoopPacket sock len buf = do
     if sock == Constants.nsServer
       then sendLoopPacket' (netGlobals.ngLoopbackServer)
       else sendLoopPacket' (netGlobals.ngLoopbackClient)
