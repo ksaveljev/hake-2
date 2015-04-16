@@ -40,14 +40,18 @@ init args = do
     CBuf.addEarlyCommands False >> CBuf.execute
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing filesystem...");
+    -}
 
     FS.initFileSystem
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("loading config...");
+    -}
 
     reconfigure False
 
@@ -55,8 +59,10 @@ init args = do
     FS.markBaseSearchPaths -- mark the default search paths
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.testQ2Data(); // test for valid baseq2
+    -}
 
     --
     -- init commands and vars
@@ -82,25 +88,31 @@ init args = do
                                .add(Globals.__DATE__)
                                .add(BUILDSTRING));
     -}
-    let s = BC.pack $ show Constants.version ++ show Constants.__date__ -- IMPROVE: use formatting library?
+    let s = BC.pack (show Constants.version) `B.append` " " `B.append` Constants.__date__ -- IMPROVE: use formatting library?
 
     void $ CVar.get "version" s (Constants.cvarServerInfo .|. Constants.cvarNoSet)
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing network subsystem...");
+    -}
 
     NET.init >> NetChannel.init
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing server subsystem...");
+    -}
 
     SVMain.init
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.setStatus("initializing client subsystem...");
+    -}
 
     CL.init
 
@@ -122,8 +134,10 @@ init args = do
     CL.writeConfiguration
 
     -- if (globals.dedicated.cvValue != 1.0)
+    {-
     whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
       undefined -- TODO: Jake2.Q2Dialog.dispose();
+    -}
 
 {-
 - Trigger generation of a frame for the given time. The setjmp/longjmp

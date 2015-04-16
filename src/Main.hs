@@ -37,8 +37,10 @@ main = do
         CVar.update dedicated { _cvValue = 1.0 }
 
       -- if (globals.dedicated.cvValue != 1.0)
+      {-
       whenQ (liftM ((/= 1.0) . (^.cvValue)) dedicatedCVar) $ do
-        undefined -- TODO: init our client window
+        undefined -- TODO: inits Q2DataDialog (which we probably do not want to implement yet)
+      -}
 
       -- in C the first arg is the filename
       let updatedArgs = "hake2" : args
