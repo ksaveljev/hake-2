@@ -13,5 +13,6 @@ makeLenses ''VIDGlobals
 
 initialVIDGlobals :: VIDGlobals
 initialVIDGlobals =
-  VIDGlobals { _vgVidModes = VidModes.vidModes
+  VIDGlobals { _vgVidModes     = VidModes.vidModes
+             , _vgRefLibActive = False
              }

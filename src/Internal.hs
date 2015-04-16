@@ -1360,5 +1360,6 @@ data PushedT =
           }
 
 data VIDGlobals =
-  VIDGlobals { _vgVidModes :: V.Vector VidModeT
+  VIDGlobals { _vgVidModes     :: V.Vector VidModeT
+             , _vgRefLibActive :: Bool
              }

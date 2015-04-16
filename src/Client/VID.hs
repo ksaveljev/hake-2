@@ -1,17 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.VID where
 
-import Control.Lens ((.=), ix, (^.), zoom)
-import Control.Monad (void, liftM)
+import Control.Lens ((.=), ix, (^.), zoom, use)
+import Control.Monad (void, liftM, when, unless)
+import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.Console as Console
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Render.Renderer as Renderer
+import qualified Sound.S as S
 
 init :: Quake ()
 init = do
@@ -67,4 +71,68 @@ update the rendering DLL and/or video mode to match.
 ============
 -}
 checkChanges :: Quake ()
-checkChanges = io (putStrLn "VID.checkChanges") >> undefined -- TODO
+checkChanges = do
+    vd <- use $ globals.vidDef
+    globals.vidDef .= vd { _vdWidth = (vd^.vdNewWidth), _vdHeight = (vd^.vdNewHeight) }
+
+    vidRef <- vidRefCVar
+
+    when (vidRef^.cvModified) $
+      S.stopAllSounds
+    
+    changeRefresh (vidRef^.cvModified)
+
+  where changeRefresh :: Bool -> Quake ()
+        changeRefresh False = return ()
+        -- refresh has changed
+        changeRefresh True = do
+          vidRef <- vidRefCVar
+          vidFullScreen <- vidFullScreenCVar
+
+          CVar.update vidRef { _cvModified = False }
+          CVar.update vidFullScreen { _cvModified = True }
+
+          globals.cl.csRefreshPrepped .= False
+          globals.cls.csDisableScreen .= 1 -- True
+
+          loaded <- loadRefresh (vidRef^.cvString) True
+
+          unless loaded $ do
+            let renderer = if (vidRef^.cvString) == Renderer.getPreferredName
+                             -- try the default renderer as fallback after preferred
+                             then Renderer.getDefaultName
+                             -- try the preferred renderer as first fallback
+                             else Renderer.getPreferredName
+
+            renderer' <- if (vidRef^.cvString) == Renderer.getDefaultName
+                           then do
+                             Com.printf "Refresh failed\n"
+                             Just glMode <- CVar.get "gl_mode" "0" 0
+
+                             if (glMode^.cvValue) /= 0
+                               then do
+                                 Com.printf "Trying mode 0\n"
+                                 CVar.setValueF "gl_mode" 0
+
+                                 loaded' <- loadRefresh (vidRef^.cvString) False
+                                 unless loaded' $
+                                   Com.comError Constants.errFatal ("Couldn't fall back to " `B.append` (vidRef^.cvString) `B.append` " refresh!")
+                               else 
+                                 Com.comError Constants.errFatal ("Couldn't fall back to " `B.append` (vidRef^.cvString) `B.append` " refresh!")
+
+                             return (vidRef^.cvString)
+
+                           else return renderer
+
+            void $ CVar.set "vid_ref" renderer'
+
+            -- drop the console if we fail to load a refresh
+            keyDest <- use $ globals.cls.csKeyDest
+            when (keyDest /= Constants.keyConsole) $
+              Console.toggleConsoleF -- TODO: catch exception?
+
+          globals.cls.csDisableScreen .= 0 -- False
+
+loadRefresh :: B.ByteString -> Bool -> Quake Bool
+loadRefresh name fast = do
+    io (putStrLn "VID.loadRefresh") >> undefined -- TODO
