@@ -6,7 +6,7 @@ module Sys.NET where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (handle, IOException)
-import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
+import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix, zoom)
 import Control.Monad (when, liftM, unless, void)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
@@ -233,5 +233,41 @@ sleep msec = do
       io (putStrLn $ "sleeping " ++ show msec ++ " msec") >> io (threadDelay $ msec * 1000)
 
 -- Sends a Packet
-sendPacket :: Lens' QuakeState (Maybe S.Socket) -> Int -> B.ByteString -> NetAdrT -> Quake ()
-sendPacket = undefined -- TODO
+sendPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
+sendPacket sock len buf adr =
+    if (adr^.naType) == Constants.naLoopback
+      then sendLoopPacket sock len buf adr
+      else if sock == Constants.nsServer
+             then sendPacket' (netGlobals.ngIpSocketServer)
+             else sendPacket' (netGlobals.ngIpSocketClient)
+
+  where sendPacket' :: Lens' QuakeState (Maybe S.Socket) -> Quake ()
+        sendPacket' socketLens = do
+          s <- use socketLens
+
+          if | isNothing s -> return ()
+             | (adr^.naType) /= Constants.naBroadcast && (adr^.naType) /= Constants.naIp ->
+                 Com.comError Constants.errFatal "NET_SendPacket: bad address type"
+             | otherwise -> do
+                 let Just ss = s
+
+                 -- TODO: check all data has been sent
+                 void $ io $ S.sendTo ss buf (fromJust $ adr^.naIP) (NS.PortNum (fromIntegral $ adr^.naPort))
+
+-- Sends a packet via internal loopback.
+sendLoopPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
+sendLoopPacket sock len buf adr =
+    if sock == Constants.nsServer
+      then sendLoopPacket' (netGlobals.ngLoopbackServer)
+      else sendLoopPacket' (netGlobals.ngLoopbackClient)
+
+  where sendLoopPacket' :: Lens' QuakeState LoopbackT -> Quake ()
+        sendLoopPacket' socketLens = do
+          loop <- use socketLens
+          -- modulo 4
+          let i = (loop^.lSend) .&. (maxLoopback - 1)
+          socketLens.lSend += 1
+
+          zoom (socketLens.lMsgs.ix i) $ do
+            lmData .= buf
+            lmDataLen .= len

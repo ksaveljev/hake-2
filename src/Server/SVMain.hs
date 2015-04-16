@@ -462,7 +462,7 @@ masterHeartbeat = do
   where sendToNetAdr :: B.ByteString -> NetAdrT -> Quake ()
         sendToNetAdr strToSend netAdr = do
           Com.printf $ "Sending heartbeat to " `B.append` NET.adrToString netAdr `B.append` "\n"
-          NetChannel.outOfBandPrint (netGlobals.ngIpSocketServer) netAdr ("heartbeat\n" `B.append` strToSend)
+          NetChannel.outOfBandPrint Constants.nsServer netAdr ("heartbeat\n" `B.append` strToSend)
 
 {-
 - SV_PrepWorldFrame

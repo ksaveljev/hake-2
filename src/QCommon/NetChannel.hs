@@ -15,7 +15,6 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified Sys.NET as NET
 import qualified QCommon.SZ as SZ
-import qualified Sys.Socket as S
 import qualified Sys.Timer as Timer
 
 init :: Quake ()
@@ -28,8 +27,9 @@ init = do
     void $ CVar.get "showdrop" "0" 0
     void $ CVar.get "qport" (BC.pack $ show port) Constants.cvarNoSet
 
-outOfBandPrint :: Lens' QuakeState (Maybe S.Socket) -> NetAdrT -> B.ByteString -> Quake ()
-outOfBandPrint socketLens adr buf = do
+-- Netchan_OutOfBand. Sends an out-of-band datagram.
+outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
+outOfBandPrint sock adr buf = do
     -- write the packet header
     SZ.init (netGlobals.ngSend) "" Constants.maxMsgLen
     MSG.writeInt (netGlobals.ngSend) (-1) -- -1 sequence means out of band
@@ -37,7 +37,7 @@ outOfBandPrint socketLens adr buf = do
 
     -- send the datagram
     send <- use $ netGlobals.ngSend
-    NET.sendPacket socketLens (send^.sbCurSize) (send^.sbData) adr
+    NET.sendPacket sock (send^.sbCurSize) (send^.sbData) adr
 
 {-
 - Netchan_Transmit tries to send an unreliable message to a connection, 
