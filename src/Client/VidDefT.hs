@@ -11,3 +11,11 @@ data VidDefT =
           }
 
 makeLenses ''VidDefT
+
+newVidDefT :: VidDefT
+newVidDefT =
+  VidDefT { _vdWidth     = 0
+          , _vdHeight    = 0
+          , _vdNewWidth  = 0
+          , _vdNewHeight = 0
+          }
