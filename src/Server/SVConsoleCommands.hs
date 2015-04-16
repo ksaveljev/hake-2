@@ -96,7 +96,7 @@ setMasterF = do
                   Com.printf $ "Master server at " `B.append` NET.adrToString masterAdr `B.append` "\n"
                   Com.printf "Sending a ping.\n"
 
-                  NetChannel.outOfBandPrint Constants.nsServer masterAdr "ping"
+                  NetChannel.outOfBandPrint (netGlobals.ngIpSocketServer) masterAdr "ping"
 
                   collectMasters argc (idx + 1) (slot + 1) ((slot, masterAdr) : accum)
 

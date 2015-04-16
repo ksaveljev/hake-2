@@ -104,7 +104,6 @@ data QuakeState =
              , _cmdGlobals         :: !CmdGlobals
              , _keyGlobals         :: !KeyGlobals
              , _fsGlobals          :: !FSGlobals
-             , _netChannelGlobals  :: !NetChannelGlobals
              , _svGlobals          :: !SVGlobals
              , _gameBaseGlobals    :: !GameBaseGlobals
              , _pMoveGlobals       :: !PMoveGlobals
@@ -200,10 +199,6 @@ data FSGlobals =
             , _fsBaseSearchPaths :: !([SearchPathT])
             , _fsFileFromPak     :: !Int
             }
-
-data NetChannelGlobals =
-  NetChannelGlobals {
-                    }
 
 data SVGlobals =
   SVGlobals { _svMasterAdr            :: !(V.Vector NetAdrT)
@@ -953,6 +948,7 @@ data NETGlobals =
              , _ngLoopbackServer :: !LoopbackT
              , _ngIpSocketClient :: !(Maybe Socket)
              , _ngIpSocketServer :: !(Maybe Socket)
+             , _ngSend           :: !SizeBufT
              }
 
 data GItemT =

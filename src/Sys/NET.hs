@@ -7,7 +7,7 @@ module Sys.NET where
 import Control.Concurrent (threadDelay)
 import Control.Exception (handle, IOException)
 import Control.Lens (preuse, use, (^.), (.=), Lens', (+=), ix)
-import Control.Monad (when, liftM, unless)
+import Control.Monad (when, liftM, unless, void)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -92,11 +92,11 @@ socket ip port = do
         bindResult <- io $ handle (\(e :: IOException) -> return (Left e)) $ do
           if B.length ip == 0 || ip == "localhost"
             then if port == Constants.portAny
-                   then S.bind s NS.iNADDR_ANY (NS.PortNum 0)
-                   else S.bind s NS.iNADDR_ANY (NS.PortNum (fromIntegral port))
+                   then void $ S.bind s NS.iNADDR_ANY (NS.PortNum 0) -- TODO: actually check bind result code
+                   else void $ S.bind s NS.iNADDR_ANY (NS.PortNum (fromIntegral port)) -- TODO: actually check bind result code
             else do
               resolved <- NBSD.getHostByName (BC.unpack ip)
-              S.bind s (head $ NBSD.hostAddresses resolved) (NS.PortNum (fromIntegral port)) -- this head is kinda bad, isn't it?
+              void $ S.bind s (head $ NBSD.hostAddresses resolved) (NS.PortNum (fromIntegral port)) -- this head is kinda bad, isn't it? TODO: actually check bind result code
           return $ Right () 
 
         case bindResult of
@@ -231,3 +231,7 @@ sleep msec = do
     -- when we are not a server, just run full speed
     unless (isNothing ipSocketServer || dedicatedValue == 0) $
       io (putStrLn $ "sleeping " ++ show msec ++ " msec") >> io (threadDelay $ msec * 1000)
+
+-- Sends a Packet
+sendPacket :: Lens' QuakeState (Maybe S.Socket) -> Int -> B.ByteString -> NetAdrT -> Quake ()
+sendPacket = undefined -- TODO

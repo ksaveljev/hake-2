@@ -2,7 +2,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.NetChannel where
 
-import Control.Lens (Traversal', Lens')
+import Control.Lens (Traversal', Lens', use, (^.))
 import Control.Monad (void)
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
@@ -12,6 +12,10 @@ import Quake
 import QuakeState
 import qualified Constants
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
+import qualified Sys.NET as NET
+import qualified QCommon.SZ as SZ
+import qualified Sys.Socket as S
 import qualified Sys.Timer as Timer
 
 init :: Quake ()
@@ -24,8 +28,16 @@ init = do
     void $ CVar.get "showdrop" "0" 0
     void $ CVar.get "qport" (BC.pack $ show port) Constants.cvarNoSet
 
-outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
-outOfBandPrint _ _ _ = io (putStrLn "NetChannel.outOfBandPrint") >> undefined -- TODO
+outOfBandPrint :: Lens' QuakeState (Maybe S.Socket) -> NetAdrT -> B.ByteString -> Quake ()
+outOfBandPrint socketLens adr buf = do
+    -- write the packet header
+    SZ.init (netGlobals.ngSend) "" Constants.maxMsgLen
+    MSG.writeInt (netGlobals.ngSend) (-1) -- -1 sequence means out of band
+    SZ.write (netGlobals.ngSend) buf (B.length buf)
+
+    -- send the datagram
+    send <- use $ netGlobals.ngSend
+    NET.sendPacket socketLens (send^.sbCurSize) (send^.sbData) adr
 
 {-
 - Netchan_Transmit tries to send an unreliable message to a connection, 

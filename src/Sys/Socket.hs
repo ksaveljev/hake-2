@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Sys.Socket ( Socket
                   , socket
                   , bind
@@ -7,56 +6,23 @@ module Sys.Socket ( Socket
                   , recvFrom
                   ) where
 
-import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Foreign (Ptr, alloca, allocaBytes, peek)
-import Foreign.C.Types
-import Network.Socket (HostAddress, PortNumber(PortNum))
+import Control.Monad.Except
+import Network.Socket (HostAddress, PortNumber)
 import qualified Data.ByteString as B
 
 data Socket = Socket Int
 
-foreign import ccall unsafe "socket_open" c_socket_open :: IO CInt
-
 socket :: IO (Maybe Socket)
-socket = do
-    s <- c_socket_open
-    return $ if s <= 0
-               then Nothing
-               else Just $ Socket (fromIntegral s)
-
-foreign import ccall unsafe "socket_bind" c_socket_bind :: CInt -> CULong -> CUShort -> IO CInt
+socket = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined
 
 bind :: Socket -> HostAddress -> PortNumber -> IO Bool
-bind (Socket s) host (PortNum port) = do
-    v <- c_socket_bind (fromIntegral s) (fromIntegral host) (fromIntegral port)
-    return $ v == 0
-
-foreign import ccall unsafe "socket_close" c_socket_close :: CInt -> IO ()
+bind _ _ _ = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined
 
 close :: Socket -> IO ()
-close (Socket s) = c_socket_close (fromIntegral s)
-
-foreign import ccall unsafe "socket_send" c_socket_send :: CInt -> CULong -> CUShort -> Ptr CChar -> CInt -> IO CInt
+close _ = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined
 
 sendTo :: Socket -> B.ByteString -> HostAddress -> PortNumber -> IO Int
-sendTo (Socket s) bs host (PortNum port) = do
-    sentSize <- unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      c_socket_send (fromIntegral s) (fromIntegral host) (fromIntegral port) ptr (fromIntegral len)
-
-    return $ fromIntegral sentSize
-
-foreign import ccall unsafe "socket_receive" c_socket_receive :: CInt -> Ptr CULong -> Ptr CUShort -> Ptr CChar -> CInt -> IO CInt
+sendTo _ _ _ _ = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined
 
 recvFrom :: Socket -> Int -> IO (Maybe (B.ByteString, HostAddress, PortNumber))
-recvFrom (Socket s) nbytes =
-    alloca $ \host ->
-    alloca $ \port ->
-    allocaBytes nbytes $ \ptr -> do
-      len <- c_socket_receive (fromIntegral s) host port ptr (fromIntegral nbytes)
-      if len == 0
-        then return Nothing
-        else do
-          bs <- B.packCStringLen (ptr, fromIntegral len)
-          host' <- peek host
-          port' <- peek port
-          return $ Just (bs, fromIntegral host', PortNum (fromIntegral port'))
+recvFrom _ _ = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined
