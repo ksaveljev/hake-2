@@ -16,7 +16,7 @@ import qualified Client.Console as Console
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
-import qualified Render.QRenderer as QRenderer
+import {-# SOURCE #-} qualified Render.QRenderer as QRenderer
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 
@@ -205,3 +205,11 @@ freeRefLib = do
 
     globals.re .= Nothing
     vidGlobals.vgRefLibActive .= False
+
+printf :: Int -> B.ByteString -> Quake ()
+printf printLevel str =
+    if printLevel == Constants.printAll
+      then
+        Com.printf str
+      else
+        Com.dprintf str

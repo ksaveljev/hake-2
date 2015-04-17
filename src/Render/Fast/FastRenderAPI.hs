@@ -1,11 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPI where
 
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
 import Quake
 import Render.RenderAPI
+import qualified Constants
+import qualified Client.VID as VID
 import qualified Render.Fast.Warp as Warp
+
+refVersion :: B.ByteString
+refVersion = "GL 0.01"
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -38,5 +45,6 @@ turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
 
 fastInit :: Int -> Int -> Quake Bool
 fastInit vidXPos vidYPos = do
+    VID.printf Constants.printAll ("ref_gl version: " `B.append` refVersion `B.append` "\n")
 
     undefined -- TODO
