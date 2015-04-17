@@ -28,6 +28,7 @@ import Game.CmdAliasT
 import Game.CVarT
 import QCommon.NetAdrT
 import QCommon.SizeBufT
+import Render.DummyRenderer
 
 import Internal
 
