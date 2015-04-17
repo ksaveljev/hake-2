@@ -3,6 +3,7 @@ module Client.VID where
 
 import Control.Lens ((.=), ix, (^.), zoom, use)
 import Control.Monad (void, liftM, when, unless)
+import Data.Maybe (isJust)
 import qualified Data.ByteString as B
 
 import Quake
@@ -155,4 +156,13 @@ loadRefresh name fast = do
 
 freeRefLib :: Quake ()
 freeRefLib = do
-    io (putStrLn "VID.freeRefLib") >> undefined -- TODO
+    r <- use $ globals.re
+
+    when (isJust r) $ do
+      let Just renderer = r
+          Just kbd = renderer^.reGetKeyboardHandler
+      kbd^.kbdClose
+      IN.shutdown
+
+    globals.re .= Nothing
+    vidGlobals.vgRefLibActive .= False
