@@ -213,3 +213,6 @@ printf printLevel str =
         Com.printf str
       else
         Com.dprintf str
+
+menuInit :: Quake ()
+menuInit = io (putStrLn "VID.menuInit") >> undefined -- TODO

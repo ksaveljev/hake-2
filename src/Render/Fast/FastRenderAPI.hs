@@ -19,7 +19,7 @@ refVersion = "GL 0.01"
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
     RenderAPI { _rInit              = fastInit
-              , _rInit2             = DT.trace "FastRenderAPI.rInit2" undefined -- TODO
+              , _rInit2             = fastInit2
               , _rShutdown          = DT.trace "FastRenderAPI.rShutdown" undefined -- TODO
               , _rBeginRegistration = DT.trace "FastRenderAPI.rBeginRegistration" undefined -- TODO
               , _rRegisterModel     = DT.trace "FastRenderAPI.rRegisterModel" undefined -- TODO
@@ -65,6 +65,14 @@ fastInit _ _ = do
         return False
       else
         return True
+
+fastInit2 :: Quake Bool
+fastInit2 = do
+    VID.menuInit
+
+    -- get our various GL strings
+
+    io (putStrLn "FastRenderAPI.fastInit2") >> undefined
 
 rRegister :: Quake ()
 rRegister = io (putStrLn "FastRenderAPI.rRegister") >> undefined -- TODO
