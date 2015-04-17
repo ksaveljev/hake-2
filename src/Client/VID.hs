@@ -3,7 +3,7 @@ module Client.VID where
 
 import Control.Lens ((.=), ix, (^.), zoom, use)
 import Control.Monad (void, liftM, when, unless)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing)
 import qualified Data.ByteString as B
 
 import Quake
@@ -152,7 +152,45 @@ loadRefresh name fast = do
 
     Com.printf $ "------- Loading " `B.append` name `B.append` " -------\n"
 
-    io (putStrLn "VID.loadRefresh") >> undefined -- TODO
+    let found = elem name Renderer.getDriverNames
+
+    if not found
+      then do
+        Com.printf $ "LoadLibrary(\"" `B.append` name `B.append` "\") failed\n"
+        return False
+      else do
+        Com.printf $ "LoadLibrary(\"" `B.append` name `B.append` "\")\n"
+        let r = Renderer.getDriver name fast
+        globals.re .= r
+
+        when (isNothing r) $
+          Com.comError Constants.errFatal (name `B.append` " can't load but registered")
+
+        let Just renderer = r
+
+        when ((renderer^.reApiVersion) /= Constants.apiVersion) $ do
+          freeRefLib
+          Com.comError Constants.errFatal (name `B.append` " has incompatible api_version")
+
+        IN.realINInit
+
+        xpos <- liftM (truncate . (^.cvValue)) vidXPosCVar
+        ypos <- liftM (truncate . (^.cvValue)) vidYPosCVar
+        ok <- (renderer^.reInit) xpos ypos
+
+        if not ok
+          then do
+            renderer^.reShutDown
+            freeRefLib
+            return False
+          else do
+            -- init KBD
+            let Just kbd = renderer^.reGetKeyboardHandler
+            kbd^.kbdInit
+
+            Com.printf "------------------------------------\n"
+            vidGlobals.vgRefLibActive .= True
+            return True
 
 freeRefLib :: Quake ()
 freeRefLib = do
