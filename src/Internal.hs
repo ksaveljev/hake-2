@@ -1380,6 +1380,7 @@ data KBD =
 data Renderer = Renderer { _rName      :: B.ByteString
                          , _rRefExport :: RefExportT
                          , _rRenderAPI :: RenderAPI
+                         , _rKBD       :: KBD
                          }
 
 data RenderAPI =

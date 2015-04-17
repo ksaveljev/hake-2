@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sys.KBD ( KBD
+module Sys.KBD ( KBD(..)
                , module Sys.KBD
                ) where
 

@@ -12,6 +12,7 @@ dummyRenderer =
   Renderer { _rName      = "DUMMY"
            , _rRefExport = dummyRefExportT
            , _rRenderAPI = dummyRenderAPI
+           , _rKBD       = dummyKBD
            }
 
 dummyRefExportT :: RefExportT
@@ -67,3 +68,17 @@ dummyRenderAPI =
               , _rBeginFrame        = (\_ -> return ())
               , _glScreenShotF      = return ()
               }
+
+dummyKBD :: KBD
+dummyKBD =
+  KBD { _kbdWinX           = 0
+      , _kbdWinY           = 0
+      , _kbdMX             = 0
+      , _kbdMY             = 0
+      , _kbdInit           = return ()
+      , _kbdUpdate         = return ()
+      , _kbdClose          = return ()
+      , _kbdDoKeyEvent     = (\_ _ -> return ())
+      , _kbdInstallGrabs   = return ()
+      , _kbdUninstallGrabs = return ()
+      }
