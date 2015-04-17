@@ -10,13 +10,11 @@ import Render.Renderer
 dummyRenderer :: Renderer
 dummyRenderer =
   Renderer { _rName      = "DUMMY"
-           , _rRefExport = dummyRefExportT
-           , _rRenderAPI = dummyRenderAPI
-           , _rKBD       = dummyKBD
+           , _rRefExport = dummyRefExportT dummyRenderAPI
            }
 
-dummyRefExportT :: RefExportT
-dummyRefExportT =
+dummyRefExportT :: RenderAPI -> RefExportT
+dummyRefExportT _ =
   RefExportT { _reInit                = (\_ _ -> return False)
              , _reShutDown            = return ()
              , _reBeginRegistration   = (\_ -> return ())
@@ -68,17 +66,3 @@ dummyRenderAPI =
               , _rBeginFrame        = (\_ -> return ())
               , _glScreenShotF      = return ()
               }
-
-dummyKBD :: KBD
-dummyKBD =
-  KBD { _kbdWinX           = 0
-      , _kbdWinY           = 0
-      , _kbdMX             = 0
-      , _kbdMY             = 0
-      , _kbdInit           = return ()
-      , _kbdUpdate         = return ()
-      , _kbdClose          = return ()
-      , _kbdDoKeyEvent     = (\_ _ -> return ())
-      , _kbdInstallGrabs   = return ()
-      , _kbdUninstallGrabs = return ()
-      }

@@ -25,7 +25,7 @@ getDriver driverName fast = do
 
     case foundDriver of
       Nothing -> Nothing
-      Just driver -> Just (driver { _rRenderAPI = if fast then fastRenderAPI else basicRenderAPI })
+      Just driver -> Just (driver { _rRefExport = glfwbRefExport (if fast then fastRenderAPI else basicRenderAPI) })
 
 getDriverNames :: V.Vector B.ByteString
 getDriverNames = V.map (^.rName) drivers
