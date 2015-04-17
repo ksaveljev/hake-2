@@ -12,6 +12,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import QCommon.QFiles.PcxT
+import QCommon.XCommandT
 import qualified Constants
 import qualified Client.VID as VID
 import qualified QCommon.Com as Com
@@ -93,3 +94,6 @@ loadPCX fileName returnPalette returnDimensions = do
                         in decodePCX raw (idx + 2) (x + runLength) y maxX maxY $! acc `B.append` (B.replicate runLength byte)
                    else -- write one pixel
                      decodePCX raw (idx + 1) (x + 1) y maxX maxY $! acc `B.snoc` dataByte
+
+glImageListF :: XCommandT
+glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
