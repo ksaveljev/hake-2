@@ -1,8 +1,11 @@
 module Render.Fast.FastRenderAPI where
 
+import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
+import Quake
 import Render.RenderAPI
+import qualified Render.Fast.Warp as Warp
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -28,3 +31,12 @@ fastRenderAPI =
               , _rBeginFrame        = DT.trace "FastRenderAPI.rBeginFrame" undefined -- TODO
               , _glScreenShotF      = DT.trace "FastRenderAPI.glScreenShotF" undefined -- TODO
               }
+
+-- fill r_turbsin
+turbSin :: UV.Vector Float
+turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
+
+fastInit :: Int -> Int -> Quake Bool
+fastInit vidXPos vidYPos = do
+
+    undefined -- TODO
