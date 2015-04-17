@@ -151,7 +151,7 @@ data Globals =
           , _cvarVars           :: !(M.Map B.ByteString CVarT)
           , _con                :: !ConsoleT
           , _vidDef             :: VidDefT
-          , _re                 :: !(Maybe RefExportT)
+          , _re                 :: !(Maybe Renderer)
 
           , _keyBindings        :: !(V.Vector (Maybe B.ByteString))
           , _keyDown            :: !(UV.Vector Bool)
@@ -1376,3 +1376,32 @@ data KBD =
       , _kbdInstallGrabs   :: Quake ()
       , _kbdUninstallGrabs :: Quake ()
       }
+
+data Renderer = Renderer { _rName      :: B.ByteString
+                         , _rRefExport :: RefExportT
+                         , _rRenderAPI :: RenderAPI
+                         }
+
+data RenderAPI =
+    RenderAPI { _rInit              :: Int -> Int -> Quake Bool
+              , _rInit2             :: Quake Bool
+              , _rShutdown          :: Quake ()
+              , _rBeginRegistration :: B.ByteString -> Quake ()
+              , _rRegisterModel     :: B.ByteString -> Quake (Maybe ModelT)
+              , _rRegisterSkin      :: B.ByteString -> Quake (Maybe ImageT)
+              , _rDrawFindPic       :: B.ByteString -> Quake (Maybe ImageT)
+              , _rSetSky            :: B.ByteString -> Float -> V3 Float -> Quake ()
+              , _rEndRegistration   :: Quake ()
+              , _rRenderFrame       :: RefDefT -> Quake ()
+              , _rDrawGetPicSize    :: B.ByteString -> Quake (Int, Int)
+              , _rDrawPic           :: Int -> Int -> B.ByteString -> Quake ()
+              , _rDrawStretchPic    :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+              , _rDrawChar          :: Int -> Int -> Int -> Quake ()
+              , _rDrawTileClear     :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+              , _rDrawFill          :: Int -> Int -> Int -> Int -> Int -> Quake ()
+              , _rDrawFadeScreen    :: Quake ()
+              , _rDrawStretchRaw    :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+              , _rSetPalette        :: B.ByteString -> Quake ()
+              , _rBeginFrame        :: Float -> Quake ()
+              , _glScreenShotF      :: XCommandT
+              }

@@ -1,13 +1,21 @@
-module Render.DummyRenderer ( module Render.DummyRenderer
-                            , RefExportT
-                            ) where
+{-# LANGUAGE OverloadedStrings #-}
+module Render.DummyRenderer (dummyRenderer) where
 
 import qualified Data.Vector.Unboxed as UV
 
 import Client.RefExportT
+import Render.RenderAPI
+import Render.Renderer
 
-dummyRenderer :: RefExportT
+dummyRenderer :: Renderer
 dummyRenderer =
+  Renderer { _rName      = "DUMMY"
+           , _rRefExport = dummyRefExportT
+           , _rRenderAPI = dummyRenderAPI
+           }
+
+dummyRefExportT :: RefExportT
+dummyRefExportT =
   RefExportT { _reInit                = (\_ _ -> return False)
              , _reShutDown            = return ()
              , _reBeginRegistration   = (\_ -> return ())
@@ -34,3 +42,28 @@ dummyRenderer =
              , _reGetModeList         = UV.empty
              , _reGetKeyboardHandler  = Nothing
              }
+
+dummyRenderAPI :: RenderAPI
+dummyRenderAPI =
+    RenderAPI { _rInit              = (\_ _ -> return False)
+              , _rInit2             = return False
+              , _rShutdown          = return ()
+              , _rBeginRegistration = (\_ -> return ())
+              , _rRegisterModel     = (\_ -> return Nothing)
+              , _rRegisterSkin      = (\_ -> return Nothing)
+              , _rDrawFindPic       = (\_ -> return Nothing)
+              , _rSetSky            = (\_ _ _ -> return ())
+              , _rEndRegistration   = return ()
+              , _rRenderFrame       = (\_ -> return ())
+              , _rDrawGetPicSize    = (\_ -> return (0, 0))
+              , _rDrawPic           = (\_ _ _ -> return ())
+              , _rDrawStretchPic    = (\_ _ _ _ _ -> return ())
+              , _rDrawChar          = (\_ _ _ -> return ())
+              , _rDrawTileClear     = (\_ _ _ _ _ -> return ())
+              , _rDrawFill          = (\_ _ _ _ _ -> return ())
+              , _rDrawFadeScreen    = return ()
+              , _rDrawStretchRaw    = (\_ _ _ _ _ _ _ -> return ())
+              , _rSetPalette        = (\_ -> return ())
+              , _rBeginFrame        = (\_ -> return ())
+              , _glScreenShotF      = return ()
+              }

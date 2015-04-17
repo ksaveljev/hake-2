@@ -141,12 +141,12 @@ loadRefresh name fast = do
 
     when refLibActive $ do
       Just renderer <- use $ globals.re
-      let Just kbd = renderer^.reGetKeyboardHandler
+      let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
       kbd^.kbdClose
 
       IN.shutdown
 
-      renderer^.reShutDown
+      renderer^.rRefExport.reShutDown
 
       freeRefLib
 
@@ -168,7 +168,7 @@ loadRefresh name fast = do
 
         let Just renderer = r
 
-        when ((renderer^.reApiVersion) /= Constants.apiVersion) $ do
+        when ((renderer^.rRefExport.reApiVersion) /= Constants.apiVersion) $ do
           freeRefLib
           Com.comError Constants.errFatal (name `B.append` " has incompatible api_version")
 
@@ -176,16 +176,16 @@ loadRefresh name fast = do
 
         xpos <- liftM (truncate . (^.cvValue)) vidXPosCVar
         ypos <- liftM (truncate . (^.cvValue)) vidYPosCVar
-        ok <- (renderer^.reInit) xpos ypos
+        ok <- (renderer^.rRefExport.reInit) xpos ypos
 
         if not ok
           then do
-            renderer^.reShutDown
+            renderer^.rRefExport.reShutDown
             freeRefLib
             return False
           else do
             -- init KBD
-            let Just kbd = renderer^.reGetKeyboardHandler
+            let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
             kbd^.kbdInit
 
             Com.printf "------------------------------------\n"
@@ -198,7 +198,7 @@ freeRefLib = do
 
     when (isJust r) $ do
       let Just renderer = r
-          Just kbd = renderer^.reGetKeyboardHandler
+          Just kbd = renderer^.rRefExport.reGetKeyboardHandler
       kbd^.kbdClose
       IN.shutdown
 

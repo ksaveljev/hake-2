@@ -9,6 +9,7 @@ module Globals ( module Globals
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
+               , module Render.Renderer
                ) where
 
 import Control.Lens (makeLenses)
@@ -29,6 +30,7 @@ import Game.CVarT
 import QCommon.NetAdrT
 import QCommon.SizeBufT
 import Render.DummyRenderer
+import Render.Renderer
 
 import Internal
 

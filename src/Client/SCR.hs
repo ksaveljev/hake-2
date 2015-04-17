@@ -52,7 +52,7 @@ updateScreenF = updateScreen2
 updateScreen :: Quake ()
 updateScreen = do
     Just renderer <- use $ globals.re
-    (renderer^.reUpdateScreen) updateScreenF
+    (renderer^.rRefExport.reUpdateScreen) updateScreenF
 
 {-
 - ================== SCR_UpdateScreen
