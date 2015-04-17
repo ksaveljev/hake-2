@@ -3,6 +3,7 @@
 module Util.Math3D where
 
 import Control.Lens (preuse, ix, (^.), Const)
+import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z)
 
 import Quake
@@ -10,6 +11,9 @@ import QuakeState
 import qualified Constants
 
 import qualified Debug.Trace as DT
+
+shortRatio :: Float
+shortRatio = 360 / 65536
 
 piRatio :: Float
 piRatio = pi / 360
@@ -95,3 +99,6 @@ angleVectors angles setForward setRight setUp =
                then Just $ V3 (cr' * sp * cy + sr * sy) (cr' * sp * sy + (-sr) * cy) (cr' * cp)
                else Nothing
     in (forward, right, up)
+
+shortToAngle :: Int16 -> Float
+shortToAngle x = (fromIntegral x) * shortRatio

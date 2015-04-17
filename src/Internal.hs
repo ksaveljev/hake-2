@@ -117,6 +117,8 @@ data QuakeState =
              , _mInfantryGlobals   :: !MInfantryGlobals
              , _playerTrailGlobals :: !PlayerTrailGlobals
              , _vidGlobals         :: !VIDGlobals
+             , _inGlobals          :: !INGlobals
+             , _glfwbKBDGlobals    :: !GLFWbKBDGlobals
              }
 
 data Globals =
@@ -1404,3 +1406,21 @@ data RenderAPI =
               , _rBeginFrame        :: Float -> Quake ()
               , _glScreenShotF      :: XCommandT
               }
+
+data INGlobals =
+  INGlobals { _inMouseAvail          :: Bool
+            , _inMouseActive         :: Bool
+            , _inIgnoreFirst         :: Bool
+            , _inMouseButtonState    :: Int
+            , _inMouseOldButtonState :: Int
+            , _inOldMouseX           :: Int
+            , _inOldMouseY           :: Int
+            , _inMLooking            :: Bool
+            }
+
+data GLFWbKBDGlobals =
+  GLFWbKBDGlobals { _glfwbKBDmx    :: Int
+                  , _glfwbKBDmy    :: Int
+                  , _glfwbKBDwinx  :: Int
+                  , _glfwbKBDwiny  :: Int
+                  }

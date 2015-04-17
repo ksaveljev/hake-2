@@ -2,6 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.ClientStateT ( ClientStateT(..)
                            , module Client.ClientStateT
+                           , module Client.ClientInfoT
+                           , module Client.FrameT
+                           , module Client.RefDefT
+                           , module Game.UserCmdT
+                           , module Render.ImageT
+                           , module Render.ModelT
+                           , module Sound.SfxT
                            ) where
 
 import Control.Lens (makeLenses)

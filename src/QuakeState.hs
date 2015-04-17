@@ -17,6 +17,8 @@ module QuakeState ( QuakeState(..)
                   , mInfantryGlobals
                   , playerTrailGlobals
                   , vidGlobals
+                  , inGlobals
+                  , glfwbKBDGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -38,6 +40,8 @@ module QuakeState ( QuakeState(..)
                   , module Server.SVGlobals
                   , module Game.GameBaseGlobals
                   , module QCommon.PMoveGlobals
+                  , module Sys.GLFWbKBDGlobals
+                  , module Sys.INGlobals
                   , module Sys.NETGlobals
                   , module Game.GameItemsGlobals
                   , module Game.Monsters.MSoldierGlobals
@@ -64,6 +68,8 @@ import QCommon.CMGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.PMoveGlobals
+import Sys.GLFWbKBDGlobals
+import Sys.INGlobals
 import Sys.NETGlobals
 
 makeLenses ''QuakeState
@@ -86,4 +92,6 @@ initialQuakeState =
              , _mInfantryGlobals   = initialMInfantryGlobals
              , _playerTrailGlobals = initialPlayerTrailGlobals
              , _vidGlobals         = initialVIDGlobals
+             , _inGlobals          = initialINGlobals
+             , _glfwbKBDGlobals    = initialGLFWbKBDGlobals
              }
