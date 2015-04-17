@@ -5,6 +5,7 @@ import Control.Lens ((.=), ix, (^.), zoom, use)
 import Control.Monad (void, liftM, when, unless)
 import Data.Maybe (isJust, isNothing)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -15,14 +16,14 @@ import qualified Client.Console as Console
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
-import qualified Render.Renderer as Renderer
+import qualified Render.QRenderer as QRenderer
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 
 init :: Quake ()
 init = do
     -- Create the video variables so we know how to start the graphics drivers
-    void $ CVar.get "vid_ref" Renderer.getPreferredName Constants.cvarArchive
+    void $ CVar.get "vid_ref" QRenderer.getPreferredName Constants.cvarArchive
     void $ CVar.get "vid_xpos" "3" Constants.cvarArchive
     void $ CVar.get "vid_ypos" "22" Constants.cvarArchive
     void $ CVar.get "vid_width" "640" Constants.cvarArchive
@@ -100,13 +101,13 @@ checkChanges = do
           loaded <- loadRefresh (vidRef^.cvString) True
 
           unless loaded $ do
-            let renderer = if (vidRef^.cvString) == Renderer.getPreferredName
+            let renderer = if (vidRef^.cvString) == QRenderer.getPreferredName
                              -- try the default renderer as fallback after preferred
-                             then Renderer.getDefaultName
+                             then QRenderer.getDefaultName
                              -- try the preferred renderer as first fallback
-                             else Renderer.getPreferredName
+                             else QRenderer.getPreferredName
 
-            renderer' <- if (vidRef^.cvString) == Renderer.getDefaultName
+            renderer' <- if (vidRef^.cvString) == QRenderer.getDefaultName
                            then do
                              Com.printf "Refresh failed\n"
                              Just glMode <- CVar.get "gl_mode" "0" 0
@@ -152,7 +153,7 @@ loadRefresh name fast = do
 
     Com.printf $ "------- Loading " `B.append` name `B.append` " -------\n"
 
-    let found = elem name Renderer.getDriverNames
+    let found = V.elem name QRenderer.getDriverNames
 
     if not found
       then do
@@ -160,7 +161,7 @@ loadRefresh name fast = do
         return False
       else do
         Com.printf $ "LoadLibrary(\"" `B.append` name `B.append` "\")\n"
-        let r = Renderer.getDriver name fast
+        let r = QRenderer.getDriver name fast
         globals.re .= r
 
         when (isNothing r) $
