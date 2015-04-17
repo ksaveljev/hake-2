@@ -1,19 +1,47 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Image where
 
-import Control.Lens ((^.))
-import Data.Bits ((.&.))
+import Control.Lens ((^.), (.=))
+import Control.Monad (when)
+import Data.Bits ((.&.), (.|.), shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
+import QuakeState
 import QCommon.QFiles.PcxT
 import qualified Constants
 import qualified Client.VID as VID
+import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 
 getPalette :: Quake ()
-getPalette = io (putStrLn "Image.getPalette") >> undefined -- TODO
+getPalette = do
+    (_, result, _) <- loadPCX "pics/colormap.pcx" True False
+
+    case result of
+      Nothing -> Com.comError Constants.errFatal "Couldn't load pics/colormap.pcx"
+      Just palette -> do
+        when (B.length palette /= 768) $
+          Com.comError Constants.errFatal "Couldn't load pics/colormap.pcx"
+
+        let table = UV.fromList $! map (constructPalette palette) [0..255]
+            lastElem = (constructPalette palette 255) .&. 0x00FFFFFF -- 255 is transparent
+            d8to24table = table UV.// [(255, lastElem)]
+
+        fastRenderAPIGlobals.frd8to24table .= d8to24table
+
+        particleTGlobals.pColorTable .= UV.map (.&. 0x00FFFFFF) d8to24table
+
+  where constructPalette :: B.ByteString -> Int -> Int
+        constructPalette bs i =
+          let j = i * 3
+              r :: Int = fromIntegral $ B.index bs j
+              g :: Int = fromIntegral $ B.index bs (j + 1)
+              b :: Int = fromIntegral $ B.index bs (j + 2)
+          in (255 `shiftL` 24) .|. (b `shiftL` 16) .|. (g `shiftL` 8) .|. r
 
 loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe B.ByteString, Maybe B.ByteString, Maybe (Int, Int))
 loadPCX fileName returnPalette returnDimensions = do

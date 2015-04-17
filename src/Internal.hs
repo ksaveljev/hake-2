@@ -122,6 +122,7 @@ data QuakeState =
              , _inGlobals            :: !INGlobals
              , _glfwbKBDGlobals      :: !GLFWbKBDGlobals
              , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
+             , _particleTGlobals      :: !ParticleTGlobals
              }
 
 data Globals =
@@ -1429,8 +1430,13 @@ data GLFWbKBDGlobals =
                   }
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin :: Float
-                       , _frGLDepthMax :: Float
-                       , _frGLConfig   :: GLConfigT
-                       , _frGLState    :: GLStateT
+  FastRenderAPIGlobals { _frGLDepthMin  :: Float
+                       , _frGLDepthMax  :: Float
+                       , _frGLConfig    :: GLConfigT
+                       , _frGLState     :: GLStateT
+                       , _frd8to24table :: UV.Vector Int
                        }
+
+data ParticleTGlobals =
+  ParticleTGlobals { _pColorTable :: UV.Vector Int
+                   }

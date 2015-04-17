@@ -5,6 +5,7 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Vector.Unboxed as UV
 
 import Internal
 import Render.GLConfigT
@@ -14,8 +15,9 @@ makeLenses ''FastRenderAPIGlobals
 
 initialFastRenderAPIGlobals :: FastRenderAPIGlobals
 initialFastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin = 0
-                       , _frGLDepthMax = 0
-                       , _frGLConfig   = newGLConfigT
-                       , _frGLState    = newGLStateT
+  FastRenderAPIGlobals { _frGLDepthMin  = 0
+                       , _frGLDepthMax  = 0
+                       , _frGLConfig    = newGLConfigT
+                       , _frGLState     = newGLStateT
+                       , _frd8to24table = UV.replicate 256 0
                        }
