@@ -22,7 +22,7 @@ glfwbRenderer =
 glfwbRefExportT :: KBD -> RenderAPI -> RefExportT
 glfwbRefExportT kbd renderAPI =
   RefExportT { _reInit                = glfwbInit renderAPI
-             , _reShutDown            = DT.trace "_reShutDown" undefined -- TODO
+             , _reShutDown            = glfwbShutdown renderAPI
              , _reBeginRegistration   = DT.trace "_reBeginRegistration" undefined -- TODO
              , _reRegisterModel       = DT.trace "_reRegisterModel" undefined -- TODO
              , _reRegisterSkin        = DT.trace "_reRegisterSkin" undefined -- TODO
@@ -72,3 +72,7 @@ glfwbInit renderAPI vidXPos vidYPos = do
       then return False
       -- post init
       else renderAPI^.rInit2
+
+glfwbShutdown :: RenderAPI -> Quake ()
+glfwbShutdown renderAPI = do
+    renderAPI^.rShutdown
