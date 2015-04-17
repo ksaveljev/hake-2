@@ -55,6 +55,8 @@ import QCommon.QFiles.BSP.DAreaPortalT
 import QCommon.QFiles.BSP.DVisT
 import QCommon.SearchPathT
 import QCommon.SizeBufT
+import Render.GLConfigT
+import Render.GLStateT
 import Render.MEdgeT
 import Render.MModelT
 import Render.MNodeT
@@ -101,24 +103,25 @@ newtype LinkReference = LinkReference Int
 newtype GItemReference = GItemReference Int deriving (Eq)
 
 data QuakeState =
-  QuakeState { _globals            :: !Globals
-             , _comGlobals         :: !ComGlobals
-             , _cmdGlobals         :: !CmdGlobals
-             , _keyGlobals         :: !KeyGlobals
-             , _fsGlobals          :: !FSGlobals
-             , _svGlobals          :: !SVGlobals
-             , _gameBaseGlobals    :: !GameBaseGlobals
-             , _pMoveGlobals       :: !PMoveGlobals
-             , _scrGlobals         :: !SCRGlobals
-             , _netGlobals         :: !NETGlobals
-             , _cmGlobals          :: !CMGlobals
-             , _gameItemsGlobals   :: !GameItemsGlobals
-             , _mSoldierGlobals    :: !MSoldierGlobals
-             , _mInfantryGlobals   :: !MInfantryGlobals
-             , _playerTrailGlobals :: !PlayerTrailGlobals
-             , _vidGlobals         :: !VIDGlobals
-             , _inGlobals          :: !INGlobals
-             , _glfwbKBDGlobals    :: !GLFWbKBDGlobals
+  QuakeState { _globals              :: !Globals
+             , _comGlobals           :: !ComGlobals
+             , _cmdGlobals           :: !CmdGlobals
+             , _keyGlobals           :: !KeyGlobals
+             , _fsGlobals            :: !FSGlobals
+             , _svGlobals            :: !SVGlobals
+             , _gameBaseGlobals      :: !GameBaseGlobals
+             , _pMoveGlobals         :: !PMoveGlobals
+             , _scrGlobals           :: !SCRGlobals
+             , _netGlobals           :: !NETGlobals
+             , _cmGlobals            :: !CMGlobals
+             , _gameItemsGlobals     :: !GameItemsGlobals
+             , _mSoldierGlobals      :: !MSoldierGlobals
+             , _mInfantryGlobals     :: !MInfantryGlobals
+             , _playerTrailGlobals   :: !PlayerTrailGlobals
+             , _vidGlobals           :: !VIDGlobals
+             , _inGlobals            :: !INGlobals
+             , _glfwbKBDGlobals      :: !GLFWbKBDGlobals
+             , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
              }
 
 data Globals =
@@ -1424,3 +1427,10 @@ data GLFWbKBDGlobals =
                   , _glfwbKBDwinx  :: Int
                   , _glfwbKBDwiny  :: Int
                   }
+
+data FastRenderAPIGlobals =
+  FastRenderAPIGlobals { _frGLDepthMin :: Float
+                       , _frGLDepthMax :: Float
+                       , _frGLConfig   :: GLConfigT
+                       , _frGLState    :: GLStateT
+                       }

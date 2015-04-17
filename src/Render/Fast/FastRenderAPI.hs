@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPI where
 
+import Control.Lens ((.=))
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
 import Quake
-import Render.RenderAPI
+import QuakeState
 import qualified Constants
 import qualified Client.VID as VID
+import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Warp as Warp
 
 refVersion :: B.ByteString
@@ -16,7 +18,7 @@ refVersion = "GL 0.01"
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
-    RenderAPI { _rInit              = DT.trace "FastRenderAPI.rInit" undefined -- TODO
+    RenderAPI { _rInit              = fastInit
               , _rInit2             = DT.trace "FastRenderAPI.rInit2" undefined -- TODO
               , _rShutdown          = DT.trace "FastRenderAPI.rShutdown" undefined -- TODO
               , _rBeginRegistration = DT.trace "FastRenderAPI.rBeginRegistration" undefined -- TODO
@@ -44,7 +46,28 @@ turbSin :: UV.Vector Float
 turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
 
 fastInit :: Int -> Int -> Quake Bool
-fastInit vidXPos vidYPos = do
+fastInit _ _ = do
     VID.printf Constants.printAll ("ref_gl version: " `B.append` refVersion `B.append` "\n")
 
-    undefined -- TODO
+    Image.getPalette
+
+    rRegister
+
+    -- set our "safe" modes
+    fastRenderAPIGlobals.frGLState.glsPrevMode .= 3
+
+    ok <- rSetMode
+
+    -- create the window and set up the context
+    if not ok
+      then do
+        VID.printf Constants.printAll "ref_gl::R_Init() - could not R_SetMode()\n"
+        return False
+      else
+        return True
+
+rRegister :: Quake ()
+rRegister = io (putStrLn "FastRenderAPI.rRegister") >> undefined -- TODO
+
+rSetMode :: Quake Bool
+rSetMode = io (putStrLn "FastRenderAPI.rSetMode") >> undefined -- TODO

@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Render.GLConfigT where
 
 import Control.Lens (makeLenses)
@@ -14,3 +15,13 @@ data GLConfigT =
             }
 
 makeLenses ''GLConfigT
+
+newGLConfigT :: GLConfigT
+newGLConfigT =
+  GLConfigT { _glcRenderer         = 0
+            , _glcRendererString   = ""
+            , _glcVendorString     = ""
+            , _glcVersionString    = ""
+            , _glcExtensionsString = ""
+            , _glcAllowCds         = False
+            }
