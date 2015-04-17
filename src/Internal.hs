@@ -929,10 +929,10 @@ data RefExportT =
              , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
              , _reEndRegistration     :: Quake ()
              , _reRenderFrame         :: RefDefT -> Quake ()
-             , _reDrawGetPicSize      :: Int -> Int -> B.ByteString -> Quake ()
+             , _reDrawGetPicSize      :: B.ByteString -> Quake (Maybe (Int, Int))
              , _reDrawPic             :: Int -> Int -> B.ByteString -> Quake ()
              , _reDrawStretchPic      :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-             , _reDrawChar            :: Int -> Int -> Char -> Quake ()
+             , _reDrawChar            :: Int -> Int -> Int -> Quake ()
              , _reDrawTileClear       :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
              , _reDrawFill            :: Int -> Int -> Int -> Int -> Int -> Quake ()
              , _reDrawFadeScreen      :: Quake ()
@@ -943,7 +943,7 @@ data RefExportT =
              , _reAppActivate         :: Bool -> Quake ()
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
-             , _reGetModeList         :: UV.Vector Int -- TODO: ???
+             , _reGetModeList         :: Int -- TODO
              , _reGetKeyboardHandler  :: Maybe KBD
              }
 
@@ -1392,7 +1392,7 @@ data RenderAPI =
               , _rSetSky            :: B.ByteString -> Float -> V3 Float -> Quake ()
               , _rEndRegistration   :: Quake ()
               , _rRenderFrame       :: RefDefT -> Quake ()
-              , _rDrawGetPicSize    :: B.ByteString -> Quake (Int, Int)
+              , _rDrawGetPicSize    :: B.ByteString -> Quake (Maybe (Int, Int))
               , _rDrawPic           :: Int -> Int -> B.ByteString -> Quake ()
               , _rDrawStretchPic    :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
               , _rDrawChar          :: Int -> Int -> Int -> Quake ()

@@ -1,8 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.DummyRenderer (dummyRenderer) where
 
-import qualified Data.Vector.Unboxed as UV
-
 import Client.RefExportT
 import Render.RenderAPI
 import Render.Renderer
@@ -24,7 +22,7 @@ dummyRefExportT _ =
              , _reSetSky              = (\_ _ _ -> return ())
              , _reEndRegistration     = return ()
              , _reRenderFrame         = (\_ -> return ())
-             , _reDrawGetPicSize      = (\_ _ _ -> return ())
+             , _reDrawGetPicSize      = (\_ -> return Nothing)
              , _reDrawPic             = (\_ _ _ -> return ())
              , _reDrawStretchPic      = (\_ _ _ _ _ -> return ())
              , _reDrawChar            = (\_ _ _ -> return ())
@@ -38,7 +36,7 @@ dummyRefExportT _ =
              , _reAppActivate         = (\_ -> return ())
              , _reUpdateScreen        = (\callback -> callback)
              , _reApiVersion          = 0
-             , _reGetModeList         = UV.empty
+             , _reGetModeList         = 0 -- TODO
              , _reGetKeyboardHandler  = Nothing
              }
 
@@ -54,7 +52,7 @@ dummyRenderAPI =
               , _rSetSky            = (\_ _ _ -> return ())
               , _rEndRegistration   = return ()
               , _rRenderFrame       = (\_ -> return ())
-              , _rDrawGetPicSize    = (\_ -> return (0, 0))
+              , _rDrawGetPicSize    = (\_ -> return Nothing)
               , _rDrawPic           = (\_ _ _ -> return ())
               , _rDrawStretchPic    = (\_ _ _ _ _ -> return ())
               , _rDrawChar          = (\_ _ _ -> return ())
