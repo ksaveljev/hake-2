@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.DummyRenderer (dummyRenderer) where
 
+import qualified Data.Vector as V
+
 import Client.RefExportT
 import Render.RenderAPI
 import Render.Renderer
@@ -36,7 +38,7 @@ dummyRefExportT _ =
              , _reAppActivate         = (\_ -> return ())
              , _reUpdateScreen        = (\callback -> callback)
              , _reApiVersion          = 0
-             , _reGetModeList         = 0 -- TODO
+             , _reGetModeList         = return V.empty
              , _reGetKeyboardHandler  = Nothing
              }
 

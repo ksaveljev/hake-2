@@ -951,7 +951,7 @@ data RefExportT =
              , _reAppActivate         :: Bool -> Quake ()
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
-             , _reGetModeList         :: Int -- TODO
+             , _reGetModeList         :: Quake (V.Vector VideoMode)
              , _reGetKeyboardHandler  :: Maybe KBD
              }
 

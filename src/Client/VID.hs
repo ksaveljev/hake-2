@@ -216,3 +216,10 @@ printf printLevel str =
 
 menuInit :: Quake ()
 menuInit = io (putStrLn "VID.menuInit") >> undefined -- TODO
+
+initModeList :: Quake ()
+initModeList = do
+    Just renderer <- use $ globals.re
+
+    modes <- renderer^.rRefExport.reGetModeList
+    io (putStrLn "VID.initModeList") >> undefined -- TODO

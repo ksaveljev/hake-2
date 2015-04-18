@@ -6,11 +6,13 @@ module Render.GLFWbRenderer ( glfwbRenderer
 import Control.Lens ((^.), use, (.=))
 import Control.Monad (when)
 import Data.Maybe (isNothing)
-import Graphics.UI.GLFW (getPrimaryMonitor, getVideoMode)
+import Graphics.UI.GLFW (VideoMode, getPrimaryMonitor, getVideoMode)
 import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 import qualified Debug.Trace as DT
+import qualified Graphics.UI.GLFW as GLFW
 
 import Quake
 import QuakeState
@@ -75,12 +77,19 @@ glfwbKBD = DT.trace "GLFWbRenderer.glfwKBD" undefined -- TODO
 
 glfwbInit :: RenderAPI -> Int -> Int -> Quake Bool
 glfwbInit renderAPI vidXPos vidYPos = do
-    -- pre init
-    ok <- (renderAPI^.rInit) (glfwbScreenshot renderAPI) (glfwbSetMode) vidXPos vidYPos
-    if not ok
-      then return False
-      -- post init
-      else renderAPI^.rInit2
+    r <- io $ GLFW.init
+    if r
+      then do
+        -- pre init
+        ok <- (renderAPI^.rInit) (glfwbScreenshot renderAPI) (glfwbSetMode) vidXPos vidYPos
+        if not ok
+          then return False
+          -- post init
+          else renderAPI^.rInit2
+
+      else do
+        VID.printf Constants.printAll "Failed to initialize GLFW-b\n"
+        return False
 
 glfwbShutdown :: RenderAPI -> Quake ()
 glfwbShutdown renderAPI = renderAPI^.rShutdown
@@ -148,7 +157,7 @@ glfwbAppActivate _ = return () -- do nothing
 glfwbUpdateScreen :: XCommandT -> Quake ()
 glfwbUpdateScreen callback = callback
 
-glfwbGetModeList :: Int
+glfwbGetModeList :: Quake (V.Vector VideoMode)
 glfwbGetModeList = DT.trace "GLFWbRenderer.glfwbGetModeList" undefined -- TODO
 
 glfwbSetMode :: (Int, Int) -> Int -> Bool -> Quake Int
