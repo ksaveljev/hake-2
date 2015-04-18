@@ -2,7 +2,7 @@
 module Render.Fast.FastRenderAPI where
 
 import Control.Lens ((.=), (^.), use)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
@@ -165,9 +165,43 @@ rSetMode glImplSetMode = do
 
     vid <- use $ fastRenderAPIGlobals.frVid
     let dim = (vid^.vdWidth, vid^.vdHeight)
-    
 
-    io (putStrLn "FastRenderAPI.rSetMode") >> undefined -- TODO
+    err <- glImplSetMode dim (truncate $ glMode^.cvValue) isFullscreen
+
+    if err == RenderAPIConstants.rsErrOk
+      then do
+        fastRenderAPIGlobals.frGLState.glsPrevMode .= truncate (glMode^.cvValue)
+        return True
+      else do
+        done <- if err == RenderAPIConstants.rsErrInvalidFullscreen
+                  then do
+                    CVar.setValueI "vid_fullscreen" 0
+                    vidFullScreenCVar >>= \v -> CVar.update v { _cvModified = False }
+                    VID.printf Constants.printAll "ref_gl::R_SetMode() - fullscreen unavailable in this mode\n"
+                    err' <- glImplSetMode dim (truncate $ glMode^.cvValue) False
+                    if err' == RenderAPIConstants.rsErrOk
+                      then return True
+                      else return False
+                  else return False
+
+        if done
+          then return True
+          else do
+            prevMode <- use $ fastRenderAPIGlobals.frGLState.glsPrevMode
+
+            when (err == RenderAPIConstants.rsErrInvalidMode) $ do
+              CVar.setValueI "gl_mode" prevMode
+              glModeCVar >>= \v -> CVar.update v { _cvModified = False }
+              VID.printf Constants.printAll "ref_gl::R_SetMode() - invalid mode\n"
+
+            -- try setting it back to something safe
+            err' <- glImplSetMode dim prevMode False
+
+            if err' /= RenderAPIConstants.rsErrOk
+              then do
+                VID.printf Constants.printAll "ref_gl::R_SetMode() - could not revert to safe mode\n"
+                return False
+              else return True
 
 glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
