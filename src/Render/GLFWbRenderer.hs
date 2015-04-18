@@ -72,7 +72,7 @@ glfwbKBD = DT.trace "GLFWbRenderer.glfwKBD" undefined -- TODO
 glfwbInit :: RenderAPI -> Int -> Int -> Quake Bool
 glfwbInit renderAPI vidXPos vidYPos = do
     -- pre init
-    ok <- (renderAPI^.rInit) vidXPos vidYPos
+    ok <- (renderAPI^.rInit) (glfwbScreenshot renderAPI) (glfwbSetMode) vidXPos vidYPos
     if not ok
       then return False
       -- post init
@@ -146,3 +146,6 @@ glfwbUpdateScreen callback = callback
 
 glfwbGetModeList :: Int
 glfwbGetModeList = DT.trace "GLFWbRenderer.glfwbGetModeList" undefined -- TODO
+
+glfwbSetMode :: (Int, Int) -> Int -> Bool -> Quake Int
+glfwbSetMode _ _ _ = io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO

@@ -42,7 +42,7 @@ dummyRefExportT _ =
 
 dummyRenderAPI :: RenderAPI
 dummyRenderAPI =
-    RenderAPI { _rInit              = (\_ _ -> return False)
+    RenderAPI { _rInit              = (\_ _ _ _ -> return False)
               , _rInit2             = return False
               , _rShutdown          = return ()
               , _rBeginRegistration = (\_ -> return ())

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPI where
 
-import Control.Lens ((.=))
+import Control.Lens ((.=), (^.), use)
 import Control.Monad (void)
 import Data.Bits ((.|.))
 import qualified Data.ByteString as B
@@ -10,6 +10,7 @@ import qualified Debug.Trace as DT
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.VID as VID
@@ -51,18 +52,18 @@ fastRenderAPI =
 turbSin :: UV.Vector Float
 turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
 
-fastInit :: Int -> Int -> Quake Bool
-fastInit _ _ = do
+fastInit :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
+fastInit glImplScreenshot glImplSetMode _ _ = do
     VID.printf Constants.printAll ("ref_gl version: " `B.append` refVersion `B.append` "\n")
 
     Image.getPalette
 
-    rRegister
+    rRegister glImplScreenshot
 
     -- set our "safe" modes
     fastRenderAPIGlobals.frGLState.glsPrevMode .= 3
 
-    ok <- rSetMode
+    ok <- rSetMode glImplSetMode
 
     -- create the window and set up the context
     if not ok
@@ -80,8 +81,8 @@ fastInit2 = do
 
     io (putStrLn "FastRenderAPI.fastInit2") >> undefined
 
-rRegister :: Quake ()
-rRegister = do
+rRegister :: Quake () -> Quake ()
+rRegister glImplScreenshot = do
     void $ CVar.get "hand" "0" (Constants.cvarUserInfo .|. Constants.cvarArchive)
     void $ CVar.get "r_norefresh" "0" 0
     void $ CVar.get "r_fullbright" "0" 0
@@ -150,15 +151,25 @@ rRegister = do
     void $ CVar.get "vid_ref" "lwjgl" Constants.cvarArchive
 
     Cmd.addCommand "imagelist" (Just Image.glImageListF)
-    Cmd.addCommand "screenshot" (Just fastScreenshot)
+    Cmd.addCommand "screenshot" (Just glImplScreenshot)
     Cmd.addCommand "modellist" (Just Model.modelListF)
     Cmd.addCommand "gl_strings" (Just glStringsF)
 
-rSetMode :: Quake Bool
-rSetMode = io (putStrLn "FastRenderAPI.rSetMode") >> undefined -- TODO
+rSetMode :: ((Int, Int) -> Int -> Bool -> Quake Int) -> Quake Bool
+rSetMode glImplSetMode = do
+    fullScreen <- vidFullScreenCVar
+    glMode <- glModeCVar
+
+    let isFullscreen = (fullScreen^.cvValue) > 0
+
+    CVar.update fullScreen { _cvModified = False }
+    CVar.update glMode { _cvModified = False }
+
+    vid <- use $ fastRenderAPIGlobals.frVid
+    let dim = (vid^.vdWidth, vid^.vdHeight)
+    
+
+    io (putStrLn "FastRenderAPI.rSetMode") >> undefined -- TODO
 
 glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
-
-fastScreenshot :: Quake ()
-fastScreenshot = io (putStrLn "FastRenderAPI.fastScreenshot") >> undefined -- TODO

@@ -1388,7 +1388,7 @@ data Renderer = Renderer { _rName      :: B.ByteString
                          }
 
 data RenderAPI =
-    RenderAPI { _rInit              :: Int -> Int -> Quake Bool
+    RenderAPI { _rInit              :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
               , _rInit2             :: Quake Bool
               , _rShutdown          :: Quake ()
               , _rBeginRegistration :: B.ByteString -> Quake ()
@@ -1435,6 +1435,7 @@ data FastRenderAPIGlobals =
                        , _frGLConfig    :: GLConfigT
                        , _frGLState     :: GLStateT
                        , _frd8to24table :: UV.Vector Int
+                       , _frVid         :: VidDefT
                        }
 
 data ParticleTGlobals =
