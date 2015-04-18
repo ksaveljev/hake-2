@@ -3,17 +3,21 @@ module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
-import Control.Lens ((^.))
+import Control.Lens ((^.), use, (.=))
+import Control.Monad (when)
+import Data.Maybe (isNothing)
+import Graphics.UI.GLFW (getPrimaryMonitor, getVideoMode)
 import Linear (V3)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Debug.Trace as DT
 
 import Quake
-import Client.RefDefT
+import QuakeState
 import QCommon.XCommandT
 import Render.Basic.BasicRenderAPI
-import Render.Renderer
 import qualified Constants
+import qualified Client.VID as VID
 
 glfwbRefExport :: RenderAPI -> RefExportT
 glfwbRefExport = glfwbRefExportT glfwbKBD
@@ -148,4 +152,14 @@ glfwbGetModeList :: Int
 glfwbGetModeList = DT.trace "GLFWbRenderer.glfwbGetModeList" undefined -- TODO
 
 glfwbSetMode :: (Int, Int) -> Int -> Bool -> Quake Int
-glfwbSetMode _ _ _ = io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO
+glfwbSetMode dim mode fullscreen = do
+    VID.printf Constants.printAll "Initializing OpenGL display\n"
+    VID.printf Constants.printAll $ "...setting mode " `B.append` BC.pack (show mode) `B.append` ":" -- IMPROVE?
+
+    (use $ glfwbGlobals.glfwbOldDisplayMode) >>= \oldMode ->
+      when (isNothing oldMode) $ do
+        Just monitor <- io $ getPrimaryMonitor
+        videoMode <- io $ getVideoMode monitor
+        glfwbGlobals.glfwbOldDisplayMode .= videoMode
+
+    io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO

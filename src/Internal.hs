@@ -14,6 +14,7 @@ import Control.Monad.State.Strict
 import Data.Int (Int16)
 import Data.Sequence (Seq)
 import Data.Word (Word8, Word16)
+import Graphics.UI.GLFW (VideoMode)
 import Linear (V3, V4)
 import System.IO (Handle)
 import System.Random (StdGen)
@@ -120,6 +121,7 @@ data QuakeState =
              , _playerTrailGlobals   :: !PlayerTrailGlobals
              , _vidGlobals           :: !VIDGlobals
              , _inGlobals            :: !INGlobals
+             , _glfwbGlobals         :: !GLFWbGlobals
              , _glfwbKBDGlobals      :: !GLFWbKBDGlobals
              , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
              , _particleTGlobals      :: !ParticleTGlobals
@@ -1421,6 +1423,12 @@ data INGlobals =
             , _inOldMouseY           :: Int
             , _inMLooking            :: Bool
             }
+
+data GLFWbGlobals =
+  GLFWbGlobals { _glfwbOldDisplayMode :: Maybe VideoMode
+               , _glfwbWindowXPos     :: Int
+               , _glfwbWindowYPos     :: Int
+               }
 
 data GLFWbKBDGlobals =
   GLFWbKBDGlobals { _glfwbKBDmx    :: Int

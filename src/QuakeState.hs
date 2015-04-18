@@ -18,6 +18,7 @@ module QuakeState ( QuakeState(..)
                   , playerTrailGlobals
                   , vidGlobals
                   , inGlobals
+                  , glfwbGlobals
                   , glfwbKBDGlobals
                   , fastRenderAPIGlobals
                   , particleTGlobals
@@ -52,6 +53,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.PlayerTrailGlobals
                   , module Client.VIDGlobals
                   , module Render.Fast.FastRenderAPIGlobals
+                  , module Render.GLFWbGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -73,6 +75,7 @@ import QCommon.CMGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.PMoveGlobals
+import Render.GLFWbGlobals
 import Sys.GLFWbKBDGlobals
 import Sys.INGlobals
 import Sys.NETGlobals
@@ -99,6 +102,7 @@ initialQuakeState =
              , _playerTrailGlobals   = initialPlayerTrailGlobals
              , _vidGlobals           = initialVIDGlobals
              , _inGlobals            = initialINGlobals
+             , _glfwbGlobals         = initialGLFWbGlobals
              , _glfwbKBDGlobals      = initialGLFWbKBDGlobals
              , _fastRenderAPIGlobals = initialFastRenderAPIGlobals
              , _particleTGlobals     = initialParticleTGlobals
