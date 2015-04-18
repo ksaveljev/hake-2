@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.CVar where
 
 -- CVar implements console variables. The original code is located in cvar.c
@@ -226,10 +227,15 @@ listF = do
 - networt "rate" string --> 10000 became "10000.0" and that wasn't right.
 -}
 setValueI :: B.ByteString -> Int -> Quake ()
-setValueI _ _ = io (putStrLn "CVar.setValueI") >> undefined -- TODO
+setValueI varName value =
+    void (set varName $ BC.pack (show value))
 
 setValueF :: B.ByteString -> Float -> Quake ()
-setValueF _ _ = io (putStrLn "CVar.setValueF") >> undefined -- TODO
+setValueF varName value = do
+    let tv :: Int = truncate value
+    void $ set varName $ if value == fromIntegral tv
+                           then BC.pack (show tv)
+                           else BC.pack (show value)
 
 -- Returns the float value of a variable
 variableValue :: B.ByteString -> Quake Float
