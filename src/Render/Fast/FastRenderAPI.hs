@@ -13,15 +13,13 @@ import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Warp as Warp
-
-refVersion :: B.ByteString
-refVersion = "GL 0.01"
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -54,7 +52,7 @@ turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
 
 fastInit :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
 fastInit glImplScreenshot glImplSetMode _ _ = do
-    VID.printf Constants.printAll ("ref_gl version: " `B.append` refVersion `B.append` "\n")
+    VID.printf Constants.printAll ("ref_gl version: " `B.append` RenderAPIConstants.refVersion `B.append` "\n")
 
     Image.getPalette
 
