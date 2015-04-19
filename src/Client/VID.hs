@@ -218,7 +218,13 @@ printf printLevel str =
         Com.dprintf str
 
 menuInit :: Quake ()
-menuInit = io (putStrLn "VID.menuInit") >> undefined -- TODO
+menuInit = do
+    initRefs
+
+    io (putStrLn "VID.menuInit") >> undefined -- TODO
+
+initRefs :: Quake ()
+initRefs = io (putStrLn "VID.initRefs") >> undefined -- TODO
 
 getModeInfo :: Int -> Quake (Maybe (Int, Int))
 getModeInfo mode = do
