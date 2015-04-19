@@ -4,7 +4,9 @@ module Client.VID where
 import Control.Lens ((.=), ix, (^.), zoom, use)
 import Control.Monad (void, liftM, when, unless)
 import Data.Maybe (isJust, isNothing)
+import Graphics.UI.GLFW (VideoMode)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -14,6 +16,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Client.Console as Console
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Graphics.UI.GLFW as GLFW
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Render.QRenderer as QRenderer
@@ -229,4 +232,17 @@ initModeList = do
     Just renderer <- use $ globals.re
 
     modes <- renderer^.rRefExport.reGetModeList
-    io (putStrLn "VID.initModeList") >> undefined -- TODO
+
+    let (fsResolutions, fsModes) = V.unzip $ V.imap parseMode modes
+
+    vidGlobals.vgFSModes .= Just fsModes
+    vidGlobals.vgFSResolutions .= fsResolutions
+
+  where parseMode :: Int -> VideoMode -> (B.ByteString, VidModeT)
+        parseMode idx mode =
+          let width = BC.pack (show $ GLFW.videoModeWidth mode)
+              height = BC.pack (show $ GLFW.videoModeHeight mode)
+              res = "[" `B.append` width `B.append` " " `B.append` height
+              len = B.length res
+              res' = (if len < 10 then res `B.append` BC.replicate (10 - len) ' ' else res) `B.append` "]"
+          in undefined -- TODO

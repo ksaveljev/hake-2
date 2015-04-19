@@ -4,6 +4,7 @@ module Client.VIDGlobals ( module Client.VIDGlobals
                          ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Vector as V
 
 import Internal
 import Client.VidModeT
@@ -13,7 +14,8 @@ makeLenses ''VIDGlobals
 
 initialVIDGlobals :: VIDGlobals
 initialVIDGlobals =
-  VIDGlobals { _vgVidModes     = VidModes.vidModes
-             , _vgRefLibActive = False
-             , _vgFSModes      = Nothing
+  VIDGlobals { _vgVidModes      = VidModes.vidModes
+             , _vgRefLibActive  = False
+             , _vgFSModes       = Nothing
+             , _vgFSResolutions = V.empty
              }
