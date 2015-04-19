@@ -3,7 +3,7 @@ module Client.VID where
 
 import Control.Lens ((.=), ix, (^.), zoom, use)
 import Control.Monad (void, liftM, when, unless)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (isJust, isNothing, fromJust)
 import Graphics.UI.GLFW (VideoMode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -225,7 +225,16 @@ getModeInfo mode = do
     use (vidGlobals.vgFSModes) >>= \v ->
       when (isNothing v) initModeList
 
-    io (putStrLn "VID.getModeInfo") >> undefined -- TODO
+    fullscreenValue <- liftM (^.cvValue) vidFullScreenCVar
+    modes <- if fullscreenValue /= 0
+               then liftM fromJust (use $ vidGlobals.vgFSModes)
+               else use $ vidGlobals.vgVidModes
+
+    if mode < 0 || mode > V.length modes
+      then return Nothing
+      else do
+        let m = modes V.! mode
+        return $ Just (m^.vmWidth, m^.vmHeight)
 
 initModeList :: Quake ()
 initModeList = do
@@ -240,9 +249,12 @@ initModeList = do
 
   where parseMode :: Int -> VideoMode -> (B.ByteString, VidModeT)
         parseMode idx mode =
-          let width = BC.pack (show $ GLFW.videoModeWidth mode)
-              height = BC.pack (show $ GLFW.videoModeHeight mode)
-              res = "[" `B.append` width `B.append` " " `B.append` height
+          let width = GLFW.videoModeWidth mode
+              height = GLFW.videoModeHeight mode
+              widthS = BC.pack (show width)
+              heightS = BC.pack (show height)
+              res = "[" `B.append` widthS `B.append` " " `B.append` heightS
               len = B.length res
               res' = (if len < 10 then res `B.append` BC.replicate (10 - len) ' ' else res) `B.append` "]"
-          in undefined -- TODO
+              m = "Mode " `B.append` BC.pack (show idx) `B.append` widthS `B.append` "x" `B.append` heightS
+          in (res', VidModeT m width height idx)
