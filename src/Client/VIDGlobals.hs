@@ -15,4 +15,5 @@ initialVIDGlobals :: VIDGlobals
 initialVIDGlobals =
   VIDGlobals { _vgVidModes     = VidModes.vidModes
              , _vgRefLibActive = False
+             , _vgFSModes      = Nothing
              }

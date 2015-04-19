@@ -1370,6 +1370,7 @@ data PushedT =
 data VIDGlobals =
   VIDGlobals { _vgVidModes     :: V.Vector VidModeT
              , _vgRefLibActive :: Bool
+             , _vgFSModes      :: Maybe (V.Vector VidModeT)
              }
 
 data KBD =

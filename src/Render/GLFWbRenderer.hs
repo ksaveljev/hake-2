@@ -6,7 +6,7 @@ module Render.GLFWbRenderer ( glfwbRenderer
 import Control.Lens ((^.), use, (.=))
 import Control.Monad (when)
 import Data.Maybe (isNothing)
-import Graphics.UI.GLFW (VideoMode, getPrimaryMonitor, getVideoMode)
+import Graphics.UI.GLFW (VideoMode, getPrimaryMonitor, getVideoMode, getVideoModes)
 import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -20,6 +20,7 @@ import QCommon.XCommandT
 import Render.Basic.BasicRenderAPI
 import qualified Constants
 import qualified Client.VID as VID
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 
 glfwbRefExport :: RenderAPI -> RefExportT
 glfwbRefExport = glfwbRefExportT glfwbKBD
@@ -158,7 +159,44 @@ glfwbUpdateScreen :: XCommandT -> Quake ()
 glfwbUpdateScreen callback = callback
 
 glfwbGetModeList :: Quake (V.Vector VideoMode)
-glfwbGetModeList = DT.trace "GLFWbRenderer.glfwbGetModeList" undefined -- TODO
+glfwbGetModeList = do
+    Just oldMode <- use $ glfwbGlobals.glfwbOldDisplayMode
+
+    Just monitor <- io $ getPrimaryMonitor
+    vm <- io $ getVideoModes monitor
+
+    case vm of
+      Nothing -> return $ V.fromList [oldMode]
+      Just modes -> do
+        -- TODO: implement this stuff:
+        {-
+        int j = 0;
+        DisplayMode ml = null;
+        for (j = 0; j < l.size(); j++) {
+                ml = (DisplayMode)l.get(j);
+                if (ml.getWidth() > m.getWidth()) break;
+                if (ml.getWidth() == m.getWidth() && ml.getHeight() >= m.getHeight()) break;
+        }
+        if (j == l.size()) {
+                l.addLast(m);
+        } else if (ml.getWidth() > m.getWidth() || ml.getHeight() > m.getHeight()) {
+                l.add(j, m);
+        } else if (m.getRefreshRate() > ml.getRefreshRate()){
+                l.remove(j);
+                l.add(j, m);
+        }
+        -}
+        return $ V.fromList $ filter (validDisplayMode oldMode) modes
+
+  where validDisplayMode :: VideoMode -> VideoMode -> Bool
+        validDisplayMode oldMode newMode =
+          GLFW.videoModeRedBits oldMode == GLFW.videoModeRedBits newMode &&
+          GLFW.videoModeGreenBits oldMode == GLFW.videoModeGreenBits newMode &&
+          GLFW.videoModeBlueBits oldMode == GLFW.videoModeBlueBits newMode &&
+          GLFW.videoModeRefreshRate oldMode >= GLFW.videoModeRefreshRate newMode &&
+          GLFW.videoModeWidth newMode >= 320 &&
+          GLFW.videoModeHeight newMode >= 240
+
 
 glfwbSetMode :: (Int, Int) -> Int -> Bool -> Quake Int
 glfwbSetMode dim mode fullscreen = do
@@ -171,4 +209,10 @@ glfwbSetMode dim mode fullscreen = do
         videoMode <- io $ getVideoMode monitor
         glfwbGlobals.glfwbOldDisplayMode .= videoMode
 
-    io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO
+    ok <- VID.getModeInfo mode
+    case ok of
+      Nothing -> do
+        VID.printf Constants.printAll " invalid mode\n"
+        return RenderAPIConstants.rsErrInvalidMode
+      Just newDim -> do
+        io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO

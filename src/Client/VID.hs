@@ -217,6 +217,13 @@ printf printLevel str =
 menuInit :: Quake ()
 menuInit = io (putStrLn "VID.menuInit") >> undefined -- TODO
 
+getModeInfo :: Int -> Quake (Maybe (Int, Int))
+getModeInfo mode = do
+    use (vidGlobals.vgFSModes) >>= \v ->
+      when (isNothing v) initModeList
+
+    io (putStrLn "VID.getModeInfo") >> undefined -- TODO
+
 initModeList :: Quake ()
 initModeList = do
     Just renderer <- use $ globals.re
