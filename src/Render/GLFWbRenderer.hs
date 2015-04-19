@@ -3,10 +3,9 @@ module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
-import Control.Lens ((^.), use, (.=))
+import Control.Lens ((^.), use, (.=), _1, _2)
 import Control.Monad (when)
 import Data.Maybe (isNothing, fromJust, isJust)
-import Graphics.UI.GLFW (VideoMode, getPrimaryMonitor, getVideoMode, getVideoModes)
 import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -158,12 +157,12 @@ glfwbAppActivate _ = return () -- do nothing
 glfwbUpdateScreen :: XCommandT -> Quake ()
 glfwbUpdateScreen callback = callback
 
-glfwbGetModeList :: Quake (V.Vector VideoMode)
+glfwbGetModeList :: Quake (V.Vector GLFW.VideoMode)
 glfwbGetModeList = do
     Just oldMode <- use $ glfwbGlobals.glfwbOldDisplayMode
 
-    Just monitor <- io $ getPrimaryMonitor
-    vm <- io $ getVideoModes monitor
+    Just monitor <- io $ GLFW.getPrimaryMonitor
+    vm <- io $ GLFW.getVideoModes monitor
 
     case vm of
       Nothing -> return $ V.fromList [oldMode]
@@ -188,7 +187,7 @@ glfwbGetModeList = do
         -}
         return $ V.fromList $ filter (validDisplayMode oldMode) modes
 
-  where validDisplayMode :: VideoMode -> VideoMode -> Bool
+  where validDisplayMode :: GLFW.VideoMode -> GLFW.VideoMode -> Bool
         validDisplayMode oldMode newMode =
           GLFW.videoModeRedBits oldMode == GLFW.videoModeRedBits newMode &&
           GLFW.videoModeGreenBits oldMode == GLFW.videoModeGreenBits newMode &&
@@ -205,8 +204,8 @@ glfwbSetMode dim mode fullscreen = do
 
     (use $ glfwbGlobals.glfwbOldDisplayMode) >>= \oldMode ->
       when (isNothing oldMode) $ do
-        Just monitor <- io $ getPrimaryMonitor
-        videoMode <- io $ getVideoMode monitor
+        Just monitor <- io $ GLFW.getPrimaryMonitor
+        videoMode <- io $ GLFW.getVideoMode monitor
         glfwbGlobals.glfwbOldDisplayMode .= videoMode
 
     ok <- VID.getModeInfo mode
@@ -220,7 +219,32 @@ glfwbSetMode dim mode fullscreen = do
         -- destroy the existing window
         shutdown
 
-        io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO
+        -- TODO: handle errors (Nothing)
+        Just monitor <- io $ GLFW.getPrimaryMonitor
+
+        if fullscreen
+          then do
+            -- TODO: handle errors (Nothing)
+            Just window <- io $ GLFW.createWindow (newDim^._1) (newDim^._2) "Hake2 (GLFWb)" (Just monitor) Nothing
+            glfwbGlobals.glfwbWindow .= Just window
+          else do
+            -- TODO: handle errors (Nothing)
+            Just window <- io $ GLFW.createWindow (newDim^._1) (newDim^._2) "Hake2 (GLFWb)" Nothing Nothing
+            glfwbGlobals.glfwbWindow .= Just window
+
+        Just currentMode <- io $ GLFW.getVideoMode monitor
+        when fullscreen $
+          VID.printf Constants.printAll ("...setting fullscreen " `B.append` getModeString currentMode `B.append` "\n")
+
+        let newWidth = GLFW.videoModeWidth currentMode
+            newHeight = GLFW.videoModeHeight currentMode
+
+        setVid newWidth newHeight
+
+        -- let the sound and input subsystems know about the new window
+        VID.newWindow newWidth newHeight
+
+        return RenderAPIConstants.rsErrOk
 
 shutdown :: Quake ()
 shutdown =
@@ -228,3 +252,9 @@ shutdown =
       when (isJust w) $ do
         io (GLFW.destroyWindow (fromJust w))
         glfwbGlobals.glfwbWindow .= Nothing
+
+getModeString :: GLFW.VideoMode -> B.ByteString
+getModeString = undefined -- TODO
+
+setVid :: Int -> Int -> Quake ()
+setVid _ _ = io (putStrLn "GLFWbRenderer.setVid") >> undefined -- TODO

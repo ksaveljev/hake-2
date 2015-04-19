@@ -258,3 +258,6 @@ initModeList = do
               res' = (if len < 10 then res `B.append` BC.replicate (10 - len) ' ' else res) `B.append` "]"
               m = "Mode " `B.append` BC.pack (show idx) `B.append` widthS `B.append` "x" `B.append` heightS
           in (res', VidModeT m width height idx)
+
+newWindow :: Int -> Int -> Quake ()
+newWindow _ _ = io (putStrLn "VID.newWindow") >> undefined -- TODO
