@@ -5,7 +5,7 @@ module Render.GLFWbRenderer ( glfwbRenderer
 
 import Control.Lens ((^.), use, (.=))
 import Control.Monad (when)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromJust, isJust)
 import Graphics.UI.GLFW (VideoMode, getPrimaryMonitor, getVideoMode, getVideoModes)
 import Linear (V3)
 import qualified Data.ByteString as B
@@ -215,4 +215,14 @@ glfwbSetMode dim mode fullscreen = do
         VID.printf Constants.printAll " invalid mode\n"
         return RenderAPIConstants.rsErrInvalidMode
       Just newDim -> do
+        VID.printf Constants.printAll $ BC.pack (show newDim)
+
+        -- destroy the existing window
+        shutdown
+
         io (putStrLn "GLFWbRenderer.glfwbSetMode") >> undefined -- TODO
+
+shutdown :: Quake ()
+shutdown =
+    (use $ glfwbGlobals.glfwbWindow) >>= \w ->
+      when (isJust w) $ io (GLFW.destroyWindow (fromJust w))

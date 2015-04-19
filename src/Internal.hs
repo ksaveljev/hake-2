@@ -14,7 +14,6 @@ import Control.Monad.State.Strict
 import Data.Int (Int16)
 import Data.Sequence (Seq)
 import Data.Word (Word8, Word16)
-import Graphics.UI.GLFW (VideoMode)
 import Linear (V3, V4)
 import System.IO (Handle)
 import System.Random (StdGen)
@@ -23,6 +22,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Graphics.UI.GLFW as GLFW
 
 import Client.ClientStaticT
 import Client.ConsoleT
@@ -951,7 +951,7 @@ data RefExportT =
              , _reAppActivate         :: Bool -> Quake ()
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
-             , _reGetModeList         :: Quake (V.Vector VideoMode)
+             , _reGetModeList         :: Quake (V.Vector GLFW.VideoMode)
              , _reGetKeyboardHandler  :: Maybe KBD
              }
 
@@ -1427,7 +1427,8 @@ data INGlobals =
             }
 
 data GLFWbGlobals =
-  GLFWbGlobals { _glfwbOldDisplayMode :: Maybe VideoMode
+  GLFWbGlobals { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
+               , _glfwbWindow         :: Maybe GLFW.Window
                , _glfwbWindowXPos     :: Int
                , _glfwbWindowYPos     :: Int
                }
