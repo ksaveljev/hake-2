@@ -260,4 +260,7 @@ initModeList = do
           in (res', VidModeT m width height idx)
 
 newWindow :: Int -> Int -> Quake ()
-newWindow _ _ = io (putStrLn "VID.newWindow") >> undefined -- TODO
+newWindow width height =
+    zoom (globals.vidDef) $ do
+      vdNewWidth .= width
+      vdNewHeight .= height

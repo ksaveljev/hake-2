@@ -3,7 +3,7 @@ module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
-import Control.Lens ((^.), use, (.=), _1, _2)
+import Control.Lens ((^.), use, (.=), _1, _2, zoom)
 import Control.Monad (when)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3)
@@ -264,6 +264,8 @@ getModeString vm =
     BC.pack (show $ GLFW.videoModeRefreshRate vm) `B.append`
     "Hz"
 
-
 setVid :: Int -> Int -> Quake ()
-setVid _ _ = io (putStrLn "GLFWbRenderer.setVid") >> undefined -- TODO
+setVid width height =
+    zoom (fastRenderAPIGlobals.frVid) $ do
+      vdNewWidth .= width
+      vdNewHeight .= height
