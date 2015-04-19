@@ -254,7 +254,16 @@ shutdown =
         glfwbGlobals.glfwbWindow .= Nothing
 
 getModeString :: GLFW.VideoMode -> B.ByteString
-getModeString = undefined -- TODO
+getModeString vm =
+    BC.pack (show $ GLFW.videoModeWidth vm) `B.append`
+    "x" `B.append`
+    BC.pack (show $ GLFW.videoModeHeight vm) `B.append`
+    "x" `B.append`
+    BC.pack (show $ GLFW.videoModeRedBits vm) `B.append` -- TODO: ensure this is what we think it is
+    "@" `B.append`
+    BC.pack (show $ GLFW.videoModeRefreshRate vm) `B.append`
+    "Hz"
+
 
 setVid :: Int -> Int -> Quake ()
 setVid _ _ = io (putStrLn "GLFWbRenderer.setVid") >> undefined -- TODO
