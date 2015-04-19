@@ -225,4 +225,6 @@ glfwbSetMode dim mode fullscreen = do
 shutdown :: Quake ()
 shutdown =
     (use $ glfwbGlobals.glfwbWindow) >>= \w ->
-      when (isJust w) $ io (GLFW.destroyWindow (fromJust w))
+      when (isJust w) $ do
+        io (GLFW.destroyWindow (fromJust w))
+        glfwbGlobals.glfwbWindow .= Nothing
