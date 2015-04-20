@@ -85,6 +85,8 @@ instance Zoom (QuakeS s) (QuakeS t) s t where
 
 type XCommandT = Quake ()
 
+type KeyFuncT = Int -> Quake B.ByteString
+
 -- reference to gameBaseGlobals.gbGEdicts
 newtype EdictReference = EdictReference Int deriving (Eq, Show)
 
@@ -102,6 +104,8 @@ newtype LinkReference = LinkReference Int
 
 -- reference to gameBaseGlobals.gbItemList
 newtype GItemReference = GItemReference Int deriving (Eq)
+
+newtype MenuFrameworkSReference = MenuFrameworkSReference Int
 
 data QuakeState =
   QuakeState { _globals              :: !Globals
@@ -1454,3 +1458,31 @@ data FastRenderAPIGlobals =
 data ParticleTGlobals =
   ParticleTGlobals { _pColorTable :: UV.Vector Int
                    }
+
+data MenuFrameworkS =
+  MenuFrameworkS { _mfX          :: Int
+                 , _mfY          :: Int
+                 , _mfCursor     :: Int
+                 , _mfNItems     :: Int
+                 , _mfNSlots     :: Int
+                 , _mfItems      :: V.Vector MenuCommonS
+                 , _mfStatusBar  :: B.ByteString
+                 , _mfCursorDraw :: Maybe (MenuFrameworkS -> Quake ())
+                 }
+
+data MenuCommonS =
+  MenuCommonS { _mcType          :: Int
+              , _mcName          :: B.ByteString
+              , _mcX             :: Int
+              , _mcY             :: Int
+              , _mcParent        :: MenuFrameworkSReference
+              , _mcCursorOffset  :: Int
+              , _mcLocalData     :: V4 Int
+              , _mcFlags         :: Int
+              , _mcN             :: Int
+              , _mcStatusBar     :: B.ByteString
+              , _mcCallback      :: Maybe (MenuCommonS -> Quake ())
+              , _mcStatusBarFunc :: Maybe (MenuCommonS -> Quake ())
+              , _mcOwnerDraw     :: Maybe (MenuCommonS -> Quake ())
+              , _mcCursorDraw    :: Maybe (MenuCommonS -> Quake ())
+              }

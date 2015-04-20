@@ -221,7 +221,20 @@ menuInit :: Quake ()
 menuInit = do
     initRefs
 
+    setNonExistingCVar "gl_driver" QRenderer.getPreferredName 0
+    setNonExistingCVar "gl_picmip" "0" 0
+    setNonExistingCVar "gl_mode" "3" 0
+    setNonExistingCVar "gl_ext_palettedtexture" "1" Constants.cvarArchive
+    setNonExistingCVar "gl_swapinterval" "0" Constants.cvarArchive
+
     io (putStrLn "VID.menuInit") >> undefined -- TODO
+
+  where setNonExistingCVar :: B.ByteString -> B.ByteString -> Int -> Quake ()
+        setNonExistingCVar name value flags =
+          CVar.findVar name >>= \v ->
+            when (isNothing v) $
+              void $ CVar.get name value flags
+
 
 initRefs :: Quake ()
 initRefs = do
