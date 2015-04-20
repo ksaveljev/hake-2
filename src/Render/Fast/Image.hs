@@ -97,3 +97,6 @@ loadPCX fileName returnPalette returnDimensions = do
 
 glImageListF :: XCommandT
 glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
+
+glInitImages :: Quake ()
+glInitImages = io (putStrLn "Image.glInitImages") >> undefined -- TODO

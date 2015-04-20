@@ -85,7 +85,7 @@ glfwbInit renderAPI vidXPos vidYPos = do
         if not ok
           then return False
           -- post init
-          else renderAPI^.rInit2
+          else (renderAPI^.rInit2) endFrame
 
       else do
         VID.printf Constants.printAll "Failed to initialize GLFW-b\n"
@@ -269,3 +269,6 @@ setVid width height =
     zoom (fastRenderAPIGlobals.frVid) $ do
       vdNewWidth .= width
       vdNewHeight .= height
+
+endFrame :: Quake ()
+endFrame = io (putStrLn "GLFWbRenderer.endFrame") >> undefined -- TODO

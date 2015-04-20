@@ -1407,7 +1407,7 @@ data Renderer = Renderer { _rName      :: B.ByteString
 
 data RenderAPI =
     RenderAPI { _rInit              :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
-              , _rInit2             :: Quake Bool
+              , _rInit2             :: Quake () -> Quake Bool
               , _rShutdown          :: Quake ()
               , _rBeginRegistration :: B.ByteString -> Quake ()
               , _rRegisterModel     :: B.ByteString -> Quake (Maybe ModelT)
@@ -1455,12 +1455,19 @@ data GLFWbKBDGlobals =
                   }
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin  :: Float
-                       , _frGLDepthMax  :: Float
-                       , _frGLConfig    :: GLConfigT
-                       , _frGLState     :: GLStateT
-                       , _frd8to24table :: UV.Vector Int
-                       , _frVid         :: VidDefT
+  FastRenderAPIGlobals { _frGLDepthMin        :: Float
+                       , _frGLDepthMax        :: Float
+                       , _frGLConfig          :: GLConfigT
+                       , _frGLState           :: GLStateT
+                       , _frd8to24table       :: UV.Vector Int
+                       , _frVid               :: VidDefT
+                       , _frColorTableEXT     :: Bool
+                       , _frActiveTextureARB  :: Bool
+                       , _frPointParameterEXT :: Bool
+                       , _frLockArraysEXT     :: Bool
+                       , _frSwapIntervalEXT   :: Bool
+                       , _frTexture0          :: Int
+                       , _frTexture1          :: Int
                        }
 
 data ParticleTGlobals =

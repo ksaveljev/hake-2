@@ -1,12 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.FastRenderAPI where
 
+import Control.Exception (handle, IOException)
 import Control.Lens ((.=), (^.), use, zoom)
-import Control.Monad (void, when, liftM)
+import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
+import Graphics.Rendering.OpenGL (($=))
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -18,14 +21,16 @@ import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
-import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified Graphics.Rendering.OpenGL.GL as GL
+import qualified Graphics.Rendering.OpenGL as GL
 import qualified QCommon.CVar as CVar
+import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Warp as Warp
+import qualified Render.OpenGL.QGLConstants as QGLConstants
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -77,8 +82,8 @@ fastInit glImplScreenshot glImplSetMode _ _ = do
       else
         return True
 
-fastInit2 :: Quake Bool
-fastInit2 = do
+fastInit2 :: Quake () -> Quake Bool
+fastInit2 endFrame = do
     VID.menuInit
 
     -- get our various GL strings
@@ -151,7 +156,103 @@ fastInit2 = do
                                      then "...allowing CDS\n"
                                      else "...disabling CDS\n")
 
-    io (putStrLn "FastRenderAPI.fastInit2") >> undefined
+    -- grab extensions
+    cva <- if "GL_EXT_compiled_vertex_array" `BC.isInfixOf` extensions ||
+             "GL_SGI_compiled_vertex_array" `BC.isInfixOf` extensions
+             then do
+               VID.printf Constants.printAll "...enabling GL_EXT_compiled_vertex_array\n"
+               liftM (^.cvValue) glExtCompiledVertexArrayCVar >>= \v ->
+                if v /= 0 then return True else return False
+             else do
+               VID.printf Constants.printAll "...GL_EXT_compiled_vertex_array not found\n"
+               return False
+
+    fastRenderAPIGlobals.frLockArraysEXT .= cva
+
+    si <- if "WGL_EXT_swap_control" `BC.isInfixOf` extensions
+            then do
+              VID.printf Constants.printAll "...enabling WGL_EXT_swap_control\n"
+              return True
+            else do
+              VID.printf Constants.printAll "...WGL_EXT_swap_control not found\n"
+              return False
+
+    fastRenderAPIGlobals.frSwapIntervalEXT .= si
+
+    pp <- if "GL_EXT_point_parameters" `BC.isInfixOf` extensions
+            then do
+              liftM (^.cvValue) glExtPointParametersCVar >>= \v ->
+                if v /= 0
+                  then do
+                    VID.printf Constants.printAll "...using GL_EXT_point_parameters\n"
+                    return True
+                  else do
+                    VID.printf Constants.printAll "...ignoring GL_EXT_point_parameters\n"
+                    return False
+            else do
+              VID.printf Constants.printAll "...GL_EXT_point_parameters not found\n"
+              return False
+
+    fastRenderAPIGlobals.frPointParameterEXT .= pp
+
+    colorTable <- use $ fastRenderAPIGlobals.frColorTableEXT
+    ct <- if not colorTable &&
+             "GL_EXT_paletted_texture" `BC.isInfixOf` extensions &&
+             "GL_EXT_shared_texture_palette" `BC.isInfixOf` extensions
+            then do
+              liftM (^.cvValue) glExtPalettedTextureCVar >>= \v ->
+                if v /= 0
+                  then do
+                    VID.printf Constants.printAll "...using GL_EXT_shared_texture_palette\n"
+                    return True
+                  else do
+                    VID.printf Constants.printAll "...ignoring GL_EXT_shared_texture_palette\n"
+                    return False
+            else do
+              VID.printf Constants.printAll "...GL_EXT_shared_texture_palette not found\n"
+              return False
+
+    fastRenderAPIGlobals.frColorTableEXT .= ct
+
+    cat <- if "GL_ARB_multitexture" `BC.isInfixOf` extensions
+             then do
+               -- check if the extension really exists
+               ok <- io $ handle (\(_ :: IOException) -> return False) $ do
+                 GL.clientActiveTexture $= GL.TextureUnit (fromIntegral QGLConstants.glTexture0ARB)
+                 -- seems to work correctly
+                 return True
+
+               if ok
+                 then do
+                   VID.printf Constants.printAll "...using GL_ARB_multitexture\n"
+                   fastRenderAPIGlobals.frTexture0 .= QGLConstants.glTexture0ARB
+                   fastRenderAPIGlobals.frTexture1 .= QGLConstants.glTexture1ARB
+                   return True
+                 else
+                   return False
+             else do
+               VID.printf Constants.printAll "...GL_ARB_multitexture not found\n"
+               return False
+
+    fastRenderAPIGlobals.frActiveTextureARB .= cat
+
+    if not cat
+      then do
+        VID.printf Constants.printAll "Missing multi-texturing!\n"
+        return False
+      else do
+        glSetDefaultState
+        Image.glInitImages
+        Model.modInit
+        rInitParticleTexture
+        Draw.initLocal
+
+        err <- io $ GL.get GL.errors
+        unless (null err) $
+          VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
+
+        endFrame
+        return True
 
 rRegister :: Quake () -> Quake ()
 rRegister glImplScreenshot = do
@@ -279,3 +380,9 @@ rSetMode glImplSetMode = do
 
 glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
+
+glSetDefaultState :: Quake ()
+glSetDefaultState = io (putStrLn "FastRenderAPI.glSetDefaultState") >> undefined -- TODO
+
+rInitParticleTexture :: Quake ()
+rInitParticleTexture = io (putStrLn "FastRenderAPI.rInitParticleTexture") >> undefined -- TODO
