@@ -3,9 +3,9 @@
 module Render.Fast.FastRenderAPI where
 
 import Control.Lens ((.=), (^.), use, zoom)
-import Control.Monad (void, when)
-import Data.Bits ((.|.))
-import Data.Char (toLower)
+import Control.Monad (void, when, liftM)
+import Data.Bits ((.|.), (.&.))
+import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
@@ -117,6 +117,39 @@ fastInit2 = do
                          | otherwise -> RenderAPIConstants.glRendererOther
 
     fastRenderAPIGlobals.frGLConfig.glcRenderer .= rendererInt
+
+    monoLightMapValue <- liftM (BC.map toUpper . (^.cvString)) glMonoLightMapCVar
+    when (B.length monoLightMapValue < 2 || BC.index monoLightMapValue 1 /= 'F') $ do
+      if rendererInt == RenderAPIConstants.glRendererPerMedia2
+        then do
+          void $ CVar.set "gl_monolightmap" "A"
+          VID.printf Constants.printAll "...using gl_monolightmap 'a'\n"
+        else
+          void $ CVar.set "gl_monolightmap" "0"
+
+    -- power vr can't have anything stay in the framebuffer, so
+    -- the screen needs to redraw the tiled background every frame
+    if rendererInt .&. RenderAPIConstants.glRendererPowerVR /= 0
+      then void $ CVar.set "scr_drawall" "1"
+      else void $ CVar.set "scr_drawall" "0"
+
+    -- MCD has buffering issues
+    when (rendererInt == RenderAPIConstants.glRendererMCD) $
+      CVar.setValueI "gl_finish" 1
+
+    allow <- if rendererInt .&. RenderAPIConstants.glRenderer3DLabs /= 0
+               then do
+                 brokenValue <- liftM (^.cvValue) gl3DLabsBrokenCVar
+                 if brokenValue /= 0
+                   then return False
+                   else return True
+             else return True
+                   
+    fastRenderAPIGlobals.frGLConfig.glcAllowCds .= allow
+
+    VID.printf Constants.printAll (if allow
+                                     then "...allowing CDS\n"
+                                     else "...disabling CDS\n")
 
     io (putStrLn "FastRenderAPI.fastInit2") >> undefined
 
