@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.MenuItem ( MenuItem
+module Client.MenuItem ( MenuItem(..)
                        , MenuItemReference(..)
                        , module Client.MenuItem
                        , module Client.MenuCommonS

@@ -1483,7 +1483,7 @@ data MenuCommonS =
               , _mcName          :: B.ByteString
               , _mcX             :: Int
               , _mcY             :: Int
-              , _mcParent        :: MenuFrameworkSReference
+              , _mcParent        :: Maybe MenuFrameworkSReference
               , _mcCursorOffset  :: Int
               , _mcLocalData     :: V4 Int
               , _mcFlags         :: Int
