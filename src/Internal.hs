@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Internal where
 
 import Control.Applicative
@@ -105,7 +106,11 @@ newtype LinkReference = LinkReference Int
 -- reference to gameBaseGlobals.gbItemList
 newtype GItemReference = GItemReference Int deriving (Eq)
 
+-- reference to menuGlobals.mgMenuFrameworks
 newtype MenuFrameworkSReference = MenuFrameworkSReference Int
+
+-- reference to menuGlobals.mgMenuItems
+newtype MenuItemReference = MenuItemReference Int
 
 data QuakeState =
   QuakeState { _globals              :: !Globals
@@ -128,7 +133,8 @@ data QuakeState =
              , _glfwbGlobals         :: !GLFWbGlobals
              , _glfwbKBDGlobals      :: !GLFWbKBDGlobals
              , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
-             , _particleTGlobals      :: !ParticleTGlobals
+             , _particleTGlobals     :: !ParticleTGlobals
+             , _menuGlobals          :: !MenuGlobals
              }
 
 data Globals =
@@ -1372,12 +1378,14 @@ data PushedT =
           }
 
 data VIDGlobals =
-  VIDGlobals { _vgVidModes      :: V.Vector VidModeT
-             , _vgRefLibActive  :: Bool
-             , _vgFSModes       :: Maybe (V.Vector VidModeT)
-             , _vgFSResolutions :: V.Vector B.ByteString
-             , _vgRefs          :: V.Vector B.ByteString
-             , _vgDrivers       :: V.Vector B.ByteString
+  VIDGlobals { _vgVidModes           :: V.Vector VidModeT
+             , _vgRefLibActive       :: Bool
+             , _vgFSModes            :: Maybe (V.Vector VidModeT)
+             , _vgFSResolutions      :: V.Vector B.ByteString
+             , _vgModeX              :: Int
+             , _vgRefs               :: V.Vector B.ByteString
+             , _vgDrivers            :: V.Vector B.ByteString
+             , _vgCurrentMenu        :: Maybe MenuFrameworkSReference
              }
 
 data KBD =
@@ -1465,9 +1473,9 @@ data MenuFrameworkS =
                  , _mfCursor     :: Int
                  , _mfNItems     :: Int
                  , _mfNSlots     :: Int
-                 , _mfItems      :: V.Vector MenuCommonS
+                 , _mfItems      :: V.Vector (Maybe MenuItemReference)
                  , _mfStatusBar  :: B.ByteString
-                 , _mfCursorDraw :: Maybe (MenuFrameworkS -> Quake ())
+                 , _mfCursorDraw :: Maybe (Quake ())
                  }
 
 data MenuCommonS =
@@ -1481,8 +1489,27 @@ data MenuCommonS =
               , _mcFlags         :: Int
               , _mcN             :: Int
               , _mcStatusBar     :: B.ByteString
-              , _mcCallback      :: Maybe (MenuCommonS -> Quake ())
-              , _mcStatusBarFunc :: Maybe (MenuCommonS -> Quake ())
-              , _mcOwnerDraw     :: Maybe (MenuCommonS -> Quake ())
-              , _mcCursorDraw    :: Maybe (MenuCommonS -> Quake ())
+              , _mcCallback      :: Maybe (Quake ())
+              , _mcStatusBarFunc :: Maybe (Quake ())
+              , _mcOwnerDraw     :: Maybe (Quake ())
+              , _mcCursorDraw    :: Maybe (Quake ())
+              }
+
+data MenuItem =
+    MenuListS { _mlGeneric   :: MenuCommonS
+              , _mlCurValue  :: Int
+              , _mlItemNames :: Maybe (V.Vector B.ByteString)
+              }
+  | MenuSliderS { _msGeneric  :: MenuCommonS
+                , _msMinValue :: Float
+                , _msMaxValue :: Float
+                , _msCurValue :: Float
+                , _msRange    :: Float
+                }
+  | MenuActionS { _maGeneric :: MenuCommonS
+                }
+
+data MenuGlobals =
+  MenuGlobals { _mgMenuFrameworks :: V.Vector MenuFrameworkS
+              , _mgMenuItems      :: V.Vector MenuItem
               }

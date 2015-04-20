@@ -22,6 +22,7 @@ module QuakeState ( QuakeState(..)
                   , glfwbKBDGlobals
                   , fastRenderAPIGlobals
                   , particleTGlobals
+                  , menuGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -38,6 +39,7 @@ module QuakeState ( QuakeState(..)
                   , module QCommon.ComGlobals
                   , module Game.CmdGlobals
                   , module Client.KeyGlobals
+                  , module Client.MenuGlobals
                   , module Client.ParticleTGlobals
                   , module Client.SCRGlobals
                   , module QCommon.FSGlobals
@@ -67,6 +69,7 @@ import Game.Monsters.MInfantryGlobals
 import Game.Monsters.MSoldierGlobals
 import Game.PlayerTrailGlobals
 import Client.KeyGlobals
+import Client.MenuGlobals
 import Client.ParticleTGlobals
 import Client.SCRGlobals
 import Client.VIDGlobals
@@ -106,4 +109,5 @@ initialQuakeState =
              , _glfwbKBDGlobals      = initialGLFWbKBDGlobals
              , _fastRenderAPIGlobals = initialFastRenderAPIGlobals
              , _particleTGlobals     = initialParticleTGlobals
+             , _menuGlobals          = initialMenuGlobals
              }

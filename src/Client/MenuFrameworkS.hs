@@ -1,14 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Client.MenuFrameworkS ( MenuFrameworkS
+                             , MenuFrameworkSReference(..)
                              , module Client.MenuFrameworkS
+                             , module Client.MenuItem
                              ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
 import Internal
-import Client.MenuCommonS
+import Client.MenuItem
 
 makeLenses ''MenuFrameworkS
 
@@ -19,7 +21,7 @@ newMenuFrameworkS =
                  , _mfCursor     = 0
                  , _mfNItems     = 0
                  , _mfNSlots     = 0
-                 , _mfItems      = V.replicate 64 newMenuCommonS
+                 , _mfItems      = V.replicate 64 Nothing
                  , _mfStatusBar  = ""
                  , _mfCursorDraw = Nothing
                  }
