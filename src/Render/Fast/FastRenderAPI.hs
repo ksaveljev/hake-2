@@ -1,10 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Fast.FastRenderAPI where
 
-import Control.Lens ((.=), (^.), use)
+import Control.Lens ((.=), (^.), use, zoom)
 import Control.Monad (void, when)
 import Data.Bits ((.|.))
+import Data.Char (toLower)
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
@@ -16,6 +21,7 @@ import qualified Constants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Graphics.Rendering.OpenGL.GL as GL
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Model as Model
@@ -76,6 +82,41 @@ fastInit2 = do
     VID.menuInit
 
     -- get our various GL strings
+    vendor <- io $ GL.get GL.vendor >>= return . BC.pack
+    renderer <- io $ GL.get GL.renderer >>= return . BC.pack
+    version <- io $ GL.get GL.glVersion >>= return . BC.pack
+    extensions <- io $ GL.get GL.glExtensions >>= return . BC.pack . show
+
+    zoom (fastRenderAPIGlobals.frGLConfig) $ do
+      glcVendorString .= vendor
+      glcRendererString .= renderer
+      glcVersionString .= version
+      glcExtensionsString .= extensions
+      glcVersion .= (let v = B.take 3 version
+                     in fromMaybe 1.1 (readMaybe (BC.unpack v))) -- IMPROVE?
+
+    VID.printf Constants.printAll $ "GL_VENDOR: " `B.append` vendor `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_RENDERER: " `B.append` renderer `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_VERSION: " `B.append` version `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_EXTENSIONS: " `B.append` extensions `B.append` "\n"
+
+    let rendererBuffer = BC.map toLower renderer
+        vendorBuffer = BC.map toLower vendor
+
+    let rendererInt = if | "voodoo"   `BC.isInfixOf` rendererBuffer ->
+                             if "rush" `BC.isInfixOf`rendererBuffer 
+                               then RenderAPIConstants.glRendererVoodooRush
+                               else RenderAPIConstants.glRendererVoodoo
+                         | "sgi"      `BC.isInfixOf` vendorBuffer -> RenderAPIConstants.glRendererSGI
+                         | "permedia" `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPerMedia2
+                         | "glint"    `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererGlintMX
+                         | "glzicd"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRealizm
+                         | "gdi"      `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererMCD
+                         | "pcx2"     `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPCX2
+                         | "verite"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRendition
+                         | otherwise -> RenderAPIConstants.glRendererOther
+
+    fastRenderAPIGlobals.frGLConfig.glcRenderer .= rendererInt
 
     io (putStrLn "FastRenderAPI.fastInit2") >> undefined
 

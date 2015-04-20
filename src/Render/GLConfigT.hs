@@ -12,6 +12,7 @@ data GLConfigT =
             , _glcVersionString    :: B.ByteString
             , _glcExtensionsString :: B.ByteString
             , _glcAllowCds         :: Bool
+            , _glcVersion          :: Float
             }
 
 makeLenses ''GLConfigT
@@ -24,4 +25,5 @@ newGLConfigT =
             , _glcVersionString    = ""
             , _glcExtensionsString = ""
             , _glcAllowCds         = False
+            , _glcVersion          = 1.1
             }
