@@ -18,4 +18,6 @@ initialVIDGlobals =
              , _vgRefLibActive  = False
              , _vgFSModes       = Nothing
              , _vgFSResolutions = V.empty
+             , _vgRefs          = V.empty
+             , _vgDrivers       = V.empty
              }

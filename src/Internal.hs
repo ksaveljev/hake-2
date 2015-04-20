@@ -1372,6 +1372,8 @@ data VIDGlobals =
              , _vgRefLibActive  :: Bool
              , _vgFSModes       :: Maybe (V.Vector VidModeT)
              , _vgFSResolutions :: V.Vector B.ByteString
+             , _vgRefs          :: V.Vector B.ByteString
+             , _vgDrivers       :: V.Vector B.ByteString
              }
 
 data KBD =

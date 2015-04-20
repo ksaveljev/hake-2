@@ -224,7 +224,17 @@ menuInit = do
     io (putStrLn "VID.menuInit") >> undefined -- TODO
 
 initRefs :: Quake ()
-initRefs = io (putStrLn "VID.initRefs") >> undefined -- TODO
+initRefs = do
+    let drivers = QRenderer.getDriverNames
+    vidGlobals.vgDrivers .= drivers
+    vidGlobals.vgRefs .= V.map constructRef drivers
+
+  where constructRef :: B.ByteString -> B.ByteString
+        constructRef driver =
+          let a = "[OpenGL " `B.append` driver
+              b = if B.length a < 16 then a `B.append` BC.replicate (16 - B.length a) ' ' else a
+              c = b `B.append` "]"
+          in c
 
 getModeInfo :: Int -> Quake (Maybe (Int, Int))
 getModeInfo mode = do
