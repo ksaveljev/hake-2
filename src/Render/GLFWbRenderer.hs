@@ -85,7 +85,7 @@ glfwbInit renderAPI vidXPos vidYPos = do
         if not ok
           then return False
           -- post init
-          else (renderAPI^.rInit2) endFrame
+          else (renderAPI^.rInit2) glfwbSetSwapInterval endFrame
 
       else do
         VID.printf Constants.printAll "Failed to initialize GLFW-b\n"
@@ -272,3 +272,6 @@ setVid width height =
 
 endFrame :: Quake ()
 endFrame = io (putStrLn "GLFWbRenderer.endFrame") >> undefined -- TODO
+
+glfwbSetSwapInterval :: Int -> Quake ()
+glfwbSetSwapInterval v = io $ GLFW.swapInterval v

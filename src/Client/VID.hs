@@ -366,7 +366,7 @@ menuInit = do
         mlItemNames .= Just yesNoNames
         mlCurValue .= palettedTextureValue
 
-    liftM (truncate . (^.cvValue)) glSwapInternalCVar >>= \swapIntervalValue ->
+    liftM (truncate . (^.cvValue)) glSwapIntervalCVar >>= \swapIntervalValue ->
       zoom (menuGlobals.mgMenuItems.ix (MenuConstants.vSyncBox)) $ do
         mlGeneric.mcType .= Constants.mtypeSpinControl
         mlGeneric.mcX .= 0

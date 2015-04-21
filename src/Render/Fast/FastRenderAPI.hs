@@ -83,8 +83,8 @@ fastInit glImplScreenshot glImplSetMode _ _ = do
       else
         return True
 
-fastInit2 :: Quake () -> Quake Bool
-fastInit2 endFrame = do
+fastInit2 :: (Int -> Quake ()) -> Quake () -> Quake Bool
+fastInit2 setSwapInterval endFrame = do
     VID.menuInit
 
     -- get our various GL strings
@@ -242,7 +242,7 @@ fastInit2 endFrame = do
         VID.printf Constants.printAll "Missing multi-texturing!\n"
         return False
       else do
-        glSetDefaultState
+        glSetDefaultState setSwapInterval
         Image.glInitImages
         Model.modInit
         rInitParticleTexture
@@ -389,8 +389,8 @@ rSetMode glImplSetMode = do
 glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
 
-glSetDefaultState :: Quake ()
-glSetDefaultState = do
+glSetDefaultState :: (Int -> Quake ()) -> Quake ()
+glSetDefaultState setSwapInterval = do
     GL.glClearColor 1 0 0.5 0.5
     GL.glCullFace GL.gl_FRONT
     GL.glEnable GL.gl_TEXTURE_2D
@@ -449,7 +449,7 @@ glSetDefaultState = do
       d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
       Image.glSetTexturePalette d8to24table
 
-    glUpdateSwapInterval
+    glUpdateSwapInterval setSwapInterval
 
     -- vertex array extension
     t0 <- use $ fastRenderAPIGlobals.frTexture0
@@ -464,5 +464,12 @@ glSetDefaultState = do
 rInitParticleTexture :: Quake ()
 rInitParticleTexture = io (putStrLn "FastRenderAPI.rInitParticleTexture") >> undefined -- TODO
 
-glUpdateSwapInterval :: Quake ()
-glUpdateSwapInterval = io (putStrLn "FastRenderAPI.glUpdateSwapInterval") >> undefined -- TODO
+glUpdateSwapInterval :: (Int -> Quake ()) -> Quake ()
+glUpdateSwapInterval setSwapInterval = do
+    glSwapInterval <- glSwapIntervalCVar
+
+    when (glSwapInterval^.cvModified) $ do
+      CVar.update glSwapInterval { _cvModified = False }
+      stereoEnabled <- use $ fastRenderAPIGlobals.frGLState.glsStereoEnabled
+      unless stereoEnabled $
+        setSwapInterval (truncate $ glSwapInterval^.cvValue)

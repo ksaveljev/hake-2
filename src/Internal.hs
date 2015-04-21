@@ -1407,7 +1407,7 @@ data Renderer = Renderer { _rName      :: B.ByteString
 
 data RenderAPI =
     RenderAPI { _rInit              :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
-              , _rInit2             :: Quake () -> Quake Bool
+              , _rInit2             :: (Int -> Quake ()) -> Quake () -> Quake Bool
               , _rShutdown          :: Quake ()
               , _rBeginRegistration :: B.ByteString -> Quake ()
               , _rRegisterModel     :: B.ByteString -> Quake (Maybe ModelT)
