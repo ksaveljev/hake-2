@@ -35,8 +35,13 @@ initialFastRenderAPIGlobals =
                        , _frSwapIntervalEXT   = False
                        , _frTexture0          = QGLConstants.glTexture0
                        , _frTexture1          = QGLConstants.glTexture1
+                       , _frGLSolidFormat     = 3
+                       , _frGLAlphaFormat     = 4
+                       , _frGLTexSolidFormat  = 3
+                       , _frGLTexAlphaFormat  = 4
                        , _frGLFilterMin       = QGLConstants.glLinearMipmapNearest
                        , _frGLFilterMax       = QGLConstants.glLinear
                        , _frNumGLTextures     = 0
                        , _frGLTextures        = V.generate RenderAPIConstants.maxGLTextures newImageT
+                       , _frLastModes         = (-1, -1)
                        }

@@ -2,10 +2,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Image where
 
-import Control.Lens ((^.), (.=), use, preuse, ix)
+import Control.Lens ((^.), (.=), use, preuse, ix, _1, _2)
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Char (toUpper)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -15,12 +17,22 @@ import QuakeState
 import QCommon.QFiles.PcxT
 import QCommon.XCommandT
 import Render.GLModeT
+import Render.GLTModeT
 import qualified Constants
 import qualified Client.VID as VID
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.RenderAPIConstants as RenderAPIConstants
+
+numGLModes :: Int
+numGLModes = V.length modes
+
+numGLAlphaModes :: Int
+numGLAlphaModes = V.length glAlphaModes
+
+numGLSolidModes :: Int
+numGLSolidModes = V.length glSolidModes
 
 modes :: V.Vector GLModeT
 modes =
@@ -30,6 +42,26 @@ modes =
                , GLModeT "GL_LINEAR_MIPMAP_NEAREST"  (fromIntegral GL.gl_LINEAR_MIPMAP_NEAREST ) (fromIntegral GL.gl_LINEAR )
                , GLModeT "GL_NEAREST_MIPMAP_LINEAR"  (fromIntegral GL.gl_NEAREST_MIPMAP_LINEAR ) (fromIntegral GL.gl_NEAREST)
                , GLModeT "GL_LINEAR_MIPMAP_LINEAR"   (fromIntegral GL.gl_LINEAR_MIPMAP_LINEAR  ) (fromIntegral GL.gl_LINEAR )
+               ]
+
+glAlphaModes :: V.Vector GLTModeT
+glAlphaModes =
+    V.fromList [ GLTModeT "default"    4
+               , GLTModeT "GL_RGBA"    (fromIntegral GL.gl_RGBA   )
+               , GLTModeT "GL_RGBA8"   (fromIntegral GL.gl_RGBA8  )
+               , GLTModeT "GL_RGB5_A1" (fromIntegral GL.gl_RGB5_A1)
+               , GLTModeT "GL_RGBA4"   (fromIntegral GL.gl_RGBA4  )
+               , GLTModeT "GL_RGBA2"   (fromIntegral GL.gl_RGBA2  )
+               ]
+
+glSolidModes :: V.Vector GLTModeT
+glSolidModes =
+    V.fromList [ GLTModeT "default"     3
+               , GLTModeT "GL_RGB"      (fromIntegral GL.gl_RGB     )
+               , GLTModeT "GL_RGB8"     (fromIntegral GL.gl_RGB8    )
+               , GLTModeT "GL_RGB5"     (fromIntegral GL.gl_RGB5    )
+               , GLTModeT "GL_RGB4"     (fromIntegral GL.gl_RGB4    )
+               , GLTModeT "GL_R3_G3_B2" (fromIntegral GL.gl_R3_G3_B2)
                ]
 
 getPalette :: Quake ()
@@ -117,7 +149,7 @@ glInitImages = io (putStrLn "Image.glInitImages") >> undefined -- TODO
 
 glTextureMode :: B.ByteString -> Quake ()
 glTextureMode str = do
-    let found = V.find (\m -> (m^.glmName) == str) modes
+    let found = V.find (\m -> BC.map toUpper (m^.glmName) == str) modes
 
     case found of
       Nothing -> VID.printf Constants.printAll ("bad filter name: [" `B.append` str `B.append` "]\n")
@@ -141,13 +173,35 @@ glTextureMode str = do
                 GL.glTexParameteri GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral $ mode^.glmMaximize)
 
 glTextureAlphaMode :: B.ByteString -> Quake ()
-glTextureAlphaMode _ = io (putStrLn "Image.glTextureAlphaMode") >> undefined -- TODO
+glTextureAlphaMode str = do
+    let strUp = BC.map toUpper str
+        found = V.find (\m -> BC.map toUpper (m^.gltmName) == strUp) glAlphaModes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad alpha texture mode name: [" `B.append` str `B.append` "]\n")
+      Just mode -> fastRenderAPIGlobals.frGLTexAlphaFormat .= (mode^.gltmMode)
 
 glTextureSolidMode :: B.ByteString -> Quake ()
-glTextureSolidMode _ = io (putStrLn "Image.glTextureSolidMode") >> undefined -- TODO
+glTextureSolidMode str = do
+    let strUp = BC.map toUpper str
+        found = V.find (\m -> BC.map toUpper (m^.gltmName) == strUp) glSolidModes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad solid texture mode name: [" `B.append` str `B.append` "]\n")
+      Just mode -> fastRenderAPIGlobals.frGLTexSolidFormat .= (mode^.gltmMode)
 
 glTexEnv :: GL.GLenum -> Quake ()
-glTexEnv _ = io (putStrLn "Image.glTexEnv") >> undefined -- TODO
+glTexEnv mode = do
+    tmu <- use $ fastRenderAPIGlobals.frGLState.glsCurrentTmu
+    lastMode <- if tmu == 0
+                  then use $ fastRenderAPIGlobals.frLastModes._1
+                  else use $ fastRenderAPIGlobals.frLastModes._2
+
+    when (mode /= fromIntegral lastMode) $ do
+      GL.glTexEnvi GL.gl_TEXTURE_ENV GL.gl_TEXTURE_ENV_MODE (fromIntegral mode)
+      if tmu == 0
+        then fastRenderAPIGlobals.frLastModes._1 .= fromIntegral mode
+        else fastRenderAPIGlobals.frLastModes._2 .= fromIntegral mode
 
 glSetTexturePalette :: UV.Vector Int -> Quake ()
 glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
