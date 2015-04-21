@@ -71,7 +71,7 @@ newClientStateT =
                , _csModelDraw              = V.replicate Constants.maxModels newModelT
                , _csModelClip              = V.replicate Constants.maxModels (CModelReference (-1))
                , _csSoundPrecache          = V.replicate Constants.maxSounds newSfxT
-               , _csImagePrecache          = V.replicate Constants.maxImages newImageT
+               , _csImagePrecache          = V.generate Constants.maxImages newImageT
                , _csClientInfo             = V.replicate Constants.maxClients newClientInfoT
                , _csBaseClientInfo         = newClientInfoT
                }

@@ -2,22 +2,35 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Image where
 
-import Control.Lens ((^.), (.=))
+import Control.Lens ((^.), (.=), use, preuse, ix)
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.), shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import QCommon.QFiles.PcxT
 import QCommon.XCommandT
+import Render.GLModeT
 import qualified Constants
 import qualified Client.VID as VID
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
+import qualified Render.RenderAPIConstants as RenderAPIConstants
+
+modes :: V.Vector GLModeT
+modes =
+    V.fromList [ GLModeT "GL_NEAREST"                (fromIntegral GL.gl_NEAREST               ) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR"                 (fromIntegral GL.gl_LINEAR                ) (fromIntegral GL.gl_LINEAR )
+               , GLModeT "GL_NEAREST_MIPMAP_NEAREST" (fromIntegral GL.gl_NEAREST_MIPMAP_NEAREST) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR_MIPMAP_NEAREST"  (fromIntegral GL.gl_LINEAR_MIPMAP_NEAREST ) (fromIntegral GL.gl_LINEAR )
+               , GLModeT "GL_NEAREST_MIPMAP_LINEAR"  (fromIntegral GL.gl_NEAREST_MIPMAP_LINEAR ) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR_MIPMAP_LINEAR"   (fromIntegral GL.gl_LINEAR_MIPMAP_LINEAR  ) (fromIntegral GL.gl_LINEAR )
+               ]
 
 getPalette :: Quake ()
 getPalette = do
@@ -103,7 +116,29 @@ glInitImages :: Quake ()
 glInitImages = io (putStrLn "Image.glInitImages") >> undefined -- TODO
 
 glTextureMode :: B.ByteString -> Quake ()
-glTextureMode _ = io (putStrLn "Image.glTextureMode") >> undefined -- TODO
+glTextureMode str = do
+    let found = V.find (\m -> (m^.glmName) == str) modes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad filter name: [" `B.append` str `B.append` "]\n")
+      Just mode -> do
+        fastRenderAPIGlobals.frGLFilterMin .= (mode^.glmMinimize)
+        fastRenderAPIGlobals.frGLFilterMax .= (mode^.glmMaximize)
+
+        -- change all existing mipmap texture objects
+        numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+        changeMipMap mode 0 numGLTextures
+
+  where changeMipMap :: GLModeT -> Int -> Int -> Quake ()
+        changeMipMap mode idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just glt <- preuse $ fastRenderAPIGlobals.frGLTextures.ix idx
+
+              when ((glt^.iType) /= RenderAPIConstants.itPic && (glt^.iType) /= RenderAPIConstants.itSky) $ do
+                glBind (glt^.iTexNum)
+                GL.glTexParameteri GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral $ mode^.glmMinimize)
+                GL.glTexParameteri GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral $ mode^.glmMaximize)
 
 glTextureAlphaMode :: B.ByteString -> Quake ()
 glTextureAlphaMode _ = io (putStrLn "Image.glTextureAlphaMode") >> undefined -- TODO
@@ -116,3 +151,6 @@ glTexEnv _ = io (putStrLn "Image.glTexEnv") >> undefined -- TODO
 
 glSetTexturePalette :: UV.Vector Int -> Quake ()
 glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
+
+glBind :: Int -> Quake ()
+glBind _ = io (putStrLn "Image.glBind") >> undefined -- TODO

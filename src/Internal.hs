@@ -1470,6 +1470,8 @@ data FastRenderAPIGlobals =
                        , _frTexture1          :: Int
                        , _frGLFilterMin       :: Int
                        , _frGLFilterMax       :: Int
+                       , _frNumGLTextures     :: Int
+                       , _frGLTextures        :: V.Vector ImageT
                        }
 
 data ParticleTGlobals =

@@ -10,9 +10,9 @@ import Internal
 
 makeLenses ''ImageT
 
-newImageT :: ImageT
-newImageT =
-  ImageT { _iId                   = 0
+newImageT :: Int -> ImageT
+newImageT idx =
+  ImageT { _iId                   = idx
          , _iName                 = ""
          , _iType                 = 0
          , _iWidth                = 0

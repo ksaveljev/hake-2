@@ -3,15 +3,19 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         , module Client.VidDefT
                                         , module Render.GLConfigT
                                         , module Render.GLStateT
+                                        , module Render.ImageT
                                         ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
 import Client.VidDefT
 import Render.GLConfigT
 import Render.GLStateT
+import Render.ImageT
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 
 makeLenses ''FastRenderAPIGlobals
@@ -33,4 +37,6 @@ initialFastRenderAPIGlobals =
                        , _frTexture1          = QGLConstants.glTexture1
                        , _frGLFilterMin       = QGLConstants.glLinearMipmapNearest
                        , _frGLFilterMax       = QGLConstants.glLinear
+                       , _frNumGLTextures     = 0
+                       , _frGLTextures        = V.generate RenderAPIConstants.maxGLTextures newImageT
                        }
