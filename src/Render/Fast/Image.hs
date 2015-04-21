@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Image where
 
-import Control.Lens ((^.), (.=), use, preuse, ix, _1, _2)
+import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
 import Control.Monad (when, void, liftM)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Char (toUpper)
@@ -274,5 +274,78 @@ This is also used as an entry point for the generated r_notexture
 ================
 -}
 glLoadPic :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ImageReference
-glLoadPic name pic width height picType bits =
-    io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+glLoadPic name pic width height picType bits = do
+    -- find a free image_t
+    numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+    glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+
+    let imageRef@(ImageReference idx) = findFreeImage glTextures 0 numGLTextures
+
+    when (idx == numGLTextures) $ do
+      when (numGLTextures == RenderAPIConstants.maxGLTextures) $
+        Com.comError Constants.errDrop "MAX_GLTEXTURES"
+
+      fastRenderAPIGlobals.frNumGLTextures += 1
+
+    when (B.length name > Constants.maxQPath) $
+      Com.comError Constants.errDrop ("Draw_LoadPic: \"" `B.append` name `B.append` "\" is too long")
+
+    rs <- use $ fastRenderAPIGlobals.frRegistrationSequence
+
+    zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+      iName .= name
+      iRegistrationSequence .= rs
+      iWidth .= width
+      iHeight .= height
+      iType .= picType
+
+    image <- if picType == RenderAPIConstants.itSkin && bits == 8
+               then rFloodFillSkin pic width height
+               else return pic
+
+    -- load little pics into the scrap
+    if picType == RenderAPIConstants.itPic && bits == 8 && width < 64 && height < 64
+      then do
+        io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+      else do
+        -- this was label nonscrap
+        let texNum = RenderAPIConstants.texNumImages + idx
+          
+        zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+          iScrap .= False
+          iTexNum .= texNum
+
+        glBind texNum
+
+        if bits == 8
+          then do
+            io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+          else do
+            io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+
+        uploadWidth <- use $ fastRenderAPIGlobals.frUploadWidth
+        uploadHeight <- use $ fastRenderAPIGlobals.frUploadHeight
+        uploadedPaletted <- use $ fastRenderAPIGlobals.frUploadedPaletted
+
+        zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+          iUploadWidth .= uploadWidth
+          iUploadHeight .= uploadHeight
+          iPaletted .= uploadedPaletted
+          iSL .= 0
+          iSH .= 1
+          iTL .= 0
+          iTH .= 1
+
+    return imageRef
+
+  where findFreeImage :: V.Vector ImageT -> Int -> Int -> ImageReference
+        findFreeImage glTextures idx maxIdx
+          | idx >= maxIdx = ImageReference maxIdx
+          | otherwise =
+              if (glTextures V.! idx)^.iTexNum == 0
+                then ImageReference idx
+                else findFreeImage glTextures (idx + 1) maxIdx
+
+rFloodFillSkin :: B.ByteString -> Int -> Int -> Quake B.ByteString
+rFloodFillSkin _ _ _ = do
+    io (putStrLn "Image.rFloodFillSkin") >> undefined -- TODO

@@ -1487,6 +1487,9 @@ data FastRenderAPIGlobals =
                        , _frModNoVis             :: B.ByteString
                        , _frNoTexture            :: ImageReference
                        , _frParticleTexture      :: ImageReference
+                       , _frUploadWidth          :: Int
+                       , _frUploadHeight         :: Int
+                       , _frUploadedPaletted     :: Bool
                        }
 
 data ParticleTGlobals =

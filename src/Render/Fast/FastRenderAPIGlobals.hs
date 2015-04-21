@@ -55,4 +55,7 @@ initialFastRenderAPIGlobals =
                        , _frModNoVis             = ""
                        , _frNoTexture            = ImageReference (-1)
                        , _frParticleTexture      = ImageReference (-1)
+                       , _frUploadWidth          = 0
+                       , _frUploadHeight         = 0
+                       , _frUploadedPaletted     = False
                        }
