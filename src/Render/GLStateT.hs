@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Render.GLStateT where
 
 import Data.Word (Word8)
@@ -11,7 +10,7 @@ data GLStateT =
   GLStateT { _glsInverseIntensity        :: Float
            , _glsFullScreen              :: Bool
            , _glsPrevMode                :: Int
-           , _glsD16To8Table             :: B.ByteString
+           , _glsD16To8Table             :: Maybe B.ByteString
            , _glsLightmapTextures        :: Int
            , _glsCurrentTextures         :: (Int, Int)
            , _glsCurrentTmu              :: Int
@@ -29,7 +28,7 @@ newGLStateT =
   GLStateT { _glsInverseIntensity        = 0
            , _glsFullScreen              = False
            , _glsPrevMode                = 0
-           , _glsD16To8Table             = ""
+           , _glsD16To8Table             = Nothing
            , _glsLightmapTextures        = 0
            , _glsCurrentTextures         = (0, 0)
            , _glsCurrentTmu              = 0

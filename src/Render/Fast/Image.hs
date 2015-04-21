@@ -1,11 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), use, preuse, ix, _1, _2)
-import Control.Monad (when)
+import Control.Monad (when, void, liftM)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Char (toUpper)
+import Data.Maybe (isNothing)
+import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -14,6 +17,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.QFiles.PcxT
 import QCommon.XCommandT
 import Render.GLModeT
@@ -22,6 +26,7 @@ import qualified Constants
 import qualified Client.VID as VID
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 
@@ -145,7 +150,59 @@ glImageListF :: XCommandT
 glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
 
 glInitImages :: Quake ()
-glInitImages = io (putStrLn "Image.glInitImages") >> undefined -- TODO
+glInitImages = do
+    fastRenderAPIGlobals.frRegistrationSequence .= 1
+
+    -- init intensity conversions
+    void $ CVar.get "intensity" "2" 0
+
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      when (v <= 1) $
+        void $ CVar.set "intensity" "1"
+
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      fastRenderAPIGlobals.frGLState.glsInverseIntensity .= 1 / v
+
+    getPalette
+
+    use (fastRenderAPIGlobals.frColorTableEXT) >>= \v ->
+      when v $ do
+        FS.loadFile "pics/16to8.dat" >>= \buf -> do
+          fastRenderAPIGlobals.frGLState.glsD16To8Table .= buf
+          when (isNothing buf) $
+            Com.comError Constants.errFatal "Couldn't load pics/16to8.pcx"
+
+    renderer <- use $ fastRenderAPIGlobals.frGLConfig.glcRenderer
+    g <- if renderer .&. (RenderAPIConstants.glRendererVoodoo .|. RenderAPIConstants.glRendererVoodoo2) /= 0
+           then return 1
+           else liftM (^.cvValue) vidGammaCVar
+
+    fastRenderAPIGlobals.frGammaTable .= (B.unfoldr (if g == 1 then simpleGamma else complexGamma g) 0)
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      fastRenderAPIGlobals.frIntensityTable .= (B.unfoldr (genIntensityTable v) 0)
+
+  where simpleGamma :: Int -> Maybe (Word8, Int)
+        simpleGamma idx
+          | idx >= 256 = Nothing
+          | otherwise = Just (fromIntegral idx, idx + 1)
+
+        complexGamma :: Float -> Int -> Maybe (Word8, Int)
+        complexGamma g idx
+          | idx >= 256 = Nothing
+          | otherwise =
+              let inf :: Int = truncate (255 * (((fromIntegral idx + 0.5) / 255.5) ** g) + 0.5)
+                  inf' = if | inf < 0 -> 0
+                            | inf > 255 -> 255
+                            | otherwise -> inf
+              in Just (fromIntegral inf', idx + 1)
+
+        genIntensityTable :: Float -> Int -> Maybe (Word8, Int)
+        genIntensityTable v idx
+          | idx >= 256 = Nothing
+          | otherwise =
+              let j :: Int = truncate (fromIntegral idx * v)
+                  j' = if j > 255 then 255 else j
+              in Just (fromIntegral j', idx + 1)
 
 glTextureMode :: B.ByteString -> Quake ()
 glTextureMode str = do

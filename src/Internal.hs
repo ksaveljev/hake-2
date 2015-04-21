@@ -1455,28 +1455,31 @@ data GLFWbKBDGlobals =
                   }
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin        :: Float
-                       , _frGLDepthMax        :: Float
-                       , _frGLConfig          :: GLConfigT
-                       , _frGLState           :: GLStateT
-                       , _frd8to24table       :: UV.Vector Int
-                       , _frVid               :: VidDefT
-                       , _frColorTableEXT     :: Bool
-                       , _frActiveTextureARB  :: Bool
-                       , _frPointParameterEXT :: Bool
-                       , _frLockArraysEXT     :: Bool
-                       , _frSwapIntervalEXT   :: Bool
-                       , _frTexture0          :: Int
-                       , _frTexture1          :: Int
-                       , _frGLSolidFormat     :: Int
-                       , _frGLAlphaFormat     :: Int
-                       , _frGLTexSolidFormat  :: Int
-                       , _frGLTexAlphaFormat  :: Int
-                       , _frGLFilterMin       :: Int
-                       , _frGLFilterMax       :: Int
-                       , _frNumGLTextures     :: Int
-                       , _frGLTextures        :: V.Vector ImageT
-                       , _frLastModes         :: (Int, Int)
+  FastRenderAPIGlobals { _frGLDepthMin           :: Float
+                       , _frGLDepthMax           :: Float
+                       , _frGLConfig             :: GLConfigT
+                       , _frGLState              :: GLStateT
+                       , _frd8to24table          :: UV.Vector Int
+                       , _frVid                  :: VidDefT
+                       , _frColorTableEXT        :: Bool
+                       , _frActiveTextureARB     :: Bool
+                       , _frPointParameterEXT    :: Bool
+                       , _frLockArraysEXT        :: Bool
+                       , _frSwapIntervalEXT      :: Bool
+                       , _frTexture0             :: Int
+                       , _frTexture1             :: Int
+                       , _frGLSolidFormat        :: Int
+                       , _frGLAlphaFormat        :: Int
+                       , _frGLTexSolidFormat     :: Int
+                       , _frGLTexAlphaFormat     :: Int
+                       , _frGLFilterMin          :: Int
+                       , _frGLFilterMax          :: Int
+                       , _frNumGLTextures        :: Int
+                       , _frGLTextures           :: V.Vector ImageT
+                       , _frLastModes            :: (Int, Int)
+                       , _frRegistrationSequence :: Int
+                       , _frGammaTable           :: B.ByteString
+                       , _frIntensityTable       :: B.ByteString
                        }
 
 data ParticleTGlobals =
