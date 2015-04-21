@@ -1,9 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobals
                                         , module Client.VidDefT
                                         , module Render.GLConfigT
                                         , module Render.GLStateT
                                         , module Render.ImageT
+                                        , module Render.ModelT
                                         ) where
 
 import Control.Lens (makeLenses)
@@ -16,6 +18,7 @@ import Client.VidDefT
 import Render.GLConfigT
 import Render.GLStateT
 import Render.ImageT
+import Render.ModelT
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 
@@ -48,4 +51,6 @@ initialFastRenderAPIGlobals =
                        , _frRegistrationSequence = 0
                        , _frGammaTable           = B.replicate 256 0
                        , _frIntensityTable       = B.replicate 256 0
+                       , _frModKnown             = V.empty
+                       , _frModNoVis             = ""
                        }

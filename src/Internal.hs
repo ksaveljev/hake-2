@@ -1480,6 +1480,8 @@ data FastRenderAPIGlobals =
                        , _frRegistrationSequence :: Int
                        , _frGammaTable           :: B.ByteString
                        , _frIntensityTable       :: B.ByteString
+                       , _frModKnown             :: V.Vector ModelT
+                       , _frModNoVis             :: B.ByteString
                        }
 
 data ParticleTGlobals =
