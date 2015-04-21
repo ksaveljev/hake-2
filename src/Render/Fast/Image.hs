@@ -15,6 +15,7 @@ import QCommon.QFiles.PcxT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.VID as VID
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 
@@ -100,3 +101,18 @@ glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
 
 glInitImages :: Quake ()
 glInitImages = io (putStrLn "Image.glInitImages") >> undefined -- TODO
+
+glTextureMode :: B.ByteString -> Quake ()
+glTextureMode _ = io (putStrLn "Image.glTextureMode") >> undefined -- TODO
+
+glTextureAlphaMode :: B.ByteString -> Quake ()
+glTextureAlphaMode _ = io (putStrLn "Image.glTextureAlphaMode") >> undefined -- TODO
+
+glTextureSolidMode :: B.ByteString -> Quake ()
+glTextureSolidMode _ = io (putStrLn "Image.glTextureSolidMode") >> undefined -- TODO
+
+glTexEnv :: GL.GLenum -> Quake ()
+glTexEnv _ = io (putStrLn "Image.glTexEnv") >> undefined -- TODO
+
+glSetTexturePalette :: UV.Vector Int -> Quake ()
+glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO

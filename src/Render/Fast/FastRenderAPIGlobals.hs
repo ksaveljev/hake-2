@@ -31,4 +31,6 @@ initialFastRenderAPIGlobals =
                        , _frSwapIntervalEXT   = False
                        , _frTexture0          = QGLConstants.glTexture0
                        , _frTexture1          = QGLConstants.glTexture1
+                       , _frGLFilterMin       = QGLConstants.glLinearMipmapNearest
+                       , _frGLFilterMax       = QGLConstants.glLinear
                        }

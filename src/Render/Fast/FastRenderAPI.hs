@@ -9,7 +9,8 @@ import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
-import Graphics.Rendering.OpenGL (($=))
+import Foreign.Marshal.Array (withArray)
+import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -23,7 +24,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified Graphics.Rendering.OpenGL as GL
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
@@ -87,10 +88,10 @@ fastInit2 endFrame = do
     VID.menuInit
 
     -- get our various GL strings
-    vendor <- io $ GL.get GL.vendor >>= return . BC.pack
-    renderer <- io $ GL.get GL.renderer >>= return . BC.pack
-    version <- io $ GL.get GL.glVersion >>= return . BC.pack
-    extensions <- io $ GL.get GL.glExtensions >>= return . BC.pack . show
+    vendor <- io $ getGLString GL.gl_VENDOR
+    renderer <- io $ getGLString GL.gl_RENDERER
+    version <- io $ getGLString GL.gl_VERSION
+    extensions <- io $ getGLString GL.gl_EXTENSIONS
 
     zoom (fastRenderAPIGlobals.frGLConfig) $ do
       glcVendorString .= vendor
@@ -218,7 +219,7 @@ fastInit2 endFrame = do
              then do
                -- check if the extension really exists
                ok <- io $ handle (\(_ :: IOException) -> return False) $ do
-                 GL.clientActiveTexture $= GL.TextureUnit (fromIntegral QGLConstants.glTexture0ARB)
+                 GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture0ARB)
                  -- seems to work correctly
                  return True
 
@@ -247,12 +248,19 @@ fastInit2 endFrame = do
         rInitParticleTexture
         Draw.initLocal
 
-        err <- io $ GL.get GL.errors
-        unless (null err) $
+        err <- io $ GL.glGetError
+        unless (err == GL.gl_NO_ERROR) $
           VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
 
         endFrame
         return True
+
+  where getGLString :: GL.GLenum -> IO B.ByteString
+        getGLString n = GL.glGetString n >>= maybeNullPtr (return "") (B.packCString . castPtr)
+
+        maybeNullPtr :: b -> (Ptr a -> b) -> Ptr a -> b
+        maybeNullPtr n f ptr | ptr == nullPtr = n
+                             | otherwise      = f ptr
 
 rRegister :: Quake () -> Quake ()
 rRegister glImplScreenshot = do
@@ -382,7 +390,79 @@ glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
 
 glSetDefaultState :: Quake ()
-glSetDefaultState = io (putStrLn "FastRenderAPI.glSetDefaultState") >> undefined -- TODO
+glSetDefaultState = do
+    GL.glClearColor 1 0 0.5 0.5
+    GL.glCullFace GL.gl_FRONT
+    GL.glEnable GL.gl_TEXTURE_2D
+
+    GL.glEnable GL.gl_ALPHA_TEST
+    GL.glAlphaFunc GL.gl_GREATER 0.666
+
+    GL.glDisable GL.gl_DEPTH_TEST
+    GL.glDisable GL.gl_CULL_FACE
+    GL.glDisable GL.gl_BLEND
+
+    GL.glColor4f 1 1 1 1
+
+    GL.glPolygonMode GL.gl_FRONT_AND_BACK GL.gl_FILL
+    GL.glShadeModel GL.gl_FLAT
+
+    liftM (^.cvString) glTextureModeCVar >>= Image.glTextureMode
+    liftM (^.cvString) glTextureAlphaModeCVar >>= Image.glTextureAlphaMode
+    liftM (^.cvString) glTextureSolidModeCVar >>= Image.glTextureSolidMode
+
+    minFilter <- use $ fastRenderAPIGlobals.frGLFilterMin
+    maxFilter <- use $ fastRenderAPIGlobals.frGLFilterMax
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral minFilter)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral maxFilter)
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_WRAP_S (fromIntegral GL.gl_REPEAT)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_WRAP_T (fromIntegral GL.gl_REPEAT)
+
+    GL.glBlendFunc GL.gl_SRC_ALPHA GL.gl_ONE_MINUS_SRC_ALPHA
+
+    Image.glTexEnv GL.gl_REPLACE
+
+    ppExt <- use $ fastRenderAPIGlobals.frPointParameterEXT
+
+    when ppExt $ do
+      a <- liftM (^.cvValue) glParticleAttACVar
+      b <- liftM (^.cvValue) glParticleAttBCVar
+      c <- liftM (^.cvValue) glParticleAttCCVar
+      minSize <- liftM (^.cvValue) glParticleMinSizeCVar
+      maxSize <- liftM (^.cvValue) glParticleMaxSizeCVar
+
+      let arr :: [GL.GLfloat] = fmap realToFrac [a, b, c]
+
+      GL.glEnable GL.gl_POINT_SMOOTH
+      GL.glPointParameterfEXT GL.gl_POINT_SIZE_MIN_EXT (realToFrac minSize)
+      GL.glPointParameterfEXT GL.gl_POINT_SIZE_MAX_EXT (realToFrac maxSize)
+      io $ withArray arr $ \ptr ->
+        GL.glPointParameterfvEXT GL.gl_DISTANCE_ATTENUATION_EXT ptr
+
+    ctExt <- use $ fastRenderAPIGlobals.frColorTableEXT
+    pt <- liftM (^.cvValue) glExtPalettedTextureCVar
+
+    when (ctExt && pt /= 0) $ do
+      io $ GL.glEnable GL.gl_SHARED_TEXTURE_PALETTE_EXT
+      d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+      Image.glSetTexturePalette d8to24table
+
+    glUpdateSwapInterval
+
+    -- vertex array extension
+    t0 <- use $ fastRenderAPIGlobals.frTexture0
+
+    GL.glEnableClientState GL.gl_VERTEX_ARRAY
+    GL.glClientActiveTextureARB (fromIntegral t0)
+    GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+    -- perspective correction (commented out in jake2 source)
+    -- gl.glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
 rInitParticleTexture :: Quake ()
 rInitParticleTexture = io (putStrLn "FastRenderAPI.rInitParticleTexture") >> undefined -- TODO
+
+glUpdateSwapInterval :: Quake ()
+glUpdateSwapInterval = io (putStrLn "FastRenderAPI.glUpdateSwapInterval") >> undefined -- TODO

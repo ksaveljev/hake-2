@@ -1468,6 +1468,8 @@ data FastRenderAPIGlobals =
                        , _frSwapIntervalEXT   :: Bool
                        , _frTexture0          :: Int
                        , _frTexture1          :: Int
+                       , _frGLFilterMin       :: Int
+                       , _frGLFilterMax       :: Int
                        }
 
 data ParticleTGlobals =
