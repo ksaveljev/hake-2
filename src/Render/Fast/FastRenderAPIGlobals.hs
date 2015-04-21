@@ -53,4 +53,6 @@ initialFastRenderAPIGlobals =
                        , _frIntensityTable       = B.replicate 256 0
                        , _frModKnown             = V.empty
                        , _frModNoVis             = ""
+                       , _frNoTexture            = ImageReference (-1)
+                       , _frParticleTexture      = ImageReference (-1)
                        }

@@ -265,3 +265,14 @@ glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -
 
 glBind :: Int -> Quake ()
 glBind _ = io (putStrLn "Image.glBind") >> undefined -- TODO
+
+{-
+================
+GL_LoadPic
+
+This is also used as an entry point for the generated r_notexture
+================
+-}
+glLoadPic :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ImageReference
+glLoadPic name pic width height picType bits =
+    io (putStrLn "Image.glLoadPic") >> undefined -- TODO

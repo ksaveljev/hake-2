@@ -112,6 +112,9 @@ newtype MenuFrameworkSReference = MenuFrameworkSReference Int
 -- reference to menuGlobals.mgMenuItems
 newtype MenuItemReference = MenuItemReference Int
 
+-- reference to (fast/basic)RenderAPIGlobals.frGLTextures
+newtype ImageReference = ImageReference Int
+
 data QuakeState =
   QuakeState { _globals              :: !Globals
              , _comGlobals           :: !ComGlobals
@@ -1482,6 +1485,8 @@ data FastRenderAPIGlobals =
                        , _frIntensityTable       :: B.ByteString
                        , _frModKnown             :: V.Vector ModelT
                        , _frModNoVis             :: B.ByteString
+                       , _frNoTexture            :: ImageReference
+                       , _frParticleTexture      :: ImageReference
                        }
 
 data ParticleTGlobals =
