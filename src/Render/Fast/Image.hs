@@ -4,10 +4,10 @@
 module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
-import Control.Monad (when, void, liftM)
+import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Char (toUpper)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -264,7 +264,29 @@ glSetTexturePalette :: UV.Vector Int -> Quake ()
 glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
 
 glBind :: Int -> Quake ()
-glBind _ = io (putStrLn "Image.glBind") >> undefined -- TODO
+glBind texNum = do
+    noBindValue <- liftM (^.cvValue) glNoBindCVar
+    drawChars <- use $ fastRenderAPIGlobals.frDrawChars
+
+    texNum' <- if noBindValue /= 0 && isJust drawChars
+                 then do
+                   -- performance evaluation option
+                   let (Just (ImageReference idx)) = drawChars
+                   Just num <- preuse $ fastRenderAPIGlobals.frGLTextures.ix idx.iTexNum
+                   return num
+                 else
+                   return texNum
+
+    glState <- use $ fastRenderAPIGlobals.frGLState
+    let access = if glState^.glsCurrentTmu == 0
+                   then _1
+                   else _2
+
+    unless (glState^.glsCurrentTextures.access == texNum') $ do
+      if glState^.glsCurrentTmu == 0
+        then fastRenderAPIGlobals.frGLState.glsCurrentTextures._1 .= texNum'
+        else fastRenderAPIGlobals.frGLState.glsCurrentTextures._2 .= texNum'
+      GL.glBindTexture GL.gl_TEXTURE_2D (fromIntegral texNum')
 
 {-
 ================
