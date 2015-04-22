@@ -625,4 +625,26 @@ Operates in place, quartering the size of the texture
 ================
 -}
 glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
-glMipMap _ _ _ = undefined -- TODO
+glMipMap img width height =
+    let -- width' = width `shiftL` 2
+        height' = height `shiftR` 1
+    in forI 0 0 height' ""
+
+  where forI :: Int -> Int -> Int -> B.ByteString -> B.ByteString
+        forI inIdx i maxI acc
+          | i >= maxI = acc
+          | otherwise = 
+              let w = width `shiftL` 2
+                  (inIdx', r) = forJ inIdx 0 w ""
+              in forI (inIdx' + w) (i + 1) maxI (acc `B.append` r)
+
+        forJ :: Int -> Int -> Int -> B.ByteString -> (Int, B.ByteString)
+        forJ inIdx j maxJ acc
+          | j >= maxJ = (inIdx, acc)
+          | otherwise =
+              let w = width `shiftL` 2
+                  a = ((img `B.index` (inIdx + 0)) + (img `B.index` (inIdx + 4)) + (img `B.index` (inIdx + w + 0)) + (img `B.index` (inIdx + w + 4))) `shiftR` 2
+                  b = ((img `B.index` (inIdx + 1)) + (img `B.index` (inIdx + 5)) + (img `B.index` (inIdx + w + 1)) + (img `B.index` (inIdx + w + 5))) `shiftR` 2
+                  c = ((img `B.index` (inIdx + 2)) + (img `B.index` (inIdx + 6)) + (img `B.index` (inIdx + w + 2)) + (img `B.index` (inIdx + w + 6))) `shiftR` 2
+                  d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
+              in forJ (inIdx + 8) (j + 8) maxJ (acc `B.append` (B.pack [a, b, c, d]))
