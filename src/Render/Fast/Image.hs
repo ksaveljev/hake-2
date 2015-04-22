@@ -527,8 +527,44 @@ glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
 glResampleTexture _ _ _ _ _ = undefined -- TODO
 
 glLightScaleTexture :: B.ByteString -> Int -> Int -> Bool -> Quake B.ByteString
-glLightScaleTexture _ _ _ _ = do
-    io (putStrLn "Image.glLightScaleTexture") >> undefined -- TODO
+glLightScaleTexture img width height onlyGamma = do
+    let c = width * height
+    gammaTable <- use $ fastRenderAPIGlobals.frGammaTable
+
+    if onlyGamma
+      then return $ buildFromGammaTable gammaTable 0 0 c ""
+      else do
+        intensityTable <- use $ fastRenderAPIGlobals.frIntensityTable
+        return $ buildFromGammaAndIntesityTable gammaTable intensityTable 0 0 c ""
+
+  where buildFromGammaTable :: B.ByteString -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildFromGammaTable gammaTable idx p maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let p0 = img `B.index` p
+                  p1 = img `B.index` (p + 1)
+                  p2 = img `B.index` (p + 2)
+                  p3 = img `B.index` (p + 3)
+                  a = gammaTable `B.index` (fromIntegral p0)
+                  b = gammaTable `B.index` (fromIntegral p1)
+                  c = gammaTable `B.index` (fromIntegral p2)
+              in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `B.append` (B.pack [a, b, c, p3]))
+
+        buildFromGammaAndIntesityTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildFromGammaAndIntesityTable gammaTable intensityTable idx p maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let p0 = img `B.index` p
+                  p1 = img `B.index` (p + 1)
+                  p2 = img `B.index` (p + 2)
+                  p3 = img `B.index` (p + 3)
+                  i0 = intensityTable `B.index` (fromIntegral p0)
+                  i1 = intensityTable `B.index` (fromIntegral p1)
+                  i2 = intensityTable `B.index` (fromIntegral p2)
+                  a = gammaTable `B.index` (fromIntegral i0)
+                  b = gammaTable `B.index` (fromIntegral i1)
+                  c = gammaTable `B.index` (fromIntegral i2)
+              in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `B.append` (B.pack [a, b, c, p3]))
 
 glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
 glMipMap _ _ _ = undefined -- TODO
