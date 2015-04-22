@@ -15,6 +15,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
 import QuakeState
@@ -25,7 +26,6 @@ import Render.GLModeT
 import Render.GLTModeT
 import qualified Constants
 import qualified Client.VID as VID
-import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
@@ -626,8 +626,7 @@ Operates in place, quartering the size of the texture
 -}
 glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
 glMipMap img width height =
-    let -- width' = width `shiftL` 2
-        height' = height `shiftR` 1
+    let height' = height `shiftR` 1
     in forI 0 0 height' ""
 
   where forI :: Int -> Int -> Int -> B.ByteString -> B.ByteString
@@ -648,3 +647,7 @@ glMipMap img width height =
                   c = ((img `B.index` (inIdx + 2)) + (img `B.index` (inIdx + 6)) + (img `B.index` (inIdx + w + 2)) + (img `B.index` (inIdx + w + 6))) `shiftR` 2
                   d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
               in forJ (inIdx + 8) (j + 8) maxJ (acc `B.append` (B.pack [a, b, c, d]))
+
+glFindImage :: B.ByteString -> Int -> Quake (Maybe ImageReference)
+glFindImage _ _ = do
+    io (putStrLn "Image.glFindImage") >> undefined -- TODO
