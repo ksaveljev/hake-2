@@ -1471,8 +1471,6 @@ data FastRenderAPIGlobals =
                        , _frSwapIntervalEXT      :: Bool
                        , _frTexture0             :: Int
                        , _frTexture1             :: Int
-                       , _frGLSolidFormat        :: Int
-                       , _frGLAlphaFormat        :: Int
                        , _frGLTexSolidFormat     :: Int
                        , _frGLTexAlphaFormat     :: Int
                        , _frGLFilterMin          :: Int

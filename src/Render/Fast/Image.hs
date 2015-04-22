@@ -5,13 +5,14 @@ module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
 import Control.Monad (when, void, liftM, unless)
-import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -29,6 +30,12 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.RenderAPIConstants as RenderAPIConstants
+
+glSolidFormat :: Int
+glSolidFormat = 3
+
+glAlphaFormat :: Int
+glAlphaFormat = 4
 
 numGLModes :: Int
 numGLModes = V.length modes
@@ -328,7 +335,7 @@ glLoadPic name pic width height picType bits = do
     -- load little pics into the scrap
     if picType == RenderAPIConstants.itPic && bits == 8 && width < 64 && height < 64
       then do
-        io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+        io (putStrLn "Image.glLoadPic [scrap]") >> undefined -- TODO
       else do
         -- this was label nonscrap
         let texNum = RenderAPIConstants.texNumImages + idx
@@ -339,17 +346,16 @@ glLoadPic name pic width height picType bits = do
 
         glBind texNum
 
-        if bits == 8
-          then do
-            io (putStrLn "Image.glLoadPic") >> undefined -- TODO
-          else do
-            io (putStrLn "Image.glLoadPic") >> undefined -- TODO
+        hasAlpha <- if bits == 8
+                      then glUpload8  image width height (picType /= RenderAPIConstants.itPic && picType /= RenderAPIConstants.itSky) (picType == RenderAPIConstants.itSky)
+                      else glUpload32 image width height (picType /= RenderAPIConstants.itPic && picType /= RenderAPIConstants.itSky)
 
         uploadWidth <- use $ fastRenderAPIGlobals.frUploadWidth
         uploadHeight <- use $ fastRenderAPIGlobals.frUploadHeight
         uploadedPaletted <- use $ fastRenderAPIGlobals.frUploadedPaletted
 
         zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+          iHasAlpha .= hasAlpha
           iUploadWidth .= uploadWidth
           iUploadHeight .= uploadHeight
           iPaletted .= uploadedPaletted
@@ -371,3 +377,158 @@ glLoadPic name pic width height picType bits = do
 rFloodFillSkin :: B.ByteString -> Int -> Int -> Quake B.ByteString
 rFloodFillSkin _ _ _ = do
     io (putStrLn "Image.rFloodFillSkin") >> undefined -- TODO
+
+glUpload8 :: B.ByteString -> Int -> Int -> Bool -> Bool -> Quake Bool
+glUpload8 _ _ _ _ _ = do
+    io (putStrLn "Image.glUpload8") >> undefined -- TODO
+
+glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
+glUpload32 image width height mipmap = do
+    scaledWidth <- calcScaledWidthHeight width
+    scaledHeight <- calcScaledWidthHeight height
+
+    zoom (fastRenderAPIGlobals) $ do
+      frUploadedPaletted .= False
+      frUploadWidth .= scaledWidth
+      frUploadHeight .= scaledHeight
+
+    when (scaledWidth * scaledHeight > 256 * 256) $
+      Com.comError Constants.errDrop "GL_Upload32: too big"
+
+    -- scan the texture for any non-255 alpha
+    let c = width * height
+        samples = scanAlpha 0 3 c
+
+    comp <- if | samples == glSolidFormat -> use $ fastRenderAPIGlobals.frGLTexSolidFormat
+               | samples == glAlphaFormat -> use $ fastRenderAPIGlobals.frGLTexAlphaFormat
+               | otherwise -> do
+                   VID.printf Constants.printAll ("Unknown number of texture components " `B.append` (BC.pack $ show samples) `B.append` "\n") -- IMPROVE?
+                   return samples
+
+    result <- if scaledWidth == width && scaledHeight == height
+                then
+                  if not mipmap
+                    then do
+                      uploadImage image scaledWidth scaledHeight 0 samples comp
+                      -- goto done;
+                      return Nothing
+                    else
+                      return (Just image)
+                else do
+                  let scaled = glResampleTexture image width height scaledWidth scaledHeight
+                  return $ Just scaled
+
+    when (isJust result) $ do
+      scaled <- glLightScaleTexture (fromJust result) scaledWidth scaledHeight (not mipmap)
+      uploadImage scaled scaledWidth scaledHeight 0 samples comp
+
+      when mipmap $
+        uploadMipMaps scaled scaledWidth scaledHeight 0 samples comp
+
+    -- label done
+
+    filterMin <- use $ fastRenderAPIGlobals.frGLFilterMin
+    filterMax <- use $ fastRenderAPIGlobals.frGLFilterMax
+
+    if mipmap
+      then do
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral filterMin)
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral filterMax)
+      else do
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral filterMax)
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral filterMax)
+
+    return $ samples == glAlphaFormat
+
+  where calcScaledWidthHeight :: Int -> Quake Int
+        calcScaledWidthHeight value = do
+          roundDownValue <- liftM (^.cvValue) glRoundDownCVar
+
+          let sv = calcScale 1 value
+              sv' = if roundDownValue > 0 && sv > value && mipmap
+                      then sv `shiftR` 1
+                      else sv
+
+          -- let people sample down the world textures for speed
+          sv'' <- if mipmap
+                    then do
+                      picMipValue <- liftM (truncate . (^.cvValue)) glPicMipCVar
+                      return $ sv' `shiftR` picMipValue
+                    else return sv'
+
+          -- don't ever bother with > 256 textures
+          return $ if | sv'' > 256 -> 256
+                      | sv'' < 1 -> 1
+                      | otherwise -> sv''
+
+        calcScale :: Int -> Int -> Int
+        calcScale v value
+          | v >= value = v
+          | otherwise = calcScale (v `shiftL` 1) value
+
+        scanAlpha :: Int -> Int -> Int -> Int
+        scanAlpha idx scan maxIdx
+          | idx >= maxIdx = glSolidFormat
+          | otherwise =
+              if image `B.index` scan /= 0xFF
+                then glAlphaFormat
+                else scanAlpha (idx + 1) (scan + 4) maxIdx
+
+        uploadImage :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
+        uploadImage img scaledWidth scaledHeight mipLevel samples comp = do
+          colorTable <- use $ fastRenderAPIGlobals.frColorTableEXT
+          palettedTextureValue <- liftM (^.cvValue) glExtPalettedTextureCVar
+
+          if colorTable && palettedTextureValue /= 0 && samples == glSolidFormat
+            then do
+              fastRenderAPIGlobals.frUploadedPaletted .= True
+              palettedTexture <- glBuildPalettedTexture img scaledWidth scaledHeight
+              io $ BU.unsafeUseAsCString palettedTexture $ \ptr ->
+                GL.glTexImage2D GL.gl_TEXTURE_2D
+                                (fromIntegral mipLevel) 
+                                (fromIntegral GL.gl_COLOR_INDEX8_EXT)
+                                (fromIntegral scaledWidth)
+                                (fromIntegral scaledHeight)
+                                0
+                                GL.gl_COLOR_INDEX
+                                GL.gl_UNSIGNED_BYTE
+                                ptr
+
+            else
+              io $ BU.unsafeUseAsCString img $ \ptr ->
+                GL.glTexImage2D GL.gl_TEXTURE_2D
+                                (fromIntegral mipLevel)
+                                (fromIntegral comp)
+                                (fromIntegral scaledWidth)
+                                (fromIntegral scaledHeight)
+                                0
+                                GL.gl_RGBA
+                                GL.gl_UNSIGNED_BYTE
+                                ptr
+
+        uploadMipMaps :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
+        uploadMipMaps img scaledWidth scaledHeight mipLevel samples comp
+          | scaledWidth <= 1 || scaledHeight <= 1 = return ()
+          | otherwise = do
+              let scaled = glMipMap img scaledWidth scaledHeight
+                  sw = scaledWidth `shiftR` 1
+                  sh = scaledHeight `shiftR` 1
+                  scaledWidth' = if sw < 1 then 1 else sw
+                  scaledHeight' = if sh < 1 then 1 else sh
+                  mipLevel' = mipLevel + 1
+
+              uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
+              uploadMipMaps scaled scaledWidth' scaledHeight' mipLevel' samples comp
+
+glBuildPalettedTexture :: B.ByteString -> Int -> Int -> Quake B.ByteString
+glBuildPalettedTexture _ _ _ = io (putStrLn "Image.glBuildPalettedTexture") >> undefined -- TODO
+
+glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
+glResampleTexture _ _ _ _ _ = undefined -- TODO
+
+glLightScaleTexture :: B.ByteString -> Int -> Int -> Bool -> Quake B.ByteString
+glLightScaleTexture _ _ _ _ = do
+    io (putStrLn "Image.glLightScaleTexture") >> undefined -- TODO
+
+glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
+glMipMap _ _ _ = undefined -- TODO

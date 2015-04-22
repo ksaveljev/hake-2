@@ -196,9 +196,9 @@ glfwbGetModeList = do
           GLFW.videoModeWidth newMode >= 320 &&
           GLFW.videoModeHeight newMode >= 240
 
-
+-- first param is dim but it is not used anywhere for some reason
 glfwbSetMode :: (Int, Int) -> Int -> Bool -> Quake Int
-glfwbSetMode dim mode fullscreen = do
+glfwbSetMode _ mode fullscreen = do
     VID.printf Constants.printAll "Initializing OpenGL display\n"
     VID.printf Constants.printAll $ "...setting mode " `B.append` BC.pack (show mode) `B.append` ":" -- IMPROVE?
 
