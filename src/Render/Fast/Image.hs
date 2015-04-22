@@ -523,9 +523,60 @@ glUpload32 image width height mipmap = do
 glBuildPalettedTexture :: B.ByteString -> Int -> Int -> Quake B.ByteString
 glBuildPalettedTexture _ _ _ = io (putStrLn "Image.glBuildPalettedTexture") >> undefined -- TODO
 
+{-
+================
+GL_ResampleTexture
+================
+-}
 glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
-glResampleTexture _ _ _ _ _ = undefined -- TODO
+glResampleTexture img width height scaledWidth scaledHeight =
+    let fracStep = (width * 0x10000) `div` scaledWidth
+        frac = fracStep `shiftR` 2
+        p1 = buildP frac fracStep 0 scaledWidth ""
+        frac' = 3 * (fracStep `shiftR` 2)
+        p2 = buildP frac' fracStep 0 scaledWidth ""
+    in resample fracStep p1 p2 0 scaledHeight ""
 
+  where buildP :: Int -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildP frac fracStep idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let v = 4 * (frac `shiftR` 16)
+              in buildP (frac + fracStep) fracStep (idx + 1) maxIdx (acc `B.snoc` fromIntegral v)
+
+        resample :: Int -> B.ByteString -> B.ByteString -> Int -> Int -> B.ByteString -> B.ByteString
+        resample fracStep p1 p2 idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              -- TODO: make sure we need '4 *' here
+              let inRow = 4 * width * truncate ((fromIntegral idx + 0.25 :: Float) * fromIntegral height / fromIntegral scaledHeight)
+                  inRow2 = 4 * width * truncate ((fromIntegral idx + 0.75 :: Float) * fromIntegral height / fromIntegral scaledHeight)
+                  -- frac = fracStep `shiftR` 1
+                  row = buildRow p1 p2 inRow inRow2 0 scaledWidth ""
+              in resample fracStep p1 p2 (idx + 1) maxIdx (acc `B.append` row)
+
+        buildRow :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildRow p1 p2 inRow inRow2 idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let pix1 = inRow  + fromIntegral (p1 `B.index` idx)
+                  pix2 = inRow  + fromIntegral (p2 `B.index` idx)
+                  pix3 = inRow2 + fromIntegral (p1 `B.index` idx)
+                  pix4 = inRow2 + fromIntegral (p2 `B.index` idx)
+                  a = ((img `B.index` (pix1 + 0)) + (img `B.index` (pix2 + 0)) + (img `B.index` (pix3 + 0)) + (img `B.index` (pix4 + 0))) `shiftR` 2
+                  b = ((img `B.index` (pix1 + 1)) + (img `B.index` (pix2 + 1)) + (img `B.index` (pix3 + 1)) + (img `B.index` (pix4 + 1))) `shiftR` 2
+                  c = ((img `B.index` (pix1 + 2)) + (img `B.index` (pix2 + 2)) + (img `B.index` (pix3 + 2)) + (img `B.index` (pix4 + 2))) `shiftR` 2
+                  d = ((img `B.index` (pix1 + 3)) + (img `B.index` (pix2 + 3)) + (img `B.index` (pix3 + 3)) + (img `B.index` (pix4 + 3))) `shiftR` 2
+              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `B.append` (B.pack [a, b, c, d]))
+
+{-
+================
+GL_LightScaleTexture
+
+Scale up the pixel values in a texture to increase the
+lighting range
+================
+-}
 glLightScaleTexture :: B.ByteString -> Int -> Int -> Bool -> Quake B.ByteString
 glLightScaleTexture img width height onlyGamma = do
     let c = width * height
@@ -566,5 +617,12 @@ glLightScaleTexture img width height onlyGamma = do
                   c = gammaTable `B.index` (fromIntegral i2)
               in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `B.append` (B.pack [a, b, c, p3]))
 
+{-
+================
+GL_MipMap
+
+Operates in place, quartering the size of the texture
+================
+-}
 glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
 glMipMap _ _ _ = undefined -- TODO
