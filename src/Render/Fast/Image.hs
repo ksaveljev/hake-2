@@ -649,5 +649,62 @@ glMipMap img width height =
               in forJ (inIdx + 8) (j + 8) maxJ (acc `B.append` (B.pack [a, b, c, d]))
 
 glFindImage :: B.ByteString -> Int -> Quake (Maybe ImageReference)
-glFindImage _ _ = do
-    io (putStrLn "Image.glFindImage") >> undefined -- TODO
+glFindImage imgName imgType = do
+    if B.length imgName < 5
+      then return Nothing
+      else do
+        -- look for it
+        numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+        glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+
+        let found = findImage glTextures 0 numGLTextures
+
+        case found of
+          Just (ImageReference imageIdx) -> do
+            registrationSequence <- use $ fastRenderAPIGlobals.frRegistrationSequence
+            fastRenderAPIGlobals.frGLTextures.ix imageIdx.iRegistrationSequence .= registrationSequence
+            return found
+          Nothing -> do
+            -- load the pic from disk
+            img <- if | ".pcx" `BC.isSuffixOf` imgName -> do
+                          (pic, _, dimensions) <- loadPCX imgName False True
+                          if isNothing pic
+                            then return Nothing
+                            else do
+                              let Just (width, height) = dimensions
+                              imgRef <- glLoadPic imgName (fromJust pic) width height imgType 8
+                              return $ Just imgRef
+                      | ".wal" `BC.isSuffixOf` imgName -> do
+                          imgRef <- glLoadWal imgName
+                          return $ Just imgRef
+                      | ".tga" `BC.isSuffixOf` imgName -> do
+                          tga <- loadTGA imgName
+                          case tga of
+                            Nothing -> return Nothing
+                            Just (pic, (width, height)) -> do
+                              imgRef <- glLoadPic imgName pic width height imgType 32
+                              return $ Just imgRef
+                      | otherwise -> do
+                          (pic, _, dimensions) <- loadPCX ("pics/" `B.append` imgName `B.append` ".pcx") False True
+                          if isNothing pic
+                            then return Nothing
+                            else do
+                              let Just (width, height) = dimensions
+                              imgRef <- glLoadPic imgName (fromJust pic) width height imgType 8
+                              return $ Just imgRef
+
+            return img
+
+  where findImage :: V.Vector ImageT -> Int -> Int -> Maybe ImageReference
+        findImage textures idx maxIdx
+          | idx >= maxIdx = Nothing
+          | otherwise =
+              if (textures V.! idx)^.iName == imgName
+                then Just (ImageReference idx)
+                else findImage textures (idx + 1) maxIdx
+
+glLoadWal :: B.ByteString -> Quake ImageReference
+glLoadWal _ = io (putStrLn "Image.glLoadWal") >> undefined -- TODO
+
+loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
+loadTGA _ = io (putStrLn "Image.loadTGA") >> undefined -- TODO
