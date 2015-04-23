@@ -11,6 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Debug.Trace as DT
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Graphics.UI.GLFW as GLFW
 
 import Quake
@@ -271,7 +272,10 @@ setVid width height =
       vdNewHeight .= height
 
 endFrame :: Quake ()
-endFrame = io (putStrLn "GLFWbRenderer.endFrame") >> undefined -- TODO
+endFrame = do
+    GL.glFlush
+    Just window <- use $ glfwbGlobals.glfwbWindow
+    io $ GLFW.swapBuffers window
 
 glfwbSetSwapInterval :: Int -> Quake ()
 glfwbSetSwapInterval v = io $ GLFW.swapInterval v
