@@ -5,6 +5,7 @@ module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
 import Control.Monad (when, void, liftM, unless)
+import Data.Binary (encode)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -379,8 +380,61 @@ rFloodFillSkin _ _ _ = do
     io (putStrLn "Image.rFloodFillSkin") >> undefined -- TODO
 
 glUpload8 :: B.ByteString -> Int -> Int -> Bool -> Bool -> Quake Bool
-glUpload8 _ _ _ _ _ = do
-    io (putStrLn "Image.glUpload8") >> undefined -- TODO
+glUpload8 image width height mipmap isSky = do
+    let s = width * height
+
+    when (s > 512 * 256) $
+      Com.comError Constants.errDrop "GL_Upload8: too large"
+
+    colorTable <- use $ fastRenderAPIGlobals.frColorTableEXT
+    palettedTextureValue <- liftM (^.cvValue) glExtPalettedTextureCVar
+
+    if colorTable && palettedTextureValue /= 0 && isSky
+      then do
+        io $ BU.unsafeUseAsCString image $ \ptr ->
+          GL.glTexImage2D GL.gl_TEXTURE_2D
+                          0
+                          (fromIntegral GL.gl_COLOR_INDEX8_EXT)
+                          (fromIntegral width)
+                          (fromIntegral height)
+                          0
+                          GL.gl_COLOR_INDEX
+                          GL.gl_UNSIGNED_BYTE
+                          ptr
+
+        filterMax <- use $ fastRenderAPIGlobals.frGLFilterMax
+
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral filterMax)
+        GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral filterMax)
+
+        -- TODO check this (jake2 comment)
+        return False
+      else do
+        d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+        let trans = constructTrans d8to24table 0 s ""
+        glUpload32 trans width height mipmap
+
+  where constructTrans :: UV.Vector Int -> Int -> Int -> B.ByteString -> B.ByteString
+        constructTrans d8to24table idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let p = image `B.index` idx
+                  t = d8to24table UV.! (fromIntegral p)
+                  p' = if p == 0xFF
+                         -- transparent, so scan around for another color
+                         -- to avoid alpha fringes
+                         -- FIXME: do a full flood fill so mips work...
+                         then if | idx > width && (image `B.index` (idx - width)) /= 0xFF -> image `B.index` (idx - width)
+                                 | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF -> image `B.index` (idx + width)
+                                 | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF -> image `B.index` (idx - 1)
+                                 | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF -> image `B.index` (idx + 1)
+                                 | otherwise -> 0
+                         else p
+                  t' = if p == 0xFF
+                         -- copy rgb components
+                         then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
+                         else t
+              in constructTrans d8to24table (idx + 1) maxIdx (acc `B.append` (BL.toStrict $ encode t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap = do
