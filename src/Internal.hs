@@ -1018,7 +1018,7 @@ class EntTouchAdapter a where
     touch :: a -> EdictReference -> EdictReference -> CPlaneT -> Maybe CSurfaceT -> Quake ()
 
 class EntUseAdapter a where
-    entUse :: a -> EdictReference -> EdictReference -> Maybe EdictReference -> Quake ()
+    entUse :: a -> EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ()
 
 class EntPainAdapter a where
     pain :: a -> EdictReference -> EdictReference -> Float -> Int -> Quake ()
@@ -1066,9 +1066,9 @@ data EntTouch =
                   }
 
 data EntUse =
-    FuncExplosiveUse B.ByteString (EdictReference -> EdictReference -> Maybe EdictReference -> Quake ())
+    FuncExplosiveUse B.ByteString (EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ())
   | GenericEntUse { _geuId :: B.ByteString
-                , _geuUse :: EdictReference -> EdictReference -> Maybe EdictReference -> Quake ()
+                , _geuUse :: EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ()
                 }
 
 data EntPain =

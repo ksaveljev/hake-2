@@ -200,9 +200,7 @@ spLight er@(EdictReference edictIdx) = do
 spFuncWall :: EdictReference -> Quake ()
 spFuncWall edictRef@(EdictReference edictIdx) = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
-    let setModel = gameImport^.giSetModel
-        linkEntity = gameImport^.giLinkEntity
-        dprintf = gameImport^.giDprintf
+    let linkEntity = gameImport^.giLinkEntity
 
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= Constants.moveTypePush
 
@@ -468,7 +466,7 @@ spMiscStroggShip edictRef@(EdictReference edictIdx) = do
                   Lib.vtos (edict^.eEdictMinMax.eAbsMin) `B.append` "\n"
         GameUtil.freeEdict edictRef
 
-      Just target -> do
+      Just _ -> do
         tris <- modelIndex "models/ships/strogg1/tris.md2"
         time <- use $ gameBaseGlobals.gbLevel.llTime
 

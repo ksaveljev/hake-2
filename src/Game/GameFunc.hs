@@ -312,8 +312,81 @@ spFuncKillBox =
 
 spFuncRotating :: EntThink
 spFuncRotating =
-  GenericEntThink "sp_func_rotating" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncRotating") >> undefined -- TODO
+  GenericEntThink "sp_func_rotating" $ \edictRef@(EdictReference edictIdx) -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
+
+    updateMoveType edictRef
+
+    -- set the axis of rotation
+    updateRotationAxis edictRef
+
+    -- check for reverse rotation
+    checkRevereseRotation edictRef
+
+    checkSpeedAndDmg edictRef
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just rotatingUse
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eEdictStatus.eDmg) /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaBlocked .= Just rotatingBlocked
+
+    when ((edict^.eSpawnFlags) .&. 1 /= 0) $
+      entUse (fromJust $ edict^.eEdictAction.eaUse) edictRef Nothing Nothing
+
+    when ((edict^.eSpawnFlags) .&. 64 /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+
+    when ((edict^.eSpawnFlags) .&. 128 /= 0) $
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+
+    setModel edictRef (edict^.eEdictInfo.eiModel)
+    linkEntity edictRef
+
+    return True
+
+  where updateMoveType :: EdictReference -> Quake ()
+        updateMoveType (EdictReference edictIdx) = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          let moveType = if spawnFlags .&. 32 /= 0
+                           then Constants.moveTypeStop
+                           else Constants.moveTypePush
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= moveType
+
+        updateRotationAxis :: EdictReference -> Quake ()
+        updateRotationAxis (EdictReference edictIdx) = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          let moveDir = if | spawnFlags .&. 4 /= 0 -> V3 0 0 1
+                           | spawnFlags .&. 8 /= 0 -> V3 1 0 0
+                           | otherwise -> V3 0 1 0
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir .= moveDir
+
+        checkRevereseRotation :: EdictReference -> Quake ()
+        checkRevereseRotation (EdictReference edictIdx) = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          when (spawnFlags .&. 2 /= 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir %= (fmap (0 -))
+
+        checkSpeedAndDmg :: EdictReference -> Quake ()
+        checkSpeedAndDmg (EdictReference edictIdx) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eEdictPhysics.eSpeed) == 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 100
+
+          when ((edict^.eEdictStatus.eDmg) == 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 2
+
 
 spTriggerElevator :: EntThink
 spTriggerElevator =
@@ -895,3 +968,13 @@ moveDone =
     void $ think (fromJust endFunc) edictRef
 
     return True
+
+rotatingUse :: EntUse
+rotatingUse =
+  GenericEntUse "rotating_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.rotatingUse") >> undefined -- TODO
+
+rotatingBlocked :: EntBlocked
+rotatingBlocked =
+  GenericEntBlocked "rotating_blocked" $ \_ _ -> do
+    io (putStrLn "GameFunc.rotatingBlocked") >> undefined -- TODO

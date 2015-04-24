@@ -210,7 +210,7 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
                   then dprintf "WARNING: Entity used iteself.\n"
                   else 
                     when (isJust $ foundEdict^.eEdictAction.eaUse) $
-                      entUse (fromJust $ foundEdict^.eEdictAction.eaUse) fr er activatorReference
+                      entUse (fromJust $ foundEdict^.eEdictAction.eaUse) fr (Just er) activatorReference
 
                 Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
 
