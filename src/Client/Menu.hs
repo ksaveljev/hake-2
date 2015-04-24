@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Client.Menu where
 
 import Control.Lens (use, preuse, ix, (.=), (+=), (^.))
@@ -7,10 +8,33 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import QCommon.XCommandT
 import qualified Constants
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
+
+maxMenuDepth :: Int
+maxMenuDepth = 8
 
 init :: Quake ()
-init = io (putStrLn "Menu.init") >> undefined -- TODO
+init = do
+    Cmd.addCommand "menu_main" (Just menuMain)
+    Cmd.addCommand "menu_game" (Just menuGame)
+    Cmd.addCommand "menu_loadgame" (Just menuLoadGame)
+    Cmd.addCommand "menu_savegame" (Just menuSaveGame)
+    Cmd.addCommand "menu_joinserver" (Just menuJoinServer)
+    Cmd.addCommand "menu_addressbook" (Just menuAddressBook)
+    Cmd.addCommand "menu_startserver" (Just menuStartServer)
+    Cmd.addCommand "menu_dmoptions" (Just menuDMOptions)
+    Cmd.addCommand "menu_playerconfig" (Just menuPlayerConfig)
+    Cmd.addCommand "menu_downloadoptions" (Just menuDownloadOptions)
+    Cmd.addCommand "menu_credits" (Just menuCredits)
+    Cmd.addCommand "menu_multiplayer" (Just menuMultiplayer)
+    Cmd.addCommand "menu_video" (Just menuVideo)
+    Cmd.addCommand "menu_options" (Just menuOptions)
+    Cmd.addCommand "menu_keys" (Just menuKeys)
+    Cmd.addCommand "menu_quit" (Just menuQuit)
+
+    menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
 -- IMPROVE: instead of Int use "Reference" newtype ?
 addItem :: Int -> Int -> Quake ()
@@ -59,3 +83,51 @@ tallySlots menuIdx = do
                                  _ -> return (V.length $ fromJust (menuItem^.mlItemNames))
             MenuSliderS _ _ _ _ _ -> return 1
             MenuActionS _ -> return 1
+
+menuMain :: XCommandT
+menuMain = io (putStrLn "Menu.menuMain") >> undefined -- TODO
+
+menuGame :: XCommandT
+menuGame = io (putStrLn "Menu.menuGame") >> undefined -- TODO
+
+menuLoadGame :: XCommandT
+menuLoadGame = io (putStrLn "Menu.menuLoadGame") >> undefined -- TODO
+
+menuSaveGame :: XCommandT
+menuSaveGame = io (putStrLn "Menu.menuSaveGame") >> undefined -- TODO
+
+menuJoinServer :: XCommandT
+menuJoinServer = io (putStrLn "Menu.menuJoinServer") >> undefined -- TODO
+
+menuAddressBook :: XCommandT
+menuAddressBook = io (putStrLn "Menu.menuAddressBook") >> undefined -- TODO
+
+menuStartServer :: XCommandT
+menuStartServer = io (putStrLn "Menu.menuStartServer") >> undefined -- TODO
+
+menuDMOptions :: XCommandT
+menuDMOptions = io (putStrLn "Menu.menuDMOptions") >> undefined -- TODO
+
+menuPlayerConfig :: XCommandT
+menuPlayerConfig = io (putStrLn "Menu.menuPlayerConfig") >> undefined -- TODO
+
+menuDownloadOptions :: XCommandT
+menuDownloadOptions = io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
+
+menuCredits :: XCommandT
+menuCredits = io (putStrLn "Menu.menuCredits") >> undefined -- TODO
+
+menuMultiplayer :: XCommandT
+menuMultiplayer = io (putStrLn "Menu.menuMultiplayer") >> undefined -- TODO
+
+menuVideo :: XCommandT
+menuVideo = io (putStrLn "Menu.menuVideo") >> undefined -- TODO
+
+menuOptions :: XCommandT
+menuOptions = io (putStrLn "Menu.menuOptions") >> undefined -- TODO
+
+menuKeys :: XCommandT
+menuKeys = io (putStrLn "Menu.menuKeys") >> undefined -- TODO
+
+menuQuit :: XCommandT
+menuQuit = io (putStrLn "Menu.menuQuit") >> undefined -- TODO

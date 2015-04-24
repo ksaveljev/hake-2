@@ -1536,4 +1536,10 @@ data MenuItem =
 data MenuGlobals =
   MenuGlobals { _mgMenuFrameworks :: V.Vector MenuFrameworkS
               , _mgMenuItems      :: V.Vector MenuItem
+              , _mgLayers         :: V.Vector MenuLayerT
               }
+
+data MenuLayerT =
+  MenuLayerT { _mlDraw :: Maybe XCommandT
+             , _mlKey  :: Maybe KeyFuncT
+             }

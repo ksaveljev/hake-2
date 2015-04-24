@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.MenuGlobals ( module Client.MenuGlobals
                           , module Client.MenuFrameworkS
+                          , module Client.MenuLayerT
                           ) where
 
 import Control.Lens (makeLenses)
@@ -8,6 +9,7 @@ import qualified Data.Vector as V
 
 import Internal
 import Client.MenuFrameworkS
+import Client.MenuLayerT
 
 makeLenses ''MenuGlobals
 
@@ -27,6 +29,7 @@ initialMenuGlobals =
                                           , newMenuActionS  -- applyAction
                                           , newMenuActionS  -- defaultsAction
                                           ]
+              , _mgLayers = V.empty
               }
 
 {-
