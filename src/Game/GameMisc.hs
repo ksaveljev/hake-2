@@ -383,7 +383,26 @@ spMonsterCommanderBody :: EdictReference -> Quake ()
 spMonsterCommanderBody _ = io (putStrLn "GameMisc.spMonsterCommanderBody") >> undefined -- TODO
 
 spMiscBanner :: EdictReference -> Quake ()
-spMiscBanner _ = io (putStrLn "GameMisc.spMiscBanner") >> undefined -- TODO
+spMiscBanner edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    tris <- modelIndex "models/objects/banner/tris.md2"
+    r <- Lib.rand
+    time <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidNot
+      eEntityState.esModelIndex .= tris
+      eEntityState.esFrame .= (fromIntegral r) `mod` 16
+
+    linkEntity edictRef
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+      eaThink .= Just miscBannerThink
+      eaNextThink .= time + Constants.frameTime
 
 spMiscDeadSoldier :: EdictReference -> Quake ()
 spMiscDeadSoldier er@(EdictReference edictIdx) = do
@@ -628,3 +647,8 @@ funcWallUse :: EntUse
 funcWallUse =
   GenericEntUse "func_wall_use" $ \_ _ _ -> do
     io (putStrLn "GameMisc.funcWallUse") >> undefined -- TODO
+
+miscBannerThink :: EntThink
+miscBannerThink =
+  GenericEntThink "misc_banner_think" $ \_ -> do
+    io (putStrLn "GameMisc.miscBannerThink") >> undefined -- TODO
