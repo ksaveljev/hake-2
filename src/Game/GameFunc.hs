@@ -971,10 +971,30 @@ moveDone =
 
 rotatingUse :: EntUse
 rotatingUse =
-  GenericEntUse "rotating_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.rotatingUse") >> undefined -- TODO
+  GenericEntUse "rotating_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    vec3origin <- use $ globals.vec3Origin
+
+    if (self^.eEdictPhysics.eAVelocity) /= vec3origin
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esSound .= 0
+          eEdictPhysics.eAVelocity .= V3 0 0 0
+          eEdictAction.eaTouch .= Nothing
+      else do
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esSound .= (self^.eMoveInfo.miSoundMiddle)
+          eEdictPhysics.eAVelocity .= fmap (* (self^.eEdictPhysics.eSpeed)) (self^.eEdictPhysics.eMoveDir)
+
+        when ((self^.eSpawnFlags) .&. 16 /= 0) $
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaTouch .= Just rotatingTouch
 
 rotatingBlocked :: EntBlocked
 rotatingBlocked =
   GenericEntBlocked "rotating_blocked" $ \_ _ -> do
     io (putStrLn "GameFunc.rotatingBlocked") >> undefined -- TODO
+
+rotatingTouch :: EntTouch
+rotatingTouch =
+  GenericEntTouch "rotating_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameFunc.rotatingTouch") >> undefined -- TODO
