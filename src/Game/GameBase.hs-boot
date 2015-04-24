@@ -31,3 +31,5 @@ clientEndServerFrames :: Quake ()
 runEntity :: EdictReference -> Quake ()
 
 pickTarget :: Maybe B.ByteString -> Quake (Maybe EdictReference)
+
+addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)

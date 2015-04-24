@@ -15,7 +15,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
-import qualified Game.GameBase as GameBase
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 

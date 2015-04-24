@@ -17,6 +17,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameFunc as GameFunc
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -369,7 +370,39 @@ spMiscViperBomb :: EdictReference -> Quake ()
 spMiscViperBomb _ = io (putStrLn "GameMisc.spMiscViperBomb") >> undefined -- TODO
 
 spMiscStroggShip :: EdictReference -> Quake ()
-spMiscStroggShip _ = io (putStrLn "GameMisc.spMiscStroggShip") >> undefined -- TODO
+spMiscStroggShip edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    case (edict^.eEdictInfo.eiTarget) of
+      Nothing -> do
+        dprintf $ (edict^.eClassName) `B.append` " without a target at " `B.append`
+                  Lib.vtos (edict^.eEdictMinMax.eAbsMin) `B.append` "\n"
+        GameUtil.freeEdict edictRef
+
+      Just target -> do
+        tris <- modelIndex "models/ships/strogg1/tris.md2"
+        time <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eMoveType .= Constants.moveTypePush
+          eSolid .= Constants.solidNot
+          eEntityState.esModelIndex .= tris
+          eEdictMinMax.eMins .= V3 (-16) (-16) 0
+          eEdictMinMax.eMaxs .= V3 16 16 32
+
+          eEdictAction.eaThink .= Just (GameFunc.funcTrainFind)
+          eEdictAction.eaNextThink .= time + Constants.frameTime
+          eEdictAction.eaUse .= Just (miscStroggShipUse)
+          eSvFlags %= (.|. Constants.svfNoClient)
+          eMoveInfo.miAccel .= (edict^.eEdictPhysics.eSpeed)
+          eMoveInfo.miDecel .= (edict^.eEdictPhysics.eSpeed)
+          eMoveInfo.miSpeed .= (edict^.eEdictPhysics.eSpeed)
+
+        linkEntity edictRef
 
 spMiscSatelliteDish :: EdictReference -> Quake ()
 spMiscSatelliteDish _ = io (putStrLn "GameMisc.spMiscSatelliteDish") >> undefined -- TODO
@@ -519,3 +552,8 @@ pointCombatTouch :: EntTouch
 pointCombatTouch =
   GenericEntTouch "point_combat_touch" $ \_ _ _ _ -> do
     io (putStrLn "GameMisc.pointCombatTouch") >> undefined -- TODO
+
+miscStroggShipUse :: EntUse
+miscStroggShipUse =
+  GenericEntUse "misc_strogg_ship_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.miscStroggShipUse") >> undefined -- TODO
