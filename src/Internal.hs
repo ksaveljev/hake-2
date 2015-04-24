@@ -1392,11 +1392,7 @@ data VIDGlobals =
              }
 
 data KBD =
-  KBD { _kbdWinX           :: Int
-      , _kbdWinY           :: Int
-      , _kbdMX             :: Int
-      , _kbdMY             :: Int
-      , _kbdInit           :: Quake ()
+  KBD { _kbdInit           :: Quake ()
       , _kbdUpdate         :: Quake ()
       , _kbdClose          :: Quake ()
       , _kbdDoKeyEvent     :: Int -> Bool -> Quake ()

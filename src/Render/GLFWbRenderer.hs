@@ -61,20 +61,14 @@ glfwbRefExportT kbd renderAPI =
              }
 
 glfwbKBD :: KBD
-glfwbKBD = DT.trace "GLFWbRenderer.glfwKBD" undefined -- TODO
-{-
-  KBD { _kbdWinX           :: Int
-      , _kbdWinY           :: Int
-      , _kbdMX             :: Int
-      , _kbdMY             :: Int
-      , _kbdInit           :: Quake ()
-      , _kbdUpdate         :: Quake ()
-      , _kbdClose          :: Quake ()
-      , _kbdDoKeyEvent     :: Int -> Bool -> Quake ()
-      , _kbdInstallGrabs   :: Quake ()
-      , _kbdUninstallGrabs :: Quake ()
+glfwbKBD =
+  KBD { _kbdInit           = return ()
+      , _kbdUpdate         = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+      , _kbdClose          = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+      , _kbdDoKeyEvent     = (\_ _ -> io (putStrLn "glfwbKBD.kbdDoKeyEvent") >> undefined) -- TODO
+      , _kbdInstallGrabs   = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+      , _kbdUninstallGrabs = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
       }
--}
 
 glfwbInit :: RenderAPI -> Int -> Int -> Quake Bool
 glfwbInit renderAPI vidXPos vidYPos = do
