@@ -3,6 +3,7 @@
 module Game.GameAI where
 
 import Control.Lens (use, (^.), ix, preuse, (.=))
+import Control.Monad (void)
 import Data.Bits ((.&.))
 import Data.Maybe (isNothing)
 
@@ -10,6 +11,7 @@ import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
+import qualified Game.Monster as Monster
 
 aiStand :: AI
 aiStand =
@@ -38,8 +40,10 @@ aiRun =
 
 walkMonsterStart :: EntThink
 walkMonsterStart =
-  GenericEntThink "walkmonster_start" $ \_ -> do
-    io (putStrLn "GameAI.walkMonsterStart") >> undefined -- TODO
+  GenericEntThink "walkmonster_start" $ \edictRef@(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaThink .= Just walkMonsterStartGo
+    void $ Monster.monsterStart edictRef
+    return True
 
 {-
 - Called once each frame to set level.sight_client to the player to be
@@ -76,3 +80,8 @@ aiSetSightClient = do
              | check' == start ->
                  gameBaseGlobals.gbLevel.llSightClient .= Nothing
              | otherwise -> lookThroughClients maxClients start check'
+
+walkMonsterStartGo :: EntThink
+walkMonsterStartGo =
+  GenericEntThink "walkmonster_start_go" $ \_ -> do
+    io (putStrLn "GameAI.walkMonsterStartGo") >> undefined -- TODO
