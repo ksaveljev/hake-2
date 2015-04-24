@@ -198,7 +198,73 @@ spLight er@(EdictReference edictIdx) = do
             else configString (Constants.csLights + (edict^.eStyle)) "m"
 
 spFuncWall :: EdictReference -> Quake ()
-spFuncWall _ = io (putStrLn "GameMisc.spFuncWall") >> undefined -- TODO
+spFuncWall edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+        dprintf = gameImport^.giDprintf
+
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= Constants.moveTypePush
+
+    updateEdictEffects
+
+    isAWall <- checkWall
+
+    if isAWall
+      then do
+        -- just a wall
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
+        linkEntity edictRef
+      else do
+        -- it must be TRIGGER_SPAWN
+        checkTriggerSpawn
+
+        -- yell if the spawnflags are odd
+        checkOddSpawnFlags
+
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just funcWallUse
+
+        preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags) >>= \(Just v) ->
+          if v .&. 4 /= 0
+            then
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
+            else do
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidNot
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags %= (.|. Constants.svfNoClient)
+
+        linkEntity edictRef
+
+  where updateEdictEffects :: Quake ()
+        updateEdictEffects = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          when (spawnFlags .&. 8 /= 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+
+          when (spawnFlags .&. 16 /= 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+
+        checkWall :: Quake Bool
+        checkWall = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+          return $ spawnFlags .&. 7 == 0
+
+        checkTriggerSpawn :: Quake ()
+        checkTriggerSpawn = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+          when (spawnFlags .&. 1 == 0) $ do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf "func_wall missing TRIGGER_SPAWN\n"
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. 1)
+
+        checkOddSpawnFlags :: Quake ()
+        checkOddSpawnFlags = do
+          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+
+          when (spawnFlags .&. 4 /= 0 && spawnFlags .&. 2 == 0) $ do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf "func_wall START_ON without TOGGLE\n"
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. 2)
 
 spFuncObject :: EdictReference -> Quake ()
 spFuncObject _ = io (putStrLn "GameMisc.spFuncObject") >> undefined -- TODO
@@ -557,3 +623,8 @@ miscStroggShipUse :: EntUse
 miscStroggShipUse =
   GenericEntUse "misc_strogg_ship_use" $ \_ _ _ -> do
     io (putStrLn "GameMisc.miscStroggShipUse") >> undefined -- TODO
+
+funcWallUse :: EntUse
+funcWallUse =
+  GenericEntUse "func_wall_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.funcWallUse") >> undefined -- TODO
