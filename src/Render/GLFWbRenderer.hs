@@ -10,7 +10,6 @@ import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
-import qualified Debug.Trace as DT
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Graphics.UI.GLFW as GLFW
 
