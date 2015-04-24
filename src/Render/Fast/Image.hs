@@ -5,12 +5,14 @@ module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
 import Control.Monad (when, void, liftM, unless)
-import Data.Binary (encode)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
+import Data.Int (Int32)
 import Data.Maybe (isNothing, isJust, fromJust)
+import Data.Monoid (mappend, mempty, mconcat)
 import Data.Word (Word8)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
@@ -136,13 +138,13 @@ loadPCX fileName returnPalette returnDimensions = do
                                else Nothing
 
             -- decode pcx
-            let pix = decodePCX raw 0 0 0 height width ""
+            let pix = decodePCX raw 0 0 0 height width mempty
 
             return (Just pix, palette, dimensions)
 
-  where decodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+  where decodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         decodePCX raw idx x y maxX maxY acc
-          | y >= maxY = acc
+          | y >= maxY = BL.toStrict $ BB.toLazyByteString acc
           | x >= maxX = decodePCX raw idx 0 (y + 1) maxX maxY acc
           | otherwise =
               let dataByte = B.index raw idx
@@ -150,9 +152,9 @@ loadPCX fileName returnPalette returnDimensions = do
                    then let runLength = fromIntegral $ dataByte .&. 0x3F
                             byte = B.index raw (idx + 1)
                             -- write runLength pixel
-                        in decodePCX raw (idx + 2) (x + runLength) y maxX maxY $! acc `B.append` (B.replicate runLength byte)
+                        in decodePCX raw (idx + 2) (x + runLength) y maxX maxY (acc `mappend` mconcat (replicate runLength (BB.word8 byte)))
                    else -- write one pixel
-                     decodePCX raw (idx + 1) (x + 1) y maxX maxY $! acc `B.snoc` dataByte
+                     decodePCX raw (idx + 1) (x + 1) y maxX maxY (acc `mappend` BB.word8 dataByte)
 
 glImageListF :: XCommandT
 glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
@@ -411,12 +413,12 @@ glUpload8 image width height mipmap isSky = do
         return False
       else do
         d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
-        let trans = constructTrans d8to24table 0 s ""
+        let trans = constructTrans d8to24table 0 s mempty
         glUpload32 trans width height mipmap
 
-  where constructTrans :: UV.Vector Int -> Int -> Int -> B.ByteString -> B.ByteString
+  where constructTrans :: UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
         constructTrans d8to24table idx maxIdx acc
-          | idx >= maxIdx = acc
+          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
               let p = image `B.index` idx
                   t = d8to24table UV.! (fromIntegral p)
@@ -430,11 +432,11 @@ glUpload8 image width height mipmap isSky = do
                                  | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF -> image `B.index` (idx + 1)
                                  | otherwise -> 0
                          else p
-                  t' = if p == 0xFF
-                         -- copy rgb components
-                         then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
-                         else t
-              in constructTrans d8to24table (idx + 1) maxIdx (acc `B.append` (BL.toStrict $ encode t'))
+                  t' :: Int32 = fromIntegral $ if p == 0xFF
+                                                 -- copy rgb components
+                                                 then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
+                                                 else t
+              in constructTrans d8to24table (idx + 1) maxIdx (acc `mappend` (BB.int32BE t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap = do
@@ -586,30 +588,30 @@ glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
 glResampleTexture img width height scaledWidth scaledHeight =
     let fracStep = (width * 0x10000) `div` scaledWidth
         frac = fracStep `shiftR` 2
-        p1 = buildP frac fracStep 0 scaledWidth ""
+        p1 = buildP frac fracStep 0 scaledWidth mempty
         frac' = 3 * (fracStep `shiftR` 2)
-        p2 = buildP frac' fracStep 0 scaledWidth ""
-    in resample fracStep p1 p2 0 scaledHeight ""
+        p2 = buildP frac' fracStep 0 scaledWidth mempty
+    in resample fracStep p1 p2 0 scaledHeight mempty
 
-  where buildP :: Int -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+  where buildP :: Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         buildP frac fracStep idx maxIdx acc
-          | idx >= maxIdx = acc
+          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
               let v = 4 * (frac `shiftR` 16)
-              in buildP (frac + fracStep) fracStep (idx + 1) maxIdx (acc `B.snoc` fromIntegral v)
+              in buildP (frac + fracStep) fracStep (idx + 1) maxIdx (acc `mappend` BB.word8 (fromIntegral v))
 
-        resample :: Int -> B.ByteString -> B.ByteString -> Int -> Int -> B.ByteString -> B.ByteString
+        resample :: Int -> B.ByteString -> B.ByteString -> Int -> Int -> BB.Builder -> B.ByteString
         resample fracStep p1 p2 idx maxIdx acc
-          | idx >= maxIdx = acc
+          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
               -- TODO: make sure we need '4 *' here
               let inRow = 4 * width * truncate ((fromIntegral idx + 0.25 :: Float) * fromIntegral height / fromIntegral scaledHeight)
                   inRow2 = 4 * width * truncate ((fromIntegral idx + 0.75 :: Float) * fromIntegral height / fromIntegral scaledHeight)
                   -- frac = fracStep `shiftR` 1
-                  row = buildRow p1 p2 inRow inRow2 0 scaledWidth ""
-              in resample fracStep p1 p2 (idx + 1) maxIdx (acc `B.append` row)
+                  row = buildRow p1 p2 inRow inRow2 0 scaledWidth mempty
+              in resample fracStep p1 p2 (idx + 1) maxIdx (acc `mappend` row)
 
-        buildRow :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildRow :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> BB.Builder -> BB.Builder
         buildRow p1 p2 inRow inRow2 idx maxIdx acc
           | idx >= maxIdx = acc
           | otherwise =
@@ -621,7 +623,7 @@ glResampleTexture img width height scaledWidth scaledHeight =
                   b = ((img `B.index` (pix1 + 1)) + (img `B.index` (pix2 + 1)) + (img `B.index` (pix3 + 1)) + (img `B.index` (pix4 + 1))) `shiftR` 2
                   c = ((img `B.index` (pix1 + 2)) + (img `B.index` (pix2 + 2)) + (img `B.index` (pix3 + 2)) + (img `B.index` (pix4 + 2))) `shiftR` 2
                   d = ((img `B.index` (pix1 + 3)) + (img `B.index` (pix2 + 3)) + (img `B.index` (pix3 + 3)) + (img `B.index` (pix4 + 3))) `shiftR` 2
-              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `B.append` (B.pack [a, b, c, d]))
+              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, d])))
 
 {-
 ================
@@ -637,14 +639,14 @@ glLightScaleTexture img width height onlyGamma = do
     gammaTable <- use $ fastRenderAPIGlobals.frGammaTable
 
     if onlyGamma
-      then return $ buildFromGammaTable gammaTable 0 0 c ""
+      then return $ buildFromGammaTable gammaTable 0 0 c mempty
       else do
         intensityTable <- use $ fastRenderAPIGlobals.frIntensityTable
-        return $ buildFromGammaAndIntesityTable gammaTable intensityTable 0 0 c ""
+        return $ buildFromGammaAndIntesityTable gammaTable intensityTable 0 0 c mempty
 
-  where buildFromGammaTable :: B.ByteString -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+  where buildFromGammaTable :: B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         buildFromGammaTable gammaTable idx p maxIdx acc
-          | idx >= maxIdx = acc
+          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
               let p0 = img `B.index` p
                   p1 = img `B.index` (p + 1)
@@ -653,11 +655,11 @@ glLightScaleTexture img width height onlyGamma = do
                   a = gammaTable `B.index` (fromIntegral p0)
                   b = gammaTable `B.index` (fromIntegral p1)
                   c = gammaTable `B.index` (fromIntegral p2)
-              in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `B.append` (B.pack [a, b, c, p3]))
+              in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
 
-        buildFromGammaAndIntesityTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> B.ByteString -> B.ByteString
+        buildFromGammaAndIntesityTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         buildFromGammaAndIntesityTable gammaTable intensityTable idx p maxIdx acc
-          | idx >= maxIdx = acc
+          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
               let p0 = img `B.index` p
                   p1 = img `B.index` (p + 1)
@@ -669,7 +671,7 @@ glLightScaleTexture img width height onlyGamma = do
                   a = gammaTable `B.index` (fromIntegral i0)
                   b = gammaTable `B.index` (fromIntegral i1)
                   c = gammaTable `B.index` (fromIntegral i2)
-              in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `B.append` (B.pack [a, b, c, p3]))
+              in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
 
 {-
 ================
@@ -681,17 +683,17 @@ Operates in place, quartering the size of the texture
 glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
 glMipMap img width height =
     let height' = height `shiftR` 1
-    in forI 0 0 height' ""
+    in forI 0 0 height' mempty
 
-  where forI :: Int -> Int -> Int -> B.ByteString -> B.ByteString
+  where forI :: Int -> Int -> Int -> BB.Builder -> B.ByteString
         forI inIdx i maxI acc
-          | i >= maxI = acc
+          | i >= maxI = BL.toStrict $ BB.toLazyByteString acc
           | otherwise = 
               let w = width `shiftL` 2
-                  (inIdx', r) = forJ inIdx 0 w ""
-              in forI (inIdx' + w) (i + 1) maxI (acc `B.append` r)
+                  (inIdx', r) = forJ inIdx 0 w mempty
+              in forI (inIdx' + w) (i + 1) maxI (acc `mappend` r)
 
-        forJ :: Int -> Int -> Int -> B.ByteString -> (Int, B.ByteString)
+        forJ :: Int -> Int -> Int -> BB.Builder -> (Int, BB.Builder)
         forJ inIdx j maxJ acc
           | j >= maxJ = (inIdx, acc)
           | otherwise =
@@ -700,7 +702,7 @@ glMipMap img width height =
                   b = ((img `B.index` (inIdx + 1)) + (img `B.index` (inIdx + 5)) + (img `B.index` (inIdx + w + 1)) + (img `B.index` (inIdx + w + 5))) `shiftR` 2
                   c = ((img `B.index` (inIdx + 2)) + (img `B.index` (inIdx + 6)) + (img `B.index` (inIdx + w + 2)) + (img `B.index` (inIdx + w + 6))) `shiftR` 2
                   d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
-              in forJ (inIdx + 8) (j + 8) maxJ (acc `B.append` (B.pack [a, b, c, d]))
+              in forJ (inIdx + 8) (j + 8) maxJ (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, d])))
 
 glFindImage :: B.ByteString -> Int -> Quake (Maybe ImageReference)
 glFindImage imgName imgType = do
