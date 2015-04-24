@@ -205,6 +205,9 @@ setItemNames = do
           configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
           configString (Constants.csItems + idx) (fromJust (item^.giPickupName))
 
+findItemByClassname :: B.ByteString -> Quake (Maybe GItemReference)
+findItemByClassname _ = io (putStrLn "GameItems.findItemByClassname") >> undefined -- TODO
+
 findItem :: B.ByteString -> Quake (Maybe GItemReference)
 findItem pickupName = do
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems

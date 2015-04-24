@@ -658,9 +658,9 @@ teFlechette        = 55 :: Int
 -- content masks
 maskAll          = -1 :: Int
 maskSolid        = contentsSolid .|. contentsWindow
-maskPlayersolid  = contentsSolid .|. contentsPlayerClip .|. contentsWindow .|. contentsMonster
-maskDeadsolid    = contentsSolid .|. contentsPlayerClip .|. contentsWindow
-maskMonstersolid = contentsSolid .|. contentsMonsterClip .|. contentsWindow .|. contentsMonster
+maskPlayerSolid  = contentsSolid .|. contentsPlayerClip .|. contentsWindow .|. contentsMonster
+maskDeadSolid    = contentsSolid .|. contentsPlayerClip .|. contentsWindow
+maskMonsterSolid = contentsSolid .|. contentsMonsterClip .|. contentsWindow .|. contentsMonster
 maskWater        = contentsWater .|. contentsLava .|. contentsSlime
 maskOpaque       = contentsSolid .|. contentsSlime .|. contentsLava
 maskShot         = contentsSolid .|. contentsMonster .|. contentsWindow .|. contentsDeadMonster

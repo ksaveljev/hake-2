@@ -1,12 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.MonsterInfoT ( MonsterInfoT(..)
                          , module Game.MonsterInfoT
+                         , module Game.MMoveT
                          ) where
 
 import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
 import Internal
+import Game.MMoveT
 
 makeLenses ''MonsterInfoT
 

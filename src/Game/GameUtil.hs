@@ -231,3 +231,13 @@ freeEdictA =
   GenericEntThink "G_FreeEdictA" $ \er -> do
     freeEdict er
     return False
+
+monsterUse :: EntUse
+monsterUse =
+  GenericEntUse "monster_use" $ \_ _ _ -> do
+    io (putStrLn "GameUtil.monsterUse") >> undefined -- TODO
+
+mCheckAttack :: EntThink
+mCheckAttack =
+  GenericEntThink "M_CheckAttack" $ \_ -> do
+    io (putStrLn "GameUtil.mCheckAttack") >> undefined -- TODO

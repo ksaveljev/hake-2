@@ -13,7 +13,6 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import Game.MFrameT
-import Game.MMoveT
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
