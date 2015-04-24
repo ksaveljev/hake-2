@@ -376,7 +376,7 @@ findTeams = do
 
   where findNextTeam :: Int -> Int -> Int -> Int -> Quake (Int, Int)
         findNextTeam maxIdx idx c c2
-          | idx == maxIdx = return (c, c2)
+          | idx >= maxIdx = return (c, c2)
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
@@ -389,12 +389,12 @@ findTeams = do
 
         findTeamMembers :: B.ByteString -> EdictReference -> EdictReference -> Int -> Int -> Int -> Quake Int
         findTeamMembers teamName master chain@(EdictReference chainIdx) maxIdx idx c2
-          | idx == maxIdx = return c2
+          | idx >= maxIdx = return c2
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
               if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eEdictInfo.eiTeam)
-                then findTeamMembers teamName master chain maxIdx idx c2
+                then findTeamMembers teamName master chain maxIdx (idx + 1) c2
                 else do
                   gameBaseGlobals.gbGEdicts.ix chainIdx.eEdictOther.eoTeamChain .= Just (EdictReference idx)
                   gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoTeamMaster .= Just master
