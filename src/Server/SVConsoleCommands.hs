@@ -188,7 +188,7 @@ CopyFile
 ================
 -}
 svCopyFile :: B.ByteString -> B.ByteString -> Quake ()
-svCopyFile src dst = io $ copyFile (BC.unpack src) (BC.unpack dst) -- IMPROVE: catch exceptions ?
+svCopyFile src dst = io $ handle (\(_ :: IOException) -> return ()) (copyFile (BC.unpack src) (BC.unpack dst)) -- IMPROVE: Announce that copy file failed
 
 {-
 ================
@@ -301,7 +301,9 @@ SV_WriteServerFile
 ==============
 -}
 writeServerFile :: Bool -> Quake ()
-writeServerFile _ = io (putStrLn "SVConsoleCommands.writeServerFile") >> undefined -- TODO
+writeServerFile _ = do
+    io (putStrLn "SKIPPED SVConsoleCommands.writeServerFile! IMPLEMENT ME!") >> return ()
+    --io (putStrLn "SVConsoleCommands.writeServerFile") >> undefined -- TODO
 
 {-
 ==============
