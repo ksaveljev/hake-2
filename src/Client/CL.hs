@@ -32,6 +32,8 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified Sound.S as S
 import qualified Sys.IN as IN
+import qualified Sys.NET as NET
+import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
@@ -369,7 +371,35 @@ precacheF :: XCommandT
 precacheF = io (putStrLn "CL.precacheF") >> undefined -- TODO
 
 readPackets :: Quake ()
-readPackets = io (putStrLn "CL.readPackets") >> undefined -- TODO
+readPackets = do
+    gotPacket <- NET.getPacket Constants.nsClient (globals.netFrom) (globals.netMessage)
+
+    when gotPacket $ do
+      io (putStrLn "CL.readPackets") >> undefined -- TODO
+      readPackets
 
 sendCommand :: Quake ()
-sendCommand = io (putStrLn "CL.sendCommand") >> undefined -- TODO
+sendCommand = do
+    -- get new key events
+    Sys.sendKeyEvents
+
+    -- allow mice or other external controllers to add commands
+    IN.commands
+
+    -- process console commands
+    CBuf.execute
+
+    -- fix any cheating cvars
+    fixCVarCheats
+
+    -- send intentions now
+    CLInput.sendCmd
+
+    -- resend a connection request if necessary
+    checkForResend
+
+fixCVarCheats :: Quake ()
+fixCVarCheats = io (putStrLn "CL.fixCVarCheats") >> undefined -- TODO
+
+checkForResend :: Quake ()
+checkForResend = io (putStrLn "CL.checkForResend") >> undefined -- TODO

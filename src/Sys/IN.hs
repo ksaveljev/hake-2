@@ -126,3 +126,6 @@ frame = do
     if not (cl'^.csCinematicPaletteActive) && (not (cl'^.csRefreshPrepped) || keyDest == Constants.keyConsole || keyDest == Constants.keyMenu)
       then deactivateMouse
       else activateMouse
+
+commands :: Quake ()
+commands = io (putStrLn "IN.commands") >> undefined -- TODO

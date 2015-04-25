@@ -138,3 +138,6 @@ kLookDown = io (putStrLn "CLInput.kLookDown") >> undefined -- TODO
 
 kLookUp :: XCommandT
 kLookUp = io (putStrLn "CLInput.kLookUp") >> undefined -- TODO
+
+sendCmd :: Quake ()
+sendCmd = io (putStrLn "CLInput.sendCmd") >> undefined -- TODO
