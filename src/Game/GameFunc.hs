@@ -971,7 +971,7 @@ moveDone =
 
 rotatingUse :: EntUse
 rotatingUse =
-  GenericEntUse "rotating_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+  GenericEntUse "rotating_use" $ \(EdictReference selfIdx) _ _ -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
     vec3origin <- use $ globals.vec3Origin
 

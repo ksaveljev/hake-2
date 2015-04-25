@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.CL where
 
-import Control.Lens (use, (.=), (^.))
+import Control.Concurrent (threadDelay)
+import Control.Lens (use, (.=), (^.), (+=))
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.))
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
+import System.Mem (performGC)
 import qualified Data.ByteString as B
 
 import Quake
@@ -12,8 +14,11 @@ import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.CLFX as CLFX
 import qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
+import qualified Client.CLPred as CLPred
+import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
 import qualified Client.Menu as Menu
@@ -21,12 +26,12 @@ import qualified Client.SCR as SCR
 import qualified Client.V as V
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified Sound.S as S
-import qualified Sys.IN as IN
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import qualified Sound.S as S
+import qualified Sys.IN as IN
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
@@ -206,11 +211,94 @@ writeConfiguration = do
         CVar.writeVariables path
 
 frame :: Int -> Quake ()
-frame _ = do
+frame msec = do
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     unless (dedicatedValue /= 0) $ do
-      io (putStrLn "CL.frame") >> undefined -- TODO
+      clientGlobals.cgExtraTime += msec
+
+      skip <- shouldSkip
+
+      unless skip $ do
+        -- let the mouse activate or deactivate
+        IN.frame
+
+        -- decide the simulation time
+        extraTime <- use $ clientGlobals.cgExtraTime
+        time <- use $ globals.curtime
+        let frameTime = fromIntegral extraTime / 1000
+        globals.cls.csFrameTime .= frameTime
+        globals.cl.csTime += extraTime
+        globals.cls.csRealTime .= time
+
+        clientGlobals.cgExtraTime .= 0
+
+        when (frameTime > (1 / 5)) $
+          globals.cls.csFrameTime .= 1 / 5
+
+        -- if in the debugger last frame, don't timeout
+        when (msec > 5000) $ do
+          millis <- Timer.milliseconds
+          globals.cls.csNetChan.ncLastReceived .= millis
+          
+        -- fetch results from server
+        readPackets
+
+        -- send a new command message to the server
+        sendCommand
+
+        -- predict all unacknowledged movements
+        CLPred.predictMovement
+
+        -- allow rendering DLL change
+        VID.checkChanges
+        state <- use $ globals.cls.csState
+        refreshPrepped <- use $ globals.cl.csRefreshPrepped
+        when (not refreshPrepped && state == Constants.caActive) $ do
+          CLView.prepRefresh
+          -- force GC after level loading
+          -- but not on playing a cinematic
+          cinematicTime <- use $ globals.cl.csCinematicTime
+          when (cinematicTime == 0) $
+            io performGC -- TODO: do we really need this?
+
+        SCR.updateScreen
+
+        -- update audio
+        updateAudio
+        
+        -- advance local effects for next frame
+        CLFX.runDLights
+        CLFX.runLightStyles
+        SCR.runCinematic
+        SCR.runConsole
+
+        globals.cls.csFrameCount += 1
+
+        keyDest <- use $ globals.cls.csKeyDest
+
+        when (state /= Constants.caActive || keyDest /= Constants.keyGame) $
+          io (threadDelay $ 20 * 1000)
+
+  where shouldSkip :: Quake Bool
+        shouldSkip = do
+          timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
+          maxFpsValue <- liftM (^.cvValue) clMaxFPSCVar
+          state <- use $ globals.cls.csState
+          extraTime <- use $ clientGlobals.cgExtraTime
+
+          if timeDemoValue == 0
+                    -- don't flood packets out while connecting            -- framerate is too high
+            then if (state == Constants.caConnected && extraTime < 100) || (fromIntegral extraTime < 1000 / maxFpsValue)
+                   then return True
+                   else return False
+            else return False
+
+        updateAudio :: Quake ()
+        updateAudio = do
+          cl' <- use $ globals.cl
+          S.update (cl'^.csRefDef.rdViewOrg) (cl'^.csVForward) (cl'^.csVRight) (cl'^.csVUp)
+
 
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()
@@ -279,3 +367,9 @@ rconF = io (putStrLn "CL.rconF") >> undefined -- TODO
 
 precacheF :: XCommandT
 precacheF = io (putStrLn "CL.precacheF") >> undefined -- TODO
+
+readPackets :: Quake ()
+readPackets = io (putStrLn "CL.readPackets") >> undefined -- TODO
+
+sendCommand :: Quake ()
+sendCommand = io (putStrLn "CL.sendCommand") >> undefined -- TODO

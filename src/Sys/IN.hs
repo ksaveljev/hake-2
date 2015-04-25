@@ -117,3 +117,6 @@ centerView = do
 
     Just angle <- preuse $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.(Math3D.v3Access Constants.pitch)
     globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle angle))
+
+frame :: Quake ()
+frame = io (putStrLn "IN.frame") >> undefined -- TODO

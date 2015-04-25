@@ -124,3 +124,9 @@ sizeDownF = io (putStrLn "SCR.sizeDownF") >> undefined -- TODO
 
 skyF :: XCommandT
 skyF = io (putStrLn "SCR.skyF") >> undefined -- TODO
+
+runCinematic :: Quake ()
+runCinematic = io (putStrLn "SCR.runCinematic") >> undefined -- TODO
+
+runConsole :: Quake ()
+runConsole = io (putStrLn "SCR.runConsole") >> undefined -- TODO

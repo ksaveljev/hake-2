@@ -138,6 +138,7 @@ data QuakeState =
              , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
              , _particleTGlobals     :: !ParticleTGlobals
              , _menuGlobals          :: !MenuGlobals
+             , _clientGlobals        :: !ClientGlobals
              }
 
 data Globals =
@@ -1543,3 +1544,7 @@ data MenuLayerT =
   MenuLayerT { _mlDraw :: Maybe XCommandT
              , _mlKey  :: Maybe KeyFuncT
              }
+
+data ClientGlobals =
+  ClientGlobals { _cgExtraTime :: Int
+                }
