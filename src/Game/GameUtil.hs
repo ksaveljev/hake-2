@@ -10,6 +10,7 @@ import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -28,9 +29,12 @@ spawn :: Quake EdictReference
 spawn = do
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+    edicts <- use $ gameBaseGlobals.gbGEdicts
     time <- use $ gameBaseGlobals.gbLevel.llTime
 
-    foundIndex <- findFreeEdict (maxClientsValue+1) (numEdicts-1) time
+    -- search for a free edict starting from index (maxClientsValue+1) up
+    -- to (numEdicts-1)
+    let foundIndex = findFreeEdict (V.drop maxClientsValue edicts) time numEdicts
 
     case foundIndex of
       Just er@(EdictReference idx) -> do
@@ -49,18 +53,14 @@ spawn = do
         initEdict (EdictReference numEdicts)
         return (EdictReference numEdicts)
 
-  where findFreeEdict :: Int -> Int -> Float -> Quake (Maybe EdictReference)
-        findFreeEdict idx maxIdx levelTime
-          | idx >= maxIdx = return Nothing
-          | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
-
-              let notInUse = not (edict^.eInUse)
-                  freeTime = edict^.eFreeTime
-
-              if notInUse && (freeTime < 2 || levelTime - freeTime > 0.5)
-                then return $ Just (EdictReference idx)
-                else findFreeEdict (idx + 1) maxIdx levelTime
+  where findFreeEdict :: V.Vector EdictT -> Float -> Int -> Maybe EdictReference
+        findFreeEdict edicts levelTime numEdicts =
+          let found = V.findIndex (\edict -> (not $ edict^.eInUse) && ((edict^.eFreeTime) < 2 || levelTime - (edict^.eFreeTime) > 0.5)) edicts
+          in case found of
+               Nothing -> Nothing
+               Just idx -> if idx >= numEdicts
+                             then Nothing
+                             else Just $ EdictReference idx
 
 initEdict :: EdictReference -> Quake ()
 initEdict er@(EdictReference idx) = do
