@@ -119,4 +119,10 @@ centerView = do
     globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle angle))
 
 frame :: Quake ()
-frame = io (putStrLn "IN.frame") >> undefined -- TODO
+frame = do
+    cl' <- use $ globals.cl
+    keyDest <- use $ globals.cls.csKeyDest
+
+    if not (cl'^.csCinematicPaletteActive) && (not (cl'^.csRefreshPrepped) || keyDest == Constants.keyConsole || keyDest == Constants.keyMenu)
+      then deactivateMouse
+      else activateMouse
