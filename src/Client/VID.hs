@@ -168,8 +168,7 @@ loadRefresh name fast = do
 
     when refLibActive $ do
       Just renderer <- use $ globals.re
-      let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
-      kbd^.kbdClose
+      renderer^.rRefExport.reGetKeyboardHandler.kbdClose
 
       IN.shutdown
 
@@ -212,8 +211,7 @@ loadRefresh name fast = do
             return False
           else do
             -- init KBD
-            let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
-            kbd^.kbdInit
+            renderer^.rRefExport.reGetKeyboardHandler.kbdInit
 
             Com.printf "------------------------------------\n"
             vidGlobals.vgRefLibActive .= True
@@ -225,8 +223,7 @@ freeRefLib = do
 
     when (isJust r) $ do
       let Just renderer = r
-          Just kbd = renderer^.rRefExport.reGetKeyboardHandler
-      kbd^.kbdClose
+      renderer^.rRefExport.reGetKeyboardHandler.kbdClose
       IN.shutdown
 
     globals.re .= Nothing

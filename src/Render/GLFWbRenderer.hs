@@ -56,7 +56,7 @@ glfwbRefExportT kbd renderAPI =
              , _reUpdateScreen        = glfwbUpdateScreen
              , _reApiVersion          = Constants.apiVersion
              , _reGetModeList         = glfwbGetModeList
-             , _reGetKeyboardHandler  = Just kbd
+             , _reGetKeyboardHandler  = kbd
              }
 
 glfwbKBD :: KBD

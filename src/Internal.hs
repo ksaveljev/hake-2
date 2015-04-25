@@ -183,6 +183,7 @@ data Globals =
           , _keyLinePos         :: !Int
           , _editLine           :: !Int
 
+          , _sysFrameTime       :: Int
           , _netFrom            :: !NetAdrT
 
           , _vec3Origin         :: !(V3 Float)
@@ -966,7 +967,7 @@ data RefExportT =
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
              , _reGetModeList         :: Quake (V.Vector GLFW.VideoMode)
-             , _reGetKeyboardHandler  :: Maybe KBD
+             , _reGetKeyboardHandler  :: KBD
              }
 
 data NETGlobals =

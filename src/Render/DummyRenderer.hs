@@ -39,8 +39,18 @@ dummyRefExportT _ =
              , _reUpdateScreen        = (\callback -> callback)
              , _reApiVersion          = 0
              , _reGetModeList         = return V.empty
-             , _reGetKeyboardHandler  = Nothing
+             , _reGetKeyboardHandler  = dummyKBD
              }
+
+dummyKBD :: KBD
+dummyKBD =
+  KBD { _kbdInit           = return ()
+      , _kbdUpdate         = return ()
+      , _kbdClose          = return ()
+      , _kbdDoKeyEvent     = \_ _ -> return ()
+      , _kbdInstallGrabs   = return ()
+      , _kbdUninstallGrabs = return ()
+      }
 
 dummyRenderAPI :: RenderAPI
 dummyRenderAPI =

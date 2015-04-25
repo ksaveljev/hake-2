@@ -97,15 +97,13 @@ deactivateMouse = do
 installGrabs :: Quake ()
 installGrabs = do
     Just renderer <- use $ globals.re
-    let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
-    kbd^.kbdInstallGrabs
+    renderer^.rRefExport.reGetKeyboardHandler.kbdInstallGrabs
     inGlobals.inIgnoreFirst .= True
 
 uninstallGrabs :: Quake ()
 uninstallGrabs = do
     Just renderer <- use $ globals.re
-    let Just kbd = renderer^.rRefExport.reGetKeyboardHandler
-    kbd^.kbdUninstallGrabs
+    renderer^.rRefExport.reGetKeyboardHandler.kbdUninstallGrabs
 
 centerView :: Quake ()
 centerView = do

@@ -79,6 +79,7 @@ initialGlobals =
           , _keyLinePos         = 0
           , _editLine           = 0
 
+          , _sysFrameTime       = 0
           , _netFrom            = newNetAdrT
 
           , _vec3Origin         = V3 0 0 0
