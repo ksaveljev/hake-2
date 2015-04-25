@@ -6,6 +6,7 @@ import Data.Bits ((.|.))
 import Data.Foldable (forM_)
 import Control.Lens ((.=), use, (^.), (%=), (+=), preuse, ix)
 import Control.Monad (when, void, unless, liftM)
+import System.Directory
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -111,9 +112,16 @@ checkForSavegame = do
     unless (noReloadValue /= 0 || deathmatchValue /= 0) $ do
       gamedir <- FS.gameDir
       name <- use $ svGlobals.svServer.sName
-      -- let filename = gamedir `B.append` "/save/current/" `B.append` name `B.append` ".sav"
+      let filename = gamedir `B.append` "/save/current/" `B.append` name `B.append` ".sav"
+          filenameS = BC.unpack filename
 
-      io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
+      fileExists <- io $ doesFileExist filenameS
+      canRead <- if fileExists
+                   then io $ liftM readable (getPermissions filenameS)
+                   else return False
+
+      when canRead $ do
+        io (putStrLn "SVInit.checkForSavegame") >> undefined -- TODO
 
 {-
 - SV_SpawnServer.
