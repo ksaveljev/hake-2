@@ -376,7 +376,7 @@ readPackets = do
 
     when gotPacket $ do
       io (putStrLn "CL.readPackets") >> undefined -- TODO
-      readPackets
+      --readPackets -- TODO: do not forget to uncomment this
 
 sendCommand :: Quake ()
 sendCommand = do

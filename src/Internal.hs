@@ -1443,7 +1443,13 @@ data INGlobals =
             }
 
 data GLFWKBDEvent =
-  TODO Int
+    KeyPress
+  | KeyRelease
+  | MotionNotify
+  | ButtonPress
+  | ButtonRelease
+  | ConfigureNotify
+  | WheelMoved
 
 data GLFWbGlobals =
   GLFWbGlobals { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
