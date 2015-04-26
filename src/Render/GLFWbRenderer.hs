@@ -3,9 +3,10 @@ module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
-import Control.Concurrent.STM.TChan (TChan, newTChanIO)
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TChan (TChan, newTChanIO, readTChan, isEmptyTChan)
 import Control.Lens ((^.), use, (.=), _1, _2, zoom)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3)
 import qualified Data.ByteString as B
@@ -289,12 +290,33 @@ glfwbKBDInit = do
 
 glfwbKBDUpdate :: Quake ()
 glfwbKBDUpdate = do
+    io $ GLFW.pollEvents
+
     Just window <- use $ glfwbGlobals.glfwbWindow
     io (GLFW.windowShouldClose window) >>= \quit ->
       when quit $
         CBuf.executeText Constants.execAppend "quit"
 
-    io (putStrLn "GLFWbRenderer.glfwbKBDUpdate") >> undefined -- TODO
+    Just kbdChan <- use $ glfwbGlobals.glfwbKBDChan
+
+    handleEvents kbdChan
+
+  where handleEvents :: TChan GLFWKBDEvent -> Quake ()
+        handleEvents kbdChan = do
+          emptyChan <- io $ atomically $ isEmptyTChan kbdChan
+
+          unless emptyChan $ do
+            msg <- io $ atomically $ readTChan kbdChan
+            case msg of
+              KeyPress -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              KeyRelease -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              MotionNotify -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              ButtonPress -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              ButtonRelease -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              ConfigureNotify -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              WheelMoved -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+
+            handleEvents kbdChan
 
 keyCallback :: TChan GLFWKBDEvent -> GLFW.Window -> GLFW.Key -> Int -> GLFW.KeyState -> GLFW.ModifierKeys -> IO ()
 keyCallback _ _ _ _ _ _ = putStrLn "GLFWbRenderer.keyCallback" >> undefined -- TODO
