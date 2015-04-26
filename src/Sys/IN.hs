@@ -3,12 +3,14 @@ module Sys.IN where
 
 import Control.Lens ((.=), use, (^.), preuse)
 import Control.Monad (void, when)
+import Data.Bits ((.&.), shiftL)
 import Linear (_x, _y, _z)
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.CVar as CVar
 import qualified Util.Math3D as Math3D
@@ -126,4 +128,25 @@ frame = do
       else activateMouse
 
 commands :: Quake ()
-commands = io (putStrLn "IN.commands") >> undefined -- TODO
+commands = do
+    mouseAvail <- use $ inGlobals.inMouseAvail
+
+    when mouseAvail $ do
+      Just renderer <- use $ globals.re
+      let kbd = renderer^.rRefExport.reGetKeyboardHandler
+      checkMouseButtonState kbd 0 3
+      mouseButtonState <- use $ inGlobals.inMouseButtonState
+      inGlobals.inMouseOldButtonState .= mouseButtonState
+
+  where checkMouseButtonState :: KBD -> Int -> Int -> Quake ()
+        checkMouseButtonState kbd idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              mouseButtonState <- use $ inGlobals.inMouseButtonState
+              mouseOldButtonState <- use $ inGlobals.inMouseOldButtonState
+
+              when ((mouseButtonState .&. (1 `shiftL` idx) /= 0) && (mouseOldButtonState .&. (1 `shiftL` idx) == 0)) $
+                (kbd^.kbdDoKeyEvent) (KeyConstants.kMouse1 + idx) True
+
+              when ((mouseButtonState .&. (1 `shiftL` idx) == 0) && (mouseOldButtonState .&. (1 `shiftL` idx) /= 0)) $
+                (kbd^.kbdDoKeyEvent) (KeyConstants.kMouse1 + idx) False
