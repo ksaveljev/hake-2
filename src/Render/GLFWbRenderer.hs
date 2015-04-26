@@ -3,6 +3,7 @@ module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
+import Control.Concurrent.STM.TChan (TChan, newTChanIO)
 import Control.Lens ((^.), use, (.=), _1, _2, zoom)
 import Control.Monad (when)
 import Data.Maybe (isNothing, fromJust, isJust)
@@ -19,6 +20,7 @@ import QCommon.XCommandT
 import Render.Basic.BasicRenderAPI
 import qualified Constants
 import qualified Client.VID as VID
+import qualified QCommon.CBuf as CBuf
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 
 glfwbRefExport :: RenderAPI -> RefExportT
@@ -61,8 +63,8 @@ glfwbRefExportT kbd renderAPI =
 
 glfwbKBD :: KBD
 glfwbKBD =
-  KBD { _kbdInit           = return ()
-      , _kbdUpdate         = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+  KBD { _kbdInit           = glfwbKBDInit
+      , _kbdUpdate         = glfwbKBDUpdate
       , _kbdClose          = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
       , _kbdDoKeyEvent     = (\_ _ -> io (putStrLn "glfwbKBD.kbdDoKeyEvent") >> undefined) -- TODO
       , _kbdInstallGrabs   = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
@@ -272,3 +274,36 @@ endFrame = do
 
 glfwbSetSwapInterval :: Int -> Quake ()
 glfwbSetSwapInterval v = io $ GLFW.swapInterval v
+
+glfwbKBDInit :: Quake ()
+glfwbKBDInit = do
+    Just window <- use $ glfwbGlobals.glfwbWindow
+
+    kbdChan <- io (newTChanIO :: IO (TChan GLFWKBDEvent))
+    glfwbGlobals.glfwbKBDChan .= Just kbdChan
+
+    io $ GLFW.setKeyCallback window (Just $ keyCallback kbdChan)
+    io $ GLFW.setMouseButtonCallback window (Just $ mouseButtonCallback kbdChan)
+    io $ GLFW.setCursorPosCallback window (Just $ cursorPosCallback kbdChan)
+    io $ GLFW.setScrollCallback window (Just $ scrollCallback kbdChan)
+
+glfwbKBDUpdate :: Quake ()
+glfwbKBDUpdate = do
+    Just window <- use $ glfwbGlobals.glfwbWindow
+    io (GLFW.windowShouldClose window) >>= \quit ->
+      when quit $
+        CBuf.executeText Constants.execAppend "quit"
+
+    io (putStrLn "GLFWbRenderer.glfwbKBDUpdate") >> undefined -- TODO
+
+keyCallback :: TChan GLFWKBDEvent -> GLFW.Window -> GLFW.Key -> Int -> GLFW.KeyState -> GLFW.ModifierKeys -> IO ()
+keyCallback _ _ _ _ _ _ = putStrLn "GLFWbRenderer.keyCallback" >> undefined -- TODO
+
+mouseButtonCallback :: TChan GLFWKBDEvent -> GLFW.Window -> GLFW.MouseButton -> GLFW.MouseButtonState -> GLFW.ModifierKeys -> IO ()
+mouseButtonCallback _ _ _ _ _ = putStrLn "GLFWbRenderer.mouseButtonCallback" >> undefined -- TODO
+
+cursorPosCallback :: TChan GLFWKBDEvent -> GLFW.Window -> Double -> Double -> IO ()
+cursorPosCallback _ _ _ _ = putStrLn "GLFWbRenderer.cursorPosCallback" >> undefined -- TODO
+
+scrollCallback :: TChan GLFWKBDEvent -> GLFW.Window -> Double -> Double -> IO ()
+scrollCallback _ _ _ _ = putStrLn "GLFWbRenderer.scrollCallback" >> undefined -- TODO

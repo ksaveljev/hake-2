@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Render.GLFWbGlobals (module Render.GLFWbGlobals) where
+module Render.GLFWbGlobals ( GLFWKBDEvent(..)
+                           , module Render.GLFWbGlobals) where
 
 import Control.Lens (makeLenses)
 
@@ -13,4 +14,5 @@ initialGLFWbGlobals =
                , _glfwbWindow         = Nothing
                , _glfwbWindowXPos     = 0
                , _glfwbWindowYPos     = 0
+               , _glfwbKBDChan        = Nothing
                }

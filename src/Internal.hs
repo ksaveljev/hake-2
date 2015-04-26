@@ -8,6 +8,7 @@
 module Internal where
 
 import Control.Applicative
+import Control.Concurrent.STM.TChan (TChan)
 import Control.Lens (Zoom, zoom, Lens')
 import Control.Lens.Internal.Zoom (Zoomed, Focusing)
 import Control.Monad.Except
@@ -1441,11 +1442,15 @@ data INGlobals =
             , _inMLooking            :: Bool
             }
 
+data GLFWKBDEvent =
+  TODO Int
+
 data GLFWbGlobals =
   GLFWbGlobals { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
                , _glfwbWindow         :: Maybe GLFW.Window
                , _glfwbWindowXPos     :: Int
                , _glfwbWindowYPos     :: Int
+               , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
                }
 
 data GLFWbKBDGlobals =

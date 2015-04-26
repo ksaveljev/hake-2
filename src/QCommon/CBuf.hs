@@ -149,3 +149,6 @@ copyToDefer = do
 
     globals.deferTextBuf .= B.take curSize buf
     globals.cmdText.sbCurSize .= 0
+
+executeText :: Int -> B.ByteString -> Quake ()
+executeText _ _ = io (putStrLn "CBuf.executeText") >> undefined -- TODO
