@@ -485,4 +485,37 @@ keyState keyLens = do
                 | otherwise -> val
 
 clampPitch :: Quake ()
-clampPitch = io (putStrLn "CLInput.clampPitch") >> undefined -- TODO
+clampPitch = do
+    let access = case Constants.pitch of
+                   0 -> _x
+                   1 -> _y
+                   2 -> _z
+                   _ -> undefined -- shouldn't happen
+
+    angle <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.access
+    let p = Math3D.shortToAngle angle
+        pitch = if p > 180
+                  then p - 360
+                  else p
+
+    let access2 = case Constants.pitch of
+                    0 -> _x
+                    1 -> _y
+                    2 -> _z
+                    _ -> undefined -- shouldn't happen
+
+    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+      when (v + pitch < (-360)) $
+        globals.cl.csViewAngles.access2 += 360 -- wrapped
+
+    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+      when (v + pitch > 360) $
+        globals.cl.csViewAngles.access2 -= 360 -- wrapped
+
+    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+      when (v + pitch > 89) $
+        globals.cl.csViewAngles.access2 .= 89 - pitch
+
+    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+      when (v + pitch < (-89)) $
+        globals.cl.csViewAngles.access2 .= (-89) - pitch
