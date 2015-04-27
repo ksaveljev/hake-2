@@ -1,13 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.CLInput where
 
-import Control.Monad (void)
+import Control.Lens ((^.), use, ix, (.=), preuse)
+import Control.Monad (void, unless, when, liftM)
+import Data.Bits ((.&.))
+import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
+import QuakeState
+import CVarVariables
 import QCommon.XCommandT
+import qualified Constants
+import qualified Client.CL as CL
+import qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
+import qualified QCommon.NetChannel as NetChannel
+import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
+
+nullcmd :: UserCmdT
+nullcmd = newUserCmdT
 
 initInput :: Quake()
 initInput = do
@@ -140,4 +156,125 @@ kLookUp :: XCommandT
 kLookUp = io (putStrLn "CLInput.kLookUp") >> undefined -- TODO
 
 sendCmd :: Quake ()
-sendCmd = io (putStrLn "CLInput.sendCmd") >> undefined -- TODO
+sendCmd = do
+    -- build a command even if not connected
+
+    -- save this command off for prediction
+    cmdRef <- saveCommandForPrediction
+
+    state <- use $ globals.cls.csState
+
+    unless (state == Constants.caDisconnected || state == Constants.caConnecting) $ do
+      curSize <- use $ globals.cls.csNetChan.ncMessage.sbCurSize
+      lastSent <- use $ globals.cls.csNetChan.ncLastSent
+      curTime <- use $ globals.curtime
+      if state == Constants.caConnected && (curSize /= 0 || (curTime - lastSent) > 1000)
+        then
+          NetChannel.transmit (globals.cls.csNetChan) 0 ""
+        else do
+          -- send a userinfo update if needed
+          use (globals.userInfoModified) >>= \modified ->
+            when modified $ do
+              CL.fixUpGender
+              globals.userInfoModified .= False
+              MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcUserInfo
+              userInfo <- CVar.userInfo
+              MSG.writeString (globals.cls.csNetChan.ncMessage) userInfo
+
+          SZ.init (clientGlobals.cgBuf) "" 128
+
+          shouldSkipCinematic cmdRef >>= \shouldSkip ->
+            -- skip the rest of the cinematic
+            when shouldSkip SCR.finishCinematic
+
+          -- begin a client move command
+          MSG.writeByteI (clientGlobals.cgBuf) Constants.clcMove
+
+          -- save the position for a checksum byte
+          checksumIndex <- use $ clientGlobals.cgBuf.sbCurSize
+          MSG.writeByteI (clientGlobals.cgBuf) 0
+
+          -- let the server know what the last frame we
+          -- got was, so the next message can be delta compressed
+          setCompressionInfo
+
+          -- send this and the previous cmds in the message, so
+          -- if the last packet was dropped, it can be recovered
+          writeCommandsToBuf
+
+          -- IMPROVE: this is most likely a candidate for performance optimization
+          -- calculate a checksum over the move commands
+          calculateChecksum checksumIndex
+
+          -- deliver the message
+          deliverMessage
+
+  where saveCommandForPrediction :: Quake UserCmdReference
+        saveCommandForPrediction = do
+          cls' <- use $ globals.cls
+          let i = (cls'^.csNetChan.ncOutgoingSequence) .&. (Constants.cmdBackup - 1)
+              cmdRef = UserCmdReference i
+          realTime <- use $ globals.cls.csRealTime
+          globals.cl.csCmdTime.ix i .= realTime -- for netgraph ping calculation
+
+          -- fill the cmd
+          createCmd cmdRef
+
+          Just cmd <- preuse $ globals.cl.csCmds.ix i
+          globals.cl.csCmd .= cmd
+
+          return cmdRef
+
+        shouldSkipCinematic :: UserCmdReference -> Quake Bool
+        shouldSkipCinematic (UserCmdReference idx) = do
+          Just cmd <- preuse $ globals.cl.csCmds.ix idx
+
+          realTime <- use $ globals.cls.csRealTime
+          cl' <- use $ globals.cl
+
+          return $ if (cmd^.ucButtons) /= 0 && (cl'^.csCinematicTime) > 0 &&
+                      not (cl'^.csAttractLoop) && realTime - (cl'^.csCinematicTime) > 1000
+                     then True
+                     else False
+
+        setCompressionInfo :: Quake ()
+        setCompressionInfo = do
+          noDeltaValue <- liftM (^.cvValue) clNoDeltaCVar
+          validFrame <- use $ globals.cl.csFrame.fValid
+          demoWaiting <- use $ globals.cls.csDemoWaiting
+
+          if noDeltaValue /= 0 || not validFrame || demoWaiting
+            then 
+              MSG.writeLong (clientGlobals.cgBuf) (-1) -- no compression
+            else do
+              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+              MSG.writeLong (clientGlobals.cgBuf) serverFrame
+
+        writeCommandsToBuf :: Quake ()
+        writeCommandsToBuf = do
+          outgoingSequence <- use $ globals.cls.csNetChan.ncOutgoingSequence
+          cmds <- use $ globals.cl.csCmds
+
+          let i = (outgoingSequence - 2) .&. (Constants.cmdBackup - 1)
+          MSG.writeDeltaUserCmd (clientGlobals.cgBuf) nullcmd (cmds V.! i)
+
+          let j = (outgoingSequence - 1) .&. (Constants.cmdBackup - 1)
+          MSG.writeDeltaUserCmd (clientGlobals.cgBuf) (cmds V.! i) (cmds V.! j)
+
+          let k = outgoingSequence .&. (Constants.cmdBackup - 1)
+          MSG.writeDeltaUserCmd (clientGlobals.cgBuf) (cmds V.! j) (cmds V.! k)
+
+        deliverMessage :: Quake ()
+        deliverMessage = do
+          buf <- use $ clientGlobals.cgBuf
+          NetChannel.transmit (globals.cls.csNetChan) (buf^.sbCurSize) (buf^.sbData)
+
+        calculateChecksum :: Int -> Quake ()
+        calculateChecksum checksumIndex = do
+          buf <- use $ clientGlobals.cgBuf
+          outgoingSequence <- use $ globals.cls.csNetChan.ncOutgoingSequence
+          crcByte <- Com.blockSequenceCRCByte (buf^.sbData) (checksumIndex + 1) ((buf^.sbCurSize) - checksumIndex - 1) outgoingSequence
+          clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData))
+
+createCmd :: UserCmdReference -> Quake ()
+createCmd _ = io (putStrLn "CLInput.createCmd") >> undefined -- TODO

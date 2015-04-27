@@ -116,6 +116,9 @@ newtype MenuItemReference = MenuItemReference Int
 -- reference to (fast/basic)RenderAPIGlobals.frGLTextures
 newtype ImageReference = ImageReference Int
 
+-- reference to globals.cl.cmds
+newtype UserCmdReference = UserCmdReference Int
+
 data QuakeState =
   QuakeState { _globals              :: !Globals
              , _comGlobals           :: !ComGlobals
@@ -1560,4 +1563,5 @@ data MenuLayerT =
 data ClientGlobals =
   ClientGlobals { _cgExtraTime    :: Int
                 , _cgNumCheatVars :: Int
+                , _cgBuf          :: SizeBufT
                 }

@@ -94,6 +94,9 @@ writeAngle _ _ = io (putStrLn "MSG.writeAngle") >> undefined -- TODO
 writeAngle16 :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle16 _ _ = io (putStrLn "MSG.writeAngle16") >> undefined -- TODO
 
+writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
+writeDeltaUserCmd _ _ _ = io (putStrLn "MSG.writeDeltaUserCmd") >> undefined -- TODO
+
 --
 -- reading functions
 --

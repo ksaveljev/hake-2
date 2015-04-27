@@ -128,5 +128,8 @@ skyF = io (putStrLn "SCR.skyF") >> undefined -- TODO
 runCinematic :: Quake ()
 runCinematic = io (putStrLn "SCR.runCinematic") >> undefined -- TODO
 
+finishCinematic :: Quake ()
+finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
+
 runConsole :: Quake ()
 runConsole = io (putStrLn "SCR.runConsole") >> undefined -- TODO

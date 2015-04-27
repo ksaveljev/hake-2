@@ -17,7 +17,7 @@ import Client.CheatVarT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLFX as CLFX
-import qualified Client.CLInput as CLInput
+import {-# SOURCE #-} qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
 import qualified Client.CLView as CLView
@@ -442,3 +442,6 @@ fixCVarCheats = do
 
 checkForResend :: Quake ()
 checkForResend = io (putStrLn "CL.checkForResend") >> undefined -- TODO
+
+fixUpGender :: Quake ()
+fixUpGender = io (putStrLn "CL.fixUpGender") >> undefined -- TODO
