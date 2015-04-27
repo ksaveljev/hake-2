@@ -213,14 +213,14 @@ data CmdGlobals =
              }
 
 data KeyGlobals =
-  KeyGlobals { _anyKeyDown  :: !Int
-             , _keyWaiting  :: !Int
-             , _historyLine :: !Int
-             , _shiftDown   :: !Bool
-             , _keyRepeats  :: !(UV.Vector Int)
-             , _menuBound   :: !(UV.Vector Bool)
-             , _consoleKeys :: !(UV.Vector Bool)
-             , _keyNames    :: !(V.Vector (Maybe B.ByteString))
+  KeyGlobals { _kgAnyKeyDown  :: !Int
+             , _kgKeyWaiting  :: !Int
+             , _kgHistoryLine :: !Int
+             , _kgShiftDown   :: !Bool
+             , _kgKeyRepeats  :: !(UV.Vector Int)
+             , _kgMenuBound   :: !(UV.Vector Bool)
+             , _kgConsoleKeys :: !(UV.Vector Bool)
+             , _kgKeyNames    :: !(V.Vector (Maybe B.ByteString))
              }
 
 data FSGlobals =

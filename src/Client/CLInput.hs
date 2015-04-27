@@ -6,7 +6,7 @@ module Client.CLInput where
 
 import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=), (*=), zoom)
 import Control.Monad (void, unless, when, liftM)
-import Data.Bits ((.&.), xor)
+import Data.Bits ((.&.), xor, (.|.), complement)
 import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -25,6 +25,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
+import qualified Util.Math3D as Math3D
 
 nullcmd :: UserCmdT
 nullcmd = newUserCmdT
@@ -360,7 +361,47 @@ baseMove (UserCmdReference cmdIdx) = do
         ucUpMove *= 2
 
 finishMove :: UserCmdReference -> Quake ()
-finishMove _ = io (putStrLn "CLInput.finishMove") >> undefined -- TODO
+finishMove (UserCmdReference cmdIdx) = do
+    -- figure button bits
+    use (clientGlobals.cgInAttack.kbState) >>= \v ->
+      when (v .&. 3 /= 0) $
+        globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAttack))
+
+    clientGlobals.cgInAttack.kbState %= (.&. (complement 2))
+
+    use (clientGlobals.cgInUse.kbState) >>= \v ->
+      when (v .&. 3 /= 0) $
+        globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonUse))
+
+    clientGlobals.cgInUse.kbState %= (.&. (complement 2))
+
+    anyKeyDown <- use $ keyGlobals.kgAnyKeyDown
+    keyDest <- use $ globals.cls.csKeyDest
+
+    when (anyKeyDown /= 0 && keyDest == Constants.keyGame) $
+      globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAny))
+
+    -- send milliseconds of time to apply the move
+    frameTime <- use $ globals.cls.csFrameTime
+    let ms :: Int = truncate (frameTime * 1000)
+        ms' = if ms > 250
+                then 100 -- time was unreasonable
+                else ms
+
+    globals.cl.csCmds.ix cmdIdx.ucMsec .= fromIntegral ms
+
+    clampPitch
+
+    viewAngles <- use $ globals.cl.csViewAngles
+    globals.cl.csCmds.ix cmdIdx.ucAngles .= fmap Math3D.angleToShort viewAngles
+
+    inImpulse <- use $ clientGlobals.cgInImpulse
+    globals.cl.csCmds.ix cmdIdx.ucImpulse .= fromIntegral inImpulse
+    clientGlobals.cgInImpulse .= 0
+
+    -- send the ambient light level at the player's current position
+    lightLevelValue <- liftM (^.cvValue) clLightLevelCVar
+    globals.cl.csCmds.ix cmdIdx.ucLightLevel .= truncate lightLevelValue
 
 {-
 - ================ CL_AdjustAngles ================
@@ -442,3 +483,6 @@ keyState keyLens = do
     return $ if | val < 0 -> 0
                 | val > 1 -> 1
                 | otherwise -> val
+
+clampPitch :: Quake ()
+clampPitch = io (putStrLn "CLInput.clampPitch") >> undefined -- TODO

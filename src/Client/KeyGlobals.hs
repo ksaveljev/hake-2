@@ -2,14 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.KeyGlobals ( KeyGlobals
                          , initialKeyGlobals
-                         , anyKeyDown
-                         , consoleKeys
-                         , historyLine
-                         , keyNames
-                         , keyRepeats
-                         , keyWaiting
-                         , menuBound
-                         , shiftDown
+                         , kgAnyKeyDown
+                         , kgConsoleKeys
+                         , kgHistoryLine
+                         , kgKeyNames
+                         , kgKeyRepeats
+                         , kgKeyWaiting
+                         , kgMenuBound
+                         , kgShiftDown
                          ) where
 
 import Control.Lens (makeLenses)
@@ -80,12 +80,12 @@ setupKeyNames = [ (kTab,          Just "TAB")
 
 initialKeyGlobals :: KeyGlobals
 initialKeyGlobals =
-  KeyGlobals { _anyKeyDown  = 0
-             , _keyWaiting  = 0
-             , _historyLine = 0
-             , _shiftDown   = False
-             , _keyRepeats  = UV.replicate 256 0
-             , _menuBound   = UV.replicate 256 False
-             , _consoleKeys = UV.replicate 256 False
-             , _keyNames    = V.replicate 256 Nothing V.// setupKeyNames
+  KeyGlobals { _kgAnyKeyDown  = 0
+             , _kgKeyWaiting  = 0
+             , _kgHistoryLine = 0
+             , _kgShiftDown   = False
+             , _kgKeyRepeats  = UV.replicate 256 0
+             , _kgMenuBound   = UV.replicate 256 False
+             , _kgConsoleKeys = UV.replicate 256 False
+             , _kgKeyNames    = V.replicate 256 Nothing V.// setupKeyNames
              }

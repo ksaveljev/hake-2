@@ -142,7 +142,7 @@ surfNoDraw  = 0x80 :: Int -- don't bother referencing the texture
 --
 -- button bits
 --
-buttonAttach =   1 :: Int
+buttonAttack =   1 :: Int
 buttonUse    =   2 :: Int
 buttonAny    = 128 :: Int
 

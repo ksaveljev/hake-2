@@ -25,7 +25,7 @@ init = do
     globals.keyLines .= kl
     globals.keyLinePos .= 1
 
-    keyGlobals.consoleKeys %= (UV.// (([32..127] `zip` repeat True) ++ 
+    keyGlobals.kgConsoleKeys %= (UV.// (([32..127] `zip` repeat True) ++ 
             ([kEnter, kKpEnter, kTab, kLeftArrow, kKpLeftArrow,
              kRightArrow, kKpRightArrow, kUpArrow, kKpUpArrow,
              kDownArrow, kKpDownArrow, kBackspace, kHome, kKpHome,
@@ -33,7 +33,7 @@ init = do
              kIns, kKpIns, kKpDel, kKpSlash, kKpPlus, kKpMinus, 
              kKp5] `zip` repeat True) ++ [(96, False), (126, False)])) -- 96 is '`', 126 is '~'
 
-    keyGlobals.menuBound %= (UV.// ([kF1, kF2, kF3, kF4, kF5,
+    keyGlobals.kgMenuBound %= (UV.// ([kF1, kF2, kF3, kF4, kF5,
                              kF6, kF7, kF8, kF9, kF10,
                              kF11, kF12, kEscape] `zip` repeat True))
 
@@ -103,7 +103,7 @@ stringToKeynum str =
       then return $ ord $ BC.index str 0
       else do
         let upperStr = BC.map toUpper str
-        keynames <- use $ keyGlobals.keyNames
+        keynames <- use $ keyGlobals.kgKeyNames
 
         case V.findIndex (== Just upperStr) keynames of
           Just i -> return i
@@ -113,7 +113,7 @@ stringToKeynum str =
 -- given keynum.
 keynumToString :: Int -> Quake B.ByteString
 keynumToString keynum = do
-    keynames <- use $ keyGlobals.keyNames
+    keynames <- use $ keyGlobals.kgKeyNames
 
     if | keynum < 0 || keynum > 255 -> return "<KEY NOT FOUND>"
        | keynum > 32 && keynum < 127 -> return $ BC.pack [chr keynum]

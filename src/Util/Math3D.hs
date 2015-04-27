@@ -102,3 +102,6 @@ angleVectors angles setForward setRight setUp =
 
 shortToAngle :: Int16 -> Float
 shortToAngle x = (fromIntegral x) * shortRatio
+
+angleToShort :: Float -> Int16
+angleToShort x = truncate (x / shortRatio)
