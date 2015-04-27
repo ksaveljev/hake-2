@@ -11,7 +11,8 @@ makeLenses ''ClientGlobals
 
 initialClientGlobals :: ClientGlobals
 initialClientGlobals =
-  ClientGlobals { _cgExtraTime    = 0
-                , _cgNumCheatVars = 0
-                , _cgBuf          = newSizeBufT
+  ClientGlobals { _cgExtraTime       = 0
+                , _cgNumCheatVars    = 0
+                , _cgBuf             = newSizeBufT
+                , _cgOldSysFrameTime = 0
                 }

@@ -150,3 +150,6 @@ commands = do
 
               when ((mouseButtonState .&. (1 `shiftL` idx) == 0) && (mouseOldButtonState .&. (1 `shiftL` idx) /= 0)) $
                 (kbd^.kbdDoKeyEvent) (KeyConstants.kMouse1 + idx) False
+
+move :: UserCmdReference -> Quake ()
+move _ = io (putStrLn "IN.move") >> undefined -- TODO

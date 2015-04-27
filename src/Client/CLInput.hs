@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.CLInput where
 
 import Control.Lens ((^.), use, ix, (.=), preuse)
@@ -277,4 +278,28 @@ sendCmd = do
           clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData))
 
 createCmd :: UserCmdReference -> Quake ()
-createCmd _ = io (putStrLn "CLInput.createCmd") >> undefined -- TODO
+createCmd cmdRef@(UserCmdReference cmdIdx) = do
+    sysFrameTime' <- use $ globals.sysFrameTime
+    oldSysFrameTime <- use $ clientGlobals.cgOldSysFrameTime
+
+    let diff = sysFrameTime' - oldSysFrameTime
+        frameMsec = if | diff < 1 -> 1
+                       | diff > 200 -> 200
+                       | otherwise -> diff
+
+    -- get basic movement from keyboard
+    baseMove cmdRef
+
+    -- allow mice or other external controllers to add to the move
+    IN.move cmdRef
+
+    finishMove cmdRef
+
+    use (globals.sysFrameTime) >>= \v ->
+      clientGlobals.cgOldSysFrameTime .= v
+
+baseMove :: UserCmdReference -> Quake ()
+baseMove _ = io (putStrLn "CLInput.baseMove") >> undefined -- TODO
+
+finishMove :: UserCmdReference -> Quake ()
+finishMove _ = io (putStrLn "CLInput.finishMove") >> undefined -- TODO

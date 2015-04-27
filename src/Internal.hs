@@ -1561,7 +1561,8 @@ data MenuLayerT =
              }
 
 data ClientGlobals =
-  ClientGlobals { _cgExtraTime    :: Int
-                , _cgNumCheatVars :: Int
-                , _cgBuf          :: SizeBufT
+  ClientGlobals { _cgExtraTime       :: Int
+                , _cgNumCheatVars    :: Int
+                , _cgBuf             :: SizeBufT
+                , _cgOldSysFrameTime :: Int
                 }
