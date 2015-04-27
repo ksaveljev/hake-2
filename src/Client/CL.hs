@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
@@ -8,6 +9,7 @@ import Data.Bits ((.|.))
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as Vec
 
 import Quake
@@ -486,5 +488,34 @@ checkForResend = do
 fixUpGender :: Quake ()
 fixUpGender = io (putStrLn "CL.fixUpGender") >> undefined -- TODO
 
+{-
+- SendConnectPacket
+- 
+- We have gotten a challenge from the server, so try and connect.
+-}
 sendConnectPacket :: Quake ()
-sendConnectPacket = io (putStrLn "CL.sendConnectPacket") >> undefined -- TODO
+sendConnectPacket = do
+    serverName <- use $ globals.cls.csServerName
+
+    maybeAdr <- NET.stringToAdr serverName
+
+    case maybeAdr of
+      Nothing -> do
+        Com.printf "Bad server address\n"
+        globals.cls.csConnectTime .= 0
+      Just adr -> do
+        let adr' = if (adr^.naPort) == 0
+                     then adr { _naPort = Constants.portServer }
+                     else adr
+
+        port :: Int <- liftM truncate (CVar.variableValue "qport")
+        globals.userInfoModified .= False
+
+        challenge <- use $ globals.cls.csChallenge
+        userInfo <- CVar.userInfo
+
+        let str = "connect " `B.append` (BC.pack $ show Constants.protocolVersion) `B.append` -- IMPROVE?
+                  " " `B.append` (BC.pack $ show port) `B.append` " " `B.append` -- IMPROVE ?
+                  (BC.pack $ show challenge) `B.append` " \"" `B.append` userInfo `B.append` "\"\n" -- IMPROVE?
+
+        NetChannel.outOfBandPrint Constants.nsClient adr' str
