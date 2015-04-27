@@ -4,9 +4,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.CLInput where
 
-import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=))
+import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=), (*=), zoom)
 import Control.Monad (void, unless, when, liftM)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), xor)
 import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -25,7 +25,6 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
-import qualified Util.Math3D as Math3D
 
 nullcmd :: UserCmdT
 nullcmd = newUserCmdT
@@ -312,7 +311,53 @@ createCmd cmdRef@(UserCmdReference cmdIdx) = do
 baseMove :: UserCmdReference -> Quake ()
 baseMove (UserCmdReference cmdIdx) = do
     adjustAngles
-    io (putStrLn "CLInput.baseMove") >> undefined -- TODO
+
+    globals.cl.csCmds.ix cmdIdx .= newUserCmdT
+
+    use (globals.cl.csViewAngles) >>= \angles ->
+      globals.cl.csCmds.ix cmdIdx.ucAngles .= fmap truncate angles
+
+    inStrafe <- use $ clientGlobals.cgInStrafe
+    inKLook <- use $ clientGlobals.cgInKLook
+    inSpeed <- use $ clientGlobals.cgInSpeed
+
+    sideSpeedValue <- liftM (^.cvValue) clSideSpeedCVar
+    upSpeedValue <- liftM (^.cvValue) clUpSpeedCVar
+    forwardSpeedValue <- liftM (^.cvValue) clForwardSpeedCVar
+    runValue <- liftM (^.cvValue) clRunCVar
+
+    when ((inStrafe^.kbState) .&. 1 /= 0) $ do
+      rightValue <- keyState (clientGlobals.cgInRight)
+      leftValue <- keyState (clientGlobals.cgInLeft)
+      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+        ucSideMove += truncate (sideSpeedValue * rightValue)
+        ucSideMove -= truncate (sideSpeedValue * leftValue)
+
+    moveRightValue <- keyState (clientGlobals.cgInMoveRight)
+    moveLeftValue <- keyState (clientGlobals.cgInMoveLeft)
+    zoom (globals.cl.csCmds.ix cmdIdx) $ do
+      ucSideMove += truncate (sideSpeedValue * moveRightValue)
+      ucSideMove -= truncate (sideSpeedValue * moveLeftValue)
+
+    upValue <- keyState (clientGlobals.cgInUp)
+    downValue <- keyState (clientGlobals.cgInDown)
+    zoom (globals.cl.csCmds.ix cmdIdx) $ do
+      ucUpMove += truncate (upSpeedValue * upValue)
+      ucUpMove -= truncate (upSpeedValue * downValue)
+
+    when ((inKLook^.kbState) .&. 1 == 0) $ do
+      forwardValue <- keyState (clientGlobals.cgInForward)
+      backValue <- keyState (clientGlobals.cgInBack)
+      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+        ucForwardMove += truncate (forwardSpeedValue * forwardValue)
+        ucForwardMove -= truncate (forwardSpeedValue * backValue)
+
+    -- adjust for speed key / running
+    when (((inSpeed^.kbState) .&. 1) `xor` (truncate runValue) /= 0) $ do
+      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+        ucForwardMove *= 2
+        ucSideMove *= 2
+        ucUpMove *= 2
 
 finishMove :: UserCmdReference -> Quake ()
 finishMove _ = io (putStrLn "CLInput.finishMove") >> undefined -- TODO
