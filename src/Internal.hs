@@ -13,7 +13,7 @@ import Control.Lens (Zoom, zoom, Lens')
 import Control.Lens.Internal.Zoom (Zoomed, Focusing)
 import Control.Monad.Except
 import Control.Monad.State.Strict
-import Data.Int (Int16)
+import Data.Int (Int16, Int64)
 import Data.Sequence (Seq)
 import Data.Word (Word8, Word16)
 import Linear (V3, V4)
@@ -31,6 +31,7 @@ import Client.ConsoleT
 import Client.DirtyT
 import Client.DLightT
 import Client.FrameT
+import Client.KButtonT
 import Client.LightStyleT
 import Client.VidDefT
 import Client.VidModeT
@@ -1564,5 +1565,22 @@ data ClientGlobals =
   ClientGlobals { _cgExtraTime       :: Int
                 , _cgNumCheatVars    :: Int
                 , _cgBuf             :: SizeBufT
-                , _cgOldSysFrameTime :: Int
+                , _cgFrameMsec       :: Int64
+                , _cgOldSysFrameTime :: Int64
+                , _cgInKLook         :: KButtonT
+                , _cgInLeft          :: KButtonT
+                , _cgInRight         :: KButtonT
+                , _cgInForward       :: KButtonT
+                , _cgInBack          :: KButtonT
+                , _cgInLookUp        :: KButtonT
+                , _cgInLookDown      :: KButtonT
+                , _cgInMoveLeft      :: KButtonT
+                , _cgInMoveRight     :: KButtonT
+                , _cgInStrafe        :: KButtonT
+                , _cgInSpeed         :: KButtonT
+                , _cgInUse           :: KButtonT
+                , _cgInAttack        :: KButtonT
+                , _cgInUp            :: KButtonT
+                , _cgInDown          :: KButtonT
+                , _cgInImpulse       :: Int
                 }

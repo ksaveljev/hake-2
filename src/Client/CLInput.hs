@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.CLInput where
 
-import Control.Lens ((^.), use, ix, (.=), preuse)
+import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=))
 import Control.Monad (void, unless, when, liftM)
 import Data.Bits ((.&.))
+import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
@@ -22,6 +25,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
+import qualified Util.Math3D as Math3D
 
 nullcmd :: UserCmdT
 nullcmd = newUserCmdT
@@ -282,10 +286,12 @@ createCmd cmdRef@(UserCmdReference cmdIdx) = do
     sysFrameTime' <- use $ globals.sysFrameTime
     oldSysFrameTime <- use $ clientGlobals.cgOldSysFrameTime
 
-    let diff = sysFrameTime' - oldSysFrameTime
+    let diff = fromIntegral sysFrameTime' - oldSysFrameTime
         frameMsec = if | diff < 1 -> 1
                        | diff > 200 -> 200
                        | otherwise -> diff
+
+    clientGlobals.cgFrameMsec .= fromIntegral frameMsec
 
     -- get basic movement from keyboard
     baseMove cmdRef
@@ -296,10 +302,98 @@ createCmd cmdRef@(UserCmdReference cmdIdx) = do
     finishMove cmdRef
 
     use (globals.sysFrameTime) >>= \v ->
-      clientGlobals.cgOldSysFrameTime .= v
+      clientGlobals.cgOldSysFrameTime .= fromIntegral v
 
+{-
+- ================ CL_BaseMove ================
+- 
+- Send the intended movement message to the server
+-}
 baseMove :: UserCmdReference -> Quake ()
-baseMove _ = io (putStrLn "CLInput.baseMove") >> undefined -- TODO
+baseMove (UserCmdReference cmdIdx) = do
+    adjustAngles
+    io (putStrLn "CLInput.baseMove") >> undefined -- TODO
 
 finishMove :: UserCmdReference -> Quake ()
 finishMove _ = io (putStrLn "CLInput.finishMove") >> undefined -- TODO
+
+{-
+- ================ CL_AdjustAngles ================
+- 
+- Moves the local angle positions
+-}
+adjustAngles :: Quake ()
+adjustAngles = do
+    inSpeed <- use $ clientGlobals.cgInSpeed
+    inStrafe <- use $ clientGlobals.cgInStrafe
+    inKLook <- use $ clientGlobals.cgInKLook
+    frameTime <- use $ globals.cls.csFrameTime
+    pitchSpeed <- liftM (^.cvValue) clPitchSpeedCVar
+
+    speed <- if (inSpeed^.kbState) .&. 1 /= 0
+               then do
+                 angleSpeedKeyValue <- liftM (^.cvValue) clAngleSpeedkeyCVar
+                 return $ frameTime * angleSpeedKeyValue
+               else
+                 return frameTime
+
+    when ((inStrafe^.kbState) .&. 1 == 0) $ do
+      yawSpeed <- liftM (^.cvValue) clYawSpeedCVar
+      rightValue <- keyState (clientGlobals.cgInRight)
+      leftValue <- keyState (clientGlobals.cgInLeft)
+      let access = case Constants.yaw of
+                     0 -> _x
+                     1 -> _y
+                     2 -> _z
+                     _ -> undefined -- shouldn't happen
+      globals.cl.csViewAngles.access -= speed * yawSpeed * rightValue
+      globals.cl.csViewAngles.access += speed * yawSpeed * leftValue
+
+    when ((inKLook^.kbState) .&. 1 /= 0) $ do
+      forwardValue <- keyState (clientGlobals.cgInForward)
+      backValue <- keyState (clientGlobals.cgInBack)
+      let access = case Constants.pitch of
+                     0 -> _x
+                     1 -> _y
+                     2 -> _z
+                     _ -> undefined -- shouldn't happen
+      globals.cl.csViewAngles.access -= speed * pitchSpeed * forwardValue
+      globals.cl.csViewAngles.access += speed * pitchSpeed * backValue
+
+    upValue <- keyState (clientGlobals.cgInLookUp)
+    downValue <- keyState (clientGlobals.cgInLookDown)
+    let access = case Constants.pitch of
+                   0 -> _x
+                   1 -> _y
+                   2 -> _z
+                   _ -> undefined -- shouldn't happen
+    globals.cl.csViewAngles.access -= speed * pitchSpeed * upValue
+    globals.cl.csViewAngles.access += speed * pitchSpeed * downValue
+
+keyState :: Lens' QuakeState KButtonT -> Quake Float
+keyState keyLens = do
+    -- clear impulses
+    keyLens.kbState %= (.&. 1)
+
+    key <- use keyLens
+
+    let msec = key^.kbMsec
+    keyLens.kbMsec .= 0
+
+    msec' <- if (key^.kbState) /= 0
+               then do
+                 -- still down
+                 sysFrameTime' <- liftM fromIntegral (use $ globals.sysFrameTime)
+
+                 let ms = msec + sysFrameTime' - (key^.kbDownTime)
+                 keyLens.kbDownTime .= sysFrameTime'
+                 return ms
+               else
+                 return msec
+
+    frameMsec <- use $ clientGlobals.cgFrameMsec
+    let val :: Float = fromIntegral msec' / fromIntegral frameMsec
+
+    return $ if | val < 0 -> 0
+                | val > 1 -> 1
+                | otherwise -> val
