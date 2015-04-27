@@ -32,6 +32,7 @@ import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import qualified QCommon.NetChannel as NetChannel
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 import qualified Sys.NET as NET
@@ -440,8 +441,50 @@ fixCVarCheats = do
           when ((cvar^.cvString) /= (cheatVar^.chvValue)) $
             void $ CVar.set (cheatVar^.chvName) (cheatVar^.chvValue)
 
+{-
+- CheckForResend
+- 
+- Resend a connect message if the last one has timed out.
+-}
 checkForResend :: Quake ()
-checkForResend = io (putStrLn "CL.checkForResend") >> undefined -- TODO
+checkForResend = do
+    -- if the local server is running and we aren't then connect
+    state <- use $ globals.cls.csState
+    serverState' <- use $ globals.serverState
+
+    if state == Constants.caDisconnected && serverState' /= 0
+      then do
+        globals.cls.csState .= Constants.caConnecting
+        globals.cls.csServerName .= "localhost"
+        -- we don't need a challenge on the localhost
+        sendConnectPacket
+      else do
+        realTime <- use $ globals.cls.csRealTime
+        connectTime <- use $ globals.cls.csConnectTime
+
+        -- resend if we haven't gotten a reply yet
+        unless (state /= Constants.caConnecting || (fromIntegral realTime - connectTime) < 3000) $ do
+          serverName <- use $ globals.cls.csServerName
+          adrMaybe <- NET.stringToAdr serverName
+
+          case adrMaybe of
+            Nothing -> do
+              Com.printf "Bad server address\n"
+              globals.cls.csState .= Constants.caDisconnected
+            Just adr -> do
+              let adr' = if (adr^.naPort) == 0
+                           then adr { _naPort = Constants.portServer }
+                           else adr
+
+              -- for retransmit requests
+              globals.cls.csConnectTime .= fromIntegral realTime
+
+              Com.printf $ "Connecting to " `B.append` serverName `B.append` "...\n"
+
+              NetChannel.outOfBandPrint Constants.nsClient adr' "getchallenge\n"
 
 fixUpGender :: Quake ()
 fixUpGender = io (putStrLn "CL.fixUpGender") >> undefined -- TODO
+
+sendConnectPacket :: Quake ()
+sendConnectPacket = io (putStrLn "CL.sendConnectPacket") >> undefined -- TODO

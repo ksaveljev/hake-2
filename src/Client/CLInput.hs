@@ -282,7 +282,7 @@ sendCmd = do
           clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData))
 
 createCmd :: UserCmdReference -> Quake ()
-createCmd cmdRef@(UserCmdReference cmdIdx) = do
+createCmd cmdRef = do
     sysFrameTime' <- use $ globals.sysFrameTime
     oldSysFrameTime <- use $ clientGlobals.cgOldSysFrameTime
 
@@ -388,7 +388,7 @@ finishMove (UserCmdReference cmdIdx) = do
                 then 100 -- time was unreasonable
                 else ms
 
-    globals.cl.csCmds.ix cmdIdx.ucMsec .= fromIntegral ms
+    globals.cl.csCmds.ix cmdIdx.ucMsec .= fromIntegral ms'
 
     clampPitch
 
