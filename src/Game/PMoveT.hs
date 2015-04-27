@@ -15,16 +15,26 @@ import Game.TraceT
 import Game.UserCmdT
 import qualified Constants
 
-{-
-TODO:
-PMF_DUCKED = 1
-PMF_JUMP_HELD = 2
-PMF_ON_GROUND = 4
-PMF_TIME_WATERJUMP = 8
-PMF_TIME_LAND = 16
-PMF_TIME_TELEPORT = 32
-PMF_NO_PREDICTION = 64
--}
+pmfDucked :: Int
+pmfDucked        = 1
+
+pmfJumpHeld :: Int
+pmfJumpHeld      = 2
+
+pmfOnGround :: Int
+pmfOnGround      = 4
+
+pmfTimeWaterJump :: Int
+pmfTimeWaterJump = 8
+
+pmfTimeLand :: Int
+pmfTimeLand      = 16
+
+pmfTimeTeleport :: Int
+pmfTimeTeleport  = 32
+
+pmfNoPrediction :: Int
+pmfNoPrediction  = 64
 
 makeLenses ''PMoveT
 
