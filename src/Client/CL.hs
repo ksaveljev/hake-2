@@ -2,16 +2,18 @@
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
-import Control.Lens (use, (.=), (^.), (+=))
+import Control.Lens (use, (.=), (^.), (+=), preuse, ix)
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.))
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
 import qualified Data.ByteString as B
+import qualified Data.Vector as Vec
 
 import Quake
 import QuakeState
 import CVarVariables
+import Client.CheatVarT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLFX as CLFX
@@ -36,6 +38,21 @@ import qualified Sys.NET as NET
 import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
+
+cheatVars :: Vec.Vector CheatVarT
+cheatVars =
+    Vec.fromList [ CheatVarT "timescale" "1"
+               , CheatVarT "timedemo" "0"
+               , CheatVarT "r_drawworld" "1"
+               , CheatVarT "cl_testlights" "0"
+               , CheatVarT "r_fullbright" "0"
+               , CheatVarT "r_drawflat" "0"
+               , CheatVarT "paused" "0"
+               , CheatVarT "fixedtime" "0"
+               , CheatVarT "sw_draworder" "0"
+               , CheatVarT "gl_lightmap" "0"
+               , CheatVarT "gl_saturatelighting" "0"
+               ]
 
 -- Initialize client subsystem.
 init :: Quake ()
@@ -399,7 +416,29 @@ sendCommand = do
     checkForResend
 
 fixCVarCheats :: Quake ()
-fixCVarCheats = io (putStrLn "CL.fixCVarCheats") >> undefined -- TODO
+fixCVarCheats = do
+    Just maxClients <- preuse $ globals.cl.csConfigStrings.ix Constants.csMaxClients
+
+    -- single player can cheat
+    unless (maxClients == "1" || B.length maxClients == 0) $ do
+      -- -----------------------------------
+      -- ACTUALLY WE DO NOT NEED THIS REALLY
+      -- -----------------------------------
+      -- find all the cvars if we haven't done it yet
+      {-
+      numCheatVars <- use $ clientGlobals.cgNumCheatVars
+      when (numCheatVars == 0) $ do
+        undefined -- TODO
+      -}
+
+      -- make sure they are all set to the proper values
+      Vec.mapM_ fixCVar cheatVars
+
+  where fixCVar :: CheatVarT -> Quake ()
+        fixCVar cheatVar = do
+          cvar <- CVar.getExisting (cheatVar^.chvName)
+          when ((cvar^.cvString) /= (cheatVar^.chvValue)) $
+            void $ CVar.set (cheatVar^.chvName) (cheatVar^.chvValue)
 
 checkForResend :: Quake ()
 checkForResend = io (putStrLn "CL.checkForResend") >> undefined -- TODO
