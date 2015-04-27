@@ -139,7 +139,7 @@ data QuakeState =
              , _vidGlobals           :: !VIDGlobals
              , _inGlobals            :: !INGlobals
              , _glfwbGlobals         :: !GLFWbGlobals
-             , _glfwbKBDGlobals      :: !GLFWbKBDGlobals
+             , _kbdGlobals           :: !KBDGlobals
              , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
              , _particleTGlobals     :: !ParticleTGlobals
              , _menuGlobals          :: !MenuGlobals
@@ -1463,12 +1463,12 @@ data GLFWbGlobals =
                , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
                }
 
-data GLFWbKBDGlobals =
-  GLFWbKBDGlobals { _glfwbKBDmx    :: Int
-                  , _glfwbKBDmy    :: Int
-                  , _glfwbKBDwinx  :: Int
-                  , _glfwbKBDwiny  :: Int
-                  }
+data KBDGlobals =
+  KBDGlobals { _kbdMx    :: Int
+             , _kbdMy    :: Int
+             , _kbdWinx  :: Int
+             , _kbdWiny  :: Int
+             }
 
 data FastRenderAPIGlobals =
   FastRenderAPIGlobals { _frGLDepthMin           :: Float

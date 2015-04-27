@@ -19,7 +19,7 @@ module QuakeState ( QuakeState(..)
                   , vidGlobals
                   , inGlobals
                   , glfwbGlobals
-                  , glfwbKBDGlobals
+                  , kbdGlobals
                   , fastRenderAPIGlobals
                   , particleTGlobals
                   , menuGlobals
@@ -50,7 +50,7 @@ module QuakeState ( QuakeState(..)
                   , module Server.SVGlobals
                   , module Game.GameBaseGlobals
                   , module QCommon.PMoveGlobals
-                  , module Sys.GLFWbKBDGlobals
+                  , module Sys.KBDGlobals
                   , module Sys.INGlobals
                   , module Sys.NETGlobals
                   , module Game.GameItemsGlobals
@@ -84,7 +84,7 @@ import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.PMoveGlobals
 import Render.GLFWbGlobals
-import Sys.GLFWbKBDGlobals
+import Sys.KBDGlobals
 import Sys.INGlobals
 import Sys.NETGlobals
 import Render.Fast.FastRenderAPIGlobals
@@ -111,7 +111,7 @@ initialQuakeState =
              , _vidGlobals           = initialVIDGlobals
              , _inGlobals            = initialINGlobals
              , _glfwbGlobals         = initialGLFWbGlobals
-             , _glfwbKBDGlobals      = initialGLFWbKBDGlobals
+             , _kbdGlobals           = initialKBDGlobals
              , _fastRenderAPIGlobals = initialFastRenderAPIGlobals
              , _particleTGlobals     = initialParticleTGlobals
              , _menuGlobals          = initialMenuGlobals
