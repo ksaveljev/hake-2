@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.SCR where
 
-import Control.Lens ((.=), use, (^.))
+import Control.Lens ((.=), use, (^.), _1, _2)
 import Control.Monad (liftM, when, void)
 
 import Quake
@@ -90,7 +90,15 @@ updateScreen2 = do
     needToUpdate <- shouldUpdate
 
     when needToUpdate $ do
-      io (putStrLn "SCR.updateScreen2") >> undefined -- TODO
+      -- range check cl_camera_separation so we don't inadvertently fry
+      -- someone's brain
+      checkStereoSeparation
+      (numFrames, separation) <- checkStereo
+
+      runFrames separation 0 numFrames
+
+      Just renderer <- use $ globals.re
+      renderer^.rRefExport.reEndFrame
 
   where shouldUpdate :: Quake Bool
         shouldUpdate = do
@@ -109,6 +117,35 @@ updateScreen2 = do
                -- not initialized yet
              | (not initialized) || (not conInitialized) -> return False
              | otherwise -> return True
+
+        checkStereoSeparation :: Quake ()
+        checkStereoSeparation = do
+          stereoSeparationValue <- liftM (^.cvValue) clStereoSeparationCVar
+          if | stereoSeparationValue > 1 ->
+                 void $ CVar.setValueF "cl_stereo_separation" 1.0
+             | stereoSeparationValue < 0 ->
+                 void $ CVar.setValueF "cl_stereo_separation" 0.0
+             | otherwise -> return ()
+
+        checkStereo :: Quake (Int, (Float, Float))
+        checkStereo = do
+          stereoValue <- liftM (^.cvValue) clStereoCVar
+          if stereoValue /= 0
+            then do
+              stereoSeparationValue <- liftM (^.cvValue) clStereoSeparationCVar
+              return (2, (stereoSeparationValue / (-2), (stereoSeparationValue / 2)))
+            else
+              return (1, (0, 0))
+
+        runFrames :: (Float, Float) -> Int -> Int -> Quake ()
+        runFrames separation idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let access = if idx == 0 then _1 else _2
+
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reBeginFrame) (separation^.access)
+              io (putStrLn "SCR.updateScreen2#runFrames") >> undefined -- TODO
 
 timeRefreshF :: XCommandT
 timeRefreshF = io (putStrLn "SCR.timeRefreshF") >> undefined -- TODO
