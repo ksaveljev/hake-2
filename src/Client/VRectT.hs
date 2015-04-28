@@ -1,13 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.VRectT where
+module Client.VRectT ( VRectT
+                     , module Client.VRectT
+                     ) where
 
 import Control.Lens (makeLenses)
 
-data VRectT =
-  VRectT { _vrX      :: Int
-         , _vrY      :: Int
-         , _vrWidth  :: Int
-         , _vrHeight :: Int
-         }
+import Internal
 
 makeLenses ''VRectT
+
+newVRectT :: VRectT
+newVRectT =
+  VRectT { _vrX      = 0
+         , _vrY      = 0
+         , _vrWidth  = 0
+         , _vrHeight = 0
+         }

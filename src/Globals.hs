@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
+               , module Client.VRectT
                , module Client.ClientStaticT
                , module Client.ClientStateT
                , module Client.ConsoleT
@@ -25,6 +26,7 @@ import Client.ClientStateT
 import Client.ConsoleT
 import Client.RefExportT
 import Client.VidDefT
+import Client.VRectT
 import Game.CmdAliasT
 import Game.CVarT
 import QCommon.NetAdrT
@@ -79,6 +81,7 @@ initialGlobals =
           , _keyLinePos         = 0
           , _editLine           = 0
 
+          , _scrVRect           = newVRectT
           , _sysFrameTime       = 0
           , _netFrom            = newNetAdrT
 

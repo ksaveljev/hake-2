@@ -188,6 +188,7 @@ data Globals =
           , _keyLinePos         :: !Int
           , _editLine           :: !Int
 
+          , _scrVRect           :: VRectT
           , _sysFrameTime       :: Int
           , _netFrom            :: !NetAdrT
 
@@ -1603,3 +1604,10 @@ data ClientGlobals =
                 , _cgInDown          :: KButtonT
                 , _cgInImpulse       :: Int
                 }
+
+data VRectT =
+  VRectT { _vrX      :: Int
+         , _vrY      :: Int
+         , _vrWidth  :: Int
+         , _vrHeight :: Int
+         }

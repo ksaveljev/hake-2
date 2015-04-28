@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.SCR where
 
-import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse)
+import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
 import Control.Monad (liftM, when, void)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), complement)
 
 import Quake
 import QuakeState
@@ -241,9 +242,31 @@ finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
 runConsole :: Quake ()
 runConsole = io (putStrLn "SCR.runConsole") >> undefined -- TODO
 
+{-
+- ================= SCR_CalcVrect =================
+- 
+- Sets scr_vrect, the coordinates of the rendered window
+-}
 calcVrect :: Quake ()
 calcVrect = do
-    io (putStrLn "SCR.calcVrect") >> undefined -- TODO
+    -- bound viewsize
+    viewSizeCVar >>= \viewSize -> do
+      when ((viewSize^.cvValue) < 40) $
+        void $ CVar.set "viewsize" "40"
+      when ((viewSize^.cvValue) > 100) $
+        void $ CVar.set "viewsize" "100"
+
+    size :: Int <- liftM (truncate . (^.cvValue)) viewSizeCVar
+    vidDef' <- use $ globals.vidDef
+
+    let w = ((vidDef'^.vdWidth) * size `div` 100) .&. (complement 7)
+        h = ((vidDef'^.vdHeight) * size `div` 100) .&. (complement 1)
+
+    zoom (globals.scrVRect) $ do
+      vrWidth .= w
+      vrHeight .= h
+      vrX .= ((vidDef'^.vdWidth) - w) `div` 2
+      vrY .= ((vidDef'^.vdHeight) - h) `div` 2
 
 tileClear :: Quake ()
 tileClear = do
