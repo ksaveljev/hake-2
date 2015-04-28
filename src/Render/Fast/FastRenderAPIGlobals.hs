@@ -57,4 +57,5 @@ initialFastRenderAPIGlobals =
                        , _frUploadHeight         = 0
                        , _frUploadedPaletted     = False
                        , _frDrawChars            = Nothing
+                       , _frTrickFrame           = 0
                        }

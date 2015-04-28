@@ -4,7 +4,7 @@
 module Render.Fast.FastRenderAPI where
 
 import Control.Exception (handle, IOException)
-import Control.Lens ((.=), (^.), use, zoom)
+import Control.Lens ((.=), (^.), use, zoom, (+=))
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
@@ -680,4 +680,35 @@ fastScreenShotF = io (putStrLn "FastRenderAPI.fastScreenShotF") >> undefined -- 
 
 rClear :: Quake ()
 rClear = do
-    io (putStrLn "FastRenderAPI.rClear") >> undefined -- TODO
+    ztrickValue <- liftM (^.cvValue) glZTrickCVar
+    clearValue <- liftM (^.cvValue) glClearCVar
+
+    if ztrickValue /= 0
+      then do
+        when (clearValue /= 0) $
+          GL.glClear GL.gl_COLOR_BUFFER_BIT
+
+        fastRenderAPIGlobals.frTrickFrame += 1
+        trickFrame <- use $ fastRenderAPIGlobals.frTrickFrame
+
+        if trickFrame .&. 1 /= 0
+          then do
+            fastRenderAPIGlobals.frGLDepthMin .= 0
+            fastRenderAPIGlobals.frGLDepthMax .= 0.49999
+            GL.glDepthFunc GL.gl_LEQUAL
+          else do
+            fastRenderAPIGlobals.frGLDepthMin .= 1
+            fastRenderAPIGlobals.frGLDepthMax .= 0.5
+            GL.glDepthFunc GL.gl_GEQUAL
+      else do
+        if clearValue /= 0
+          then GL.glClear (GL.gl_COLOR_BUFFER_BIT .|. GL.gl_DEPTH_BUFFER_BIT)
+          else GL.glClear GL.gl_DEPTH_BUFFER_BIT
+
+        fastRenderAPIGlobals.frGLDepthMin .= 0
+        fastRenderAPIGlobals.frGLDepthMax .= 1
+        GL.glDepthFunc GL.gl_LEQUAL
+
+    depthMin <- use $ fastRenderAPIGlobals.frGLDepthMin
+    depthMax <- use $ fastRenderAPIGlobals.frGLDepthMax
+    GL.glDepthRange (realToFrac depthMin) (realToFrac depthMax)
