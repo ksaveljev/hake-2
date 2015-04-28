@@ -607,7 +607,77 @@ fastBeginFrame glDriver cameraSeparation = do
         -- jake2 skips implementing this?
         VID.printf Constants.printDeveloper "gamma anpassung fuer VOODOO nicht gesetzt"
 
-    io (putStrLn "FastRenderAPI.fastBeginFrame") >> undefined -- TODO
+    (glDriver^.gldBeginFrame) cameraSeparation
+
+    -- go into 2D mode
+    goInto2DMode
+
+    -- draw buffer stuff
+    drawBufferStuff
+
+    -- texturemode stuff
+    textureModeStuff
+
+    -- swapinterval stuff
+    glUpdateSwapInterval glDriver
+
+    -- clear screen if desired
+    rClear
+
+  where goInto2DMode :: Quake ()
+        goInto2DMode = do
+          vid <- use $ fastRenderAPIGlobals.frVid
+          let width = vid^.vdWidth
+              height = vid^.vdHeight
+          GL.glViewport 0 0 (fromIntegral width) (fromIntegral height)
+          GL.glMatrixMode GL.gl_PROJECTION
+          GL.glLoadIdentity
+          GL.glOrtho 0 (fromIntegral width) (fromIntegral height) 0 (-99999) 99999
+          GL.glMatrixMode GL.gl_MODELVIEW
+          GL.glLoadIdentity
+          GL.glDisable GL.gl_DEPTH_TEST
+          GL.glDisable GL.gl_CULL_FACE
+          GL.glDisable GL.gl_BLEND
+          GL.glEnable GL.gl_ALPHA_TEST
+          GL.glColor4f 1 1 1 1
+
+        drawBufferStuff :: Quake ()
+        drawBufferStuff = do
+          drawBuffer <- glDrawBufferCVar
+
+          when (drawBuffer^.cvModified) $ do
+            CVar.update drawBuffer { _cvModified = False }
+
+            glState <- use $ fastRenderAPIGlobals.frGLState
+
+            when ((glState^.glsCameraSeparation) == 0 || not (glState^.glsStereoEnabled)) $ do
+              if BC.map toUpper (drawBuffer^.cvString) == "GL_FRONT"
+                then GL.glDrawBuffer GL.gl_FRONT
+                else GL.glDrawBuffer GL.gl_BACK
+
+        textureModeStuff :: Quake ()
+        textureModeStuff = do
+          textureMode <- glTextureModeCVar
+
+          when (textureMode^.cvModified) $ do
+            Image.glTextureMode (textureMode^.cvString)
+            CVar.update textureMode { _cvModified = False }
+
+          textureAlphaMode <- glTextureAlphaModeCVar
+
+          when (textureAlphaMode^.cvModified) $ do
+            Image.glTextureAlphaMode (textureAlphaMode^.cvString)
+            CVar.update textureAlphaMode { _cvModified = False }
+
+          textureSolidMode <- glTextureSolidModeCVar
+
+          when (textureSolidMode^.cvModified) $ do
+            Image.glTextureSolidMode (textureSolidMode^.cvString)
+            CVar.update textureSolidMode { _cvModified = False }
 
 fastScreenShotF :: XCommandT
 fastScreenShotF = io (putStrLn "FastRenderAPI.fastScreenShotF") >> undefined -- TODO
+
+rClear :: Quake ()
+rClear = do
+    io (putStrLn "FastRenderAPI.rClear") >> undefined -- TODO
