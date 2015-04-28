@@ -37,3 +37,7 @@ init = do
     void $ CVar.get "cl_testlights" "0" 0
 
     void $ CVar.get "cl_stats" "0" 0
+
+renderView :: Float -> Quake ()
+renderView _ = do
+    io (putStrLn "V.renderView") >> undefined -- TODO

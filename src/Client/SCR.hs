@@ -2,14 +2,18 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.SCR where
 
-import Control.Lens ((.=), use, (^.), _1, _2)
+import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse)
 import Control.Monad (liftM, when, void)
+import Data.Bits ((.&.))
 
 import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.CLInv as CLInv
+import qualified Client.Menu as Menu
+import qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -145,7 +149,73 @@ updateScreen2 = do
 
               Just renderer <- use $ globals.re
               (renderer^.rRefExport.reBeginFrame) (separation^.access)
-              io (putStrLn "SCR.updateScreen2#runFrames") >> undefined -- TODO
+
+              scrDrawLoading' <- use $ scrGlobals.scrDrawLoading
+              cinematicTime <- use $ globals.cl.csCinematicTime
+              cinematicPaletteActive <- use $ globals.cl.csCinematicPaletteActive
+
+                   -- loading plaque over black screen
+              if | scrDrawLoading' == 2 -> do
+                     (renderer^.rRefExport.reCinematicSetPalette) Nothing
+                     scrGlobals.scrDrawLoading .= 0 -- false
+                     Just (width, height) <- (renderer^.rRefExport.reDrawGetPicSize) "loading"
+
+                     vidDef' <- use $ globals.vidDef
+                     (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) (((vidDef'^.vdHeight) - height) `div` 2) "loading"
+
+                   -- if a cinematic is supposed to be running, handle
+                   -- menus and console specially
+                 | cinematicTime > 0 -> do
+                     keyDest <- use $ globals.cls.csKeyDest
+
+                     if | keyDest == Constants.keyMenu -> do
+                            when cinematicPaletteActive $ do
+                              (renderer^.rRefExport.reCinematicSetPalette) Nothing
+                              globals.cl.csCinematicPaletteActive .= False
+
+                            Menu.draw
+
+                        | keyDest == Constants.keyConsole -> do
+                            when cinematicPaletteActive $ do
+                              (renderer^.rRefExport.reCinematicSetPalette) Nothing
+                              globals.cl.csCinematicPaletteActive .= False
+
+                            drawConsole
+
+                        | otherwise -> do
+                            -- TODO: implement cinematics completely
+                            drawCinematic
+
+                 | otherwise -> do
+                     -- make sure the game palette is active
+                     when cinematicPaletteActive $ do
+                       (renderer^.rRefExport.reCinematicSetPalette) Nothing
+                       globals.cl.csCinematicPaletteActive .= False
+
+                     -- do 3D refresh drawing, and then update the screen
+                     calcVrect
+
+                     -- clear any dirty part of the background
+                     tileClear
+
+                     V.renderView (if idx == 0 then separation^._1 else separation^._2)
+
+                     drawStats
+
+                     Just statLayout <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statLayouts
+                     when (statLayout .&. 1 /= 0) $
+                       drawLayout
+                     when (statLayout .&. 2 /= 0) $
+                       CLInv.drawInventory
+
+                     drawNet
+                     checkDrawCenterString
+                     drawFPS
+
+                     drawPause
+                     drawConsole
+                     Menu.draw
+                     drawLoading
 
 timeRefreshF :: XCommandT
 timeRefreshF = io (putStrLn "SCR.timeRefreshF") >> undefined -- TODO
@@ -170,3 +240,47 @@ finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
 
 runConsole :: Quake ()
 runConsole = io (putStrLn "SCR.runConsole") >> undefined -- TODO
+
+calcVrect :: Quake ()
+calcVrect = do
+    io (putStrLn "SCR.calcVrect") >> undefined -- TODO
+
+tileClear :: Quake ()
+tileClear = do
+    io (putStrLn "SCR.tileClear") >> undefined -- TODO
+
+drawStats :: Quake ()
+drawStats = do
+    io (putStrLn "SCR.drawStats") >> undefined -- TODO
+
+drawLayout :: Quake ()
+drawLayout = do
+    io (putStrLn "SCR.drawLayout") >> undefined -- TODO
+
+drawNet :: Quake ()
+drawNet = do
+    io (putStrLn "SCR.drawNet") >> undefined -- TODO
+
+checkDrawCenterString :: Quake ()
+checkDrawCenterString = do
+    io (putStrLn "SCR.checkDrawCenterString") >> undefined -- TODO
+
+drawFPS :: Quake ()
+drawFPS = do
+    io (putStrLn "SCR.drawFPS") >> undefined -- TODO
+
+drawPause :: Quake ()
+drawPause = do
+    io (putStrLn "SCR.drawPause") >> undefined -- TODO
+
+drawConsole :: Quake ()
+drawConsole = do
+    io (putStrLn "SCR.drawConsole") >> undefined -- TODO
+
+drawCinematic :: Quake ()
+drawCinematic = do
+    io (putStrLn "SCR.drawCinematic") >> undefined -- TODO
+
+drawLoading :: Quake ()
+drawLoading = do
+    io (putStrLn "SCR.drawLoading") >> undefined -- TODO

@@ -131,3 +131,7 @@ menuKeys = io (putStrLn "Menu.menuKeys") >> undefined -- TODO
 
 menuQuit :: XCommandT
 menuQuit = io (putStrLn "Menu.menuQuit") >> undefined -- TODO
+
+draw :: Quake ()
+draw = do
+    io (putStrLn "Menu.draw") >> undefined -- TODO

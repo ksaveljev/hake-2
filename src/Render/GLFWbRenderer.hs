@@ -132,7 +132,7 @@ glfwbDrawFadeScreen renderAPI = (renderAPI^.rDrawFadeScreen) glfwbGLDriver
 glfwbDrawStretchRaw :: RenderAPI -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
 glfwbDrawStretchRaw renderAPI = (renderAPI^.rDrawStretchRaw) glfwbGLDriver
 
-glfwbCinematicSetPalette :: RenderAPI -> B.ByteString -> Quake ()
+glfwbCinematicSetPalette :: RenderAPI -> Maybe B.ByteString -> Quake ()
 glfwbCinematicSetPalette renderAPI = (renderAPI^.rSetPalette) glfwbGLDriver
 
 glfwbBeginFrame :: RenderAPI -> Float -> Quake ()

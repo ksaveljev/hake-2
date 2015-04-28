@@ -965,7 +965,7 @@ data RefExportT =
              , _reDrawFill            :: Int -> Int -> Int -> Int -> Int -> Quake ()
              , _reDrawFadeScreen      :: Quake ()
              , _reDrawStretchRaw      :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-             , _reCinematicSetPalette :: B.ByteString -> Quake ()
+             , _reCinematicSetPalette :: Maybe B.ByteString -> Quake ()
              , _reBeginFrame          :: Float -> Quake ()
              , _reEndFrame            :: Quake ()
              , _reAppActivate         :: Bool -> Quake ()
@@ -1448,7 +1448,7 @@ data RenderAPI =
             , _rDrawFill          :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
             , _rDrawFadeScreen    :: GLDriver -> Quake ()
             , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-            , _rSetPalette        :: GLDriver -> B.ByteString -> Quake ()
+            , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
             , _rBeginFrame        :: GLDriver -> Float -> Quake ()
             , _glScreenShotF      :: GLDriver -> XCommandT
             }
