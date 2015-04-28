@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.LightStyleT where
 
-import Linear.V3 (V3)
+import Linear (V3(..))
 import Control.Lens (makeLenses)
 
 data LightStyleT =
@@ -10,3 +10,9 @@ data LightStyleT =
               }
 
 makeLenses ''LightStyleT
+
+newLightStyleT :: LightStyleT
+newLightStyleT =
+  LightStyleT { _lsRGB   = V3 0 0 0
+              , _lsWhite = 0
+              }

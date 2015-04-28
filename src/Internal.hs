@@ -144,6 +144,7 @@ data QuakeState =
              , _particleTGlobals     :: !ParticleTGlobals
              , _menuGlobals          :: !MenuGlobals
              , _clientGlobals        :: !ClientGlobals
+             , _vGlobals             :: !VGlobals
              }
 
 data Globals =
@@ -1611,3 +1612,12 @@ data VRectT =
          , _vrWidth  :: Int
          , _vrHeight :: Int
          }
+
+data VGlobals =
+  VGlobals { _vgRNumDLights   :: Int
+           , _vgRNumEntities  :: Int
+           , _vgRNumParticles :: Int
+           , _vgRLightStyles  :: V.Vector LightStyleT
+           , _vgREntities     :: V.Vector EntityT
+           , _vgRDLights      :: V.Vector DLightT
+           }

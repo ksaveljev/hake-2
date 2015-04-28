@@ -24,6 +24,7 @@ module QuakeState ( QuakeState(..)
                   , particleTGlobals
                   , menuGlobals
                   , clientGlobals
+                  , vGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -46,6 +47,7 @@ module QuakeState ( QuakeState(..)
                   , module Client.MenuGlobals
                   , module Client.ParticleTGlobals
                   , module Client.SCRGlobals
+                  , module Client.VGlobals
                   , module QCommon.FSGlobals
                   , module Server.SVGlobals
                   , module Game.GameBaseGlobals
@@ -78,6 +80,7 @@ import Client.MenuGlobals
 import Client.ParticleTGlobals
 import Client.SCRGlobals
 import Client.VIDGlobals
+import Client.VGlobals
 import Server.SVGlobals
 import QCommon.CMGlobals
 import QCommon.ComGlobals
@@ -116,4 +119,5 @@ initialQuakeState =
              , _particleTGlobals     = initialParticleTGlobals
              , _menuGlobals          = initialMenuGlobals
              , _clientGlobals        = initialClientGlobals
+             , _vGlobals             = initialVGlobals
              }

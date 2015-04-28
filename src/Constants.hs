@@ -962,7 +962,7 @@ doorYaxis     = 128 :: Int
 
 -- R E N D E R E R 
 ------------------
-maxDlights   =   32 :: Int
+maxDLights   =   32 :: Int
 maxEntities  =  128 :: Int
 maxParticles = 4096 :: Int
 

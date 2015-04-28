@@ -105,3 +105,15 @@ shortToAngle x = (fromIntegral x) * shortRatio
 
 angleToShort :: Float -> Int16
 angleToShort x = truncate (x / shortRatio)
+
+-- TODO: use Double here???
+calcFov :: Float -> Float -> Float -> Float
+calcFov fovX width height =
+    -- TODO: do we need this?? when can this happen?
+    {-
+    when (fovX < 1.0 || fovX > 179.0) $
+      Com.comError Constants.errDrop ("Bad fov: " `B.append` BC.pack (show fovX))
+    -}
+    let x = width / tan (fovX * piRatio)
+        a = atan (height / x)
+    in a / piRatio

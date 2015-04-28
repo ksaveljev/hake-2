@@ -14,7 +14,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLInv as CLInv
 import qualified Client.Menu as Menu
-import qualified Client.V as V
+import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -414,3 +414,11 @@ drawLoading = do
 
 dirtyScreen :: Quake ()
 dirtyScreen = io (putStrLn "SCR.dirtyScreen") >> undefined -- TODO
+
+addDirtyPoint :: Int -> Int -> Quake ()
+addDirtyPoint _ _ = do
+    io (putStrLn "SCR.addDirtyPoint") >> undefined -- TODO
+
+drawCrosshair :: Quake ()
+drawCrosshair = do
+    io (putStrLn "SCR.drawCrosshair") >> undefined -- TODO
