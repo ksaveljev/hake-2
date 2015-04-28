@@ -113,3 +113,11 @@ dumpF = io (putStrLn "Console.dumpF") >> undefined -- TODO
 
 clearNotify :: Quake ()
 clearNotify = globals.con.cTimes .= UV.replicate Constants.numConTimes 0
+
+drawAltString :: Int -> Int -> B.ByteString -> Quake ()
+drawAltString _ _ _ = do
+    io (putStrLn "Console.drawAltString") >> undefined -- TODO
+
+drawString :: Int -> Int -> B.ByteString -> Quake ()
+drawString _ _ _ = do
+    io (putStrLn "Console.drawString") >> undefined -- TODO

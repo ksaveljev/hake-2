@@ -6,7 +6,9 @@ module Client.SCR where
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement)
+import Data.Maybe (isNothing)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -14,6 +16,7 @@ import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLInv as CLInv
+import qualified Client.Console as Console
 import qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
@@ -21,6 +24,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
+import qualified Util.Lib as Lib
 
 init :: Quake ()
 init = do
@@ -432,5 +436,167 @@ drawCrosshair = do
     io (putStrLn "SCR.drawCrosshair") >> undefined -- TODO
 
 executeLayoutString :: B.ByteString -> Quake ()
-executeLayoutString _ = do
-    io (putStrLn "SCR.executeLayoutString") >> undefined -- TODO
+executeLayoutString str = do
+    shouldSkip <- checkIfShouldSkip
+
+    unless shouldSkip $ do
+      parseLayoutString 0 0 3 0
+
+  where checkIfShouldSkip :: Quake Bool
+        checkIfShouldSkip = do
+          state <- use $ globals.cls.csState
+          refreshPrepped <- use $ globals.cl.csRefreshPrepped
+
+          return $ if state /= Constants.caActive || not refreshPrepped || B.length str == 0
+                     then True
+                     else False
+
+        parseLayoutString :: Int -> Int -> Int -> Int -> Quake ()
+        parseLayoutString x y width idx
+          | idx >= B.length str = return ()
+          | otherwise = do
+              (maybeToken, newIdx) <- Com.parse str (B.length str) idx
+
+              case maybeToken of
+                Nothing -> parseLayoutString x y width newIdx
+                Just token -> do
+                  (x', y', width', finalIdx) <- processToken x y width newIdx token
+                  parseLayoutString x' y' width' finalIdx
+
+        processToken :: Int -> Int -> Int -> Int -> B.ByteString -> Quake (Int, Int, Int, Int)
+        processToken x y width idx token =
+          case token of
+            "xl" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let x' = Lib.atoi tkn
+              return (x', y, width, newIdx)
+
+            "xr" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              w <- use $ globals.vidDef.vdWidth
+              let x' = w + Lib.atoi tkn
+              return (x', y, width, newIdx)
+
+            "xv" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              w <- use $ globals.vidDef.vdWidth
+              let x' = w `div` 2 - 160 + Lib.atoi tkn
+              return (x', y, width, newIdx)
+
+            "yt" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let y' = Lib.atoi tkn
+              return (x, y', width, newIdx)
+
+            "yb" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              h <- use $ globals.vidDef.vdHeight
+              let y' = h + Lib.atoi tkn
+              return (x, y', width, newIdx)
+
+            "yv" -> do
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              h <- use $ globals.vidDef.vdHeight
+              let y' = h `div` 2 - 120 + Lib.atoi tkn
+              return (x, y', width, newIdx)
+
+            "pic" -> do
+              -- draw a pick from a stat number
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
+              let value' = fromIntegral value
+              when (value' >= Constants.maxImages) $
+                Com.comError Constants.errDrop "Pic >= MAX_IMAGES"
+
+              Just cs <- preuse $ globals.cl.csConfigStrings.ix (Constants.csImages + value')
+              when (B.length cs > 0) $ do -- TODO: do we need to introduce Maybe ByteString in csConfigStrings ?
+                addDirtyPoint x y
+                addDirtyPoint (x + 23) (y + 23)
+                Just renderer <- use $ globals.re
+                (renderer^.rRefExport.reDrawPic) x y cs
+
+              return (x, y, width, newIdx)
+
+            "client" -> do
+              -- draw a deathmatch client block
+              vidDef' <- use $ globals.vidDef
+
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
+
+              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
+              let y' = (vidDef'^.vdHeight) `div` 2 - 120 + Lib.atoi tkn2
+
+              addDirtyPoint x' y'
+              addDirtyPoint (x' + 159) (y' + 31)
+
+              (Just tkn3, newIdx3) <- Com.parse str (B.length str) newIdx2
+              let clientInfoIdx = Lib.atoi tkn3
+              when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
+                Com.comError Constants.errDrop "client >= MAX_CLIENTS"
+
+              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
+              
+              (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
+              let score = Lib.atoi tkn4
+
+              (Just tkn5, newIdx5) <- Com.parse str (B.length str) newIdx4
+              let ping = Lib.atoi tkn5
+
+              (Just tkn6, newIdx6) <- Com.parse str (B.length str) newIdx5
+              let time = Lib.atoi tkn6
+
+              Console.drawAltString (x' + 32) y' (clientInfo^.ciName)
+              Console.drawString (x' + 32) (y' + 8) "Score: "
+              Console.drawAltString (x' + 32 + 7 * 8) (y' + 8) (BC.pack $ show score)
+              Console.drawString (x' + 32) (y' + 16) ("Ping:  " `B.append` BC.pack (show ping)) -- IMPROVE?
+              Console.drawString (x' + 32) (y' + 24) ("Time:  " `B.append` BC.pack (show time)) -- IMPROVE?
+
+              Just renderer <- use $ globals.re
+
+              if isNothing (clientInfo^.ciIcon)
+                then do
+                  iconName <- use $ globals.cl.csBaseClientInfo.ciIconName
+                  (renderer^.rRefExport.reDrawPic) x' y' iconName
+                else
+                  (renderer^.rRefExport.reDrawPic) x' y' (clientInfo^.ciIconName)
+
+              return (x', y', width, newIdx6)
+              
+            "ctf" -> do
+              undefined
+
+            "picn" -> do
+              undefined
+
+            "num" -> do
+              undefined
+
+            "hnum" -> do
+              undefined
+              
+            "anum" -> do
+              undefined
+
+            "rnum" -> do
+              undefined
+
+            "stat_string" -> do
+              undefined
+
+            "cstring" -> do
+              undefined
+
+            "string" -> do
+              undefined
+
+            "cstring2" -> do
+              undefined
+
+            "string2" -> do
+              undefined
+
+            "if" -> do
+              undefined
+
+            _ -> return (x, y, width, idx)
