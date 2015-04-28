@@ -6,6 +6,7 @@ module Client.SCR where
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement)
+import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
@@ -376,9 +377,16 @@ tileClear = do
             else
               return clear
 
+{-
+- ================ SCR_DrawStats
+- 
+- The status bar is a small layout program that is based on the stats array
+- ================
+-}
 drawStats :: Quake ()
 drawStats = do
-    io (putStrLn "SCR.drawStats") >> undefined -- TODO
+    Just str <- preuse $ globals.cl.csConfigStrings.ix Constants.csStatusBar
+    executeLayoutString str
 
 drawLayout :: Quake ()
 drawLayout = do
@@ -422,3 +430,7 @@ addDirtyPoint _ _ = do
 drawCrosshair :: Quake ()
 drawCrosshair = do
     io (putStrLn "SCR.drawCrosshair") >> undefined -- TODO
+
+executeLayoutString :: B.ByteString -> Quake ()
+executeLayoutString _ = do
+    io (putStrLn "SCR.executeLayoutString") >> undefined -- TODO
