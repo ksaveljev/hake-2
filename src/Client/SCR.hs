@@ -4,7 +4,7 @@
 module Client.SCR where
 
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
-import Control.Monad (liftM, when, void)
+import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement)
 
 import Quake
@@ -268,9 +268,113 @@ calcVrect = do
       vrX .= ((vidDef'^.vdWidth) - w) `div` 2
       vrY .= ((vidDef'^.vdHeight) - h) `div` 2
 
+{-
+- ============== SCR_TileClear
+- 
+- Clear any parts of the tiled background that were drawn on last frame
+- ==============
+-}
 tileClear :: Quake ()
 tileClear = do
-    io (putStrLn "SCR.tileClear") >> undefined -- TODO
+    drawAllValue <- liftM (^.cvValue) scrDrawAllCVar
+
+    when (drawAllValue /= 0) $
+      dirtyScreen -- for power vr or broken page filppers...
+
+    scrConCurrent' <- use $ scrGlobals.scrConCurrent
+    viewSizeValue <- liftM (^.cvValue) viewSizeCVar
+    cinematicTime <- use $ globals.cl.csCinematicTime
+        -- full screen console | full screen rendering | full screen cinematic
+    unless (scrConCurrent' == 1 || viewSizeValue == 100 || cinematicTime > 0) $ do
+      -- erase rect will be the union of the past three frames
+      -- so tripple buffering works properly
+      scrDirty' <- use $ scrGlobals.scrDirty
+      scrOldDirty' <- use $ scrGlobals.scrOldDirty
+      let tmpClear = calcClear scrDirty' scrOldDirty' 0 2
+
+      scrGlobals.scrOldDirty .= (scrDirty', scrOldDirty'^._1)
+
+      zoom (scrGlobals.scrDirty) $ do
+        x1 .= 9999
+        x2 .= (-9999)
+        y1 .= 9999
+        y2 .= (-9999)
+
+      -- don't bother with anything covered by the console
+      vidDef' <- use $ globals.vidDef
+      let tmp :: Int = truncate $ scrConCurrent' * fromIntegral (vidDef'^.vdHeight)
+          clear = if tmp >= (tmpClear^.y1)
+                    then tmpClear { _y1 = tmp }
+                    else tmpClear
+
+      -- nothing disturbed
+      unless ((clear^.y2) <= (clear^.y1)) $ do
+        vrect <- use $ globals.scrVRect
+        let top = vrect^.vrY
+            bottom = top + (vrect^.vrHeight) - 1
+            left = vrect^.vrX
+            right = left + (vrect^.vrWidth) - 1
+
+        void $ clearAbove top clear
+                 >>= clearBelow bottom
+                 >>= clearLeft left
+                 >>= clearRight right
+
+  where calcClear :: DirtyT -> (DirtyT, DirtyT) -> Int -> Int -> DirtyT
+        calcClear clear oldDirty idx maxIdx
+          | idx >= maxIdx = clear
+          | otherwise =
+              let access = if idx == 0 then _1 else _2
+                  xx1 = if (oldDirty^.access.x1) < (clear^.x1) then oldDirty^.access.x1 else clear^.x1
+                  xx2 = if (oldDirty^.access.x2) > (clear^.x2) then oldDirty^.access.x2 else clear^.x2
+                  yy1 = if (oldDirty^.access.y1) < (clear^.y1) then oldDirty^.access.y1 else clear^.y1
+                  yy2 = if (oldDirty^.access.y2) > (clear^.y2) then oldDirty^.access.y2 else clear^.y2
+                  newClear = DirtyT { _x1 = xx1, _x2 = xx2, _y1 = yy1, _y2 = yy2 }
+              in calcClear newClear oldDirty (idx + 1) maxIdx
+
+        clearAbove :: Int -> DirtyT -> Quake DirtyT
+        clearAbove top clear = do
+          if (clear^.y1) < top -- clear above view screen
+            then do
+              let i = if (clear^.y2) < (top - 1) then clear^.y2 else top - 1
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawTileClear) (clear^.x1) (clear^.y1) ((clear^.x2) - (clear^.x1) + 1) (i - (clear^.y1) + 1) "backtile"
+              return $ clear { _y1 = top }
+            else
+              return clear
+
+        clearBelow :: Int -> DirtyT -> Quake DirtyT
+        clearBelow bottom clear = do
+          if (clear^.y2) > bottom -- clear below view screen
+            then do
+              let i = if (clear^.y1) > bottom + 1 then clear^.y1 else bottom + 1
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawTileClear) (clear^.x1) i ((clear^.x2) - (clear^.x1) + 1) ((clear^.y2) - i + 1) "backtile"
+              return $ clear { _y2 = bottom }
+            else
+              return clear
+
+        clearLeft :: Int -> DirtyT -> Quake DirtyT
+        clearLeft left clear = do
+          if (clear^.x1) < left -- clear left of view screen
+            then do
+              let i = if (clear^.x2) < left - 1 then clear^.x2 else left - 1
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawTileClear) (clear^.x1) (clear^.y1) (i - (clear^.x1) + 1) ((clear^.y2) - (clear^.y1) + 1) "backtile"
+              return $ clear { _x1 = left }
+            else
+              return clear
+
+        clearRight :: Int -> DirtyT -> Quake DirtyT
+        clearRight right clear = do
+          if (clear^.x2) > right -- clear right of view screen
+            then do
+              let i = if (clear^.x1) > right + 1 then clear^.x1 else right + 1
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawTileClear) i (clear^.y1) ((clear^.x2) - i + 1) ((clear^.y2) - (clear^.y1) + 1) "backtile"
+              return $ clear { _x2 = right }
+            else
+              return clear
 
 drawStats :: Quake ()
 drawStats = do
@@ -307,3 +411,6 @@ drawCinematic = do
 drawLoading :: Quake ()
 drawLoading = do
     io (putStrLn "SCR.drawLoading") >> undefined -- TODO
+
+dirtyScreen :: Quake ()
+dirtyScreen = io (putStrLn "SCR.dirtyScreen") >> undefined -- TODO
