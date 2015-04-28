@@ -21,6 +21,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
+import Render.OpenGL.GLDriver
 import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
@@ -54,7 +55,7 @@ fastRenderAPI =
               , _rDrawFadeScreen    = DT.trace "FastRenderAPI.rDrawFadeScreen" undefined -- TODO
               , _rDrawStretchRaw    = DT.trace "FastRenderAPI.rDrawStretchRaw" undefined -- TODO
               , _rSetPalette        = DT.trace "FastRenderAPI.rSetPalette" undefined -- TODO
-              , _rBeginFrame        = DT.trace "FastRenderAPI.rBeginFrame" undefined -- TODO
+              , _rBeginFrame        = fastBeginFrame
               , _glScreenShotF      = DT.trace "FastRenderAPI.glScreenShotF" undefined -- TODO
               }
 
@@ -62,18 +63,18 @@ fastRenderAPI =
 turbSin :: UV.Vector Float
 turbSin = UV.generate 256 (\idx -> (Warp.sinV UV.! idx) * 0.5)
 
-fastInit :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
-fastInit glImplScreenshot glImplSetMode _ _ = do
+fastInit :: GLDriver -> Int -> Int -> Quake Bool
+fastInit glDriver _ _ = do
     VID.printf Constants.printAll ("ref_gl version: " `B.append` RenderAPIConstants.refVersion `B.append` "\n")
 
     Image.getPalette
 
-    rRegister glImplScreenshot
+    rRegister
 
     -- set our "safe" modes
     fastRenderAPIGlobals.frGLState.glsPrevMode .= 3
 
-    ok <- rSetMode glImplSetMode
+    ok <- rSetMode (glDriver^.gldSetMode)
 
     -- create the window and set up the context
     if not ok
@@ -83,8 +84,8 @@ fastInit glImplScreenshot glImplSetMode _ _ = do
       else
         return True
 
-fastInit2 :: (Int -> Quake ()) -> Quake () -> Quake Bool
-fastInit2 setSwapInterval endFrame = do
+fastInit2 :: GLDriver -> Quake Bool
+fastInit2 glDriver = do
     VID.menuInit
 
     -- get our various GL strings
@@ -242,7 +243,7 @@ fastInit2 setSwapInterval endFrame = do
         VID.printf Constants.printAll "Missing multi-texturing!\n"
         return False
       else do
-        glSetDefaultState setSwapInterval
+        glSetDefaultState glDriver
         Image.glInitImages
         Model.modInit
         rInitParticleTexture
@@ -252,7 +253,7 @@ fastInit2 setSwapInterval endFrame = do
         unless (err == GL.gl_NO_ERROR) $
           VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
 
-        endFrame
+        glDriver^.gldEndFrame
         return True
 
   where getGLString :: GL.GLenum -> IO B.ByteString
@@ -262,8 +263,8 @@ fastInit2 setSwapInterval endFrame = do
         maybeNullPtr n f ptr | ptr == nullPtr = n
                              | otherwise      = f ptr
 
-rRegister :: Quake () -> Quake ()
-rRegister glImplScreenshot = do
+rRegister :: Quake ()
+rRegister = do
     void $ CVar.get "hand" "0" (Constants.cvarUserInfo .|. Constants.cvarArchive)
     void $ CVar.get "r_norefresh" "0" 0
     void $ CVar.get "r_fullbright" "0" 0
@@ -332,7 +333,7 @@ rRegister glImplScreenshot = do
     void $ CVar.get "vid_ref" "lwjgl" Constants.cvarArchive
 
     Cmd.addCommand "imagelist" (Just Image.glImageListF)
-    Cmd.addCommand "screenshot" (Just glImplScreenshot)
+    Cmd.addCommand "screenshot" (Just fastScreenShotF)
     Cmd.addCommand "modellist" (Just Model.modelListF)
     Cmd.addCommand "gl_strings" (Just glStringsF)
 
@@ -389,8 +390,8 @@ rSetMode glImplSetMode = do
 glStringsF :: XCommandT
 glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
 
-glSetDefaultState :: (Int -> Quake ()) -> Quake ()
-glSetDefaultState setSwapInterval = do
+glSetDefaultState :: GLDriver -> Quake ()
+glSetDefaultState glDriver = do
     GL.glClearColor 1 0 0.5 0.5
     GL.glCullFace GL.gl_FRONT
     GL.glEnable GL.gl_TEXTURE_2D
@@ -449,7 +450,7 @@ glSetDefaultState setSwapInterval = do
       d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
       Image.glSetTexturePalette d8to24table
 
-    glUpdateSwapInterval setSwapInterval
+    glUpdateSwapInterval glDriver
 
     -- vertex array extension
     t0 <- use $ fastRenderAPIGlobals.frTexture0
@@ -557,12 +558,56 @@ rInitParticleTexture = do
     fastRenderAPIGlobals.frParticleTexture .= pt
     fastRenderAPIGlobals.frNoTexture .= nt
 
-glUpdateSwapInterval :: (Int -> Quake ()) -> Quake ()
-glUpdateSwapInterval setSwapInterval = do
+glUpdateSwapInterval :: GLDriver -> Quake ()
+glUpdateSwapInterval glDriver = do
     glSwapInterval <- glSwapIntervalCVar
 
     when (glSwapInterval^.cvModified) $ do
       CVar.update glSwapInterval { _cvModified = False }
       stereoEnabled <- use $ fastRenderAPIGlobals.frGLState.glsStereoEnabled
       unless stereoEnabled $
-        setSwapInterval (truncate $ glSwapInterval^.cvValue)
+        (glDriver^.gldSetSwapInterval) (truncate $ glSwapInterval^.cvValue)
+
+fastBeginFrame :: GLDriver -> Float -> Quake ()
+fastBeginFrame glDriver cameraSeparation = do
+    use (fastRenderAPIGlobals.frVid) >>= \vid ->
+      zoom (fastRenderAPIGlobals.frVid) $ do
+        vdWidth .= (vid^.vdNewWidth)
+        vdHeight .= (vid^.vdNewHeight)
+
+    fastRenderAPIGlobals.frGLState.glsCameraSeparation .= cameraSeparation
+
+    -- change modes if necessary
+    vidFullScreenModified <- liftM (^.cvModified) vidFullScreenCVar
+    glModeModified <- liftM (^.cvModified) glModeCVar
+
+    when (glModeModified || vidFullScreenModified) $ do
+      -- FIXME: only restart if CDS is required
+      Just ref <- CVar.get "vid_ref" "GLFWb" 0
+      CVar.update ref { _cvModified = True }
+
+    glLog <- glLogCVar
+
+    when (glLog^.cvModified) $ do
+      (glDriver^.gldEnableLogging) ((glLog^.cvValue) /= 0)
+      CVar.update glLog { _cvModified = False }
+
+    when ((glLog^.cvValue) /= 0) $
+      glDriver^.gldLogNewFrame
+
+    -- update 3Dfx gamma -- it is expected that a user will do a vid_restart
+    -- after tweaking this value
+    vidGamma <- vidGammaCVar
+
+    when (vidGamma^.cvModified) $ do
+      CVar.update vidGamma { _cvModified = False }
+
+      r <- use $ fastRenderAPIGlobals.frGLConfig.glcRenderer
+      when (r .&. RenderAPIConstants.glRendererVoodoo /= 0) $ do
+        -- jake2 skips implementing this?
+        VID.printf Constants.printDeveloper "gamma anpassung fuer VOODOO nicht gesetzt"
+
+    io (putStrLn "FastRenderAPI.fastBeginFrame") >> undefined -- TODO
+
+fastScreenShotF :: XCommandT
+fastScreenShotF = io (putStrLn "FastRenderAPI.fastScreenShotF") >> undefined -- TODO

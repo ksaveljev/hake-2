@@ -971,7 +971,7 @@ data RefExportT =
              , _reAppActivate         :: Bool -> Quake ()
              , _reUpdateScreen        :: XCommandT -> Quake ()
              , _reApiVersion          :: Int
-             , _reGetModeList         :: Quake (V.Vector GLFW.VideoMode)
+             , _reGetModeList         :: Quake (V.Vector VideoMode)
              , _reGetKeyboardHandler  :: KBD
              }
 
@@ -1411,29 +1411,47 @@ data Renderer = Renderer { _rName      :: B.ByteString
                          , _rRefExport :: RefExportT
                          }
 
+data VideoMode =
+  GLFWbVideoMode GLFW.VideoMode
+-- | GLUTVideoMode GLUT.GameModeCapability
+
+data GLDriver =
+  GLDriver { _gldInit            :: Int -> Int -> Quake Bool
+           , _gldSetMode         :: (Int, Int) -> Int -> Bool -> Quake Int
+           , _gldShutdown        :: Quake ()
+           , _gldBeginFrame      :: Float -> Quake ()
+           , _gldEndFrame        :: Quake ()
+           , _gldAppActivate     :: Bool -> Quake ()
+           , _gldEnableLogging   :: Bool -> Quake ()
+           , _gldLogNewFrame     :: Quake ()
+           , _gldGetModeList     :: Quake (V.Vector VideoMode)
+           , _gldUpdateScreen    :: XCommandT -> Quake ()
+           , _gldSetSwapInterval :: Int -> Quake ()
+           }
+
 data RenderAPI =
-    RenderAPI { _rInit              :: Quake () -> ((Int, Int) -> Int -> Bool -> Quake Int) -> Int -> Int -> Quake Bool
-              , _rInit2             :: (Int -> Quake ()) -> Quake () -> Quake Bool
-              , _rShutdown          :: Quake ()
-              , _rBeginRegistration :: B.ByteString -> Quake ()
-              , _rRegisterModel     :: B.ByteString -> Quake (Maybe ModelT)
-              , _rRegisterSkin      :: B.ByteString -> Quake (Maybe ImageT)
-              , _rDrawFindPic       :: B.ByteString -> Quake (Maybe ImageT)
-              , _rSetSky            :: B.ByteString -> Float -> V3 Float -> Quake ()
-              , _rEndRegistration   :: Quake ()
-              , _rRenderFrame       :: RefDefT -> Quake ()
-              , _rDrawGetPicSize    :: B.ByteString -> Quake (Maybe (Int, Int))
-              , _rDrawPic           :: Int -> Int -> B.ByteString -> Quake ()
-              , _rDrawStretchPic    :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-              , _rDrawChar          :: Int -> Int -> Int -> Quake ()
-              , _rDrawTileClear     :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-              , _rDrawFill          :: Int -> Int -> Int -> Int -> Int -> Quake ()
-              , _rDrawFadeScreen    :: Quake ()
-              , _rDrawStretchRaw    :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-              , _rSetPalette        :: B.ByteString -> Quake ()
-              , _rBeginFrame        :: Float -> Quake ()
-              , _glScreenShotF      :: XCommandT
-              }
+  RenderAPI { _rInit              :: GLDriver -> Int -> Int -> Quake Bool
+            , _rInit2             :: GLDriver -> Quake Bool
+            , _rShutdown          :: GLDriver -> Quake ()
+            , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
+            , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe ModelT)
+            , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe ImageT)
+            , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe ImageT)
+            , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
+            , _rEndRegistration   :: GLDriver -> Quake ()
+            , _rRenderFrame       :: GLDriver -> RefDefT -> Quake ()
+            , _rDrawGetPicSize    :: GLDriver -> B.ByteString -> Quake (Maybe (Int, Int))
+            , _rDrawPic           :: GLDriver -> Int -> Int -> B.ByteString -> Quake ()
+            , _rDrawStretchPic    :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+            , _rDrawChar          :: GLDriver -> Int -> Int -> Int -> Quake ()
+            , _rDrawTileClear     :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+            , _rDrawFill          :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
+            , _rDrawFadeScreen    :: GLDriver -> Quake ()
+            , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+            , _rSetPalette        :: GLDriver -> B.ByteString -> Quake ()
+            , _rBeginFrame        :: GLDriver -> Float -> Quake ()
+            , _glScreenShotF      :: GLDriver -> XCommandT
+            }
 
 data INGlobals =
   INGlobals { _inMouseAvail          :: Bool

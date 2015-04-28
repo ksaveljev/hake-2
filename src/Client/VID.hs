@@ -6,7 +6,6 @@ import Control.Lens ((.=), ix, (^.), zoom, use, preuse, (-=))
 import Control.Monad (void, liftM, when, unless)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Graphics.UI.GLFW (VideoMode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -15,12 +14,12 @@ import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
+import Render.VideoMode
 import qualified Constants
 import qualified Client.Console as Console
 import qualified Client.Menu as Menu
 import qualified Client.MenuConstants as MenuConstants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified Graphics.UI.GLFW as GLFW
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Render.QRenderer as QRenderer
@@ -453,8 +452,8 @@ initModeList = do
 
   where parseMode :: Int -> VideoMode -> (B.ByteString, VidModeT)
         parseMode idx mode =
-          let width = GLFW.videoModeWidth mode
-              height = GLFW.videoModeHeight mode
+          let width = getVideoModeWidth mode
+              height = getVideoModeHeight mode
               widthS = BC.pack (show width)
               heightS = BC.pack (show height)
               res = "[" `B.append` widthS `B.append` " " `B.append` heightS
