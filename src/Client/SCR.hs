@@ -399,7 +399,11 @@ drawLayout = do
 
 drawNet :: Quake ()
 drawNet = do
-    io (putStrLn "SCR.drawNet") >> undefined -- TODO
+    nc <- use $ globals.cls.csNetChan
+    unless ((nc^.ncOutgoingSequence) - (nc^.ncIncomingAcknowledged) < Constants.cmdBackup - 1) $ do
+      vrect <- use $ globals.scrVRect
+      Just renderer <- use $ globals.re
+      (renderer^.rRefExport.reDrawPic) ((vrect^.vrX) + 64) (vrect^.vrY) "net"
 
 checkDrawCenterString :: Quake ()
 checkDrawCenterString = do
