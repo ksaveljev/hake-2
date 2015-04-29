@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.SCR where
 
-import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
+import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
 import Data.Maybe (isNothing)
@@ -407,7 +407,12 @@ drawNet = do
 
 checkDrawCenterString :: Quake ()
 checkDrawCenterString = do
-    io (putStrLn "SCR.checkDrawCenterString") >> undefined -- TODO
+    frameTime <- use $ globals.cls.csFrameTime
+    scrGlobals.scrCenterTimeOff -= frameTime
+
+    use (scrGlobals.scrCenterTimeOff) >>= \v ->
+      unless (v <= 0)
+        drawCenterString
 
 drawFPS :: Quake ()
 drawFPS = do
@@ -758,3 +763,6 @@ drawField _ _ _ _ _ = do
 drawHUDString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
 drawHUDString _ _ _ _ _ = do
     io (putStrLn "SCR.drawHUDString") >> undefined -- TODO
+
+drawCenterString :: Quake ()
+drawCenterString = io (putStrLn "SCR.drawCenterString") >> undefined -- TODO

@@ -22,4 +22,5 @@ initialSCRGlobals =
              , _scrCrosshairPic    = ""
              , _scrCrosshairWidth  = 0
              , _scrCrosshairHeight = 0
+             , _scrCenterTimeOff   = 0
              }

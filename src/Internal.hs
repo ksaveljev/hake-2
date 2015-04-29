@@ -947,6 +947,7 @@ data SCRGlobals =
              , _scrCrosshairPic    :: !B.ByteString
              , _scrCrosshairWidth  :: !Int
              , _scrCrosshairHeight :: !Int
+             , _scrCenterTimeOff   :: Float
              }
 
 data RefExportT =
