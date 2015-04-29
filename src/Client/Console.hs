@@ -121,3 +121,11 @@ drawAltString _ _ _ = do
 drawString :: Int -> Int -> B.ByteString -> Quake ()
 drawString _ _ _ = do
     io (putStrLn "Console.drawString") >> undefined -- TODO
+
+drawConsole :: Float -> Quake ()
+drawConsole _ = do
+    io (putStrLn "Console.drawConsole") >> undefined -- TODO
+
+drawNotify :: Quake ()
+drawNotify = do
+    io (putStrLn "Console.drawNotify") >> undefined -- TODO

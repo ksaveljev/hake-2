@@ -459,11 +459,44 @@ drawFPS = do
 
 drawPause :: Quake ()
 drawPause = do
-    io (putStrLn "SCR.drawPause") >> undefined -- TODO
+    showPauseValue <- liftM (^.cvValue) scrShowPauseCVar
+    pausedValue <- liftM (^.cvValue) clPausedCVar
+
+    -- turn off for screenshots
+    unless (showPauseValue == 0 || pausedValue == 0) $ do
+      vidDef' <- use $ globals.vidDef
+      Just renderer <- use $ globals.re
+      Just (width, _) <- (renderer^.rRefExport.reDrawGetPicSize) "pause"
+      (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) ((vidDef'^.vdHeight) `div` 2 + 8) "pause"
 
 drawConsole :: Quake ()
 drawConsole = do
-    io (putStrLn "SCR.drawConsole") >> undefined -- TODO
+    Console.checkResize
+
+    state <- use $ globals.cls.csState
+    refreshPrepped <- use $ globals.cl.csRefreshPrepped
+
+         -- forced full screen console
+    if | state == Constants.caDisconnected || state == Constants.caConnecting ->
+           Console.drawConsole 1
+
+         -- connected, but can't render
+       | state /= Constants.caActive || not refreshPrepped -> do
+           Console.drawConsole 0.5
+
+           vidDef' <- use $ globals.vidDef
+           Just renderer <- use $ globals.re
+           (renderer^.rRefExport.reDrawFill) 0 ((vidDef'^.vdHeight) `div` 2) (vidDef'^.vdWidth) ((vidDef'^.vdHeight) `div` 2) 0
+
+       | otherwise -> do
+           conCurrent <- use $ scrGlobals.scrConCurrent
+           if conCurrent /= 0
+             then Console.drawConsole conCurrent
+             else do
+               keyDest <- use $ globals.cls.csKeyDest
+               when (keyDest == Constants.keyGame || keyDest == Constants.keyMessage) $
+                 Console.drawNotify -- only draw notify in game
+           
 
 drawCinematic :: Quake ()
 drawCinematic = do
