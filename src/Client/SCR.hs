@@ -5,8 +5,9 @@ module Client.SCR where
 
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom)
 import Control.Monad (liftM, when, void, unless)
-import Data.Bits ((.&.), complement)
+import Data.Bits ((.&.), complement, shiftR)
 import Data.Maybe (isNothing)
+import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -564,39 +565,192 @@ executeLayoutString str = do
               return (x', y', width, newIdx6)
               
             "ctf" -> do
-              undefined
+              -- draw a ctf client block
+              vidDef' <- use $ globals.vidDef
+
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
+
+              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
+              let y' = (vidDef'^.vdHeight) `div` 2 - 120 + Lib.atoi tkn2
+
+              addDirtyPoint x' y'
+              addDirtyPoint (x' + 159) (y' + 31)
+
+              (Just tkn3, newIdx3) <- Com.parse str (B.length str) newIdx2
+              let clientInfoIdx = Lib.atoi tkn3
+              when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
+                Com.comError Constants.errDrop "client >= MAX_CLIENTS"
+
+              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
+
+              (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
+              let score = Lib.atoi tkn4
+
+              (Just tkn5, newIdx5) <- Com.parse str (B.length str) newIdx4
+              let tmpPing = Lib.atoi tkn5
+                  ping = if tmpPing > 999 then 999 else tmpPing
+
+              let block = BC.pack $ printf "%3d %3d %-12.12s" score ping (BC.unpack $ clientInfo^.ciName)
+
+              playerNum <- use $ globals.cl.csPlayerNum
+              if clientInfoIdx == playerNum
+                then Console.drawAltString x' y' block
+                else Console.drawString x' y' block
+
+              return (x', y', width, newIdx5)
 
             "picn" -> do
-              undefined
+              -- draw a pic from a name
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              addDirtyPoint x y
+              addDirtyPoint (x + 23) (y + 23)
+
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawPic) x y tkn
+
+              return (x, y, width, newIdx)
 
             "num" -> do
-              undefined
+              -- draw a number
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let width' = Lib.atoi tkn
+
+              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
+              let statsIdx = Lib.atoi tkn2
+
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix statsIdx
+              drawField x y 0 width' (fromIntegral value)
+
+              return (x, y, width', newIdx2)
 
             "hnum" -> do
-              undefined
+              -- health number
+              let width' = 3
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statHealth
+
+              color <- if | value > 25 -> return 0 -- green
+                          | value > 0 -> do
+                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+                              return $ (serverFrame `shiftR` 2) .&. 1
+                          | otherwise -> return 1
+
+              Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+              when (sf .&. 1 /= 0) $ do
+                Just renderer <- use $ globals.re
+                (renderer^.rRefExport.reDrawPic) x y "field_3"
+
+              drawField x y color width' (fromIntegral value)
+
+              return (x, y, width', idx)
               
             "anum" -> do
-              undefined
+              -- ammo number
+              let width' = 3
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statAmmo
+
+              color <- if | value > 5 -> return 0 -- green
+                          | value >= 0 -> do
+                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+                              return $ (serverFrame `shiftR` 2) .&. 1
+                          | otherwise -> return (-1)
+              
+              -- negative number = don't show
+              unless (color == -1) $ do
+                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+                when (sf .&. 4 /= 0) $ do
+                  Just renderer <- use $ globals.re
+                  (renderer^.rRefExport.reDrawPic) x y "field_3"
+
+                drawField x y color width' (fromIntegral value)
+
+              return (x, y, width', idx)
 
             "rnum" -> do
-              undefined
+              -- armor number
+              let width' = 3
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statArmor
+
+              unless (value < 1) $ do
+                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+                when (sf .&. 2 /= 0) $ do
+                  Just renderer <- use $ globals.re
+                  (renderer^.rRefExport.reDrawPic) x y "field_3"
+
+                drawField x y 0 width' (fromIntegral value)
+
+              return (x, y, width', idx)
 
             "stat_string" -> do
-              undefined
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              let index = Lib.atoi tkn
+              
+              when (index < 0 || index >= Constants.maxConfigStrings) $
+                Com.comError Constants.errDrop "Bad stat_string index"
+
+              Just csIndexTmp <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix index
+              let csIndex = fromIntegral csIndexTmp
+
+              when (csIndex < 0 || csIndex >= Constants.maxConfigStrings) $
+                Com.comError Constants.errDrop "Bad stat_string index"
+
+              Just configStr <- preuse $ globals.cl.csConfigStrings.ix csIndex
+
+              Console.drawString x y configStr
+
+              return (x, y, width, newIdx)
 
             "cstring" -> do
-              undefined
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              drawHUDString tkn x y 320 0
+              return (x, y, width, newIdx)
 
             "string" -> do
-              undefined
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              Console.drawString x y tkn
+              return (x, y, width, newIdx)
 
             "cstring2" -> do
-              undefined
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              drawHUDString tkn x y 320 0x80
+              return (x, y, width, newIdx)
 
             "string2" -> do
-              undefined
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              Console.drawAltString x y tkn
+              return (x, y, width, newIdx)
 
             "if" -> do
-              undefined
+              -- draw a number
+              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
+              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
+
+              if value == 0
+                then do
+                  -- skip to endif
+                  finalIdx <- skipToEndIf newIdx
+                  return (x, y, width, finalIdx)
+                else
+                  return (x, y, width, newIdx)
 
             _ -> return (x, y, width, idx)
+
+        skipToEndIf :: Int -> Quake Int
+        skipToEndIf idx
+          | idx >= B.length str = return idx
+          | otherwise = do
+              (tkn, newIdx) <- Com.parse str (B.length str) idx
+              case tkn of
+                Nothing -> skipToEndIf newIdx
+                Just token -> if token == "endif"
+                                then return newIdx
+                                else skipToEndIf newIdx
+
+
+drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
+drawField _ _ _ _ _ = do
+    io (putStrLn "SCR.drawField") >> undefined -- TODO
+
+drawHUDString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+drawHUDString _ _ _ _ _ = do
+    io (putStrLn "SCR.drawHUDString") >> undefined -- TODO
