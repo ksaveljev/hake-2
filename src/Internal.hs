@@ -947,7 +947,10 @@ data SCRGlobals =
              , _scrCrosshairPic    :: !B.ByteString
              , _scrCrosshairWidth  :: !Int
              , _scrCrosshairHeight :: !Int
-             , _scrCenterTimeOff   :: Float
+             , _scrCenterTimeOff   :: !Float
+             , _scrLastFrames      :: !Int
+             , _scrLastTime        :: !Int
+             , _scrFPSValue        :: !B.ByteString
              }
 
 data RefExportT =

@@ -6,6 +6,7 @@ module Client.SCR where
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
+import Data.Char (ord)
 import Data.Maybe (isNothing)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
@@ -416,7 +417,45 @@ checkDrawCenterString = do
 
 drawFPS :: Quake ()
 drawFPS = do
-    io (putStrLn "SCR.drawFPS") >> undefined -- TODO
+    fps <- fpsCVar
+
+    if | (fps^.cvValue) > 0 -> do
+           when (fps^.cvModified) $ do
+             CVar.update fps { _cvModified = False }
+             CVar.setValueI "cl_maxfps" 1000
+
+           realTime <- use $ globals.cls.csRealTime
+           lastTime <- use $ scrGlobals.scrLastTime
+           let diff = realTime - lastTime
+
+           when (diff > truncate ((fps^.cvValue) * 1000)) $ do
+             frameCount <- use $ globals.cls.csFrameCount
+             lastFrames <- use $ scrGlobals.scrLastFrames
+             let fpsvalue :: Float = fromIntegral (frameCount - lastFrames) * 100000 / fromIntegral diff / 100.0
+                 fpsStr = BC.pack (show fpsvalue) `B.append` " fps"
+
+             scrGlobals.scrLastFrames .= frameCount
+             scrGlobals.scrLastTime .= realTime
+             scrGlobals.scrFPSValue .= fpsStr
+
+           vidDef' <- use $ globals.vidDef
+           fpsValue <- use $ scrGlobals.scrFPSValue
+           let x = (vidDef'^.vdWidth) - 8 * (B.length fpsValue) - 2
+           drawFPSByChar x 0 fpsValue
+
+       | fps^.cvModified -> do
+           CVar.update fps { _cvModified = False }
+           CVar.setValueI "cl_maxfps" 90
+
+       | otherwise -> return ()
+
+  where drawFPSByChar :: Int -> Int -> B.ByteString -> Quake ()
+        drawFPSByChar x idx str
+          | idx >= B.length str = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) x 2 (ord $ BC.index str idx)
+              drawFPSByChar (x + 8) (idx + 1) str
 
 drawPause :: Quake ()
 drawPause = do

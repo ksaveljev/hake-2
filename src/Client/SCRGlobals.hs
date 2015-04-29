@@ -23,4 +23,7 @@ initialSCRGlobals =
              , _scrCrosshairWidth  = 0
              , _scrCrosshairHeight = 0
              , _scrCenterTimeOff   = 0
+             , _scrLastFrames      = 0
+             , _scrLastTime        = 0
+             , _scrFPSValue        = ""
              }
