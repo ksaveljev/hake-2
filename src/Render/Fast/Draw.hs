@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.Draw where
 
-import Control.Lens (preuse, (^.), ix, use)
-import Control.Monad (when)
-import Data.Bits ((.&.))
+import Control.Lens (preuse, (^.), ix, use, (.=))
+import Control.Monad (when, unless)
+import Data.Bits ((.&.), shiftR)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Graphics.Rendering.OpenGL.Raw as GL
@@ -19,7 +19,9 @@ import qualified Render.RenderAPIConstants as RenderAPIConstants
 initLocal :: Quake ()
 initLocal = do
     -- load console characters (don't bilerp characters)
-    Just (ImageReference imageIdx) <- Image.glFindImage "pics/conchars.pcx" RenderAPIConstants.itPic
+    Just imageRef@(ImageReference imageIdx) <- Image.glFindImage "pics/conchars.pcx" RenderAPIConstants.itPic
+    fastRenderAPIGlobals.frDrawChars .= Just imageRef
+
     Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
     Image.glBind (image^.iTexNum)
     GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral GL.gl_NEAREST)
@@ -71,3 +73,42 @@ findPic name =
     if BC.take 1 name == "/" || BC.take 1 name == "\\"
       then Image.glFindImage (B.drop 1 name) RenderAPIConstants.itPic
       else Image.glFindImage name RenderAPIConstants.itPic
+
+{-
+================
+Draw_Char
+
+Draws one 8*8 graphics character with 0 being transparent.
+It can be clipped to the top of the screen to allow the console to be
+smoothly scrolled off.
+================
+-}
+drawChar :: GLDriver -> Int -> Int -> Int -> Quake ()
+drawChar _ x y num = do
+    let n = num .&. 255
+
+        -- it's a space   -- totally off screen
+    unless (n .&. 127 == 32 || y <= -8) $ do
+      let row = n `shiftR` 4
+          col = n .&. 15
+          frow = fromIntegral row * 0.0625
+          fcol = fromIntegral col * 0.0625
+          size = 0.0625
+          x' = fromIntegral x
+          y' = fromIntegral y
+
+      Just (ImageReference imageIdx) <- use $ fastRenderAPIGlobals.frDrawChars
+      Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
+
+      Image.glBind (image^.iTexNum)
+
+      GL.glBegin GL.gl_QUADS
+      GL.glTexCoord2f fcol frow
+      GL.glVertex2f x' y'
+      GL.glTexCoord2f (fcol + size) frow
+      GL.glVertex2f (x' + 8) y'
+      GL.glTexCoord2f (fcol + size) (frow + size)
+      GL.glVertex2f (x' + 8) (y' + 8)
+      GL.glTexCoord2f fcol (frow + size)
+      GL.glVertex2f x' (y' + 8)
+      GL.glEnd
