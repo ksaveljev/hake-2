@@ -18,7 +18,7 @@ import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLInv as CLInv
-import qualified Client.Console as Console
+import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd

@@ -1,9 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.Console where
 
-import Control.Lens ((.=), use, zoom)
-import Control.Monad (void, unless)
-import Data.Bits (shiftR)
+import Control.Lens ((.=), use, zoom, (^.))
+import Control.Monad (void, unless, when)
+import Data.Bits (shiftR, shiftL)
+import Data.Char (ord)
+import Data.Maybe (isJust)
+import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
@@ -12,6 +16,7 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -122,10 +127,97 @@ drawString :: Int -> Int -> B.ByteString -> Quake ()
 drawString _ _ _ = do
     io (putStrLn "Console.drawString") >> undefined -- TODO
 
+{-
+- ================ Con_DrawConsole
+- 
+- Draws the console with the solid background ================
+-}
 drawConsole :: Float -> Quake ()
-drawConsole _ = do
-    io (putStrLn "Console.drawConsole") >> undefined -- TODO
+drawConsole frac = do
+    vidDef' <- use $ globals.vidDef
+
+    let width = vidDef'^.vdWidth
+        height = vidDef'^.vdHeight
+        tmpLinesNum = truncate ((fromIntegral height) * frac)
+
+    unless (tmpLinesNum <= 0) $ do
+      let linesNum = if tmpLinesNum > height
+                       then height
+                       else tmpLinesNum
+
+      -- draw the background
+      Just renderer <- use $ globals.re
+      (renderer^.rRefExport.reDrawStretchPic) 0 (-height + linesNum) width height "conback"
+      SCR.addDirtyPoint 0 0
+      SCR.addDirtyPoint (width - 1) (linesNum - 1)
+
+      let version = BC.pack (printf "v%4.2f" Constants.version)
+      drawVersion version width linesNum 0 5
+
+      -- draw the text
+      globals.con.cVisLines .= linesNum
+      console <- use $ globals.con
+
+      (rows, y) <- do
+        let rows = (linesNum - 22) `shiftR` 3 -- rows of text to draw
+            y = linesNum - 30
+
+        -- draw from the bottom up
+        if (console^.cDisplay) /= (console^.cCurrent)
+          then do
+            -- draw arrows to show the buffer is backscrolled
+            drawArrows 0 (console^.cLineWidth) y
+            return (rows - 1, y - 8)
+          else
+            return (rows, y)
+
+      let row = console^.cDisplay
+      drawText console row y 0 rows
+
+      download <- use $ globals.cls.csDownload
+
+      when (isJust download) $ do
+        io (putStrLn "Console.drawConsole") >> undefined -- TODO
+
+      -- draw the input prompt, user text, and cursor if desired
+      drawInput
+
+  where drawVersion :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+        drawVersion version width linesNum idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) (width - 44 + idx * 8) (linesNum - 12) (128 + ord (BC.index version idx))
+              drawVersion version width linesNum (idx + 1) maxIdx
+
+        drawArrows :: Int -> Int -> Int -> Quake ()
+        drawArrows x maxX y
+          | x >= maxX = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) ((x + 1) `shiftL` 3) y (ord '^')
+              drawArrows (x + 4) maxX y
+
+        drawText :: ConsoleT -> Int -> Int -> Int -> Int -> Quake ()
+        drawText console row y idx maxIdx
+          | idx >= maxIdx || row < 0 || (console^.cCurrent) - row >= (console^.cTotalLines) = return ()
+          | otherwise = do
+              let first = (row `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+              drawLine (console^.cText) first y 0 (console^.cLineWidth)
+              drawText console (row - 1) (y - 8) (idx + 1) maxIdx
+
+        drawLine :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+        drawLine text first y idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) ((idx + 1) `shiftL` 3) y (ord $ BC.index text (idx + first))
+              drawLine text first y (idx + 1) maxIdx
 
 drawNotify :: Quake ()
 drawNotify = do
     io (putStrLn "Console.drawNotify") >> undefined -- TODO
+
+drawInput :: Quake ()
+drawInput = do
+    io (putStrLn "Console.drawInput") >> undefined -- TODO
