@@ -26,7 +26,7 @@ initLocal = do
     GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral GL.gl_NEAREST)
 
 stretchPic :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-stretchPic glDriver x y w h pic = do
+stretchPic _ x y w h pic = do
     maybeImage <- findPic pic
 
     case maybeImage of

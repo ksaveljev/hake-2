@@ -510,8 +510,20 @@ dirtyScreen :: Quake ()
 dirtyScreen = io (putStrLn "SCR.dirtyScreen") >> undefined -- TODO
 
 addDirtyPoint :: Int -> Int -> Quake ()
-addDirtyPoint _ _ = do
-    io (putStrLn "SCR.addDirtyPoint") >> undefined -- TODO
+addDirtyPoint x y = do
+    dirty <- use $ scrGlobals.scrDirty
+
+    when (x < (dirty^.x1)) $
+      scrGlobals.scrDirty.x1 .= x
+
+    when (x > (dirty^.x2)) $
+      scrGlobals.scrDirty.x2 .= x
+
+    when (y < (dirty^.y1)) $
+      scrGlobals.scrDirty.y1 .= y
+
+    when (y > (dirty^.y2)) $
+      scrGlobals.scrDirty.y2 .= y
 
 drawCrosshair :: Quake ()
 drawCrosshair = do
