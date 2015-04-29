@@ -764,3 +764,6 @@ glLoadWal _ = io (putStrLn "Image.glLoadWal") >> undefined -- TODO
 
 loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
 loadTGA _ = io (putStrLn "Image.loadTGA") >> undefined -- TODO
+
+scrapUpload :: Quake ()
+scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO

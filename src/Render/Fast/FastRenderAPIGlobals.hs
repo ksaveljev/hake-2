@@ -58,4 +58,5 @@ initialFastRenderAPIGlobals =
                        , _frUploadedPaletted     = False
                        , _frDrawChars            = Nothing
                        , _frTrickFrame           = 0
+                       , _frScrapDirty           = False
                        }

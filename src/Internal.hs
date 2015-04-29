@@ -1527,6 +1527,7 @@ data FastRenderAPIGlobals =
                        , _frUploadedPaletted     :: Bool
                        , _frDrawChars            :: Maybe ImageReference
                        , _frTrickFrame           :: Int
+                       , _frScrapDirty           :: Bool
                        }
 
 data ParticleTGlobals =
