@@ -79,3 +79,7 @@ removeKey str key = do
         composeTokens _ _ = do
           Com.printf "MISSING VALUE\n"
           return str
+
+valueForKey :: B.ByteString -> B.ByteString -> Quake (Maybe B.ByteString)
+valueForKey _ _ = do
+    io (putStrLn "Info.valueForKey") >> undefined -- TODO

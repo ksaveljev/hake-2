@@ -6,6 +6,7 @@ import Control.Lens (Traversal', use, (^.), ix, preuse, (.=), zoom)
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
@@ -20,6 +21,10 @@ import qualified Game.GameUtil as GameUtil
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
 clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined -- TODO
+
+clientConnect :: ClientReference -> B.ByteString -> Quake (Bool, B.ByteString)
+clientConnect _ _ = do
+    io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
 
 {-
 - Some information that should be persistant, like health, is still stored

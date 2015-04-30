@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVMain where
 
-import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal', ix)
+import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal', ix, zoom)
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
@@ -631,8 +631,60 @@ svcDirectConnect = do
                     else
                       findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
 
+-- Initializes player structures after successful connection.
 gotNewClient :: ClientReference -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
-gotNewClient _ _ _ _ _ = io (putStrLn "SVMain.gotNewClient") >> undefined -- TODO
+gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport = do
+    -- build a new connection
+    -- accept the new client
+    -- this is the only place a client_t is ever initialized
+    svGlobals.svClient .= Just clientRef
+
+    let edictIdx = clientIdx + 1
+
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict .= Just (EdictReference edictIdx)
+
+    -- save challenge for checksumming
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cChallenge .= challenge
+
+    -- get the game a chance to reject this connection or modify the userinfo
+    (allowed, userInfo') <- PlayerClient.clientConnect clientRef userInfo
+    if not allowed
+      then do
+        value <- Info.valueForKey userInfo' "rejmsg"
+
+        case value of
+          Nothing -> NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
+          Just v -> NetChannel.outOfBandPrint Constants.nsServer adr $ "print\n" `B.append` v `B.append` "\nConnection refused.\n"
+
+        Com.dprintf "Game rejected a connection.\n"
+
+      else do
+        -- parse some info from the info strings
+        svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo .= userInfo'
+        userInfoChanged clientRef
+
+        -- send the connect packet to the client
+        NetChannel.outOfBandPrint Constants.nsServer adr "client_connect"
+
+        NetChannel.setup Constants.nsServer (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) adr qport
+
+        svGlobals.svServerStatic.ssClients.ix clientIdx.cState .= Constants.csConnected
+
+        Just buf <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagramBuf
+        SZ.init (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram) buf (B.length buf)
+
+        realTime <- use $ svGlobals.svServerStatic.ssRealTime
+
+        zoom (svGlobals.svServerStatic.ssClients.ix clientIdx) $ do
+          cDatagram.sbAllowOverflow .= True
+          cLastMessage .= realTime
+          cLastConnect .= realTime
+
+        Com.dprintf "new client added.\n"
 
 svcRemoteCommand :: Quake ()
 svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO
+
+userInfoChanged :: ClientReference -> Quake ()
+userInfoChanged _ = do
+    io (putStrLn "SVMain.userInfoChanged") >> undefined -- TODO

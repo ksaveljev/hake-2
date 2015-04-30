@@ -12,7 +12,7 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
 
-init :: Lens' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
+init :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =
     bufLens .= newSizeBufT { _sbData = bufData, _sbMaxSize = len }
 

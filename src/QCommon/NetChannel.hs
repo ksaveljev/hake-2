@@ -55,3 +55,7 @@ transmit _ _ _ = io (putStrLn "NetChannel.transmit") >> undefined -- TODO
 -}
 process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
 process _ _ = io (putStrLn "NetChannel.process") >> undefined -- TODO
+
+setup :: Int -> Traversal' QuakeState NetChanT -> NetAdrT -> Int -> Quake ()
+setup _ _ _ _ = do
+    io (putStrLn "NetChannel.setup") >> undefined -- TODO
