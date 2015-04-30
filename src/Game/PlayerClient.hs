@@ -201,8 +201,11 @@ clientBeginServerFrame :: EdictReference -> Quake ()
 clientBeginServerFrame _ = io (putStrLn "PlayerClient.clientBeginServerFrame") >> undefined -- TODO
 
 initClientResp :: GClientReference -> Quake ()
-initClientResp _ = do
-    io (putStrLn "PlayerClient.initClientResp") >> undefined -- TODO
+initClientResp (GClientReference gClientIdx) = do
+    frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+    Just pers <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp .= newClientRespawnT { _crEnterFrame = frameNum, _crCoopRespawn = pers }
 
 initClientPersistant :: GClientReference -> Quake ()
 initClientPersistant _ = do
