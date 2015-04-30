@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
@@ -390,13 +391,57 @@ rconF = io (putStrLn "CL.rconF") >> undefined -- TODO
 precacheF :: XCommandT
 precacheF = io (putStrLn "CL.precacheF") >> undefined -- TODO
 
+remoteCommandHeader :: B.ByteString
+remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
+
 readPackets :: Quake ()
 readPackets = do
-    gotPacket <- NET.getPacket Constants.nsClient (globals.netFrom) (globals.netMessage)
+    nextPacket
 
-    when gotPacket $ do
-      io (putStrLn "CL.readPackets") >> undefined -- TODO
-      --readPackets -- TODO: do not forget to uncomment this
+    -- check timeout
+    cls' <- use $ globals.cls
+    timeoutValue <- liftM (^.cvValue) clTimeoutCVar
+    if (cls'^.csState) >= Constants.caConnected && (cls'^.csRealTime) - (cls'^.csNetChan.ncLastReceived) > (truncate timeoutValue) * 1000
+      then do
+        globals.cl.csTimeOutCount += 1
+        use (globals.cl.csTimeOutCount) >>= \v ->
+          when (v > 5) $ do -- timeoutcount saves debugger
+            Com.printf "\nServer connection timed out.\n"
+            disconnect
+      else
+        globals.cl.csTimeOutCount .= 0
+
+  where nextPacket :: Quake ()
+        nextPacket = do
+          gotPacket <- NET.getPacket Constants.nsClient (globals.netFrom) (globals.netMessage)
+          cls' <- use $ globals.cls
+
+          when gotPacket $ do
+            netMsg <- use $ globals.netMessage
+
+            if | B.take 4 (netMsg^.sbData) == remoteCommandHeader -> do
+                   connectionlessPacket
+               | (cls'^.csState) == Constants.caDisconnected || (cls'^.csState) == Constants.caConnecting ->
+                   -- dump it if not connected
+                   return ()
+               | (netMsg^.sbCurSize) < 8 -> do
+                   from <- use $ globals.netFrom
+                   Com.printf $ (NET.adrToString from) `B.append` ": Runt packet\n"
+               | otherwise -> do
+                   -- packet from server
+                   from <- use $ globals.netFrom
+                   remote <- use $ globals.cls.csNetChan.ncRemoteAddress
+                   let same = NET.compareAdr from remote
+
+                   if not same
+                     then Com.dprintf $ (NET.adrToString from) `B.append` ":sequenced packet without connection\n"
+                     else do
+                       ok <- NetChannel.process (globals.cls.csNetChan) (globals.netMessage)
+                       -- might not be accepted for some reason
+                       when ok $
+                         CLParse.parseServerMessage
+
+            nextPacket
 
 sendCommand :: Quake ()
 sendCommand = do
@@ -519,3 +564,6 @@ sendConnectPacket = do
                   (BC.pack $ show challenge) `B.append` " \"" `B.append` userInfo `B.append` "\"\n" -- IMPROVE?
 
         NetChannel.outOfBandPrint Constants.nsClient adr' str
+
+connectionlessPacket :: Quake ()
+connectionlessPacket = io (putStrLn "CL.connectionlessPacket") >> undefined -- TODO

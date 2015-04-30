@@ -194,6 +194,10 @@ compareBaseAdr a b =
        | (a^.naType) == Constants.naIp -> (a^.naIP) == (b^.naIP) -- TODO: verify it works?
        | otherwise -> False
 
+-- compares ip address and port
+compareAdr :: NetAdrT -> NetAdrT -> Bool
+compareAdr a b = (a^.naIP) == (b^.naIP) && (a^.naPort) == (b^.naPort)
+
 -- Gets a packet from internal loopback.
 getLoopPacket :: Lens' QuakeState LoopbackT -> Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Quake Bool
 getLoopPacket loopbackLens netFromLens netMessageLens = do
