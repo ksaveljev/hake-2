@@ -18,6 +18,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified Game.GameBase as GameBase
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.Com as Com
@@ -485,5 +486,57 @@ prepWorldFrame = do
               gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esEvent .= 0
               resetEdictEvent (idx + 1) maxIdx
 
+{-
+- A connectionless packet has four leading 0xff characters to distinguish
+- it from a game channel. Clients that are in the game can still send
+- connectionless packets. It is used also by rcon commands.
+-}
 connectionlessPacket :: Quake ()
-connectionlessPacket = io (putStrLn "SVMain.connectionlessPacket") >> undefined -- TODO
+connectionlessPacket = do
+    MSG.beginReading (globals.netMessage)
+    _ <- MSG.readLong (globals.netMessage) -- skip the -1 marker
+
+    s <- MSG.readStringLine (globals.netMessage)
+
+    Cmd.tokenizeString s False
+
+    c <- Cmd.argv 0
+
+    -- for debugging purposes
+    -- TODO: REMOVE ME!!
+    from <- use $ globals.netFrom
+    Com.printf $ "REMOVE ME! DEBUG! Packet " `B.append` NET.adrToString from `B.append` " : " `B.append` c `B.append` "\n"
+
+    case c of
+      "ping" -> svcPing
+      "ack" -> svcAck
+      "status" -> svcStatus
+      "info" -> svcInfo
+      "getchallenge" -> svcGetChallenge
+      "connect" -> svcDirectConnect
+      "rcon" -> svcRemoteCommand
+      _ -> do
+        Com.printf $ "bad connectionless packet from " `B.append` NET.adrToString from `B.append` "\n"
+        Com.printf $ "[" `B.append` s `B.append` "]\n"
+        -- TODO: print hexdump of data like in jake2?
+
+svcPing :: Quake ()
+svcPing = io (putStrLn "SVMain.svcPing") >> undefined -- TODO
+
+svcAck :: Quake ()
+svcAck = io (putStrLn "SVMain.svcAck") >> undefined -- TODO
+
+svcStatus :: Quake ()
+svcStatus = io (putStrLn "SVMain.svcStatus") >> undefined -- TODO
+
+svcInfo :: Quake ()
+svcInfo = io (putStrLn "SVMain.svcInfo") >> undefined -- TODO
+
+svcGetChallenge :: Quake ()
+svcGetChallenge = io (putStrLn "SVMain.svcGetChallenge") >> undefined -- TODO
+
+svcDirectConnect :: Quake ()
+svcDirectConnect = io (putStrLn "SVMain.svcDirectConnect") >> undefined -- TODO
+
+svcRemoteCommand :: Quake ()
+svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO
