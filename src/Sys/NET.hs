@@ -262,8 +262,8 @@ sendPacket sock len buf adr =
 sendLoopPacket :: Int -> Int -> B.ByteString -> Quake ()
 sendLoopPacket sock len buf = do
     if sock == Constants.nsServer
-      then sendLoopPacket' (netGlobals.ngLoopbackServer)
-      else sendLoopPacket' (netGlobals.ngLoopbackClient)
+      then sendLoopPacket' (netGlobals.ngLoopbackClient)
+      else sendLoopPacket' (netGlobals.ngLoopbackServer)
 
   where sendLoopPacket' :: Lens' QuakeState LoopbackT -> Quake ()
         sendLoopPacket' socketLens = do
