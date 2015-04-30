@@ -3,11 +3,12 @@
 {-# LANGUAGE BangPatterns #-}
 module Client.Console where
 
-import Control.Lens ((.=), use, zoom, (^.))
+import Control.Lens ((.=), use, zoom, (^.), ix, preuse)
 import Control.Monad (void, unless, when)
-import Data.Bits (shiftR, shiftL)
+import Data.Bits (shiftR, shiftL, (.&.))
 import Data.Char (ord)
 import Data.Maybe (isJust)
+import Data.Word (Word8)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -219,6 +220,46 @@ drawNotify :: Quake ()
 drawNotify = do
     io (putStrLn "Console.drawNotify") >> undefined -- TODO
 
+{-
+- ================ Con_DrawInput
+- 
+- The input line scrolls horizontally if typing goes beyond the right edge
+- ================
+-}
 drawInput :: Quake ()
 drawInput = do
-    io (putStrLn "Console.drawInput") >> undefined -- TODO
+    keyDest <- use $ globals.cls.csKeyDest
+    state <- use $ globals.cls.csState
+                                            -- don't draw anything (always draw if not active)
+    unless (keyDest == Constants.keyMenu || (keyDest /= Constants.keyConsole && state == Constants.caActive)) $ do
+      editLine' <- use $ globals.editLine
+      Just text <- preuse $ globals.keyLines.ix editLine'
+      linePos <- use $ globals.keyLinePos
+      lineWidth <- use $ globals.con.cLineWidth
+
+      -- add the cursor frame and fill out remainder with spaces
+      realTime <- use $ globals.cls.csRealTime
+      let cursorFrame :: Word8 = fromIntegral $ 10 + ((realTime `shiftR` 8) .&. 1)
+          fullLine = text `B.append` B.unfoldr (\i -> if i == 0 
+                                                        then Just (cursorFrame, 1) 
+                                                        else if linePos + 1 + i < lineWidth 
+                                                               then Just (32, i + 1)
+                                                               else Nothing) 0
+
+      -- prestep if horizontally scrolling
+      let start = if linePos >= lineWidth
+                    then 1 + linePos - lineWidth
+                    else 0
+
+      -- draw it
+      visLines <- use $ globals.con.cVisLines
+      Just renderer <- use $ globals.re
+      let drawChar = renderer^.rRefExport.reDrawChar
+      drawInputLine drawChar fullLine (visLines - 22) 0 lineWidth
+
+  where drawInputLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Quake ()
+        drawInputLine drawChar text y idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              drawChar ((idx + 1) `shiftL` 3) y (ord $ BC.index text idx)
+              drawInputLine drawChar text y (idx + 1) maxIdx

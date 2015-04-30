@@ -77,7 +77,7 @@ initialGlobals =
           , _keyDown            = UV.empty
           , _chatTeam           = False
           , _chatBuffer         = ""
-          , _keyLines           = V.empty
+          , _keyLines           = V.replicate 32 ""
           , _keyLinePos         = 0
           , _editLine           = 0
 
