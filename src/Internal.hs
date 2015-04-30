@@ -1212,8 +1212,8 @@ data ClientPersistantT =
                     , _cpMaxGrenades     :: !Int
                     , _cpMaxCells        :: !Int
                     , _cpMaxSlugs        :: !Int
-                    , _cpWeapon          :: !(Maybe GItemT)
-                    , _cpLastWeapon      :: !(Maybe GItemT)
+                    , _cpWeapon          :: !(Maybe GItemReference)
+                    , _cpLastWeapon      :: !(Maybe GItemReference)
                     , _cpPowerCubes      :: !Int
                     , _cpScore           :: !Int
                     , _cpGameHelpChanged :: !Int

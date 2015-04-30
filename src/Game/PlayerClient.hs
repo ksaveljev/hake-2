@@ -16,6 +16,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
@@ -207,9 +208,33 @@ initClientResp (GClientReference gClientIdx) = do
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp .= newClientRespawnT { _crEnterFrame = frameNum, _crCoopRespawn = pers }
 
+{-
+- This is only called when the game first initializes in single player, but
+- is called after each death and level change in deathmatch. 
+-}
 initClientPersistant :: GClientReference -> Quake ()
-initClientPersistant _ = do
-    io (putStrLn "PlayerClient.initClientPersistant") >> undefined -- TODO
+initClientPersistant (GClientReference gClientIdx) = do
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers .= newClientPersistantT
+
+    Just itemRef@(GItemReference itemIdx) <- GameItems.findItem "Blaster"
+
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers) $ do
+      cpSelectedItem .= itemIdx
+      cpInventory.ix itemIdx .= 1
+
+      cpWeapon .= Just itemRef
+
+      cpHealth .= 100
+      cpMaxHealth .= 100
+
+      cpMaxBullets .= 200
+      cpMaxShells .= 100
+      cpMaxRockets .= 50
+      cpMaxGrenades .= 50
+      cpMaxCells .= 200
+      cpMaxSlugs .= 50
+
+      cpConnected .= True
 
 clientUserInfoChanged :: EdictReference -> B.ByteString -> Quake B.ByteString
 clientUserInfoChanged _ _ = do
