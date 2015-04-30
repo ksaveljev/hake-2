@@ -1580,6 +1580,8 @@ data MenuGlobals =
   MenuGlobals { _mgMenuFrameworks :: V.Vector MenuFrameworkS
               , _mgMenuItems      :: V.Vector MenuItem
               , _mgLayers         :: V.Vector MenuLayerT
+              , _mgDrawFunc       :: Maybe XCommandT
+              , _mgEnterSound     :: Bool
               }
 
 data MenuLayerT =

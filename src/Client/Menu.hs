@@ -4,16 +4,28 @@ module Client.Menu where
 import Control.Lens (use, preuse, ix, (.=), (+=), (^.))
 import Control.Monad (when)
 import Data.Maybe (fromJust)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Sound.S as S
 
 maxMenuDepth :: Int
 maxMenuDepth = 8
+
+menuInSound :: B.ByteString
+menuInSound = "misc/menu1.wav"
+
+menuMoveSound :: B.ByteString
+menuMoveSound = "misc/menu2.wav"
+
+menuOutSound :: B.ByteString
+menuOutSound = "misc/menu3.wav"
 
 init :: Quake ()
 init = do
@@ -134,4 +146,27 @@ menuQuit = io (putStrLn "Menu.menuQuit") >> undefined -- TODO
 
 draw :: Quake ()
 draw = do
-    io (putStrLn "Menu.draw") >> undefined -- TODO
+    keyDest <- use $ globals.cls.csKeyDest
+
+    when (keyDest == Constants.keyMenu) $ do
+      -- repaint everything next frame
+      SCR.dirtyScreen
+
+      -- dim everything behind it down
+      cinematicTime <- use $ globals.cl.csCinematicTime
+      Just renderer <- use $ globals.re
+      vidDef' <- use $ globals.vidDef
+
+      if cinematicTime > 0
+        then (renderer^.rRefExport.reDrawFill) 0 0 (vidDef'^.vdWidth) (vidDef'^.vdHeight) 0
+        else renderer^.rRefExport.reDrawFadeScreen
+
+      Just drawFunc <- use $ menuGlobals.mgDrawFunc
+      drawFunc
+
+      -- delay playing the enter sound until after the menu has been drawn,
+      -- to avoid delay while caching images
+      enterSound <- use $ menuGlobals.mgEnterSound
+      when enterSound $ do
+        S.startLocalSound menuInSound
+        menuGlobals.mgEnterSound .= False

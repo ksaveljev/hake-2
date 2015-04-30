@@ -16,20 +16,22 @@ makeLenses ''MenuGlobals
 initialMenuGlobals :: MenuGlobals
 initialMenuGlobals =
   MenuGlobals { _mgMenuFrameworks = V.replicate 13 newMenuFrameworkS
-              , _mgMenuItems = V.fromList [ newMenuListS    -- modeList
-                                          , newMenuListS    -- refList
-                                          , newMenuSliderS  -- tqSlider
-                                          , newMenuSliderS  -- screenSizeSlider
-                                          , newMenuSliderS  -- brightnessSlider
-                                          , newMenuListS    -- fsBox
-                                          , newMenuListS    -- stippleBox
-                                          , newMenuListS    -- palettedTextureBox
-                                          , newMenuListS    -- vSyncBox
-                                          , newMenuListS    -- windowedMouse
-                                          , newMenuActionS  -- applyAction
-                                          , newMenuActionS  -- defaultsAction
-                                          ]
-              , _mgLayers = V.empty
+              , _mgMenuItems      = V.fromList [ newMenuListS    -- modeList
+                                               , newMenuListS    -- refList
+                                               , newMenuSliderS  -- tqSlider
+                                               , newMenuSliderS  -- screenSizeSlider
+                                               , newMenuSliderS  -- brightnessSlider
+                                               , newMenuListS    -- fsBox
+                                               , newMenuListS    -- stippleBox
+                                               , newMenuListS    -- palettedTextureBox
+                                               , newMenuListS    -- vSyncBox
+                                               , newMenuListS    -- windowedMouse
+                                               , newMenuActionS  -- applyAction
+                                               , newMenuActionS  -- defaultsAction
+                                               ]
+              , _mgLayers         = V.empty
+              , _mgDrawFunc       = Nothing
+              , _mgEnterSound     = False
               }
 
 {-

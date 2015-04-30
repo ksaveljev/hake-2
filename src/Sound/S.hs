@@ -1,6 +1,7 @@
 module Sound.S where
 
 import Linear (V3)
+import qualified Data.ByteString as B
 
 import Quake
 
@@ -13,3 +14,7 @@ stopAllSounds = return () -- TODO: don't want to get involved with sound system 
 
 update :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake ()
 update _ _ _ _ = io (putStrLn "S.update") >> undefined -- TODO
+
+startLocalSound :: B.ByteString -> Quake ()
+startLocalSound _ = do
+    io (putStrLn "S.startLocalSound") >> undefined -- TODO
