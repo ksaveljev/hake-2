@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 module Client.Console where
 
 import Control.Lens ((.=), use, zoom, (^.))
@@ -201,17 +202,18 @@ drawConsole frac = do
         drawText console row y idx maxIdx
           | idx >= maxIdx || row < 0 || (console^.cCurrent) - row >= (console^.cTotalLines) = return ()
           | otherwise = do
+              Just renderer <- use $ globals.re
               let first = (row `mod` (console^.cTotalLines)) * (console^.cLineWidth)
-              drawLine (console^.cText) first y 0 (console^.cLineWidth)
+                  drawChar = renderer^.rRefExport.reDrawChar
+              drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
               drawText console (row - 1) (y - 8) (idx + 1) maxIdx
 
-        drawLine :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
-        drawLine text first y idx maxIdx
+        drawLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+        drawLine drawChar text first y idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
-              (renderer^.rRefExport.reDrawChar) ((idx + 1) `shiftL` 3) y (ord $ BC.index text (idx + first))
-              drawLine text first y (idx + 1) maxIdx
+              drawChar ((idx + 1) `shiftL` 3) y $! (ord $ BC.index text (idx + first))
+              drawLine drawChar text first y (idx + 1) maxIdx
 
 drawNotify :: Quake ()
 drawNotify = do
