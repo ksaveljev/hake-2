@@ -5,10 +5,14 @@ module QCommon.MSG where
 
 import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
-import Data.Int (Int16, Int32)
+import Data.Int (Int8, Int16, Int32)
+import Data.Monoid (mempty, mappend)
 import Data.Word (Word8)
 import Linear (V3, _x, _y, _z, dot)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
 import Quake
@@ -141,3 +145,31 @@ readShort sizeBufLens = do
             result = a .|. (b `shiftL` 8)
         sizeBufLens.sbReadCount += 2
         return $ fromIntegral result 
+
+readChar :: Lens' QuakeState SizeBufT -> Quake Int8
+readChar sizeBufLens = do
+    msgRead <- use sizeBufLens
+
+    let c = if (msgRead^.sbReadCount) + 1 > (msgRead^.sbCurSize)
+              then (-1)
+              else fromIntegral $ B.index (msgRead^.sbData) (msgRead^.sbReadCount)
+
+    sizeBufLens.sbReadCount += 1
+
+    return c
+
+readStringLine :: Lens' QuakeState SizeBufT -> Quake B.ByteString
+readStringLine sizeBufLens = do
+    ret <- readStr 0 mempty
+    let trimmedRet = B.reverse . BC.dropWhile (<= ' ') . B.reverse $ ret
+    Com.dprintf $ "MSG.ReadStringLine:[" `B.append` trimmedRet `B.append` "]\n"
+    return trimmedRet
+
+  where readStr :: Int -> BB.Builder -> Quake B.ByteString
+        readStr idx acc
+          | idx >= 2047 = return (BL.toStrict $ BB.toLazyByteString acc)
+          | otherwise = do
+              c <- readChar sizeBufLens
+              if c == -1 || c == 0 || c == 0x0A
+                then return (BL.toStrict $ BB.toLazyByteString acc)
+                else readStr (idx + 1) (acc `mappend` BB.int8 c)

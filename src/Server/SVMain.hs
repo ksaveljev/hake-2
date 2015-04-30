@@ -284,6 +284,9 @@ checkTimeouts = do
 
               checkClientTimeout realTime dropPoint zombiePoint (idx + 1) maxIdx
 
+remoteCommandHeader :: B.ByteString
+remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
+
 -- Reads packets from the network or loopback
 readPackets :: Quake ()
 readPackets = do
@@ -292,7 +295,7 @@ readPackets = do
     when readSomething $ do
       -- check for connectionless packet (0xffffffff) first
       netMessageData <- liftM (B.take 4) (use $ globals.netMessage.sbData)
-      if netMessageData == B.pack [0xFF, 0xFF, 0xFF, 0xFF]
+      if netMessageData == remoteCommandHeader
         then do
           connectionlessPacket
           readPackets

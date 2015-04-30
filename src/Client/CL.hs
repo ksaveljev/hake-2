@@ -35,6 +35,7 @@ import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified Sound.S as S
 import qualified Sys.IN as IN
@@ -566,4 +567,48 @@ sendConnectPacket = do
         NetChannel.outOfBandPrint Constants.nsClient adr' str
 
 connectionlessPacket :: Quake ()
-connectionlessPacket = io (putStrLn "CL.connectionlessPacket") >> undefined -- TODO
+connectionlessPacket = do
+    MSG.beginReading (globals.netMessage)
+    _ <- MSG.readLong (globals.netMessage) -- skip the -1
+
+    s <- MSG.readStringLine (globals.netMessage)
+
+    Cmd.tokenizeString s False
+
+    c <- Cmd.argv 0
+
+    use (globals.netFrom) >>= \from ->
+      Com.println $ NET.adrToString from `B.append` ": " `B.append` c
+
+    case c of
+      -- server connection
+      "client_connect" -> do
+        undefined -- TODO
+
+      -- server responding to a status broadcast
+      "info" -> do
+        undefined -- TODO
+
+      -- remote command from gui front end
+      "cmd" -> do
+        undefined -- TODO
+
+      -- print command from somewhere
+      "print" -> do
+        undefined -- TODO
+
+      -- ping from somewhere
+      "ping" -> do
+        undefined -- TODO
+
+      -- challenge from the server we are connecting to
+      "challenge" -> do
+        undefined -- TODO
+
+      -- echo request from server
+      "echo" -> do
+        undefined -- TODO
+
+      _ -> Com.printf "Unknown command.\n"
+
+    io (putStrLn "CL.connectionlessPacket") >> undefined -- TODO
