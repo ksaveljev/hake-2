@@ -51,7 +51,14 @@ clientConnect edictRef@(EdictReference edictIdx) userInfo = do
                                  io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
                                else do
                                  -- check for a password
-                                 io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
+                                 pass <- Info.valueForKey userInfo "password"
+                                 actualPassword <- liftM (^.cvString) spectatorPasswordCVar
+                                 if not (passwordOK actualPassword pass)
+                                   then do
+                                     info <- Info.setValueForKey userInfo "rejmsg" "Password required or incorrect."
+                                     return (True, info)
+                                   else
+                                     return (False, userInfo)
 
         if done
           then 
@@ -204,3 +211,9 @@ initClientPersistant _ = do
 clientUserInfoChanged :: EdictReference -> B.ByteString -> Quake B.ByteString
 clientUserInfoChanged _ _ = do
     io (putStrLn "PlayerClient.clientUserInfoChanged") >> undefined -- TODO
+
+passwordOK :: B.ByteString -> B.ByteString -> Bool
+passwordOK p1 p2 =
+    if B.length p1 > 0 && p1 /= "none" && p1 /= p2
+      then False
+      else True
