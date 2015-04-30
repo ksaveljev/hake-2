@@ -1,12 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Client.SCRGlobals ( module Client.SCRGlobals
+                         , module Client.CinematicsT
                          , module Client.DirtyT
                          ) where
 
 import Control.Lens (makeLenses)
 
 import Internal
+import Client.CinematicsT
 import Client.DirtyT
 
 makeLenses ''SCRGlobals
@@ -26,4 +28,5 @@ initialSCRGlobals =
              , _scrLastFrames      = 0
              , _scrLastTime        = 0
              , _scrFPSValue        = ""
+             , _scrCin             = newCinematicsT
              }

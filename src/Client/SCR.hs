@@ -7,7 +7,7 @@ import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
 import Data.Char (ord)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -241,7 +241,63 @@ skyF :: XCommandT
 skyF = io (putStrLn "SCR.skyF") >> undefined -- TODO
 
 runCinematic :: Quake ()
-runCinematic = io (putStrLn "SCR.runCinematic") >> undefined -- TODO
+runCinematic = do
+    cl' <- use $ globals.cl
+    cls' <- use $ globals.cls
+
+    if | cl'^.csCinematicTime <= 0 -> stopCinematic
+       | cl'^.csCinematicFrame == -1 -> return () -- static image
+       | cls'^.csKeyDest /= Constants.keyGame -> globals.cl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14 -- pause if menu or console is up
+       | otherwise -> do
+           let frameF :: Float = fromIntegral (cls'^.csRealTime) - fromIntegral (cl'^.csCinematicTime) * 14 / 1000
+               frame :: Int = truncate frameF
+
+           unless (frame <= (cl'^.csCinematicFrame)) $ do
+             when (frame > (cl'^.csCinematicFrame) + 1) $ do
+               Com.println $ "Dropped frame: " `B.append` BC.pack (show frame) `B.append` -- IMPROVE ?
+                             " > " `B.append` BC.pack (show $ (cl'^.csCinematicTime) + 1)  -- IMPROVE ?
+               globals.cl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14
+
+             use (scrGlobals.scrCin.cPicPending) >>= \v ->
+               scrGlobals.scrCin.cPic .= v
+
+             nextFrame <- readNextFrame
+             scrGlobals.scrCin.cPicPending .= nextFrame
+
+             when (isNothing nextFrame) $ do
+               stopCinematic
+               finishCinematic
+               -- hack to get the black screen behind loading
+               globals.cl.csCinematicTime .= 1
+               beginLoadingPlaque
+               globals.cl.csCinematicTime .= 0
+
+stopCinematic :: Quake ()
+stopCinematic = do
+    restartSound <- use $ scrGlobals.scrCin.cRestartSound
+
+    when restartSound $ do
+      -- done
+      globals.cl.csCinematicTime .= 0
+      scrGlobals.scrCin.cPic .= Nothing
+      scrGlobals.scrCin.cPicPending .= Nothing
+
+      use (globals.cl.csCinematicPaletteActive) >>= \active ->
+        when active $ do
+          Just renderer <- use $ globals.re
+          (renderer^.rRefExport.reCinematicSetPalette) Nothing
+          globals.cl.csCinematicPaletteActive .= False
+
+      use (globals.cl.csCinematicFile) >>= \f ->
+        when (isJust f) $
+          globals.cl.csCinematicFile .= Nothing
+
+      use (scrGlobals.scrCin.cHNodes1) >>= \v ->
+        when (isJust v) $
+          scrGlobals.scrCin.cHNodes1 .= Nothing
+
+      S.disableStreaming
+      scrGlobals.scrCin.cRestartSound .= False
 
 finishCinematic :: Quake ()
 finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
@@ -856,3 +912,7 @@ drawHUDString _ _ _ _ _ = do
 
 drawCenterString :: Quake ()
 drawCenterString = io (putStrLn "SCR.drawCenterString") >> undefined -- TODO
+
+readNextFrame :: Quake (Maybe B.ByteString)
+readNextFrame = do
+    io (putStrLn "SCR.readNextFrame") >> undefined -- TODO

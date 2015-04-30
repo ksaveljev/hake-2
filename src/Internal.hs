@@ -746,7 +746,7 @@ data ClientStateT =
                , _csVUp                    :: !(V3 Float)
                , _csLayout                 :: !B.ByteString
                , _csInventory              :: !(UV.Vector Int)
-               , _csCinematicFile          :: !B.ByteString
+               , _csCinematicFile          :: !(Maybe B.ByteString)
                , _csCinematicTime          :: !Int
                , _csCinematicFrame         :: !Int
                , _csCinematicPalette       :: !B.ByteString
@@ -951,6 +951,7 @@ data SCRGlobals =
              , _scrLastFrames      :: !Int
              , _scrLastTime        :: !Int
              , _scrFPSValue        :: !B.ByteString
+             , _scrCin             :: !CinematicsT
              }
 
 data RefExportT =
@@ -1646,3 +1647,18 @@ data CLightStyleT =
                , _clsValue  :: V3 Float
                , _clsMap    :: UV.Vector Float
                }
+
+data CinematicsT =
+  CinematicsT { _cRestartSound :: Bool
+              , _cSRate        :: Int
+              , _cSWidth       :: Int
+              , _cSChannels    :: Int
+              , _cWidth        :: Int
+              , _cHeight       :: Int
+              , _cPic          :: Maybe B.ByteString
+              , _cPicPending   :: Maybe B.ByteString
+              , _cHNodes1      :: Maybe (UV.Vector Int)
+              , _cNumHNodes1   :: UV.Vector Int
+              , _cHUsed        :: UV.Vector Int
+              , _cHCount       :: UV.Vector Int
+              }
