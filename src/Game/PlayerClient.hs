@@ -6,6 +6,7 @@ import Control.Lens (Traversal', use, (^.), ix, preuse, (.=), zoom)
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower)
+import Data.Maybe (isNothing)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -16,15 +17,76 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Info as Info
 
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
 clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined -- TODO
 
-clientConnect :: ClientReference -> B.ByteString -> Quake (Bool, B.ByteString)
-clientConnect _ _ = do
-    io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
+{-
+- Called when a player begins connecting to the server. The game can refuse
+- entrance to a client by returning false. If the client is allowed, the
+- connection process will continue and eventually get to ClientBegin()
+- Changing levels will NOT cause this to be called again, but loadgames
+- will. 
+-}
+clientConnect :: EdictReference -> B.ByteString -> Quake (Bool, B.ByteString)
+clientConnect edictRef@(EdictReference edictIdx) userInfo = do
+    -- check to see if they are on the banned IP list
+    value <- Info.valueForKey userInfo "ip"
+    banned <- GameSVCmds.filterPacket value
+    if banned
+      then do
+        userInfo' <- Info.setValueForKey userInfo "rejmsg" "Banned."
+        return (False, userInfo')
+      else do
+        -- check for a spectator
+        value' <- Info.valueForKey userInfo "spectator"
+        deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+        (done, userInfo') <- if deathmatchValue /= 0 && B.length value' > 0 && value' /= "0"
+                               then do
+                                 io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
+                               else do
+                                 -- check for a password
+                                 io (putStrLn "PlayerClient.clientConnect") >> undefined -- TODO
+
+        if done
+          then 
+            return (False, userInfo')
+          else do
+            -- they can connect
+            let gClientIdx = edictIdx - 1
+                gClientRef = GClientReference gClientIdx
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eClient .= Just gClientRef
+
+            -- if there is already a body waiting for us (a loadgame), just
+            -- take it, otherwise spawn one from scratch
+            Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+            unless inUse $ do
+              -- clear the respawning variables
+              initClientResp gClientRef
+              autoSaved <- use $ gameBaseGlobals.gbGame.glAutosaved
+              Just weapon <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpWeapon
+
+              when (not autoSaved || isNothing weapon) $
+                initClientPersistant gClientRef
+
+            userInfo'' <- clientUserInfoChanged edictRef userInfo
+
+            maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
+
+            when (maxClients > 1) $ do
+              dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+              Just netName <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpNetName
+              dprintf $ netName `B.append` " connected\n"
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= 0 -- make sure we start with known default
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpConnected .= True
+
+            return (True, userInfo'')
 
 {-
 - Some information that should be persistant, like health, is still stored
@@ -130,3 +192,15 @@ spCreateCoopSpots =
 
 clientBeginServerFrame :: EdictReference -> Quake ()
 clientBeginServerFrame _ = io (putStrLn "PlayerClient.clientBeginServerFrame") >> undefined -- TODO
+
+initClientResp :: GClientReference -> Quake ()
+initClientResp _ = do
+    io (putStrLn "PlayerClient.initClientResp") >> undefined -- TODO
+
+initClientPersistant :: GClientReference -> Quake ()
+initClientPersistant _ = do
+    io (putStrLn "PlayerClient.initClientPersistant") >> undefined -- TODO
+
+clientUserInfoChanged :: EdictReference -> B.ByteString -> Quake B.ByteString
+clientUserInfoChanged _ _ = do
+    io (putStrLn "PlayerClient.clientUserInfoChanged") >> undefined -- TODO

@@ -647,14 +647,14 @@ gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport 
     svGlobals.svServerStatic.ssClients.ix clientIdx.cChallenge .= challenge
 
     -- get the game a chance to reject this connection or modify the userinfo
-    (allowed, userInfo') <- PlayerClient.clientConnect clientRef userInfo
+    (allowed, userInfo') <- PlayerClient.clientConnect (EdictReference edictIdx) userInfo
     if not allowed
       then do
         value <- Info.valueForKey userInfo' "rejmsg"
 
-        case value of
-          Nothing -> NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
-          Just v -> NetChannel.outOfBandPrint Constants.nsServer adr $ "print\n" `B.append` v `B.append` "\nConnection refused.\n"
+        if B.length value == 0
+          then NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
+          else NetChannel.outOfBandPrint Constants.nsServer adr $ "print\n" `B.append` value `B.append` "\nConnection refused.\n"
 
         Com.dprintf "Game rejected a connection.\n"
 

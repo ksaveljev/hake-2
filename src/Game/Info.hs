@@ -80,6 +80,6 @@ removeKey str key = do
           Com.printf "MISSING VALUE\n"
           return str
 
-valueForKey :: B.ByteString -> B.ByteString -> Quake (Maybe B.ByteString)
+valueForKey :: B.ByteString -> B.ByteString -> Quake B.ByteString
 valueForKey _ _ = do
     io (putStrLn "Info.valueForKey") >> undefined -- TODO
