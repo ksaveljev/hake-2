@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.CDLightT where
+module Client.CDLightT ( CDLightT
+                       , module Client.CDLightT
+                       ) where
 
 import Control.Lens (makeLenses)
 import Linear (V3(..))

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.ClientGlobals ( module Client.ClientGlobals
                             , module Client.CDLightT
+                            , module Client.CLightStyleT
                             , module Client.KButtonT
                             , module QCommon.SizeBufT
                             ) where
@@ -11,6 +12,7 @@ import qualified Data.Vector as V
 
 import Internal
 import Client.CDLightT
+import Client.CLightStyleT
 import Client.KButtonT
 import QCommon.SizeBufT
 import qualified Constants
@@ -41,4 +43,6 @@ initialClientGlobals =
                 , _cgInDown          = newKButtonT
                 , _cgInImpulse       = 0
                 , _cgDLights         = V.replicate Constants.maxDLights newCDLightT
+                , _cgLightStyle      = V.replicate Constants.maxLightStyles newCLightStyleT
+                , _cgLastOfs         = 0
                 }
