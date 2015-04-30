@@ -303,7 +303,30 @@ finishCinematic :: Quake ()
 finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
 
 runConsole :: Quake ()
-runConsole = io (putStrLn "SCR.runConsole") >> undefined -- TODO
+runConsole = do
+    -- decide one the height of the console
+    keyDest <- use $ globals.cls.csKeyDest
+
+    let conLines = if keyDest == Constants.keyConsole
+                     then 0.5 -- half screen
+                     else 0 -- none visible
+
+    scrGlobals.scrConLines .= conLines
+    conCurrent <- use $ scrGlobals.scrConCurrent
+    frameTime <- use $ globals.cls.csFrameTime
+    conSpeedValue <- liftM (^.cvValue) scrConSpeedCVar
+
+    if | conLines < conCurrent -> do
+           let v = conCurrent - conSpeedValue * frameTime
+           scrGlobals.scrConCurrent .= v
+           when (conLines > v) $
+             scrGlobals.scrConCurrent .= conLines
+       | conLines > conCurrent -> do
+           let v = conCurrent + conSpeedValue * frameTime
+           scrGlobals.scrConCurrent .= v
+           when (conLines < v) $
+             scrGlobals.scrConCurrent .= conLines
+       | otherwise -> return ()
 
 {-
 - ================= SCR_CalcVrect =================
