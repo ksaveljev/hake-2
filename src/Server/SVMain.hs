@@ -521,7 +521,9 @@ connectionlessPacket = do
         -- TODO: print hexdump of data like in jake2?
 
 svcPing :: Quake ()
-svcPing = io (putStrLn "SVMain.svcPing") >> undefined -- TODO
+svcPing = do
+    from <- use $ globals.netFrom
+    NetChannel.outOfBandPrint Constants.nsServer from "ack"
 
 svcAck :: Quake ()
 svcAck = io (putStrLn "SVMain.svcAck") >> undefined -- TODO
