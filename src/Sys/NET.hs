@@ -275,3 +275,7 @@ sendLoopPacket sock len buf = do
           zoom (socketLens.lMsgs.ix i) $ do
             lmData .= buf
             lmDataLen .= len
+
+-- Seems to return true, if the address is on 127.0.0.1
+isLocalAddress :: NetAdrT -> Bool
+isLocalAddress adr = compareAdr adr netLocalAdr

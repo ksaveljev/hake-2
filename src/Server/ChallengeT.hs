@@ -6,16 +6,16 @@ import Control.Lens (makeLenses)
 import QCommon.NetAdrT
 
 data ChallengeT =
-  ChallengeT { _cAdr       :: NetAdrT
-             , _cChallenge :: Int
-             , _cTime      :: Int
+  ChallengeT { _chAdr       :: NetAdrT
+             , _chChallenge :: Int
+             , _chTime      :: Int
              }
 
 makeLenses ''ChallengeT
 
 newChallengeT :: ChallengeT
 newChallengeT =
-  ChallengeT { _cAdr       = newNetAdrT
-             , _cChallenge = 0
-             , _cTime      = 0
+  ChallengeT { _chAdr       = newNetAdrT
+             , _chChallenge = 0
+             , _chTime      = 0
              }

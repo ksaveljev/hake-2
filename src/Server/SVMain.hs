@@ -20,6 +20,7 @@ import CVarVariables
 import qualified Constants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified Game.GameBase as GameBase
+import qualified Game.Info as Info
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -542,8 +543,96 @@ svcInfo = io (putStrLn "SVMain.svcInfo") >> undefined -- TODO
 svcGetChallenge :: Quake ()
 svcGetChallenge = io (putStrLn "SVMain.svcGetChallenge") >> undefined -- TODO
 
+-- A connection request that did not come from the master.
 svcDirectConnect :: Quake ()
-svcDirectConnect = io (putStrLn "SVMain.svcDirectConnect") >> undefined -- TODO
+svcDirectConnect = do
+    adr <- use $ globals.netFrom
+
+    Com.printf "SVC_DirectConnect ()\n"
+
+    version <- Cmd.argv 1 >>= return . Lib.atoi
+
+    if version /= Constants.protocolVersion
+      then do
+        NetChannel.outOfBandPrint Constants.nsServer adr ("print\nServer is version " `B.append` BC.pack (show Constants.version) `B.append` "\n") -- IMPROVE ?
+        Com.dprintf $ "    rejected connect from version " `B.append` BC.pack (show version) `B.append` "\n" -- IMPROVE ?
+      else do
+        qport <- Cmd.argv 2 >>= return . Lib.atoi
+        challenge <- Cmd.argv 3 >>= return . Lib.atoi
+        -- force the IP key/value pair so the game can filter based on ip
+        userInfo <- Cmd.argv 4 >>= \v -> Info.setValueForKey v "ip" (NET.adrToString adr)
+
+        -- attractloop servers are ONLY for local clients
+        attractloop <- use $ svGlobals.svServer.sAttractLoop
+        if attractloop && not (NET.isLocalAddress adr)
+          then do
+            Com.printf "Remote connect in attract loop.  Ignored.\n"
+            NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
+          else do
+            -- see if the challenge is valid
+            ok <- if not (NET.isLocalAddress adr)
+                    then do
+                      challenges <- use $ svGlobals.svServerStatic.ssChallenges
+                      let foundChallenge = V.find (\c -> NET.compareBaseAdr adr (c^.chAdr)) challenges
+
+                      case foundChallenge of
+                        Nothing -> do
+                          NetChannel.outOfBandPrint Constants.nsServer adr "print\nNo challenge for address.\n"
+                          return False
+                        Just ch -> do
+                          if (ch^.chChallenge) == challenge
+                            then
+                              return True
+                            else do
+                              NetChannel.outOfBandPrint Constants.nsServer adr "print\nBad challenge.\n"
+                              return False
+
+                    else
+                      return True
+
+            when ok $ do
+              -- if there is already a slot for this ip, reuse it
+              maxClientsValue :: Int <- liftM (truncate . (^.cvValue)) maxClientsCVar
+              clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
+              done <- findAndReuseIPSlot clients adr qport challenge userInfo 0 maxClientsValue
+
+              unless done $ do
+                -- fina a client slot
+                let foundClientSlot = V.findIndex (\c -> c^.cState == Constants.csFree) clients
+                case foundClientSlot of
+                  Nothing -> do
+                    NetChannel.outOfBandPrint Constants.nsServer adr "print\nServer is full.\n"
+                    Com.dprintf "Rejected a connection.\n"
+                  Just idx -> do
+                    gotNewClient (ClientReference idx) challenge userInfo adr qport
+
+  where findAndReuseIPSlot :: V.Vector ClientT -> NetAdrT -> Int -> Int -> B.ByteString -> Int -> Int -> Quake Bool
+        findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
+          | idx >= maxIdx = return False -- no existing slot has been found for client ip
+          | otherwise = do
+              let client = clients V.! idx
+
+              if client^.cState == Constants.csFree
+                then findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
+                else do
+                  if NET.compareBaseAdr adr (client^.cNetChan.ncRemoteAddress) && ((client^.cNetChan.ncRemoteQPort) == qport || (adr^.naPort) == (client^.cNetChan.ncRemoteAddress.naPort))
+                    then do
+                      realTime <- use $ svGlobals.svServerStatic.ssRealTime
+                      reconnectLimitValue <- liftM (^.cvValue) svReconnectLimitCVar
+
+                      if (not (NET.isLocalAddress adr)) && (realTime - (client^.cLastConnect) < truncate (reconnectLimitValue * 1000))
+                        then do
+                          Com.dprintf $ NET.adrToString adr `B.append` ":reconnect rejected : too soon\n"
+                          return True
+                        else do
+                          Com.printf $ NET.adrToString adr `B.append` ":reconnect\n"
+                          gotNewClient (ClientReference idx) challenge userInfo adr qport
+                          return True
+                    else
+                      findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
+
+gotNewClient :: ClientReference -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
+gotNewClient _ _ _ _ _ = io (putStrLn "SVMain.gotNewClient") >> undefined -- TODO
 
 svcRemoteCommand :: Quake ()
 svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server.ServerStaticT ( ServerStaticT(..)
                             , module Server.ServerStaticT
+                            , module Server.ChallengeT
                             , module Server.ClientT
                             , module Game.EntityStateT
                             ) where
@@ -11,7 +12,9 @@ import qualified Data.Vector as V
 
 import Internal
 import Game.EntityStateT
+import Server.ChallengeT
 import Server.ClientT
+import qualified Constants
 
 makeLenses ''ServerStaticT
 
@@ -26,7 +29,7 @@ newServerStaticT =
                 , _ssNextClientEntities = 0
                 , _ssClientEntities     = V.empty
                 , _ssLastHeartbeat      = 0
-                , _ssChallenges         = V.empty -- TODO
+                , _ssChallenges         = V.replicate Constants.maxChallenges newChallengeT
                 , _ssDemoFile           = Nothing
                 , _ssDemoMulticast      = newSizeBufT
                 , _ssDemoMulticastBuf   = ""
