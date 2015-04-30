@@ -255,7 +255,7 @@ drawInput = do
       visLines <- use $ globals.con.cVisLines
       Just renderer <- use $ globals.re
       let drawChar = renderer^.rRefExport.reDrawChar
-      drawInputLine drawChar fullLine (visLines - 22) 0 lineWidth
+      drawInputLine drawChar fullLine (visLines - 22) start lineWidth -- TODO: make sure start is here (jake2 bug with not using start?)
 
   where drawInputLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Quake ()
         drawInputLine drawChar text y idx maxIdx

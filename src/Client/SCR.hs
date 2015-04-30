@@ -497,14 +497,21 @@ drawConsole = do
                when (keyDest == Constants.keyGame || keyDest == Constants.keyMessage) $
                  Console.drawNotify -- only draw notify in game
            
-
 drawCinematic :: Quake ()
 drawCinematic = do
     io (putStrLn "SCR.drawCinematic") >> undefined -- TODO
 
 drawLoading :: Quake ()
 drawLoading = do
-    io (putStrLn "SCR.drawLoading") >> undefined -- TODO
+    loading <- use $ scrGlobals.scrDrawLoading
+
+    unless (loading == 0) $ do
+      scrGlobals.scrDrawLoading .= 0
+      vidDef' <- use $ globals.vidDef
+      Just renderer <- use $ globals.re
+
+      Just (width, height) <- (renderer^.rRefExport.reDrawGetPicSize) "loading"
+      (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) (((vidDef'^.vdHeight) - height) `div` 2) "loading"
 
 dirtyScreen :: Quake ()
 dirtyScreen = io (putStrLn "SCR.dirtyScreen") >> undefined -- TODO
@@ -838,7 +845,6 @@ executeLayoutString str = do
                 Just token -> if token == "endif"
                                 then return newIdx
                                 else skipToEndIf newIdx
-
 
 drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
 drawField _ _ _ _ _ = do
