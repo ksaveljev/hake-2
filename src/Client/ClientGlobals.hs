@@ -1,15 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Client.ClientGlobals ( module Client.ClientGlobals
+                            , module Client.CDLightT
                             , module Client.KButtonT
                             , module QCommon.SizeBufT
                             ) where
 
 import Control.Lens (makeLenses)
-import Client.KButtonT
-import QCommon.SizeBufT
+import qualified Data.Vector as V
 
 import Internal
+import Client.CDLightT
+import Client.KButtonT
+import QCommon.SizeBufT
+import qualified Constants
 
 makeLenses ''ClientGlobals
 
@@ -36,4 +40,5 @@ initialClientGlobals =
                 , _cgInUp            = newKButtonT
                 , _cgInDown          = newKButtonT
                 , _cgInImpulse       = 0
+                , _cgDLights         = V.replicate Constants.maxDLights newCDLightT
                 }

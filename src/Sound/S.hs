@@ -13,7 +13,7 @@ stopAllSounds = return () -- TODO: don't want to get involved with sound system 
     -- io (putStrLn "S.stopAllSounds") >> undefined -- TODO
 
 update :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake ()
-update _ _ _ _ = io (putStrLn "S.update") >> undefined -- TODO
+update _ _ _ _ = io (putStrLn "S.update IMPLEMENT ME!") >> return () -- io (putStrLn "S.update") >> undefined -- TODO
 
 startLocalSound :: B.ByteString -> Quake ()
 startLocalSound _ = do

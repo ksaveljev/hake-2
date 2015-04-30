@@ -1611,6 +1611,7 @@ data ClientGlobals =
                 , _cgInUp            :: KButtonT
                 , _cgInDown          :: KButtonT
                 , _cgInImpulse       :: Int
+                , _cgDLights         :: V.Vector CDLightT
                 }
 
 data VRectT =
@@ -1627,4 +1628,13 @@ data VGlobals =
            , _vgRLightStyles  :: V.Vector LightStyleT
            , _vgREntities     :: V.Vector EntityT
            , _vgRDLights      :: V.Vector DLightT
+           }
+
+data CDLightT =
+  CDLightT { _cdlKey      :: Int
+           , _cdlColor    :: V3 Float
+           , _cdlOrigin   :: V3 Float
+           , _cdlRadius   :: Float
+           , _cdlDie      :: Float
+           , _cdlMinLight :: Float
            }
