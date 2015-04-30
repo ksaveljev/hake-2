@@ -80,6 +80,20 @@ removeKey str key = do
           Com.printf "MISSING VALUE\n"
           return str
 
+-- Returns a value for a key from an info string.
 valueForKey :: B.ByteString -> B.ByteString -> Quake B.ByteString
-valueForKey _ _ = do
-    io (putStrLn "Info.valueForKey") >> undefined -- TODO
+valueForKey str key = do
+    let tokens = BC.split '\\' str
+                  -- ulgy hack for BC.split because
+                  -- BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+    findTokenValue (if null tokens then tokens else tail tokens)
+
+  where findTokenValue :: [B.ByteString] -> Quake B.ByteString
+        findTokenValue [] = return ""
+        findTokenValue (k:v:xs) = do
+          if k == key
+            then return v
+            else findTokenValue xs
+        findTokenValue _ = do
+          Com.printf "MISSING VALUE\n"
+          return str
