@@ -531,7 +531,10 @@ svcAck = do
     Com.printf $ "Ping acknowledge from " `B.append` NET.adrToString from `B.append` "\n"
 
 svcStatus :: Quake ()
-svcStatus = io (putStrLn "SVMain.svcStatus") >> undefined -- TODO
+svcStatus = do
+    status <- statusString
+    from <- use $ globals.netFrom
+    NetChannel.outOfBandPrint Constants.nsServer from ("print\n" `B.append` status)
 
 svcInfo :: Quake ()
 svcInfo = io (putStrLn "SVMain.svcInfo") >> undefined -- TODO
