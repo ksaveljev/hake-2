@@ -139,7 +139,7 @@ glfwbBeginFrame :: RenderAPI -> Float -> Quake ()
 glfwbBeginFrame renderAPI = (renderAPI^.rBeginFrame) glfwbGLDriver
 
 glfwbEndFrame :: Quake ()
-glfwbEndFrame = io (putStrLn "GLFWbRenderer.glfwbEndFrame") >> undefined -- TODO
+glfwbEndFrame = glfwbGLDriver^.gldEndFrame
 
 glfwbAppActivate :: Bool -> Quake ()
 glfwbAppActivate _ = io (putStrLn "GLFWbRenderer.appActivate") >> undefined -- TODO
