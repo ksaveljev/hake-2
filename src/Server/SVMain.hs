@@ -685,6 +685,34 @@ gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport 
 svcRemoteCommand :: Quake ()
 svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO
 
+{-
+- Pull specific info from a newly changed userinfo string into a more C
+- freindly form.
+-}
 userInfoChanged :: ClientReference -> Quake ()
-userInfoChanged _ = do
-    io (putStrLn "SVMain.userInfoChanged") >> undefined -- TODO
+userInfoChanged (ClientReference clientIdx) = do
+    Just userInfo <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
+    Just (Just edictRef@(EdictReference edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
+
+    -- call prog code to allow overrides
+    void $ PlayerClient.clientUserInfoChanged edictRef userInfo
+
+    -- name for C code
+    name <- Info.valueForKey userInfo "name"
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cName .= name
+
+    -- rate command
+    val <- Info.valueForKey userInfo "rate"
+    let rate = if B.length val > 0
+                 then let i = Lib.atoi val
+                      in if | i < 100 -> 100
+                            | i > 15000 -> 15000
+                            | otherwise -> i
+                 else 5000
+
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cRate .= rate
+    
+    -- msg command
+    msg <- Info.valueForKey userInfo "msg"
+    when (B.length msg > 0) $
+      svGlobals.svServerStatic.ssClients.ix clientIdx.cMessageLevel .= Lib.atoi msg
