@@ -97,3 +97,10 @@ valueForKey str key = do
         findTokenValue _ = do
           Com.printf "MISSING VALUE\n"
           return str
+
+{-
+- Some characters are illegal in info strings because they can mess up the
+- server's parsing.
+-}
+validate :: B.ByteString -> Bool
+validate str = '"' `BC.elem` str || ';' `BC.elem` str

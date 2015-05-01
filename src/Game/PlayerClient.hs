@@ -1,5 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerClient where
 
 import Control.Lens (Traversal', use, (^.), ix, preuse, (.=), zoom)
@@ -16,11 +18,12 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.Info as Info
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
-import qualified Game.Info as Info
+import qualified Util.Lib as Lib
 
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
@@ -236,9 +239,64 @@ initClientPersistant (GClientReference gClientIdx) = do
 
       cpConnected .= True
 
+{-
+- Called whenever the player updates a userinfo variable.
+- 
+- The game can override any of the settings in place (forcing skins or
+- names, etc) before copying it off. 
+-
+-}
 clientUserInfoChanged :: EdictReference -> B.ByteString -> Quake B.ByteString
-clientUserInfoChanged _ _ = do
-    io (putStrLn "PlayerClient.clientUserInfoChanged") >> undefined -- TODO
+clientUserInfoChanged (EdictReference edictIdx) userInfo = do
+    -- check for malformed or illegal info strings
+    if not (Info.validate userInfo)
+      then return "\\name\\badinfo\\skin\\male/grunt"
+      else do
+        Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+
+        -- set name
+        name <- Info.valueForKey userInfo "name"
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpNetName .= name
+
+        -- set spectator
+        s <- Info.valueForKey userInfo "spectator"
+        -- spectators are only supported in deathmatch
+        deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+        if deathmatchValue /= 0 && s /= "0"
+          then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpSpectator .= True
+          else gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpSpectator .= False
+
+        -- set skin
+        skin <- Info.valueForKey userInfo "skin"
+
+        let playerNum = edictIdx - 1
+
+        -- combine name and skin into a configstring
+        configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
+        configString (Constants.csPlayerSkins + playerNum) (name `B.append` "\\" `B.append` skin)
+
+        -- fov
+        dmFlagsValue :: Int <- liftM (truncate .(^.cvValue)) dmFlagsCVar
+        if deathmatchValue /= 0 && (dmFlagsValue .&. Constants.dfFixedFov) /= 0
+          then
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psFOV .= 90
+          else do
+            fov <- Info.valueForKey userInfo "fov"
+            let tmpFov = Lib.atoi fov
+                finalFov = if | tmpFov < 1 -> 90
+                              | tmpFov > 160 -> 160
+                              | otherwise -> tmpFov
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psFOV .= fromIntegral finalFov
+
+        -- handedness
+        hand <- Info.valueForKey userInfo "hand"
+        when (B.length hand > 0) $
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpHand .= Lib.atoi hand
+
+        -- save off the userinfo in case we want to check something later
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpUserInfo .= userInfo
+
+        return userInfo
 
 passwordOK :: B.ByteString -> B.ByteString -> Bool
 passwordOK p1 p2 =
