@@ -583,32 +583,58 @@ connectionlessPacket = do
     case c of
       -- server connection
       "client_connect" -> do
-        undefined -- TODO
+        state <- use $ globals.cls.csState
+        if state == Constants.caConnected
+          then 
+            Com.printf "Dup connect received.  Ignored.\n"
+          else do
+            from <- use $ globals.netFrom
+            qport <- use $ globals.cls.csQuakePort
+            NetChannel.setup Constants.nsClient (globals.cls.csNetChan) from qport
+            MSG.writeCharI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.cls.csNetChan.ncMessage) "new"
+            globals.cls.csState .= Constants.caConnected
 
       -- server responding to a status broadcast
-      "info" -> do
-        undefined -- TODO
+      "info" ->
+        parseStatusMessage
 
       -- remote command from gui front end
       "cmd" -> do
-        undefined -- TODO
+        from <- use $ globals.netFrom
+
+        if not (NET.isLocalAddress from)
+          then
+            Com.printf "Command packet from remote host.  Ignored.\n"
+          else do
+            cmd <- MSG.readString (globals.netMessage)
+            CBuf.addText cmd
+            CBuf.addText "\n"
 
       -- print command from somewhere
       "print" -> do
-        undefined -- TODO
+        msg <- MSG.readString (globals.netMessage)
+        when (B.length msg > 0) $
+          Com.printf msg
 
       -- ping from somewhere
       "ping" -> do
-        undefined -- TODO
+        from <- use $ globals.netFrom
+        NetChannel.outOfBandPrint Constants.nsClient from "ack"
 
       -- challenge from the server we are connecting to
       "challenge" -> do
-        undefined -- TODO
+        v1 <- Cmd.argv 1
+        globals.cls.csChallenge .= Lib.atoi v1
+        sendConnectPacket
 
       -- echo request from server
       "echo" -> do
-        undefined -- TODO
+        v1 <- Cmd.argv 1
+        from <- use $ globals.netFrom
+        NetChannel.outOfBandPrint Constants.nsClient from v1
 
       _ -> Com.printf "Unknown command.\n"
 
-    io (putStrLn "CL.connectionlessPacket") >> undefined -- TODO
+parseStatusMessage :: Quake ()
+parseStatusMessage = io (putStrLn "CL.parseStatusMessage") >> undefined -- TODO

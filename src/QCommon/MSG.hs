@@ -173,3 +173,7 @@ readStringLine sizeBufLens = do
               if c == -1 || c == 0 || c == 0x0A
                 then return (BL.toStrict $ BB.toLazyByteString acc)
                 else readStr (idx + 1) (acc `mappend` BB.int8 c)
+
+readString :: Lens' QuakeState SizeBufT -> Quake B.ByteString
+readString _ = do
+    io (putStrLn "MSG.readString") >> undefined -- TODO
