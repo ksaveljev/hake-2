@@ -21,6 +21,7 @@ data NetChanT =
            , _ncIncomingReliableAcknowledged :: Int
            , _ncIncomingReliableSequence     :: Int
            , _ncOutgoingSequence             :: Int
+           , _ncReliableSequence             :: Int
            , _ncLastReliableSequence         :: Int
            , _ncMessage                      :: SizeBufT
            , _ncMessageBuf                   :: B.ByteString
@@ -44,6 +45,7 @@ newNetChanT =
            , _ncIncomingReliableAcknowledged = 0
            , _ncIncomingReliableSequence     = 0
            , _ncOutgoingSequence             = 0
+           , _ncReliableSequence             = 0
            , _ncLastReliableSequence         = 0
            , _ncMessage                      = newSizeBufT
            , _ncMessageBuf                   = "" -- size [Constants.maxMsgLen - 16]

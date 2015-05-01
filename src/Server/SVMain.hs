@@ -692,7 +692,7 @@ svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO
 userInfoChanged :: ClientReference -> Quake ()
 userInfoChanged (ClientReference clientIdx) = do
     Just userInfo <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
-    Just (Just edictRef@(EdictReference edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
+    Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
 
     -- call prog code to allow overrides
     void $ PlayerClient.clientUserInfoChanged edictRef userInfo

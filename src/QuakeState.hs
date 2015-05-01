@@ -25,6 +25,7 @@ module QuakeState ( QuakeState(..)
                   , menuGlobals
                   , clientGlobals
                   , vGlobals
+                  , netChannelGlobals
                   , EdictReference(..)
                   , ClientReference(..)
                   , GClientReference(..)
@@ -62,6 +63,7 @@ module QuakeState ( QuakeState(..)
                   , module Client.VIDGlobals
                   , module Render.Fast.FastRenderAPIGlobals
                   , module Render.GLFWbGlobals
+                  , module QCommon.NetChannelGlobals
                   ) where
 
 import Control.Lens (makeLenses)
@@ -85,6 +87,7 @@ import Server.SVGlobals
 import QCommon.CMGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
+import QCommon.NetChannelGlobals
 import QCommon.PMoveGlobals
 import Render.GLFWbGlobals
 import Sys.KBDGlobals
@@ -120,4 +123,5 @@ initialQuakeState =
              , _menuGlobals          = initialMenuGlobals
              , _clientGlobals        = initialClientGlobals
              , _vGlobals             = initialVGlobals
+             , _netChannelGlobals    = initialNetChannelGlobals
              }

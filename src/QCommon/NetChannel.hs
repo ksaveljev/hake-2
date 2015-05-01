@@ -1,16 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE MultiWayIf #-}
 module QCommon.NetChannel where
 
-import Control.Lens (Traversal', Lens', use, (^.), (.=))
-import Control.Monad (void)
-import Data.Bits ((.&.))
+import Control.Lens (Traversal', Lens', use, (^.), (.=), (+=), preuse, (%=), zoom)
+import Control.Monad (void, when, liftM)
+import Data.Bits ((.&.), xor, (.|.), complement, shiftL)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified Sys.NET as NET
@@ -47,7 +50,68 @@ outOfBandPrint sock adr buf = do
 - messages.
 -}
 transmit :: Traversal' QuakeState NetChanT -> Int -> B.ByteString -> Quake ()
-transmit _ _ _ = io (putStrLn "NetChannel.transmit") >> undefined -- TODO
+transmit netChanLens len buf = do
+    Just chan <- preuse netChanLens
+
+    -- check for message overflow
+    if chan^.ncMessage.sbOverflowed
+      then do
+        netChanLens.ncFatalError .= True
+        Com.printf $ NET.adrToString (chan^.ncRemoteAddress) `B.append` ":Outgoing message overflow\n"
+      else do
+        let sendReliable = if needReliable chan then 1 else 0 :: Int
+
+        when ((chan^.ncReliableLength) == 0 && (chan^.ncMessage.sbCurSize) /= 0) $ do
+          zoom netChanLens $ do
+            ncReliableBuf .= B.take (chan^.ncMessage.sbCurSize) (chan^.ncMessageBuf)
+            ncReliableLength .= (chan^.ncMessage.sbCurSize)
+            ncMessage.sbCurSize .= 0
+            ncReliableSequence %= (`xor` 1)
+
+        -- write the packet header
+        sendBuf <- use $ netChannelGlobals.ncSendBuf
+        SZ.init (netChannelGlobals.ncSend) sendBuf Constants.maxMsgLen
+
+        let w1 = ((chan^.ncOutgoingSequence) .&. (complement (1 `shiftL` 31))) .|. (sendReliable `shiftL` 31)
+            w2 = ((chan^.ncIncomingSequence) .&. (complement (1 `shiftL` 31))) .|. ((chan^.ncIncomingReliableSequence) `shiftL` 31)
+
+        netChanLens.ncOutgoingSequence += 1
+        curTime <- use $ globals.curtime
+        netChanLens.ncLastSent .= curTime
+
+        MSG.writeInt (netChannelGlobals.ncSend) w1
+        MSG.writeInt (netChannelGlobals.ncSend) w2
+
+        -- send the qport if we are a client
+        when ((chan^.ncSock) == Constants.nsClient) $ do
+          qport <- liftM (truncate . (^.cvValue)) qportCVar
+          MSG.writeShort (netChannelGlobals.ncSend) qport
+
+        Just chan' <- preuse netChanLens
+
+        -- copy the reliable message to the packet first
+        when (sendReliable /= 0) $ do
+          SZ.write (netChannelGlobals.ncSend) (chan'^.ncReliableBuf) (chan'^.ncReliableLength)
+          netChanLens.ncLastReliableSequence .= (chan'^.ncOutgoingSequence)
+
+        -- add the unreliable part if space if available
+        use (netChannelGlobals.ncSend) >>= \send ->
+          if (send^.sbMaxSize) - (send^.sbCurSize) >= len
+            then SZ.write (netChannelGlobals.ncSend) buf len
+            else Com.printf "Netchan_Transmit: dumped unreliable\n"
+
+        -- send the datagram
+        use (netChannelGlobals.ncSend) >>= \send ->
+          NET.sendPacket (chan'^.ncSock) (send^.sbCurSize) (send^.sbData) (chan'^.ncRemoteAddress)
+
+        showPacketsValue <- liftM (^.cvValue) showPacketsCVar
+        when (showPacketsValue /= 0) $ do
+          io (putStrLn "NetChannel.transmit") >> undefined -- TODO
+          {-
+          if sendReliable /= 0
+            then undefined
+            else undefined
+            -}
 
 {-
 - Netchan_Process is called when the current net_message is from remote_address modifies
@@ -72,3 +136,11 @@ setup sock netChanLens adr qport = do
     SZ.init (netChanLens.ncMessage) "" (Constants.maxMsgLen - 16)
 
     netChanLens.ncMessage.sbAllowOverflow .= True
+
+needReliable :: NetChanT -> Bool
+needReliable chan =
+         -- if the remote side dropped the last reliable message, resend
+    if | (chan^.ncIncomingAcknowledged) > (chan^.ncLastReliableSequence) && (chan^.ncIncomingReliableAcknowledged) /= (chan^.ncReliableSequence) -> True
+         -- if the reliable transmit buffer is empty, copy the current message out
+       | (chan^.ncReliableLength) == 0 && (chan^.ncMessage.sbCurSize) /= 0 -> True
+       | otherwise -> False

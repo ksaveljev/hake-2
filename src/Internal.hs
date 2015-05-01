@@ -145,6 +145,7 @@ data QuakeState =
              , _menuGlobals          :: !MenuGlobals
              , _clientGlobals        :: !ClientGlobals
              , _vGlobals             :: !VGlobals
+             , _netChannelGlobals    :: !NetChannelGlobals
              }
 
 data Globals =
@@ -1662,3 +1663,8 @@ data CinematicsT =
               , _cHUsed        :: UV.Vector Int
               , _cHCount       :: UV.Vector Int
               }
+
+data NetChannelGlobals =
+  NetChannelGlobals { _ncSendBuf :: B.ByteString
+                    , _ncSend    :: SizeBufT
+                    }
