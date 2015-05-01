@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module QCommon.NetChannel where
 
 import Control.Lens (Traversal', Lens', use, (^.), (.=), (+=), preuse, (%=), zoom)
 import Control.Monad (void, when, liftM)
-import Data.Bits ((.&.), xor, (.|.), complement, shiftL)
+import Data.Bits ((.&.), xor, (.|.), complement, shiftL, shiftR)
+import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -118,7 +120,67 @@ transmit netChanLens len buf = do
 - net_message so that it points to the packet payload.
 -}
 process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
-process _ _ = io (putStrLn "NetChannel.process") >> undefined -- TODO
+process netChanLens msgLens = do
+    -- get sequence numbers
+    MSG.beginReading msgLens
+    seqn <- MSG.readLong msgLens
+    seqnAck <- MSG.readLong msgLens
+
+    -- read the qport if we are a server
+    preuse (netChanLens.ncSock) >>= \(Just sock) ->
+      when (sock == Constants.nsServer) $
+        void $ MSG.readShort msgLens
+
+    -- TODO: make sure it works! some wierd stuff with unsigned int and shiftR
+    let seqnU :: Word32 = fromIntegral seqn
+        seqnAckU :: Word32 = fromIntegral seqnAck
+        reliableMessage :: Int = fromIntegral (seqnU `shiftR` 31)
+        reliableAck :: Int = fromIntegral (seqnAckU `shiftR` 31)
+        seqn' = seqn .&. (complement (1 `shiftL` 31))
+        seqnAck' = seqnAck .&. (complement (1 `shiftL` 31))
+
+    showPacketsValue <- liftM (^.cvValue) showPacketsCVar
+    when (showPacketsValue /= 0) $ do
+      io (putStrLn "NetChannel.process") >> undefined -- TODO
+
+    -- discard stale or duplicated packets
+    Just chan <- preuse netChanLens
+
+    if seqn' <= (chan^.ncIncomingSequence)
+      then do
+        showDropValue <- liftM (^.cvValue) showDropCVar
+        when (showDropValue /= 0) $
+          io (putStrLn "NetChannel.process") >> undefined -- TODO
+        return False
+      else do
+        -- dropped packets don't keep the message from being used 
+        let dropped = seqn' - ((chan^.ncIncomingSequence) + 1)
+        netChanLens.ncDropped .= dropped
+        when (dropped > 0) $ do
+          showDropValue <- liftM (^.cvValue) showDropCVar
+          when (showDropValue /= 0) $
+            io (putStrLn "NetChannel.process") >> undefined -- TODO
+
+        -- if the current outgoing realiable message has been acknowledged
+        -- clear the buffer to make way for the next
+        when (reliableAck == (chan^.ncReliableSequence)) $
+          netChanLens.ncReliableLength .= 0 -- it has been received
+
+        -- if this message contains a reliable message, bump
+        -- incoming_reliable_sequence
+        zoom netChanLens $ do
+          ncIncomingSequence .= seqn'
+          ncIncomingAcknowledged .= seqnAck'
+          ncIncomingReliableAcknowledged .= reliableAck
+
+        when (reliableMessage /= 0) $
+          netChanLens.ncIncomingReliableSequence %= (`xor` 1)
+
+        -- the message can now be read from the current message pointer
+        curTime <- use $ globals.curtime
+        netChanLens.ncLastReceived .= curTime
+        
+        return True
 
 -- Netchan_Setup is called to open a channel to a remote system.
 setup :: Int -> Traversal' QuakeState NetChanT -> NetAdrT -> Int -> Quake ()
