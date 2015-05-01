@@ -2,7 +2,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.NetChannel where
 
-import Control.Lens (Traversal', Lens', use, (^.))
+import Control.Lens (Traversal', Lens', use, (^.), (.=))
 import Control.Monad (void)
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
@@ -56,6 +56,19 @@ transmit _ _ _ = io (putStrLn "NetChannel.transmit") >> undefined -- TODO
 process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
 process _ _ = io (putStrLn "NetChannel.process") >> undefined -- TODO
 
+-- Netchan_Setup is called to open a channel to a remote system.
 setup :: Int -> Traversal' QuakeState NetChanT -> NetAdrT -> Int -> Quake ()
-setup _ _ _ _ = do
-    io (putStrLn "NetChannel.setup") >> undefined -- TODO
+setup sock netChanLens adr qport = do
+    curTime <- use $ globals.curtime
+
+    netChanLens .= newNetChanT { _ncSock = sock
+                               , _ncRemoteAddress = adr
+                               , _ncRemoteQPort = qport
+                               , _ncLastReceived = curTime
+                               , _ncIncomingSequence = 0
+                               , _ncOutgoingSequence = 1
+                               }
+
+    SZ.init (netChanLens.ncMessage) "" (Constants.maxMsgLen - 16)
+
+    netChanLens.ncMessage.sbAllowOverflow .= True
