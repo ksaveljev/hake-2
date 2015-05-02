@@ -144,3 +144,45 @@ fill _ x y w h colorIndex = do
     GL.glEnd
     GL.glColor3f 1 1 1
     GL.glEnable GL.gl_TEXTURE_2D
+
+drawPic :: GLDriver -> Int -> Int -> B.ByteString -> Quake ()
+drawPic _ x y pic = do
+    foundPic <- findPic pic
+
+    case foundPic of
+      Nothing -> VID.printf Constants.printAll ("Can't find pic: " `B.append` pic `B.append` "\n")
+      Just (ImageReference imageIdx) -> do
+
+        use (fastRenderAPIGlobals.frScrapDirty) >>= \scrapDirty ->
+          when scrapDirty Image.scrapUpload
+
+        Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
+        glConfig <- use $ fastRenderAPIGlobals.frGLConfig
+
+        when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
+          GL.glDisable GL.gl_ALPHA_TEST
+
+        let x' = fromIntegral x
+            y' = fromIntegral y
+            tl = realToFrac (image^.iTL)
+            th = realToFrac (image^.iTH)
+            sl = realToFrac (image^.iSL)
+            sh = realToFrac (image^.iSH)
+            w = fromIntegral (image^.iWidth)
+            h = fromIntegral (image^.iHeight)
+        
+        Image.glBind (image^.iTexNum)
+
+        GL.glBegin GL.gl_QUADS
+        GL.glTexCoord2f sl tl
+        GL.glVertex2f x' y'
+        GL.glTexCoord2f sh tl
+        GL.glVertex2f (x' + w) y'
+        GL.glTexCoord2f sh th
+        GL.glVertex2f (x' + w) (y' + h)
+        GL.glTexCoord2f sl th
+        GL.glVertex2f x' (y' + h)
+        GL.glEnd
+
+        when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
+          GL.glEnable GL.gl_ALPHA_TEST

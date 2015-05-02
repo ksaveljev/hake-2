@@ -706,7 +706,7 @@ glMipMap img width height =
 
 glFindImage :: B.ByteString -> Int -> Quake (Maybe ImageReference)
 glFindImage imgName imgType = do
-    if B.length imgName < 5
+    if B.length imgName < 1
       then return Nothing
       else do
         -- look for it
