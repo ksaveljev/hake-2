@@ -52,8 +52,8 @@ writeInt sizeBufLens v = do
         d :: Word8 = fromIntegral ((v `shiftR` 24) .&. 0xFF)
     SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
 
-writeLong :: ASetter' QuakeState SizeBufT -> Int -> Quake ()
-writeLong _ _ = io (putStrLn "MSG.writeLong") >> undefined -- TODO
+writeLong :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeLong sizeBufLens v = writeInt sizeBufLens v
 
 writeFloat :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeFloat _ _ = io (putStrLn "MSG.writeFloat") >> undefined -- TODO

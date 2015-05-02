@@ -6,6 +6,7 @@ import Control.Monad (when, unless)
 import Data.Bits ((.&.), shiftR)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
@@ -13,6 +14,7 @@ import QuakeState
 import Render.OpenGL.GLDriver
 import qualified Constants
 import qualified Client.VID as VID
+import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 
@@ -112,3 +114,33 @@ drawChar _ x y num = do
       GL.glTexCoord2f fcol (frow + size)
       GL.glVertex2f x' (y' + 8)
       GL.glEnd
+
+fill :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fill glDriver x y w h colorIndex = do
+    when (colorIndex > 255) $
+      Com.comError Constants.errFatal "Draw_Fill: bad color"
+
+    GL.glDisable GL.gl_TEXTURE_2D
+
+    d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+    let color = d8to24table UV.! colorIndex
+
+    GL.glColor3ub (fromIntegral $ (color `shiftR`  0) .&. 0xFF) -- r
+                  (fromIntegral $ (color `shiftR`  8) .&. 0xFF) -- g
+                  (fromIntegral $ (color `shiftR` 16) .&. 0xFF) -- b
+
+    let x' = fromIntegral x
+        y' = fromIntegral y
+        w' = fromIntegral w
+        h' = fromIntegral h
+
+    GL.glBegin GL.gl_QUADS
+
+    GL.glVertex2f x' y'
+    GL.glVertex2f (x' + w') y'
+    GL.glVertex2f (x' + w') (y' + h')
+    GL.glVertex2f x' (y' + h')
+
+    GL.glEnd
+    GL.glColor3f 1 1 1
+    GL.glEnable GL.gl_TEXTURE_2D
