@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVMain where
 
-import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), Traversal', ix, zoom)
+import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), ix, zoom)
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
@@ -31,7 +31,7 @@ import {-# SOURCE #-} qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts as SVEnts
 import qualified Server.SVGame as SVGame
 import {-# SOURCE #-} qualified Server.SVSend as SVSend
-import qualified Server.SVUser as SVUser
+import {-# SOURCE #-} qualified Server.SVUser as SVUser
 import qualified Sys.NET as NET
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
@@ -127,20 +127,21 @@ masterShutdown = io (putStrLn "SVMain.masterShutdown") >> undefined -- TODO
 - unwillingly. This is NOT called if the entire server is quiting or
 - crashing.
 -}
-dropClient :: Traversal' QuakeState ClientT -> Quake ()
-dropClient clientLens = do
-    Just client <- preuse $ clientLens
+dropClient :: ClientReference -> Quake ()
+dropClient (ClientReference clientIdx) = do
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
-    MSG.writeByteI (clientLens.cNetChan.ncMessage) (fromIntegral Constants.svcDisconnect)
+    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (fromIntegral Constants.svcDisconnect)
 
     when ((client^.cState) == Constants.csSpawned) $
-      PlayerClient.clientDisconnect (clientLens.cEdict)
+      PlayerClient.clientDisconnect (client^.cEdict)
 
     when (isJust (client^.cDownload)) $
-      clientLens.cDownload .= Just ""
+      svGlobals.svServerStatic.ssClients.ix clientIdx.cDownload .= Just ""
 
-    clientLens.cState .= Constants.csZombie
-    clientLens.cName .= ""
+    zoom (svGlobals.svServerStatic.ssClients.ix clientIdx) $ do
+      cState .= Constants.csZombie
+      cName .= ""
 
 {- ==============================================================================
 - 
@@ -281,7 +282,7 @@ checkTimeouts = do
                 else
                   when (((client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned) && (client^.cLastMessage) < dropPoint) $ do
                     SVSend.broadcastPrintf Constants.printHigh $ (client^.cName) `B.append` " timed out\n"
-                    dropClient (svGlobals.svServerStatic.ssClients.ix idx)
+                    dropClient (ClientReference idx)
                     svGlobals.svServerStatic.ssClients.ix idx.cState .= Constants.csFree -- don't bother with zombie state
 
               checkClientTimeout realTime dropPoint zombiePoint (idx + 1) maxIdx
@@ -338,7 +339,7 @@ readPackets = do
                        when ((client^.cState) /= Constants.csZombie) $ do
                          realTime <- use $ svGlobals.svServerStatic.ssRealTime
                          svGlobals.svServerStatic.ssClients.ix idx.cLastMessage .= realTime -- don't timeout
-                         SVUser.executeClientMessage idx
+                         SVUser.executeClientMessage (ClientReference idx)
 
                      return idx
 

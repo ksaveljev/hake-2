@@ -5,7 +5,7 @@
 module Server.SVSend where
 
 import Control.Exception (IOException, handle)
-import Control.Lens (use, preuse, (.=), (^.), ix, Traversal')
+import Control.Lens (use, preuse, (.=), (^.), ix)
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Maybe (isJust)
@@ -299,7 +299,7 @@ startSound origin (EdictReference edictIdx) channel soundIndex volume attenuatio
 SV_SendClientDatagram
 =======================
 -}
-sendClientDatagram :: Traversal' QuakeState ClientT -> Quake ()
+sendClientDatagram :: ClientReference -> Quake ()
 sendClientDatagram _ = io (putStrLn "SVSend.sendClientDatagram") >> undefined -- TODO
 
 {-
@@ -330,7 +330,7 @@ Returns true if the client is over its current
 bandwidth estimation and should not be sent another packet
 =======================
 -}
-rateDrop :: Traversal' QuakeState ClientT -> Quake Bool
+rateDrop :: ClientReference -> Quake Bool
 rateDrop _ = io (putStrLn "SVSend.rateDrop") >> undefined -- TODO
 
 {-
@@ -379,32 +379,32 @@ sendClientMessages = do
     when (isJust msglen) $ do
       -- send a message to each connected client
       maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
-      void $ traverse (\idx -> sendMessage (svGlobals.svServerStatic.ssClients.ix idx)) [0..maxClientsValue-1]
+      void $ traverse (\idx -> sendMessage (ClientReference idx)) [0..maxClientsValue-1]
 
-  where sendMessage :: Traversal' QuakeState ClientT -> Quake ()
-        sendMessage clientLens = do
-          Just client <- preuse clientLens
+  where sendMessage :: ClientReference -> Quake ()
+        sendMessage clientRef@(ClientReference clientIdx) = do
+          Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
           when ((client^.cState) /= 0) $ do
             -- if the reliable message overflowed, drop the client
             when (client^.cNetChan.ncMessage.sbOverflowed) $ do
-              SZ.clear (clientLens.cNetChan.ncMessage)
-              SZ.clear (clientLens.cDatagram)
+              SZ.clear (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage)
+              SZ.clear (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram)
               broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " overflowed\n")
-              SVMain.dropClient clientLens
+              SVMain.dropClient clientRef
 
             state <- use $ svGlobals.svServer.sState
 
             if | elem state [Constants.ssCinematic, Constants.ssDemo, Constants.ssPic] -> do
                    msg <- use $ svGlobals.svMsgBuf
-                   NetChannel.transmit (clientLens.cNetChan) (B.length msg) msg
+                   NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) (B.length msg) msg
                | state == Constants.csSpawned -> do
-                   flooded <- rateDrop clientLens
+                   flooded <- rateDrop clientRef
                    -- don't overrun bandwidth
-                   unless flooded $ sendClientDatagram clientLens
+                   unless flooded $ sendClientDatagram clientRef
                | otherwise -> do
-                   Just netChan <- preuse $ clientLens.cNetChan
+                   Just netChan <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan
                    curTime <- use $ globals.curtime
                    -- just update reliable if needed
                    when ((netChan^.ncMessage.sbCurSize) /= 0 || curTime - (netChan^.ncLastSent) > 1000) $
-                     NetChannel.transmit (clientLens.cNetChan) 0 ""
+                     NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) 0 ""

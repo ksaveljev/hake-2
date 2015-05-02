@@ -537,14 +537,14 @@ kickF = do
            sp <- setPlayer
 
            when sp $ do
-             Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+             Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
              let playerName = client^.cName
              SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
              -- print directly, because the dropped client won't get the
              -- SV_BroadcastPrintf message
              SVSend.clientPrintf client Constants.printHigh "You were kicked from the game\n"
-             SVMain.dropClient (svGlobals.svServerStatic.ssClients.ix clientIdx)
+             SVMain.dropClient clientRef
              -- SV_INIT.svs.realtime
              realtime <- use $ svGlobals.svServerStatic.ssRealTime
              svGlobals.svServerStatic.ssClients.ix clientIdx.cLastMessage .= realtime -- min case there is a funny zombie

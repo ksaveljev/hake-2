@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerClient where
 
-import Control.Lens (Traversal', use, (^.), ix, preuse, (.=), zoom)
+import Control.Lens (use, (^.), ix, preuse, (.=), zoom)
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower)
@@ -26,7 +26,7 @@ import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 -- Called when a player drops from the server. Will not be called between levels. 
-clientDisconnect :: Traversal' QuakeState (Maybe EdictReference) -> Quake ()
+clientDisconnect :: Maybe EdictReference -> Quake ()
 clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined -- TODO
 
 {-

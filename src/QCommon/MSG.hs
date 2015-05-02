@@ -224,3 +224,6 @@ readStringLine sizeBufLens = do
 readString :: Lens' QuakeState SizeBufT -> Quake B.ByteString
 readString _ = do
     io (putStrLn "MSG.readString") >> undefined -- TODO
+
+readDeltaUserCmd :: Lens' QuakeState SizeBufT -> UserCmdT -> Quake UserCmdT
+readDeltaUserCmd _ _ = io (putStrLn "MSG.readDeltaUserCmd") >> undefined -- TODO
