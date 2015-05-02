@@ -21,7 +21,7 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLFX as CLFX
 import {-# SOURCE #-} qualified Client.CLInput as CLInput
-import qualified Client.CLParse as CLParse
+import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
 import qualified Client.CLView as CLView
 import qualified Client.Console as Console
@@ -638,3 +638,6 @@ connectionlessPacket = do
 
 parseStatusMessage :: Quake ()
 parseStatusMessage = io (putStrLn "CL.parseStatusMessage") >> undefined -- TODO
+
+writeDemoMessage :: Quake ()
+writeDemoMessage = io (putStrLn "CL.writeDemoMessage") >> undefined -- TODO

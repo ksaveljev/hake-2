@@ -129,9 +129,21 @@ readLong sizeBufLens = do
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
 
+readByte :: Lens' QuakeState SizeBufT -> Quake Word8
+readByte sizeBufLens = do
+    sizeBuf <- use sizeBufLens
+
+    let c = if (sizeBuf^.sbReadCount) + 1 > (sizeBuf^.sbCurSize)
+              then -1
+              else (sizeBuf^.sbData) `B.index` (sizeBuf^.sbReadCount)
+
+    sizeBufLens.sbReadCount += 1
+
+    return c
+
 readShort :: Lens' QuakeState SizeBufT -> Quake Int16
 readShort sizeBufLens = do
-    sizeBuf <- use $ sizeBufLens
+    sizeBuf <- use sizeBufLens
 
     if (sizeBuf^.sbReadCount) + 2 > (sizeBuf^.sbCurSize)
       then do
