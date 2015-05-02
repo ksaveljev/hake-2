@@ -4,12 +4,12 @@
 module QCommon.MSG where
 
 import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
-import Control.Monad (when)
+import Control.Monad (when, liftM)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int8, Int16, Int32)
 import Data.Monoid (mempty, mappend)
 import Data.Word (Word8)
-import Linear (V3, _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
@@ -164,7 +164,7 @@ readLong sizeBufLens = do
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
 
-readByte :: Lens' QuakeState SizeBufT -> Quake Int
+readByte :: Lens' QuakeState SizeBufT -> Quake Int8
 readByte sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
@@ -176,7 +176,7 @@ readByte sizeBufLens = do
 
     return c
 
-readShort :: Lens' QuakeState SizeBufT -> Quake Int
+readShort :: Lens' QuakeState SizeBufT -> Quake Int16
 readShort sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
@@ -187,8 +187,8 @@ readShort sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int = fromIntegral $ B.index buf readCount
-            b :: Int = fromIntegral $ B.index buf (readCount + 1)
+            a :: Int16 = fromIntegral $ B.index buf readCount
+            b :: Int16 = fromIntegral $ B.index buf (readCount + 1)
             result = a .|. (b `shiftL` 8)
         sizeBufLens.sbReadCount += 2
         return result 
@@ -226,4 +226,39 @@ readString _ = do
     io (putStrLn "MSG.readString") >> undefined -- TODO
 
 readDeltaUserCmd :: Lens' QuakeState SizeBufT -> UserCmdT -> Quake UserCmdT
-readDeltaUserCmd _ _ = io (putStrLn "MSG.readDeltaUserCmd") >> undefined -- TODO
+readDeltaUserCmd sizeBufLens from = do
+    let move = from
+
+    bits <- liftM fromIntegral $ readByte sizeBufLens
+
+    -- read current angles
+    a1 <- if bits .&. Constants.cmAngle1 /= 0 then readShort sizeBufLens else return (from^.ucAngles._x)
+    a2 <- if bits .&. Constants.cmAngle2 /= 0 then readShort sizeBufLens else return (from^.ucAngles._y)
+    a3 <- if bits .&. Constants.cmAngle3 /= 0 then readShort sizeBufLens else return (from^.ucAngles._z)
+
+    -- read movement
+    forward <- if bits .&. Constants.cmForward /= 0 then readShort sizeBufLens else return (from^.ucForwardMove)
+    side <- if bits .&. Constants.cmSide /= 0 then readShort sizeBufLens else return (from^.ucSideMove)
+    up <- if bits .&. Constants.cmUp /= 0 then readShort sizeBufLens else return (from^.ucUpMove)
+
+    -- read buttons
+    buttons <- if bits .&. Constants.cmButtons /= 0 then readByte sizeBufLens else return (from^.ucButtons)
+    impulse <- if bits .&. Constants.cmImpulse /= 0 then readByte sizeBufLens else return (from^.ucImpulse)
+
+    -- read time to run command
+    msec <- readByte sizeBufLens
+
+    -- read the light level
+    lightLevel <- readByte sizeBufLens
+
+    return move { _ucAngles      = V3 a1 a2 a3
+                , _ucForwardMove = forward
+                , _ucSideMove    = side
+                , _ucUpMove      = up
+                , _ucButtons     = buttons
+                , _ucImpulse     = impulse
+                , _ucMsec        = msec
+                , _ucLightLevel  = lightLevel
+                }
+
+    io (putStrLn "MSG.readDeltaUserCmd") >> undefined -- TODO

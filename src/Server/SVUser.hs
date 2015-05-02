@@ -40,7 +40,7 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
               -- Com.Printf(Lib.hexDump(Globals.net_message.data, 32, false));
               SVMain.dropClient clientRef
             else do
-              c <- MSG.readByte (globals.netMessage)
+              c <- liftM fromIntegral $ MSG.readByte (globals.netMessage)
 
               (done, moveIssued', stringCmdCount') <- execute c moveIssued stringCmdCount
 
@@ -113,6 +113,8 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
 
                  | c == Constants.clcStringCmd -> do
                      io (putStrLn "SVUser.executeClientMessage#executeMessage#clcStringCmd") >> undefined -- TODO
+                 | otherwise -> do
+                     io (putStrLn "SVUser.executeClientMessage#executeMessage") >> undefined -- TODO
 
         execCmd :: ClientReference -> UserCmdT -> Int -> Quake Int
         execCmd cr lastcmd netDrop
