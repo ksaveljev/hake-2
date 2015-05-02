@@ -262,12 +262,12 @@ useTargetSplash =
 
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-    writeByte Constants.svcTempEntity
-    writeByte Constants.teSplash
-    writeByte (self^.eCount)
+    writeByte (fromIntegral Constants.svcTempEntity)
+    writeByte (fromIntegral Constants.teSplash)
+    writeByte (fromIntegral $ self^.eCount)
     writePosition (self^.eEntityState.esOrigin)
     writeDir (self^.eEdictPhysics.eMoveDir)
-    writeByte (self^.eSounds)
+    writeByte (fromIntegral $ self^.eSounds)
     multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
 
     when ((self^.eEdictStatus.eDmg) /= 0) $

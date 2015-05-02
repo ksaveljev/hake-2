@@ -41,6 +41,7 @@ module Game.GameImportT ( GameImportT(..)
                         ) where
 
 import Control.Lens (Lens')
+import Data.Int (Int8, Int16)
 import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -73,8 +74,8 @@ giBoxEdicts          :: Functor f => ((V3 Float -> V3 Float -> Lens' QuakeState 
 giPMove              :: Functor f => ((PMoveT -> Quake ()) -> f (PMoveT -> Quake ())) -> GameImportT -> f GameImportT
 giMulticast          :: Functor f => ((V3 Float -> Int -> Quake ()) -> f (V3 Float -> Int -> Quake ())) -> GameImportT -> f GameImportT
 giUnicast            :: Functor f => ((EdictReference -> Bool -> Quake ()) -> f (EdictReference -> Bool -> Quake ())) -> GameImportT -> f GameImportT
-giWriteByte          :: Functor f => ((Int -> Quake ()) -> f (Int -> Quake ())) -> GameImportT -> f GameImportT
-giWriteShort         :: Functor f => ((Int -> Quake ()) -> f (Int -> Quake ())) -> GameImportT -> f GameImportT
+giWriteByte          :: Functor f => ((Int8 -> Quake ()) -> f (Int8 -> Quake ())) -> GameImportT -> f GameImportT
+giWriteShort         :: Functor f => ((Int16 -> Quake ()) -> f (Int16 -> Quake ())) -> GameImportT -> f GameImportT
 giWriteString        :: Functor f => ((B.ByteString -> Quake ()) -> f (B.ByteString -> Quake ())) -> GameImportT -> f GameImportT
 giWritePosition      :: Functor f => ((V3 Float -> Quake ()) -> f (V3 Float -> Quake ())) -> GameImportT -> f GameImportT
 giWriteDir           :: Functor f => ((V3 Float -> Quake ()) -> f (V3 Float -> Quake ())) -> GameImportT -> f GameImportT

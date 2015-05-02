@@ -591,7 +591,7 @@ connectionlessPacket = do
             from <- use $ globals.netFrom
             qport <- use $ globals.cls.csQuakePort
             NetChannel.setup Constants.nsClient (globals.cls.csNetChan) from qport
-            MSG.writeCharI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeCharI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
             MSG.writeString (globals.cls.csNetChan.ncMessage) "new"
             globals.cls.csState .= Constants.caConnected
 

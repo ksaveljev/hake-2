@@ -131,7 +131,7 @@ dropClient :: Traversal' QuakeState ClientT -> Quake ()
 dropClient clientLens = do
     Just client <- preuse $ clientLens
 
-    MSG.writeByteI (clientLens.cNetChan.ncMessage) Constants.svcDisconnect
+    MSG.writeByteI (clientLens.cNetChan.ncMessage) (fromIntegral Constants.svcDisconnect)
 
     when ((client^.cState) == Constants.csSpawned) $
       PlayerClient.clientDisconnect (clientLens.cEdict)

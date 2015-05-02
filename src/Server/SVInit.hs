@@ -54,8 +54,8 @@ findIndex name start maxIdx create =
 
                 when (state /= Constants.ssLoading) $ do
                   SZ.clear (svGlobals.svServer.sMulticast)
-                  MSG.writeCharI (svGlobals.svServer.sMulticast) Constants.svcConfigString
-                  MSG.writeShort (svGlobals.svServer.sMulticast) (start + idx)
+                  MSG.writeCharI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcConfigString)
+                  MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral (start + idx))
                   MSG.writeString (svGlobals.svServer.sMulticast) name
                   origin <- use $ globals.vec3Origin
                   SVSend.multicast origin Constants.multicastAllR

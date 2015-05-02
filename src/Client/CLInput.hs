@@ -182,7 +182,7 @@ sendCmd = do
             when modified $ do
               CL.fixUpGender
               globals.userInfoModified .= False
-              MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcUserInfo
+              MSG.writeByteI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcUserInfo)
               userInfo <- CVar.userInfo
               MSG.writeString (globals.cls.csNetChan.ncMessage) userInfo
 
@@ -193,7 +193,7 @@ sendCmd = do
             when shouldSkip SCR.finishCinematic
 
           -- begin a client move command
-          MSG.writeByteI (clientGlobals.cgBuf) Constants.clcMove
+          MSG.writeByteI (clientGlobals.cgBuf) (fromIntegral Constants.clcMove)
 
           -- save the position for a checksum byte
           checksumIndex <- use $ clientGlobals.cgBuf.sbCurSize

@@ -68,7 +68,7 @@ broadcastCommand :: B.ByteString -> Quake ()
 broadcastCommand s = do
     state <- use $ svGlobals.svServer.sState
     when (state /= 0) $ do
-      MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcStuffText
+      MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcStuffText)
       MSG.writeString (svGlobals.svServer.sMulticast) s
       multicast (V3 0 0 0) Constants.multicastAllR -- TODO: we send V3 0 0 0 but there is NULL in jake2
 
@@ -235,9 +235,9 @@ startSound origin (EdictReference edictIdx) channel soundIndex volume attenuatio
       }
     -}
 
-    MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcSound
-    MSG.writeByteI (svGlobals.svServer.sMulticast) flags
-    MSG.writeByteI (svGlobals.svServer.sMulticast) soundIndex
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcSound)
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral flags)
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral soundIndex)
 
     when (flags .&. Constants.sndVolume /= 0) $
       MSG.writeByteF (svGlobals.svServer.sMulticast) (volume * 255)
@@ -249,7 +249,7 @@ startSound origin (EdictReference edictIdx) channel soundIndex volume attenuatio
       MSG.writeByteF (svGlobals.svServer.sMulticast) (timeOfs * 1000)
 
     when (flags .&. Constants.sndEnt /= 0) $
-      MSG.writeShort (svGlobals.svServer.sMulticast) sendChan
+      MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral sendChan)
 
     when (flags .&. Constants.sndPos /= 0) $
       MSG.writePos (svGlobals.svServer.sMulticast) origin

@@ -3,6 +3,7 @@ module Server.SVGame where
 
 import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
 import Control.Monad (when, unless, liftM)
+import Data.Int (Int8, Int16)
 import Data.Maybe (isNothing, fromJust)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
@@ -72,7 +73,7 @@ centerPrintf er@(EdictReference edictIdx) str = do
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
     unless (n < 1 || n > maxClientsValue) $ do
-      MSG.writeByteI (svGlobals.svServer.sMulticast) Constants.svcCenterPrint
+      MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcCenterPrint)
       MSG.writeString (svGlobals.svServer.sMulticast) str
       unicast er True
 
@@ -124,20 +125,20 @@ configString index val = do
 
     unless (state == Constants.ssLoading) $ do
       SZ.clear (svGlobals.svServer.sMulticast)
-      MSG.writeCharI (svGlobals.svServer.sMulticast) Constants.svcConfigString
-      MSG.writeShort (svGlobals.svServer.sMulticast) index
+      MSG.writeCharI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcConfigString)
+      MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral index)
       MSG.writeString (svGlobals.svServer.sMulticast) val
 
       origin <- use $ globals.vec3Origin
       SVSend.multicast origin Constants.multicastAllR
 
-writeChar :: Int -> Quake ()
+writeChar :: Int8 -> Quake ()
 writeChar c = MSG.writeCharI (svGlobals.svServer.sMulticast) c
 
-writeByte :: Int -> Quake ()
+writeByte :: Int8 -> Quake ()
 writeByte c = MSG.writeByteI (svGlobals.svServer.sMulticast) c
 
-writeShort :: Int -> Quake ()
+writeShort :: Int16 -> Quake ()
 writeShort c = MSG.writeShort (svGlobals.svServer.sMulticast) c
 
 writeLong :: Int -> Quake ()

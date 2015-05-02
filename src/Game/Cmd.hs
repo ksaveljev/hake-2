@@ -310,7 +310,7 @@ forwardToServer = do
     if (clientStatic^.csState) <= Constants.caConnected || ch == '-' || ch == '+'
       then Com.printf $ "Unknown command \"" `B.append` cmd `B.append` "\"\n"
       else do 
-        MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+        MSG.writeByteI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
         SZ.print (globals.cls.csNetChan.ncMessage) cmd
 
         c <- argc

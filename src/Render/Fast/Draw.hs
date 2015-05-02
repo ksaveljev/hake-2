@@ -116,7 +116,7 @@ drawChar _ x y num = do
       GL.glEnd
 
 fill :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
-fill glDriver x y w h colorIndex = do
+fill _ x y w h colorIndex = do
     when (colorIndex > 255) $
       Com.comError Constants.errFatal "Draw_Fill: bad color"
 
