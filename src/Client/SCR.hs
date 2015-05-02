@@ -939,3 +939,6 @@ drawCenterString = io (putStrLn "SCR.drawCenterString") >> undefined -- TODO
 readNextFrame :: Quake (Maybe B.ByteString)
 readNextFrame = do
     io (putStrLn "SCR.readNextFrame") >> undefined -- TODO
+
+debugGraph :: Float -> Int -> Quake ()
+debugGraph _ _ = io (putStrLn "IMPLEMENT ME!! SCR.debugGraph") >> return ()

@@ -5,7 +5,7 @@ module QCommon.MSG where
 
 import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
-import Data.Int (Int8, Int16, Int32)
+import Data.Int (Int8, Int32)
 import Data.Monoid (mempty, mappend)
 import Data.Word (Word8)
 import Linear (V3, _x, _y, _z, dot)
@@ -129,19 +129,19 @@ readLong sizeBufLens = do
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
 
-readByte :: Lens' QuakeState SizeBufT -> Quake Word8
+readByte :: Lens' QuakeState SizeBufT -> Quake Int
 readByte sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
     let c = if (sizeBuf^.sbReadCount) + 1 > (sizeBuf^.sbCurSize)
               then -1
-              else (sizeBuf^.sbData) `B.index` (sizeBuf^.sbReadCount)
+              else fromIntegral $ (sizeBuf^.sbData) `B.index` (sizeBuf^.sbReadCount)
 
     sizeBufLens.sbReadCount += 1
 
     return c
 
-readShort :: Lens' QuakeState SizeBufT -> Quake Int16
+readShort :: Lens' QuakeState SizeBufT -> Quake Int
 readShort sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
@@ -152,11 +152,11 @@ readShort sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int16 = fromIntegral $ B.index buf readCount
-            b :: Int16 = fromIntegral $ B.index buf (readCount + 1)
+            a :: Int = fromIntegral $ B.index buf readCount
+            b :: Int = fromIntegral $ B.index buf (readCount + 1)
             result = a .|. (b `shiftL` 8)
         sizeBufLens.sbReadCount += 2
-        return $ fromIntegral result 
+        return result 
 
 readChar :: Lens' QuakeState SizeBufT -> Quake Int8
 readChar sizeBufLens = do
