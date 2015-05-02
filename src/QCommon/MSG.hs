@@ -260,5 +260,3 @@ readDeltaUserCmd sizeBufLens from = do
                 , _ucMsec        = msec
                 , _ucLightLevel  = lightLevel
                 }
-
-    io (putStrLn "MSG.readDeltaUserCmd") >> undefined -- TODO
