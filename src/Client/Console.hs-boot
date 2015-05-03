@@ -30,3 +30,5 @@ drawString :: Int -> Int -> B.ByteString -> Quake ()
 drawConsole :: Float -> Quake ()
 
 drawNotify :: Quake ()
+
+print :: B.ByteString -> Quake ()

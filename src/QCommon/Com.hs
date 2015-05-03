@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module QCommon.Com where
 
-import Data.Char (chr)
-import Data.Word (Word8)
+import Control.Lens ((.=), (%=), use, (^.))
 import Control.Monad (when, void, unless)
-import Control.Lens ((.=), (%=), use)
+import Data.Char (chr)
+import Data.Maybe (isJust, fromJust)
+import Data.Word (Word8)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString.Char8 as BC
@@ -14,7 +15,9 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
-import qualified Sys.Sys as Sys
+import {-# SOURCE #-} qualified Client.Console as Console
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified Sys.Sys as Sys
 
 -- checks the number of command line arguments and
 -- copies all arguments with valid length into comArgv
@@ -49,7 +52,20 @@ comError code fmt = do
         errReact _ = io (putStrLn "Com.comError#errReact") >> undefined -- TODO
 
 printf :: B.ByteString -> Quake ()
-printf = io . B.putStr -- io.print -- TODO -- putStrLn for grep
+printf msg = do
+    use (comGlobals.cgRdTarget) >>= \rdTarget ->
+      when (rdTarget /= 0) $ do
+        io (putStrLn "Com.printf") >> undefined -- TODO
+
+    Console.print msg
+
+    -- also echo to debugging console
+    Sys.consoleOutput msg
+
+    -- logfile
+    logfileActive <- CVar.findVar "logfile"
+    when (isJust logfileActive && ((fromJust logfileActive)^.cvValue) /= 0) $ do
+      io (putStrLn "Com.printf") >> undefined -- TODO
 
 println :: B.ByteString -> Quake ()
 println str = printf $ str `B.append` "\n" -- TODO

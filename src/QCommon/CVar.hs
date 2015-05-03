@@ -25,7 +25,7 @@ import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Constants
-import qualified Util.Lib as Lib
+import {-# SOURCE #-} qualified Util.Lib as Lib
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
 get :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)

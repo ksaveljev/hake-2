@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CVarVariables where
 
-import qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 clStereoSeparationCVar       = CVar.getExisting "cl_stereo_separation"
 clStereoCVar                 = CVar.getExisting "cl_stereo"

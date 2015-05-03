@@ -200,12 +200,13 @@ data Globals =
           }
 
 data ComGlobals =
-  ComGlobals { _cgComArgc     :: !Int
-             , _cgComArgv     :: !(V.Vector B.ByteString)
-             , _cgRecursive   :: !Bool
-             , _cgMsg         :: !B.ByteString
-             , _debugContext  :: !B.ByteString
-             , _debugContext2 :: !B.ByteString
+  ComGlobals { _cgComArgc       :: !Int
+             , _cgComArgv       :: !(V.Vector B.ByteString)
+             , _cgRecursive     :: !Bool
+             , _cgMsg           :: !B.ByteString
+             , _cgDebugContext  :: !B.ByteString
+             , _cgDebugContext2 :: !B.ByteString
+             , _cgRdTarget      :: Int
              }
 
 data CmdGlobals =
@@ -1616,6 +1617,7 @@ data ClientGlobals =
                 , _cgDLights         :: V.Vector CDLightT
                 , _cgLightStyle      :: V.Vector CLightStyleT
                 , _cgLastOfs         :: Int
+                , _cgCR              :: Int -- from Console.hs
                 }
 
 data VRectT =

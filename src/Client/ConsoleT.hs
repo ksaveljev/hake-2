@@ -1,16 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Client.ConsoleT where
 
 import Control.Lens (makeLenses)
-import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 import qualified Constants
 
 data ConsoleT =
   ConsoleT { _cInitialized :: Bool
-           , _cText        :: B.ByteString
+           , _cText        :: UV.Vector Char
            , _cCurrent     :: Int
            , _cX           :: Int
            , _cDisplay     :: Int
@@ -27,7 +25,7 @@ makeLenses ''ConsoleT
 newConsoleT :: ConsoleT
 newConsoleT =
   ConsoleT { _cInitialized = False
-           , _cText        = "" -- max size is Constants.conTextSize
+           , _cText        = UV.empty -- max size is Constants.conTextSize
            , _cCurrent     = 0
            , _cX           = 0
            , _cDisplay     = 0

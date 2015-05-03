@@ -15,10 +15,11 @@ makeLenses ''ComGlobals
 
 initialComGlobals :: ComGlobals
 initialComGlobals =
-  ComGlobals { _cgComArgc     = 0
-             , _cgComArgv     = V.replicate Constants.maxNumArgvs ""
-             , _cgRecursive   = False
-             , _cgMsg         = B.empty
-             , _debugContext  = ""
-             , _debugContext2 = ""
+  ComGlobals { _cgComArgc       = 0
+             , _cgComArgv       = V.replicate Constants.maxNumArgvs ""
+             , _cgRecursive     = False
+             , _cgMsg           = B.empty
+             , _cgDebugContext  = ""
+             , _cgDebugContext2 = ""
+             , _cgRdTarget      = 0
              }

@@ -45,4 +45,5 @@ initialClientGlobals =
                 , _cgDLights         = V.replicate Constants.maxDLights newCDLightT
                 , _cgLightStyle      = V.replicate Constants.maxLightStyles newCLightStyleT
                 , _cgLastOfs         = 0
+                , _cgCR              = 0 -- from Console.hs
                 }

@@ -3,10 +3,10 @@
 {-# LANGUAGE BangPatterns #-}
 module Client.Console where
 
-import Control.Lens ((.=), use, zoom, (^.), ix, preuse)
+import Control.Lens ((.=), use, zoom, (^.), ix, preuse, (-=), (%=), (+=))
 import Control.Monad (void, unless, when)
-import Data.Bits (shiftR, shiftL, (.&.))
-import Data.Char (ord)
+import Data.Bits (shiftR, shiftL, (.&.), (.|.))
+import Data.Char (ord, chr)
 import Data.Maybe (isJust)
 import Data.Word (Word8)
 import Text.Printf (printf)
@@ -18,7 +18,7 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
-import qualified Client.SCR as SCR
+import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -61,7 +61,7 @@ checkResize = do
           zoom (globals.con) $ do
             cLineWidth .= 38
             cTotalLines .= Constants.conTextSize `div` 38
-            cText .= BC.replicate Constants.conTextSize ' '
+            cText .= UV.replicate Constants.conTextSize ' '
         else do
           oldWidth <- use $ globals.con.cLineWidth
           globals.con.cLineWidth .= width
@@ -80,8 +80,7 @@ checkResize = do
 
           tbuf <- use $ globals.con.cText
           currentLine <- use $ globals.con.cCurrent
-          let updatedBuf = fillInBuf oldTotalLines oldWidth currentLine totalLines width tbuf [] 0 0 numLines numChars
-          globals.con.cText .= (BC.pack $ UV.toList updatedBuf) -- IMPROVE: performance?
+          globals.con.cText .= fillInBuf oldTotalLines oldWidth currentLine totalLines width tbuf [] 0 0 numLines numChars
 
           clearNotify
 
@@ -90,14 +89,14 @@ checkResize = do
       globals.con.cDisplay .= totalLines - 1
 
         -- IMPROVE: em, can we optimize it? some other approach maybe?
-  where fillInBuf :: Int -> Int -> Int -> Int -> Int -> B.ByteString -> [(Int, Char)] -> Int -> Int -> Int -> Int -> UV.Vector Char
+  where fillInBuf :: Int -> Int -> Int -> Int -> Int -> UV.Vector Char -> [(Int, Char)] -> Int -> Int -> Int -> Int -> UV.Vector Char
         fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf buf i j maxI maxJ
           | i >= maxI = (UV.replicate Constants.conTextSize ' ') UV.// buf
           | j >= maxJ = fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf buf (i + 1) 0 maxI maxJ
           | otherwise =
               let idx = (totalLines - 1 - i) * lineWidth + j
                   idx2 = ((currentLine - i + oldTotalLines) `mod` oldTotalLines) * oldWidth + j
-              in fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf ((idx, BC.index tbuf idx2):buf) i (j + 1) maxI maxJ
+              in fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf ((idx, tbuf UV.! idx2):buf) i (j + 1) maxI maxJ
 
 toggleConsoleF :: XCommandT
 toggleConsoleF = io (putStrLn "Console.toggleConsoleF") >> undefined -- TODO
@@ -209,11 +208,11 @@ drawConsole frac = do
               drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
               drawText console (row - 1) (y - 8) (idx + 1) maxIdx
 
-        drawLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+        drawLine :: (Int -> Int -> Int -> Quake ()) -> UV.Vector Char -> Int -> Int -> Int -> Int -> Quake ()
         drawLine drawChar text first y idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              drawChar ((idx + 1) `shiftL` 3) y $! (ord $ BC.index text (idx + first))
+              drawChar ((idx + 1) `shiftL` 3) y $! (ord $ text UV.! (idx + first))
               drawLine drawChar text first y (idx + 1) maxIdx
 
 drawNotify :: Quake ()
@@ -263,3 +262,97 @@ drawInput = do
           | otherwise = do
               drawChar ((idx + 1) `shiftL` 3) y (ord $ BC.index text idx)
               drawInputLine drawChar text y (idx + 1) maxIdx
+
+{-
+- ================ Con_Print
+- 
+- Handles cursor positioning, line wrapping, etc All console printing must
+- go through this in order to be logged to disk If no console is visible,
+- the text will appear at the top of the game window ================
+-}
+print :: B.ByteString -> Quake ()
+print txt = do
+    initialized <- use $ globals.con.cInitialized
+
+    when initialized $ do
+      let (mask, txtpos) = if txt `B.index` 0 == 1 || txt `B.index` 0 == 2
+                             then (128, 1)
+                             else (0, 0)
+
+      printTxt txtpos mask []
+
+  where printTxt :: Int -> Int -> [(Int, Char)] -> Quake ()
+        printTxt txtpos mask changes
+          | txtpos >= B.length txt = globals.con.cText %= (UV.// changes)
+          | otherwise = do
+              console <- use $ globals.con
+
+              let c = txt `BC.index` txtpos
+                  len = findWordLen (console^.cLineWidth) txtpos 0
+
+              -- word wrap
+              when (len /= (console^.cLineWidth) && (console^.cX) + len > (console^.cLineWidth)) $
+                globals.con.cX .= 0
+
+              use (clientGlobals.cgCR) >>= \v ->
+                when (v /= 0) $ do
+                  globals.con.cCurrent -= 1
+                  clientGlobals.cgCR .= 0
+
+              use (globals.con) >>= \console' ->
+                when ((console'^.cX) == 0) $ do
+                  lineFeed
+                  -- mark time for transparent overlay
+                  when ((console'^.cCurrent) >= 0) $ do
+                    realTime <- use $ globals.cls.csRealTime
+                    globals.con.cTimes.ix ((console'^.cCurrent) `mod` Constants.numConTimes) .= fromIntegral realTime
+
+              case c of
+                '\n' -> do
+                  globals.con.cX .= 0
+                  printTxt (txtpos + 1) mask changes
+
+                '\r' -> do
+                  globals.con.cX .= 0
+                  clientGlobals.cgCR .= 1
+                  printTxt (txtpos + 1) mask changes
+
+                _ -> -- display character and advance
+                  use (globals.con) >>= \console' -> do
+                    let y = (console'^.cCurrent) `mod` (console'^.cTotalLines)
+                        idx = y * (console'^.cLineWidth) + (console'^.cX)
+                        b = (ord c) .|. mask .|. (console'^.cOrMask)
+                    globals.con.cX += 1
+                    when ((console'^.cX) + 1 >= (console'^.cLineWidth)) $
+                      globals.con.cX .= 0
+                    printTxt (txtpos + 1) mask ((idx, chr b) : changes)
+
+        findWordLen :: Int -> Int -> Int -> Int
+        findWordLen lineWidth txtpos idx =
+          if idx >= lineWidth || idx >= (B.length txt - txtpos)
+            then idx
+            else if txt `BC.index` (idx + txtpos) <= ' '
+                   then idx
+                   else findWordLen lineWidth txtpos (idx + 1)
+
+lineFeed :: Quake ()
+lineFeed = do
+    globals.con.cX .= 0
+
+    use (globals.con) >>= \console ->
+      when ((console^.cDisplay) == (console^.cCurrent)) $
+        globals.con.cDisplay += 1
+
+    globals.con.cCurrent += 1
+
+    (i, e) <- use (globals.con) >>= \console -> do
+                let i = ((console^.cCurrent) `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+                    e = i + (console^.cLineWidth)
+                return (i, e)
+
+    fillSpaces i e []
+
+  where fillSpaces :: Int -> Int -> [(Int, Char)] -> Quake ()
+        fillSpaces i e changes
+          | i >= e = globals.con.cText %= (UV.// changes)
+          | otherwise = fillSpaces (i + 1) e ((i, ' ') : changes)

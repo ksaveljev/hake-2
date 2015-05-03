@@ -190,12 +190,12 @@ frame msec = do
 
     timeBefore <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
-    comGlobals.debugContext .= "SV:"
+    comGlobals.cgDebugContext .= "SV:"
     SVMain.frame msec
 
     timeBetween <- if hsv /= 0.0 then Timer.milliseconds else return 0
 
-    comGlobals.debugContext .= "CL:"
+    comGlobals.cgDebugContext .= "CL:"
     CL.frame msec
 
     when (hsv /= 0) $ do

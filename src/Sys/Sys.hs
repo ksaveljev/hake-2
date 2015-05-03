@@ -1,10 +1,14 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Sys.Sys where
 
 import Control.Lens (use, (.=), (^.))
+import Control.Monad (unless)
+import Data.Maybe (isJust, fromJust)
 import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sys.Timer as Timer
 
 sysError :: B.ByteString -> Quake ()
@@ -18,3 +22,10 @@ sendKeyEvents = do
     -- grab frame time
     time <- Timer.milliseconds
     globals.sysFrameTime .= time
+
+consoleOutput :: B.ByteString -> Quake ()
+consoleOutput msg = do
+    noStdout <- CVar.findVar "nostdout"
+
+    unless (isJust noStdout && ((fromJust noStdout)^.cvValue) /= 0) $
+      io (B.putStr msg)
