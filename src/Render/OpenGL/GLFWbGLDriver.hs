@@ -128,15 +128,12 @@ glDriverSetMode _ mode fullscreen = do
         when fullscreen $
           VID.printf Constants.printAll ("...setting fullscreen " `B.append` getModeString currentMode `B.append` "\n")
 
-        let newWidth = GLFW.videoModeWidth currentMode
-            newHeight = GLFW.videoModeHeight currentMode
-
         zoom (fastRenderAPIGlobals.frVid) $ do
-          vdNewWidth .= newWidth
-          vdNewHeight .= newHeight
+          vdNewWidth .= newDim^._1
+          vdNewHeight .= newDim^._2
 
         -- let the sound and input subsystems know about the new window
-        VID.newWindow newWidth newHeight
+        VID.newWindow (newDim^._1) (newDim^._2)
 
         return RenderAPIConstants.rsErrOk
 
