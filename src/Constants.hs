@@ -997,8 +997,8 @@ svcBad = 0 :: Int
 -- these ops are known to the game dll
 -- protocol bytes that can be directly added to messages
 
-svcMuzzleflash  = 1 :: Int
-svcMuzzleflash2 = 2 :: Int
+svcMuzzleFlash  = 1 :: Int
+svcMuzzleFlash2 = 2 :: Int
 svcTempEntity   = 3 :: Int
 svcLayout       = 4 :: Int
 svcInventory    = 5 :: Int
