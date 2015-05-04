@@ -5,6 +5,7 @@ module Server.SVUser where
 import Control.Lens ((.=), preuse, ix, use, (^.))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 import Quake
@@ -14,6 +15,9 @@ import qualified Constants
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
 import qualified Server.SVMain as SVMain
+
+maxStringCmds :: Int
+maxStringCmds = 8
 
 nextServer :: Quake ()
 nextServer = io (putStrLn "SVUser.nextServer") >> undefined -- TODO
@@ -112,7 +116,19 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                                  return (False, True, stringCmdCount)
 
                  | c == Constants.clcStringCmd -> do
-                     io (putStrLn "SVUser.executeClientMessage#executeMessage#clcStringCmd") >> undefined -- TODO
+                     s <- MSG.readString (globals.netMessage)
+
+                     -- malicious users may try using too many string commands
+                     let stringCmdCount' = stringCmdCount + 1
+                     when (stringCmdCount' < maxStringCmds) $
+                       executeUserCommand s
+
+                     Just state <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cState
+
+                     if state == Constants.csZombie
+                       then return (True, moveIssued, stringCmdCount')
+                       else return (False, moveIssued, stringCmdCount')
+
                  | otherwise -> do
                      io (putStrLn "SVUser.executeClientMessage#executeMessage") >> undefined -- TODO
 
@@ -125,3 +141,8 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
 
 clientThink :: ClientReference -> UserCmdT -> Quake ()
 clientThink _ _ = io (putStrLn "SVUser.clientThink") >> undefined -- TODO
+
+executeUserCommand :: B.ByteString -> Quake ()
+executeUserCommand str = do
+    Com.dprintf $ "SV_ExecuteUserCommand:" `B.append` str `B.append` "\n"
+    io (putStrLn "SVUser.executeUserCommand") >> undefined -- TODO
