@@ -16,7 +16,6 @@ import qualified Data.Vector as Vec
 import Quake
 import QuakeState
 import CVarVariables
-import Client.CEntityT
 import Client.CheatVarT
 import QCommon.XCommandT
 import qualified Constants

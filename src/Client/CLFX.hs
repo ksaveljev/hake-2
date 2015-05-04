@@ -67,7 +67,14 @@ clearEffects = do
 
 clearParticles :: Quake ()
 clearParticles = do
-    io (putStrLn "CLFX.clearParticles") >> undefined -- TODO
+    clientGlobals.cgFreeParticles .= CParticleReference 0
+    clientGlobals.cgActiveParticles .= Nothing
+
+    particles <- use $ clientGlobals.cgParticles
+    let particles' = V.imap (\idx p -> p { _cpNext = Just (CParticleReference (idx + 1))}) particles
+        p = particles' V.! (Constants.maxParticles - 1)
+        particles'' = particles' V.// [(Constants.maxParticles - 1, p { _cpNext = Nothing })]
+    clientGlobals.cgParticles .= particles''
 
 clearDLights :: Quake ()
 clearDLights = do

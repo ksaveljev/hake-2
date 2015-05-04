@@ -1,17 +1,23 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.CParticleT where
+module Client.CParticleT ( CParticleT(..)
+                         , module Client.CParticleT
+                         ) where
 
-import Linear.V3 (V3)
+import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
-data CParticleT =
-  CParticleT { _cpTime     :: Float
-             , _cpOrg      :: V3 Float
-             , _cpVel      :: V3 Float
-             , _cpAccel    :: V3 Float
-             , _cpColor    :: Float
-             , _cpAlpha    :: Float
-             , _cpAlphaVel :: Float
-             }
+import Internal
 
 makeLenses ''CParticleT
+
+newCParticleT :: CParticleT
+newCParticleT =
+  CParticleT { _cpTime     = 0
+             , _cpOrg      = V3 0 0 0
+             , _cpVel      = V3 0 0 0
+             , _cpAccel    = V3 0 0 0
+             , _cpColor    = 0
+             , _cpAlpha    = 0
+             , _cpAlphaVel = 0
+             , _cpNext     = Nothing
+             }

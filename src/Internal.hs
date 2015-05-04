@@ -120,6 +120,9 @@ newtype ImageReference = ImageReference Int
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
 
+-- reference to clientGlobals.cgParticles
+newtype CParticleReference = CParticleReference Int
+
 data QuakeState =
   QuakeState { _globals              :: !Globals
              , _comGlobals           :: !ComGlobals
@@ -1619,6 +1622,9 @@ data ClientGlobals =
                 , _cgLightStyle      :: V.Vector CLightStyleT
                 , _cgLastOfs         :: Int
                 , _cgCR              :: Int -- from Console.hs
+                , _cgParticles       :: V.Vector CParticleT
+                , _cgActiveParticles :: Maybe CParticleReference
+                , _cgFreeParticles   :: CParticleReference
                 }
 
 data VRectT =
@@ -1671,3 +1677,14 @@ data NetChannelGlobals =
   NetChannelGlobals { _ncSendBuf :: B.ByteString
                     , _ncSend    :: SizeBufT
                     }
+
+data CParticleT =
+  CParticleT { _cpTime     :: Float
+             , _cpOrg      :: V3 Float
+             , _cpVel      :: V3 Float
+             , _cpAccel    :: V3 Float
+             , _cpColor    :: Float
+             , _cpAlpha    :: Float
+             , _cpAlphaVel :: Float
+             , _cpNext     :: Maybe CParticleReference
+             }
