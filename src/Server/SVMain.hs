@@ -297,8 +297,8 @@ readPackets = do
 
     when readSomething $ do
       -- check for connectionless packet (0xffffffff) first
-      netMessageData <- liftM (B.take 4) (use $ globals.netMessage.sbData)
-      if netMessageData == remoteCommandHeader
+      netMessageHeader <- liftM (B.take 4) (use $ globals.netMessage.sbData)
+      if netMessageHeader == remoteCommandHeader
         then do
           connectionlessPacket
           readPackets
@@ -598,7 +598,7 @@ svcDirectConnect = do
               done <- findAndReuseIPSlot clients adr qport challenge userInfo 0 maxClientsValue
 
               unless done $ do
-                -- fina a client slot
+                -- find a client slot
                 let foundClientSlot = V.findIndex (\c -> c^.cState == Constants.csFree) clients
                 case foundClientSlot of
                   Nothing -> do
@@ -672,7 +672,7 @@ gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport 
         svGlobals.svServerStatic.ssClients.ix clientIdx.cState .= Constants.csConnected
 
         Just buf <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagramBuf
-        SZ.init (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram) buf (B.length buf)
+        SZ.init (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram) buf Constants.maxMsgLen
 
         realTime <- use $ svGlobals.svServerStatic.ssRealTime
 

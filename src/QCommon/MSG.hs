@@ -8,7 +8,7 @@ import Control.Monad (when, liftM)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int8, Int16, Int32)
 import Data.Monoid (mempty, mappend)
-import Data.Word (Word8)
+import Data.Word (Word8, Word16)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -164,19 +164,19 @@ readLong sizeBufLens = do
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
 
-readByte :: Lens' QuakeState SizeBufT -> Quake Int8
+readByte :: Lens' QuakeState SizeBufT -> Quake Int
 readByte sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
     let c = if (sizeBuf^.sbReadCount) + 1 > (sizeBuf^.sbCurSize)
-              then -1
+              then (-1)
               else fromIntegral $ (sizeBuf^.sbData) `B.index` (sizeBuf^.sbReadCount)
 
     sizeBufLens.sbReadCount += 1
 
     return c
 
-readShort :: Lens' QuakeState SizeBufT -> Quake Int16
+readShort :: Lens' QuakeState SizeBufT -> Quake Int
 readShort sizeBufLens = do
     sizeBuf <- use sizeBufLens
 
@@ -187,8 +187,8 @@ readShort sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int16 = fromIntegral $ B.index buf readCount
-            b :: Int16 = fromIntegral $ B.index buf (readCount + 1)
+            a :: Int = fromIntegral $ B.index buf readCount
+            b :: Int = fromIntegral $ B.index buf (readCount + 1)
             result = a .|. (b `shiftL` 8)
         sizeBufLens.sbReadCount += 2
         return result 
@@ -232,18 +232,18 @@ readDeltaUserCmd sizeBufLens from = do
     bits <- liftM fromIntegral $ readByte sizeBufLens
 
     -- read current angles
-    a1 <- if bits .&. Constants.cmAngle1 /= 0 then readShort sizeBufLens else return (from^.ucAngles._x)
-    a2 <- if bits .&. Constants.cmAngle2 /= 0 then readShort sizeBufLens else return (from^.ucAngles._y)
-    a3 <- if bits .&. Constants.cmAngle3 /= 0 then readShort sizeBufLens else return (from^.ucAngles._z)
+    a1 <- if bits .&. Constants.cmAngle1 /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._x)
+    a2 <- if bits .&. Constants.cmAngle2 /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._y)
+    a3 <- if bits .&. Constants.cmAngle3 /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._z)
 
     -- read movement
-    forward <- if bits .&. Constants.cmForward /= 0 then readShort sizeBufLens else return (from^.ucForwardMove)
-    side <- if bits .&. Constants.cmSide /= 0 then readShort sizeBufLens else return (from^.ucSideMove)
-    up <- if bits .&. Constants.cmUp /= 0 then readShort sizeBufLens else return (from^.ucUpMove)
+    forward <- if bits .&. Constants.cmForward /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucForwardMove)
+    side <- if bits .&. Constants.cmSide /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucSideMove)
+    up <- if bits .&. Constants.cmUp /= 0 then liftM fromIntegral (readShort sizeBufLens) else return (from^.ucUpMove)
 
     -- read buttons
-    buttons <- if bits .&. Constants.cmButtons /= 0 then readByte sizeBufLens else return (from^.ucButtons)
-    impulse <- if bits .&. Constants.cmImpulse /= 0 then readByte sizeBufLens else return (from^.ucImpulse)
+    buttons <- if bits .&. Constants.cmButtons /= 0 then liftM fromIntegral (readByte sizeBufLens) else return (from^.ucButtons)
+    impulse <- if bits .&. Constants.cmImpulse /= 0 then liftM fromIntegral (readByte sizeBufLens) else return (from^.ucImpulse)
 
     -- read time to run command
     msec <- readByte sizeBufLens
@@ -257,6 +257,6 @@ readDeltaUserCmd sizeBufLens from = do
                 , _ucUpMove      = up
                 , _ucButtons     = buttons
                 , _ucImpulse     = impulse
-                , _ucMsec        = msec
-                , _ucLightLevel  = lightLevel
+                , _ucMsec        = fromIntegral msec
+                , _ucLightLevel  = fromIntegral lightLevel
                 }

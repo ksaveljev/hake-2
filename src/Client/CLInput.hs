@@ -173,9 +173,10 @@ sendCmd = do
       curSize <- use $ globals.cls.csNetChan.ncMessage.sbCurSize
       lastSent <- use $ globals.cls.csNetChan.ncLastSent
       curTime <- use $ globals.curtime
-      if state == Constants.caConnected && (curSize /= 0 || (curTime - lastSent) > 1000)
+      if state == Constants.caConnected
         then
-          NetChannel.transmit (globals.cls.csNetChan) 0 ""
+          when (curSize /= 0 || (curTime - lastSent) > 1000) $
+            NetChannel.transmit (globals.cls.csNetChan) 0 ""
         else do
           -- send a userinfo update if needed
           use (globals.userInfoModified) >>= \modified ->

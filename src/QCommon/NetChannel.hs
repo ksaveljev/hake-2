@@ -7,6 +7,7 @@ module QCommon.NetChannel where
 import Control.Lens (Traversal', Lens', use, (^.), (.=), (+=), preuse, (%=), zoom)
 import Control.Monad (void, when, liftM)
 import Data.Bits ((.&.), xor, (.|.), complement, shiftL, shiftR)
+import Data.Int (Int32)
 import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -74,8 +75,9 @@ transmit netChanLens len buf = do
         sendBuf <- use $ netChannelGlobals.ncSendBuf
         SZ.init (netChannelGlobals.ncSend) sendBuf Constants.maxMsgLen
 
-        let w1 = ((chan^.ncOutgoingSequence) .&. (complement (1 `shiftL` 31))) .|. (sendReliable `shiftL` 31)
-            w2 = ((chan^.ncIncomingSequence) .&. (complement (1 `shiftL` 31))) .|. ((chan^.ncIncomingReliableSequence) `shiftL` 31)
+        let mask :: Int32 = complement (1 `shiftL` 31)
+            w1 = fromIntegral $ (fromIntegral (chan^.ncOutgoingSequence) .&. mask) .|. (fromIntegral sendReliable `shiftL` 31)
+            w2 = fromIntegral $ (fromIntegral (chan^.ncIncomingSequence) .&. mask) .|. (fromIntegral (chan^.ncIncomingReliableSequence) `shiftL` 31)
 
         netChanLens.ncOutgoingSequence += 1
         curTime <- use $ globals.curtime
@@ -108,12 +110,22 @@ transmit netChanLens len buf = do
 
         showPacketsValue <- liftM (^.cvValue) showPacketsCVar
         when (showPacketsValue /= 0) $ do
-          io (putStrLn "NetChannel.transmit") >> undefined -- TODO
-          {-
-          if sendReliable /= 0
-            then undefined
-            else undefined
-            -}
+          use (netChannelGlobals.ncSend) >>= \send ->
+            if sendReliable /= 0
+              then
+                Com.printf $ "send " `B.append` (BC.pack $ show (send^.sbCurSize)) `B.append`
+                             " : s=" `B.append` (BC.pack $ show ((chan'^.ncOutgoingSequence) - 1)) `B.append`
+                            " reliable=" `B.append` (BC.pack $ show (chan'^.ncReliableSequence)) `B.append`
+                            " ack=" `B.append` (BC.pack $ show (chan'^.ncIncomingSequence)) `B.append`
+                            " rack=" `B.append` (BC.pack $ show (chan^.ncIncomingReliableSequence)) `B.append`
+                            " data=" `B.append` (send^.sbData) `B.append`
+                            "\n"
+              else
+                Com.printf $ "send " `B.append` (BC.pack $ show (send^.sbCurSize)) `B.append`
+                             " : s=" `B.append` (BC.pack $ show ((chan'^.ncOutgoingSequence) - 1)) `B.append`
+                            " ack=" `B.append` (BC.pack $ show (chan'^.ncIncomingSequence)) `B.append`
+                            " rack=" `B.append` (BC.pack $ show (chan^.ncIncomingReliableSequence)) `B.append`
+                            "\n"
 
 {-
 - Netchan_Process is called when the current net_message is from remote_address modifies
@@ -136,12 +148,26 @@ process netChanLens msgLens = do
         seqnAckU :: Word32 = fromIntegral seqnAck
         reliableMessage :: Int = fromIntegral (seqnU `shiftR` 31)
         reliableAck :: Int = fromIntegral (seqnAckU `shiftR` 31)
-        seqn' = seqn .&. (complement (1 `shiftL` 31))
-        seqnAck' = seqnAck .&. (complement (1 `shiftL` 31))
+        mask :: Int32 = complement (1 `shiftL` 31)
+        seqn' :: Int = fromIntegral (fromIntegral seqn .&. mask)
+        seqnAck' :: Int = fromIntegral (fromIntegral seqnAck .&. mask)
 
     showPacketsValue <- liftM (^.cvValue) showPacketsCVar
     when (showPacketsValue /= 0) $ do
-      io (putStrLn "NetChannel.process") >> undefined -- TODO
+      msg <- use msgLens
+      Just chan <- preuse netChanLens
+      if reliableMessage /= 0
+        then Com.printf $ "recv " `B.append` (BC.pack $ show (msg^.sbCurSize)) `B.append`
+                          " : s=" `B.append` (BC.pack $ show seqn') `B.append`
+                          " reliable=" `B.append` (BC.pack $ show ((chan^.ncIncomingReliableSequence) `xor` 1)) `B.append`
+                          " ack=" `B.append` (BC.pack $ show seqnAck') `B.append`
+                          " rack=" `B.append` (BC.pack $ show reliableAck) `B.append`
+                          "\n"
+        else Com.printf $ "recv " `B.append` (BC.pack $ show (msg^.sbCurSize)) `B.append`
+                          " : s=" `B.append` (BC.pack $ show seqn') `B.append`
+                          " ack=" `B.append` (BC.pack $ show seqnAck') `B.append`
+                          " rack=" `B.append` (BC.pack $ show reliableAck) `B.append`
+                          "\n"
 
     -- discard stale or duplicated packets
     Just chan <- preuse netChanLens
@@ -179,7 +205,7 @@ process netChanLens msgLens = do
         -- the message can now be read from the current message pointer
         curTime <- use $ globals.curtime
         netChanLens.ncLastReceived .= curTime
-        
+
         return True
 
 -- Netchan_Setup is called to open a channel to a remote system.
