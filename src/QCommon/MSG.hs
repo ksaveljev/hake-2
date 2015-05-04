@@ -6,9 +6,9 @@ module QCommon.MSG where
 import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Control.Monad (when, liftM)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
-import Data.Int (Int8, Int16, Int32)
+import Data.Int (Int8, Int32)
 import Data.Monoid (mempty, mappend)
-import Data.Word (Word8, Word16)
+import Data.Word (Word8)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -24,21 +24,21 @@ import qualified QCommon.SZ as SZ
 
 -- IMPROVE: use binary package for conversion to ByteString?
 
-writeCharI :: Traversal' QuakeState SizeBufT -> Int8 -> Quake ()
+writeCharI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeCharI = writeByteI
 
 writeCharF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeCharF = writeByteF
 
-writeByteI :: Traversal' QuakeState SizeBufT -> Int8 -> Quake ()
+writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = do
-    SZ.write sizeBufLens (B.pack [fromIntegral c]) 1
+    SZ.write sizeBufLens (B.pack [fromIntegral (c .&. 0xFF)]) 1
 
 writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeByteF sizeBufLens c = do
     writeByteI sizeBufLens (truncate c)
 
-writeShort :: Traversal' QuakeState SizeBufT -> Int16 -> Quake ()
+writeShort :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeShort sizeBufLens c = do
     let a :: Word8 = fromIntegral (c .&. 0xFF)
         b :: Word8 = fromIntegral ((c `shiftR` 8) .&. 0xFF)
@@ -115,26 +115,26 @@ writeDeltaUserCmd sizeBufLens from cmd = do
     writeByteI sizeBufLens (fromIntegral bits)
 
     when (bits .&. Constants.cmAngle1 /= 0) $
-      writeShort sizeBufLens (cmd^.ucAngles._x)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucAngles._x)
     when (bits .&. Constants.cmAngle2 /= 0) $
-      writeShort sizeBufLens (cmd^.ucAngles._y)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucAngles._y)
     when (bits .&. Constants.cmAngle3 /= 0) $
-      writeShort sizeBufLens (cmd^.ucAngles._z)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucAngles._z)
 
     when (bits .&. Constants.cmForward /= 0) $
-      writeShort sizeBufLens (cmd^.ucForwardMove)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucForwardMove)
     when (bits .&. Constants.cmSide /= 0) $
-      writeShort sizeBufLens (cmd^.ucSideMove)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucSideMove)
     when (bits .&. Constants.cmUp /= 0) $
-      writeShort sizeBufLens (cmd^.ucUpMove)
+      writeShort sizeBufLens (fromIntegral $ cmd^.ucUpMove)
 
     when (bits .&. Constants.cmButtons /= 0) $
-      writeByteI sizeBufLens (cmd^.ucButtons)
+      writeByteI sizeBufLens (fromIntegral $ cmd^.ucButtons)
     when (bits .&. Constants.cmImpulse /= 0) $
-      writeByteI sizeBufLens (cmd^.ucImpulse)
+      writeByteI sizeBufLens (fromIntegral $ cmd^.ucImpulse)
 
-    writeByteI sizeBufLens (cmd^.ucMsec)
-    writeByteI sizeBufLens (cmd^.ucLightLevel)
+    writeByteI sizeBufLens (fromIntegral $ cmd^.ucMsec)
+    writeByteI sizeBufLens (fromIntegral $ cmd^.ucLightLevel)
 
 --
 -- reading functions

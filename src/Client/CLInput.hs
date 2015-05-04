@@ -173,6 +173,7 @@ sendCmd = do
       curSize <- use $ globals.cls.csNetChan.ncMessage.sbCurSize
       lastSent <- use $ globals.cls.csNetChan.ncLastSent
       curTime <- use $ globals.curtime
+
       if state == Constants.caConnected
         then
           when (curSize /= 0 || (curTime - lastSent) > 1000) $

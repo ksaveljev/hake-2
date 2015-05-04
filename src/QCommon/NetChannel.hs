@@ -66,7 +66,7 @@ transmit netChanLens len buf = do
 
         when ((chan^.ncReliableLength) == 0 && (chan^.ncMessage.sbCurSize) /= 0) $ do
           zoom netChanLens $ do
-            ncReliableBuf .= B.take (chan^.ncMessage.sbCurSize) (chan^.ncMessageBuf)
+            ncReliableBuf .= B.take (chan^.ncMessage.sbCurSize) (chan^.ncMessage.sbData) -- TODO: make sure this sbData stuff is correct (jake2 reads from ncMessageBuf)
             ncReliableLength .= (chan^.ncMessage.sbCurSize)
             ncMessage.sbCurSize .= 0
             ncReliableSequence %= (`xor` 1)

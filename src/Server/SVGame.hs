@@ -3,7 +3,6 @@ module Server.SVGame where
 
 import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
 import Control.Monad (when, unless, liftM)
-import Data.Int (Int8, Int16)
 import Data.Maybe (isNothing, fromJust)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
@@ -132,13 +131,13 @@ configString index val = do
       origin <- use $ globals.vec3Origin
       SVSend.multicast origin Constants.multicastAllR
 
-writeChar :: Int8 -> Quake ()
+writeChar :: Int -> Quake ()
 writeChar c = MSG.writeCharI (svGlobals.svServer.sMulticast) c
 
-writeByte :: Int8 -> Quake ()
+writeByte :: Int -> Quake ()
 writeByte c = MSG.writeByteI (svGlobals.svServer.sMulticast) c
 
-writeShort :: Int16 -> Quake ()
+writeShort :: Int -> Quake ()
 writeShort c = MSG.writeShort (svGlobals.svServer.sMulticast) c
 
 writeLong :: Int -> Quake ()
