@@ -22,6 +22,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Server.SVMain as SVMain
+import qualified Util.Lib as Lib
 
 maxStringCmds :: Int
 maxStringCmds = 8
@@ -248,7 +249,51 @@ newF = do
              MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` (BC.pack $ show spawnCount) `B.append` " 0\n") -- IMPROVE?
 
 configStringsF :: XCommandT
-configStringsF = io (putStrLn "SVUser.configStringsF") >> undefined -- TODO
+configStringsF = do
+    Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+    Com.dprintf $ "Configstrings() from " `B.append` (client^.cName) `B.append` "\n"
+
+    if (client^.cState) /= Constants.csConnected
+      then Com.printf "configstrings not valid -- already spawned\n"
+      else do
+        -- handle the case of a level changing while a client was connecting
+        v1 <- Cmd.argv 1
+        spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
+        if Lib.atoi v1 /= spawnCount
+          then do
+            Com.printf "SV_Configstrings_f from different level\n"
+            newF
+          else do
+            v2 <- Cmd.argv 2
+            let start = Lib.atoi v2
+
+            -- write a packet full of data
+            configStrings <- use $ svGlobals.svServer.sConfigStrings
+            start' <- writeConfigStringsPacket configStrings clientRef start
+
+            -- send next command
+            if start' == Constants.maxConfigStrings
+              then do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd baselines " `B.append` BC.pack (show spawnCount) `B.append` " 0\n");
+              else do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
+
+  where writeConfigStringsPacket :: V.Vector B.ByteString -> ClientReference -> Int -> Quake Int
+        writeConfigStringsPacket configStrings clientRef@(ClientReference clientIdx) start = do
+          Just curSize <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage.sbCurSize
+          if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxConfigStrings
+            then do
+              let cs = configStrings V.! start
+              when (B.length cs /= 0) $ do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcConfigString
+                MSG.writeShort (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) start
+                MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) cs
+              writeConfigStringsPacket configStrings clientRef (start + 1)
+            else
+              return start
 
 baselinesF :: XCommandT
 baselinesF = io (putStrLn "SVUser.baselinesF") >> undefined -- TODO
