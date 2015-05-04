@@ -72,14 +72,14 @@ clearParticles = do
 
     particles <- use $ clientGlobals.cgParticles
     let particles' = V.imap (\idx p -> p { _cpNext = Just (CParticleReference (idx + 1))}) particles
-        p = particles' V.! (Constants.maxParticles - 1)
-        particles'' = particles' V.// [(Constants.maxParticles - 1, p { _cpNext = Nothing })]
+        lastone = particles' V.! (Constants.maxParticles - 1)
+        particles'' = particles' V.// [(Constants.maxParticles - 1, lastone { _cpNext = Nothing })]
     clientGlobals.cgParticles .= particles''
 
 clearDLights :: Quake ()
-clearDLights = do
-    io (putStrLn "CLFX.clearDLights") >> undefined -- TODO
+clearDLights = clientGlobals.cgDLights .= V.replicate Constants.maxDLights newCDLightT
 
 clearLightStyles :: Quake ()
 clearLightStyles = do
-    io (putStrLn "CLFX.clearLightStyles") >> undefined -- TODO
+    clientGlobals.cgLightStyle .= V.replicate Constants.maxLightStyles newCLightStyleT
+    clientGlobals.cgLastOfs .= -1
