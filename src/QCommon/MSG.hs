@@ -222,8 +222,18 @@ readStringLine sizeBufLens = do
                 else readStr (idx + 1) (acc `mappend` BB.int8 c)
 
 readString :: Lens' QuakeState SizeBufT -> Quake B.ByteString
-readString _ = do
-    io (putStrLn "MSG.readString") >> undefined -- TODO
+readString sizeBufLens = do
+    buildString 0 mempty
+
+  where buildString :: Int -> BB.Builder -> Quake B.ByteString
+        buildString len acc
+          | len >= 2047 = return (BL.toStrict $ BB.toLazyByteString acc)
+          | otherwise = do
+              c <- readByte sizeBufLens
+
+              if c == -1
+                then return (BL.toStrict $ BB.toLazyByteString acc)
+                else buildString (len + 1) (acc `mappend` (BB.word8 $ fromIntegral c))
 
 readDeltaUserCmd :: Lens' QuakeState SizeBufT -> UserCmdT -> Quake UserCmdT
 readDeltaUserCmd sizeBufLens from = do
