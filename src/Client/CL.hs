@@ -350,7 +350,20 @@ disconnect :: Quake ()
 disconnect = io (putStrLn "CL.disconnect") >> undefined -- TODO
 
 forwardToServerF :: XCommandT
-forwardToServerF = io (putStrLn "CL.forwardToServerF") >> undefined -- TODO
+forwardToServerF = do
+    state <- use $ globals.cls.csState
+
+    if state /= Constants.caConnected && state /= Constants.caActive
+      then do
+        v0 <- Com.argv 0
+        Com.printf $ "Can't \"" `B.append` v0 `B.append` "\", not connected\n"
+      else do
+        -- don't forward the first argument
+        c <- Cmd.argc
+        when (c > 1) $ do
+          args <- Cmd.args
+          MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+          SZ.print (globals.cls.csNetChan.ncMessage) args
 
 pauseF :: XCommandT
 pauseF = io (putStrLn "CL.pauseF") >> undefined -- TODO
