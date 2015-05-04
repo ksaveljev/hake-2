@@ -138,7 +138,7 @@ loadPCX fileName returnPalette returnDimensions = do
                                else Nothing
 
             -- decode pcx
-            let pix = decodePCX raw 0 0 0 height width mempty
+            let pix = decodePCX (BL.toStrict $ pcx^.pcxData) 0 0 0 width height mempty
 
             return (Just pix, palette, dimensions)
 
