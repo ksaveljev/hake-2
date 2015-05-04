@@ -79,7 +79,7 @@ parseServerMessage = do
                          CBuf.execute -- make sure any stuffed commands are done
                          parseServerData
 
-                     | cmd == Constants.svcConfigString -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcConfigString") >> undefined -- TODO
+                     | cmd == Constants.svcConfigString -> parseConfigString
 
                      | cmd == Constants.svcSound -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcSound") >> undefined -- TODO
 
@@ -152,3 +152,7 @@ parseServerData = do
       else do
         Com.printf $ "Levelname:" `B.append` levelName `B.append` "\n"
         globals.cl.csRefreshPrepped .= False
+
+parseConfigString :: Quake ()
+parseConfigString = do
+    io (putStrLn "CLParse.parseConfigString") >> undefined -- TODO
