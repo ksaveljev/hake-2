@@ -319,3 +319,7 @@ forwardToServer = do
           cmdArgs <- args
           SZ.print (globals.cls.csNetChan.ncMessage) " "
           SZ.print (globals.cls.csNetChan.ncMessage) cmdArgs
+
+clientCommand :: EdictReference -> Quake ()
+clientCommand _ = do
+    io (putStrLn "Cmd.clientCommand") >> undefined -- TODO

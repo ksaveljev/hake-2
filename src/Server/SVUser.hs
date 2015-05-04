@@ -11,7 +11,10 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import CVarVariables
+import QCommon.XCommandT
+import Server.UCmdT
 import qualified Constants
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
 import qualified Server.SVMain as SVMain
@@ -24,6 +27,21 @@ nextServer = io (putStrLn "SVUser.nextServer") >> undefined -- TODO
 
 nullCmd :: UserCmdT
 nullCmd = newUserCmdT
+
+uCmds :: V.Vector UCmdT
+uCmds =
+    V.fromList [ UCmdT "new" newF
+               , UCmdT "configstrings" configStringsF
+               , UCmdT "baselines" baselinesF
+               , UCmdT "begin" beginF
+               , UCmdT "nextserver" nextServerF
+               , UCmdT "disconnect" disconnectF
+
+               -- issued by hand at client consoles
+               , UCmdT "info" showServerInfoF
+               , UCmdT "download" beginDownloadF
+               , UCmdT "nextdl" nextDownloadF
+               ]
 
 executeClientMessage :: ClientReference -> Quake ()
 executeClientMessage clientRef@(ClientReference clientIdx) = do
@@ -145,4 +163,48 @@ clientThink _ _ = io (putStrLn "SVUser.clientThink") >> undefined -- TODO
 executeUserCommand :: B.ByteString -> Quake ()
 executeUserCommand str = do
     Com.dprintf $ "SV_ExecuteUserCommand:" `B.append` str `B.append` "\n"
-    io (putStrLn "SVUser.executeUserCommand") >> undefined -- TODO
+
+    Cmd.tokenizeString str True
+
+    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
+
+    svGlobals.svPlayer .= Just edictRef
+
+    v0 <- Cmd.argv 0
+
+    let foundCmd = V.find (\c -> (c^.ucName) == v0) uCmds
+
+    case foundCmd of
+      Just (UCmdT _ func) -> func
+      Nothing -> do
+        state <- use $ svGlobals.svServer.sState
+        when (state == Constants.ssGame) $
+          Cmd.clientCommand edictRef
+
+newF :: XCommandT
+newF = io (putStrLn "SVUser.newF") >> undefined -- TODO
+
+configStringsF :: XCommandT
+configStringsF = io (putStrLn "SVUser.configStringsF") >> undefined -- TODO
+
+baselinesF :: XCommandT
+baselinesF = io (putStrLn "SVUser.baselinesF") >> undefined -- TODO
+
+beginF :: XCommandT
+beginF = io (putStrLn "SVUser.beginF") >> undefined -- TODO
+
+nextServerF :: XCommandT
+nextServerF = io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
+
+disconnectF :: XCommandT
+disconnectF = io (putStrLn "SVUser.disconnectF") >> undefined -- TODO
+
+showServerInfoF :: XCommandT
+showServerInfoF = io (putStrLn "SVUser.showServerInfoF") >> undefined -- TODO
+
+beginDownloadF :: XCommandT
+beginDownloadF = io (putStrLn "SVUser.beginDownloadF") >> undefined -- TODO
+
+nextDownloadF :: XCommandT
+nextDownloadF = io (putStrLn "SVUser.nextDownloadF") >> undefined -- TODO
