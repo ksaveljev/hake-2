@@ -61,6 +61,7 @@ writeFloat _ _ = io (putStrLn "MSG.writeFloat") >> undefined -- TODO
 writeString :: Traversal' QuakeState SizeBufT -> B.ByteString -> Quake ()
 writeString sizeBufLens s = do
     SZ.write sizeBufLens s (B.length s)
+    writeByteI sizeBufLens 0
 
 writeCoord :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeCoord _ _ = io (putStrLn "MSG.writeCoord") >> undefined -- TODO
@@ -231,7 +232,7 @@ readString sizeBufLens = do
           | otherwise = do
               c <- readByte sizeBufLens
 
-              if c == -1
+              if c == -1 || c == 0
                 then return (BL.toStrict $ BB.toLazyByteString acc)
                 else buildString (len + 1) (acc `mappend` (BB.word8 $ fromIntegral c))
 
