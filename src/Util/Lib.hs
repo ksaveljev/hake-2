@@ -61,7 +61,7 @@ rand = do
     g <- use $ globals.rnd
     let (result, newG) = random g
     globals.rnd .= newG
-    return result
+    return $ if result < 0 then -result else result -- TODO: ugly hack, find different approach?
 
 randomF :: Quake Float
 randomF = do
