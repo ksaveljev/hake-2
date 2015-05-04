@@ -48,4 +48,22 @@ write bufLens bufData len = do
     bufLens.sbData .= updatedData
 
 print :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()
-print _ _ = io (putStrLn "SZ.print") >> undefined -- TODO
+print sizeBufLens str = do
+    Com.dprintf $ "SZ.print():<" `B.append` str `B.append` ">\n"
+    let len = B.length str + 1
+
+    use sizeBufLens >>= \buf -> do
+      if (buf^.sbCurSize) /= 0
+        then do
+          if (buf^.sbData) `B.index` ((buf^.sbCurSize) - 1) /= 0
+            then do
+              -- no trailing 0
+              idx <- getSpace sizeBufLens len
+              sizeBufLens.sbData .= B.take idx (buf^.sbData) `B.append` str `B.append` "\0"
+            else do
+              -- write over trailing 0
+              idx <- getSpace sizeBufLens len
+              sizeBufLens.sbData .= B.take (idx - 1) (buf^.sbData) `B.append` str `B.append` "\0"
+        else do
+          _ <- getSpace sizeBufLens len
+          sizeBufLens.sbData .= str `B.append` "\0"
