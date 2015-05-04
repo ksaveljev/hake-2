@@ -71,7 +71,7 @@ println :: B.ByteString -> Quake ()
 println str = printf $ str `B.append` "\n" -- TODO
 
 dprintf :: B.ByteString -> Quake ()
-dprintf str = printf $ str
+dprintf = io . B.putStr -- TODO: use printf $ str -- memory is going crazy here, need optimizations
 
 argc :: Quake Int
 argc = use $ comGlobals.cgComArgc

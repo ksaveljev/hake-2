@@ -1,11 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
 module Server.SVUser where
 
-import Control.Lens ((.=), preuse, ix, use, (^.))
+import Control.Lens ((.=), preuse, ix, use, (^.), zoom)
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -17,6 +20,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Server.SVMain as SVMain
 
 maxStringCmds :: Int
@@ -182,8 +186,66 @@ executeUserCommand str = do
         when (state == Constants.ssGame) $
           Cmd.clientCommand edictRef
 
+{-
+- ================ SV_New_f
+- 
+- Sends the first message from the server to a connected client. This will
+- be sent on the initial connection and upon each server load.
+- ================
+-}
 newF :: XCommandT
-newF = io (putStrLn "SVUser.newF") >> undefined -- TODO
+newF = do
+    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+    state <- use $ svGlobals.svServer.sState
+
+    Com.dprintf ("New() from " `B.append` (client^.cName) `B.append` "\n")
+
+    if | (client^.cState) /= Constants.csConnected ->
+           Com.printf "New not valid -- already spawned\n"
+         -- demo servers just dump the file message
+       | state == Constants.ssDemo ->
+           beginDemoServer
+       | otherwise -> do
+           -- serverdata needs to go over for all types of servers
+           -- to make sure the protocol is right, and to set the gamedir
+           gameDir <- CVar.variableString "gamedir"
+
+           -- send the serverdata
+           
+           MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcServerData
+           MSG.writeInt (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.protocolVersion
+
+           spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
+           MSG.writeLong (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) spawnCount
+
+           attractLoop <- use $ svGlobals.svServer.sAttractLoop
+           MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (if attractLoop then 1 else 0)
+
+           MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) gameDir
+
+           let playerNum = if state == Constants.ssCinematic || state == Constants.ssPic
+                             then -1
+                             else client^.cServerIndex
+
+           MSG.writeShort (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) playerNum
+
+           -- send full levelname
+           Just levelName <- preuse $ svGlobals.svServer.sConfigStrings.ix (Constants.csName)
+           MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) levelName
+
+           -- game server
+           when (state == Constants.ssGame) $ do
+             -- set up the entity for the client
+             let edictIdx = playerNum + 1
+             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esNumber .= edictIdx
+             zoom (svGlobals.svServerStatic.ssClients.ix clientIdx) $ do
+               cEdict .= Just (EdictReference edictIdx)
+               cLastCmd .= newUserCmdT
+
+             -- begin fetching configstrings
+             MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+             MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` (BC.pack $ show spawnCount) `B.append` " 0\n") -- IMPROVE?
 
 configStringsF :: XCommandT
 configStringsF = io (putStrLn "SVUser.configStringsF") >> undefined -- TODO
@@ -208,3 +270,6 @@ beginDownloadF = io (putStrLn "SVUser.beginDownloadF") >> undefined -- TODO
 
 nextDownloadF :: XCommandT
 nextDownloadF = io (putStrLn "SVUser.nextDownloadF") >> undefined -- TODO
+
+beginDemoServer :: Quake ()
+beginDemoServer = io (putStrLn "SVUser.beginDemoServer") >> undefined -- TODO
