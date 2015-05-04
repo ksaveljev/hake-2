@@ -16,6 +16,7 @@ import qualified Data.Vector as Vec
 import Quake
 import QuakeState
 import CVarVariables
+import Client.CEntityT
 import Client.CheatVarT
 import QCommon.XCommandT
 import qualified Constants
@@ -23,6 +24,7 @@ import qualified Client.CLFX as CLFX
 import {-# SOURCE #-} qualified Client.CLInput as CLInput
 import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
+import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
@@ -37,6 +39,7 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
+import qualified QCommon.SZ as SZ
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 import qualified Sys.NET as NET
@@ -643,4 +646,13 @@ writeDemoMessage :: Quake ()
 writeDemoMessage = io (putStrLn "CL.writeDemoMessage") >> undefined -- TODO
 
 clearState :: Quake ()
-clearState = io (putStrLn "CL.clearState") >> undefined -- TODO
+clearState = do
+    S.stopAllSounds
+    CLFX.clearEffects
+    CLTEnt.clearTEnts
+
+    -- wipe the entire cl structure
+    globals.cl .= newClientStateT
+    globals.clEntities .= Vec.replicate Constants.maxEdicts newCEntityT
+
+    SZ.clear (globals.cls.csNetChan.ncMessage)

@@ -58,3 +58,21 @@ runLightStyles = do
                      clientGlobals.cgLightStyle.ix idx.clsValue .= V3 v v v
 
               runLightStyle lightStyles ofs (idx + 1) maxIdx
+
+clearEffects :: Quake ()
+clearEffects = do
+    clearParticles
+    clearDLights
+    clearLightStyles
+
+clearParticles :: Quake ()
+clearParticles = do
+    io (putStrLn "CLFX.clearParticles") >> undefined -- TODO
+
+clearDLights :: Quake ()
+clearDLights = do
+    io (putStrLn "CLFX.clearDLights") >> undefined -- TODO
+
+clearLightStyles :: Quake ()
+clearLightStyles = do
+    io (putStrLn "CLFX.clearLightStyles") >> undefined -- TODO

@@ -1,12 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
-               , module Client.VRectT
+               , module Client.CEntityT
                , module Client.ClientStaticT
                , module Client.ClientStateT
                , module Client.ConsoleT
                , module Client.RefExportT
                , module Client.VidDefT
+               , module Client.VRectT
                , module Game.CmdAliasT
                , module Game.CVarT
                , module QCommon.SizeBufT
@@ -21,6 +22,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Client.CEntityT
 import Client.ClientStaticT
 import Client.ClientStateT
 import Client.ConsoleT
@@ -33,6 +35,7 @@ import QCommon.NetAdrT
 import QCommon.SizeBufT
 import Render.DummyRenderer
 import Render.Renderer
+import qualified Constants
 
 import Internal
 
@@ -65,6 +68,7 @@ initialGlobals =
 
           , _cls                = newClientStaticT
           , _cl                 = newClientStateT
+          , _clEntities         = V.replicate Constants.maxEdicts newCEntityT
 
           , _userInfoModified   = False
 

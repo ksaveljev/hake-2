@@ -174,6 +174,7 @@ data Globals =
 
           , _cls                :: !ClientStaticT
           , _cl                 :: !ClientStateT
+          , _clEntities         :: !(V.Vector CEntityT)
 
           , _userInfoModified   :: !Bool
 
