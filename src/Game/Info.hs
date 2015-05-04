@@ -103,4 +103,4 @@ valueForKey str key = do
 - server's parsing.
 -}
 validate :: B.ByteString -> Bool
-validate str = '"' `BC.elem` str || ';' `BC.elem` str
+validate str = not ('"' `BC.elem` str || ';' `BC.elem` str)
