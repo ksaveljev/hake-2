@@ -2,8 +2,8 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.CLParse where
 
-import Control.Lens (use, (^.))
-import Control.Monad (when, liftM)
+import Control.Lens (use, (^.), (.=))
+import Control.Monad (when, liftM, void)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -14,8 +14,10 @@ import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CL as CL
 import qualified Client.CLView as CLView
+import {-# SOURCE #-} qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 
 downloadF :: XCommandT
@@ -101,4 +103,49 @@ parseServerMessage = do
                   parseMessage
 
 parseServerData :: Quake ()
-parseServerData = io (putStrLn "CLParse.parseServerData") >> undefined -- TODO
+parseServerData = do
+    -- wite the client_state_t struct
+    CL.clearState
+    globals.cls.csState .= Constants.caConnected
+
+    -- parse protocol version number
+    version <- MSG.readLong (globals.netMessage)
+    globals.cls.csServerProtocol .= version
+
+    -- BIG HACK to let demos from release work with the 3.0x patch!!
+    use (globals.serverState) >>= \state ->
+      if state /= 0 && Constants.protocolVersion == 34
+        then return ()
+        else if version /= Constants.protocolVersion
+               then Com.comError Constants.errDrop $ "Server returned version " `B.append` BC.pack (show version) `B.append`
+                                                     ", not " `B.append` BC.pack (show Constants.protocolVersion)
+               else return ()
+
+    serverCount <- MSG.readLong (globals.netMessage)
+    attractLoop <- MSG.readByte (globals.netMessage)
+    globals.cl.csServerCount .= serverCount
+    globals.cl.csAttractLoop .= if attractLoop /= 0 then True else False
+
+    -- game directory
+    str <- MSG.readString (globals.netMessage)
+    globals.cl.csGameDir .= str
+    Com.dprintf ("gamedir=" `B.append` str `B.append` "\n")
+
+    -- set gamedir
+    gameDirVar <- liftM (^.cvString) fsGameDirVarCVar
+    when (B.length str > 0 && (B.length gameDirVar == 0 || str == gameDirVar) || (B.length str == 0 && B.length gameDirVar == 0)) $
+      void $ CVar.set "game" str
+
+    -- parse player entity number
+    playerNum <- MSG.readShort (globals.netMessage)
+    globals.cl.csPlayerNum .= playerNum
+    Com.dprintf $ "numplayers=" `B.append` BC.pack (show playerNum) `B.append` "\n"
+    -- get the full level name
+    levelName <- MSG.readString (globals.netMessage)
+    Com.dprintf $ "levelname=" `B.append` levelName `B.append` "\n"
+
+    if playerNum == -1 -- playing a cinematic or showing a pic, not a level
+      then SCR.playCinematic levelName
+      else do
+        Com.printf $ "Levelname:" `B.append` levelName `B.append` "\n"
+        globals.cl.csRefreshPrepped .= False

@@ -641,3 +641,6 @@ parseStatusMessage = io (putStrLn "CL.parseStatusMessage") >> undefined -- TODO
 
 writeDemoMessage :: Quake ()
 writeDemoMessage = io (putStrLn "CL.writeDemoMessage") >> undefined -- TODO
+
+clearState :: Quake ()
+clearState = io (putStrLn "CL.clearState") >> undefined -- TODO

@@ -942,3 +942,7 @@ readNextFrame = do
 
 debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = io (putStrLn "IMPLEMENT ME!! SCR.debugGraph") >> return ()
+
+playCinematic :: B.ByteString -> Quake ()
+playCinematic _ = do
+    io (putStrLn "SCR.playCinematic") >> undefined -- TODO

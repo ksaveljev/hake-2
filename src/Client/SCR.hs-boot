@@ -68,3 +68,5 @@ drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
 drawHUDString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
 
 drawCenterString :: Quake ()
+
+playCinematic :: B.ByteString -> Quake ()
