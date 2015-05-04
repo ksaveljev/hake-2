@@ -70,7 +70,10 @@ parseServerMessage = do
 
                      | cmd == Constants.svcCenterPrint -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcCenterPrint") >> undefined -- TODO
 
-                     | cmd == Constants.svcStuffText -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcStuffText") >> undefined -- TODO
+                     | cmd == Constants.svcStuffText -> do
+                         str <- MSG.readString (globals.netMessage)
+                         Com.dprintf $ "stufftext: " `B.append` str `B.append` "\n"
+                         CBuf.addText str
 
                      | cmd == Constants.svcServerData -> do
                          CBuf.execute -- make sure any stuffed commands are done
