@@ -453,7 +453,7 @@ glUpload32 image width height mipmap = do
 
     -- scan the texture for any non-255 alpha
     let c = width * height
-        samples = scanAlpha 0 3 c
+        samples = scanAlpha 0 0 c
 
     comp <- if | samples == glSolidFormat -> use $ fastRenderAPIGlobals.frGLTexSolidFormat
                | samples == glAlphaFormat -> use $ fastRenderAPIGlobals.frGLTexAlphaFormat
@@ -588,42 +588,43 @@ glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
 glResampleTexture img width height scaledWidth scaledHeight =
     let fracStep = (width * 0x10000) `div` scaledWidth
         frac = fracStep `shiftR` 2
-        p1 = buildP frac fracStep 0 scaledWidth mempty
+        p1 = UV.unfoldr buildP (0, frac, fracStep)
         frac' = 3 * (fracStep `shiftR` 2)
-        p2 = buildP frac' fracStep 0 scaledWidth mempty
+        p2 = UV.unfoldr buildP (0, frac', fracStep)
     in resample fracStep p1 p2 0 scaledHeight mempty
 
-  where buildP :: Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-        buildP frac fracStep idx maxIdx acc
-          | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
-          | otherwise =
-              let v = 4 * (frac `shiftR` 16)
-              in buildP (frac + fracStep) fracStep (idx + 1) maxIdx (acc `mappend` BB.word8 (fromIntegral v))
+  where buildP :: (Int, Int, Int) -> Maybe (Int, (Int, Int, Int))
+        buildP (idx, frac, fracStep)
+          | idx >= scaledWidth = Nothing
+          | otherwise = let v = 4 * (frac `shiftR` 16)
+                        in Just (v, (idx + 1, frac + fracStep, fracStep))
 
-        resample :: Int -> B.ByteString -> B.ByteString -> Int -> Int -> BB.Builder -> B.ByteString
+        resample :: Int -> UV.Vector Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
         resample fracStep p1 p2 idx maxIdx acc
           | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
-              -- TODO: make sure we need '4 *' here
               let inRow = 4 * width * truncate ((fromIntegral idx + 0.25 :: Float) * fromIntegral height / fromIntegral scaledHeight)
                   inRow2 = 4 * width * truncate ((fromIntegral idx + 0.75 :: Float) * fromIntegral height / fromIntegral scaledHeight)
-                  -- frac = fracStep `shiftR` 1
                   row = buildRow p1 p2 inRow inRow2 0 scaledWidth mempty
               in resample fracStep p1 p2 (idx + 1) maxIdx (acc `mappend` row)
 
-        buildRow :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> BB.Builder -> BB.Builder
+        buildRow :: UV.Vector Int -> UV.Vector Int -> Int -> Int -> Int -> Int -> BB.Builder -> BB.Builder
         buildRow p1 p2 inRow inRow2 idx maxIdx acc
           | idx >= maxIdx = acc
           | otherwise =
-              let pix1 = inRow  + fromIntegral (p1 `B.index` idx)
-                  pix2 = inRow  + fromIntegral (p2 `B.index` idx)
-                  pix3 = inRow2 + fromIntegral (p1 `B.index` idx)
-                  pix4 = inRow2 + fromIntegral (p2 `B.index` idx)
-                  a = ((img `B.index` (pix1 + 0)) + (img `B.index` (pix2 + 0)) + (img `B.index` (pix3 + 0)) + (img `B.index` (pix4 + 0))) `shiftR` 2
-                  b = ((img `B.index` (pix1 + 1)) + (img `B.index` (pix2 + 1)) + (img `B.index` (pix3 + 1)) + (img `B.index` (pix4 + 1))) `shiftR` 2
-                  c = ((img `B.index` (pix1 + 2)) + (img `B.index` (pix2 + 2)) + (img `B.index` (pix3 + 2)) + (img `B.index` (pix4 + 2))) `shiftR` 2
-                  d = ((img `B.index` (pix1 + 3)) + (img `B.index` (pix2 + 3)) + (img `B.index` (pix3 + 3)) + (img `B.index` (pix4 + 3))) `shiftR` 2
-              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, d])))
+              let pix1 = inRow  + (p1 UV.! idx)
+                  pix2 = inRow  + (p2 UV.! idx)
+                  pix3 = inRow2 + (p1 UV.! idx)
+                  pix4 = inRow2 + (p2 UV.! idx)
+                  r1 :: Int = fromIntegral (img `B.index` (pix1 + 3))
+                  g1 :: Int = fromIntegral (img `B.index` (pix1 + 2))
+                  b1 :: Int = fromIntegral (img `B.index` (pix1 + 1))
+                  a1 :: Int = fromIntegral (img `B.index` (pix1 + 0))
+                  r :: Word8 = fromIntegral $ (r1 + fromIntegral (img `B.index` (pix2 + 3)) + fromIntegral (img `B.index` (pix3 + 3)) + fromIntegral (img `B.index` (pix4 + 3))) `shiftR` 2
+                  g :: Word8 = fromIntegral $ (g1 + fromIntegral (img `B.index` (pix2 + 2)) + fromIntegral (img `B.index` (pix3 + 2)) + fromIntegral (img `B.index` (pix4 + 2))) `shiftR` 2
+                  b :: Word8 = fromIntegral $ (b1 + fromIntegral (img `B.index` (pix2 + 1)) + fromIntegral (img `B.index` (pix3 + 1)) + fromIntegral (img `B.index` (pix4 + 1))) `shiftR` 2
+                  a :: Word8 = fromIntegral $ (a1 + fromIntegral (img `B.index` (pix2 + 0)) + fromIntegral (img `B.index` (pix3 + 0)) + fromIntegral (img `B.index` (pix4 + 0))) `shiftR` 2
+              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [r, g, b, a])))
 
 {-
 ================
