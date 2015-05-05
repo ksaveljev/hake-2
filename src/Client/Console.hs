@@ -310,12 +310,12 @@ print txt = do
               case c of
                 '\n' -> do
                   globals.con.cX .= 0
-                  printTxt (txtpos + 1) mask changes
+                  printTxt (txtpos + 1) mask $! changes
 
                 '\r' -> do
                   globals.con.cX .= 0
                   clientGlobals.cgCR .= 1
-                  printTxt (txtpos + 1) mask changes
+                  printTxt (txtpos + 1) mask $! changes
 
                 _ -> -- display character and advance
                   use (globals.con) >>= \console' -> do
@@ -325,7 +325,7 @@ print txt = do
                     globals.con.cX += 1
                     when ((console'^.cX) + 1 >= (console'^.cLineWidth)) $
                       globals.con.cX .= 0
-                    printTxt (txtpos + 1) mask ((idx, chr b) : changes)
+                    printTxt (txtpos + 1) mask $! ((idx, chr b) : changes)
 
         findWordLen :: Int -> Int -> Int -> Int
         findWordLen lineWidth txtpos idx =
@@ -355,4 +355,5 @@ lineFeed = do
   where fillSpaces :: Int -> Int -> [(Int, Char)] -> Quake ()
         fillSpaces i e changes
           | i >= e = globals.con.cText %= (UV.// changes)
-          | otherwise = fillSpaces (i + 1) e ((i, ' ') : changes)
+          | otherwise = fillSpaces (i + 1) e $! ((i, ' ') : changes)
+

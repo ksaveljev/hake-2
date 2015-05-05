@@ -1,17 +1,23 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.CLFX where
 
 -- Client Graphics Effects
 
-import Control.Lens ((.=), ix, use, (^.))
-import Control.Monad (unless)
+import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
+import Control.Monad (unless, when)
+import Data.Char (ord)
 import Linear (V3(..))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.Com as Com
 
 runDLights :: Quake ()
 runDLights = do
@@ -86,5 +92,23 @@ clearLightStyles = do
 
 -- Int is reference to globals.cl.csConfigStrings
 setLightStyle :: Int -> Quake () 
-setLightStyle _ = do
-    io (putStrLn "CLFX.setLightStyle") >> undefined -- TODO
+setLightStyle csIdx = do
+    Just str <- preuse $ globals.cl.csConfigStrings.ix (csIdx + Constants.csLights)
+    let len = B.length str
+
+    when (len >= Constants.maxQPath) $
+      Com.comError Constants.errDrop $ "svc_lightstyle length=" `B.append` BC.pack (show len) -- IMPROVE?
+
+    let d :: Float = fromIntegral (ord 'm' - ord 'a') -- so we do not recalculate it every time
+        lsMap = UV.unfoldr buildLightStyle (str, d, 0)
+
+    zoom (clientGlobals.cgLightStyle.ix csIdx) $ do
+      clsLength .= len
+      clsMap .=  lsMap -- TODO: make sure we never want to access something beyond length
+
+  where buildLightStyle :: (B.ByteString, Float, Int) -> Maybe (Float, (B.ByteString, Float, Int))
+        buildLightStyle (str, d, idx)
+          | idx >= B.length str = Nothing
+          | otherwise =
+              let a :: Float = fromIntegral $ ord (str `BC.index` idx) - ord 'a'
+              in Just (a / d, (str, d, idx + 1))
