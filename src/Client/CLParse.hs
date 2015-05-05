@@ -168,11 +168,12 @@ parseConfigString = do
     Just oldStr <- preuse $ globals.cl.csConfigStrings.ix i
     globals.cl.csConfigStrings.ix i .= str
 
+    refreshPrepped <- use $ globals.cl.csRefreshPrepped
+
     if | i >= Constants.csLights && i < Constants.csLights + Constants.maxLightStyles ->
            CLFX.setLightStyle (i - Constants.csLights)
 
        | i >= Constants.csModels && i < Constants.csModels + Constants.maxModels -> do
-           refreshPrepped <- use $ globals.cl.csRefreshPrepped
            when refreshPrepped $ do
              Just renderer <- use $ globals.re
              model <- (renderer^.rRefExport.reRegisterModel) str
@@ -186,19 +187,33 @@ parseConfigString = do
                  globals.cl.csModelClip.ix (i - Constants.csModels) .= Nothing
 
        | i >= Constants.csSounds && i < Constants.csSounds + Constants.maxSounds -> do
-           refreshPrepped <- use $ globals.cl.csRefreshPrepped
            when refreshPrepped $ do
              sound <- S.registerSound str
              globals.cl.csSoundPrecache.ix (i - Constants.csSounds) .= sound
 
        | i >= Constants.csImages && i < Constants.csImages + Constants.maxImages -> do
-           refreshPrepped <- use $ globals.cl.csRefreshPrepped
            when refreshPrepped $ do
              Just renderer <- use $ globals.re
              image <- (renderer^.rRefExport.reRegisterPic) str
              globals.cl.csImagePrecache.ix (i - Constants.csImages) .= image
 
        | i >= Constants.csPlayerSkins && i < Constants.csPlayerSkins + Constants.maxClients -> do
-           io (putStrLn "CLParse.parseConfigString#csPlayerSkins") >> undefined -- TODO
+           when (refreshPrepped && not (oldStr == str)) $
+             parseClientInfo (i - Constants.csPlayerSkins)
 
        | otherwise -> return ()
+
+{-
+- ================ CL_ParseClientinfo
+- 
+- Load the skin, icon, and model for a client ================
+-}
+parseClientInfo :: Int -> Quake ()
+parseClientInfo player = do
+    Just str <- preuse $ globals.cl.csConfigStrings.ix (player + Constants.csPlayerSkins)
+    clientInfo <- loadClientInfo str
+    globals.cl.csClientInfo.ix player .= clientInfo
+
+loadClientInfo :: B.ByteString -> Quake ClientInfoT
+loadClientInfo str = do
+    io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
