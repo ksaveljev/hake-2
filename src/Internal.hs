@@ -1597,34 +1597,39 @@ data MenuLayerT =
              }
 
 data ClientGlobals =
-  ClientGlobals { _cgExtraTime       :: Int
-                , _cgNumCheatVars    :: Int
-                , _cgBuf             :: SizeBufT
-                , _cgFrameMsec       :: Int64
-                , _cgOldSysFrameTime :: Int64
-                , _cgInKLook         :: KButtonT
-                , _cgInLeft          :: KButtonT
-                , _cgInRight         :: KButtonT
-                , _cgInForward       :: KButtonT
-                , _cgInBack          :: KButtonT
-                , _cgInLookUp        :: KButtonT
-                , _cgInLookDown      :: KButtonT
-                , _cgInMoveLeft      :: KButtonT
-                , _cgInMoveRight     :: KButtonT
-                , _cgInStrafe        :: KButtonT
-                , _cgInSpeed         :: KButtonT
-                , _cgInUse           :: KButtonT
-                , _cgInAttack        :: KButtonT
-                , _cgInUp            :: KButtonT
-                , _cgInDown          :: KButtonT
-                , _cgInImpulse       :: Int
-                , _cgDLights         :: V.Vector CDLightT
-                , _cgLightStyle      :: V.Vector CLightStyleT
-                , _cgLastOfs         :: Int
-                , _cgCR              :: Int -- from Console.hs
-                , _cgParticles       :: V.Vector CParticleT
-                , _cgActiveParticles :: Maybe CParticleReference
-                , _cgFreeParticles   :: CParticleReference
+  ClientGlobals { _cgExtraTime          :: Int
+                , _cgNumCheatVars       :: Int
+                , _cgBuf                :: SizeBufT
+                , _cgFrameMsec          :: Int64
+                , _cgOldSysFrameTime    :: Int64
+                , _cgInKLook            :: KButtonT
+                , _cgInLeft             :: KButtonT
+                , _cgInRight            :: KButtonT
+                , _cgInForward          :: KButtonT
+                , _cgInBack             :: KButtonT
+                , _cgInLookUp           :: KButtonT
+                , _cgInLookDown         :: KButtonT
+                , _cgInMoveLeft         :: KButtonT
+                , _cgInMoveRight        :: KButtonT
+                , _cgInStrafe           :: KButtonT
+                , _cgInSpeed            :: KButtonT
+                , _cgInUse              :: KButtonT
+                , _cgInAttack           :: KButtonT
+                , _cgInUp               :: KButtonT
+                , _cgInDown             :: KButtonT
+                , _cgInImpulse          :: Int
+                , _cgDLights            :: V.Vector CDLightT
+                , _cgLightStyle         :: V.Vector CLightStyleT
+                , _cgLastOfs            :: Int
+                , _cgCR                 :: Int -- from Console.hs
+                , _cgParticles          :: V.Vector CParticleT
+                , _cgActiveParticles    :: Maybe CParticleReference
+                , _cgFreeParticles      :: CParticleReference
+                , _cgPrecacheCheck      :: Int
+                , _cgPrecacheSpawnCount :: Int
+                , _cgPrecacheTex        :: Int
+                , _cgPrecacheModelSkin  :: Int
+                , _cgPrecacheModel      :: Maybe B.ByteString
                 }
 
 data VRectT =

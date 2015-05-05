@@ -4,7 +4,7 @@
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
-import Control.Lens (use, (.=), (^.), (+=), preuse, ix)
+import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.))
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
@@ -404,8 +404,27 @@ reconnectF = io (putStrLn "CL.reconnectF") >> undefined -- TODO
 rconF :: XCommandT
 rconF = io (putStrLn "CL.rconF") >> undefined -- TODO
 
+{-
+- The server will send this command right before allowing the client into
+- the server.
+-}
 precacheF :: XCommandT
-precacheF = io (putStrLn "CL.precacheF") >> undefined -- TODO
+precacheF = do
+    c <- Cmd.argc
+
+    -- Yet another hack to let old demos work the old precache sequence
+    when (c < 2) $ do
+      io (putStrLn "CL.precacheF") >> undefined -- TODO
+
+    v1 <- Cmd.argv 1
+
+    zoom clientGlobals $ do
+      cgPrecacheCheck .= Constants.csModels
+      cgPrecacheSpawnCount .= Lib.atoi v1
+      cgPrecacheModel .= Nothing
+      cgPrecacheModelSkin .= 0
+
+    requestNextDownload
 
 remoteCommandHeader :: B.ByteString
 remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
@@ -668,3 +687,10 @@ clearState = do
     globals.clEntities .= Vec.replicate Constants.maxEdicts newCEntityT
 
     SZ.clear (globals.cls.csNetChan.ncMessage)
+
+requestNextDownload :: Quake ()
+requestNextDownload = do
+    state <- use $ globals.cls.csState
+
+    when (state == Constants.caConnected) $ do
+      io (putStrLn "CL.requestNextDownload") >> undefined -- TODO
