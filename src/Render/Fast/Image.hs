@@ -436,7 +436,7 @@ glUpload8 image width height mipmap isSky = do
                                                  -- copy rgb components
                                                  then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
                                                  else t
-              in constructTrans d8to24table (idx + 1) maxIdx (acc `mappend` (BB.int32BE t'))
+              in constructTrans d8to24table (idx + 1) maxIdx (acc `mappend` (BB.int32LE t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap = do
