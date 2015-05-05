@@ -104,7 +104,7 @@ setModel er@(EdictReference edictIdx) name = do
 
     -- if it is an inline model, get the size information for it
     when (BC.head modelName == '*') $ do
-      modelIdx <- CM.inlineModel modelName
+      (CModelReference modelIdx) <- CM.inlineModel modelName
       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do

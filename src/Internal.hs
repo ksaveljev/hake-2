@@ -762,10 +762,10 @@ data ClientStateT =
                , _csGameDir                :: !B.ByteString
                , _csPlayerNum              :: !Int
                , _csConfigStrings          :: !(V.Vector B.ByteString)
-               , _csModelDraw              :: !(V.Vector ModelT)
-               , _csModelClip              :: !(V.Vector CModelReference)
+               , _csModelDraw              :: !(V.Vector (Maybe ModelT))
+               , _csModelClip              :: !(V.Vector (Maybe CModelReference))
                , _csSoundPrecache          :: !(V.Vector SfxT)
-               , _csImagePrecache          :: !(V.Vector ImageT)
+               , _csImagePrecache          :: !(V.Vector (Maybe ImageT))
                , _csClientInfo             :: !(V.Vector ClientInfoT)
                , _csBaseClientInfo         :: !ClientInfoT
                }

@@ -83,3 +83,8 @@ clearLightStyles :: Quake ()
 clearLightStyles = do
     clientGlobals.cgLightStyle .= V.replicate Constants.maxLightStyles newCLightStyleT
     clientGlobals.cgLastOfs .= -1
+
+-- Int is reference to globals.cl.csConfigStrings
+setLightStyle :: Int -> Quake () 
+setLightStyle _ = do
+    io (putStrLn "CLFX.setLightStyle") >> undefined -- TODO

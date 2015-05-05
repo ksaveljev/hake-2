@@ -4,6 +4,7 @@ import Linear (V3)
 import qualified Data.ByteString as B
 
 import Quake
+import Sound.SfxT
 
 init :: Quake ()
 init = return () -- TODO: don't want to get involved with sound system yet -- io (putStrLn "S.init") >> undefined -- TODO
@@ -21,3 +22,7 @@ startLocalSound _ = do
 
 disableStreaming :: Quake ()
 disableStreaming = io (putStrLn "S.disableStreaming") >> undefined -- TODO
+
+registerSound :: B.ByteString -> Quake SfxT
+registerSound _ = do
+    io (putStrLn "S.registerSound") >> undefined -- TODO

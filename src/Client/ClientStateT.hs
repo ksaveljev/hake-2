@@ -68,10 +68,10 @@ newClientStateT =
                , _csGameDir                = ""
                , _csPlayerNum              = 0
                , _csConfigStrings          = V.replicate Constants.maxConfigStrings ""
-               , _csModelDraw              = V.replicate Constants.maxModels newModelT
-               , _csModelClip              = V.replicate Constants.maxModels (CModelReference (-1))
+               , _csModelDraw              = V.replicate Constants.maxModels (Just newModelT)
+               , _csModelClip              = V.replicate Constants.maxModels Nothing
                , _csSoundPrecache          = V.replicate Constants.maxSounds newSfxT
-               , _csImagePrecache          = V.generate Constants.maxImages newImageT
+               , _csImagePrecache          = V.generate Constants.maxImages (\i -> Just (newImageT i))
                , _csClientInfo             = V.replicate Constants.maxClients newClientInfoT
                , _csBaseClientInfo         = newClientInfoT
                }

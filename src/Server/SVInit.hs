@@ -202,7 +202,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     modelsCount <- CM.numInlineModels
     svGlobals.svServer.sConfigStrings %= (V.// fmap (\i -> (Constants.csModels + 1 + i, "*" `B.append` BC.pack (show i))) [1..modelsCount-1]) -- IMPROVE: convert Int to ByteString using binary package?
     -- copy references
-    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \mIdx -> return (i + 1, CModelReference mIdx)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
+    updatedModels <- mapM (\i -> CM.inlineModel ("*" `B.append` BC.pack (show i)) >>= \modelRef -> return (i + 1, modelRef)) [1..modelsCount-1] -- IMPROVE: convert Int to ByteString using binary package?
     svGlobals.svServer.sModels %= (V.// updatedModels)
 
     -- spawn the rest of the entities on the map

@@ -746,7 +746,7 @@ initBoxHull = do
                 | x == 1 -> V3 0 v 0
                 | otherwise -> V3 0 0 v
 
-inlineModel :: B.ByteString -> Quake Int -- return index of cmGlobals.cmMapCModels
+inlineModel :: B.ByteString -> Quake CModelReference
 inlineModel name = do
     when (name == "" || BC.head name /= '*') $
       Com.comError Constants.errDrop "CM_InlineModel: bad name"
@@ -757,7 +757,7 @@ inlineModel name = do
     when (num < 1 || num >= numCModels) $
       Com.comError Constants.errDrop "CM_InlineModel: bad number"
 
-    return num
+    return (CModelReference num)
 
 numInlineModels :: Quake Int
 numInlineModels = use $ cmGlobals.cmNumCModels

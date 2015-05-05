@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.CLParse where
 
-import Control.Lens (use, (^.), (.=))
+import Control.Lens (use, (^.), (.=), preuse, ix)
 import Control.Monad (when, liftM, void)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -13,12 +13,15 @@ import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CL as CL
+import qualified Client.CLFX as CLFX
 import qualified Client.CLView as CLView
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
+import qualified Sound.S as S
 
 downloadF :: XCommandT
 downloadF = io (putStrLn "CLParse.downloadF") >> undefined -- TODO
@@ -155,4 +158,47 @@ parseServerData = do
 
 parseConfigString :: Quake ()
 parseConfigString = do
-    io (putStrLn "CLParse.parseConfigString") >> undefined -- TODO
+    i <- MSG.readShort (globals.netMessage)
+
+    when (i < 0 || i >= Constants.maxConfigStrings) $
+      Com.comError Constants.errDrop "configstring > MAX_CONFIGSTRINGS"
+
+    str <- MSG.readString (globals.netMessage)
+
+    Just oldStr <- preuse $ globals.cl.csConfigStrings.ix i
+    globals.cl.csConfigStrings.ix i .= str
+
+    if | i >= Constants.csLights && i < Constants.csLights + Constants.maxLightStyles ->
+           CLFX.setLightStyle (i - Constants.csLights)
+
+       | i >= Constants.csModels && i < Constants.csModels + Constants.maxModels -> do
+           refreshPrepped <- use $ globals.cl.csRefreshPrepped
+           when refreshPrepped $ do
+             Just renderer <- use $ globals.re
+             model <- (renderer^.rRefExport.reRegisterModel) str
+             globals.cl.csModelDraw.ix (i - Constants.csModels) .= model
+
+             if B.take 1 str == "*"
+               then do
+                 idx <- CM.inlineModel str
+                 globals.cl.csModelClip.ix (i - Constants.csModels) .= Just idx
+               else
+                 globals.cl.csModelClip.ix (i - Constants.csModels) .= Nothing
+
+       | i >= Constants.csSounds && i < Constants.csSounds + Constants.maxSounds -> do
+           refreshPrepped <- use $ globals.cl.csRefreshPrepped
+           when refreshPrepped $ do
+             sound <- S.registerSound str
+             globals.cl.csSoundPrecache.ix (i - Constants.csSounds) .= sound
+
+       | i >= Constants.csImages && i < Constants.csImages + Constants.maxImages -> do
+           refreshPrepped <- use $ globals.cl.csRefreshPrepped
+           when refreshPrepped $ do
+             Just renderer <- use $ globals.re
+             image <- (renderer^.rRefExport.reRegisterPic) str
+             globals.cl.csImagePrecache.ix (i - Constants.csImages) .= image
+
+       | i >= Constants.csPlayerSkins && i < Constants.csPlayerSkins + Constants.maxClients -> do
+           io (putStrLn "CLParse.parseConfigString#csPlayerSkins") >> undefined -- TODO
+
+       | otherwise -> return ()
