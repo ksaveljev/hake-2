@@ -137,6 +137,10 @@ writeDeltaUserCmd sizeBufLens from cmd = do
     writeByteI sizeBufLens (fromIntegral $ cmd^.ucMsec)
     writeByteI sizeBufLens (fromIntegral $ cmd^.ucLightLevel)
 
+writeDeltaEntity :: EntityStateT -> EntityStateT -> Traversal' QuakeState SizeBufT -> Bool -> Bool -> Quake ()
+writeDeltaEntity _ _ _ _ _ = do
+    io (putStrLn "MSG.writeDeltaEntity") >> undefined -- TODO
+
 --
 -- reading functions
 --

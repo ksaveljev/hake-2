@@ -33,6 +33,9 @@ nextServer = io (putStrLn "SVUser.nextServer") >> undefined -- TODO
 nullCmd :: UserCmdT
 nullCmd = newUserCmdT
 
+nullState :: EntityStateT
+nullState = newEntityStateT Nothing
+
 uCmds :: V.Vector UCmdT
 uCmds =
     V.fromList [ UCmdT "new" newF
@@ -296,7 +299,52 @@ configStringsF = do
               return start
 
 baselinesF :: XCommandT
-baselinesF = io (putStrLn "SVUser.baselinesF") >> undefined -- TODO
+baselinesF = do
+    Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+
+    Com.dprintf $ "Baselines() from " `B.append` (client^.cName) `B.append` "\n"
+
+    if (client^.cState) /= Constants.csConnected
+      then
+        Com.printf "baselines not valid -- already spawned\n"
+      else do
+        -- handle the case of a level changing while a client was connecting
+        spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
+        v1 <- Cmd.argv 1
+        if Lib.atoi v1 /= spawnCount
+          then do
+            Com.printf "SV_Baselines_f from different level\n"
+            newF
+          else do
+            v2 <- Cmd.argv 2
+            let start = Lib.atoi v2
+
+            -- write a packet full of data
+            baselines <- use $ svGlobals.svServer.sBaselines
+            start' <- writeBaselinePacket baselines clientRef start
+
+            -- send next command
+            if start' == Constants.maxEdicts
+              then do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("precache " `B.append` BC.pack (show spawnCount) `B.append` "\n") -- IMPROVE?
+              else do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd baselines " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
+
+  where writeBaselinePacket :: V.Vector EntityStateT -> ClientReference -> Int -> Quake Int
+        writeBaselinePacket baselines clientRef@(ClientReference clientIdx) start = do
+          Just curSize <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage.sbCurSize
+          if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxEdicts
+            then do
+              let base = baselines V.! start
+              when ((base^.esModelIndex) /= 0 || (base^.esSound) /= 0 || (base^.esEffects) /= 0) $ do
+                MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcSpawnBaseline
+                MSG.writeDeltaEntity nullState base (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) True True
+              writeBaselinePacket baselines clientRef (start + 1)
+            else
+              return start
 
 beginF :: XCommandT
 beginF = io (putStrLn "SVUser.beginF") >> undefined -- TODO
