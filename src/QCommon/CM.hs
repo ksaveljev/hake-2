@@ -21,14 +21,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import Game.CSurfaceT
-import Game.MapSurfaceT
-import QCommon.CAreaT
-import QCommon.CBrushT
-import QCommon.CBrushSideT
-import QCommon.CLeafT
-import QCommon.CNodeT
 import QCommon.LumpT
-import QCommon.QFiles.BSP.DAreaPortalT
 import QCommon.QFiles.BSP.DAreaT
 import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
@@ -37,7 +30,6 @@ import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DModelT
 import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
-import QCommon.QFiles.BSP.DVisT
 import QCommon.TexInfoT
 import Util.Binary
 import Util.QuakeFile (QuakeFile)

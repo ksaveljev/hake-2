@@ -220,7 +220,7 @@ parseClientInfo player = do
     globals.cl.csClientInfo.ix player .= clientInfo
 
 loadClientInfo :: B.ByteString -> Quake ClientInfoT
-loadClientInfo str = do
+loadClientInfo _ = do
     io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
 
 {-
@@ -286,3 +286,7 @@ downloadFileName :: B.ByteString -> Quake B.ByteString
 downloadFileName fileName = do
     gameDir <- FS.gameDir
     return $ gameDir `B.append` "/" `B.append` fileName
+
+registerSounds :: Quake ()
+registerSounds = do
+    io (putStrLn "CLParse.registerSounds") >> undefined -- TODO

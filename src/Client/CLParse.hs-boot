@@ -10,3 +10,5 @@ downloadF :: XCommandT
 parseServerMessage :: Quake ()
 
 checkOrDownloadFile :: B.ByteString -> Quake Bool
+
+registerSounds :: Quake ()

@@ -1,6 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.CMGlobals where
+module QCommon.CMGlobals ( module QCommon.CMGlobals
+                         , module Game.CModelT
+                         , module Game.CPlaneT
+                         , module Game.MapSurfaceT
+                         , module Game.TraceT
+                         , module QCommon.CAreaT
+                         , module QCommon.CBrushSideT
+                         , module QCommon.CBrushT
+                         , module QCommon.CLeafT
+                         , module QCommon.CNodeT
+                         , module QCommon.QFiles.BSP.DAreaPortalT
+                         , module QCommon.QFiles.BSP.DVisT
+                         ) where
 
 import Control.Lens (makeLenses)
 import Linear (V3(..))

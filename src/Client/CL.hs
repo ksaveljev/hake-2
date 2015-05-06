@@ -7,6 +7,7 @@ import Control.Concurrent (threadDelay)
 import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.))
+import Data.Maybe (fromJust)
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
 import qualified Data.ByteString as B
@@ -52,6 +53,9 @@ playerMult = 5
 -- ENV_CNT is map load, ENV_CNT+1 is first env map
 envCnt :: Int
 envCnt = Constants.csPlayerSkins + Constants.maxClients * playerMult
+
+textureCnt :: Int
+textureCnt = envCnt + 13
 
 cheatVars :: Vec.Vector CheatVarT
 cheatVars =
@@ -701,10 +705,17 @@ requestNextDownload = do
 
     when (state == Constants.caConnected) $ do
       updatePrecacheCheck
-      done <- checkIfDownloadStarted
 
-      unless done $ do
-        io (putStrLn "CL.requestNextDownload") >> undefined -- TODO
+      checkIfDownloadStarted
+        >>= checkModelsDownload
+        >>= checkSoundsDownload
+        >>= checkImagesDownload
+        >>= checkSkinsDownload
+        >>= loadMap
+        >>= checkPicsDownload
+        >>= updatePrecacheCheck2
+        >>= checkTexturesDownload
+        >>= finishDownloads
 
   where updatePrecacheCheck :: Quake ()
         updatePrecacheCheck = do
@@ -714,6 +725,8 @@ requestNextDownload = do
           when (allowDownloadValue == 0 && precacheCheck < envCnt) $
             clientGlobals.cgPrecacheCheck .= envCnt
 
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
         checkIfDownloadStarted :: Quake Bool
         checkIfDownloadStarted = do
           precacheCheck <- use $ clientGlobals.cgPrecacheCheck
@@ -734,3 +747,278 @@ requestNextDownload = do
                   return False
             else
               return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkModelsDownload :: Bool -> Quake Bool
+        checkModelsDownload True = return True -- do nothing
+        checkModelsDownload False = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck >= Constants.csModels && precacheCheck < Constants.csModels + Constants.maxModels
+            then do
+              allowDownloadModelsValue <- liftM (^.cvValue) allowDownloadModelsCVar
+
+              if allowDownloadModelsValue /= 0
+                then do
+                  configStrings <- use $ globals.cl.csConfigStrings
+                  done <- downloadModels configStrings
+
+                  if done
+                    then return True
+                    else do
+                      clientGlobals.cgPrecacheCheck .= Constants.csSounds
+                      return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csSounds
+                  return False
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        downloadModels :: Vec.Vector B.ByteString -> Quake Bool
+        downloadModels configStrings = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck < Constants.csModels + Constants.maxModels && B.length (configStrings Vec.! precacheCheck) > 0
+            then do
+              let str = configStrings Vec.! precacheCheck
+
+              (done, continue) <- checkWildcard str
+                                    >>= checkPrecacheModelSkin str
+                                    >>= checkPrecacheModel str
+                
+              if | done -> return True
+                 | continue -> downloadModels configStrings
+                 | otherwise -> do
+                     io (putStrLn "CL.requestNextDownload#downloadModels") >> undefined -- TODO
+
+            else
+              return False
+
+        checkWildcard :: B.ByteString -> Quake (Bool, Bool)
+        checkWildcard str = do
+          if str `BC.index` 0 == '*' || str `BC.index` 0 == '#'
+            then do
+              clientGlobals.cgPrecacheCheck += 1
+              return (False, True)
+            else
+              return (False, False)
+
+        checkPrecacheModelSkin :: B.ByteString -> (Bool, Bool) -> Quake (Bool, Bool)
+        checkPrecacheModelSkin _ (True, _) = return (True, False)
+        checkPrecacheModelSkin _ (_, True) = return (False, True)
+        checkPrecacheModelSkin str _ = do
+          precacheModelSkin <- use $ clientGlobals.cgPrecacheModelSkin
+          
+          if precacheModelSkin == 0
+            then do
+              fileExists <- CLParse.checkOrDownloadFile str
+              clientGlobals.cgPrecacheModelSkin .= 1
+              return $ if fileExists then (False, False) else (True, False)
+            else
+              return (False, False)
+
+        checkPrecacheModel :: B.ByteString -> (Bool, Bool) -> Quake (Bool, Bool)
+        checkPrecacheModel _ (True, _) = return (True, False)
+        checkPrecacheModel _ (_, True) = return (False, True)
+        checkPrecacheModel str _ = do
+          io (putStrLn "CL.requestNextDownload#checkPrecacheModel") >> undefined -- TODO
+
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkSoundsDownload :: Bool -> Quake Bool
+        checkSoundsDownload True = return True -- do nothing
+        checkSoundsDownload False = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck >= Constants.csSounds && precacheCheck < Constants.csSounds + Constants.maxSounds
+            then do
+              allowDownloadSoundsValue <- liftM (^.cvValue) allowDownloadSoundsCVar
+
+              if allowDownloadSoundsValue /= 0
+                then do
+                  when (precacheCheck == Constants.csSounds) $
+                    clientGlobals.cgPrecacheCheck += 1 -- zero is blank
+
+                  configStrings <- use $ globals.cl.csConfigStrings
+                  done <- downloadSounds configStrings
+
+                  if done
+                    then
+                      return True
+
+                    else do
+                      clientGlobals.cgPrecacheCheck .= Constants.csImages
+                      return False
+
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csImages
+                  return False
+
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        downloadSounds :: Vec.Vector B.ByteString -> Quake Bool
+        downloadSounds configStrings = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck < Constants.csSounds + Constants.maxSounds && B.length (configStrings Vec.! precacheCheck) > 0
+            then do
+              let str = configStrings Vec.! precacheCheck
+              clientGlobals.cgPrecacheCheck += 1
+
+              if str `BC.index` 0 == '*'
+                then
+                  downloadSounds configStrings
+                else do
+                  let fn = "sound/" `B.append` str
+                  fileExists <- CLParse.checkOrDownloadFile fn
+                  if fileExists
+                    then downloadSounds configStrings
+                    else return True
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkImagesDownload :: Bool -> Quake Bool
+        checkImagesDownload True = return True -- do nothing
+        checkImagesDownload False = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck >= Constants.csImages && precacheCheck < Constants.csImages + Constants.maxImages
+            then do
+              when (precacheCheck == Constants.csImages) $
+                clientGlobals.cgPrecacheCheck += 1 -- zero is blank
+
+              configStrings <- use $ globals.cl.csConfigStrings
+              done <- downloadImages configStrings
+
+              if done
+                then
+                  return True
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins
+                  return False
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        downloadImages :: Vec.Vector B.ByteString -> Quake Bool
+        downloadImages configStrings = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+          
+          if precacheCheck < Constants.csImages + Constants.maxImages && B.length (configStrings Vec.! precacheCheck) > 0
+            then do
+              let str = configStrings Vec.! precacheCheck
+              clientGlobals.cgPrecacheCheck += 1
+
+              let fn = "pics/" `B.append` str `B.append` ".pcx"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then downloadImages configStrings
+                else return True
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkSkinsDownload :: Bool -> Quake Bool
+        checkSkinsDownload True = return True -- do nothing
+        checkSkinsDownload False = do
+          io (putStrLn "CL.requestNextDownload#checkSkinsDownload" ) >> undefined -- TODO
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        loadMap :: Bool -> Quake Bool
+        loadMap True = return True -- do nothing
+        loadMap False = do
+          io (putStrLn "CL.requestNextDownload#loadMap" ) >> undefined -- TODO
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkPicsDownload :: Bool -> Quake Bool
+        checkPicsDownload True = return True -- do nothing
+        checkPicsDownload False = do
+          io (putStrLn "CL.requestNextDownload#checkPicsDownload" ) >> undefined -- TODO
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        updatePrecacheCheck2 :: Bool -> Quake Bool
+        updatePrecacheCheck2 True = return True -- do nothing
+        updatePrecacheCheck2 False = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          when (precacheCheck == textureCnt) $ do
+            clientGlobals.cgPrecacheCheck .= textureCnt + 1
+            clientGlobals.cgPrecacheTex .= 0
+
+          return False
+
+        -- confirm existance of textures, download any that don't exist
+        --
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        checkTexturesDownload :: Bool -> Quake Bool
+        checkTexturesDownload True = return True -- do nothing
+        checkTexturesDownload False = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck == textureCnt + 1
+            then do
+              allowDownloadValue <- liftM (^.cvValue) allowDownloadCVar
+              allowDownloadMapsValue <- liftM (^.cvValue) allowDownloadMapsCVar
+
+              if allowDownloadValue /= 0 && allowDownloadMapsValue /= 0
+                then do
+                  mapSurfaces <- use $ cmGlobals.cmMapSurfaces
+
+                  done <- downloadTextures mapSurfaces
+
+                  if done
+                    then
+                      return True
+                    else do
+                      clientGlobals.cgPrecacheCheck .= textureCnt + 999
+                      return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= textureCnt + 999
+                  return False
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        downloadTextures :: Vec.Vector MapSurfaceT -> Quake Bool
+        downloadTextures mapSurfaces = do
+          precacheTex <- use $ clientGlobals.cgPrecacheTex
+          numTexInfo <- use $ cmGlobals.cmNumTexInfo
+
+          if precacheTex < numTexInfo
+            then do
+              let fn = "textures/" `B.append` (fromJust $ (mapSurfaces Vec.! precacheTex)^.msRName) `B.append` ".wal"
+              clientGlobals.cgPrecacheTex += 1
+
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then downloadTextures mapSurfaces
+                else return True
+            else
+              return False
+        
+        finishDownloads :: Bool -> Quake ()
+        finishDownloads True = return ()
+        finishDownloads False = do
+          CLParse.registerSounds
+          CLView.prepRefresh
+
+          precacheSpawnCount <- use $ clientGlobals.cgPrecacheSpawnCount
+
+          MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+          MSG.writeString (globals.cls.csNetChan.ncMessage) ("begin " `B.append` BC.pack (show precacheSpawnCount) `B.append` "\n") -- IMPROVE?
