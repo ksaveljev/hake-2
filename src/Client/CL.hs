@@ -7,17 +7,19 @@ import Control.Concurrent (threadDelay)
 import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.))
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isNothing)
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as Vec
 
 import Quake
 import QuakeState
 import CVarVariables
 import Client.CheatVarT
+import QCommon.QFiles.MD2.DMdlT
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CLFX as CLFX
@@ -45,6 +47,7 @@ import qualified Sys.IN as IN
 import qualified Sys.NET as NET
 import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
+import qualified Util.Binary as Binary
 import qualified Util.Lib as Lib
 
 playerMult :: Int
@@ -792,8 +795,42 @@ requestNextDownload = do
               if | done -> return True
                  | continue -> downloadModels configStrings
                  | otherwise -> do
-                     io (putStrLn "CL.requestNextDownload#downloadModels") >> undefined -- TODO
+                     Just model <- use $ clientGlobals.cgPrecacheModel
+                     let pheader = newDMdlT (BL.fromStrict model)
 
+                     ret <- downloadModel pheader
+
+                     if ret
+                       then
+                         return True
+                       else do
+                         clientGlobals.cgPrecacheModel .= Nothing
+                         clientGlobals.cgPrecacheModelSkin .= 0
+                         clientGlobals.cgPrecacheCheck += 1
+                         return False
+
+            else
+              return False
+
+        downloadModel :: DMdlT -> Quake Bool
+        downloadModel pheader = do
+          precacheModelSkin <- use $ clientGlobals.cgPrecacheModelSkin
+
+          if precacheModelSkin - 1 < (pheader^.dmNumSkins)
+            then do
+              Just model <- use $ clientGlobals.cgPrecacheModel
+              let name = B.take (Constants.maxSkinName * (pheader^.dmNumSkins)) (B.drop ((pheader^.dmOfsSkins) + (precacheModelSkin - 1) * Constants.maxSkinName) model)
+                  zeroIdx = B.findIndex (== 0) name
+                  name' = case zeroIdx of
+                            Nothing -> name
+                            Just idx -> B.take idx name
+
+              fileExists <- CLParse.checkOrDownloadFile name'
+              clientGlobals.cgPrecacheModelSkin += 1
+
+              if fileExists
+                then downloadModel pheader
+                else return True
             else
               return False
 
@@ -820,12 +857,62 @@ requestNextDownload = do
             else
               return (False, False)
 
+        -- checking for skins in the model
         checkPrecacheModel :: B.ByteString -> (Bool, Bool) -> Quake (Bool, Bool)
         checkPrecacheModel _ (True, _) = return (True, False)
         checkPrecacheModel _ (_, True) = return (False, True)
         checkPrecacheModel str _ = do
-          io (putStrLn "CL.requestNextDownload#checkPrecacheModel") >> undefined -- TODO
+          precacheModel <- use $ clientGlobals.cgPrecacheModel
 
+          if isNothing precacheModel
+            then do
+              model <- FS.loadFile str
+              clientGlobals.cgPrecacheModel .= model
+              checkContentsLoaded model
+                >>= checkAliasModel model
+                >>= checkModelLoaded model
+            else
+              return (False, False)
+
+        checkContentsLoaded :: Maybe B.ByteString -> Quake (Bool, Bool)
+        checkContentsLoaded Nothing = do
+          clientGlobals.cgPrecacheModelSkin .= 0
+          clientGlobals.cgPrecacheCheck += 1
+          return (False, True) -- couldn't load the file
+        checkContentsLoaded _ = return (False, False)
+
+        checkAliasModel :: Maybe B.ByteString -> (Bool, Bool) -> Quake (Bool, Bool)
+        checkAliasModel _ (True, _) = return (True, False)
+        checkAliasModel _ (_, True) = return (False, True)
+        checkAliasModel maybeModel _ = do
+          let Just model = maybeModel -- pretty sure it is not Nothing
+              byte = B.take 4 model
+              header = Binary.runGet Binary.getInt (BL.fromStrict byte)
+
+          if header /= idAliasHeader
+            then do
+              -- not an alias model
+              clientGlobals.cgPrecacheModel .= Nothing
+              clientGlobals.cgPrecacheModelSkin .= 0
+              clientGlobals.cgPrecacheCheck += 1
+              return (False, True)
+            else
+              return (False, False)
+
+        checkModelLoaded :: Maybe B.ByteString -> (Bool, Bool) -> Quake (Bool, Bool)
+        checkModelLoaded _ (True, _) = return (True, False)
+        checkModelLoaded _ (_, True) = return (False, True)
+        checkModelLoaded maybeModel _ = do
+          let Just model = maybeModel -- pretty sure it is not Nothing
+              pheader = newDMdlT (BL.fromStrict model)
+
+          if (pheader^.dmVersion) /= Constants.aliasVersion
+            then do
+              clientGlobals.cgPrecacheCheck += 1
+              clientGlobals.cgPrecacheModelSkin .= 0
+              return (False, True) -- couldn't load it
+            else
+              return (False, False)
 
         -- returns True if we started a download and
         -- need to quit the requestNextDownload function
