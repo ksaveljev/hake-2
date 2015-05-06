@@ -267,3 +267,10 @@ blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
 blockSequenceCRCByte _ _ _ _ = do
     io (putStrLn "IMPLEMENT ME!! Com.blockSequenceCRCByte") >> return 0
     -- io (putStrLn "Com.blockSequenceCRCByte") >> undefined -- TODO
+
+stripExtension :: B.ByteString -> B.ByteString
+stripExtension str =
+    let i = '.' `BC.elemIndexEnd` str
+    in case i of
+         Nothing -> str
+         Just idx -> B.take idx str

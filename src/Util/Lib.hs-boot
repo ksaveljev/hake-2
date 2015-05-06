@@ -17,6 +17,8 @@ vtos :: V3 Float -> B.ByteString
 
 fOpen :: B.ByteString -> IOMode -> Quake (Maybe Handle)
 
+fOpenBinary :: B.ByteString -> IOMode -> Quake (Maybe Handle)
+
 fClose :: Handle -> Quake ()
 
 rand :: Quake Int16

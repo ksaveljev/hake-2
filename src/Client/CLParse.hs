@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.CLParse where
 
-import Control.Lens (use, (^.), (.=), preuse, ix)
+import Control.Exception (handle, IOException)
+import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=))
 import Control.Monad (when, liftM, void)
+import System.IO (IOMode(ReadWriteMode), hFileSize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -20,8 +23,10 @@ import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
+import {-# SOURCE #-} qualified Util.Lib as Lib
 
 downloadF :: XCommandT
 downloadF = io (putStrLn "CLParse.downloadF") >> undefined -- TODO
@@ -218,6 +223,66 @@ loadClientInfo :: B.ByteString -> Quake ClientInfoT
 loadClientInfo str = do
     io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
 
+{-
+- CL_CheckOrDownloadFile returns true if the file exists, 
+- otherwise it attempts to start a
+- download from the server.
+-}
 checkOrDownloadFile :: B.ByteString -> Quake Bool
-checkOrDownloadFile _ = do
-    io (putStrLn "CLParse.checkOrDownloadFile") >> undefined -- TODO
+checkOrDownloadFile fileName = do
+    done <- checkIfShouldProceed
+
+    if done
+      then
+        return True
+      else do
+        let tmpFileName = (Com.stripExtension fileName) `B.append` ".tmp"
+
+        zoom (globals.cls) $ do
+          csDownloadName .= fileName
+          -- download to a temp name, and only rename
+          -- to the real name when done, so if interrupted
+          -- a runt file wont be left
+          csDownloadTempName .= tmpFileName
+
+        -- check to see if we already have a tmp for this file, if so, try
+        -- to resume; open the file if not opened yet
+        name <- downloadFileName tmpFileName
+        fp <- Lib.fOpenBinary name ReadWriteMode
+
+        case fp of
+          Just h -> do
+            -- it exists
+            len <- io (handle (\(_ :: IOException) -> return 0) $ hFileSize h)
+
+            globals.cls.csDownload .= Just h
+
+            -- give the server an offset to start the download
+            Com.printf $ "Resuming " `B.append` fileName `B.append` "\n"
+            MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName `B.append` " " `B.append` BC.pack (show len)) -- IMPROVE?
+
+          Nothing -> do
+            Com.printf $ "Downloading " `B.append` fileName `B.append` "\n"
+            MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName)
+
+        globals.cls.csDownloadNumber += 1
+
+        return False
+
+  where checkIfShouldProceed :: Quake Bool
+        checkIfShouldProceed = do
+          if ".." `BC.isInfixOf` fileName
+            then do
+              Com.printf "Refusing to download a path with ..\n"
+              return True
+            else do
+              len <- FS.fileLength fileName
+              -- if file exists then there is no need to download
+              return $ if len > 0 then True else False
+
+downloadFileName :: B.ByteString -> Quake B.ByteString
+downloadFileName fileName = do
+    gameDir <- FS.gameDir
+    return $ gameDir `B.append` "/" `B.append` fileName

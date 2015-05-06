@@ -7,7 +7,7 @@ import Control.Lens (use, (.=))
 import Data.Int (Int16)
 import Data.Maybe (fromMaybe)
 import Linear (V3(..))
-import System.IO (Handle, IOMode, openFile, hClose)
+import System.IO (Handle, IOMode, openFile, hClose, openBinaryFile)
 import System.Random (random)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
@@ -39,8 +39,8 @@ atov str = let strres = BC.split ' ' str
 vtos :: V3 Float -> B.ByteString
 vtos (V3 a b c) = BC.pack $ show (truncate a :: Int) ++ " " ++ show (truncate b :: Int) ++ " " ++ show (truncate c :: Int) -- IMPROVE ?
 
-fOpen :: B.ByteString -> IOMode -> Quake (Maybe Handle)
-fOpen name mode = do
+fOpenCommon :: (FilePath -> IOMode -> IO Handle) -> B.ByteString -> IOMode -> Quake (Maybe Handle)
+fOpenCommon f name mode = do
     result <- io $ tryToOpenFile name mode
     case result of
       Nothing -> do
@@ -50,8 +50,14 @@ fOpen name mode = do
 
   where tryToOpenFile :: B.ByteString -> IOMode -> IO (Maybe Handle)
         tryToOpenFile fileName openMode = handle (\(_ :: IOException) -> return Nothing) $ do
-          h <- openFile (BC.unpack fileName) openMode
+          h <- f (BC.unpack fileName) openMode
           return $ Just h
+
+fOpen :: B.ByteString -> IOMode -> Quake (Maybe Handle)
+fOpen = fOpenCommon openFile
+
+fOpenBinary :: B.ByteString -> IOMode -> Quake (Maybe Handle)
+fOpenBinary = fOpenCommon openBinaryFile
 
 fClose :: Handle -> Quake ()
 fClose h = io $ handle (\(_ :: IOException) -> return ()) (hClose h)
