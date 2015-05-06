@@ -217,3 +217,7 @@ parseClientInfo player = do
 loadClientInfo :: B.ByteString -> Quake ClientInfoT
 loadClientInfo str = do
     io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
+
+checkOrDownloadFile :: B.ByteString -> Quake Bool
+checkOrDownloadFile _ = do
+    io (putStrLn "CLParse.checkOrDownloadFile") >> undefined -- TODO

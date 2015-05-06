@@ -46,6 +46,13 @@ import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
+playerMult :: Int
+playerMult = 5
+
+-- ENV_CNT is map load, ENV_CNT+1 is first env map
+envCnt :: Int
+envCnt = Constants.csPlayerSkins + Constants.maxClients * playerMult
+
 cheatVars :: Vec.Vector CheatVarT
 cheatVars =
     Vec.fromList [ CheatVarT "timescale" "1"
@@ -693,4 +700,37 @@ requestNextDownload = do
     state <- use $ globals.cls.csState
 
     when (state == Constants.caConnected) $ do
-      io (putStrLn "CL.requestNextDownload") >> undefined -- TODO
+      updatePrecacheCheck
+      done <- checkIfDownloadStarted
+
+      unless done $ do
+        io (putStrLn "CL.requestNextDownload") >> undefined -- TODO
+
+  where updatePrecacheCheck :: Quake ()
+        updatePrecacheCheck = do
+          allowDownloadValue <- liftM (^.cvValue) allowDownloadCVar
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          when (allowDownloadValue == 0 && precacheCheck < envCnt) $
+            clientGlobals.cgPrecacheCheck .= envCnt
+
+        checkIfDownloadStarted :: Quake Bool
+        checkIfDownloadStarted = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck == Constants.csModels -- confirm map
+            then do
+              clientGlobals.cgPrecacheCheck .= Constants.csModels + 2 -- 0 isn't used
+              allowDownloadMapsValue <- liftM (^.cvValue) allowDownloadMapsCVar
+
+              if allowDownloadMapsValue /= 0
+                then do
+                  Just str <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + 1)
+                  fileExists <- CLParse.checkOrDownloadFile str
+                  return $ if fileExists
+                             then False
+                             else True -- started a download
+                else
+                  return False
+            else
+              return False
