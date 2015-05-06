@@ -453,7 +453,7 @@ glUpload32 image width height mipmap = do
 
     -- scan the texture for any non-255 alpha
     let c = width * height
-        samples = scanAlpha 0 0 c
+        samples = scanAlpha 0 3 c
 
     comp <- if | samples == glSolidFormat -> use $ fastRenderAPIGlobals.frGLTexSolidFormat
                | samples == glAlphaFormat -> use $ fastRenderAPIGlobals.frGLTexAlphaFormat
@@ -616,14 +616,14 @@ glResampleTexture img width height scaledWidth scaledHeight =
                   pix2 = inRow  + (p2 UV.! idx)
                   pix3 = inRow2 + (p1 UV.! idx)
                   pix4 = inRow2 + (p2 UV.! idx)
-                  r1 :: Int = fromIntegral (img `B.index` (pix1 + 3))
-                  g1 :: Int = fromIntegral (img `B.index` (pix1 + 2))
-                  b1 :: Int = fromIntegral (img `B.index` (pix1 + 1))
-                  a1 :: Int = fromIntegral (img `B.index` (pix1 + 0))
-                  r :: Word8 = fromIntegral $ (r1 + fromIntegral (img `B.index` (pix2 + 3)) + fromIntegral (img `B.index` (pix3 + 3)) + fromIntegral (img `B.index` (pix4 + 3))) `shiftR` 2
-                  g :: Word8 = fromIntegral $ (g1 + fromIntegral (img `B.index` (pix2 + 2)) + fromIntegral (img `B.index` (pix3 + 2)) + fromIntegral (img `B.index` (pix4 + 2))) `shiftR` 2
-                  b :: Word8 = fromIntegral $ (b1 + fromIntegral (img `B.index` (pix2 + 1)) + fromIntegral (img `B.index` (pix3 + 1)) + fromIntegral (img `B.index` (pix4 + 1))) `shiftR` 2
-                  a :: Word8 = fromIntegral $ (a1 + fromIntegral (img `B.index` (pix2 + 0)) + fromIntegral (img `B.index` (pix3 + 0)) + fromIntegral (img `B.index` (pix4 + 0))) `shiftR` 2
+                  r1 :: Int = fromIntegral (img `B.index` (pix1 + 0))
+                  g1 :: Int = fromIntegral (img `B.index` (pix1 + 1))
+                  b1 :: Int = fromIntegral (img `B.index` (pix1 + 2))
+                  a1 :: Int = fromIntegral (img `B.index` (pix1 + 3))
+                  r :: Word8 = fromIntegral $ (r1 + fromIntegral (img `B.index` (pix2 + 0)) + fromIntegral (img `B.index` (pix3 + 0)) + fromIntegral (img `B.index` (pix4 + 0))) `shiftR` 2
+                  g :: Word8 = fromIntegral $ (g1 + fromIntegral (img `B.index` (pix2 + 1)) + fromIntegral (img `B.index` (pix3 + 1)) + fromIntegral (img `B.index` (pix4 + 1))) `shiftR` 2
+                  b :: Word8 = fromIntegral $ (b1 + fromIntegral (img `B.index` (pix2 + 2)) + fromIntegral (img `B.index` (pix3 + 2)) + fromIntegral (img `B.index` (pix4 + 2))) `shiftR` 2
+                  a :: Word8 = fromIntegral $ (a1 + fromIntegral (img `B.index` (pix2 + 3)) + fromIntegral (img `B.index` (pix3 + 3)) + fromIntegral (img `B.index` (pix4 + 3))) `shiftR` 2
               in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [r, g, b, a])))
 
 {-

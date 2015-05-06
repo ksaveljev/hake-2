@@ -19,7 +19,6 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
-import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Graphics.UI.GLFW as GLFW
 
 import Quake
@@ -119,10 +118,13 @@ glDriverSetMode _ mode fullscreen = do
             -- TODO: handle errors (Nothing)
             Just window <- io $ GLFW.createWindow (newDim^._1) (newDim^._2) "Hake2 (GLFWb)" (Just monitor) Nothing
             glfwbGlobals.glfwbWindow .= Just window
+            io $ GLFW.makeContextCurrent (Just window)
+
           else do
             -- TODO: handle errors (Nothing)
             Just window <- io $ GLFW.createWindow (newDim^._1) (newDim^._2) "Hake2 (GLFWb)" Nothing Nothing
             glfwbGlobals.glfwbWindow .= Just window
+            io $ GLFW.makeContextCurrent (Just window)
 
         Just currentMode <- io $ GLFW.getVideoMode monitor
         when fullscreen $
@@ -167,7 +169,6 @@ glDriverBeginFrame _ = return () -- do nothing
 
 glDriverEndFrame :: Quake ()
 glDriverEndFrame = do
-    GL.glFlush
     Just window <- use $ glfwbGlobals.glfwbWindow
     io $ GLFW.swapBuffers window
 
