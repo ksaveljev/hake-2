@@ -6,7 +6,7 @@ module Client.CL where
 import Control.Concurrent (threadDelay)
 import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
 import Control.Monad (unless, liftM, when, void)
-import Data.Bits ((.|.))
+import Data.Bits ((.|.), xor, (.&.))
 import Data.Maybe (fromJust, isNothing)
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
@@ -36,6 +36,7 @@ import qualified Client.V as V
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
@@ -60,20 +61,23 @@ envCnt = Constants.csPlayerSkins + Constants.maxClients * playerMult
 textureCnt :: Int
 textureCnt = envCnt + 13
 
+envSuf :: Vec.Vector B.ByteString
+envSuf = Vec.fromList [ "rt", "bk", "lf", "ft", "up", "dn" ]
+
 cheatVars :: Vec.Vector CheatVarT
 cheatVars =
     Vec.fromList [ CheatVarT "timescale" "1"
-               , CheatVarT "timedemo" "0"
-               , CheatVarT "r_drawworld" "1"
-               , CheatVarT "cl_testlights" "0"
-               , CheatVarT "r_fullbright" "0"
-               , CheatVarT "r_drawflat" "0"
-               , CheatVarT "paused" "0"
-               , CheatVarT "fixedtime" "0"
-               , CheatVarT "sw_draworder" "0"
-               , CheatVarT "gl_lightmap" "0"
-               , CheatVarT "gl_saturatelighting" "0"
-               ]
+                 , CheatVarT "timedemo" "0"
+                 , CheatVarT "r_drawworld" "1"
+                 , CheatVarT "cl_testlights" "0"
+                 , CheatVarT "r_fullbright" "0"
+                 , CheatVarT "r_drawflat" "0"
+                 , CheatVarT "paused" "0"
+                 , CheatVarT "fixedtime" "0"
+                 , CheatVarT "sw_draworder" "0"
+                 , CheatVarT "gl_lightmap" "0"
+                 , CheatVarT "gl_saturatelighting" "0"
+                 ]
 
 -- Initialize client subsystem.
 init :: Quake ()
@@ -1014,26 +1018,226 @@ requestNextDownload = do
             else
               return False
 
+        -- skins are special, since a player has three things to download:
+        -- model, weapon model and skin
+        -- so precache_check is now *3
+        --
         -- returns True if we started a download and
         -- need to quit the requestNextDownload function
         checkSkinsDownload :: Bool -> Quake Bool
         checkSkinsDownload True = return True -- do nothing
         checkSkinsDownload False = do
-          io (putStrLn "CL.requestNextDownload#checkSkinsDownload" ) >> undefined -- TODO
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck >= Constants.csPlayerSkins && precacheCheck < Constants.csPlayerSkins + Constants.maxClients * playerMult
+            then do
+              allowDownloadPlayersValue <- liftM (^.cvValue) allowDownloadPlayersCVar
+
+              if allowDownloadPlayersValue /= 0
+                then do
+                  configStrings <- use $ globals.cl.csConfigStrings
+                  done <- downloadSkin configStrings
+
+                  if done
+                    then
+                      return False
+                    else do
+                      clientGlobals.cgPrecacheCheck .= envCnt
+                      return False
+                else do
+                  -- precache phase completed
+                  clientGlobals.cgPrecacheCheck .= envCnt
+                  return False
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        downloadSkin :: Vec.Vector B.ByteString -> Quake Bool
+        downloadSkin configStrings = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck < Constants.csPlayerSkins + Constants.maxClients * playerMult
+            then do
+              let i = (precacheCheck - Constants.csPlayerSkins) `div` playerMult
+                  n = (precacheCheck - Constants.csPlayerSkins) `mod` playerMult
+                  str = configStrings Vec.! (Constants.csPlayerSkins + i)
+
+              if B.length str == 0
+                then do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + (i + 1) * playerMult
+                  downloadSkin configStrings
+                else do
+                  let indices = BC.findIndices (== '\\') str
+                      (pos, pos2) = case indices of
+                                      [] -> (0, fromJust $ BC.findIndex (== '/') str)
+                                      [a] -> (a, fromJust $ BC.findIndex (== '/') str)
+                                      (a:b:_) -> (a, b)
+                      model = B.drop (pos + 1) (B.take pos2 str)
+                      skin = B.drop (pos2 + 1) str
+
+                  done <- getModel model n i
+                            >>= getWeaponModel model n i
+                            >>= getWeaponSkin model n i
+                            >>= getSkin model skin n i
+                            >>= getSkinI model skin n i
+
+                  if done
+                    then
+                      return True
+                    else do
+                      clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + (i + 1) * playerMult
+                      downloadSkin configStrings
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        getModel :: B.ByteString -> Int -> Int -> Quake Bool
+        getModel model n i
+          | n > 0 = return False
+          | otherwise = do
+              let fn = "players/" `B.append` model `B.append` "/tris.md2"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then
+                  return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 1
+                  return True
+
+        getWeaponModel :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
+        getWeaponModel _ _ _ True = return True
+        getWeaponModel model n i _
+          | n > 1 = return False
+          | otherwise = do
+              let fn = "players/" `B.append` model `B.append` "/weapon.md2"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then
+                  return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 2
+                  return True
+
+        getWeaponSkin :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
+        getWeaponSkin _ _ _ True = return True
+        getWeaponSkin model n i _
+          | n > 2 = return False
+          | otherwise = do
+              let fn = "players/" `B.append` model `B.append` "/weapon.pcx"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then
+                  return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 3
+                  return True
+
+        getSkin :: B.ByteString -> B.ByteString -> Int -> Int -> Bool -> Quake Bool
+        getSkin _ _ _ _ True = return True
+        getSkin model skin n i _
+          | n > 3 = return False
+          | otherwise = do
+              let fn = "players/" `B.append` model `B.append` "/" `B.append` skin `B.append` ".pcx"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then
+                  return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 4
+                  return True
+
+        getSkinI :: B.ByteString -> B.ByteString -> Int -> Int -> Bool -> Quake Bool
+        getSkinI _ _ _ _ True = return True
+        getSkinI model skin n i _
+          | n > 4 = return False
+          | otherwise = do
+              let fn = "players/" `B.append` model `B.append` "/" `B.append` skin `B.append` "_i.pcx"
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then
+                  return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 5
+                  return True
 
         -- returns True if we started a download and
         -- need to quit the requestNextDownload function
         loadMap :: Bool -> Quake Bool
         loadMap True = return True -- do nothing
         loadMap False = do
-          io (putStrLn "CL.requestNextDownload#loadMap" ) >> undefined -- TODO
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck == envCnt
+            then do
+              clientGlobals.cgPrecacheCheck += 1
+              configStrings <- use $ globals.cl.csConfigStrings
+
+              let str = configStrings Vec.! (Constants.csModels + 1)
+                  chk = configStrings Vec.! Constants.csMapChecksum
+
+              (_, checksum) <- CM.loadMap str True [0]
+              let mapChecksum = head checksum
+
+              if mapChecksum `xor` Lib.atoi chk /= 0
+                then do
+                  Com.comError Constants.errDrop $ "Local map version differs from server: " `B.append`
+                                                   BC.pack (show mapChecksum) `B.append` " != '" `B.append`
+                                                   chk `B.append` "'\n"
+                  return True
+                else
+                  return False
+            else
+              return False
+
 
         -- returns True if we started a download and
         -- need to quit the requestNextDownload function
         checkPicsDownload :: Bool -> Quake Bool
         checkPicsDownload True = return True -- do nothing
         checkPicsDownload False = do
-          io (putStrLn "CL.requestNextDownload#checkPicsDownload" ) >> undefined -- TODO
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+
+          if precacheCheck > envCnt && precacheCheck < textureCnt
+            then do
+              allowDownloadValue <- liftM (^.cvValue) allowDownloadCVar
+              allowDownloadMapsValue <- liftM (^.cvValue) allowDownloadMapsCVar
+
+              if allowDownloadValue /= 0 && allowDownloadMapsValue /= 0
+                then do
+                  configStrings <- use $ globals.cl.csConfigStrings
+                  done <- getSkyPic (configStrings Vec.! Constants.csSky)
+
+                  if done
+                    then
+                      return True
+                    else do
+                      clientGlobals.cgPrecacheCheck .= textureCnt
+                      return False
+                else do
+                  clientGlobals.cgPrecacheCheck .= textureCnt
+                  return False
+            else
+              return False
+
+        -- returns True if we started a download and
+        -- need to quit the requestNextDownload function
+        getSkyPic :: B.ByteString -> Quake Bool
+        getSkyPic skyStr = do
+          precacheCheck <- use $ clientGlobals.cgPrecacheCheck
+          if precacheCheck < textureCnt
+            then do
+              clientGlobals.cgPrecacheCheck += 1
+              let n = precacheCheck - envCnt - 1
+                  fn = "env/" `B.append` skyStr `B.append` (envSuf Vec.! (n `div` 2)) `B.append` (if n .&. 1 /= 0 then ".pcx" else ".tga")
+
+              fileExists <- CLParse.checkOrDownloadFile fn
+              if fileExists
+                then getSkyPic skyStr
+                else return True
+            else
+              return False
 
         -- returns True if we started a download and
         -- need to quit the requestNextDownload function
