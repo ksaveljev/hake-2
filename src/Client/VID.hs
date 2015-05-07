@@ -123,7 +123,7 @@ checkChanges = do
           globals.cl.csRefreshPrepped .= False
           globals.cls.csDisableScreen .= 1 -- True
 
-          loaded <- loadRefresh (vidRef^.cvString) True
+          loaded <- loadRefresh (vidRef^.cvString) False -- TODO: change to True to start with FastRenderAPI
 
           unless loaded $ do
             let renderer = if (vidRef^.cvString) == QRenderer.getPreferredName

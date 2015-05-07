@@ -127,31 +127,32 @@ newtype CParticleReference = CParticleReference Int
 data ModelReference = ModInlineReference Int | ModKnownReference Int
 
 data QuakeState =
-  QuakeState { _globals              :: !Globals
-             , _comGlobals           :: !ComGlobals
-             , _cmdGlobals           :: !CmdGlobals
-             , _keyGlobals           :: !KeyGlobals
-             , _fsGlobals            :: !FSGlobals
-             , _svGlobals            :: !SVGlobals
-             , _gameBaseGlobals      :: !GameBaseGlobals
-             , _pMoveGlobals         :: !PMoveGlobals
-             , _scrGlobals           :: !SCRGlobals
-             , _netGlobals           :: !NETGlobals
-             , _cmGlobals            :: !CMGlobals
-             , _gameItemsGlobals     :: !GameItemsGlobals
-             , _mSoldierGlobals      :: !MSoldierGlobals
-             , _mInfantryGlobals     :: !MInfantryGlobals
-             , _playerTrailGlobals   :: !PlayerTrailGlobals
-             , _vidGlobals           :: !VIDGlobals
-             , _inGlobals            :: !INGlobals
-             , _glfwbGlobals         :: !GLFWbGlobals
-             , _kbdGlobals           :: !KBDGlobals
-             , _fastRenderAPIGlobals :: !FastRenderAPIGlobals
-             , _particleTGlobals     :: !ParticleTGlobals
-             , _menuGlobals          :: !MenuGlobals
-             , _clientGlobals        :: !ClientGlobals
-             , _vGlobals             :: !VGlobals
-             , _netChannelGlobals    :: !NetChannelGlobals
+  QuakeState { _globals               :: !Globals
+             , _comGlobals            :: !ComGlobals
+             , _cmdGlobals            :: !CmdGlobals
+             , _keyGlobals            :: !KeyGlobals
+             , _fsGlobals             :: !FSGlobals
+             , _svGlobals             :: !SVGlobals
+             , _gameBaseGlobals       :: !GameBaseGlobals
+             , _pMoveGlobals          :: !PMoveGlobals
+             , _scrGlobals            :: !SCRGlobals
+             , _netGlobals            :: !NETGlobals
+             , _cmGlobals             :: !CMGlobals
+             , _gameItemsGlobals      :: !GameItemsGlobals
+             , _mSoldierGlobals       :: !MSoldierGlobals
+             , _mInfantryGlobals      :: !MInfantryGlobals
+             , _playerTrailGlobals    :: !PlayerTrailGlobals
+             , _vidGlobals            :: !VIDGlobals
+             , _inGlobals             :: !INGlobals
+             , _glfwbGlobals          :: !GLFWbGlobals
+             , _kbdGlobals            :: !KBDGlobals
+             , _basicRenderAPIGlobals :: !BasicRenderAPIGlobals
+             , _fastRenderAPIGlobals  :: !FastRenderAPIGlobals
+             , _particleTGlobals      :: !ParticleTGlobals
+             , _menuGlobals           :: !MenuGlobals
+             , _clientGlobals         :: !ClientGlobals
+             , _vGlobals              :: !VGlobals
+             , _netChannelGlobals     :: !NetChannelGlobals
              }
 
 data Globals =
@@ -1503,6 +1504,20 @@ data KBDGlobals =
              , _kbdWinx  :: Int
              , _kbdWiny  :: Int
              }
+
+data BasicRenderAPIGlobals =
+  BasicRenderAPIGlobals { _brGLConfig             :: GLConfigT
+                        , _brGLState              :: GLStateT
+                        , _brd8to24table          :: UV.Vector Int
+                        , _brVid                  :: VidDefT
+                        , _brColorTableEXT        :: Bool
+                        , _brActiveTextureARB     :: Bool
+                        , _brPointParameterEXT    :: Bool
+                        , _brLockArraysEXT        :: Bool
+                        , _brSwapIntervalEXT      :: Bool
+                        , _brMTexCoord2fSGIS      :: Bool
+                        , _brSelectTextureSGIS    :: Bool
+                        }
 
 data FastRenderAPIGlobals =
   FastRenderAPIGlobals { _frGLDepthMin           :: Float

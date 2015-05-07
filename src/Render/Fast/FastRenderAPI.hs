@@ -74,7 +74,7 @@ fastInit glDriver _ _ = do
     -- set our "safe" modes
     fastRenderAPIGlobals.frGLState.glsPrevMode .= 3
 
-    ok <- rSetMode (glDriver^.gldSetMode)
+    ok <- rSetMode glDriver -- (glDriver^.gldSetMode)
 
     -- create the window and set up the context
     if not ok
@@ -330,15 +330,15 @@ rRegister = do
 
     void $ CVar.get "vid_fullscreen" "0" Constants.cvarArchive
     void $ CVar.get "vid_gamma" "1.0" Constants.cvarArchive
-    void $ CVar.get "vid_ref" "lwjgl" Constants.cvarArchive
+    void $ CVar.get "vid_ref" "GLFWb" Constants.cvarArchive
 
     Cmd.addCommand "imagelist" (Just Image.glImageListF)
     Cmd.addCommand "screenshot" (Just fastScreenShotF)
     Cmd.addCommand "modellist" (Just Model.modelListF)
     Cmd.addCommand "gl_strings" (Just glStringsF)
 
-rSetMode :: ((Int, Int) -> Int -> Bool -> Quake Int) -> Quake Bool
-rSetMode glImplSetMode = do
+rSetMode :: GLDriver -> Quake Bool
+rSetMode glDriver = do
     fullScreen <- vidFullScreenCVar
     glMode <- glModeCVar
 
@@ -350,7 +350,7 @@ rSetMode glImplSetMode = do
     vid <- use $ fastRenderAPIGlobals.frVid
     let dim = (vid^.vdWidth, vid^.vdHeight)
 
-    err <- glImplSetMode dim (truncate $ glMode^.cvValue) isFullscreen
+    err <- (glDriver^.gldSetMode) dim (truncate $ glMode^.cvValue) isFullscreen
 
     if err == RenderAPIConstants.rsErrOk
       then do
@@ -362,7 +362,7 @@ rSetMode glImplSetMode = do
                     CVar.setValueI "vid_fullscreen" 0
                     vidFullScreenCVar >>= \v -> CVar.update v { _cvModified = False }
                     VID.printf Constants.printAll "ref_gl::R_SetMode() - fullscreen unavailable in this mode\n"
-                    err' <- glImplSetMode dim (truncate $ glMode^.cvValue) False
+                    err' <- (glDriver^.gldSetMode) dim (truncate $ glMode^.cvValue) False
                     if err' == RenderAPIConstants.rsErrOk
                       then return True
                       else return False
@@ -379,7 +379,7 @@ rSetMode glImplSetMode = do
               VID.printf Constants.printAll "ref_gl::R_SetMode() - invalid mode\n"
 
             -- try setting it back to something safe
-            err' <- glImplSetMode dim prevMode False
+            err' <- (glDriver^.gldSetMode) dim prevMode False
 
             if err' /= RenderAPIConstants.rsErrOk
               then do

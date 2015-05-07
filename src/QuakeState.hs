@@ -20,6 +20,7 @@ module QuakeState ( QuakeState(..)
                   , inGlobals
                   , glfwbGlobals
                   , kbdGlobals
+                  , basicRenderAPIGlobals
                   , fastRenderAPIGlobals
                   , particleTGlobals
                   , menuGlobals
@@ -63,6 +64,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.Monsters.MInfantryGlobals
                   , module Game.PlayerTrailGlobals
                   , module Client.VIDGlobals
+                  , module Render.Basic.BasicRenderAPIGlobals
                   , module Render.Fast.FastRenderAPIGlobals
                   , module Render.GLFWbGlobals
                   , module QCommon.NetChannelGlobals
@@ -91,39 +93,41 @@ import QCommon.ComGlobals
 import QCommon.FSGlobals
 import QCommon.NetChannelGlobals
 import QCommon.PMoveGlobals
+import Render.Basic.BasicRenderAPIGlobals
+import Render.Fast.FastRenderAPIGlobals
 import Render.GLFWbGlobals
 import Sys.KBDGlobals
 import Sys.INGlobals
 import Sys.NETGlobals
-import Render.Fast.FastRenderAPIGlobals
 
 makeLenses ''QuakeState
 
 initialQuakeState :: QuakeState
 initialQuakeState =
-  QuakeState { _globals              = initialGlobals
-             , _comGlobals           = initialComGlobals
-             , _cmdGlobals           = initialCmdGlobals
-             , _keyGlobals           = initialKeyGlobals
-             , _fsGlobals            = initialFSGlobals
-             , _svGlobals            = initialSVGlobals
-             , _gameBaseGlobals      = initialGameBaseGlobals
-             , _pMoveGlobals         = initialPMoveGlobals
-             , _scrGlobals           = initialSCRGlobals
-             , _netGlobals           = initialNETGlobals
-             , _cmGlobals            = initialCMGlobals
-             , _gameItemsGlobals     = initialGameItemsGlobals
-             , _mSoldierGlobals      = initialMSoldierGlobals
-             , _mInfantryGlobals     = initialMInfantryGlobals
-             , _playerTrailGlobals   = initialPlayerTrailGlobals
-             , _vidGlobals           = initialVIDGlobals
-             , _inGlobals            = initialINGlobals
-             , _glfwbGlobals         = initialGLFWbGlobals
-             , _kbdGlobals           = initialKBDGlobals
-             , _fastRenderAPIGlobals = initialFastRenderAPIGlobals
-             , _particleTGlobals     = initialParticleTGlobals
-             , _menuGlobals          = initialMenuGlobals
-             , _clientGlobals        = initialClientGlobals
-             , _vGlobals             = initialVGlobals
-             , _netChannelGlobals    = initialNetChannelGlobals
+  QuakeState { _globals               = initialGlobals
+             , _comGlobals            = initialComGlobals
+             , _cmdGlobals            = initialCmdGlobals
+             , _keyGlobals            = initialKeyGlobals
+             , _fsGlobals             = initialFSGlobals
+             , _svGlobals             = initialSVGlobals
+             , _gameBaseGlobals       = initialGameBaseGlobals
+             , _pMoveGlobals          = initialPMoveGlobals
+             , _scrGlobals            = initialSCRGlobals
+             , _netGlobals            = initialNETGlobals
+             , _cmGlobals             = initialCMGlobals
+             , _gameItemsGlobals      = initialGameItemsGlobals
+             , _mSoldierGlobals       = initialMSoldierGlobals
+             , _mInfantryGlobals      = initialMInfantryGlobals
+             , _playerTrailGlobals    = initialPlayerTrailGlobals
+             , _vidGlobals            = initialVIDGlobals
+             , _inGlobals             = initialINGlobals
+             , _glfwbGlobals          = initialGLFWbGlobals
+             , _kbdGlobals            = initialKBDGlobals
+             , _basicRenderAPIGlobals = initialBasicRenderAPIGlobals
+             , _fastRenderAPIGlobals  = initialFastRenderAPIGlobals
+             , _particleTGlobals      = initialParticleTGlobals
+             , _menuGlobals           = initialMenuGlobals
+             , _clientGlobals         = initialClientGlobals
+             , _vGlobals              = initialVGlobals
+             , _netChannelGlobals     = initialNetChannelGlobals
              }

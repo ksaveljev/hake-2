@@ -1,8 +1,414 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Basic.BasicRenderAPI where
 
+import Control.Lens ((.=), (^.), use, zoom)
+import Control.Monad (void, when, unless, liftM)
+import Data.Bits ((.|.), (.&.))
+import Data.Char (toLower, toUpper)
+import Data.Maybe (fromMaybe)
+import Foreign.Marshal.Array (withArray)
+import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import Text.Read (readMaybe)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Debug.Trace as DT
 
-import Render.RenderAPI
+import Quake
+import QuakeState
+import CVarVariables
+import QCommon.XCommandT
+import Render.OpenGL.GLDriver
+import qualified Constants
+import qualified Client.VID as VID
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Graphics.Rendering.OpenGL.Raw as GL
+import qualified QCommon.CVar as CVar
+import qualified Render.Basic.Draw as Draw
+import qualified Render.Basic.Image as Image
+import qualified Render.Basic.Model as Model
+import qualified Render.Basic.Warp as Warp
+import qualified Render.OpenGL.QGLConstants as QGLConstants
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 
 basicRenderAPI :: RenderAPI
-basicRenderAPI = DT.trace "BasicRenderAPI.basicRenderAPI" undefined -- TODO
+basicRenderAPI =
+    RenderAPI { _rInit              = basicInit
+              , _rInit2             = basicInit2
+              , _rShutdown          = DT.trace "BasicRenderAPI.rShutdown" undefined -- TODO
+              , _rBeginRegistration = Model.rBeginRegistration
+              , _rRegisterModel     = DT.trace "BasicRenderAPI.rRegisterModel" undefined -- TODO
+              , _rRegisterSkin      = DT.trace "BasicRenderAPI.rRegisterSkin" undefined -- TODO
+              , _rDrawFindPic       = DT.trace "BasicRenderAPI.rDrawFindPic" undefined -- TODO
+              , _rSetSky            = DT.trace "BasicRenderAPI.rSetSky" undefined -- TODO
+              , _rEndRegistration   = DT.trace "BasicRenderAPI.rEndRegistration" undefined -- TODO
+              , _rRenderFrame       = DT.trace "BasicRenderAPI.rRenderFrame" undefined -- TODO
+              , _rDrawGetPicSize    = DT.trace "BasicRenderAPI.rDrawGetPicSize" undefined -- TODO
+              , _rDrawPic           = Draw.drawPic
+              , _rDrawStretchPic    = Draw.stretchPic
+              , _rDrawChar          = Draw.drawChar
+              , _rDrawTileClear     = DT.trace "BasicRenderAPI.rDrawTileClear" undefined -- TODO
+              , _rDrawFill          = Draw.fill
+              , _rDrawFadeScreen    = DT.trace "BasicRenderAPI.rDrawFadeScreen" undefined -- TODO
+              , _rDrawStretchRaw    = DT.trace "BasicRenderAPI.rDrawStretchRaw" undefined -- TODO
+              , _rSetPalette        = DT.trace "BasicRenderAPI.rSetPalette" undefined -- TODO
+              , _rBeginFrame        = basicBeginFrame
+              , _glScreenShotF      = DT.trace "BasicRenderAPI.glScreenShotF" undefined -- TODO
+              }
+
+basicInit :: GLDriver -> Int -> Int -> Quake Bool
+basicInit glDriver _ _ = do
+    VID.printf Constants.printAll ("ref_gl version: " `B.append` RenderAPIConstants.refVersion `B.append` "\n")
+
+    Image.getPalette
+
+    rRegister
+
+    -- set our "safe" modes
+    basicRenderAPIGlobals.brGLState.glsPrevMode .= 3
+
+    ok <- rSetMode glDriver
+
+    -- create the window and set up the context
+    if not ok
+      then do
+        VID.printf Constants.printAll "ref_gl::R_Init() - could not R_SetMode()\n"
+        return False
+      else
+        return True
+
+basicInit2 :: GLDriver -> Quake Bool
+basicInit2 glDriver = do
+    VID.menuInit
+
+    -- get our various GL strings
+    vendor <- io $ getGLString GL.gl_VENDOR
+    renderer <- io $ getGLString GL.gl_RENDERER
+    version <- io $ getGLString GL.gl_VERSION
+    extensions <- io $ getGLString GL.gl_EXTENSIONS
+
+    zoom (basicRenderAPIGlobals.brGLConfig) $ do
+      glcVendorString .= vendor
+      glcRendererString .= renderer
+      glcVersionString .= version
+      glcExtensionsString .= extensions
+      glcVersion .= (let v = B.take 3 version
+                     in fromMaybe 1.1 (readMaybe (BC.unpack v))) -- IMPROVE?
+
+    VID.printf Constants.printAll $ "GL_VENDOR: " `B.append` vendor `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_RENDERER: " `B.append` renderer `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_VERSION: " `B.append` version `B.append` "\n"
+    VID.printf Constants.printAll $ "GL_EXTENSIONS: " `B.append` extensions `B.append` "\n"
+
+    let rendererBuffer = BC.map toLower renderer
+        vendorBuffer = BC.map toLower vendor
+
+    let rendererInt = if | "voodoo"   `BC.isInfixOf` rendererBuffer ->
+                             if "rush" `BC.isInfixOf`rendererBuffer 
+                               then RenderAPIConstants.glRendererVoodooRush
+                               else RenderAPIConstants.glRendererVoodoo
+                         | "sgi"      `BC.isInfixOf` vendorBuffer -> RenderAPIConstants.glRendererSGI
+                         | "permedia" `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPerMedia2
+                         | "glint"    `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererGlintMX
+                         | "glzicd"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRealizm
+                         | "gdi"      `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererMCD
+                         | "pcx2"     `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPCX2
+                         | "verite"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRendition
+                         | otherwise -> RenderAPIConstants.glRendererOther
+
+    basicRenderAPIGlobals.brGLConfig.glcRenderer .= rendererInt
+
+    monoLightMapValue <- liftM (BC.map toUpper . (^.cvString)) glMonoLightMapCVar
+    when (B.length monoLightMapValue < 2 || BC.index monoLightMapValue 1 /= 'F') $ do
+      if rendererInt == RenderAPIConstants.glRendererPerMedia2
+        then do
+          void $ CVar.set "gl_monolightmap" "A"
+          VID.printf Constants.printAll "...using gl_monolightmap 'a'\n"
+        else
+          void $ CVar.set "gl_monolightmap" "0"
+
+    -- power vr can't have anything stay in the framebuffer, so
+    -- the screen needs to redraw the tiled background every frame
+    if rendererInt .&. RenderAPIConstants.glRendererPowerVR /= 0
+      then void $ CVar.set "scr_drawall" "1"
+      else void $ CVar.set "scr_drawall" "0"
+
+    CVar.setValueI "gl_finish" 1
+
+    -- MCD has buffering issues
+    when (rendererInt == RenderAPIConstants.glRendererMCD) $
+      CVar.setValueI "gl_finish" 1
+
+    allow <- if rendererInt .&. RenderAPIConstants.glRenderer3DLabs /= 0
+               then do
+                 brokenValue <- liftM (^.cvValue) gl3DLabsBrokenCVar
+                 if brokenValue /= 0
+                   then return False
+                   else return True
+             else return True
+                   
+    basicRenderAPIGlobals.brGLConfig.glcAllowCds .= allow
+
+    VID.printf Constants.printAll (if allow
+                                     then "...allowing CDS\n"
+                                     else "...disabling CDS\n")
+
+    -- grab extensions
+    cva <- if "GL_EXT_compiled_vertex_array" `BC.isInfixOf` extensions ||
+             "GL_SGI_compiled_vertex_array" `BC.isInfixOf` extensions
+             then do
+               VID.printf Constants.printAll "...enabling GL_EXT_compiled_vertex_array\n"
+               liftM (^.cvValue) glExtCompiledVertexArrayCVar >>= \v ->
+                if v /= 0 then return True else return False
+             else do
+               VID.printf Constants.printAll "...GL_EXT_compiled_vertex_array not found\n"
+               return False
+
+    basicRenderAPIGlobals.brLockArraysEXT .= cva
+
+    si <- if "WGL_EXT_swap_control" `BC.isInfixOf` extensions
+            then do
+              VID.printf Constants.printAll "...enabling WGL_EXT_swap_control\n"
+              return True
+            else do
+              VID.printf Constants.printAll "...WGL_EXT_swap_control not found\n"
+              return False
+
+    basicRenderAPIGlobals.brSwapIntervalEXT .= si
+
+    pp <- if "GL_EXT_point_parameters" `BC.isInfixOf` extensions
+            then do
+              liftM (^.cvValue) glExtPointParametersCVar >>= \v ->
+                if v /= 0
+                  then do
+                    VID.printf Constants.printAll "...using GL_EXT_point_parameters\n"
+                    return True
+                  else do
+                    VID.printf Constants.printAll "...ignoring GL_EXT_point_parameters\n"
+                    return False
+            else do
+              VID.printf Constants.printAll "...GL_EXT_point_parameters not found\n"
+              return False
+
+    basicRenderAPIGlobals.brPointParameterEXT .= pp
+
+    colorTable <- use $ basicRenderAPIGlobals.brColorTableEXT
+    ct <- if not colorTable &&
+             "GL_EXT_paletted_texture" `BC.isInfixOf` extensions &&
+             "GL_EXT_shared_texture_palette" `BC.isInfixOf` extensions
+            then do
+              liftM (^.cvValue) glExtPalettedTextureCVar >>= \v ->
+                if v /= 0
+                  then do
+                    VID.printf Constants.printAll "...using GL_EXT_shared_texture_palette\n"
+                    return True
+                  else do
+                    VID.printf Constants.printAll "...ignoring GL_EXT_shared_texture_palette\n"
+                    return False
+            else do
+              VID.printf Constants.printAll "...GL_EXT_shared_texture_palette not found\n"
+              return False
+
+    basicRenderAPIGlobals.brColorTableEXT .= ct
+
+    cat <- if "GL_ARB_multitexture" `BC.isInfixOf` extensions
+             then do
+               multiTextureValue <- liftM (^.cvValue) glExtMultiTextureCVar
+               if multiTextureValue /= 0
+                 then do
+                   VID.printf Constants.printAll "...using GL_ARB_multitexture\n"
+                   basicRenderAPIGlobals.brMTexCoord2fSGIS .= True
+                   CVar.setValueI "r_fullbright" 1
+                   return True
+                 else do
+                   VID.printf Constants.printAll "...ignoring GL_ARB_multitexture\n"
+                   CVar.setValueI "r_fullbright" 0
+                   return False
+             else do
+               VID.printf Constants.printAll "...GL_ARB_multitexture not found\n"
+               CVar.setValueI "r_fullbright" 0
+               return False
+
+    basicRenderAPIGlobals.brActiveTextureARB .= cat
+
+    if "GL_SGIS_multitexture" `BC.isInfixOf` extensions
+      then do
+        multiTextureValue <- liftM (^.cvValue) glExtMultiTextureCVar
+
+        if | cat -> do
+               VID.printf Constants.printAll "...GL_SGIS_multitexture deprecated in favor of ARB_multitexture\n"
+               CVar.setValueI "r_fullbright" 1
+           | multiTextureValue /= 0 -> do
+               VID.printf Constants.printAll "...using GL_SGIS_multitexture\n"
+               basicRenderAPIGlobals.brSelectTextureSGIS .= True
+               basicRenderAPIGlobals.brMTexCoord2fSGIS .= True
+               CVar.setValueI "r_fullbright" 1
+           | otherwise -> do
+               VID.printf Constants.printAll "...ignoring GL_SGIS_multitexture\n"
+               CVar.setValueI "r_fullbright" 0
+
+      else do
+        VID.printf Constants.printAll "...GL_SGIS_multitexture not found\n"
+        when (not cat) $
+          CVar.setValueI "r_fullbright" 0
+
+    glSetDefaultState glDriver
+    Image.glInitImages
+    Model.modInit
+    rInitParticleTexture
+    Draw.initLocal
+
+    err <- io $ GL.glGetError
+    unless (err == GL.gl_NO_ERROR) $
+      VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
+
+    return True
+
+  where getGLString :: GL.GLenum -> IO B.ByteString
+        getGLString n = GL.glGetString n >>= maybeNullPtr (return "") (B.packCString . castPtr)
+
+        maybeNullPtr :: b -> (Ptr a -> b) -> Ptr a -> b
+        maybeNullPtr n f ptr | ptr == nullPtr = n
+                             | otherwise      = f ptr
+
+basicBeginFrame :: GLDriver -> Float -> Quake ()
+basicBeginFrame glDriver cameraSeparation = do
+    io (putStrLn "BasicRenderAPI.basicBeginFrame") >> undefined -- TODO
+
+rRegister :: Quake ()
+rRegister = do
+    void $ CVar.get "hand" "0" (Constants.cvarUserInfo .|. Constants.cvarArchive)
+    void $ CVar.get "r_norefresh" "0" 0
+    void $ CVar.get "r_fullbright" "0" 0
+    void $ CVar.get "r_drawentities" "1" 0
+    void $ CVar.get "r_drawworld" "1" 0
+    void $ CVar.get "r_novis" "0" 0
+    void $ CVar.get "r_nocull" "0" 0
+    void $ CVar.get "r_lerpmodels" "1" 0
+    void $ CVar.get "r_speeds" "0" 0
+
+    void $ CVar.get "r_lightlevel" "1" 0
+
+    void $ CVar.get "gl_nosubimage" "0" 0
+    void $ CVar.get "gl_allow_software" "0" 0
+
+    void $ CVar.get "gl_particle_min_size" "2" Constants.cvarArchive
+    void $ CVar.get "gl_particle_max_size" "40" Constants.cvarArchive
+    void $ CVar.get "gl_particle_size" "40" Constants.cvarArchive
+    void $ CVar.get "gl_particle_att_a" "0.01" Constants.cvarArchive
+    void $ CVar.get "gl_particle_att_b" "0.0" Constants.cvarArchive
+    void $ CVar.get "gl_particle_att_c" "0.01" Constants.cvarArchive
+
+    void $ CVar.get "gl_modulate" "1.5" Constants.cvarArchive
+    void $ CVar.get "gl_log" "0" 0
+    void $ CVar.get "gl_bitdepth" "0" 0
+    void $ CVar.get "gl_mode" "1" Constants.cvarArchive
+    void $ CVar.get "gl_lightmap" "0" 0
+    void $ CVar.get "gl_shadows" "0" Constants.cvarArchive
+    void $ CVar.get "gl_dynamic" "1" 0
+    void $ CVar.get "gl_nobind" "0" 0
+    void $ CVar.get "gl_round_down" "1" 0
+    void $ CVar.get "gl_picmip" "0" 0
+    void $ CVar.get "gl_skymip" "0" 0
+    void $ CVar.get "gl_showtris" "0" 0
+    void $ CVar.get "gl_ztrick" "0" 0
+    void $ CVar.get "gl_finish" "0" Constants.cvarArchive
+    void $ CVar.get "gl_clear" "0" 0
+    void $ CVar.get "gl_cull" "1" 0
+    void $ CVar.get "gl_polyblend" "1" 0
+    void $ CVar.get "gl_flashblend" "0" 0
+    void $ CVar.get "gl_playermip" "0" 0
+    void $ CVar.get "gl_monolightmap" "0" 0
+    void $ CVar.get "gl_driver" "opengl32" Constants.cvarArchive
+    void $ CVar.get "gl_texturemode" "GL_LINEAR_MIPMAP_NEAREST" Constants.cvarArchive
+    void $ CVar.get "gl_texturealphamode" "default" Constants.cvarArchive
+    void $ CVar.get "gl_texturesolidmode" "default" Constants.cvarArchive
+    void $ CVar.get "gl_lockpvs" "0" 0
+
+    void $ CVar.get "gl_vertex_arrays" "0" Constants.cvarArchive
+
+    void $ CVar.get "gl_ext_swapinterval" "1" Constants.cvarArchive
+    void $ CVar.get "gl_ext_palettedtexture" "0" Constants.cvarArchive
+    void $ CVar.get "gl_ext_multitexture" "1" Constants.cvarArchive
+    void $ CVar.get "gl_ext_pointparameters" "1" Constants.cvarArchive
+    void $ CVar.get "gl_ext_compiled_vertex_array" "1" Constants.cvarArchive
+
+    void $ CVar.get "gl_drawbuffer" "GL_BACK" 0
+    void $ CVar.get "gl_swapinterval" "1" Constants.cvarArchive
+
+    void $ CVar.get "gl_saturatelighting" "0" 0
+
+    void $ CVar.get "gl_3dlabs_broken" "1" Constants.cvarArchive
+
+    void $ CVar.get "vid_fullscreen" "0" Constants.cvarArchive
+    void $ CVar.get "vid_gamma" "1.0" Constants.cvarArchive
+    void $ CVar.get "vid_ref" "GLFWb" Constants.cvarArchive
+
+    Cmd.addCommand "imagelist" (Just Image.glImageListF)
+    Cmd.addCommand "screenshot" (Just basicScreenShotF)
+    Cmd.addCommand "modellist" (Just Model.modelListF)
+    Cmd.addCommand "gl_strings" (Just glStringsF)
+
+glStringsF :: XCommandT
+glStringsF = io (putStrLn "BasicRenderAPI.glStringsF") >> undefined -- TODO
+
+basicScreenShotF :: XCommandT
+basicScreenShotF = io (putStrLn "BasicRenderAPI.basicScreenShotF") >> undefined -- TODO
+
+rSetMode :: GLDriver -> Quake Bool
+rSetMode glDriver = do
+    fullScreen <- vidFullScreenCVar
+    glMode <- glModeCVar
+
+    let isFullscreen = (fullScreen^.cvValue) > 0
+
+    CVar.update fullScreen { _cvModified = False }
+    CVar.update glMode { _cvModified = False }
+
+    vid <- use $ basicRenderAPIGlobals.brVid
+    let dim = (vid^.vdWidth, vid^.vdHeight)
+
+    err <- (glDriver^.gldSetMode) dim (truncate $ glMode^.cvValue) isFullscreen
+
+    if err == RenderAPIConstants.rsErrOk
+      then do
+        basicRenderAPIGlobals.brGLState.glsPrevMode .= truncate (glMode^.cvValue)
+        return True
+      else do
+        done <- if err == RenderAPIConstants.rsErrInvalidFullscreen
+                  then do
+                    CVar.setValueI "vid_fullscreen" 0
+                    vidFullScreenCVar >>= \v -> CVar.update v { _cvModified = False }
+                    VID.printf Constants.printAll "ref_gl::R_SetMode() - fullscreen unavailable in this mode\n"
+                    err' <- (glDriver^.gldSetMode) dim (truncate $ glMode^.cvValue) False
+                    if err' == RenderAPIConstants.rsErrOk
+                      then return True
+                      else return False
+                  else return False
+
+        if done
+          then return True
+          else do
+            prevMode <- use $ basicRenderAPIGlobals.brGLState.glsPrevMode
+
+            when (err == RenderAPIConstants.rsErrInvalidMode) $ do
+              CVar.setValueI "gl_mode" prevMode
+              glModeCVar >>= \v -> CVar.update v { _cvModified = False }
+              VID.printf Constants.printAll "ref_gl::R_SetMode() - invalid mode\n"
+
+            -- try setting it back to something safe
+            err' <- (glDriver^.gldSetMode) dim prevMode False
+
+            if err' /= RenderAPIConstants.rsErrOk
+              then do
+                VID.printf Constants.printAll "ref_gl::R_SetMode() - could not revert to safe mode\n"
+                return False
+              else return True
+
+glSetDefaultState :: GLDriver -> Quake ()
+glSetDefaultState _ = do
+    io (putStrLn "BasicRenderAPI.glSetDefaultState") >> undefined -- TODO
+
+rInitParticleTexture :: Quake ()
+rInitParticleTexture = do
+    io (putStrLn "BasicRenderAPI.rInitParticleTexture") >> undefined -- TODO
