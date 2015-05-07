@@ -1515,8 +1515,21 @@ data BasicRenderAPIGlobals =
                         , _brPointParameterEXT    :: Bool
                         , _brLockArraysEXT        :: Bool
                         , _brSwapIntervalEXT      :: Bool
+                        , _brGLTexSolidFormat     :: Int
+                        , _brGLTexAlphaFormat     :: Int
                         , _brMTexCoord2fSGIS      :: Bool
                         , _brSelectTextureSGIS    :: Bool
+                        , _brGLFilterMin          :: Int
+                        , _brGLFilterMax          :: Int
+                        , _brNumGLTextures        :: Int
+                        , _brGLTextures           :: V.Vector ImageT
+                        , _brLastModes            :: (Int, Int)
+                        , _brRegistrationSequence :: Int
+                        , _brGammaTable           :: B.ByteString
+                        , _brIntensityTable       :: B.ByteString
+                        , _brModKnown             :: V.Vector ModelT
+                        , _brModNoVis             :: B.ByteString
+                        , _brDrawChars            :: Maybe ImageReference
                         }
 
 data FastRenderAPIGlobals =

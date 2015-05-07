@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Basic.BasicRenderAPI where
 
 import Control.Lens ((.=), (^.), use, zoom)
@@ -406,9 +407,77 @@ rSetMode glDriver = do
               else return True
 
 glSetDefaultState :: GLDriver -> Quake ()
-glSetDefaultState _ = do
-    io (putStrLn "BasicRenderAPI.glSetDefaultState") >> undefined -- TODO
+glSetDefaultState glDriver = do
+    GL.glClearColor 1 0 0.5 0.5
+    GL.glCullFace GL.gl_FRONT
+    GL.glEnable GL.gl_TEXTURE_2D
+
+    GL.glEnable GL.gl_ALPHA_TEST
+    GL.glAlphaFunc GL.gl_GREATER 0.666
+
+    GL.glDisable GL.gl_DEPTH_TEST
+    GL.glDisable GL.gl_CULL_FACE
+    GL.glDisable GL.gl_BLEND
+
+    GL.glColor4f 1 1 1 1
+
+    GL.glPolygonMode GL.gl_FRONT_AND_BACK GL.gl_FILL
+    GL.glShadeModel GL.gl_FLAT
+
+    liftM (^.cvString) glTextureModeCVar >>= Image.glTextureMode
+    liftM (^.cvString) glTextureAlphaModeCVar >>= Image.glTextureAlphaMode
+    liftM (^.cvString) glTextureSolidModeCVar >>= Image.glTextureSolidMode
+
+    minFilter <- use $ basicRenderAPIGlobals.brGLFilterMin
+    maxFilter <- use $ basicRenderAPIGlobals.brGLFilterMax
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral minFilter)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral maxFilter)
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_WRAP_S (fromIntegral GL.gl_REPEAT)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_WRAP_T (fromIntegral GL.gl_REPEAT)
+
+    GL.glBlendFunc GL.gl_SRC_ALPHA GL.gl_ONE_MINUS_SRC_ALPHA
+
+    Image.glTexEnv GL.gl_REPLACE
+
+    ppExt <- use $ basicRenderAPIGlobals.brPointParameterEXT
+
+    when ppExt $ do
+      a <- liftM (^.cvValue) glParticleAttACVar
+      b <- liftM (^.cvValue) glParticleAttBCVar
+      c <- liftM (^.cvValue) glParticleAttCCVar
+      minSize <- liftM (^.cvValue) glParticleMinSizeCVar
+      maxSize <- liftM (^.cvValue) glParticleMaxSizeCVar
+
+      let arr :: [GL.GLfloat] = fmap realToFrac [a, b, c]
+
+      GL.glEnable GL.gl_POINT_SMOOTH
+      GL.glPointParameterfEXT GL.gl_POINT_SIZE_MIN_EXT (realToFrac minSize)
+      GL.glPointParameterfEXT GL.gl_POINT_SIZE_MAX_EXT (realToFrac maxSize)
+      io $ withArray arr $ \ptr ->
+        GL.glPointParameterfvEXT GL.gl_DISTANCE_ATTENUATION_EXT ptr
+
+    ctExt <- use $ basicRenderAPIGlobals.brColorTableEXT
+    pt <- liftM (^.cvValue) glExtPalettedTextureCVar
+
+    when (ctExt && pt /= 0) $ do
+      io $ GL.glEnable GL.gl_SHARED_TEXTURE_PALETTE_EXT
+      d8to24table <- use $ basicRenderAPIGlobals.brd8to24table
+      Image.glSetTexturePalette d8to24table
+
+    glUpdateSwapInterval glDriver
 
 rInitParticleTexture :: Quake ()
 rInitParticleTexture = do
     io (putStrLn "BasicRenderAPI.rInitParticleTexture") >> undefined -- TODO
+
+glUpdateSwapInterval :: GLDriver -> Quake ()
+glUpdateSwapInterval glDriver = do
+    glSwapInterval <- glSwapIntervalCVar
+
+    when (glSwapInterval^.cvModified) $ do
+      CVar.update glSwapInterval { _cvModified = False }
+      stereoEnabled <- use $ fastRenderAPIGlobals.frGLState.glsStereoEnabled
+      unless stereoEnabled $
+        (glDriver^.gldSetSwapInterval) (truncate $ glSwapInterval^.cvValue)

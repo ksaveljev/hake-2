@@ -1,24 +1,81 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Basic.Image where
 
-import Control.Lens ((.=), (^.))
-import Control.Monad (when)
+import Control.Lens ((.=), (^.), preuse, ix, use, _1, _2)
+import Control.Monad (when, liftM, unless, void)
 import Data.Bits ((.|.), (.&.), shiftL)
+import Data.Char (toUpper)
+import Data.Maybe (isJust, isNothing)
 import Data.Monoid (mappend, mempty, mconcat)
+import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.QFiles.PcxT
 import QCommon.XCommandT
+import Render.GLModeT
+import Render.GLTModeT
 import qualified Constants
 import qualified Client.VID as VID
 import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
+import qualified Render.RenderAPIConstants as RenderAPIConstants
+
+glSolidFormat :: Int
+glSolidFormat = 3
+
+glAlphaFormat :: Int
+glAlphaFormat = 4
+
+numGLModes :: Int
+numGLModes = V.length modes
+
+numGLAlphaModes :: Int
+numGLAlphaModes = V.length glAlphaModes
+
+numGLSolidModes :: Int
+numGLSolidModes = V.length glSolidModes
+
+modes :: V.Vector GLModeT
+modes =
+    V.fromList [ GLModeT "GL_NEAREST"                (fromIntegral GL.gl_NEAREST               ) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR"                 (fromIntegral GL.gl_LINEAR                ) (fromIntegral GL.gl_LINEAR )
+               , GLModeT "GL_NEAREST_MIPMAP_NEAREST" (fromIntegral GL.gl_NEAREST_MIPMAP_NEAREST) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR_MIPMAP_NEAREST"  (fromIntegral GL.gl_LINEAR_MIPMAP_NEAREST ) (fromIntegral GL.gl_LINEAR )
+               , GLModeT "GL_NEAREST_MIPMAP_LINEAR"  (fromIntegral GL.gl_NEAREST_MIPMAP_LINEAR ) (fromIntegral GL.gl_NEAREST)
+               , GLModeT "GL_LINEAR_MIPMAP_LINEAR"   (fromIntegral GL.gl_LINEAR_MIPMAP_LINEAR  ) (fromIntegral GL.gl_LINEAR )
+               ]
+
+glAlphaModes :: V.Vector GLTModeT
+glAlphaModes =
+    V.fromList [ GLTModeT "default"    4
+               , GLTModeT "GL_RGBA"    (fromIntegral GL.gl_RGBA   )
+               , GLTModeT "GL_RGBA8"   (fromIntegral GL.gl_RGBA8  )
+               , GLTModeT "GL_RGB5_A1" (fromIntegral GL.gl_RGB5_A1)
+               , GLTModeT "GL_RGBA4"   (fromIntegral GL.gl_RGBA4  )
+               , GLTModeT "GL_RGBA2"   (fromIntegral GL.gl_RGBA2  )
+               ]
+
+glSolidModes :: V.Vector GLTModeT
+glSolidModes =
+    V.fromList [ GLTModeT "default"     3
+               , GLTModeT "GL_RGB"      (fromIntegral GL.gl_RGB     )
+               , GLTModeT "GL_RGB8"     (fromIntegral GL.gl_RGB8    )
+               , GLTModeT "GL_RGB5"     (fromIntegral GL.gl_RGB5    )
+               , GLTModeT "GL_RGB4"     (fromIntegral GL.gl_RGB4    )
+               , GLTModeT "GL_R3_G3_B2" (fromIntegral GL.gl_R3_G3_B2)
+               ]
 
 glImageListF :: XCommandT
 glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
@@ -100,6 +157,141 @@ loadPCX fileName returnPalette returnDimensions = do
                    else -- write one pixel
                      decodePCX raw (idx + 1) (x + 1) y maxX maxY (acc `mappend` BB.word8 dataByte)
 
+glTextureMode :: B.ByteString -> Quake ()
+glTextureMode str = do
+    let found = V.find (\m -> BC.map toUpper (m^.glmName) == str) modes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad filter name: [" `B.append` str `B.append` "]\n")
+      Just mode -> do
+        basicRenderAPIGlobals.brGLFilterMin .= (mode^.glmMinimize)
+        basicRenderAPIGlobals.brGLFilterMax .= (mode^.glmMaximize)
+
+        -- change all existing mipmap texture objects
+        numGLTextures <- use $ basicRenderAPIGlobals.brNumGLTextures
+        changeMipMap mode 0 numGLTextures
+
+  where changeMipMap :: GLModeT -> Int -> Int -> Quake ()
+        changeMipMap mode idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just glt <- preuse $ basicRenderAPIGlobals.brGLTextures.ix idx
+
+              when ((glt^.iType) /= RenderAPIConstants.itPic && (glt^.iType) /= RenderAPIConstants.itSky) $ do
+                glBind (glt^.iTexNum)
+                GL.glTexParameteri GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral $ mode^.glmMinimize)
+                GL.glTexParameteri GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral $ mode^.glmMaximize)
+
+glBind :: Int -> Quake ()
+glBind texNum = do
+    noBindValue <- liftM (^.cvValue) glNoBindCVar
+    drawChars <- use $ basicRenderAPIGlobals.brDrawChars
+
+    texNum' <- if noBindValue /= 0 && isJust drawChars
+                 then do
+                   -- performance evaluation option
+                   let (Just (ImageReference idx)) = drawChars
+                   Just num <- preuse $ basicRenderAPIGlobals.brGLTextures.ix idx.iTexNum
+                   return num
+                 else
+                   return texNum
+
+    glState <- use $ basicRenderAPIGlobals.brGLState
+    let access = if glState^.glsCurrentTmu == 0
+                   then _1
+                   else _2
+
+    unless (glState^.glsCurrentTextures.access == texNum') $ do
+      if glState^.glsCurrentTmu == 0
+        then basicRenderAPIGlobals.brGLState.glsCurrentTextures._1 .= texNum'
+        else basicRenderAPIGlobals.brGLState.glsCurrentTextures._2 .= texNum'
+      GL.glBindTexture GL.gl_TEXTURE_2D (fromIntegral texNum')
+
+glTextureAlphaMode :: B.ByteString -> Quake ()
+glTextureAlphaMode str = do
+    let strUp = BC.map toUpper str
+        found = V.find (\m -> BC.map toUpper (m^.gltmName) == strUp) glAlphaModes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad alpha texture mode name: [" `B.append` str `B.append` "]\n")
+      Just mode -> basicRenderAPIGlobals.brGLTexAlphaFormat .= (mode^.gltmMode)
+
+glTextureSolidMode :: B.ByteString -> Quake ()
+glTextureSolidMode str = do
+    let strUp = BC.map toUpper str
+        found = V.find (\m -> BC.map toUpper (m^.gltmName) == strUp) glSolidModes
+
+    case found of
+      Nothing -> VID.printf Constants.printAll ("bad solid texture mode name: [" `B.append` str `B.append` "]\n")
+      Just mode -> basicRenderAPIGlobals.brGLTexSolidFormat .= (mode^.gltmMode)
+
+glTexEnv :: GL.GLenum -> Quake ()
+glTexEnv mode = do
+    tmu <- use $ basicRenderAPIGlobals.brGLState.glsCurrentTmu
+    lastMode <- if tmu == 0
+                  then use $ basicRenderAPIGlobals.brLastModes._1
+                  else use $ basicRenderAPIGlobals.brLastModes._2
+
+    when (mode /= fromIntegral lastMode) $ do
+      GL.glTexEnvi GL.gl_TEXTURE_ENV GL.gl_TEXTURE_ENV_MODE (fromIntegral mode)
+      if tmu == 0
+        then basicRenderAPIGlobals.brLastModes._1 .= fromIntegral mode
+        else basicRenderAPIGlobals.brLastModes._2 .= fromIntegral mode
+
+glSetTexturePalette :: UV.Vector Int -> Quake ()
+glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
+
 glInitImages :: Quake ()
 glInitImages = do
-    io (putStrLn "Image.glInitImages") >> undefined -- TODO
+    basicRenderAPIGlobals.brRegistrationSequence .= 1
+
+    -- init intensity conversions
+    void $ CVar.get "intensity" "2" 0
+
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      when (v <= 1) $
+        void $ CVar.set "intensity" "1"
+
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      basicRenderAPIGlobals.brGLState.glsInverseIntensity .= 1 / v
+
+    getPalette
+
+    use (basicRenderAPIGlobals.brColorTableEXT) >>= \v ->
+      when v $ do
+        FS.loadFile "pics/16to8.dat" >>= \buf -> do
+          basicRenderAPIGlobals.brGLState.glsD16To8Table .= buf
+          when (isNothing buf) $
+            Com.comError Constants.errFatal "Couldn't load pics/16to8.pcx"
+
+    renderer <- use $ basicRenderAPIGlobals.brGLConfig.glcRenderer
+    g <- if renderer .&. (RenderAPIConstants.glRendererVoodoo .|. RenderAPIConstants.glRendererVoodoo2) /= 0
+           then return 1
+           else liftM (^.cvValue) vidGammaCVar
+
+    basicRenderAPIGlobals.brGammaTable .= (B.unfoldr (if g == 1 then simpleGamma else complexGamma g) 0)
+    liftM (^.cvValue) intensityCVar >>= \v ->
+      basicRenderAPIGlobals.brIntensityTable .= (B.unfoldr (genIntensityTable v) 0)
+
+  where simpleGamma :: Int -> Maybe (Word8, Int)
+        simpleGamma idx
+          | idx >= 256 = Nothing
+          | otherwise = Just (fromIntegral idx, idx + 1)
+
+        complexGamma :: Float -> Int -> Maybe (Word8, Int)
+        complexGamma g idx
+          | idx >= 256 = Nothing
+          | otherwise =
+              let inf :: Int = truncate (255 * (((fromIntegral idx + 0.5) / 255.5) ** g) + 0.5)
+                  inf' = if | inf < 0 -> 0
+                            | inf > 255 -> 255
+                            | otherwise -> inf
+              in Just (fromIntegral inf', idx + 1)
+
+        genIntensityTable :: Float -> Int -> Maybe (Word8, Int)
+        genIntensityTable v idx
+          | idx >= 256 = Nothing
+          | otherwise =
+              let j :: Int = truncate (fromIntegral idx * v)
+                  j' = if j > 255 then 255 else j
+              in Just (fromIntegral j', idx + 1)
