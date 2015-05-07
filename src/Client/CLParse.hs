@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
 module Client.CLParse where
 
 import Control.Exception (handle, IOException)
-import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=))
+import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=), Traversal')
 import Control.Monad (when, liftM, void)
 import System.IO (IOMode(ReadWriteMode), hFileSize)
 import qualified Data.ByteString as B
@@ -216,11 +217,10 @@ parseConfigString = do
 parseClientInfo :: Int -> Quake ()
 parseClientInfo player = do
     Just str <- preuse $ globals.cl.csConfigStrings.ix (player + Constants.csPlayerSkins)
-    clientInfo <- loadClientInfo str
-    globals.cl.csClientInfo.ix player .= clientInfo
+    loadClientInfo (globals.cl.csClientInfo.ix player) str
 
-loadClientInfo :: B.ByteString -> Quake ClientInfoT
-loadClientInfo _ = do
+loadClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> Quake ()
+loadClientInfo _ _ = do
     io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
 
 {-
@@ -289,4 +289,5 @@ downloadFileName fileName = do
 
 registerSounds :: Quake ()
 registerSounds = do
-    io (putStrLn "CLParse.registerSounds") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME!!! CLParse.registerSounds") >> return ()
+    --io (putStrLn "CLParse.registerSounds") >> undefined -- TODO

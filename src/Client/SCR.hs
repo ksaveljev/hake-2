@@ -946,3 +946,7 @@ debugGraph _ _ = io (putStrLn "IMPLEMENT ME!! SCR.debugGraph") >> return ()
 playCinematic :: B.ByteString -> Quake ()
 playCinematic _ = do
     io (putStrLn "SCR.playCinematic") >> undefined -- TODO
+
+touchPics :: Quake ()
+touchPics = do
+    io (putStrLn "SCR.touchPics") >> undefined -- TODO

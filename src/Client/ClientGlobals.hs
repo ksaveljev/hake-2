@@ -56,4 +56,6 @@ initialClientGlobals =
                 , _cgPrecacheTex        = 0
                 , _cgPrecacheModelSkin  = 0
                 , _cgPrecacheModel      = Nothing
+                , _cgNumCLWeaponModels  = 0
+                , _cgWeaponModels       = V.replicate Constants.maxClientWeaponModels ""
                 }

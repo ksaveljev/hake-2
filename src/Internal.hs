@@ -1630,6 +1630,8 @@ data ClientGlobals =
                 , _cgPrecacheTex        :: Int
                 , _cgPrecacheModelSkin  :: Int
                 , _cgPrecacheModel      :: Maybe B.ByteString
+                , _cgNumCLWeaponModels  :: Int
+                , _cgWeaponModels       :: V.Vector B.ByteString
                 }
 
 data VRectT =
