@@ -59,4 +59,9 @@ initialFastRenderAPIGlobals =
                        , _frDrawChars            = Nothing
                        , _frTrickFrame           = 0
                        , _frScrapDirty           = False
+                       , _frViewCluster          = 0
+                       , _frViewCluster2         = 0
+                       , _frOldViewCluster       = 0
+                       , _frOldViewCluster2      = 0
+                       , _frWorldModel           = Nothing
                        }

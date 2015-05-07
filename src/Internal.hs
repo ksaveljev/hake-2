@@ -123,6 +123,9 @@ newtype UserCmdReference = UserCmdReference Int
 -- reference to clientGlobals.cgParticles
 newtype CParticleReference = CParticleReference Int
 
+-- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
+data ModelReference = ModInlineReference Int | ModKnownReference Int
+
 data QuakeState =
   QuakeState { _globals              :: !Globals
              , _comGlobals           :: !ComGlobals
@@ -1535,6 +1538,11 @@ data FastRenderAPIGlobals =
                        , _frDrawChars            :: Maybe ImageReference
                        , _frTrickFrame           :: Int
                        , _frScrapDirty           :: Bool
+                       , _frViewCluster          :: Int
+                       , _frViewCluster2         :: Int
+                       , _frOldViewCluster       :: Int
+                       , _frOldViewCluster2      :: Int
+                       , _frWorldModel           :: Maybe ModelReference
                        }
 
 data ParticleTGlobals =
