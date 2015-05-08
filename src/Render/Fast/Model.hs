@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
@@ -7,10 +8,14 @@ import Control.Monad (when, liftM)
 import Data.Maybe (isNothing, fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import QCommon.QFiles.BSP.DHeaderT
+import QCommon.QFiles.MD2.DMdlT
+import QCommon.QFiles.SP2.DSpriteT
 import QCommon.XCommandT
 import Render.OpenGL.GLDriver
 import qualified Constants
@@ -19,6 +24,7 @@ import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Polygon as Polygon
 import qualified Util.Lib as Lib
+import qualified Util.Binary as Binary
 
 modelListF :: XCommandT
 modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
@@ -119,10 +125,34 @@ modForName name crash = do
                 return Nothing
 
               Just buffer -> do
-                io (putStrLn "Model.modForName") >> undefined -- TODO
+                let modelRef = ModKnownReference emptySpotIdx
+                fastRenderAPIGlobals.frLoadModel .= modelRef
+
+                -- fill it in
+                -- call the apropriate loader
+                let header = B.take 4 buffer
+
+                if | header == idAliasHeader -> loadAliasModel modelRef buffer
+                   | header == idSpriteHeader -> loadSpriteModel modelRef buffer
+                   | header == idBSPHeader -> loadBrushModel modelRef buffer
+                   | otherwise -> Com.comError Constants.errDrop ("Mod_NumForName: unknown fileid for " `B.append` name)
+
+                return $ Just modelRef
 
 resetModelArrays :: Quake ()
 resetModelArrays = do
     zoom (fastRenderAPIGlobals) $ do
       frModelTextureCoordIdx .= 0
       frModelVertexIndexIdx  .= 0
+
+loadAliasModel :: ModelReference -> B.ByteString -> Quake ()
+loadAliasModel _ _ = do
+    io (putStrLn "Model.loadAliasModel") >> undefined -- TODO
+
+loadSpriteModel :: ModelReference -> B.ByteString -> Quake ()
+loadSpriteModel _ _ = do
+    io (putStrLn "Model.loadSpriteModel") >> undefined -- TODO
+
+loadBrushModel :: ModelReference -> B.ByteString -> Quake ()
+loadBrushModel _ _ = do
+    io (putStrLn "Model.loadBrushModel") >> undefined -- TODO

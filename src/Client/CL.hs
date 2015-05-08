@@ -890,8 +890,7 @@ requestNextDownload = do
         checkAliasModel _ (_, True) = return (False, True)
         checkAliasModel maybeModel _ = do
           let Just model = maybeModel -- pretty sure it is not Nothing
-              byte = B.take 4 model
-              header = Binary.runGet Binary.getInt (BL.fromStrict byte)
+              header = B.take 4 model
 
           if header /= idAliasHeader
             then do

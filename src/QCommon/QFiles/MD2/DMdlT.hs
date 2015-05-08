@@ -1,10 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module QCommon.QFiles.MD2.DMdlT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
-import Data.Bits (shiftL)
-import Data.Char (ord)
 import Data.Functor ((<$>))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -16,8 +15,8 @@ import QCommon.QFiles.MD2.DSTVertT
 import QCommon.QFiles.MD2.DTriangleT
 import Util.Binary
 
-idAliasHeader :: Int
-idAliasHeader = (ord '2' `shiftL` 24) + (ord 'P' `shiftL` 16) + (ord 'D' `shiftL` 8) + (ord 'I')
+idAliasHeader :: B.ByteString
+idAliasHeader = "IDP2"
 
 data DMdlT =
   DMdlT { _dmIdent       :: Int
