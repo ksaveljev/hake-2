@@ -9,8 +9,10 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         ) where
 
 import Control.Lens (makeLenses)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
@@ -23,6 +25,9 @@ import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 
 makeLenses ''FastRenderAPIGlobals
+
+modelBufferSize :: Int
+modelBufferSize = 50000
 
 initialFastRenderAPIGlobals :: FastRenderAPIGlobals
 initialFastRenderAPIGlobals =
@@ -64,4 +69,8 @@ initialFastRenderAPIGlobals =
                        , _frOldViewCluster       = 0
                        , _frOldViewCluster2      = 0
                        , _frWorldModel           = Nothing
+                       , _frModelTextureCoordBuf = unsafePerformIO $ MV.new (modelBufferSize * 2)
+                       , _frModelVertexIndexBuf  = unsafePerformIO $ MV.new modelBufferSize
+                       , _frModelTextureCoordIdx = 0
+                       , _frModelVertexIndexIdx  = 0
                        }

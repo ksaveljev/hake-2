@@ -2,7 +2,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Render.Fast.Model where
 
-import Control.Lens ((.=), (+=), preuse, ix, (^.), Traversal')
+import Control.Lens ((.=), (+=), preuse, ix, (^.), Traversal', zoom)
 import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -60,5 +60,6 @@ modForName _ _ = do
 
 resetModelArrays :: Quake ()
 resetModelArrays = do
-    io (putStrLn "IMPLEMENT ME! DO WE NEED THIS? Model.resetModelArrays") >> return ()
-    --io (putStrLn "Model.resetModelArrays") >> undefined -- TODO
+    zoom (fastRenderAPIGlobals) $ do
+      frModelTextureCoordIdx .= 0
+      frModelVertexIndexIdx  .= 0
