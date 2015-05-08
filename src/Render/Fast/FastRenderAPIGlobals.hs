@@ -73,4 +73,6 @@ initialFastRenderAPIGlobals =
                        , _frModelVertexIndexBuf  = unsafePerformIO $ MV.new modelBufferSize
                        , _frModelTextureCoordIdx = 0
                        , _frModelVertexIndexIdx  = 0
+                       , _frPolygonBufferIndex   = 0
+                       , _frPolygonCount         = 0
                        }

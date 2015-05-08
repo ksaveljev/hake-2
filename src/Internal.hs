@@ -1510,48 +1510,50 @@ data BasicRenderAPIGlobals =
   BasicRenderAPIGlobals
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin             :: Float
-                       , _frGLDepthMax             :: Float
-                       , _frGLConfig               :: GLConfigT
-                       , _frGLState                :: GLStateT
-                       , _frd8to24table            :: UV.Vector Int
-                       , _frVid                    :: VidDefT
-                       , _frColorTableEXT          :: Bool
-                       , _frActiveTextureARB       :: Bool
-                       , _frPointParameterEXT      :: Bool
-                       , _frLockArraysEXT          :: Bool
-                       , _frSwapIntervalEXT        :: Bool
-                       , _frTexture0               :: Int
-                       , _frTexture1               :: Int
-                       , _frGLTexSolidFormat       :: Int
-                       , _frGLTexAlphaFormat       :: Int
-                       , _frGLFilterMin            :: Int
-                       , _frGLFilterMax            :: Int
-                       , _frNumGLTextures          :: Int
-                       , _frGLTextures             :: V.Vector ImageT
-                       , _frLastModes              :: (Int, Int)
-                       , _frRegistrationSequence   :: Int
-                       , _frGammaTable             :: B.ByteString
-                       , _frIntensityTable         :: B.ByteString
-                       , _frModKnown               :: V.Vector ModelT
-                       , _frModNoVis               :: B.ByteString
-                       , _frNoTexture              :: ImageReference
-                       , _frParticleTexture        :: ImageReference
-                       , _frUploadWidth            :: Int
-                       , _frUploadHeight           :: Int
-                       , _frUploadedPaletted       :: Bool
-                       , _frDrawChars              :: Maybe ImageReference
-                       , _frTrickFrame             :: Int
-                       , _frScrapDirty             :: Bool
-                       , _frViewCluster            :: Int
-                       , _frViewCluster2           :: Int
-                       , _frOldViewCluster         :: Int
-                       , _frOldViewCluster2        :: Int
-                       , _frWorldModel             :: Maybe ModelReference
-                       , _frModelTextureCoordBuf   :: MV.IOVector Float
-                       , _frModelVertexIndexBuf    :: MV.IOVector Int32
-                       , _frModelTextureCoordIdx   :: Int
-                       , _frModelVertexIndexIdx    :: Int
+  FastRenderAPIGlobals { _frGLDepthMin           :: Float
+                       , _frGLDepthMax           :: Float
+                       , _frGLConfig             :: GLConfigT
+                       , _frGLState              :: GLStateT
+                       , _frd8to24table          :: UV.Vector Int
+                       , _frVid                  :: VidDefT
+                       , _frColorTableEXT        :: Bool
+                       , _frActiveTextureARB     :: Bool
+                       , _frPointParameterEXT    :: Bool
+                       , _frLockArraysEXT        :: Bool
+                       , _frSwapIntervalEXT      :: Bool
+                       , _frTexture0             :: Int
+                       , _frTexture1             :: Int
+                       , _frGLTexSolidFormat     :: Int
+                       , _frGLTexAlphaFormat     :: Int
+                       , _frGLFilterMin          :: Int
+                       , _frGLFilterMax          :: Int
+                       , _frNumGLTextures        :: Int
+                       , _frGLTextures           :: V.Vector ImageT
+                       , _frLastModes            :: (Int, Int)
+                       , _frRegistrationSequence :: Int
+                       , _frGammaTable           :: B.ByteString
+                       , _frIntensityTable       :: B.ByteString
+                       , _frModKnown             :: V.Vector ModelT
+                       , _frModNoVis             :: B.ByteString
+                       , _frNoTexture            :: ImageReference
+                       , _frParticleTexture      :: ImageReference
+                       , _frUploadWidth          :: Int
+                       , _frUploadHeight         :: Int
+                       , _frUploadedPaletted     :: Bool
+                       , _frDrawChars            :: Maybe ImageReference
+                       , _frTrickFrame           :: Int
+                       , _frScrapDirty           :: Bool
+                       , _frViewCluster          :: Int
+                       , _frViewCluster2         :: Int
+                       , _frOldViewCluster       :: Int
+                       , _frOldViewCluster2      :: Int
+                       , _frWorldModel           :: Maybe ModelReference
+                       , _frModelTextureCoordBuf :: MV.IOVector Float
+                       , _frModelVertexIndexBuf  :: MV.IOVector Int32
+                       , _frModelTextureCoordIdx :: Int
+                       , _frModelVertexIndexIdx  :: Int
+                       , _frPolygonBufferIndex   :: Int
+                       , _frPolygonCount         :: Int
                        }
 
 data ParticleTGlobals =
