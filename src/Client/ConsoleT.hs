@@ -2,13 +2,15 @@
 module Client.ConsoleT where
 
 import Control.Lens (makeLenses)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Storable.Mutable as MV
 
 import qualified Constants
 
 data ConsoleT =
   ConsoleT { _cInitialized :: Bool
-           , _cText        :: UV.Vector Char
+           , _cText        :: MV.IOVector Char
            , _cCurrent     :: Int
            , _cX           :: Int
            , _cDisplay     :: Int
@@ -25,7 +27,7 @@ makeLenses ''ConsoleT
 newConsoleT :: ConsoleT
 newConsoleT =
   ConsoleT { _cInitialized = False
-           , _cText        = UV.empty -- max size is Constants.conTextSize
+           , _cText        = unsafePerformIO $ MV.replicate Constants.conTextSize ' '
            , _cCurrent     = 0
            , _cX           = 0
            , _cDisplay     = 0

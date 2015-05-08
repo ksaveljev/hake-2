@@ -3,7 +3,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Client.Console where
 
-import Control.Lens ((.=), use, zoom, (^.), ix, preuse, (-=), (%=), (+=))
+import Control.Lens ((.=), use, zoom, (^.), ix, preuse, (-=), (+=))
 import Control.Monad (void, unless, when)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.Char (ord, chr)
@@ -13,6 +13,7 @@ import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Storable.Mutable as MV
 
 import Quake
 import QuakeState
@@ -57,11 +58,14 @@ checkResize = do
 
     unless (width == lineWidth) $ do
       if width < 1 -- video hasn't been initialized yet
-        then
+        then do
           zoom (globals.con) $ do
             cLineWidth .= 38
             cTotalLines .= Constants.conTextSize `div` 38
-            cText .= UV.replicate Constants.conTextSize ' '
+
+          use (globals.con.cText) >>= \text ->
+            io $ text `MV.set` ' '
+
         else do
           oldWidth <- use $ globals.con.cLineWidth
           globals.con.cLineWidth .= width
@@ -78,9 +82,10 @@ checkResize = do
                            then width
                            else oldWidth
 
-          tbuf <- use $ globals.con.cText
           currentLine <- use $ globals.con.cCurrent
-          globals.con.cText .= fillInBuf oldTotalLines oldWidth currentLine totalLines width tbuf [] 0 0 numLines numChars
+          use (globals.con.cText) >>= \text -> do
+            tbuf <- io $ MV.clone text
+            fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines width 0 0 numLines numChars
 
           clearNotify
 
@@ -88,15 +93,15 @@ checkResize = do
       globals.con.cCurrent .= totalLines - 1
       globals.con.cDisplay .= totalLines - 1
 
-        -- IMPROVE: em, can we optimize it? some other approach maybe?
-  where fillInBuf :: Int -> Int -> Int -> Int -> Int -> UV.Vector Char -> [(Int, Char)] -> Int -> Int -> Int -> Int -> UV.Vector Char
-        fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf buf i j maxI maxJ
-          | i >= maxI = (UV.replicate Constants.conTextSize ' ') UV.// buf
-          | j >= maxJ = fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf buf (i + 1) 0 maxI maxJ
-          | otherwise =
+  where fillInBuf :: MV.IOVector Char -> MV.IOVector Char -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+        fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i j maxI maxJ
+          | i >= maxI = return ()
+          | j >= maxJ = fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth (i + 1) 0 maxI maxJ
+          | otherwise = do
               let idx = (totalLines - 1 - i) * lineWidth + j
                   idx2 = ((currentLine - i + oldTotalLines) `mod` oldTotalLines) * oldWidth + j
-              in fillInBuf oldTotalLines oldWidth currentLine totalLines lineWidth tbuf ((idx, tbuf UV.! idx2):buf) i (j + 1) maxI maxJ
+              io $ tbuf `MV.read` idx2 >>= MV.write text idx
+              fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i (j + 1) maxI maxJ
 
 toggleConsoleF :: XCommandT
 toggleConsoleF = io (putStrLn "Console.toggleConsoleF") >> undefined -- TODO
@@ -208,11 +213,12 @@ drawConsole frac = do
               drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
               drawText console (row - 1) (y - 8) (idx + 1) maxIdx
 
-        drawLine :: (Int -> Int -> Int -> Quake ()) -> UV.Vector Char -> Int -> Int -> Int -> Int -> Quake ()
+        drawLine :: (Int -> Int -> Int -> Quake ()) -> MV.IOVector Char -> Int -> Int -> Int -> Int -> Quake ()
         drawLine drawChar text first y idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              drawChar ((idx + 1) `shiftL` 3) y $! (ord $ text UV.! (idx + first))
+              ch <- io $ text `MV.read` (idx + first)
+              drawChar ((idx + 1) `shiftL` 3) y $! (ord ch)
               drawLine drawChar text first y (idx + 1) maxIdx
 
 drawNotify :: Quake ()
@@ -279,11 +285,11 @@ print txt = do
                              then (128, 1)
                              else (0, 0)
 
-      printTxt txtpos mask []
+      printTxt txtpos mask
 
-  where printTxt :: Int -> Int -> [(Int, Char)] -> Quake ()
-        printTxt txtpos mask changes
-          | txtpos >= B.length txt = globals.con.cText %= (UV.// changes)
+  where printTxt :: Int -> Int -> Quake ()
+        printTxt txtpos mask
+          | txtpos >= B.length txt = return ()
           | otherwise = do
               console <- use $ globals.con
 
@@ -310,22 +316,23 @@ print txt = do
               case c of
                 '\n' -> do
                   globals.con.cX .= 0
-                  printTxt (txtpos + 1) mask $! changes
+                  printTxt (txtpos + 1) mask
 
                 '\r' -> do
                   globals.con.cX .= 0
                   clientGlobals.cgCR .= 1
-                  printTxt (txtpos + 1) mask $! changes
+                  printTxt (txtpos + 1) mask
 
                 _ -> -- display character and advance
                   use (globals.con) >>= \console' -> do
                     let y = (console'^.cCurrent) `mod` (console'^.cTotalLines)
                         idx = y * (console'^.cLineWidth) + (console'^.cX)
                         b = (ord c) .|. mask .|. (console'^.cOrMask)
+                    io $ MV.write (console'^.cText) idx (chr b)
                     globals.con.cX += 1
                     when ((console'^.cX) + 1 >= (console'^.cLineWidth)) $
                       globals.con.cX .= 0
-                    printTxt (txtpos + 1) mask $! ((idx, chr b) : changes)
+                    printTxt (txtpos + 1) mask
 
         findWordLen :: Int -> Int -> Int -> Int
         findWordLen lineWidth txtpos idx =
@@ -345,15 +352,14 @@ lineFeed = do
 
     globals.con.cCurrent += 1
 
-    (i, e) <- use (globals.con) >>= \console -> do
-                let i = ((console^.cCurrent) `mod` (console^.cTotalLines)) * (console^.cLineWidth)
-                    e = i + (console^.cLineWidth)
-                return (i, e)
+    use (globals.con) >>= \console -> do
+      let i = ((console^.cCurrent) `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+          e = i + (console^.cLineWidth)
+      fillSpaces (console^.cText) i e
 
-    fillSpaces i e []
-
-  where fillSpaces :: Int -> Int -> [(Int, Char)] -> Quake ()
-        fillSpaces i e changes
-          | i >= e = globals.con.cText %= (UV.// changes)
-          | otherwise = fillSpaces (i + 1) e $! ((i, ' ') : changes)
-
+  where fillSpaces :: MV.IOVector Char -> Int -> Int -> Quake ()
+        fillSpaces text i e
+          | i >= e = return ()
+          | otherwise = do
+              io $ MV.write text i ' '
+              fillSpaces text (i + 1) e

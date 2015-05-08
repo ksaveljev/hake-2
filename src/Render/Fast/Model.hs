@@ -60,4 +60,5 @@ modForName _ _ = do
 
 resetModelArrays :: Quake ()
 resetModelArrays = do
-    io (putStrLn "Model.resetModelArrays") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! DO WE NEED THIS? Model.resetModelArrays") >> return ()
+    --io (putStrLn "Model.resetModelArrays") >> undefined -- TODO
