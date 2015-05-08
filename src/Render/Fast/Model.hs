@@ -2,9 +2,11 @@
 {-# LANGUAGE Rank2Types #-}
 module Render.Fast.Model where
 
-import Control.Lens ((.=), (+=), preuse, ix, (^.), Traversal', zoom)
-import Control.Monad (when)
+import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
+import Control.Monad (when, liftM)
+import Data.Maybe (isNothing, fromJust)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -12,8 +14,11 @@ import QuakeState
 import QCommon.XCommandT
 import Render.OpenGL.GLDriver
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Polygon as Polygon
+import qualified Util.Lib as Lib
 
 modelListF :: XCommandT
 modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
@@ -51,9 +56,70 @@ modFree :: ModelReference -> Quake ()
 modFree (ModInlineReference modelIdx) = fastRenderAPIGlobals.frModInline.ix modelIdx .= newModelT
 modFree (ModKnownReference modelIdx) = fastRenderAPIGlobals.frModKnown.ix modelIdx .= newModelT
 
+{-
+==================
+Mod_ForName
+
+Loads in a model for the given name
+==================
+-}
 modForName :: B.ByteString -> Bool -> Quake (Maybe ModelReference)
-modForName _ _ = do
-    io (putStrLn "Model.modForName") >> undefined -- TODO
+modForName name crash = do
+    when (B.length name == 0) $
+      Com.comError Constants.errDrop "Mod_ForName: NULL name"
+
+    -- inline models are grabbed only from worldmodel
+    if name `BC.index` 0 == '*'
+      then do
+        worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+        let i = Lib.atoi (B.drop 1 name)
+        err <- if i < 1 || isNothing worldModelRef
+                 then return True
+                 else do
+                   Just worldModel <- case fromJust worldModelRef of
+                                        ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                                        ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+                   return $ if i >= (worldModel^.mNumSubModels)
+                              then True
+                              else False
+
+        when err $ Com.comError Constants.errDrop "bad inline model number"
+        return $ Just (ModInlineReference i)
+      else do
+        -- search the currently loaded models
+        modNumKnown <- use $ fastRenderAPIGlobals.frModNumKnown
+        modKnown <- liftM (V.take modNumKnown) (use $ fastRenderAPIGlobals.frModKnown)
+        let foundIndex = V.findIndex (\m -> (m^.mName) == name) modKnown
+
+        case foundIndex of
+          Just idx -> return $ Just (ModKnownReference idx)
+          Nothing -> do
+            -- find a free model slot spot
+            let emptySpot = V.findIndex (\m -> B.null (m^.mName)) modKnown
+            emptySpotIdx <- case emptySpot of
+                              Just i -> return i
+                              Nothing -> do
+                                when (modNumKnown == maxModKnown) $
+                                  Com.comError Constants.errDrop "mod_numknown == MAX_MOD_KNOWN"
+                                fastRenderAPIGlobals.frModNumKnown += 1
+                                return modNumKnown
+
+            fastRenderAPIGlobals.frModKnown.ix emptySpotIdx.mName .= name
+
+            -- load the file
+            fileBuffer <- FS.loadFile name
+
+            case fileBuffer of
+              Nothing -> do
+                when crash $
+                  Com.comError Constants.errDrop ("Mod_NumForName: " `B.append` name `B.append` " not found\n")
+
+                fastRenderAPIGlobals.frModKnown.ix emptySpotIdx.mName .= ""
+                return Nothing
+
+              Just buffer -> do
+                io (putStrLn "Model.modForName") >> undefined -- TODO
 
 resetModelArrays :: Quake ()
 resetModelArrays = do
