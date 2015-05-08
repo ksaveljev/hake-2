@@ -1534,6 +1534,7 @@ data FastRenderAPIGlobals =
                        , _frGammaTable           :: B.ByteString
                        , _frIntensityTable       :: B.ByteString
                        , _frModKnown             :: V.Vector ModelT
+                       , _frModInline            :: V.Vector ModelT
                        , _frModNoVis             :: B.ByteString
                        , _frNoTexture            :: ImageReference
                        , _frParticleTexture      :: ImageReference

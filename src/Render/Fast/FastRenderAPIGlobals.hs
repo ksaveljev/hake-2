@@ -26,6 +26,9 @@ import qualified Render.OpenGL.QGLConstants as QGLConstants
 
 makeLenses ''FastRenderAPIGlobals
 
+maxModKnown :: Int
+maxModKnown = 512
+
 modelBufferSize :: Int
 modelBufferSize = 50000
 
@@ -54,7 +57,8 @@ initialFastRenderAPIGlobals =
                        , _frRegistrationSequence = 0
                        , _frGammaTable           = B.replicate 256 0
                        , _frIntensityTable       = B.replicate 256 0
-                       , _frModKnown             = V.empty
+                       , _frModKnown             = V.replicate maxModKnown newModelT
+                       , _frModInline            = V.replicate maxModKnown newModelT
                        , _frModNoVis             = ""
                        , _frNoTexture            = ImageReference (-1)
                        , _frParticleTexture      = ImageReference (-1)

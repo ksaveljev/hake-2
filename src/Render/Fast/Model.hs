@@ -15,9 +15,6 @@ import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Polygon as Polygon
 
-maxModKnown :: Int
-maxModKnown = 512
-
 modelListF :: XCommandT
 modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
 
@@ -43,16 +40,16 @@ rBeginRegistration _ model = do
     Just currentName <- preuse $ fastRenderAPIGlobals.frModKnown.ix 0.mName
 
     when (currentName /= fullName || (flushMap^.cvValue) /= 0) $
-      modFree (fastRenderAPIGlobals.frModKnown.ix 0)
+      modFree (ModKnownReference 0)
 
     modelRef <- modForName fullName True
     fastRenderAPIGlobals.frWorldModel .= modelRef
 
     fastRenderAPIGlobals.frViewCluster .= (-1)
 
-modFree :: Traversal' QuakeState ModelT -> Quake ()
-modFree _ = do
-    io (putStrLn "Model.modFree") >> undefined -- TODO
+modFree :: ModelReference -> Quake ()
+modFree (ModInlineReference modelIdx) = fastRenderAPIGlobals.frModInline.ix modelIdx .= newModelT
+modFree (ModKnownReference modelIdx) = fastRenderAPIGlobals.frModKnown.ix modelIdx .= newModelT
 
 modForName :: B.ByteString -> Bool -> Quake (Maybe ModelReference)
 modForName _ _ = do
