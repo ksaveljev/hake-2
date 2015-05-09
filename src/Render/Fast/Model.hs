@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
@@ -17,14 +18,16 @@ import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.XCommandT
+import Render.MVertexT
 import Render.OpenGL.GLDriver
+import Util.Binary
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Polygon as Polygon
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
-import qualified Util.Binary as Binary
 
 modelListF :: XCommandT
 modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
@@ -154,5 +157,97 @@ loadSpriteModel _ _ = do
     io (putStrLn "Model.loadSpriteModel") >> undefined -- TODO
 
 loadBrushModel :: ModelReference -> B.ByteString -> Quake ()
-loadBrushModel _ _ = do
+loadBrushModel modelRef buffer = do
+    loadModelRef <- use $ fastRenderAPIGlobals.frLoadModel
+    -- assume these can only be ModKnownReference (TODO: are we sure??)
+    let ModKnownReference modelIdx = modelRef
+        ModKnownReference loadModelIdx = loadModelRef
+
+    fastRenderAPIGlobals.frModKnown.ix loadModelIdx.mType .= RenderAPIConstants.modBrush
+
+    when (loadModelIdx /= 0) $
+      Com.comError Constants.errDrop "Loaded a brush model after the world"
+
+    let header = newDHeaderT (BL.fromStrict buffer)
+
+    when ((header^.dhVersion) /= Constants.bspVersion) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("Mod_LoadBrushModel: " `B.append` name `B.append` " has wrong version number (" `B.append` BC.pack (show (header^.dhVersion)) `B.append` " should be " `B.append` BC.pack (show Constants.bspVersion) `B.append` ")")
+
+    -- load into heap
+    loadVertexes     buffer ((header^.dhLumps) V.! Constants.lumpVertexes)
+    loadEdges        buffer ((header^.dhLumps) V.! Constants.lumpEdges)
+    loadSurfEdges    buffer ((header^.dhLumps) V.! Constants.lumpSurfEdges)
+    loadLighting     buffer ((header^.dhLumps) V.! Constants.lumpLighting)
+    loadPlanes       buffer ((header^.dhLumps) V.! Constants.lumpPlanes)
+    loadTexInfo      buffer ((header^.dhLumps) V.! Constants.lumpTexInfo)
+    loadFaces        buffer ((header^.dhLumps) V.! Constants.lumpFaces)
+    loadMarkSurfaces buffer ((header^.dhLumps) V.! Constants.lumpLeafFaces)
+    loadVisibility   buffer ((header^.dhLumps) V.! Constants.lumpVisibility)
+    loadLeafs        buffer ((header^.dhLumps) V.! Constants.lumpLeafs)
+    loadNodes        buffer ((header^.dhLumps) V.! Constants.lumpNodes)
+    loadSubmodels    buffer ((header^.dhLumps) V.! Constants.lumpModels)
     io (putStrLn "Model.loadBrushModel") >> undefined -- TODO
+
+loadVertexes :: B.ByteString -> LumpT -> Quake ()
+loadVertexes buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` diskSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` diskSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        vertexes = runGet (getVertexes count) buf
+    
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumVertexes .= count
+      mVertexes .= vertexes
+
+  where getVertexes :: Int -> Get (V.Vector MVertexT)
+        getVertexes count = V.replicateM count getMVertexT
+
+loadEdges :: B.ByteString -> LumpT -> Quake ()
+loadEdges _ _ = do
+    io (putStrLn "Model.loadEdges") >> undefined -- TODO
+
+loadSurfEdges :: B.ByteString -> LumpT -> Quake ()
+loadSurfEdges _ _ = do
+    io (putStrLn "Model.loadSurfEdges") >> undefined -- TODO
+
+loadLighting :: B.ByteString -> LumpT -> Quake ()
+loadLighting _ _ = do
+    io (putStrLn "Model.loadLighting") >> undefined -- TODO
+
+loadPlanes :: B.ByteString -> LumpT -> Quake ()
+loadPlanes _ _ = do
+    io (putStrLn "Model.loadPlanes") >> undefined -- TODO
+
+loadTexInfo :: B.ByteString -> LumpT -> Quake ()
+loadTexInfo _ _ = do
+    io (putStrLn "Model.loadTexInfo") >> undefined -- TODO
+
+loadFaces :: B.ByteString -> LumpT -> Quake ()
+loadFaces _ _ = do
+    io (putStrLn "Model.loadFaces") >> undefined -- TODO
+
+loadMarkSurfaces :: B.ByteString -> LumpT -> Quake ()
+loadMarkSurfaces _ _ = do
+    io (putStrLn "Model.loadMarkSurfaces") >> undefined -- TODO
+
+loadVisibility :: B.ByteString -> LumpT -> Quake ()
+loadVisibility _ _ = do
+    io (putStrLn "Model.loadVisibility") >> undefined -- TODO
+
+loadLeafs :: B.ByteString -> LumpT -> Quake ()
+loadLeafs _ _ = do
+    io (putStrLn "Model.loadLeafs") >> undefined -- TODO
+
+loadNodes :: B.ByteString -> LumpT -> Quake ()
+loadNodes _ _ = do
+    io (putStrLn "Model.loadNodes") >> undefined -- TODO
+
+loadSubmodels :: B.ByteString -> LumpT -> Quake ()
+loadSubmodels _ _ = do
+    io (putStrLn "Model.loadSubmodels") >> undefined -- TODO

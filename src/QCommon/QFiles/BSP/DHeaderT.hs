@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.QFiles.BSP.DHeaderT where
+module QCommon.QFiles.BSP.DHeaderT ( module QCommon.QFiles.BSP.DHeaderT
+                                   , module QCommon.LumpT
+                                   ) where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
@@ -32,7 +34,7 @@ newDHeaderT = runGet getDHeaderT
                                <*> getLumps
 
         getLumps :: Get (V.Vector LumpT)
-        getLumps = V.sequence $ V.replicate Constants.headerLumps getLumpT
+        getLumps = V.replicateM Constants.headerLumps getLumpT
 
         getLumpT :: Get LumpT
         getLumpT = LumpT <$> getInt <*> getInt

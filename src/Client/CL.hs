@@ -48,7 +48,6 @@ import qualified Sys.IN as IN
 import qualified Sys.NET as NET
 import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
-import qualified Util.Binary as Binary
 import qualified Util.Lib as Lib
 
 playerMult :: Int
