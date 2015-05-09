@@ -229,8 +229,28 @@ loadEdges buffer lump = do
         getEdges count = V.replicateM count getMEdgeT
 
 loadSurfEdges :: B.ByteString -> LumpT -> Quake ()
-loadSurfEdges _ _ = do
-    io (putStrLn "Model.loadSurfEdges") >> undefined -- TODO
+loadSurfEdges buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` Constants.sizeOfInt /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` Constants.sizeOfInt
+
+    when (count < 1 || count >= Constants.maxMapSurfEdges) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel bad surfedges count in " `B.append` name `B.append` ": " `B.append` BC.pack (show count)) -- IMPROVE?
+
+    let buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        offsets = runGet (getOffsets count) buf
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumSurfEdges .= count
+      mSurfEdges .= offsets
+
+  where getOffsets :: Int -> Get (V.Vector Int)
+        getOffsets count = V.replicateM count getInt
 
 loadLighting :: B.ByteString -> LumpT -> Quake ()
 loadLighting _ _ = do
