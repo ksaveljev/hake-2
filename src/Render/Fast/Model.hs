@@ -253,8 +253,12 @@ loadSurfEdges buffer lump = do
         getOffsets count = V.replicateM count getInt
 
 loadLighting :: B.ByteString -> LumpT -> Quake ()
-loadLighting _ _ = do
-    io (putStrLn "Model.loadLighting") >> undefined -- TODO
+loadLighting buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    if (lump^.lFileLen) == 0
+      then fastRenderAPIGlobals.frModKnown.ix modelIdx.mLightdata .= Nothing
+      else fastRenderAPIGlobals.frModKnown.ix modelIdx.mLightdata .= Just (B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer))
 
 loadPlanes :: B.ByteString -> LumpT -> Quake ()
 loadPlanes _ _ = do

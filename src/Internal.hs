@@ -900,7 +900,7 @@ data ModelT =
          , _mNumMarkSurfaces      :: !Int
          , _mMarkSurfaces         :: !(V.Vector MSurfaceT)
          -- TODO: qfiles.dvis_t vis
-         , _mLightdata            :: !B.ByteString
+         , _mLightdata            :: !(Maybe B.ByteString)
          , _mSkins                :: !(V.Vector ImageT)
          , _mExtraDataSize        :: !Int
          , _mExtraData            :: !(Maybe B.ByteString)

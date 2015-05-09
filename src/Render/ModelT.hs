@@ -50,7 +50,7 @@ newModelT =
          , _mNumMarkSurfaces      = 0
          , _mMarkSurfaces         = V.empty
          -- TODO: qfiles.dvis_t vis
-         , _mLightdata            = ""
+         , _mLightdata            = Nothing
          , _mSkins                = V.empty
          , _mExtraDataSize        = 0
          , _mExtraData            = Nothing
