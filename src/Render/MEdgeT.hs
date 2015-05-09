@@ -1,8 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Render.MEdgeT where
 
+import Control.Applicative ((<*>))
+import Data.Functor ((<$>))
 import Data.Word (Word16)
 import Control.Lens (makeLenses)
+import qualified Data.ByteString.Lazy as BL
+
+import Util.Binary
 
 data MEdgeT =
   MEdgeT { _meV                :: (Word16, Word16)
@@ -11,5 +16,8 @@ data MEdgeT =
 
 makeLenses ''MEdgeT
 
-newMEdgeT :: MEdgeT
-newMEdgeT = undefined -- TODO
+newMEdgeT :: BL.ByteString -> MEdgeT
+newMEdgeT = runGet getMEdgeT
+
+getMEdgeT :: Get MEdgeT
+getMEdgeT = MEdgeT <$> getWord162 <*> getInt

@@ -8,6 +8,7 @@ import Data.Binary.Get
 import Data.Binary.IEEE754 (getFloat32le)
 import Data.Functor ((<$>))
 import Data.Int
+import Data.Word (Word16)
 import Control.Applicative ((<*>))
 import Linear (V3(..), V4(..))
 
@@ -39,6 +40,9 @@ getV4Float = V4 <$> getFloat32le
 
 getInt2 :: Get (Int, Int)
 getInt2 = (,) <$> getInt <*> getInt
+
+getWord162 :: Get (Word16, Word16)
+getWord162 = (,) <$> getWord16le <*> getWord16le
 
 getInt4 :: Get (Int, Int, Int, Int)
 getInt4 = (,,,) <$> getInt <*> getInt <*> getInt <*> getInt

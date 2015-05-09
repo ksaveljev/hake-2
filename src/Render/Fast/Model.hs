@@ -18,6 +18,7 @@ import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.XCommandT
+import Render.MEdgeT
 import Render.MVertexT
 import Render.OpenGL.GLDriver
 import Util.Binary
@@ -209,8 +210,23 @@ loadVertexes buffer lump = do
         getVertexes count = V.replicateM count getMVertexT
 
 loadEdges :: B.ByteString -> LumpT -> Quake ()
-loadEdges _ _ = do
-    io (putStrLn "Model.loadEdges") >> undefined -- TODO
+loadEdges buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` diskSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` diskSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        edges = runGet (getEdges count) buf
+    
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumEdges .= count
+      mEdges .= edges
+
+  where getEdges :: Int -> Get (V.Vector MEdgeT)
+        getEdges count = V.replicateM count getMEdgeT
 
 loadSurfEdges :: B.ByteString -> LumpT -> Quake ()
 loadSurfEdges _ _ = do
