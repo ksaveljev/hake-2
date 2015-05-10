@@ -803,8 +803,8 @@ data MTexInfoT =
   MTexInfoT { _mtiVecs      :: !(V4 Float, V4 Float)
             , _mtiFlags     :: !Int
             , _mtiNumFrames :: !Int
-            , _mtiNext      :: !MTexInfoT
-            , _mtiImage     :: !ImageT
+            , _mtiNext      :: !(Maybe Int)
+            , _mtiImage     :: !ImageReference
             }
 
 data ImageT =

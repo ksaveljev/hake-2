@@ -21,15 +21,19 @@ import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
+import QCommon.TexInfoT
 import QCommon.XCommandT
 import Render.MEdgeT
+import Render.MTexInfoT
 import Render.MVertexT
 import Render.OpenGL.GLDriver
 import Util.Binary
 import qualified Constants
+import qualified Client.VID as VID
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
+import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
@@ -300,8 +304,54 @@ loadPlanes buffer lump = do
           in a' .|. b' .|. c'
 
 loadTexInfo :: B.ByteString -> LumpT -> Quake ()
-loadTexInfo _ _ = do
-    io (putStrLn "Model.loadTexInfo") >> undefined -- TODO
+loadTexInfo buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` texInfoTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        texInfoT = runGet (getTexInfo count) buf
+
+    mTexInfoT <- V.mapM toMTexInfoT texInfoT
+    let mTexInfoT' = V.imap (countFrames mTexInfoT) mTexInfoT
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumTexInfo .= count
+      mTexInfo .= mTexInfoT'
+
+  where getTexInfo :: Int -> Get (V.Vector TexInfoT)
+        getTexInfo count = V.replicateM count getTexInfoT
+
+        toMTexInfoT :: TexInfoT -> Quake MTexInfoT
+        toMTexInfoT texInfoT = do
+          let name = "textures/" `B.append` (texInfoT^.tiTexture) `B.append` ".wal"
+          foundImage <- Image.glFindImage name RenderAPIConstants.itWall
+          imgRef <- case foundImage of
+                      Just ref -> return ref
+                      Nothing -> do
+                        VID.printf Constants.printAll ("Couldn't load " `B.append` name `B.append` "\n")
+                        use $ fastRenderAPIGlobals.frNoTexture
+
+          return MTexInfoT { _mtiVecs = texInfoT^.tiVecs
+                           , _mtiFlags = texInfoT^.tiFlags
+                           , _mtiNumFrames = 1
+                           , _mtiNext = if (texInfoT^.tiNextTexInfo) > 0 then Just (texInfoT^.tiNextTexInfo) else Nothing
+                           , _mtiImage = imgRef
+                           }
+
+        countFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
+        countFrames allTexInfo idx current = current { _mtiNumFrames = countNumFrames allTexInfo idx current 1 }
+
+        countNumFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> Int -> Int
+        countNumFrames allTexInfo idx current count =
+          case current^.mtiNext of
+            Nothing -> count
+            Just nextIdx -> if nextIdx == idx
+                              then count
+                              else countNumFrames allTexInfo idx (allTexInfo V.! nextIdx) (count + 1)
 
 loadFaces :: B.ByteString -> LumpT -> Quake ()
 loadFaces _ _ = do

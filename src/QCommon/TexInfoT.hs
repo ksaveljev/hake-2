@@ -25,9 +25,10 @@ makeLenses ''TexInfoT
 
 newTexInfoT :: BL.ByteString -> TexInfoT
 newTexInfoT = runGet getTexInfoT
-  where getTexInfoT :: Get TexInfoT
-        getTexInfoT = TexInfoT <$> ((,) <$> getV4Float <*> getV4Float)
-                               <*> getInt
-                               <*> getInt
-                               <*> (B.takeWhile (/= 0) <$> getByteString 32)
-                               <*> getInt
+
+getTexInfoT :: Get TexInfoT
+getTexInfoT = TexInfoT <$> ((,) <$> getV4Float <*> getV4Float)
+                       <*> getInt
+                       <*> getInt
+                       <*> (B.takeWhile (/= 0) <$> getByteString 32)
+                       <*> getInt
