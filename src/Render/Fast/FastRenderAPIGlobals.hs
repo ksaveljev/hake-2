@@ -60,6 +60,7 @@ initialFastRenderAPIGlobals =
                        , _frModKnown             = V.replicate maxModKnown newModelT
                        , _frModNumKnown          = 0
                        , _frLoadModel            = ModKnownReference (-1)
+                       , _frCurrentModel         = ModKnownReference (-1)
                        , _frModInline            = V.replicate maxModKnown newModelT
                        , _frModNoVis             = ""
                        , _frNoTexture            = ImageReference (-1)

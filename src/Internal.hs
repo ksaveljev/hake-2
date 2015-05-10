@@ -1536,6 +1536,7 @@ data FastRenderAPIGlobals =
                        , _frModKnown             :: V.Vector ModelT
                        , _frModNumKnown          :: Int
                        , _frLoadModel            :: ModelReference
+                       , _frCurrentModel         :: ModelReference
                        , _frModInline            :: V.Vector ModelT
                        , _frModNoVis             :: B.ByteString
                        , _frNoTexture            :: ImageReference

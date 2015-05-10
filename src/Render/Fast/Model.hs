@@ -17,6 +17,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import QCommon.QFiles.BSP.DFaceT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
@@ -35,6 +36,7 @@ import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
+import qualified Render.Fast.Surf as Surf
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
 
@@ -354,7 +356,20 @@ loadTexInfo buffer lump = do
                               else countNumFrames allTexInfo idx (allTexInfo V.! nextIdx) (count + 1)
 
 loadFaces :: B.ByteString -> LumpT -> Quake ()
-loadFaces _ _ = do
+loadFaces buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` dFaceTSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` dFaceTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+
+    use (fastRenderAPIGlobals.frLoadModel) >>= \loadModel -> do
+      fastRenderAPIGlobals.frCurrentModel .= loadModel
+      Surf.glBeginBuildingLightmaps loadModel
+
     io (putStrLn "Model.loadFaces") >> undefined -- TODO
 
 loadMarkSurfaces :: B.ByteString -> LumpT -> Quake ()
