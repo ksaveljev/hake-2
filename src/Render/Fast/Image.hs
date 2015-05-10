@@ -23,6 +23,7 @@ import qualified Graphics.Rendering.OpenGL.Raw as GL
 import Quake
 import QuakeState
 import CVarVariables
+import QCommon.MiptexT
 import QCommon.QFiles.PcxT
 import QCommon.XCommandT
 import Render.GLModeT
@@ -761,7 +762,20 @@ glFindImage imgName imgType = do
                 else findImage textures (idx + 1) maxIdx
 
 glLoadWal :: B.ByteString -> Quake ImageReference
-glLoadWal _ = io (putStrLn "Image.glLoadWal") >> undefined -- TODO
+glLoadWal name = do
+    raw <- FS.loadFile name
+
+    case raw of
+      Nothing -> do
+        VID.printf Constants.printAll ("GL_FindImage: can't load " `B.append` name `B.append` "\n")
+        use $ fastRenderAPIGlobals.frNoTexture
+      Just buf -> do
+        let miptexT = newMiptexT (BL.fromStrict buf)
+            sz = (miptexT^.mWidth) * (miptexT^.mHeight)
+            offset = (miptexT^.mOffsets) UV.! 0
+            imgBuf = B.take sz (B.drop offset buf)
+
+        glLoadPic name imgBuf (miptexT^.mWidth) (miptexT^.mHeight) RenderAPIConstants.itWall 8
 
 loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
 loadTGA _ = io (putStrLn "Image.loadTGA") >> undefined -- TODO
