@@ -22,7 +22,8 @@ makeLenses ''DPlaneT
 
 newDPlaneT :: BL.ByteString -> DPlaneT
 newDPlaneT = runGet getDPlaneT
-  where getDPlaneT :: Get DPlaneT
-        getDPlaneT = DPlaneT <$> getV3Float
-                             <*> getFloat32le
-                             <*> getInt
+
+getDPlaneT :: Get DPlaneT
+getDPlaneT = DPlaneT <$> getV3Float
+                     <*> getFloat32le
+                     <*> getInt

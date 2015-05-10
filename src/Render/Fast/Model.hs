@@ -6,7 +6,10 @@ module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
 import Control.Monad (when, liftM)
+import Data.Bits ((.|.), shiftL)
+import Data.Int (Int8)
 import Data.Maybe (isNothing, fromJust)
+import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -15,6 +18,7 @@ import qualified Data.Vector as V
 import Quake
 import QuakeState
 import QCommon.QFiles.BSP.DHeaderT
+import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.XCommandT
@@ -261,8 +265,39 @@ loadLighting buffer lump = do
       else fastRenderAPIGlobals.frModKnown.ix modelIdx.mLightdata .= Just (B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer))
 
 loadPlanes :: B.ByteString -> LumpT -> Quake ()
-loadPlanes _ _ = do
-    io (putStrLn "Model.loadPlanes") >> undefined -- TODO
+loadPlanes buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` dPlaneTSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` dPlaneTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        dplanes = runGet (getDPlanes count) buf
+        planes = V.map toCPlane dplanes
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumPlanes .= count
+      mPlanes .= planes
+
+  where getDPlanes :: Int -> Get (V.Vector DPlaneT)
+        getDPlanes count = V.replicateM count getDPlaneT
+
+        toCPlane :: DPlaneT -> CPlaneT
+        toCPlane dPlaneT = CPlaneT { _cpNormal = dPlaneT^.dpNormal
+                                   , _cpDist = dPlaneT^.dpDist
+                                   , _cpType = fromIntegral (dPlaneT^.dpType)
+                                   , _cpSignBits = flagBits (dPlaneT^.dpNormal)
+                                   , _cpPad = (0, 0)
+                                   }
+
+        flagBits :: V3 Float -> Int8
+        flagBits (V3 a b c) =
+          let a' :: Int8 = if a < 0 then 1 `shiftL` 0 else 0
+              b' :: Int8 = if b < 0 then 1 `shiftL` 1 else 0
+              c' :: Int8 = if c < 0 then 1 `shiftL` 2 else 0
+          in a' .|. b' .|. c'
 
 loadTexInfo :: B.ByteString -> LumpT -> Quake ()
 loadTexInfo _ _ = do
