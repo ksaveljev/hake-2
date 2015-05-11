@@ -1558,6 +1558,9 @@ data FastRenderAPIGlobals =
                        , _frModelVertexIndexIdx  :: Int
                        , _frPolygonBufferIndex   :: Int
                        , _frPolygonCount         :: Int
+                       , _frGLLms                :: GLLightMapStateT
+                       , _frNewRefDef            :: RefDefT
+                       , _frFrameCount           :: Int
                        }
 
 data ParticleTGlobals =
@@ -1718,3 +1721,11 @@ data CParticleT =
              , _cpAlphaVel :: Float
              , _cpNext     :: Maybe CParticleReference
              }
+
+data GLLightMapStateT =
+  GLLightMapStateT { _lmsInternalFormat         :: Int
+                   , _lmsCurrentLightmapTexture :: Int
+                   , _lmsLightmapSurfaces       :: V.Vector Int -- TODO: reference ?
+                   , _lmsAllocated              :: UV.Vector Int
+                   , _lmsLightmapBuffer         :: MV.IOVector Word8
+                   }

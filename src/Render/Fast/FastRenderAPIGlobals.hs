@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobals
                                         , module Client.VidDefT
+                                        , module Render.Fast.GLLightMapStateT
                                         , module Render.GLConfigT
                                         , module Render.GLStateT
                                         , module Render.ImageT
@@ -16,7 +17,9 @@ import qualified Data.Vector.Storable.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
+import Client.RefDefT
 import Client.VidDefT
+import Render.Fast.GLLightMapStateT
 import Render.GLConfigT
 import Render.GLStateT
 import Render.ImageT
@@ -82,4 +85,7 @@ initialFastRenderAPIGlobals =
                        , _frModelVertexIndexIdx  = 0
                        , _frPolygonBufferIndex   = 0
                        , _frPolygonCount         = 0
+                       , _frGLLms                = newGLLightMapStateT
+                       , _frNewRefDef            = newRefDefT
+                       , _frFrameCount           = 0
                        }

@@ -2,12 +2,12 @@
 module Render.Fast.GLLightMapStateT where
 
 import Control.Lens (makeLenses)
-import Data.Word (Word8)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Storable.Mutable as MV
 
+import Internal
 import qualified Constants
 
 dynamicLightWidth :: Int
@@ -24,14 +24,6 @@ blockWidth = 128
 
 blockHeight :: Int
 blockHeight = 128
-
-data GLLightMapStateT =
-  GLLightMapStateT { _lmsInternalFormat         :: Int
-                   , _lmsCurrentLightmapTexture :: Int
-                   , _lmsLightmapSurfaces       :: V.Vector Int -- TODO: reference ?
-                   , _lmsAllocated              :: UV.Vector Int
-                   , _lmsLightmapBuffer         :: MV.IOVector Word8
-                   }
 
 makeLenses ''GLLightMapStateT
 

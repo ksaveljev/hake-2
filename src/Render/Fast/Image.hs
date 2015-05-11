@@ -782,3 +782,30 @@ loadTGA _ = io (putStrLn "Image.loadTGA") >> undefined -- TODO
 
 scrapUpload :: Quake ()
 scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO
+
+glEnableMultiTexture :: Bool -> Quake ()
+glEnableMultiTexture enable = do
+    if enable
+      then do
+        use (fastRenderAPIGlobals.frTexture1) >>= glSelectTexture
+        GL.glEnable GL.gl_TEXTURE_2D
+        glTexEnv GL.gl_REPLACE
+      else do
+        use (fastRenderAPIGlobals.frTexture1) >>= glSelectTexture
+        GL.glDisable GL.gl_TEXTURE_2D
+        glTexEnv GL.gl_REPLACE
+
+    use (fastRenderAPIGlobals.frTexture0) >>= glSelectTexture
+    glTexEnv GL.gl_REPLACE
+
+glSelectTexture :: Int -> Quake ()
+glSelectTexture texture = do
+    texture0 <- use $ fastRenderAPIGlobals.frTexture0
+    glState <- use $ fastRenderAPIGlobals.frGLState
+
+    let tmu = if texture0 == texture then 0 else 1
+
+    when (tmu /= (glState^.glsCurrentTmu)) $ do
+      fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
+      GL.glActiveTextureARB (fromIntegral texture)
+      GL.glClientActiveTextureARB (fromIntegral texture)
