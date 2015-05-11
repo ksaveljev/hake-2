@@ -6,10 +6,10 @@ module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
 import Control.Monad (when, liftM)
-import Data.Bits ((.|.), shiftL)
+import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8)
 import Data.Maybe (isNothing, fromJust)
-import Linear (V3(..))
+import Linear (V3(..), V4(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -25,6 +25,7 @@ import QCommon.QFiles.SP2.DSpriteT
 import QCommon.TexInfoT
 import QCommon.XCommandT
 import Render.MEdgeT
+import Render.MSurfaceT
 import Render.MTexInfoT
 import Render.MVertexT
 import Render.OpenGL.GLDriver
@@ -37,6 +38,7 @@ import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.Fast.Surf as Surf
+import qualified Render.Fast.Warp as Warp
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
 
@@ -341,7 +343,7 @@ loadTexInfo buffer lump = do
                            , _mtiFlags = texInfoT^.tiFlags
                            , _mtiNumFrames = 1
                            , _mtiNext = if (texInfoT^.tiNextTexInfo) > 0 then Just (texInfoT^.tiNextTexInfo) else Nothing
-                           , _mtiImage = imgRef
+                           , _mtiImage = Just imgRef
                            }
 
         countFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
@@ -365,12 +367,90 @@ loadFaces buffer lump = do
 
     let count = (lump^.lFileLen) `div` dFaceTSize
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        dFaces = runGet (getDFaces count) buf
 
     use (fastRenderAPIGlobals.frLoadModel) >>= \loadModel -> do
       fastRenderAPIGlobals.frCurrentModel .= loadModel
       Surf.glBeginBuildingLightmaps loadModel
 
-    io (putStrLn "Model.loadFaces") >> undefined -- TODO
+    surfaces <- V.sequence $ V.imap toMSurfaceT dFaces
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumSurfaces .= count
+      mSurfaces .= surfaces
+
+    Surf.glEndBuildingLightmaps
+      
+  where getDFaces :: Int -> Get (V.Vector DFaceT)
+        getDFaces count = V.replicateM count getDFaceT
+
+        toMSurfaceT :: Int -> DFaceT -> Quake MSurfaceT
+        toMSurfaceT idx dface = do
+          loadModel <- use $ fastRenderAPIGlobals.frLoadModel
+
+          let ModKnownReference modelIdx = loadModel
+              ti = fromIntegral (dface^.dfTexInfo)
+
+          Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+          when (ti < 0 || ti >= (model^.mNumTexInfo)) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: bad texinfo number"
+
+          let planeNum = fromIntegral (dface^.dfPlaneNum)
+              side = dface^.dfSide
+              flags = if side /= 0 then Constants.surfPlaneback else 0
+              i = dface^.dfLightOfs
+              texInfoFlags = ((model^.mTexInfo) V.! ti)^.mtiFlags
+              initialMSurfaceT = newMSurfaceT { _msFirstEdge = dface^.dfFirstEdge
+                                              , _msNumEdges = fromIntegral (dface^.dfNumEdges)
+                                              , _msFlags = flags
+                                              , _msPolys = Nothing
+                                              , _msPlane = Just (loadModel, CPlaneReference planeNum)
+                                              , _msTexInfo = Just (loadModel, MTexInfoReference ti)
+                                              , _msStyles = dface^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
+                                              , _msSamples = if i == -1 then Nothing else Just (B.drop i (fromJust (model^.mLightdata)))
+                                              }
+              mSurfaceT = calcSurfaceExtents model ((model^.mTexInfo) V.! ti) initialMSurfaceT
+
+          mSurfaceT' <- if texInfoFlags .&. Constants.surfWarp /= 0
+                          then Warp.glSubdivideSurface mSurfaceT { _msFlags = flags .|. Constants.surfWarp, _msExtents = (16384, 16384), _msTextureMins = (-8192, -8192) }
+                          else return mSurfaceT
+
+          mSurfaceT'' <- if texInfoFlags .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0
+                           then Surf.glCreateSurfaceLightmap mSurfaceT'
+                           else return mSurfaceT'
+
+          if texInfoFlags .&. Constants.surfWarp == 0
+            then Surf.glBuildPolygonFromSurface mSurfaceT''
+            else return mSurfaceT''
+
+calcSurfaceExtents :: ModelT -> MTexInfoT -> MSurfaceT -> MSurfaceT
+calcSurfaceExtents model texInfo surface = 
+    let (mins, maxs) = calcMinsMaxs 0 (surface^.msNumEdges) (999999, 999999) (-99999, -99999)
+        bmins = mapTuple (floor . (/ 16)) mins
+        bmaxs = mapTuple (ceiling . (/ 16)) maxs
+    in surface { _msTextureMins = mapTuple (* 16) bmins
+               , _msExtents = mapTuple (* 16) (fst bmaxs - fst bmins, snd bmaxs - snd bmins)
+               }
+
+  where calcMinsMaxs :: Int -> Int -> (Float, Float) -> (Float, Float) -> ((Float, Float), (Float, Float))
+        calcMinsMaxs idx maxIdx mins maxs
+          | idx >= maxIdx = (mins, maxs)
+          | otherwise =
+              let e = (model^.mSurfEdges) V.! ((surface^.msFirstEdge) + idx)
+                  v = if e >= 0
+                        then (model^.mVertexes) V.! fromIntegral (fst (((model^.mEdges) V.! e)^.meV))
+                        else (model^.mVertexes) V.! fromIntegral (snd (((model^.mEdges) V.! (-e))^.meV))
+                  V3 a b c = v^.mvPosition
+                  (V4 a1 b1 c1 d1, V4 a2 b2 c2 d2) = texInfo^.mtiVecs
+                  val1 = a * a1 + b * b1 + c * c1 + d1
+                  val2 = a * a2 + b * b2 + c * c2 + d2
+                  mins' = (if val1 < fst mins then val1 else fst mins, if val2 < snd mins then val2 else snd mins)
+                  maxs' = (if val1 > fst maxs then val1 else fst maxs, if val2 > snd maxs then val2 else snd maxs)
+              in calcMinsMaxs (idx + 1) maxIdx mins' maxs'
+
+        mapTuple :: (a -> b) -> (a, a) -> (b, b)
+        mapTuple f (a1, a2) = (f a1, f a2)
 
 loadMarkSurfaces :: B.ByteString -> LumpT -> Quake ()
 loadMarkSurfaces _ _ = do

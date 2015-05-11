@@ -15,6 +15,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import Client.LightStyleT
+import Render.MSurfaceT
 import qualified Constants
 import qualified Render.Fast.Image as Image
 import qualified Render.OpenGL.QGLConstants as QGLConstants
@@ -86,3 +87,15 @@ glBeginBuildingLightmaps _ = do
                       (fromIntegral glLightMapFormat)
                       GL.gl_UNSIGNED_BYTE
                       ptr
+
+glEndBuildingLightmaps :: Quake ()
+glEndBuildingLightmaps = do
+    io (putStrLn "Surf.glEndBuildingLightmaps") >> undefined -- TODO
+
+glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
+glCreateSurfaceLightmap _ = do
+    io (putStrLn "Surf.glCreateSurfaceLightmap") >> undefined -- TODO
+
+glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
+glBuildPolygonFromSurface _ = do
+    io (putStrLn "Surf.glBuildPolygonFromSurface") >> undefined -- TODO

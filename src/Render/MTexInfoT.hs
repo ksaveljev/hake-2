@@ -4,10 +4,17 @@ module Render.MTexInfoT ( MTexInfoT(..)
                         ) where
 
 import Control.Lens (makeLenses)
+import Linear (V4(..))
 
 import Internal
 
 makeLenses ''MTexInfoT
 
 newMTexInfoT :: MTexInfoT
-newMTexInfoT = undefined -- TODO
+newMTexInfoT =
+  MTexInfoT { _mtiVecs      = (V4 0 0 0 0, V4 0 0 0 0)
+            , _mtiFlags     = 0
+            , _mtiNumFrames = 0
+            , _mtiNext      = Nothing
+            , _mtiImage     = Nothing
+            }

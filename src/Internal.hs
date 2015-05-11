@@ -103,6 +103,9 @@ newtype GClientReference = GClientReference Int
 -- reference to cmGlobals.cmMapCModels
 newtype CModelReference = CModelReference Int
 
+-- reference to cmGlobals.cmMapPlanes
+newtype CPlaneReference = CPlaneReference Int
+
 -- reference to svGlobals.svLinks
 newtype LinkReference = LinkReference Int
 
@@ -123,6 +126,12 @@ newtype UserCmdReference = UserCmdReference Int
 
 -- reference to clientGlobals.cgParticles
 newtype CParticleReference = CParticleReference Int
+
+newtype MSurfaceReference = MSurfaceReference Int
+
+newtype MTexInfoReference = MTexInfoReference Int
+
+newtype GLPolyReference = GLPolyReference Int
 
 -- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
 data ModelReference = ModInlineReference Int | ModKnownReference Int
@@ -804,7 +813,7 @@ data MTexInfoT =
             , _mtiFlags     :: !Int
             , _mtiNumFrames :: !Int
             , _mtiNext      :: !(Maybe Int)
-            , _mtiImage     :: !ImageReference
+            , _mtiImage     :: !(Maybe ImageReference)
             }
 
 data ImageT =
@@ -908,7 +917,7 @@ data ModelT =
 
 data MSurfaceT =
   MSurfaceT { _msVisFrame           :: !Int
-            , _msPlane              :: !CPlaneT
+            , _msPlane              :: !(Maybe (ModelReference, CPlaneReference))
             , _msFlags              :: !Int
             , _msFirstEdge          :: !Int
             , _msNumEdges           :: !Int
@@ -918,16 +927,16 @@ data MSurfaceT =
             , _msLightT             :: !Int
             , _msDLightS            :: !Int
             , _msDLightT            :: !Int
-            , _msPolys              :: !GLPolyT
-            , _msTextureChain       :: !MSurfaceT
-            , _msLightmapChain      :: !MSurfaceT
-            , _msTexInfo            :: !MTexInfoT
+            , _msPolys              :: !(Maybe GLPolyReference)
+            , _msTextureChain       :: !(Maybe MSurfaceReference)
+            , _msLightmapChain      :: !(Maybe MSurfaceReference)
+            , _msTexInfo            :: !(Maybe (ModelReference, MTexInfoReference))
             , _msDLightFrame        :: !Int
             , _msDLightBits         :: !Int
             , _msLightmapTextureNum :: !Int
             , _msStyles             :: !B.ByteString
             , _msCachedLight        :: !(UV.Vector Float)
-            , _msSamples            :: !B.ByteString
+            , _msSamples            :: !(Maybe B.ByteString)
             }
 
 data MLeafT =
