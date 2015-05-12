@@ -1,8 +1,12 @@
 module Render.Fast.Warp where
 
+import Control.Lens (use, preuse, ix, (^.))
+import Linear (V3)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
+import QuakeState
 import Render.MSurfaceT
 
 sinV :: UV.Vector Float
@@ -41,6 +45,30 @@ sinV =
                 ,   (-1.56072), ( -1.3677), ( -1.17384), (-0.979285), (-0.784137), (-0.588517), (-0.392541), (-0.19633)
                 ]
 
+subdividePolygon :: MSurfaceT -> V.Vector (V3 Float) -> Quake MSurfaceT
+subdividePolygon surface verts = do
+    let numVerts = (surface^.msNumEdges)
+    io (putStrLn "Warp.subdividePolygon") >> undefined -- TODO
+
+{-
+- GL_SubdivideSurface
+- Breaks a polygon up along axial 64 unit
+- boundaries so that turbulent and sky warps
+- can be done reasonably.
+-}
 glSubdivideSurface :: MSurfaceT -> Quake MSurfaceT
-glSubdivideSurface _ = do
-    io (putStrLn "Warp.glSubdivideSurface") >> undefined -- TODO
+glSubdivideSurface surface = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+    -- convert edges back to a normal polygon
+    let verts = V.generate (surface^.msNumEdges) (collectVerts model)
+
+    subdividePolygon surface verts
+
+  where collectVerts :: ModelT -> Int -> V3 Float
+        collectVerts model idx =
+          let li = (model^.mSurfEdges) V.! ((surface^.msFirstEdge) + idx)
+          in if li > 0
+               then ((model^.mVertexes) V.! (fromIntegral $ fst (((model^.mEdges) V.! li)^.meV)))^.mvPosition
+               else ((model^.mVertexes) V.! (fromIntegral $ snd (((model^.mEdges) V.! (-li))^.meV)))^.mvPosition
