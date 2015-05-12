@@ -968,9 +968,9 @@ maxParticles = 4096 :: Int
 
 -- gl_model.h
 surfPlaneback      =    2 :: Int
-surfDrawsky        =    4 :: Int
-surfDrawturb       = 0x10 :: Int
-surfDrawbackground = 0x40 :: Int
+surfDrawSky        =    4 :: Int
+surfDrawTurb       = 0x10 :: Int
+surfDrawBackground = 0x40 :: Int
 surfUnderwater     = 0x80 :: Int
 
 powersuitScale = 4.0 :: Float

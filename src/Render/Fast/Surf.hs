@@ -2,6 +2,7 @@ module Render.Fast.Surf where
 
 import Control.Lens ((.=), (^.), zoom, use)
 import Control.Monad (when)
+import Data.Bits ((.&.), (.|.))
 import Data.Char (toUpper)
 import Linear (V3(..))
 import qualified Data.ByteString as B
@@ -93,9 +94,13 @@ glEndBuildingLightmaps = do
     io (putStrLn "Surf.glEndBuildingLightmaps") >> undefined -- TODO
 
 glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
-glCreateSurfaceLightmap _ = do
-    io (putStrLn "Surf.glCreateSurfaceLightmap") >> undefined -- TODO
+glCreateSurfaceLightmap surface = do
+    if (surface^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) /= 0
+      then do
+        io (putStrLn "Surf.glBuildPolygonFromSurface") >> undefined -- TODO
+      else
+        return surface
 
 glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
 glBuildPolygonFromSurface _ = do
-    io (putStrLn "Surf.glBuildPolygonFromSurface") >> undefined -- TODO
+    io (putStrLn "Surf.glBuildPolygonFromSurface") >>undefined
