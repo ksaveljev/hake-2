@@ -1,13 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.Warp where
 
 import Control.Lens (use, preuse, ix, (^.))
-import Linear (V3)
+import Control.Monad (when)
+import Linear (V3(..), _x, _y, _z)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
-import Render.MSurfaceT
+import qualified Constants
+import qualified QCommon.Com as Com
 
 sinV :: UV.Vector Float
 sinV =
@@ -48,7 +53,27 @@ sinV =
 subdividePolygon :: MSurfaceT -> V.Vector (V3 Float) -> Quake MSurfaceT
 subdividePolygon surface verts = do
     let numVerts = (surface^.msNumEdges)
+
+    when (numVerts > 60) $
+      Com.comError Constants.errDrop ("numverts = " `B.append` BC.pack (show numVerts))
+
+    let (mins, maxs) = boundPoly numVerts verts
     io (putStrLn "Warp.subdividePolygon") >> undefined -- TODO
+
+boundPoly :: Int -> V.Vector (V3 Float) -> (V3 Float, V3 Float)
+boundPoly numVerts verts = findMinMax 0 (V3 9999 9999 9999) (V3 (-9999) (-9999) (-9999))
+  where findMinMax :: Int -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
+        findMinMax idx mins maxs
+          | idx >= numVerts = (mins, maxs)
+          | otherwise =
+              let v = verts V.! idx
+                  mina = if (v^._x) < (mins^._x) then v^._x else mins^._x
+                  minb = if (v^._y) < (mins^._y) then v^._y else mins^._y
+                  minc = if (v^._z) < (mins^._z) then v^._z else mins^._z
+                  maxa = if (v^._x) > (maxs^._x) then v^._x else maxs^._x
+                  maxb = if (v^._y) > (maxs^._y) then v^._y else maxs^._y
+                  maxc = if (v^._z) > (maxs^._z) then v^._z else maxs^._z
+              in findMinMax (idx + 1) (V3 mina minb minc) (V3 maxa maxb maxc)
 
 {-
 - GL_SubdivideSurface
