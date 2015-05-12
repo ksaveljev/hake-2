@@ -4,7 +4,7 @@ import Control.Lens ((.=), (^.), zoom, use, preuse, ix)
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toUpper)
-import Linear (V3(..))
+import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Unsafe as BU
@@ -16,7 +16,6 @@ import Quake
 import QuakeState
 import CVarVariables
 import Client.LightStyleT
-import Render.MSurfaceT
 import qualified Constants
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
@@ -105,8 +104,56 @@ glCreateSurfaceLightmap surface = do
 glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
 glBuildPolygonFromSurface surface = do
     ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frCurrentModel
-    Just pedges <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mEdges
-    let lNumVerts = surface^.msNumEdges
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+    let Just (ImageReference imageIdx) = surface^.msTexInfo.mtiImage
+        lNumVerts = surface^.msNumEdges
+    Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
+    polyRef@(GLPolyReference polyIdx) <- Polygon.create lNumVerts
 
-    GLPolyReference polyIdx <- Polygon.create lNumVerts
-    io (putStrLn "Surf.glBuildPolygonFromSurface") >>undefined
+    zoom (fastRenderAPIGlobals.frPolygonCache.ix polyIdx) $ do
+      glpNext .= surface^.msPolys
+      glpFlags .= surface^.msFlags
+
+    let surface' = surface { _msPolys = Just polyRef }
+
+    doStuffWithVerts model image polyRef 0 lNumVerts
+
+    return surface'
+
+  where doStuffWithVerts :: ModelT -> ImageT -> GLPolyReference -> Int -> Int -> Quake ()
+        doStuffWithVerts model image polyRef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let li = (model^.mSurfEdges) V.! (surface^.msFirstEdge + idx)
+                  vec = if li > 0
+                          then let edge = (model^.mEdges) V.! li
+                               in ((model^.mVertexes) V.! (fromIntegral $ fst (edge^.meV)))^.mvPosition
+                          else let edge = (model^.mEdges) V.! (-li)
+                               in ((model^.mVertexes) V.! (fromIntegral $ snd (edge^.meV)))^.mvPosition
+
+                  s = vec `dot` ((fst $ surface^.msTexInfo.mtiVecs)^._xyz) + ((fst $ surface^.msTexInfo.mtiVecs)^._w)
+                  s' = s / (fromIntegral $ image^.iWidth)
+
+                  t = vec `dot` ((snd $ surface^.msTexInfo.mtiVecs)^._xyz) + ((snd $ surface^.msTexInfo.mtiVecs)^._w)
+                  t' = t / (fromIntegral $ image^.iHeight)
+
+              Polygon.setPolyX polyRef idx (vec^._x)
+              Polygon.setPolyY polyRef idx (vec^._y)
+              Polygon.setPolyZ polyRef idx (vec^._z)
+    
+              Polygon.setPolyS1 polyRef idx s'
+              Polygon.setPolyT1 polyRef idx t'
+
+              -- lightmap texture coordinates
+              let a = s - fromIntegral (fst $ surface^.msTextureMins)
+                  b = a + fromIntegral (surface^.msLightS) * 16
+                  c = b + 8
+                  d = c / fromIntegral (blockWidth * 16)
+
+                  a' = t - fromIntegral (snd $ surface^.msTextureMins)
+                  b' = a' + fromIntegral (surface^.msLightT) * 16
+                  c' = b' + 8
+                  d' = c' / fromIntegral (blockHeight * 16)
+
+              Polygon.setPolyS2 polyRef idx d
+              Polygon.setPolyT2 polyRef idx d'

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.MSurfaceT ( MSurfaceT(..)
                         , module Render.MSurfaceT
+                        , module Render.MTexInfoT
                         ) where
 
 import Control.Lens (makeLenses)
@@ -9,6 +10,7 @@ import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
+import Render.MTexInfoT
 import qualified Constants
 
 makeLenses ''MSurfaceT
@@ -29,7 +31,7 @@ newMSurfaceT =
             , _msPolys              = Nothing
             , _msTextureChain       = Nothing
             , _msLightmapChain      = Nothing
-            , _msTexInfo            = Nothing
+            , _msTexInfo            = newMTexInfoT
             , _msDLightFrame        = 0
             , _msDLightBits         = 0
             , _msLightmapTextureNum = 0

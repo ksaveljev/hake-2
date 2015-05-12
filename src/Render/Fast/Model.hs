@@ -24,10 +24,6 @@ import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.TexInfoT
 import QCommon.XCommandT
-import Render.MEdgeT
-import Render.MSurfaceT
-import Render.MTexInfoT
-import Render.MVertexT
 import Render.OpenGL.GLDriver
 import Util.Binary
 import qualified Constants
@@ -405,8 +401,8 @@ loadFaces buffer lump = do
                                               , _msNumEdges = fromIntegral (dface^.dfNumEdges)
                                               , _msFlags = flags
                                               , _msPolys = Nothing
-                                              , _msPlane = Just (loadModel, CPlaneReference planeNum)
-                                              , _msTexInfo = Just (loadModel, MTexInfoReference ti)
+                                              , _msPlane = Just ((model^.mPlanes) V.! planeNum) -- TODO: are we sure it is not a reference to (model, planeNum) ?
+                                              , _msTexInfo = (model^.mTexInfo) V.! ti -- TODO: are we sure it is not a reference to (model, texinfo) ?
                                               , _msStyles = dface^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
                                               , _msSamples = if i == -1 then Nothing else Just (B.drop i (fromJust (model^.mLightdata)))
                                               }

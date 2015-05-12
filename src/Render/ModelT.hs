@@ -2,6 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.ModelT ( ModelT(..)
                      , module Render.ModelT
+                     , module Game.CPlaneT
+                     , module Render.MEdgeT
+                     , module Render.MLeafT
+                     , module Render.MModelT
+                     , module Render.MNodeT
+                     , module Render.MSurfaceT
+                     , module Render.MTexInfoT
+                     , module Render.MVertexT
                      ) where
 
 import Control.Lens (makeLenses)
@@ -9,6 +17,14 @@ import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Internal
+import Game.CPlaneT
+import Render.MEdgeT
+import Render.MLeafT
+import Render.MModelT
+import Render.MNodeT
+import Render.MSurfaceT
+import Render.MTexInfoT
+import Render.MVertexT
 
 makeLenses ''ModelT
 

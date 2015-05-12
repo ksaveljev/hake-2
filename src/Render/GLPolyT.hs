@@ -22,4 +22,10 @@ maxBufferVertices :: Int
 maxBufferVertices = 120000
 
 newGLPolyT :: GLPolyT
-newGLPolyT = undefined -- TODO
+newGLPolyT =
+  GLPolyT { _glpNext           = Nothing
+          , _glpChain          = Nothing
+          , _glpNumVerts       = 0
+          , _glpFlags          = 0
+          , _glpPos            = 0
+          }

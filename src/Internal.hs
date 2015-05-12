@@ -785,27 +785,11 @@ data ClientStateT =
                }
 
 data GLPolyT =
-  GLPolyT { _glpNext           :: !GLPolyT
-          , _glpChain          :: !GLPolyT
+  GLPolyT { _glpNext           :: !(Maybe GLPolyReference)
+          , _glpChain          :: !(Maybe GLPolyReference)
           , _glpNumVerts       :: !Int
           , _glpFlags          :: !Int
           , _glpPos            :: !Int
-          , _glpGetX           :: Int -> Quake Float
-          , _glpSetX           :: Int -> Float -> Quake ()
-          , _glpGetY           :: Int -> Quake Float
-          , _glpSetY           :: Int -> Float -> Quake ()
-          , _glpGetZ           :: Int -> Quake Float
-          , _glpSetZ           :: Int -> Float -> Quake ()
-          , _glpGetS1          :: Int -> Quake Float
-          , _glpSetS1          :: Int -> Float -> Quake ()
-          , _glpGetT1          :: Int -> Quake Float
-          , _glpSetT1          :: Int -> Float -> Quake ()
-          , _glpGetS2          :: Int -> Quake Float
-          , _glpSetS2          :: Int -> Float -> Quake ()
-          , _glpGetT2          :: Int -> Quake Float
-          , _glpSetT2          :: Int -> Float -> Quake ()
-          , _glpBeginScrolling :: Float -> Quake ()
-          , _glpEndScrolling   :: Quake ()
           }
 
 data MTexInfoT =
@@ -917,7 +901,7 @@ data ModelT =
 
 data MSurfaceT =
   MSurfaceT { _msVisFrame           :: !Int
-            , _msPlane              :: !(Maybe (ModelReference, CPlaneReference))
+            , _msPlane              :: !(Maybe CPlaneT)
             , _msFlags              :: !Int
             , _msFirstEdge          :: !Int
             , _msNumEdges           :: !Int
@@ -930,7 +914,7 @@ data MSurfaceT =
             , _msPolys              :: !(Maybe GLPolyReference)
             , _msTextureChain       :: !(Maybe MSurfaceReference)
             , _msLightmapChain      :: !(Maybe MSurfaceReference)
-            , _msTexInfo            :: !(Maybe (ModelReference, MTexInfoReference))
+            , _msTexInfo            :: MTexInfoT -- !(Maybe (ModelReference, MTexInfoReference))
             , _msDLightFrame        :: !Int
             , _msDLightBits         :: !Int
             , _msLightmapTextureNum :: !Int
