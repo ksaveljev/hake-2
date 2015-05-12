@@ -4,6 +4,7 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         , module Client.VidDefT
                                         , module Render.Fast.GLLightMapStateT
                                         , module Render.GLConfigT
+                                        , module Render.GLPolyT
                                         , module Render.GLStateT
                                         , module Render.ImageT
                                         , module Render.ModelT
@@ -21,6 +22,7 @@ import Client.RefDefT
 import Client.VidDefT
 import Render.Fast.GLLightMapStateT
 import Render.GLConfigT
+import Render.GLPolyT
 import Render.GLStateT
 import Render.ImageT
 import Render.ModelT
@@ -83,6 +85,9 @@ initialFastRenderAPIGlobals =
                        , _frModelVertexIndexBuf  = unsafePerformIO $ MV.new modelBufferSize
                        , _frModelTextureCoordIdx = 0
                        , _frModelVertexIndexIdx  = 0
+                       , _frPolygonS1Old         = UV.replicate maxVertices 0
+                       , _frPolygonBuffer        = unsafePerformIO $ MV.new (maxBufferVertices * stride)
+                       , _frPolygonCache         = V.replicate maxPolys newGLPolyT
                        , _frPolygonBufferIndex   = 0
                        , _frPolygonCount         = 0
                        , _frGLLms                = newGLLightMapStateT

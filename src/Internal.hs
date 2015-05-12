@@ -1565,6 +1565,9 @@ data FastRenderAPIGlobals =
                        , _frModelVertexIndexBuf  :: MV.IOVector Int32
                        , _frModelTextureCoordIdx :: Int
                        , _frModelVertexIndexIdx  :: Int
+                       , _frPolygonS1Old         :: UV.Vector Float
+                       , _frPolygonBuffer        :: MV.IOVector Float
+                       , _frPolygonCache         :: V.Vector GLPolyT
                        , _frPolygonBufferIndex   :: Int
                        , _frPolygonCount         :: Int
                        , _frGLLms                :: GLLightMapStateT

@@ -1,6 +1,6 @@
 module Render.Fast.Surf where
 
-import Control.Lens ((.=), (^.), zoom, use)
+import Control.Lens ((.=), (^.), zoom, use, preuse, ix)
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toUpper)
@@ -19,6 +19,7 @@ import Client.LightStyleT
 import Render.MSurfaceT
 import qualified Constants
 import qualified Render.Fast.Image as Image
+import qualified Render.Fast.Polygon as Polygon
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 
@@ -102,5 +103,10 @@ glCreateSurfaceLightmap surface = do
         return surface
 
 glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
-glBuildPolygonFromSurface _ = do
+glBuildPolygonFromSurface surface = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frCurrentModel
+    Just pedges <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mEdges
+    let lNumVerts = surface^.msNumEdges
+
+    GLPolyReference polyIdx <- Polygon.create lNumVerts
     io (putStrLn "Surf.glBuildPolygonFromSurface") >>undefined
