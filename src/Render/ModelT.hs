@@ -3,6 +3,7 @@
 module Render.ModelT ( ModelT(..)
                      , module Render.ModelT
                      , module Game.CPlaneT
+                     , module QCommon.QFiles.BSP.DVisT
                      , module Render.MEdgeT
                      , module Render.MLeafT
                      , module Render.MModelT
@@ -18,6 +19,7 @@ import qualified Data.Vector as V
 
 import Internal
 import Game.CPlaneT
+import QCommon.QFiles.BSP.DVisT
 import Render.MEdgeT
 import Render.MLeafT
 import Render.MModelT
@@ -65,7 +67,7 @@ newModelT =
          , _mSurfEdges            = V.empty
          , _mNumMarkSurfaces      = 0
          , _mMarkSurfaces         = V.empty
-         -- TODO: qfiles.dvis_t vis
+         , _mVis                  = Nothing
          , _mLightdata            = Nothing
          , _mSkins                = V.empty
          , _mExtraDataSize        = 0

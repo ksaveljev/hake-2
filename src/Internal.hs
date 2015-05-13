@@ -892,7 +892,7 @@ data ModelT =
          , _mSurfEdges            :: !(V.Vector Int)
          , _mNumMarkSurfaces      :: !Int
          , _mMarkSurfaces         :: !(V.Vector MSurfaceT)
-         -- TODO: qfiles.dvis_t vis
+         , _mVis                  :: !(Maybe DVisT)
          , _mLightdata            :: !(Maybe B.ByteString)
          , _mSkins                :: !(V.Vector ImageT)
          , _mExtraDataSize        :: !Int

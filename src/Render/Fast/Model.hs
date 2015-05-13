@@ -478,8 +478,17 @@ loadMarkSurfaces buffer lump = do
           return $ (model^.mSurfaces) V.! i
 
 loadVisibility :: B.ByteString -> LumpT -> Quake ()
-loadVisibility _ _ = do
-    io (putStrLn "Model.loadVisibility") >> undefined -- TODO
+loadVisibility buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    if (lump^.lFileLen) == 0
+      then
+        fastRenderAPIGlobals.frModKnown.ix modelIdx.mVis .= Nothing
+      else do
+        let buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+            vis = newDVisT buf
+
+        fastRenderAPIGlobals.frModKnown.ix modelIdx.mVis .= Just vis
 
 loadLeafs :: B.ByteString -> LumpT -> Quake ()
 loadLeafs _ _ = do
