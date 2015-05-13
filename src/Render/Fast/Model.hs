@@ -9,6 +9,7 @@ import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8)
 import Data.Maybe (isNothing, fromJust)
+import Data.Word (Word16)
 import Linear (V3(..), V4(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -449,8 +450,32 @@ calcSurfaceExtents model texInfo surface =
         mapTuple f (a1, a2) = (f a1, f a2)
 
 loadMarkSurfaces :: B.ByteString -> LumpT -> Quake ()
-loadMarkSurfaces _ _ = do
-    io (putStrLn "Model.loadMarkSurfaces") >> undefined -- TODO
+loadMarkSurfaces buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+    when ((lump^.lFileLen) `mod` Constants.sizeOfShort /= 0) $ do
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+
+    let count = (lump^.lFileLen) `div` Constants.sizeOfShort
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        surfaceIndexes = runGet (getSurfaceIndexes count) buf
+
+    markSurfaces <- V.mapM (toMSurfaceT model) surfaceIndexes
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumMarkSurfaces .= count
+      mMarkSurfaces .= markSurfaces
+
+  where getSurfaceIndexes :: Int -> Get (V.Vector Word16)
+        getSurfaceIndexes count = V.replicateM count getWord16le
+
+        toMSurfaceT :: ModelT -> Word16 -> Quake MSurfaceT
+        toMSurfaceT model idx = do
+          let i = fromIntegral idx
+          when (i < 0 || i >= (model^.mNumSurfaces)) $
+            Com.comError Constants.errDrop "Mod_ParseMarksurfaces: bad surface number"
+          return $ (model^.mSurfaces) V.! i
 
 loadVisibility :: B.ByteString -> LumpT -> Quake ()
 loadVisibility _ _ = do
