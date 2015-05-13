@@ -1,6 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.Surf where
 
-import Control.Lens ((.=), (^.), zoom, use, preuse, ix)
+import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=))
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toUpper)
@@ -9,6 +10,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
@@ -17,6 +19,7 @@ import QuakeState
 import CVarVariables
 import Client.LightStyleT
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.OpenGL.QGLConstants as QGLConstants
@@ -25,8 +28,8 @@ import qualified Render.RenderAPIConstants as RenderAPIConstants
 dummy :: B.ByteString
 dummy = B.replicate (4 * 128 * 128) 0
 
-glLightMapFormat :: GL.GLenum
-glLightMapFormat = GL.gl_RGBA
+glLightmapFormat :: GL.GLenum
+glLightmapFormat = GL.gl_RGBA
 
 glBeginBuildingLightmaps :: ModelReference -> Quake ()
 glBeginBuildingLightmaps _ = do
@@ -85,7 +88,7 @@ glBeginBuildingLightmaps _ = do
                       (fromIntegral blockWidth)
                       (fromIntegral blockHeight)
                       0
-                      (fromIntegral glLightMapFormat)
+                      (fromIntegral glLightmapFormat)
                       GL.gl_UNSIGNED_BYTE
                       ptr
 
@@ -160,4 +163,46 @@ glBuildPolygonFromSurface surface = do
 
 lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock dynamic = do
-    io (putStrLn "Surf.lmUploadBlock") >> undefined -- TODO
+    lms <- use $ fastRenderAPIGlobals.frGLLms
+
+    let texture = if dynamic
+                    then 0
+                    else lms^.lmsCurrentLightmapTexture
+
+    use (fastRenderAPIGlobals.frGLState) >>= \glState ->
+      Image.glBind ((glState^.glsLightmapTextures) + texture)
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral GL.gl_LINEAR)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral GL.gl_LINEAR)
+
+    if dynamic
+      then do
+        let h = UV.maximum (lms^.lmsAllocated)
+            height = if h < 0 then 0 else h
+
+        io $ MV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+          GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                             0
+                             0
+                             0
+                             (fromIntegral blockWidth)
+                             (fromIntegral height)
+                             glLightmapFormat
+                             GL.gl_UNSIGNED_BYTE
+                             ptr
+      else do
+        io $ MV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+          GL.glTexImage2D GL.gl_TEXTURE_2D
+                          0
+                          (fromIntegral $ lms^.lmsInternalFormat)
+                          (fromIntegral blockWidth)
+                          (fromIntegral blockHeight)
+                          0
+                          glLightmapFormat
+                          GL.gl_UNSIGNED_BYTE
+                          ptr
+
+        fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture += 1
+        use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture) >>= \clt ->
+          when (clt == Constants.maxLightMaps) $
+            Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
