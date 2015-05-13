@@ -64,7 +64,6 @@ import Render.GLConfigT
 import Render.GLStateT
 import Render.MEdgeT
 import Render.MModelT
-import Render.MNodeT
 import Render.MVertexT
 import Server.ChallengeT
 import Server.ClientFrameT
@@ -133,8 +132,12 @@ newtype MTexInfoReference = MTexInfoReference Int
 
 newtype GLPolyReference = GLPolyReference Int
 
+newtype MNodeReference = MNodeReference Int
+
 -- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
 data ModelReference = ModInlineReference Int | ModKnownReference Int
+
+data MNodeChild = MNodeChildReference Int | MLeafChildReference Int
 
 data QuakeState =
   QuakeState { _globals               :: !Globals
@@ -928,7 +931,7 @@ data MLeafT =
          , _mlVisFrame        :: !Int
          , _mlMins            :: !(V3 Float)
          , _mlMaxs            :: !(V3 Float)
-         , _mlParent          :: !(Maybe Int) -- reference
+         , _mlParent          :: !(Maybe MNodeReference)
          , _mlCluster         :: !Int
          , _mlArea            :: !Int
          , _mlNumMarkSurfaces :: !Int
@@ -1732,3 +1735,15 @@ data GLLightMapStateT =
                    , _lmsAllocated              :: UV.Vector Int
                    , _lmsLightmapBuffer         :: MV.IOVector Word8
                    }
+
+data MNodeT =
+  MNodeT { _mnContents     :: Int
+         , _mnVisFrame     :: Int
+         , _mnMins         :: V3 Float
+         , _mnMaxs         :: V3 Float
+         , _mnParent       :: Maybe MNodeReference
+         , _mnPlane        :: CPlaneT
+         , _mnChildren     :: (MNodeChild, MNodeChild)
+         , _mnFirstSurface :: Int
+         , _mnNumSurfaces  :: Int
+         }

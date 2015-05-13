@@ -27,10 +27,11 @@ makeLenses ''DNodeT
 
 newDNodeT :: BL.ByteString -> DNodeT
 newDNodeT = runGet getDNodeT
-  where getDNodeT :: Get DNodeT
-        getDNodeT = DNodeT <$> getInt
-                           <*> getInt2
-                           <*> getV3Int16
-                           <*> getV3Int16
-                           <*> getWord16le
-                           <*> getWord16le
+
+getDNodeT :: Get DNodeT
+getDNodeT = DNodeT <$> getInt
+                   <*> getInt2
+                   <*> getV3Int16
+                   <*> getV3Int16
+                   <*> getWord16le
+                   <*> getWord16le

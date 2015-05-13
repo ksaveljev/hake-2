@@ -21,6 +21,7 @@ import QuakeState
 import QCommon.QFiles.BSP.DFaceT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
+import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
@@ -528,8 +529,61 @@ loadLeafs buffer lump = do
 
 
 loadNodes :: B.ByteString -> LumpT -> Quake ()
-loadNodes _ _ = do
-    io (putStrLn "Model.loadNodes") >> undefined -- TODO
+loadNodes buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+    when ((lump^.lFileLen) `mod` dNodeTSize /= 0) $ do
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+
+    let count = (lump^.lFileLen) `div` dNodeTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        dNodes = runGet (getDNodes count) buf
+        nodes = V.map (toMNodeT model) dNodes
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumNodes .= count
+      mNodes .= nodes
+
+    setParent modelIdx nodes (MNodeChildReference 0) Nothing
+
+  where getDNodes :: Int -> Get (V.Vector DNodeT)
+        getDNodes count = V.replicateM count getDNodeT
+
+        toMNodeT :: ModelT -> DNodeT -> MNodeT
+        toMNodeT model dNode =
+          MNodeT { _mnContents     = (-1)
+                 , _mnVisFrame     = 0
+                 , _mnMins         = fmap fromIntegral (dNode^.dnMins)
+                 , _mnMaxs         = fmap fromIntegral (dNode^.dnMaxs)
+                 , _mnParent       = Nothing
+                 , _mnPlane        = (model^.mPlanes) V.! (dNode^.dnPlaneNum)
+                 , _mnChildren     = getChildren (dNode^.dnChildren)
+                 , _mnFirstSurface = fromIntegral (dNode^.dnFirstFace)
+                 , _mnNumSurfaces  = fromIntegral (dNode^.dnNumFaces)
+                 }
+
+        getChildren :: (Int, Int) -> (MNodeChild, MNodeChild)
+        getChildren (p1, p2) =
+          let a = if p1 >= 0
+                    then MNodeChildReference p1
+                    else MLeafChildReference ((-1) - p1)
+              b = if p2 >= 0
+                    then MNodeChildReference p2
+                    else MLeafChildReference ((-1) - p2)
+          in (a, b)
+
+setParent :: Int -> V.Vector MNodeT -> MNodeChild -> Maybe MNodeReference -> Quake ()
+setParent modelIdx nodes childRef parentRef =
+    case childRef of
+      MNodeChildReference idx -> do
+        fastRenderAPIGlobals.frModKnown.ix modelIdx.mNodes.ix idx.mnParent .= parentRef
+        let (a, b) = (nodes V.! idx)^.mnChildren
+        setParent modelIdx nodes a (Just $ MNodeReference idx)
+        setParent modelIdx nodes b (Just $ MNodeReference idx)
+
+      MLeafChildReference idx ->
+        fastRenderAPIGlobals.frModKnown.ix modelIdx.mLeafs.ix idx.mlParent .= parentRef
 
 loadSubmodels :: B.ByteString -> LumpT -> Quake ()
 loadSubmodels _ _ = do
