@@ -93,4 +93,5 @@ initialFastRenderAPIGlobals =
                        , _frGLLms                = newGLLightMapStateT
                        , _frNewRefDef            = newRefDefT
                        , _frFrameCount           = 0
+                       , _frWarpFace             = Nothing
                        }

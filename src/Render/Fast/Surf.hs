@@ -109,7 +109,7 @@ glBuildPolygonFromSurface surface = do
         lNumVerts = surface^.msNumEdges
     Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
     polyRef@(GLPolyReference polyIdx) <- Polygon.create lNumVerts
-
+    
     zoom (fastRenderAPIGlobals.frPolygonCache.ix polyIdx) $ do
       glpNext .= surface^.msPolys
       glpFlags .= surface^.msFlags

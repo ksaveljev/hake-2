@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Warp where
 
-import Control.Lens (use, preuse, ix, (^.))
-import Control.Monad (when)
-import Linear (V3(..), _x, _y, _z)
+import Control.Applicative (Const)
+import Control.Lens (use, preuse, ix, (^.), (.=))
+import Control.Monad (when, unless)
+import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -13,6 +16,10 @@ import Quake
 import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
+import qualified Render.Fast.Polygon as Polygon
+
+subdivideSize :: Float
+subdivideSize = 64
 
 sinV :: UV.Vector Float
 sinV =
@@ -50,15 +57,111 @@ sinV =
                 ,   (-1.56072), ( -1.3677), ( -1.17384), (-0.979285), (-0.784137), (-0.588517), (-0.392541), (-0.19633)
                 ]
 
-subdividePolygon :: MSurfaceT -> V.Vector (V3 Float) -> Quake MSurfaceT
-subdividePolygon surface verts = do
-    let numVerts = (surface^.msNumEdges)
-
+subdividePolygon :: Int -> V.Vector (V3 Float) -> Quake ()
+subdividePolygon numVerts verts = do
     when (numVerts > 60) $
       Com.comError Constants.errDrop ("numverts = " `B.append` BC.pack (show numVerts))
 
     let (mins, maxs) = boundPoly numVerts verts
-    io (putStrLn "Warp.subdividePolygon") >> undefined -- TODO
+        verts' = verts `V.snoc` (verts V.! 0)
+
+    done <- subdivide verts' mins maxs 0
+
+    unless done $ do
+      polyRef@(GLPolyReference polyIdx) <- Polygon.create (numVerts + 2)
+      Just surface <- use $ fastRenderAPIGlobals.frWarpFace
+
+      fastRenderAPIGlobals.frPolygonCache.ix polyIdx.glpNext .= (surface^.msPolys)
+      fastRenderAPIGlobals.frWarpFace .= Just (surface { _msPolys = Just polyRef })
+
+      (total, totalS, totalT) <- countTotals polyRef (surface^.msTexInfo.mtiVecs) (V3 0 0 0) 0 0 0
+
+      let scale = 1 / (fromIntegral numVerts)
+
+      Polygon.setPolyX polyRef 0 ((total^._x) * scale)
+      Polygon.setPolyY polyRef 0 ((total^._y) * scale)
+      Polygon.setPolyZ polyRef 0 ((total^._z) * scale)
+      Polygon.setPolyS1 polyRef 0 (totalS * scale)
+      Polygon.setPolyT1 polyRef 0 (totalT * scale)
+
+      Polygon.getPolyX polyRef 1 >>= Polygon.setPolyX polyRef (numVerts + 1)
+      Polygon.getPolyY polyRef 1 >>= Polygon.setPolyY polyRef (numVerts + 1)
+      Polygon.getPolyZ polyRef 1 >>= Polygon.setPolyZ polyRef (numVerts + 1)
+      Polygon.getPolyS1 polyRef 1 >>= Polygon.setPolyS1 polyRef (numVerts + 1)
+      Polygon.getPolyT1 polyRef 1 >>= Polygon.setPolyT1 polyRef (numVerts + 1)
+      Polygon.getPolyS2 polyRef 1 >>= Polygon.setPolyS2 polyRef (numVerts + 1)
+      Polygon.getPolyT2 polyRef 1 >>= Polygon.setPolyT2 polyRef (numVerts + 1)
+
+  where subdivide :: V.Vector (V3 Float) -> V3 Float -> V3 Float -> Int -> Quake Bool
+        subdivide verts' mins maxs idx
+          | idx >= 3 = return False
+          | otherwise = do
+              let access = if | idx == 0 -> _x
+                              | idx == 1 -> _y
+                              | idx == 2 -> _z
+                              | otherwise -> undefined -- shouldn't happen
+                  m = ((mins^.access) + (maxs^.access)) * 0.5
+                  tmp :: Int = floor (m / subdivideSize + 0.5)
+                  m' = subdivideSize * fromIntegral tmp
+
+              if (maxs^.access) - m' < 8 || m' - (mins^.access) < 8
+                then subdivide verts' mins maxs (idx + 1)
+                else do
+                  let dist = V.generate (numVerts + 1) (buildDist verts' access m')
+                      (front, back) = buildFrontAndBack verts' dist V.empty V.empty 0 numVerts
+
+                  subdividePolygon (V.length front) front
+                  subdividePolygon (V.length back) back
+
+                  return True
+
+        buildDist :: V.Vector (V3 Float) -> ((Float -> Const Float Float) -> V3 Float -> Const Float (V3 Float)) -> Float -> Int -> Float
+        buildDist verts' access m idx =
+          if idx == numVerts
+            then ((verts' V.! 0)^.access) - m
+            else ((verts' V.! idx)^.access) - m
+
+        buildFrontAndBack :: V.Vector (V3 Float) -> V.Vector Float -> V.Vector (V3 Float) -> V.Vector (V3 Float) -> Int -> Int -> (V.Vector (V3 Float), V.Vector (V3 Float))
+        buildFrontAndBack verts' dist front back idx maxIdx
+          | idx >= maxIdx = (front, back)
+          | otherwise = 
+              let v = verts' V.! idx
+                  front' = if dist V.! idx >= 0
+                             then front `V.snoc` v
+                             else front
+                  back' = if dist V.! idx <= 0
+                            then back `V.snoc` v
+                            else back
+              in if dist V.! idx == 0 || dist V.! (idx + 1) == 0
+                   then buildFrontAndBack verts' dist front' back' (idx + 1) maxIdx
+                   else let a = dist V.! idx > 0
+                            b = dist V.! (idx + 1) > 0
+                        in if a /= b -- clip point
+                             then let frac = (dist V.! idx) / ((dist V.! idx) - (dist V.! (idx + 1)))
+                                      v1 = verts' V.! (idx + 1)
+                                      fb = v + (fmap (* frac) (v1 - v))
+                                      front'' = front' `V.snoc` fb
+                                      back'' = back' `V.snoc` fb
+                                  in buildFrontAndBack verts' dist front'' back'' (idx + 1) maxIdx
+                             else buildFrontAndBack verts' dist front' back' (idx + 1) maxIdx
+
+        countTotals :: GLPolyReference -> (V4 Float, V4 Float) -> V3 Float -> Float -> Float -> Int -> Quake (V3 Float, Float, Float)
+        countTotals polyRef vecs total totalS totalT idx
+          | idx >= numVerts = return (total, totalS, totalT)
+          | otherwise = do
+              let v = verts V.! idx
+
+              Polygon.setPolyX polyRef (idx + 1) (v^._x)
+              Polygon.setPolyY polyRef (idx + 1) (v^._y)
+              Polygon.setPolyZ polyRef (idx + 1) (v^._z)
+
+              let s = v `dot` ((fst vecs)^._xyz)
+                  t = v `dot` ((snd vecs)^._xyz)
+
+              Polygon.setPolyS1 polyRef (idx + 1) s
+              Polygon.setPolyT1 polyRef (idx + 1) t
+
+              countTotals polyRef vecs (total + v) (totalS + s) (totalT + t) (idx + 1)
 
 boundPoly :: Int -> V.Vector (V3 Float) -> (V3 Float, V3 Float)
 boundPoly numVerts verts = findMinMax 0 (V3 9999 9999 9999) (V3 (-9999) (-9999) (-9999))
@@ -89,7 +192,12 @@ glSubdivideSurface surface = do
     -- convert edges back to a normal polygon
     let verts = V.generate (surface^.msNumEdges) (collectVerts model)
 
-    subdividePolygon surface verts
+    fastRenderAPIGlobals.frWarpFace .= Just surface
+
+    subdividePolygon (surface^.msNumEdges) verts
+
+    use (fastRenderAPIGlobals.frWarpFace) >>= \(Just warpFace) ->
+      return warpFace
 
   where collectVerts :: ModelT -> Int -> V3 Float
         collectVerts model idx =

@@ -9,8 +9,8 @@ import qualified Data.ByteString.Lazy as BL
 import Util.Binary
 import qualified Constants
 
-diskSize :: Int
-diskSize = 3 * Constants.sizeOfFloat
+mVertexDiskSize :: Int
+mVertexDiskSize = 3 * Constants.sizeOfFloat
 
 memSize :: Int
 memSize = 3 * Constants.sizeOfFloat

@@ -202,11 +202,11 @@ loadVertexes :: B.ByteString -> LumpT -> Quake ()
 loadVertexes buffer lump = do
     ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
 
-    when ((lump^.lFileLen) `mod` diskSize /= 0) $ do
+    when ((lump^.lFileLen) `mod` mVertexDiskSize /= 0) $ do
       Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
       Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
 
-    let count = (lump^.lFileLen) `div` diskSize
+    let count = (lump^.lFileLen) `div` mVertexDiskSize
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
         vertexes = runGet (getVertexes count) buf
     
@@ -221,14 +221,14 @@ loadEdges :: B.ByteString -> LumpT -> Quake ()
 loadEdges buffer lump = do
     ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
 
-    when ((lump^.lFileLen) `mod` diskSize /= 0) $ do
+    when ((lump^.lFileLen) `mod` mEdgeDiskSize /= 0) $ do
       Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
       Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
 
-    let count = (lump^.lFileLen) `div` diskSize
+    let count = (lump^.lFileLen) `div` mEdgeDiskSize
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
         edges = runGet (getEdges count) buf
-    
+
     zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
       mNumEdges .= count
       mEdges .= edges

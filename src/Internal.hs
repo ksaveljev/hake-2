@@ -1557,6 +1557,7 @@ data FastRenderAPIGlobals =
                        , _frGLLms                :: GLLightMapStateT
                        , _frNewRefDef            :: RefDefT
                        , _frFrameCount           :: Int
+                       , _frWarpFace             :: Maybe MSurfaceT
                        }
 
 data ParticleTGlobals =
