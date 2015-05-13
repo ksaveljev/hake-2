@@ -91,7 +91,8 @@ glBeginBuildingLightmaps _ = do
 
 glEndBuildingLightmaps :: Quake ()
 glEndBuildingLightmaps = do
-    io (putStrLn "Surf.glEndBuildingLightmaps") >> undefined -- TODO
+    lmUploadBlock False
+    Image.glEnableMultiTexture False
 
 glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
 glCreateSurfaceLightmap surface = do
@@ -157,3 +158,7 @@ glBuildPolygonFromSurface surface = do
 
               Polygon.setPolyS2 polyRef idx d
               Polygon.setPolyT2 polyRef idx d'
+
+lmUploadBlock :: Bool -> Quake ()
+lmUploadBlock dynamic = do
+    io (putStrLn "Surf.lmUploadBlock") >> undefined -- TODO
