@@ -94,4 +94,5 @@ initialFastRenderAPIGlobals =
                        , _frNewRefDef            = newRefDefT
                        , _frFrameCount           = 0
                        , _frWarpFace             = Nothing
+                       , _frModelVisibility      = ""
                        }

@@ -924,11 +924,16 @@ data MSurfaceT =
             }
 
 data MLeafT =
-  MLeafT { _mlCluster         :: !Int
+  MLeafT { _mlContents        :: !Int
+         , _mlVisFrame        :: !Int
+         , _mlMins            :: !(V3 Float)
+         , _mlMaxs            :: !(V3 Float)
+         , _mlParent          :: !(Maybe Int) -- reference
+         , _mlCluster         :: !Int
          , _mlArea            :: !Int
          , _mlNumMarkSurfaces :: !Int
          , _mlMarkIndex       :: !Int
-         , _mlMarkSurfaces    :: !(Seq MSurfaceT)
+         , _mlMarkSurfaces    :: !(V.Vector MSurfaceT)
          }
 
 data ClientInfoT =
@@ -1558,6 +1563,7 @@ data FastRenderAPIGlobals =
                        , _frNewRefDef            :: RefDefT
                        , _frFrameCount           :: Int
                        , _frWarpFace             :: Maybe MSurfaceT
+                       , _frModelVisibility      :: B.ByteString
                        }
 
 data ParticleTGlobals =

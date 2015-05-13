@@ -30,13 +30,14 @@ makeLenses ''DLeafT
 
 newDLeafT :: BL.ByteString -> DLeafT
 newDLeafT = runGet getDLeafT
-  where getDLeafT :: Get DLeafT
-        getDLeafT = DLeafT <$> getInt
-                           <*> getInt16
-                           <*> getInt16
-                           <*> getV3Int16
-                           <*> getV3Int16
-                           <*> getWord16le
-                           <*> getWord16le
-                           <*> getWord16le
-                           <*> getWord16le
+
+getDLeafT :: Get DLeafT
+getDLeafT = DLeafT <$> getInt
+                   <*> getInt16
+                   <*> getInt16
+                   <*> getV3Int16
+                   <*> getV3Int16
+                   <*> getWord16le
+                   <*> getWord16le
+                   <*> getWord16le
+                   <*> getWord16le

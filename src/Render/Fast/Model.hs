@@ -20,6 +20,7 @@ import Quake
 import QuakeState
 import QCommon.QFiles.BSP.DFaceT
 import QCommon.QFiles.BSP.DHeaderT
+import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
@@ -485,14 +486,46 @@ loadVisibility buffer lump = do
       then
         fastRenderAPIGlobals.frModKnown.ix modelIdx.mVis .= Nothing
       else do
-        let buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
-            vis = newDVisT buf
+        let buf = B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+            buf' = BL.fromStrict buf
+            vis = newDVisT buf'
 
+        fastRenderAPIGlobals.frModelVisibility .= buf
         fastRenderAPIGlobals.frModKnown.ix modelIdx.mVis .= Just vis
 
 loadLeafs :: B.ByteString -> LumpT -> Quake ()
-loadLeafs _ _ = do
-    io (putStrLn "Model.loadLeafs") >> undefined -- TODO
+loadLeafs buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+    when ((lump^.lFileLen) `mod` dLeafTSize /= 0) $ do
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+
+    let count = (lump^.lFileLen) `div` dLeafTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        dLeafs = runGet (getDLeafs count) buf
+        leafs = V.map (toMLeafT model) dLeafs
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumLeafs .= count
+      mLeafs .= leafs
+
+  where getDLeafs :: Int -> Get (V.Vector DLeafT)
+        getDLeafs count = V.replicateM count getDLeafT
+
+        toMLeafT :: ModelT -> DLeafT -> MLeafT
+        toMLeafT model dLeaf = MLeafT { _mlContents        = dLeaf^.dlContents
+                                      , _mlVisFrame        = 0
+                                      , _mlMins            = fmap fromIntegral (dLeaf^.dlMins)
+                                      , _mlMaxs            = fmap fromIntegral (dLeaf^.dlMaxs)
+                                      , _mlParent          = Nothing
+                                      , _mlCluster         = fromIntegral (dLeaf^.dlCluster)
+                                      , _mlArea            = fromIntegral (dLeaf^.dlArea)
+                                      , _mlNumMarkSurfaces = fromIntegral (dLeaf^.dlNumLeafFaces)
+                                      , _mlMarkIndex       = fromIntegral (dLeaf^.dlFirstLeafFace)
+                                      , _mlMarkSurfaces    = model^.mMarkSurfaces
+                                      }
+
 
 loadNodes :: B.ByteString -> LumpT -> Quake ()
 loadNodes _ _ = do
