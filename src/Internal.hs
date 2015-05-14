@@ -1795,33 +1795,33 @@ data CLTEntGlobals =
                 , _cltePlayerBeams        :: V.Vector BeamT
                 , _clteLasers             :: V.Vector LaserT
                 , _clteSustains           :: V.Vector CLSustainT
-                , _clteSfxRic1            :: SfxReference
-                , _clteSfxRic2            :: SfxReference
-                , _clteSfxRic3            :: SfxReference
-                , _clteSfxLashIt          :: SfxReference
-                , _clteSfxSpark5          :: SfxReference
-                , _clteSfxSpark6          :: SfxReference
-                , _clteSfxSpark7          :: SfxReference
-                , _clteSfxRailg           :: SfxReference
-                , _clteSfxRockExp         :: SfxReference
-                , _clteSfxGrenExp         :: SfxReference
-                , _clteSfxWatrExp         :: SfxReference
-                , _clteSfxPlasExp         :: SfxReference
+                , _clteSfxRic1            :: Maybe SfxReference
+                , _clteSfxRic2            :: Maybe SfxReference
+                , _clteSfxRic3            :: Maybe SfxReference
+                , _clteSfxLashIt          :: Maybe SfxReference
+                , _clteSfxSpark5          :: Maybe SfxReference
+                , _clteSfxSpark6          :: Maybe SfxReference
+                , _clteSfxSpark7          :: Maybe SfxReference
+                , _clteSfxRailg           :: Maybe SfxReference
+                , _clteSfxRockExp         :: Maybe SfxReference
+                , _clteSfxGrenExp         :: Maybe SfxReference
+                , _clteSfxWatrExp         :: Maybe SfxReference
+                , _clteSfxPlasExp         :: Maybe SfxReference
                 , _clteSfxFootsteps       :: V.Vector SfxT
-                , _clteModExplode         :: ModelReference
-                , _clteModSmoke           :: ModelReference
-                , _clteModFlash           :: ModelReference
-                , _clteModParasiteSegment :: ModelReference
-                , _clteModGrappleCable    :: ModelReference
-                , _clteModParasiteTip     :: ModelReference
-                , _clteModExplo4          :: ModelReference
-                , _clteModBfgExplo        :: ModelReference
-                , _clteModPowerScreen     :: ModelReference
-                , _clteModPlasmaExplo     :: ModelReference
-                , _clteSfxLightning       :: SfxReference
-                , _clteSfxDisrExp         :: SfxReference
-                , _clteModLightning       :: ModelReference
-                , _clteModHeatBeam        :: ModelReference
-                , _clteModMonsterHeatBeam :: ModelReference
-                , _clteModExplo4Big       :: ModelReference
+                , _clteModExplode         :: Maybe ModelReference
+                , _clteModSmoke           :: Maybe ModelReference
+                , _clteModFlash           :: Maybe ModelReference
+                , _clteModParasiteSegment :: Maybe ModelReference
+                , _clteModGrappleCable    :: Maybe ModelReference
+                , _clteModParasiteTip     :: Maybe ModelReference
+                , _clteModExplo4          :: Maybe ModelReference
+                , _clteModBfgExplo        :: Maybe ModelReference
+                , _clteModPowerScreen     :: Maybe ModelReference
+                , _clteModPlasmaExplo     :: Maybe ModelReference
+                , _clteSfxLightning       :: Maybe SfxReference
+                , _clteSfxDisrExp         :: Maybe SfxReference
+                , _clteModLightning       :: Maybe ModelReference
+                , _clteModHeatBeam        :: Maybe ModelReference
+                , _clteModMonsterHeatBeam :: Maybe ModelReference
+                , _clteModExplo4Big       :: Maybe ModelReference
                 }
