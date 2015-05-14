@@ -134,6 +134,8 @@ newtype GLPolyReference = GLPolyReference Int
 
 newtype MNodeReference = MNodeReference Int
 
+newtype SfxReference = SfxReference Int
+
 -- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
 data ModelReference = ModInlineReference Int | ModKnownReference Int
 
@@ -1757,3 +1759,69 @@ data BeamT =
         , _bStart      :: V3 Float
         , _bEnd        :: V3 Float
         }
+
+data CLSustainT =
+  CLSustainT { _clsId            :: Int
+             , _clsType          :: Int
+             , _clsEndTime       :: Int
+             , _clsNextThink     :: Int
+             , _clsThinkInterval :: Int
+             , _clsOrg           :: V3 Float
+             , _clsDir           :: V3 Float
+             , _clsColor         :: Int
+             , _clsCount         :: Int
+             , _clsMagnitude     :: Int
+             , _clsThink         :: Maybe EntThink
+             }
+
+data LaserT =
+  LaserT { _lEnt     :: EntityT
+         , _lEndTime :: Int
+         }
+
+data ExplosionT =
+  ExplosionT { _eType       :: Int
+             , _eEnt        :: EntityT
+             , _eFrames     :: Int
+             , _eLight      :: Float
+             , _eLightColor :: V3 Float
+             , _eStart      :: Float
+             , _eBaseFrame  :: Int
+             }
+
+data CLTEntGlobals =
+  CLTEntGlobals { _clteExplosions         :: V.Vector ExplosionT
+                , _clteBeams              :: V.Vector BeamT
+                , _cltePlayerBeams        :: V.Vector BeamT
+                , _clteLasers             :: V.Vector LaserT
+                , _clteSustains           :: V.Vector CLSustainT
+                , _clteSfxRic1            :: SfxReference
+                , _clteSfxRic2            :: SfxReference
+                , _clteSfxRic3            :: SfxReference
+                , _clteSfxLashIt          :: SfxReference
+                , _clteSfxSpark5          :: SfxReference
+                , _clteSfxSpark6          :: SfxReference
+                , _clteSfxSpark7          :: SfxReference
+                , _clteSfxRailg           :: SfxReference
+                , _clteSfxRockExp         :: SfxReference
+                , _clteSfxGrenExp         :: SfxReference
+                , _clteSfxWatrExp         :: SfxReference
+                , _clteSfxPlasExp         :: SfxReference
+                , _clteSfxFootsteps       :: V.Vector SfxT
+                , _clteModExplode         :: ModelReference
+                , _clteModSmoke           :: ModelReference
+                , _clteModFlash           :: ModelReference
+                , _clteModParasiteSegment :: ModelReference
+                , _clteModGrappleCable    :: ModelReference
+                , _clteModParasiteTip     :: ModelReference
+                , _clteModExplo4          :: ModelReference
+                , _clteModBfgExplo        :: ModelReference
+                , _clteModPowerScreen     :: ModelReference
+                , _clteModPlasmaExplo     :: ModelReference
+                , _clteSfxLightning       :: SfxReference
+                , _clteSfxDisrExp         :: SfxReference
+                , _clteModLightning       :: ModelReference
+                , _clteModHeatBeam        :: ModelReference
+                , _clteModMonsterHeatBeam :: ModelReference
+                , _clteModExplo4Big       :: ModelReference
+                }

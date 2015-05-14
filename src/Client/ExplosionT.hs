@@ -4,17 +4,8 @@ module Client.ExplosionT where
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
+import Internal
 import Client.EntityT
-
-data ExplosionT =
-  ExplosionT { _eType       :: Int
-             , _eEnt        :: EntityT
-             , _eFrames     :: Int
-             , _eLight      :: Float
-             , _eLightColor :: V3 Float
-             , _eStart      :: Float
-             , _eBaseFrame  :: Int
-             }
 
 makeLenses ''ExplosionT
 

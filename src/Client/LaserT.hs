@@ -3,12 +3,7 @@ module Client.LaserT where
 
 import Control.Lens (makeLenses)
 
-import Client.EntityT
-
-data LaserT =
-  LaserT { _lEnt     :: EntityT
-         , _lEndTime :: Int
-         }
+import Internal
 
 makeLenses ''LaserT
 
