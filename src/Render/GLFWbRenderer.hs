@@ -96,7 +96,7 @@ glfwbRegisterModel renderAPI = (renderAPI^.rRegisterModel) glfwbGLDriver
 glfwbRegisterSkin :: RenderAPI -> B.ByteString -> Quake (Maybe ImageT)
 glfwbRegisterSkin renderAPI = (renderAPI^.rRegisterSkin) glfwbGLDriver
 
-glfwbRegisterPic :: RenderAPI -> B.ByteString -> Quake (Maybe ImageT)
+glfwbRegisterPic :: RenderAPI -> B.ByteString -> Quake (Maybe ImageReference)
 glfwbRegisterPic renderAPI = (renderAPI^.rDrawFindPic) glfwbGLDriver
 
 glfwbSetSky :: RenderAPI -> B.ByteString -> Float -> V3 Float -> Quake ()

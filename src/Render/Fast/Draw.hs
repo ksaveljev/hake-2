@@ -29,8 +29,8 @@ initLocal = do
     GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral GL.gl_NEAREST)
     GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral GL.gl_NEAREST)
 
-stretchPic :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-stretchPic _ x y w h pic = do
+stretchPic :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+stretchPic x y w h pic = do
     maybeImage <- findPic pic
 
     case maybeImage of
@@ -85,8 +85,8 @@ It can be clipped to the top of the screen to allow the console to be
 smoothly scrolled off.
 ================
 -}
-drawChar :: GLDriver -> Int -> Int -> Int -> Quake ()
-drawChar _ x y num = do
+drawChar :: Int -> Int -> Int -> Quake ()
+drawChar x y num = do
     let n = num .&. 255
 
         -- it's a space   -- totally off screen
@@ -115,8 +115,8 @@ drawChar _ x y num = do
       GL.glVertex2f x' (y' + 8)
       GL.glEnd
 
-fill :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
-fill _ x y w h colorIndex = do
+fill :: Int -> Int -> Int -> Int -> Int -> Quake ()
+fill x y w h colorIndex = do
     when (colorIndex > 255) $
       Com.comError Constants.errFatal "Draw_Fill: bad color"
 
@@ -145,8 +145,8 @@ fill _ x y w h colorIndex = do
     GL.glColor3f 1 1 1
     GL.glEnable GL.gl_TEXTURE_2D
 
-drawPic :: GLDriver -> Int -> Int -> B.ByteString -> Quake ()
-drawPic _ x y pic = do
+drawPic :: Int -> Int -> B.ByteString -> Quake ()
+drawPic x y pic = do
     foundPic <- findPic pic
 
     case foundPic of

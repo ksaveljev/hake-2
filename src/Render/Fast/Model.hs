@@ -51,8 +51,8 @@ modInit = do
     fastRenderAPIGlobals.frModKnown .= V.replicate maxModKnown newModelT
     fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
 
-rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
-rBeginRegistration _ model = do
+rBeginRegistration :: B.ByteString -> Quake ()
+rBeginRegistration model = do
     resetModelArrays
     Polygon.reset
 

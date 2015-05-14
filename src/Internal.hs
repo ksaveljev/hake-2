@@ -782,7 +782,7 @@ data ClientStateT =
                , _csModelDraw              :: !(V.Vector (Maybe ModelT))
                , _csModelClip              :: !(V.Vector (Maybe CModelReference))
                , _csSoundPrecache          :: !(V.Vector SfxT)
-               , _csImagePrecache          :: !(V.Vector (Maybe ImageT))
+               , _csImagePrecache          :: !(V.Vector (Maybe ImageReference))
                , _csClientInfo             :: !(V.Vector ClientInfoT)
                , _csBaseClientInfo         :: !ClientInfoT
                }
@@ -972,7 +972,7 @@ data RefExportT =
              , _reBeginRegistration   :: B.ByteString -> Quake ()
              , _reRegisterModel       :: B.ByteString -> Quake (Maybe ModelT)
              , _reRegisterSkin        :: B.ByteString -> Quake (Maybe ImageT)
-             , _reRegisterPic         :: B.ByteString -> Quake (Maybe ImageT)
+             , _reRegisterPic         :: B.ByteString -> Quake (Maybe ImageReference)
              , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
              , _reEndRegistration     :: Quake ()
              , _reRenderFrame         :: RefDefT -> Quake ()
@@ -1455,7 +1455,7 @@ data RenderAPI =
             , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
             , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe ModelT)
             , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe ImageT)
-            , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe ImageT)
+            , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe ImageReference)
             , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
             , _rEndRegistration   :: GLDriver -> Quake ()
             , _rRenderFrame       :: GLDriver -> RefDefT -> Quake ()
