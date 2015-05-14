@@ -1351,6 +1351,12 @@ sizeOfDouble = 8 :: Int
 -- move from Server/SV.hs
 maxClipPlanes = 5 :: Int
 
+-- move from Client/CLTEnt
+maxExplosions = 32 :: Int
+maxBeams      = 32 :: Int
+maxLasers     = 32 :: Int
+maxSustains   = 32 :: Int
+
 byteDirs :: V.Vector (V3 Float)
 byteDirs =
     V.fromList [ V3 (-0.525731)   0.000000    0.850651

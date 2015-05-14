@@ -168,6 +168,7 @@ data QuakeState =
              , _clientGlobals         :: !ClientGlobals
              , _vGlobals              :: !VGlobals
              , _netChannelGlobals     :: !NetChannelGlobals
+             , _clTEntGlobals         :: !CLTEntGlobals
              }
 
 data Globals =
