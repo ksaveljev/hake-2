@@ -336,6 +336,38 @@ glLoadPic name pic width height picType bits = do
                then rFloodFillSkin pic width height
                else return pic
 
+    -- TODO: skipped scrap_allocblock and stuff related to scrap here
+    --       just using the normal upload routine just like if
+    --       Scrap_AllocBlock returned -1
+
+    -- this was label nonscrap
+    let texNum = RenderAPIConstants.texNumImages + idx
+      
+    zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+      iScrap .= False
+      iTexNum .= texNum
+
+    glBind texNum
+
+    hasAlpha <- if bits == 8
+                  then glUpload8  image width height (picType /= RenderAPIConstants.itPic && picType /= RenderAPIConstants.itSky) (picType == RenderAPIConstants.itSky)
+                  else glUpload32 image width height (picType /= RenderAPIConstants.itPic && picType /= RenderAPIConstants.itSky)
+
+    uploadWidth <- use $ fastRenderAPIGlobals.frUploadWidth
+    uploadHeight <- use $ fastRenderAPIGlobals.frUploadHeight
+    uploadedPaletted <- use $ fastRenderAPIGlobals.frUploadedPaletted
+
+    zoom (fastRenderAPIGlobals.frGLTextures.ix idx) $ do
+      iHasAlpha .= hasAlpha
+      iUploadWidth .= uploadWidth
+      iUploadHeight .= uploadHeight
+      iPaletted .= uploadedPaletted
+      iSL .= 0
+      iSH .= 1
+      iTL .= 0
+      iTH .= 1
+
+{-
     -- load little pics into the scrap
     if picType == RenderAPIConstants.itPic && bits == 8 && width < 64 && height < 64
       then do
@@ -367,6 +399,7 @@ glLoadPic name pic width height picType bits = do
           iSH .= 1
           iTL .= 0
           iTH .= 1
+          -}
 
     return imageRef
 
