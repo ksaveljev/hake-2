@@ -141,7 +141,7 @@ linkEdict er@(EdictReference edictIdx) = do
               m = F.maximum [minMax, maxMax]
 
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
-            eAbsMin .= fmap (`subtract` m) (edict^.eEntityState.esOrigin)
+            eAbsMin .= fmap (m `subtract`) (edict^.eEntityState.esOrigin)
             eAbsMax .= fmap (+ m) (edict^.eEntityState.esOrigin)
 
         else

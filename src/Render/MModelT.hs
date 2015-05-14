@@ -11,7 +11,7 @@ data MModelT =
           , _mmRadius    :: Float
           , _mmHeadNode  :: Int
           , _mmVisLeafs  :: Int
-          , _mmFristFace :: Int
+          , _mmFirstFace :: Int
           , _mmNumFaces  :: Int
           }
 

@@ -25,10 +25,11 @@ makeLenses ''DModelT
 
 newDModelT :: BL.ByteString -> DModelT
 newDModelT = runGet getDModelT
-  where getDModelT :: Get DModelT
-        getDModelT = DModelT <$> getV3Float
-                             <*> getV3Float
-                             <*> getV3Float
-                             <*> getInt
-                             <*> getInt
-                             <*> getInt
+
+getDModelT :: Get DModelT
+getDModelT = DModelT <$> getV3Float
+                     <*> getV3Float
+                     <*> getV3Float
+                     <*> getInt
+                     <*> getInt
+                     <*> getInt

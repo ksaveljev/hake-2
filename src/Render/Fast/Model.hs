@@ -10,7 +10,7 @@ import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8)
 import Data.Maybe (isNothing, fromJust)
 import Data.Word (Word16)
-import Linear (V3(..), V4(..))
+import Linear (V3(..), V4(..), norm, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -21,6 +21,7 @@ import QuakeState
 import QCommon.QFiles.BSP.DFaceT
 import QCommon.QFiles.BSP.DHeaderT
 import QCommon.QFiles.BSP.DLeafT
+import QCommon.QFiles.BSP.DModelT
 import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
 import QCommon.QFiles.MD2.DMdlT
@@ -527,7 +528,6 @@ loadLeafs buffer lump = do
                                       , _mlMarkSurfaces    = model^.mMarkSurfaces
                                       }
 
-
 loadNodes :: B.ByteString -> LumpT -> Quake ()
 loadNodes buffer lump = do
     ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
@@ -586,5 +586,43 @@ setParent modelIdx nodes childRef parentRef =
         fastRenderAPIGlobals.frModKnown.ix modelIdx.mLeafs.ix idx.mlParent .= parentRef
 
 loadSubmodels :: B.ByteString -> LumpT -> Quake ()
-loadSubmodels _ _ = do
-    io (putStrLn "Model.loadSubmodels") >> undefined -- TODO
+loadSubmodels buffer lump = do
+    ModKnownReference modelIdx <- use $ fastRenderAPIGlobals.frLoadModel
+
+    when ((lump^.lFileLen) `mod` dModelTSize /= 0) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` name)
+
+    let count = (lump^.lFileLen) `div` dModelTSize
+        buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
+        dModels = runGet (getDModels count) buf
+        models = V.map toMModelT dModels
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mNumSubModels .= count
+      mSubModels .= models
+
+  where getDModels :: Int -> Get (V.Vector DModelT)
+        getDModels count = V.replicateM count getDModelT
+
+        toMModelT :: DModelT -> MModelT
+        toMModelT dModel =
+          -- spread the mins / maxs by a pixel
+          let mins = fmap (subtract 1) (dModel^.dmMins)
+              maxs = fmap (+1) (dModel^.dmMaxs)
+          in MModelT { _mmMins      = mins
+                     , _mmMaxs      = maxs
+                     , _mmOrigin    = dModel^.dmOrigin
+                     , _mmRadius    = radiusFromBounds mins maxs
+                     , _mmHeadNode  = dModel^.dmHeadNode
+                     , _mmVisLeafs  = 0
+                     , _mmFirstFace = dModel^.dmFirstFace
+                     , _mmNumFaces  = dModel^.dmNumFaces
+                     }
+
+        radiusFromBounds :: V3 Float -> V3 Float -> Float
+        radiusFromBounds mins maxs =
+          let a = if abs (mins^._x) > abs (maxs^._x) then abs (mins^._x) else abs (maxs^._x)
+              b = if abs (mins^._y) > abs (maxs^._y) then abs (mins^._y) else abs (maxs^._y)
+              c = if abs (mins^._z) > abs (maxs^._z) then abs (mins^._z) else abs (maxs^._z)
+          in norm (V3 a b c)
