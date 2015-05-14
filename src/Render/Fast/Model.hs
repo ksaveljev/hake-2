@@ -28,7 +28,6 @@ import QCommon.QFiles.MD2.DMdlT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.TexInfoT
 import QCommon.XCommandT
-import Render.OpenGL.GLDriver
 import Util.Binary
 import qualified Constants
 import qualified Client.VID as VID

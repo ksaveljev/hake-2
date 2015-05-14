@@ -11,7 +11,6 @@ import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
 import QuakeState
-import Render.OpenGL.GLDriver
 import qualified Constants
 import qualified Client.VID as VID
 import qualified QCommon.Com as Com
@@ -186,3 +185,13 @@ drawPic x y pic = do
 
         when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
           GL.glEnable GL.gl_ALPHA_TEST
+
+getPicSize :: B.ByteString -> Quake (Maybe (Int, Int))
+getPicSize pic = do
+    maybeImage <- findPic pic
+
+    case maybeImage of
+      Nothing -> return Nothing
+      Just (ImageReference imageIdx) -> do
+        Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
+        return $ Just (image^.iWidth, image^.iHeight)
