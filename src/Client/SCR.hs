@@ -11,6 +11,7 @@ import Data.Maybe (isNothing, isJust)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -27,6 +28,22 @@ import qualified QCommon.CVar as CVar
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
+
+sbNums1 :: V.Vector B.ByteString
+sbNums1 =
+    V.fromList [ "num_0" , "num_1" , "num_2"
+               , "num_3" , "num_4" , "num_5"
+               , "num_6" , "num_7" , "num_8"
+               , "num_9" , "num_minus"
+               ]
+
+sbNums2 :: V.Vector B.ByteString
+sbNums2 =
+    V.fromList [ "anum_0" , "anum_1" , "anum_2"
+               , "anum_3" , "anum_4" , "anum_5"
+               , "anum_6" , "anum_7" , "anum_8"
+               , "anum_9" , "anum_minus"
+               ]
 
 init :: Quake ()
 init = do
@@ -947,6 +964,32 @@ playCinematic :: B.ByteString -> Quake ()
 playCinematic _ = do
     io (putStrLn "SCR.playCinematic") >> undefined -- TODO
 
+{-
+- =============== SCR_TouchPics
+- 
+- Allows rendering code to cache all needed sbar graphics ===============
+-}
 touchPics :: Quake ()
 touchPics = do
-    io (putStrLn "SCR.touchPics") >> undefined -- TODO
+    Just renderer <- use $ globals.re
+    void $ V.mapM (renderer^.rRefExport.reRegisterPic) sbNums1
+
+    crosshairCVar >>= \crosshair ->
+      when ((crosshair^.cvValue) /= 0) $ do
+        v <- if (crosshair^.cvValue) > 3 || (crosshair^.cvValue) < 0
+               then do
+                 CVar.update crosshair { _cvValue = 3 }
+                 return 3
+               else
+                 return (crosshair^.cvValue)
+
+        let i :: Int = truncate v
+            pic = "ch" `B.append` BC.pack (show i)
+        scrGlobals.scrCrosshairPic .= pic
+
+        Just (width, height) <- (renderer^.rRefExport.reDrawGetPicSize) pic
+        scrGlobals.scrCrosshairWidth .= width
+        scrGlobals.scrCrosshairHeight .= height
+
+        when (width == 0) $
+          scrGlobals.scrCrosshairPic .= ""
