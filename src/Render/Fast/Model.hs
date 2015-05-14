@@ -200,7 +200,34 @@ loadBrushModel modelRef buffer = do
     loadLeafs        buffer ((header^.dhLumps) V.! Constants.lumpLeafs)
     loadNodes        buffer ((header^.dhLumps) V.! Constants.lumpNodes)
     loadSubmodels    buffer ((header^.dhLumps) V.! Constants.lumpModels)
-    io (putStrLn "Model.loadBrushModel") >> undefined -- TODO
+
+    fastRenderAPIGlobals.frModKnown.ix modelIdx.mNumFrames .= 2 -- regular and alternate animation
+
+    -- set up the submodels
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+    setupSubmodels model loadModelIdx 0 (model^.mNumSubModels)
+
+  where setupSubmodels :: ModelT -> Int -> Int -> Int -> Quake ()
+        setupSubmodels model loadModelIdx idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let bm = (model^.mSubModels) V.! idx
+              Just loadModel <- preuse $ fastRenderAPIGlobals.frModKnown.ix loadModelIdx
+
+              let starMod = loadModel { _mFirstModelSurface = bm^.mmFirstFace
+                                      , _mNumModelSurfaces = bm^.mmNumFaces
+                                      , _mFirstNode = bm^.mmHeadNode
+                                      , _mMaxs = bm^.mmMaxs
+                                      , _mMins = bm^.mmMins
+                                      , _mRadius = bm^.mmRadius
+                                      }
+
+              when (idx == 0) $
+                fastRenderAPIGlobals.frModKnown.ix loadModelIdx .= starMod
+
+              fastRenderAPIGlobals.frModInline.ix idx .= starMod { _mNumLeafs = bm^.mmVisLeafs }
+
+              setupSubmodels model loadModelIdx (idx + 1) maxIdx
 
 loadVertexes :: B.ByteString -> LumpT -> Quake ()
 loadVertexes buffer lump = do
