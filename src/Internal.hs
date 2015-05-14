@@ -1747,3 +1747,13 @@ data MNodeT =
          , _mnFirstSurface :: Int
          , _mnNumSurfaces  :: Int
          }
+
+data BeamT =
+  BeamT { _bEntity     :: Int
+        , _bDestEntity :: Int
+        , _bModel      :: Maybe ModelReference
+        , _bEndTime    :: Int
+        , _bOffset     :: V3 Float
+        , _bStart      :: V3 Float
+        , _bEnd        :: V3 Float
+        }
