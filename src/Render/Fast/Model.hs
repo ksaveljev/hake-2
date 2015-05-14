@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Model where
 
-import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use)
+import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=))
 import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8)
@@ -567,12 +567,14 @@ loadNodes buffer lump = do
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
         dNodes = runGet (getDNodes count) buf
         nodes = V.map (toMNodeT model) dNodes
+        (nodeUpdates, leafUpdates) = setParent nodes (model^.mLeafs) (MNodeChildReference 0) Nothing
 
     zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
       mNumNodes .= count
-      mNodes .= nodes
+      mNodes .= (nodes V.// nodeUpdates)
+      mLeafs %= (V.// leafUpdates)
 
-    setParent modelIdx nodes (MNodeChildReference 0) Nothing
+    --setParent modelIdx nodes (MNodeChildReference 0) Nothing
 
   where getDNodes :: Int -> Get (V.Vector DNodeT)
         getDNodes count = V.replicateM count getDNodeT
@@ -600,6 +602,22 @@ loadNodes buffer lump = do
                     else MLeafChildReference ((-1) - p2)
           in (a, b)
 
+setParent :: V.Vector MNodeT -> V.Vector MLeafT -> MNodeChild -> Maybe MNodeReference -> ([(Int, MNodeT)], [(Int, MLeafT)])
+setParent nodes leafs childRef parentRef = collectUpdates childRef parentRef [] []
+  where collectUpdates :: MNodeChild -> Maybe MNodeReference -> [(Int, MNodeT)] -> [(Int, MLeafT)] -> ([(Int, MNodeT)], [(Int, MLeafT)])
+        collectUpdates c p nodeAcc leafAcc =
+          case c of
+            MNodeChildReference idx ->
+              let nodeAcc' = (idx, (nodes V.! idx) { _mnParent = p }) : nodeAcc
+                  (a, b) = (nodes V.! idx)^.mnChildren
+                  (nodeAcc'', leafAcc') = collectUpdates a (Just $ MNodeReference idx) nodeAcc' leafAcc
+              in collectUpdates b (Just $ MNodeReference idx) nodeAcc'' leafAcc'
+
+            MLeafChildReference idx ->
+              (nodeAcc, (idx, (leafs V.! idx) { _mlParent = p }) : leafAcc)
+        
+
+{-
 setParent :: Int -> V.Vector MNodeT -> MNodeChild -> Maybe MNodeReference -> Quake ()
 setParent modelIdx nodes childRef parentRef =
     case childRef of
@@ -611,6 +629,7 @@ setParent modelIdx nodes childRef parentRef =
 
       MLeafChildReference idx ->
         fastRenderAPIGlobals.frModKnown.ix modelIdx.mLeafs.ix idx.mlParent .= parentRef
+        -}
 
 loadSubmodels :: B.ByteString -> LumpT -> Quake ()
 loadSubmodels buffer lump = do
