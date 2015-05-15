@@ -4,11 +4,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Model where
 
-import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=))
+import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal')
 import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8)
-import Data.Maybe (isNothing, fromJust)
+import Data.Maybe (isNothing, fromJust, isJust)
 import Data.Word (Word16)
 import Linear (V3(..), V4(..), norm, _x, _y, _z)
 import qualified Data.ByteString as B
@@ -671,3 +671,41 @@ loadSubmodels buffer lump = do
               b = if abs (mins^._y) > abs (maxs^._y) then abs (mins^._y) else abs (maxs^._y)
               c = if abs (mins^._z) > abs (maxs^._z) then abs (mins^._z) else abs (maxs^._z)
           in norm (V3 a b c)
+
+rRegisterModel :: B.ByteString -> Quake (Maybe ModelReference)
+rRegisterModel name = do
+    modelRef <- modForName name False
+
+    when (isJust modelRef) $ do
+      case fromJust modelRef of
+        ModKnownReference modelIdx -> registerModelImages (fastRenderAPIGlobals.frModKnown.ix modelIdx)
+        ModInlineReference modelIdx -> registerModelImages (fastRenderAPIGlobals.frModInline.ix modelIdx)
+
+    return modelRef
+
+  where registerModelImages :: Traversal' QuakeState ModelT -> Quake ()
+        registerModelImages modelLens = do
+          Just model <- preuse modelLens
+
+          regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+          modelLens.mRegistrationSequence .= regSeq
+
+          if | model^.mType == RenderAPIConstants.modSprite -> do
+                 io (putStrLn "Model.rRegisterModel#registerModelImage") >> undefined -- TODO
+
+             | model^.mType == RenderAPIConstants.modAlias -> do
+                 io (putStrLn "Model.rRegisterModel#registerModelImage") >> undefined -- TODO
+
+             | model^.mType == RenderAPIConstants.modBrush -> do
+                 -- collect all image indexes in order to update them later
+                 -- in one batch instead of updating them one by one
+                 images <- use $ fastRenderAPIGlobals.frGLTextures
+                 let updates = V.toList $ V.map (updateImageRegistrationSequence images regSeq) (V.take (model^.mNumTexInfo) (model^.mTexInfo))
+                 fastRenderAPIGlobals.frGLTextures %= (V.// updates)
+
+             | otherwise -> return ()
+
+        updateImageRegistrationSequence :: V.Vector ImageT -> Int -> MTexInfoT -> (Int, ImageT)
+        updateImageRegistrationSequence images regSeq texInfo =
+          let Just (ImageReference imageIdx) = texInfo^.mtiImage
+          in (imageIdx, (images V.! imageIdx) { _iRegistrationSequence = regSeq })
