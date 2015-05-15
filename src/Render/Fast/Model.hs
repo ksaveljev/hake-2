@@ -15,6 +15,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -24,7 +25,10 @@ import QCommon.QFiles.BSP.DLeafT
 import QCommon.QFiles.BSP.DModelT
 import QCommon.QFiles.BSP.DNodeT
 import QCommon.QFiles.BSP.DPlaneT
+import QCommon.QFiles.MD2.DAliasFrameT
 import QCommon.QFiles.MD2.DMdlT
+import QCommon.QFiles.MD2.DSTVertT
+import QCommon.QFiles.MD2.DTriangleT
 import QCommon.QFiles.SP2.DSpriteT
 import QCommon.TexInfoT
 import QCommon.XCommandT
@@ -161,8 +165,68 @@ resetModelArrays = do
       frModelVertexIndexIdx  .= 0
 
 loadAliasModel :: ModelReference -> B.ByteString -> Quake ()
-loadAliasModel _ _ = do
-    io (putStrLn "Model.loadAliasModel") >> undefined -- TODO
+loadAliasModel modelRef buffer = do
+    let ModKnownReference modelIdx = modelRef
+        lazyBuffer = BL.fromStrict buffer
+        pheader = newDMdlT lazyBuffer
+
+    Just model <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+
+    checkForErrors pheader (model^.mName)
+
+    -- load base s and t vertices (not used in gl version)
+    let pOutST = runGet (V.replicateM (pheader^.dmNumST) getDSTVertT) (BL.drop (fromIntegral $ pheader^.dmOfsST) lazyBuffer)
+
+    -- load triangle lists
+    let pOutTri = runGet (V.replicateM (pheader^.dmNumTris) getDTriangleT) (BL.drop (fromIntegral $ pheader^.dmOfsTris) lazyBuffer)
+
+    -- load the frames
+    let pOutFrame = runGet (V.replicateM (pheader^.dmNumFrames) (getDAliasFrameT (pheader^.dmNumXYZ))) (BL.drop (fromIntegral $ pheader^.dmOfsFrames) lazyBuffer)
+
+    -- load the glcmds
+    let pOutCmd = runGet (UV.replicateM (pheader^.dmNumGlCmds) getInt) (BL.drop (fromIntegral $ pheader^.dmOfsGlCmds) lazyBuffer)
+
+    -- register all skins
+    let skinNames = V.map (B.takeWhile (/= 0)) $ runGet (V.replicateM (pheader^.dmNumSkins) (getByteString Constants.maxSkinName)) (BL.drop (fromIntegral $ pheader^.dmOfsSkins) lazyBuffer)
+    skins <- V.mapM (\name -> Image.glFindImage name RenderAPIConstants.itSkin) skinNames
+
+    let pheader' = pheader { _dmSkinNames   = Just skinNames
+                           , _dmSTVerts     = Just pOutST
+                           , _dmTriAngles   = Just pOutTri
+                           , _dmGlCmds      = Just pOutCmd
+                           , _dmAliasFrames = Just pOutFrame
+                           }
+
+    fastRenderAPIGlobals.frModKnown.ix modelIdx .= model { _mType = RenderAPIConstants.modAlias
+                                                         , _mExtraData = Just (AliasModelExtra pheader')
+                                                         , _mMins = V3 (-32) (-32) (-32)
+                                                         , _mMaxs = V3 32 32 32
+                                                         }
+
+    precompileGLCmds pheader'
+
+  where checkForErrors :: DMdlT -> B.ByteString -> Quake ()
+        checkForErrors pheader modelName = do
+          when ((pheader^.dmVersion) /= Constants.aliasVersion) $
+            Com.comError Constants.errDrop (modelName `B.append` " has wrong version number (" `B.append` BC.pack (show (pheader^.dmVersion)) `B.append` " should be " `B.append` BC.pack (show Constants.aliasVersion) `B.append` ")") -- IMPROVE ?
+
+          when ((pheader^.dmSkinHeight) > RenderAPIConstants.maxLBMHeight) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has a skin taller than " `B.append` BC.pack (show RenderAPIConstants.maxLBMHeight))
+
+          when ((pheader^.dmNumXYZ) <= 0) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has no vertices")
+
+          when ((pheader^.dmNumXYZ) > Constants.maxVerts) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has too many vertices")
+
+          when ((pheader^.dmNumST) <= 0) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has no st vertices")
+
+          when ((pheader^.dmNumTris) <= 0) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has no triangles")
+
+          when ((pheader^.dmNumFrames) <= 0) $
+            Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has no frames")
 
 loadSpriteModel :: ModelReference -> B.ByteString -> Quake ()
 loadSpriteModel _ _ = do
@@ -171,7 +235,7 @@ loadSpriteModel _ _ = do
 loadBrushModel :: ModelReference -> B.ByteString -> Quake ()
 loadBrushModel modelRef buffer = do
     loadModelRef <- use $ fastRenderAPIGlobals.frLoadModel
-    -- assume these can only be ModKnownReference (TODO: are we sure??)
+
     let ModKnownReference modelIdx = modelRef
         ModKnownReference loadModelIdx = loadModelRef
 
@@ -697,7 +761,7 @@ rRegisterModel name = do
                  io (putStrLn "Model.rRegisterModel#registerModelImage") >> undefined -- TODO
 
              | model^.mType == RenderAPIConstants.modBrush -> do
-                 -- collect all image indexes in order to update them later
+                 -- collect all image updates in order to update them later
                  -- in one batch instead of updating them one by one
                  images <- use $ fastRenderAPIGlobals.frGLTextures
                  let updates = V.toList $ V.map (updateImageRegistrationSequence images regSeq) (V.take (model^.mNumTexInfo) (model^.mTexInfo))
@@ -709,3 +773,7 @@ rRegisterModel name = do
         updateImageRegistrationSequence images regSeq texInfo =
           let Just (ImageReference imageIdx) = texInfo^.mtiImage
           in (imageIdx, (images V.! imageIdx) { _iRegistrationSequence = regSeq })
+
+precompileGLCmds :: DMdlT -> Quake ()
+precompileGLCmds model = do
+    io (putStrLn "Model.precompileGLCmds") >> undefined -- TODO

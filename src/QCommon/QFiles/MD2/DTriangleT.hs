@@ -19,6 +19,7 @@ makeLenses ''DTriangleT
 
 newDTriangleT :: BL.ByteString -> DTriangleT
 newDTriangleT = runGet getDTriangleT
-  where getDTriangleT :: Get DTriangleT
-        getDTriangleT = DTriangleT <$> getV3Int16
-                                   <*> getV3Int16
+
+getDTriangleT :: Get DTriangleT
+getDTriangleT = DTriangleT <$> getV3Int16
+                           <*> getV3Int16

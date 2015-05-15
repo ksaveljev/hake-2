@@ -21,12 +21,10 @@ data DAliasFrameT =
 makeLenses ''DAliasFrameT
 
 newDAliasFrameT :: BL.ByteString -> DAliasFrameT
-newDAliasFrameT = runGet getDAliasFrameT
-  where getDAliasFrameT :: Get DAliasFrameT
-        getDAliasFrameT = DAliasFrameT <$> getV3Float
-                                       <*> getV3Float
-                                       <*> (B.takeWhile (/= 0) <$> getByteString 16) -- trim name
-                                       <*> getEmptyVector
+newDAliasFrameT = runGet (getDAliasFrameT 0)
 
-        getEmptyVector :: Get (UV.Vector Int)
-        getEmptyVector = return UV.empty
+getDAliasFrameT :: Int -> Get DAliasFrameT
+getDAliasFrameT verticesCount = DAliasFrameT <$> getV3Float
+                                             <*> getV3Float
+                                             <*> (B.takeWhile (/= 0) <$> getByteString 16) -- trim name
+                                             <*> UV.replicateM verticesCount getInt

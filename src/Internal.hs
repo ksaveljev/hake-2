@@ -58,6 +58,8 @@ import QCommon.NetChanT
 import QCommon.PmlT
 import QCommon.QFiles.BSP.DAreaPortalT
 import QCommon.QFiles.BSP.DVisT
+import QCommon.QFiles.MD2.DMdlT
+import QCommon.QFiles.SP2.DSpriteT
 import QCommon.SearchPathT
 import QCommon.SizeBufT
 import Render.GLConfigT
@@ -140,6 +142,8 @@ newtype SfxReference = SfxReference Int
 data ModelReference = ModInlineReference Int | ModKnownReference Int
 
 data MNodeChild = MNodeChildReference Int | MLeafChildReference Int
+
+data ModelExtra = AliasModelExtra DMdlT | SpriteModelExtra DSpriteT
 
 data QuakeState =
   QuakeState { _globals               :: !Globals
@@ -900,9 +904,9 @@ data ModelT =
          , _mMarkSurfaces         :: !(V.Vector MSurfaceT)
          , _mVis                  :: !(Maybe DVisT)
          , _mLightdata            :: !(Maybe B.ByteString)
-         , _mSkins                :: !(V.Vector ImageT)
+         , _mSkins                :: !(V.Vector (Maybe ImageReference))
          , _mExtraDataSize        :: !Int
-         , _mExtraData            :: !(Maybe B.ByteString)
+         , _mExtraData            :: !(Maybe ModelExtra)
          }
 
 data MSurfaceT =

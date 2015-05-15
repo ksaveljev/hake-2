@@ -18,6 +18,7 @@ makeLenses ''DSTVertT
 
 newDSTVertT :: BL.ByteString -> DSTVertT
 newDSTVertT = runGet getDSTVertT
-  where getDSTVertT :: Get DSTVertT
-        getDSTVertT = DSTVertT <$> getInt16
-                               <*> getInt16
+
+getDSTVertT :: Get DSTVertT
+getDSTVertT = DSTVertT <$> getInt16
+                       <*> getInt16
