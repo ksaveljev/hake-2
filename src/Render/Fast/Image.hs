@@ -8,16 +8,19 @@ import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
 import Data.Int (Int32)
-import Data.Maybe (isNothing, isJust, fromJust)
+import Data.Maybe (isNothing, isJust, fromJust, fromMaybe)
 import Data.Monoid (mappend, mempty, mconcat)
 import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
@@ -49,6 +52,13 @@ numGLAlphaModes = V.length glAlphaModes
 
 numGLSolidModes :: Int
 numGLSolidModes = V.length glSolidModes
+
+-- must be a power of2
+floodFillFifoSize :: Int
+floodFillFifoSize = 0x1000
+
+floodFillFifoMask :: Int
+floodFillFifoMask = floodFillFifoSize - 1
 
 modes :: V.Vector GLModeT
 modes =
@@ -412,8 +422,66 @@ glLoadPic name pic width height picType bits = do
                 else findFreeImage glTextures (idx + 1) maxIdx
 
 rFloodFillSkin :: B.ByteString -> Int -> Int -> Quake B.ByteString
-rFloodFillSkin _ _ _ = do
-    io (putStrLn "Image.rFloodFillSkin") >> undefined -- TODO
+rFloodFillSkin skin skinWidth skinHeight = do
+    let fillColor = fromIntegral (skin `B.index` 0) -- assume this is the pixel to fill
+    d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+    -- attempt to find opaque black
+    let filledColor = fromMaybe 0 (UV.findIndex (== 0xFF000000) d8to24table)
+
+    if fillColor == filledColor || fillColor == 255
+      then 
+        -- can't fill to filled color or to transparent color (used as visited marker)
+        return skin
+      else do
+        let skinMutable :: MSV.IOVector Word8 = case skin of
+                                                 BI.PS ptr 0 n -> MSV.MVector n ptr
+                                                 _ -> undefined -- shouldn't happen
+        fifo :: MV.IOVector (Int, Int) <- io $ MV.replicate floodFillFifoSize (0, 0)
+
+        floodFill skinMutable fifo (fromIntegral filledColor) (fromIntegral fillColor) 1 0
+
+        return $ case skinMutable of MSV.MVector n ptr -> BI.PS ptr 0 n
+
+  where floodFill :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Word8 -> Word8 -> Int -> Int -> Quake ()
+        floodFill skinMutable fifo filledColor fillColor inpt outpt
+          | inpt == outpt = return ()
+          | otherwise = do
+              (x, y) <- io $ MV.read fifo outpt
+              let fdc = filledColor
+                  pos = x + skinWidth * y
+                  outpt' = (outpt + 1) .&. floodFillFifoMask
+
+              (inpt1, fdc1) <- if x > 0
+                                 then floodFillStep skinMutable fifo inpt pos x y fillColor fdc (-1) (-1) 0
+                                 else return (inpt, fdc)
+
+              (inpt2, fdc2) <- if x < skinWidth - 1
+                                 then floodFillStep skinMutable fifo inpt1 pos x y fillColor fdc1 1 1 0
+                                 else return (inpt1, fdc1)
+
+              (inpt3, fdc3) <- if y > 0
+                                 then floodFillStep skinMutable fifo inpt2 pos x y fillColor fdc2 (-skinWidth) 0 (-1)
+                                 else return (inpt2, fdc2)
+
+              (inpt4, fdc4) <- if y < skinHeight - 1
+                                 then floodFillStep skinMutable fifo inpt3 pos x y fillColor fdc3 skinWidth 0 1
+                                 else return (inpt3, fdc3)
+
+              io $ MSV.write skinMutable (x + skinWidth * y) fdc4
+              floodFill skinMutable fifo filledColor fillColor inpt4 outpt'
+
+        floodFillStep :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Int -> Int -> Int -> Int -> Word8 -> Word8 -> Int -> Int -> Int -> Quake (Int, Word8)
+        floodFillStep skinMutable fifo inpt pos x y fillColor fdc off dx dy = do
+          b <- io $ MSV.read skinMutable (pos + off)
+
+          if | b == fillColor -> do
+               io $ MSV.write skinMutable (pos + off) 255
+               io $ MV.write fifo inpt (x + dx, y + dy)
+               return ((inpt + 1) .&. floodFillFifoMask, fdc)
+
+             | b /= 255 -> return (inpt, b)
+
+             | otherwise -> return (inpt, fdc)
 
 glUpload8 :: B.ByteString -> Int -> Int -> Bool -> Bool -> Quake Bool
 glUpload8 image width height mipmap isSky = do

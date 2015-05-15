@@ -201,6 +201,7 @@ loadAliasModel modelRef buffer = do
                                                          , _mExtraData = Just (AliasModelExtra pheader')
                                                          , _mMins = V3 (-32) (-32) (-32)
                                                          , _mMaxs = V3 32 32 32
+                                                         , _mSkins = skins
                                                          }
 
     precompileGLCmds pheader'
