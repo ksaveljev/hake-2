@@ -5,6 +5,7 @@ module QCommon.QFiles.MD2.DMdlT where
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
 import Data.Functor ((<$>))
+import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
@@ -39,7 +40,7 @@ data DMdlT =
         , _dmSkinNames   :: Maybe (V.Vector B.ByteString)
         , _dmSTVerts     :: Maybe (V.Vector DSTVertT)
         , _dmTriAngles   :: Maybe (V.Vector DTriangleT)
-        , _dmGlCmds      :: Maybe (UV.Vector Int)
+        , _dmGlCmds      :: Maybe (UV.Vector Word32)
         , _dmAliasFrames :: Maybe (V.Vector DAliasFrameT)
         }
 

@@ -5,16 +5,18 @@
 module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal')
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, unless)
+import Data.Binary.IEEE754 (wordToFloat)
 import Data.Bits ((.|.), (.&.), shiftL)
-import Data.Int (Int8)
+import Data.Int (Int8, Int32)
 import Data.Maybe (isNothing, fromJust, isJust)
-import Data.Word (Word16)
+import Data.Word (Word16, Word32)
 import Linear (V3(..), V4(..), norm, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -184,7 +186,7 @@ loadAliasModel modelRef buffer = do
     let pOutFrame = runGet (V.replicateM (pheader^.dmNumFrames) (getDAliasFrameT (pheader^.dmNumXYZ))) (BL.drop (fromIntegral $ pheader^.dmOfsFrames) lazyBuffer)
 
     -- load the glcmds
-    let pOutCmd = runGet (UV.replicateM (pheader^.dmNumGlCmds) getInt) (BL.drop (fromIntegral $ pheader^.dmOfsGlCmds) lazyBuffer)
+    let pOutCmd = runGet (UV.replicateM (pheader^.dmNumGlCmds) getWord32le) (BL.drop (fromIntegral $ pheader^.dmOfsGlCmds) lazyBuffer)
 
     -- register all skins
     let skinNames = V.map (B.takeWhile (/= 0)) $ runGet (V.replicateM (pheader^.dmNumSkins) (getByteString Constants.maxSkinName)) (BL.drop (fromIntegral $ pheader^.dmOfsSkins) lazyBuffer)
@@ -197,14 +199,14 @@ loadAliasModel modelRef buffer = do
                            , _dmAliasFrames = Just pOutFrame
                            }
 
+    pheader'' <- precompileGLCmds pheader'
+
     fastRenderAPIGlobals.frModKnown.ix modelIdx .= model { _mType = RenderAPIConstants.modAlias
-                                                         , _mExtraData = Just (AliasModelExtra pheader')
+                                                         , _mExtraData = Just (AliasModelExtra pheader'')
                                                          , _mMins = V3 (-32) (-32) (-32)
                                                          , _mMaxs = V3 32 32 32
                                                          , _mSkins = skins
                                                          }
-
-    precompileGLCmds pheader'
 
   where checkForErrors :: DMdlT -> B.ByteString -> Quake ()
         checkForErrors pheader modelName = do
@@ -775,6 +777,38 @@ rRegisterModel name = do
           let Just (ImageReference imageIdx) = texInfo^.mtiImage
           in (imageIdx, (images V.! imageIdx) { _iRegistrationSequence = regSeq })
 
-precompileGLCmds :: DMdlT -> Quake ()
+precompileGLCmds :: DMdlT -> Quake DMdlT
 precompileGLCmds model = do
+    textureBuf <- use $ fastRenderAPIGlobals.frModelTextureCoordBuf
+    vertexBuf <- use $ fastRenderAPIGlobals.frModelVertexIndexBuf
+    modelTextureCoordIdx <- use $ fastRenderAPIGlobals.frModelTextureCoordIdx
+    modelVertexIndexIdx <- use $ fastRenderAPIGlobals.frModelVertexIndexIdx
+
+    -- TODO: update model and set modelVertexIndexIdx and modelVertexIndexIdx
+
+    (tmp, modelTextureCoordIdx', modelVertexIndexIdx') <- setTextureAndVertex textureBuf vertexBuf (fromJust $ model^.dmGlCmds) modelTextureCoordIdx modelVertexIndexIdx 0 []
+
+    let size = length tmp
+
     io (putStrLn "Model.precompileGLCmds") >> undefined -- TODO
+
+  where setTextureAndVertex :: MSV.IOVector Float -> MSV.IOVector Int32 -> UV.Vector Word32 -> Int -> Int -> Int -> [Int32] -> Quake ([Int32], Int, Int)
+        setTextureAndVertex textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex tmp = do
+          let count :: Int32 = fromIntegral (order UV.! orderIndex)
+
+          if (count == 0)
+            then do
+              let count' = if count < 0 then -count else count
+              (textureCoordIdx', vertexIndexIdx', orderIndex') <- setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex count'
+              setTextureAndVertex textureBuf vertexBuf order textureCoordIdx' vertexIndexIdx' orderIndex' (count : tmp)
+            else
+              return (tmp, textureCoordIdx, vertexIndexIdx)
+
+        setCoords :: MSV.IOVector Float -> MSV.IOVector Int32 -> UV.Vector Word32 -> Int -> Int -> Int -> Int32 -> Quake (Int, Int, Int)
+        setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex count
+          | count <= 0 = return (textureCoordIdx, vertexIndexIdx, orderIndex)
+          | otherwise = do
+              io $ MSV.write textureBuf textureCoordIdx (wordToFloat $ order UV.! orderIndex)
+              io $ MSV.write textureBuf (textureCoordIdx + 1) (wordToFloat $ order UV.! (orderIndex + 1))
+              io $ MSV.write vertexBuf vertexIndexIdx (fromIntegral $ order UV.! (orderIndex + 2))
+              setCoords textureBuf vertexBuf order (textureCoordIdx + 2) (vertexIndexIdx + 1) (orderIndex + 3) (count - 1)
