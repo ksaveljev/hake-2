@@ -5,7 +5,7 @@
 module Render.Fast.Model where
 
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal')
-import Control.Monad (when, liftM, unless)
+import Control.Monad (when, liftM)
 import Data.Binary.IEEE754 (wordToFloat)
 import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8, Int32)
@@ -784,13 +784,22 @@ precompileGLCmds model = do
     modelTextureCoordIdx <- use $ fastRenderAPIGlobals.frModelTextureCoordIdx
     modelVertexIndexIdx <- use $ fastRenderAPIGlobals.frModelVertexIndexIdx
 
-    -- TODO: update model and set modelVertexIndexIdx and modelVertexIndexIdx
-
+    -- tmp is in reversed order, this should be taken into accounts in the
+    -- next calculations and assignments
     (tmp, modelTextureCoordIdx', modelVertexIndexIdx') <- setTextureAndVertex textureBuf vertexBuf (fromJust $ model^.dmGlCmds) modelTextureCoordIdx modelVertexIndexIdx 0 []
 
-    let size = length tmp
+    let counts = UV.fromList (reverse tmp)
+        indexElements = collectIndexElements tmp modelVertexIndexIdx 0 []
 
-    io (putStrLn "Model.precompileGLCmds") >> undefined -- TODO
+    zoom fastRenderAPIGlobals $ do
+      frModelTextureCoordIdx .= modelTextureCoordIdx'
+      frModelVertexIndexIdx .= modelVertexIndexIdx'
+
+    return model { _dmTextureCoordBufIdx = modelTextureCoordIdx
+                 , _dmVertexIndexBufIdx = modelVertexIndexIdx
+                 , _dmCounts = counts
+                 , _dmIndexElements = indexElements
+                 }
 
   where setTextureAndVertex :: MSV.IOVector Float -> MSV.IOVector Int32 -> UV.Vector Word32 -> Int -> Int -> Int -> [Int32] -> Quake ([Int32], Int, Int)
         setTextureAndVertex textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex tmp = do
@@ -812,3 +821,9 @@ precompileGLCmds model = do
               io $ MSV.write textureBuf (textureCoordIdx + 1) (wordToFloat $ order UV.! (orderIndex + 1))
               io $ MSV.write vertexBuf vertexIndexIdx (fromIntegral $ order UV.! (orderIndex + 2))
               setCoords textureBuf vertexBuf order (textureCoordIdx + 2) (vertexIndexIdx + 1) (orderIndex + 3) (count - 1)
+              
+        collectIndexElements :: [Int32] -> Int -> Int -> [(Int, Int)] -> V.Vector (Int, Int)
+        collectIndexElements [] _ _ acc = V.fromList acc
+        collectIndexElements (x:xs) idx pos acc =
+          let count = fromIntegral $ if x < 0 then -x else x
+          in collectIndexElements xs idx (pos + count) ((idx + pos, count) : acc)
