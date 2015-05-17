@@ -758,10 +758,13 @@ rRegisterModel name = do
           modelLens.mRegistrationSequence .= regSeq
 
           if | model^.mType == RenderAPIConstants.modSprite -> do
-                 io (putStrLn "Model.rRegisterModel#registerModelImage") >> undefined -- TODO
+                 io (putStrLn "Model.rRegisterModel#registerModelImage#modSprite") >> undefined -- TODO
 
              | model^.mType == RenderAPIConstants.modAlias -> do
-                 io (putStrLn "Model.rRegisterModel#registerModelImage") >> undefined -- TODO
+                 let Just (AliasModelExtra pheader) = model^.mExtraData
+                 skins <- V.mapM (\name -> Image.glFindImage name RenderAPIConstants.itSkin) (fromJust $ pheader^.dmSkinNames)
+                 modelLens.mSkins .= skins
+                 modelLens.mNumFrames .= pheader^.dmNumFrames
 
              | model^.mType == RenderAPIConstants.modBrush -> do
                  -- collect all image updates in order to update them later
