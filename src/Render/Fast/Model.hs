@@ -482,7 +482,7 @@ loadFaces buffer lump = do
       fastRenderAPIGlobals.frCurrentModel .= loadModel
       Surf.glBeginBuildingLightmaps loadModel
 
-    surfaces <- V.sequence $ V.map toMSurfaceT dFaces
+    surfaces <- V.mapM toMSurfaceT dFaces
 
     zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
       mNumSurfaces .= count
