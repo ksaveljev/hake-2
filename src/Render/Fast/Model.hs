@@ -774,7 +774,9 @@ rRegisterModel name = do
           modelLens.mRegistrationSequence .= regSeq
 
           if | model^.mType == RenderAPIConstants.modSprite -> do
-                 io (putStrLn "Model.rRegisterModel#registerModelImage#modSprite") >> undefined -- TODO
+                 let Just (SpriteModelExtra sprOut) = model^.mExtraData
+                 skins <- V.mapM (\frame -> Image.glFindImage (frame^.dsfName) RenderAPIConstants.itSprite) (sprOut^.dsFrames)
+                 modelLens.mSkins .= skins
 
              | model^.mType == RenderAPIConstants.modAlias -> do
                  let Just (AliasModelExtra pheader) = model^.mExtraData
