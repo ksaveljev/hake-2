@@ -4,6 +4,7 @@ module Client.CLView where
 import Control.Lens ((^.), use, preuse, ix, (.=), (+=))
 import Control.Monad (liftM, unless, when)
 import Data.Bits ((.&.))
+import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -19,6 +20,7 @@ import qualified Client.SCR as SCR
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified Sys.Sys as Sys
+import qualified Util.Lib as Lib
 
 {-
 - =================
@@ -154,8 +156,12 @@ prepRefresh = do
                   processClients configStrings (idx + 1) maxIdx
 
         setSky :: V.Vector B.ByteString -> Quake ()
-        setSky _ = do
-          io (putStrLn "CLView.prepRefresh#setSky") >> undefined -- TODO
+        setSky configStrings = do
+          let rotate = Lib.atof (configStrings V.! Constants.csSkyRotate)
+              (a:b:c:_) = BC.split ' ' (configStrings V.! Constants.csSkyAxis)
+              axis = V3 (Lib.atof a) (Lib.atof b) (Lib.atof c)
+          Just renderer <- use $ globals.re
+          (renderer^.rRefExport.reSetSky) (configStrings V.! Constants.csSky) rotate axis
 
 addNetGraph :: Quake ()
 addNetGraph = do
