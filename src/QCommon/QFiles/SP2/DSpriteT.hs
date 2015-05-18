@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.QFiles.SP2.DSpriteT where
+module QCommon.QFiles.SP2.DSpriteT ( module QCommon.QFiles.SP2.DSpriteT
+                                   , module QCommon.QFiles.SP2.DSprFrameT
+                                   ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
@@ -36,4 +38,4 @@ newDSpriteT = runGet getDSpriteT
           return $ DSpriteT ident version numFrames frames
 
         getFrames :: Int -> Get (V.Vector DSprFrameT)
-        getFrames numFrames = V.sequence $ V.replicate numFrames getDSprFrameT
+        getFrames numFrames = V.replicateM numFrames getDSprFrameT

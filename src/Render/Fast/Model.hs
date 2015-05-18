@@ -232,8 +232,24 @@ loadAliasModel modelRef buffer = do
             Com.comError Constants.errDrop ("model " `B.append` modelName `B.append` " has no frames")
 
 loadSpriteModel :: ModelReference -> B.ByteString -> Quake ()
-loadSpriteModel _ _ = do
-    io (putStrLn "Model.loadSpriteModel") >> undefined -- TODO
+loadSpriteModel modelRef buffer = do
+    let ModKnownReference modelIdx = modelRef
+        sprOut = newDSpriteT (BL.fromStrict buffer)
+
+    when ((sprOut^.dsVersion) /= spriteVersion) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop (name `B.append` " has wrong version number (" `B.append` BC.pack (show $ sprOut^.dsVersion) `B.append` " should be " `B.append` BC.pack (show spriteVersion) `B.append` ")") -- IMPROVE?
+
+    when ((sprOut^.dsNumFrames) > Constants.maxMd2Skins) $ do
+      Just name <- preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx.mName
+      Com.comError Constants.errDrop (name `B.append` " has too many frames (" `B.append` BC.pack (show $ sprOut^.dsNumFrames) `B.append` " > " `B.append` BC.pack (show Constants.maxMd2Skins) `B.append` ")") -- IMPROVE?
+
+    skins <- V.mapM (\frame -> Image.glFindImage (frame^.dsfName) RenderAPIConstants.itSprite) (sprOut^.dsFrames)
+
+    zoom (fastRenderAPIGlobals.frModKnown.ix modelIdx) $ do
+      mSkins .= skins
+      mType .= RenderAPIConstants.modSprite
+      mExtraData .= Just (SpriteModelExtra sprOut)
 
 loadBrushModel :: ModelReference -> B.ByteString -> Quake ()
 loadBrushModel modelRef buffer = do
@@ -762,7 +778,7 @@ rRegisterModel name = do
 
              | model^.mType == RenderAPIConstants.modAlias -> do
                  let Just (AliasModelExtra pheader) = model^.mExtraData
-                 skins <- V.mapM (\name -> Image.glFindImage name RenderAPIConstants.itSkin) (fromJust $ pheader^.dmSkinNames)
+                 skins <- V.mapM (\skinName -> Image.glFindImage skinName RenderAPIConstants.itSkin) (fromJust $ pheader^.dmSkinNames)
                  modelLens.mSkins .= skins
                  modelLens.mNumFrames .= pheader^.dmNumFrames
 

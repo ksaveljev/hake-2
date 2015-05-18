@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
 import Util.Binary
+import qualified Constants
 
 data DSprFrameT =
   DSprFrameT { _dsfWidth   :: Int
@@ -29,4 +30,4 @@ getDSprFrameT = DSprFrameT <$> getInt
                            <*> getInt
                            <*> getInt
                            <*> getInt
-                           <*> liftM (B.reverse . BC.dropWhile (<= ' ') . B.reverse . BL.toStrict) getRemainingLazyByteString
+                           <*> liftM (B.reverse . BC.dropWhile (<= ' ') . B.reverse) (getByteString Constants.maxSkinName)
