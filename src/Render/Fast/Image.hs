@@ -910,3 +910,6 @@ glSelectTexture texture = do
       fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
       GL.glActiveTextureARB (fromIntegral texture)
       GL.glClientActiveTextureARB (fromIntegral texture)
+
+rRegisterSkin :: B.ByteString -> Quake (Maybe ImageReference)
+rRegisterSkin name = glFindImage name RenderAPIConstants.itSkin
