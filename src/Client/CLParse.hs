@@ -7,9 +7,12 @@ module Client.CLParse where
 import Control.Exception (handle, IOException)
 import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=), Traversal')
 import Control.Monad (when, liftM, void)
+import Data.Char (toLower)
+import Data.Maybe (isNothing)
 import System.IO (IOMode(ReadWriteMode), hFileSize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -220,8 +223,139 @@ parseClientInfo player = do
     loadClientInfo (globals.cl.csClientInfo.ix player) str
 
 loadClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> Quake ()
-loadClientInfo _ _ = do
-    io (putStrLn "CLParse.loadClientInfo") >> undefined -- TODO
+loadClientInfo clientInfoLens str = do
+    let t = '\\' `BC.elemIndex` str
+        (name, str') = case t of
+                         Nothing -> (str, str)
+                         Just idx -> (B.take idx str, B.drop (idx + 1) str)
+
+    Just renderer <- use $ globals.re
+    noSkinsValue <- liftM (^.cvValue) clNoSkinsCVar
+
+    (modelRef, weaponModels, skinRef, iconName, iconRef) <-
+      if noSkinsValue /= 0 || B.length str' == 0
+        then do
+          modelRef <- (renderer^.rRefExport.reRegisterModel) "players/male/tris.md2"
+          weaponModelRef <- (renderer^.rRefExport.reRegisterModel) "players/male/weapon.md2"
+          skinRef <- (renderer^.rRefExport.reRegisterSkin) "players/male/grunt.pcx"
+          let iconName = "/players/male/grunt_i.pcx"
+              weaponModels = V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef else Nothing)
+          iconRef <- (renderer^.rRefExport.reRegisterPic) iconName
+          return (modelRef, weaponModels, skinRef, iconName, iconRef)
+        else do
+          -- isolate the model name
+          pos <- case '/' `BC.elemIndex` str' of
+                   Nothing -> case '\\' `BC.elemIndex` str' of
+                                Nothing -> do
+                                  Com.comError Constants.errFatal ("Invalid model name:" `B.append` str')
+                                  return 0
+                                Just idx ->
+                                  return idx
+                   Just idx -> return idx
+
+          let modelName = B.take pos str'
+              -- isolate the skin name
+              skinName = B.drop (pos + 1) str'
+              -- model file
+              modelFileName = "players/" `B.append` modelName `B.append` "/tris.md2"
+
+          modelRef <- (renderer^.rRefExport.reRegisterModel) modelFileName
+          (modelName', modelRef') <- case modelRef of
+                                       Just _ -> return (modelName, modelRef)
+                                       Nothing -> do
+                                         ref <- (renderer^.rRefExport.reRegisterModel) "players/male/tris.md2"
+                                         return ("male", ref)
+
+          -- skin file
+          let skinFileName = "players/" `B.append` modelName' `B.append` "/" `B.append` skinName `B.append` ".pcx"
+          skinRef <- (renderer^.rRefExport.reRegisterSkin) skinFileName
+
+          -- if we don't have the skin and the model wasn't male,
+          -- see if the male has it (this is for CTF's skins)
+          (modelName'', modelRef'', skinRef') <-
+            if isNothing skinRef && (BC.map toLower modelName') /= "male"
+              then do
+                -- change model to male
+                ref <- (renderer^.rRefExport.reRegisterModel) "players/male/tris.md2"
+                -- see if the skin exists for the male model
+                let skinFileName' = "players/male/" `B.append` skinName `B.append` ".pcx"
+                sr <- (renderer^.rRefExport.reRegisterSkin) skinFileName'
+                return ("male", ref, sr)
+              else
+                return (modelName', modelRef', skinRef)
+          
+          -- if we still don't have a skin, it means that the male model
+          -- didn't have it, so default to grunt
+          skinRef'' <- if isNothing skinRef'
+                         then do
+                           -- see if the skin exists for the male model
+                           let skinFileName' = "players/" `B.append` modelName'' `B.append` "/grunt.pcx"
+                           (renderer^.rRefExport.reRegisterSkin) skinFileName'
+                         else
+                           return skinRef'
+
+          -- weapon file
+          vwepValue <- liftM (^.cvValue) clVwepCVar
+          clWeaponModels <- use $ clientGlobals.cgWeaponModels
+          weaponModels <- if vwepValue == 0
+                            then do
+                              let weaponFileName = "players/" `B.append` modelName'' `B.append` "/" `B.append` (clWeaponModels V.! 0)
+                              weaponModelRef <- (renderer^.rRefExport.reRegisterModel) weaponFileName
+                              if isNothing weaponModelRef && (BC.map toLower modelName'') == "cyborg"
+                                then do
+                                  -- try male
+                                  let weaponFileName' = "players/male/" `B.append` (clWeaponModels V.! 0)
+                                  weaponModelRef' <- (renderer^.rRefExport.reRegisterModel) weaponFileName'
+                                  return $ V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef' else Nothing)
+                                else
+                                  return $ V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef else Nothing)
+                            else do
+                              numWeaponModels <- use $ clientGlobals.cgNumCLWeaponModels
+                              let emptyWeapons = V.replicate Constants.maxClientWeaponModels Nothing
+                              updates <- loadWeapons clWeaponModels modelName'' 0 numWeaponModels []
+                              return $ emptyWeapons V.// updates
+
+          -- icon file
+          let iconName = "/players/" `B.append` modelName'' `B.append` "/" `B.append` skinName `B.append` "_i.pcx"
+          iconRef <- (renderer^.rRefExport.reRegisterPic) iconName
+          return (modelRef'', weaponModels, skinRef'', iconName, iconRef)
+
+    -- must have all loaded data types to be valid
+    if isNothing skinRef || isNothing iconRef || isNothing modelRef || isNothing (weaponModels V.! 0)
+      then
+        clientInfoLens .= newClientInfoT { _ciName        = name
+                                         , _ciCInfo       = str
+                                         , _ciSkin        = Nothing
+                                         , _ciIcon        = Nothing
+                                         , _ciIconName    = iconName
+                                         , _ciModel       = Nothing
+                                         , _ciWeaponModel = V.replicate Constants.maxClientWeaponModels Nothing
+                                         }
+      else
+        clientInfoLens .= newClientInfoT { _ciName        = name
+                                         , _ciCInfo       = str
+                                         , _ciSkin        = skinRef
+                                         , _ciIcon        = iconRef
+                                         , _ciIconName    = iconName
+                                         , _ciModel       = modelRef
+                                         , _ciWeaponModel = weaponModels
+                                         }
+
+  where loadWeapons :: V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe ModelReference)] -> Quake [(Int, Maybe ModelReference)]
+        loadWeapons clWeaponModels modelName idx maxIdx acc
+          | idx >= maxIdx = return acc
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              let weaponFileName = "players/" `B.append` modelName `B.append` "/" `B.append` (clWeaponModels V.! idx)
+              weaponModelRef <- (renderer^.rRefExport.reRegisterModel) weaponFileName
+              if isNothing weaponModelRef && (BC.map toLower modelName) == "cyborg"
+                then do
+                  -- try male
+                  let weaponFileName' = "players/male/" `B.append` (clWeaponModels V.! idx)
+                  weaponModelRef' <- (renderer^.rRefExport.reRegisterModel) weaponFileName'
+                  loadWeapons clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef') : acc)
+                else
+                  loadWeapons clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef) : acc)
 
 {-
 - CL_CheckOrDownloadFile returns true if the file exists, 

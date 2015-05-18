@@ -949,11 +949,11 @@ data MLeafT =
 data ClientInfoT =
   ClientInfoT { _ciName        :: !B.ByteString
               , _ciCInfo       :: !B.ByteString
-              , _ciSkin        :: !(Maybe Int) -- index to some imageT vector
-              , _ciIcon        :: !(Maybe Int) -- index to some imageT vector
+              , _ciSkin        :: !(Maybe ImageReference) -- index to some imageT vector
+              , _ciIcon        :: !(Maybe ImageReference) -- index to some imageT vector
               , _ciIconName    :: !B.ByteString
-              , _ciModel       :: !(Maybe Int) -- index to some modelT vector
-              , _ciWeaponModel :: !(UV.Vector Int) -- index to some modelT vector
+              , _ciModel       :: !(Maybe ModelReference) -- index to some modelT vector
+              , _ciWeaponModel :: !(V.Vector (Maybe ModelReference)) -- index to some modelT vector
               }
 
 data SCRGlobals =
@@ -978,7 +978,7 @@ data RefExportT =
              , _reShutDown            :: Quake ()
              , _reBeginRegistration   :: B.ByteString -> Quake ()
              , _reRegisterModel       :: B.ByteString -> Quake (Maybe ModelReference)
-             , _reRegisterSkin        :: B.ByteString -> Quake (Maybe ImageT)
+             , _reRegisterSkin        :: B.ByteString -> Quake (Maybe ImageReference)
              , _reRegisterPic         :: B.ByteString -> Quake (Maybe ImageReference)
              , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
              , _reEndRegistration     :: Quake ()
@@ -1461,7 +1461,7 @@ data RenderAPI =
             , _rShutdown          :: GLDriver -> Quake ()
             , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
             , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe ModelReference)
-            , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe ImageT)
+            , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe ImageReference)
             , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe ImageReference)
             , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
             , _rEndRegistration   :: GLDriver -> Quake ()

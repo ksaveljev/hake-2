@@ -5,7 +5,7 @@ module Client.ClientInfoT ( ClientInfoT(..)
                           ) where
 
 import Control.Lens (makeLenses)
-import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector as V
 
 import Internal
 import qualified Constants
@@ -20,5 +20,5 @@ newClientInfoT =
               , _ciIcon        = Nothing
               , _ciIconName    = ""
               , _ciModel       = Nothing
-              , _ciWeaponModel = UV.replicate Constants.maxClientWeaponModels 0
+              , _ciWeaponModel = V.replicate Constants.maxClientWeaponModels Nothing
               }
