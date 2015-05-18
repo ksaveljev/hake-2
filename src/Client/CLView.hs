@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.CLView where
 
-import Control.Lens ((^.), use, preuse, ix, (.=))
-import Control.Monad (liftM, unless)
+import Control.Lens ((^.), use, preuse, ix, (.=), (+=))
+import Control.Monad (liftM, unless, when)
 import Data.Bits ((.&.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -15,7 +16,9 @@ import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Client.SCR as SCR
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
+import qualified Sys.Sys as Sys
 
 {-
 - =================
@@ -90,16 +93,65 @@ prepRefresh = do
       globals.cl.csForceRefDef .= True -- make sure we have a valid refdef
 
   where registerModels :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        registerModels _ _ _ = do
-          io (putStrLn "CLView.prepRefresh#registerModels") >> undefined -- TODO
+        registerModels configStrings idx maxIdx
+          | idx >= maxIdx || B.length (configStrings V.! (Constants.csModels + idx)) == 0 = return ()
+          | otherwise = do
+              let name = if B.length (configStrings V.! (Constants.csModels + idx)) > 37
+                           then B.take 36 (configStrings V.! (Constants.csModels + idx))
+                           else configStrings V.! (Constants.csModels + idx)
+
+              when (name `BC.index` 0 /= '*') $
+                Com.printf (name `B.append` "\r")
+
+              SCR.updateScreen
+              Sys.sendKeyEvents -- pump message loop
+              
+              if name `BC.index` 0 == '#'
+                then do -- special player weapon model
+                  numWeaponModels <- use $ clientGlobals.cgNumCLWeaponModels
+                  when (numWeaponModels < Constants.maxClientWeaponModels) $ do
+                    clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 name
+                    clientGlobals.cgNumCLWeaponModels += 1
+                else do
+                  Just renderer <- use $ globals.re
+                  modelRef <- (renderer^.rRefExport.reRegisterModel) name
+                  globals.cl.csModelDraw.ix idx .= modelRef
+
+                  if name `BC.index` 0 == '*'
+                    then do
+                      inlineModelRef <- CM.inlineModel name
+                      globals.cl.csModelClip.ix idx .= Just inlineModelRef
+                    else
+                      globals.cl.csModelClip.ix idx .= Nothing
+
+              when (name `BC.index` 0 /= '*') $
+                Com.printf "                                     \r"
+
+              registerModels configStrings (idx + 1) maxIdx
 
         registerImages :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        registerImages _ _ _ = do
-          io (putStrLn "CLView.prepRefresh#registerImages") >> undefined -- TODO
+        registerImages configStrings idx maxIdx
+          | idx >= maxIdx || B.length (configStrings V.! (Constants.csImages + idx)) == 0 = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              picRef <- (renderer^.rRefExport.reRegisterPic) (configStrings V.! (Constants.csImages + idx))
+              globals.cl.csImagePrecache.ix idx .= picRef
+              Sys.sendKeyEvents -- pump message loop
+              registerImages configStrings (idx + 1) maxIdx
 
         processClients :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        processClients _ _ _ = do
-          io (putStrLn "CLView.prepRefresh#processClients") >> undefined -- TODO
+        processClients configStrings idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              if B.length (configStrings V.! (Constants.csPlayerSkins + idx)) == 0
+                then processClients configStrings (idx + 1) maxIdx
+                else do
+                  Com.printf ("client " `B.append` BC.pack (show idx) `B.append` "\r") -- IMPROVE?
+                  SCR.updateScreen
+                  Sys.sendKeyEvents
+                  CLParse.parseClientInfo idx
+                  Com.printf "                                     \r"
+                  processClients configStrings (idx + 1) maxIdx
 
         setSky :: V.Vector B.ByteString -> Quake ()
         setSky _ = do
