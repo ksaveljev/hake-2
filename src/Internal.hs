@@ -1574,6 +1574,12 @@ data FastRenderAPIGlobals =
                        , _frFrameCount           :: Int
                        , _frWarpFace             :: Maybe MSurfaceT
                        , _frModelVisibility      :: B.ByteString
+                       , _frSkyName              :: B.ByteString
+                       , _frSkyRotate            :: Float
+                       , _frSkyAxis              :: V3 Float
+                       , _frSkyImages            :: V.Vector (Maybe ImageReference)
+                       , _frSkyMin               :: Float
+                       , _frSkyMax               :: Float
                        }
 
 data ParticleTGlobals =

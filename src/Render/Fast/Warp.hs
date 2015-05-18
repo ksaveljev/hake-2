@@ -4,8 +4,9 @@
 module Render.Fast.Warp where
 
 import Control.Applicative (Const)
-import Control.Lens (use, preuse, ix, (^.), (.=))
-import Control.Monad (when, unless)
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
+import Control.Monad (when, unless, liftM)
+import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -14,12 +15,19 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
+import qualified Render.RenderAPIConstants as RenderAPIConstants
 
 subdivideSize :: Float
 subdivideSize = 64
+
+suf :: V.Vector B.ByteString
+suf = V.fromList ["rt", "bk", "lf", "ft", "up", "dn"]
 
 sinV :: UV.Vector Float
 sinV =
@@ -205,3 +213,42 @@ glSubdivideSurface surface = do
           in if li > 0
                then ((model^.mVertexes) V.! (fromIntegral $ fst (((model^.mEdges) V.! li)^.meV)))^.mvPosition
                else ((model^.mVertexes) V.! (fromIntegral $ snd (((model^.mEdges) V.! (-li))^.meV)))^.mvPosition
+
+rSetSky :: B.ByteString -> Float -> V3 Float -> Quake ()
+rSetSky name rotate axis = do
+    zoom fastRenderAPIGlobals $ do
+      frSkyName .= name
+      frSkyRotate .= rotate
+      frSkyAxis .= axis
+
+    glSkyMipValue <- liftM (^.cvValue) glSkyMipCVar
+    glExtPalettedTextureValue <- liftM (^.cvValue) glExtPalettedTextureCVar
+    colorTableEXT <- use $ fastRenderAPIGlobals.frColorTableEXT
+
+    (updates, skyMin, skyMax) <- setSky glSkyMipValue glExtPalettedTextureValue colorTableEXT 0 6 [] 0 0
+    fastRenderAPIGlobals.frSkyImages %= (V.// updates)
+    fastRenderAPIGlobals.frSkyMin .= skyMin
+    fastRenderAPIGlobals.frSkyMax .= skyMax
+
+  where setSky :: Float -> Float -> Bool -> Int -> Int -> [(Int, Maybe ImageReference)] -> Float -> Float -> Quake ([(Int, Maybe ImageReference)], Float, Float)
+        setSky skyMipValue extPalettedTexture colorTableEXT idx maxIdx acc skyMin skyMax
+          | idx >= maxIdx = return (acc, skyMin, skyMax)
+          | otherwise = do
+              when (skyMipValue /= 0 || rotate /= 0) $
+                glPicMipCVar >>= \picMip -> CVar.update picMip { _cvValue = (picMip^.cvValue) + 1 }
+
+              let pathname = if colorTableEXT && extPalettedTexture /= 0
+                               then "env/" `B.append` name `B.append` (suf V.! idx) `B.append` ".pcx"
+                               else "env/" `B.append` name `B.append` (suf V.! idx) `B.append` ".tga"
+                            
+              imageRef <- Image.glFindImage pathname RenderAPIConstants.itSky
+              imageRef' <- if isNothing imageRef
+                                then (use $ fastRenderAPIGlobals.frNoTexture) >>= \ref -> return (Just ref)
+                                else return imageRef
+
+              if skyMipValue /= 0 || rotate /= 0
+                then do
+                  glPicMipCVar >>= \picMip -> CVar.update picMip { _cvValue = (picMip^.cvValue) - 1 }
+                  setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx ((idx, imageRef') : acc) (1 / 256) (255 / 256)
+                else
+                  setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx ((idx, imageRef') : acc) (1 / 512) (511 / 512)

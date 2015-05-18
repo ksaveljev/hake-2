@@ -11,6 +11,7 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         ) where
 
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -95,4 +96,10 @@ initialFastRenderAPIGlobals =
                        , _frFrameCount           = 0
                        , _frWarpFace             = Nothing
                        , _frModelVisibility      = ""
+                       , _frSkyName              = ""
+                       , _frSkyRotate            = 0
+                       , _frSkyAxis              = V3 0 0 0
+                       , _frSkyImages            = V.replicate 6 Nothing
+                       , _frSkyMin               = 0
+                       , _frSkyMax               = 0
                        }
