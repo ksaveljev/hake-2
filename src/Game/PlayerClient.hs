@@ -303,3 +303,11 @@ passwordOK p1 p2 =
     if B.length p1 > 0 && p1 /= "none" && p1 /= p2
       then False
       else True
+
+{-
+- Called when a client has finished connecting, and is ready to be placed
+- into the game. This will happen every level load. 
+-}
+clientBegin :: EdictReference -> Quake ()
+clientBegin (EdictReference edictIdx) = do
+    io (putStrLn "PlayerClient.clientBegin") >> undefined -- TODO

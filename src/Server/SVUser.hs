@@ -18,6 +18,8 @@ import QCommon.XCommandT
 import Server.UCmdT
 import qualified Constants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Game.PlayerClient as PlayerClient
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
@@ -347,7 +349,27 @@ baselinesF = do
               return start
 
 beginF :: XCommandT
-beginF = io (putStrLn "SVUser.beginF") >> undefined -- TODO
+beginF = do
+    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+    Com.dprintf $ "Begin() from " `B.append` (client^.cName) `B.append` "\n"
+
+    -- handle the case of a level changing while a client was connecting
+    v1 <- Cmd.argv 1
+    spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
+
+    if Lib.atoi v1 /= spawnCount
+      then do
+        Com.printf "SV_Begin_f from different level\n"
+        newF
+      else do
+        svGlobals.svServerStatic.ssClients.ix clientIdx.cState .= Constants.csSpawned
+
+        -- call the game begin function
+        Just edictRef <- use $ svGlobals.svPlayer
+        PlayerClient.clientBegin edictRef
+
+        CBuf.insertFromDefer
 
 nextServerF :: XCommandT
 nextServerF = io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
