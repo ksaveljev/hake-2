@@ -965,3 +965,7 @@ glSelectTexture texture = do
 
 rRegisterSkin :: B.ByteString -> Quake (Maybe ImageReference)
 rRegisterSkin name = glFindImage name RenderAPIConstants.itSkin
+
+glFreeUnusedImages :: Quake ()
+glFreeUnusedImages = do
+    io (putStrLn "Image.glFreeUnusedImages") >> undefined -- TODO

@@ -848,3 +848,32 @@ precompileGLCmds model = do
         collectIndexElements (x:xs) idx pos acc =
           let count = fromIntegral $ if x < 0 then -x else x
           in collectIndexElements xs idx (pos + count) ((idx + pos, count) : acc)
+
+rEndRegistration :: Quake ()
+rEndRegistration = do
+    modNumKnown <- use $ fastRenderAPIGlobals.frModNumKnown
+    modKnown <- use $ fastRenderAPIGlobals.frModKnown
+    regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+
+    updates <- checkModels modKnown regSeq 0 modNumKnown []
+    fastRenderAPIGlobals.frModKnown %= (V.// updates)
+
+    Image.glFreeUnusedImages
+
+  where checkModels :: V.Vector ModelT -> Int -> Int -> Int -> [(Int, ModelT)] -> Quake [(Int, ModelT)]
+        checkModels modKnown regSeq idx maxIdx updates
+          | idx >= maxIdx = return updates
+          | otherwise = do
+              let m = modKnown V.! idx
+              update <- if | B.length (m^.mName) == 0 -> return Nothing -- do nothing
+                           | (m^.mRegistrationSequence) /= regSeq -> return $ Just (idx, newModelT) -- don't need this model
+                           | otherwise -> if (m^.mType) == RenderAPIConstants.modAlias
+                                            then do
+                                              let Just (AliasModelExtra pheader) = m^.mExtraData
+                                              pheader' <- precompileGLCmds pheader
+                                              return $ Just (idx, m { _mExtraData = Just (AliasModelExtra pheader') })
+                                            else return Nothing
+
+              case update of
+                Nothing -> checkModels modKnown regSeq (idx + 1) maxIdx updates
+                Just u -> checkModels modKnown regSeq (idx + 1) maxIdx (u : updates)
