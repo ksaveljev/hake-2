@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Image where
 
-import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom)
+import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom, (%=))
 import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
@@ -11,6 +11,7 @@ import Data.Int (Int32)
 import Data.Maybe (isNothing, isJust, fromJust, fromMaybe)
 import Data.Monoid (mappend, mempty, mconcat)
 import Data.Word (Word8)
+import Foreign.Marshal.Utils (with)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
@@ -966,6 +967,44 @@ glSelectTexture texture = do
 rRegisterSkin :: B.ByteString -> Quake (Maybe ImageReference)
 rRegisterSkin name = glFindImage name RenderAPIConstants.itSkin
 
+{-
+================
+GL_FreeUnusedImages
+
+Any image that was not touched on this registration sequence
+will be freed.
+================
+-}
 glFreeUnusedImages :: Quake ()
 glFreeUnusedImages = do
-    io (putStrLn "Image.glFreeUnusedImages") >> undefined -- TODO
+    -- never free r_notexture or particle texture
+    regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+    ImageReference noTextureIdx <- use $ fastRenderAPIGlobals.frNoTexture
+    ImageReference particleTextureIdx <- use $ fastRenderAPIGlobals.frParticleTexture
+
+    fastRenderAPIGlobals.frGLTextures.ix noTextureIdx.iRegistrationSequence .= regSeq
+    fastRenderAPIGlobals.frGLTextures.ix particleTextureIdx.iRegistrationSequence .= regSeq
+
+    numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+    glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+
+    updates <- checkImages glTextures regSeq 0 numGLTextures []
+    fastRenderAPIGlobals.frGLTextures %= (V.// updates)
+
+  where checkImages :: V.Vector ImageT -> Int -> Int -> Int -> [(Int, ImageT)] -> Quake [(Int, ImageT)]
+        checkImages glTextures regSeq idx maxIdx acc
+          | idx >= maxIdx = return acc
+          | otherwise = do
+              let image = glTextures V.! idx
+
+              update <- if | (image^.iRegistrationSequence) == regSeq -> return Nothing -- used this sequence
+                           | (image^.iRegistrationSequence) == 0 -> return Nothing -- free image_t slot
+                           | (image^.iType) == RenderAPIConstants.itPic -> return Nothing -- don't free pics
+                           | otherwise -> do
+                               io $ with (fromIntegral $ image^.iTexNum) $ \ptr ->
+                                 GL.glDeleteTextures 1 ptr
+                               return $ Just (idx, newImageT idx)
+
+              case update of
+                Nothing -> checkImages glTextures regSeq (idx + 1) maxIdx acc
+                Just u -> checkImages glTextures regSeq (idx + 1) maxIdx (u : acc)
