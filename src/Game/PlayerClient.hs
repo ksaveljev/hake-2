@@ -4,11 +4,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerClient where
 
-import Control.Lens (use, (^.), ix, preuse, (.=), zoom)
+import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=))
 import Control.Monad (when, liftM, void, unless)
-import Data.Bits ((.|.), (.&.))
+import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isNothing)
+import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -372,6 +373,102 @@ clientBeginDeathmatch :: EdictReference -> Quake ()
 clientBeginDeathmatch _ = do
     io (putStrLn "PlayerClient.clientBeginDeathmatch") >> undefined -- TODO
 
+-- Called when a player connects to a server or respawns in a deathmatch.
 putClientInServer :: EdictReference -> Quake ()
-putClientInServer _ = do
+putClientInServer edictRef@(EdictReference edictIdx) = do
+    -- find a spawn point
+    -- do it before setting health back up, so farthest
+    -- ranging doesn't count this client
+    (spawnOrigin, spawnAngles) <- selectSpawnPoint edictRef
+    let gClientIdx = edictIdx - 1
+
+    -- deathmatch wipes most client data every spawn
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+    resp <- if | deathmatchValue /= 0 -> do
+                  Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                  let userInfo = gClient^.gcPers.cpUserInfo
+                  initClientPersistant (GClientReference gClientIdx)
+                  void $ clientUserInfoChanged edictRef userInfo
+                  return (gClient^.gcResp)
+
+               | coopValue /= 0 -> do
+                   Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                   let userInfo = gClient^.gcPers.cpUserInfo
+                       coopResp = (gClient^.gcResp.crCoopRespawn) { _cpGameHelpChanged = gClient^.gcPers.cpGameHelpChanged
+                                                                  , _cpHelpChanged = gClient^.gcPers.cpHelpChanged
+                                                                  }
+                       resp = (gClient^.gcResp) { _crCoopRespawn = coopResp }
+
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers .= resp^.crCoopRespawn
+                   void $ clientUserInfoChanged edictRef userInfo
+                   when ((resp^.crScore) > (resp^.crCoopRespawn.cpScore)) $
+                     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpScore .= resp^.crScore
+
+                   return resp
+
+               | otherwise -> return newClientRespawnT
+
+    -- clear everything but the persistant data
+    Just saved <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx .= (newGClientT gClientIdx) { _gcPers = saved }
+
+    when ((saved^.cpHealth) <= 0) $
+      initClientPersistant (GClientReference gClientIdx)
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp .= resp
+
+    -- copy some data from the client to the entity
+    fetchClientEntData edictRef
+
+    -- clear entity values
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictOther.eoGroundEntity .= Nothing
+      eClient                    .= Just (GClientReference gClientIdx)
+      eEdictStatus.eTakeDamage   .= Constants.damageAim
+      eMoveType                  .= Constants.moveTypeWalk
+      eEdictStatus.eViewHeight   .= 22
+      eInUse                     .= True
+      eClassName                 .= "player"
+      eEdictPhysics.eMass        .= 200
+      eSolid                     .= Constants.solidBbox
+      eEdictStatus.eDeadFlag     .= Constants.deadNo
+      eEdictPhysics.eAirFinished .= levelTime + 12
+      eClipMask                  .= Constants.maskPlayerSolid
+      eEdictInfo.eiModel         .= Just "players/male/tris.md2"
+      eEdictAction.eaPain        .= Just playerPain
+      eEdictAction.eaDie         .= Just playerDie
+      eWaterLevel                .= 0
+      eWaterType                 .= 0
+      eFlags                     %= (.&. (complement Constants.flNoKnockback))
+      eSvFlags                   %= (.&. (complement Constants.svfDeadMonster))
+      eEdictMinMax.eMins         .= V3 (-16) (-16) (-24)
+      eEdictMinMax.eMaxs         .= V3 16 16 32
+      eEdictPhysics.eVelocity    .= V3 0 0 0
+      
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcPlayerState .= newPlayerStateT
+      gcPlayerState.psPMoveState.pmsOrigin .= fmap (truncate . (* 8)) spawnOrigin
+
     io (putStrLn "PlayerClient.putClientInServer") >> undefined -- TODO
+
+selectSpawnPoint :: EdictReference -> Quake (V3 Float, V3 Float)
+selectSpawnPoint _ = do
+    io (putStrLn "PlayerClient.selectSpawnPoint") >> undefined -- TODO
+
+fetchClientEntData :: EdictReference -> Quake ()
+fetchClientEntData _ = do
+    io (putStrLn "PlayerClient.fetchClientEntData") >> undefined -- TODO
+
+playerPain :: EntPain
+playerPain = 
+  GenericEntPain "player_pain" $ \_ _ _ _ -> return ()
+
+playerDie :: EntDie
+playerDie =
+  GenericEntDie "player_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "PlayerClient.playerDie") >> undefined -- TODO

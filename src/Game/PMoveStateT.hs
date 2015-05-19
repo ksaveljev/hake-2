@@ -7,8 +7,8 @@ import Control.Lens (makeLenses)
 
 data PMoveStateT =
   PMoveStateT { _pmsPMType      :: Int
-              , _pmsOrigin      :: V3 Float
-              , _pmsVelocity    :: V3 Float
+              , _pmsOrigin      :: V3 Int16
+              , _pmsVelocity    :: V3 Int16
               , _pmsPMFlags     :: Int8
               , _pmsPMTime      :: Int8
               , _pmsGravity     :: Int16
