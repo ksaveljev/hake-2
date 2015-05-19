@@ -899,7 +899,6 @@ loadTGA name = do
 
         let columns = fromIntegral $ tgaHeader^.tgaWidth
             rows = fromIntegral $ tgaHeader^.tgaHeight
-            numPixels = columns * rows
             buf = if (tgaHeader^.tgaIdLength) /= 0
                     then BL.drop (fromIntegral $ tgaHeader^.tgaIdLength) (tgaHeader^.tgaData)
                     else tgaHeader^.tgaData

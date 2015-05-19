@@ -23,7 +23,10 @@ import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
+import qualified Game.PlayerHud as PlayerHud
+import qualified Game.PlayerView as PlayerView
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 -- Called when a player drops from the server. Will not be called between levels. 
 clientDisconnect :: Maybe EdictReference -> Quake ()
@@ -309,5 +312,66 @@ passwordOK p1 p2 =
 - into the game. This will happen every level load. 
 -}
 clientBegin :: EdictReference -> Quake ()
-clientBegin (EdictReference edictIdx) = do
-    io (putStrLn "PlayerClient.clientBegin") >> undefined -- TODO
+clientBegin edictRef@(EdictReference edictIdx) = do
+    let gClientRef = GClientReference (edictIdx - 1)
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eClient .= Just gClientRef
+
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        clientBeginDeathmatch edictRef
+      else do
+        -- if there is already a body waiting for us (a loadgame), just
+        -- take it, otherwise spawn one from scratch
+        Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+
+        if inUse
+          then do
+            -- the client has cleared the client side viewangles upon
+            -- connecting to the server, which is different than the
+            -- state when the game is saved, so we need to compensate
+            -- with deltaangles
+            Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix (edictIdx - 1)
+            gameBaseGlobals.gbGame.glClients.ix (edictIdx - 1).gcPlayerState.psPMoveState.pmsDeltaAngles .= fmap Math3D.angleToShort (gClient^.gcPlayerState.psViewAngles)
+          else do
+            -- a spawn point will completely reinitialize the entity
+            -- except for the persistant data that was initialized at
+            -- ClientConnect() time
+            GameUtil.initEdict edictRef
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eClassName .= "player"
+            initClientResp gClientRef
+            putClientInServer edictRef
+
+        intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+        if intermissionTime /= 0
+          then
+            PlayerHud.moveClientToIntermission edictRef
+          else do
+            maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
+            when (maxClients > 1) $ do
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+              let writeByte = gameImport^.giWriteByte
+                  writeShort = gameImport^.giWriteShort
+                  multicast = gameImport^.giMulticast
+                  bprintf = gameImport^.giBprintf
+
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix (edictIdx - 1)
+
+              writeByte Constants.svcMuzzleFlash
+              writeShort edictIdx
+              writeByte Constants.mzLogin
+              multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+              bprintf Constants.printHigh ((gClient^.gcPers.cpNetName) `B.append` " entered the game\n")
+
+        -- make sure all view stuff is valid
+        PlayerView.clientEndServerFrame edictRef
+
+clientBeginDeathmatch :: EdictReference -> Quake ()
+clientBeginDeathmatch _ = do
+    io (putStrLn "PlayerClient.clientBeginDeathmatch") >> undefined -- TODO
+
+putClientInServer :: EdictReference -> Quake ()
+putClientInServer _ = do
+    io (putStrLn "PlayerClient.putClientInServer") >> undefined -- TODO
