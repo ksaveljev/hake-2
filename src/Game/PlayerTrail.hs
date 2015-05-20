@@ -3,6 +3,7 @@ module Game.PlayerTrail where
 
 import Control.Lens ((^.), (.=), ix)
 import Control.Monad (liftM, when)
+import Linear (V3)
 import qualified Data.Vector as V
 
 import Quake
@@ -42,3 +43,11 @@ init = do
           er@(EdictReference idx) <- GameUtil.spawn
           gameBaseGlobals.gbGEdicts.ix idx.eClassName .= "player_trail"
           return er
+
+lastSpot :: Quake EdictReference
+lastSpot = do
+    io (putStrLn "PlayerTrail.lastSpot") >> undefined -- TODO
+
+add :: V3 Float -> Quake ()
+add _ = do
+    io (putStrLn "PlayerTrail.add") >> undefined -- TODO

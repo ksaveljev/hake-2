@@ -78,3 +78,7 @@ weaponBFG =
 changeWeapon :: EdictReference -> Quake ()
 changeWeapon _ = do
     io (putStrLn "PlayerWeapon.changeWeapon") >> undefined -- TODO
+
+thinkWeapon :: EdictReference -> Quake ()
+thinkWeapon _ = do
+    io (putStrLn "PlayerWeapon.thinkWeapon") >> undefined -- TODO

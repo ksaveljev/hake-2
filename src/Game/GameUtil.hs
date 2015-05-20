@@ -247,3 +247,7 @@ mCheckAttack =
 killBox :: EdictReference -> Quake Bool
 killBox _ = do
     io (putStrLn "GameUtil.killBox") >> undefined -- TODO
+
+visible :: EdictReference -> EdictReference -> Quake Bool
+visible _ _ = do
+    io (putStrLn "GameUtil.visible") >> undefined -- TODO

@@ -26,6 +26,7 @@ import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
 import qualified Game.PlayerHud as PlayerHud
+import qualified Game.PlayerTrail as PlayerTrail
 import qualified Game.PlayerView as PlayerView
 import qualified Game.PlayerWeapon as PlayerWeapon
 import qualified Util.Lib as Lib
@@ -207,8 +208,53 @@ spCreateCoopSpots =
   GenericEntThink "SP_CreateCoopSpots" $ \_ -> do
     io (putStrLn "PlayerClient.spCreateCoopSpots") >> undefined -- TODO
 
+{-
+- This will be called once for each server frame, before running any other
+- entities in the world. 
+-}
 clientBeginServerFrame :: EdictReference -> Quake ()
-clientBeginServerFrame _ = io (putStrLn "PlayerClient.clientBeginServerFrame") >> undefined -- TODO
+clientBeginServerFrame edictRef@(EdictReference edictIdx) = do
+    intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+
+    unless (intermissionTime /= 0) $ do
+      Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      if deathmatchValue /= 0 && (gClient^.gcPers.cpSpectator) /= (gClient^.gcResp.crSpectator) && (levelTime - gClient^.gcRespawnTime) >= 5
+        then
+          spectatorRespawn edictRef
+        else do
+          -- run weapon animations if it hasn't been done by a ucmd_t
+          if not (gClient^.gcWeaponThunk) && not (gClient^.gcResp.crSpectator)
+            then PlayerWeapon.thinkWeapon edictRef
+            else gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponThunk .= False
+
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          if (edict^.eEdictStatus.eDeadFlag) /= 0
+            then
+              -- wait for any butotn just going down
+              when (levelTime > (gClient^.gcRespawnTime)) $ do
+                -- in deathmatch, only wait for attach button
+                let buttonMask = if deathmatchValue /= 0
+                                   then Constants.buttonAttack
+                                   else -1
+
+                dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+                when ((gClient^.gcLatchedButtons) .&. buttonMask /= 0 || (deathmatchValue /= 0 && (dmFlagsValue .&. Constants.dfForceRespawn) /= 0)) $ do
+                  respawn edictRef
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcLatchedButtons .= 0
+
+            else do
+              -- add player trail so monsters can follow
+              when (deathmatchValue /= 0) $ do
+                lastSpotRef <- PlayerTrail.lastSpot
+                visible <- GameUtil.visible edictRef lastSpotRef
+                when (not visible) $
+                  PlayerTrail.add (edict^.eEntityState.esOldOrigin)
+
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcLatchedButtons .= 0
 
 initClientResp :: GClientReference -> Quake ()
 initClientResp (GClientReference gClientIdx) = do
@@ -601,3 +647,11 @@ playerDie :: EntDie
 playerDie =
   GenericEntDie "player_die" $ \_ _ _ _ _ -> do
     io (putStrLn "PlayerClient.playerDie") >> undefined -- TODO
+
+spectatorRespawn :: EdictReference -> Quake ()
+spectatorRespawn _ = do
+    io (putStrLn "PlayerClient.spectatorRespawn") >> undefined -- TODO
+
+respawn :: EdictReference -> Quake ()
+respawn _ = do
+    io (putStrLn "PlayerClient.respawn") >> undefined -- TODO
