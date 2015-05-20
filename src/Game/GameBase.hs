@@ -12,7 +12,6 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Vector as V
 
 import Quake
 import QuakeState

@@ -13,6 +13,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import qualified Client.M as M
 import qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
@@ -102,8 +103,99 @@ physicsNone = void . runThink -- regular thinking
 physicsNoClip :: EdictReference -> Quake ()
 physicsNoClip _ = io (putStrLn "SV.physicsNoClip") >> undefined -- TODO
 
+{-
+- Monsters freefall when they don't have a ground entity, otherwise all
+- movement is done with discrete steps.
+- 
+- This is also used for objects that have become still on the ground, but
+- will fall if the floor is pulled out from under them. FIXME: is this
+- true?
+-}
 physicsStep :: EdictReference -> Quake ()
-physicsStep _ = io (putStrLn "SV.physicsStep") >> undefined -- TODO
+physicsStep edictRef@(EdictReference edictIdx) = do
+    -- airborn monsters should always check for ground
+    wasOnGround <- checkGroundEntity
+
+    checkVelocity edictRef
+
+    checkFriction
+    
+    -- add gravity except:
+    --   flying monsters
+    --   swiming monsters who are in the water
+    hitSound <- checkGravity wasOnGround
+
+    -- friction for flying monsters that have been given vertical velocity
+    checkFlyingFriction
+    
+    -- friction for flying monsters that have been given vertical velocity
+    checkSwimmingFriction
+
+    io (putStrLn "SV.physicsStep") >> undefined -- TODO
+
+  where checkGroundEntity :: Quake Bool
+        checkGroundEntity = do
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity) >>= \(Just groundEntity) ->
+            when (isNothing groundEntity) $
+              M.checkGround edictRef
+
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity) >>= \(Just groundEntity) ->
+            case groundEntity of
+              Nothing -> return False
+              Just _ -> return True
+
+        checkFriction :: Quake ()
+        checkFriction = do
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAVelocity) >>= \(Just (V3 a b c)) ->
+            when (a /= 0 || b /= 0 || c /= 0) $
+              addRotationalFriction edictRef
+
+        checkGravity :: Bool -> Quake Bool
+        checkGravity wasOnGround = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          if not wasOnGround && (edict^.eFlags) .&. Constants.flFly == 0 && not ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eWaterLevel) > 2)
+            then do
+              svGravityValue <- liftM (^.cvValue) svGravityCVar
+              let hitSound = if (edict^.eEdictPhysics.eVelocity._z) < svGravityValue * (-0.1)
+                               then True
+                               else False
+
+              when ((edict^.eWaterLevel) == 0) $
+                addGravity edictRef
+
+              return hitSound
+            else
+              return False
+
+        checkFlyingFriction :: Quake ()
+        checkFlyingFriction = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eFlags) .&. Constants.flFly /= 0 && (edict^.eEdictPhysics.eVelocity._z) /= 0) $ do
+            let speed = abs (edict^.eEdictPhysics.eVelocity._z)
+                control = if speed < Constants.svStopSpeed
+                            then Constants.svStopSpeed
+                            else speed
+                friction = Constants.svFriction / 3
+                newSpeed = speed - (Constants.frameTime * control * friction)
+                newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z %= (* newSpeed')
+
+        checkSwimmingFriction :: Quake ()
+        checkSwimmingFriction = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eEdictPhysics.eVelocity._z) /= 0) $ do
+            let speed = abs (edict^.eEdictPhysics.eVelocity._z)
+                control = if speed < Constants.svStopSpeed
+                            then Constants.svStopSpeed
+                            else speed
+                newSpeed = speed - (Constants.frameTime * control * Constants.svWaterFriction * (fromIntegral $ edict^.eWaterLevel))
+                newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z %= (* newSpeed')
 
 -- Toss, bounce, and fly movement. When onground, do nothing
 physicsToss :: EdictReference -> Quake ()
@@ -629,3 +721,8 @@ testEntityPosition (EdictReference edictIdx) = do
     traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) (edict^.eEntityState.esOrigin) (EdictReference edictIdx) mask
 
     return (traceT^.tStartSolid)
+
+-- FIXME: hacked in for E3 demo
+addRotationalFriction :: EdictReference -> Quake ()
+addRotationalFriction _ = do
+    io (putStrLn "SV.addRotationalFriction") >> undefined -- TODO

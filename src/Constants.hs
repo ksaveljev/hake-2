@@ -941,9 +941,9 @@ svfMonster     = 0x00000004 :: Int -- treat as CONTENTS_MONSTER for collision
 
 maxEntClusters = 16 :: Int
 
-svStopspeed     = 100 :: Int
-svFriction      =   6 :: Int
-svWaterfriction =   1 :: Int
+svStopSpeed     = 100 :: Float
+svFriction      =   6 :: Float
+svWaterFriction =   1 :: Float
 
 platLowTrigger = 1 :: Int
 
