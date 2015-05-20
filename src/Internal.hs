@@ -466,7 +466,7 @@ data GClientT =
            , _gcOldButtons         :: !Int
            , _gcLatchedButtons     :: !Int
            , _gcWeaponThunk        :: !Bool
-           , _gcNewWeapon          :: !(Maybe GItemT)
+           , _gcNewWeapon          :: !(Maybe GItemReference)
            , _gcDamageArmor        :: !Int
            , _gcDamagePArmor       :: !Int
            , _gcDamageBlood        :: !Int
@@ -626,9 +626,9 @@ data GameImportT =
               , _giConfigString       :: Int -> B.ByteString -> Quake ()
               , _giError              :: B.ByteString -> Quake ()
               , _giError2             :: Int -> B.ByteString -> Quake ()
-              , _giModelIndex         :: B.ByteString -> Quake Int
-              , _giSoundIndex         :: B.ByteString -> Quake Int
-              , _giImageIndex         :: B.ByteString -> Quake Int
+              , _giModelIndex         :: Maybe B.ByteString -> Quake Int
+              , _giSoundIndex         :: Maybe B.ByteString -> Quake Int
+              , _giImageIndex         :: Maybe B.ByteString -> Quake Int
               , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
               , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
               , _giPointContents      :: V3 Float -> Quake Int

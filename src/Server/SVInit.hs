@@ -2,10 +2,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVInit where
 
-import Data.Bits ((.|.))
-import Data.Foldable (forM_)
 import Control.Lens ((.=), use, (^.), (%=), (+=), preuse, ix)
 import Control.Monad (when, void, unless, liftM)
+import Data.Bits ((.|.))
+import Data.Foldable (forM_)
+import Data.Maybe (isNothing, fromJust)
 import System.Directory
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -33,9 +34,9 @@ import qualified Server.SVWorld as SVWorld
 import qualified Sys.NET as NET
 import qualified Util.Lib as Lib
 
-findIndex :: B.ByteString -> Int -> Int -> Bool -> Quake Int
+findIndex :: Maybe B.ByteString -> Int -> Int -> Bool -> Quake Int
 findIndex name start maxIdx create =
-    if B.length name == 0
+    if isNothing name || B.length (fromJust name) == 0
       then return 0
       else do
         configStrings <- use $ svGlobals.svServer.sConfigStrings
@@ -48,7 +49,7 @@ findIndex name start maxIdx create =
                 when (idx == maxIdx) $
                   Com.comError Constants.errDrop "*Index: overflow"
 
-                svGlobals.svServer.sConfigStrings %= (V.// [(start + idx, name)])
+                svGlobals.svServer.sConfigStrings %= (V.// [(start + idx, (fromJust name))])
 
                 state <- use $ svGlobals.svServer.sState
 
@@ -56,7 +57,7 @@ findIndex name start maxIdx create =
                   SZ.clear (svGlobals.svServer.sMulticast)
                   MSG.writeCharI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcConfigString)
                   MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral (start + idx))
-                  MSG.writeString (svGlobals.svServer.sMulticast) name
+                  MSG.writeString (svGlobals.svServer.sMulticast) (fromJust name)
                   origin <- use $ globals.vec3Origin
                   SVSend.multicast origin Constants.multicastAllR
 
@@ -65,16 +66,16 @@ findIndex name start maxIdx create =
   where findConfigString :: V.Vector B.ByteString -> Int -> (Bool, Int)
         findConfigString configStrings i
           | i >= maxIdx || configStrings V.! (start + i) == "" = (False, i)
-          | configStrings V.! (start + i) == name = (True, i)
+          | configStrings V.! (start + i) == (fromJust name) = (True, i)
           | otherwise = findConfigString configStrings (i + 1)
 
-modelIndex :: B.ByteString -> Quake Int
+modelIndex :: Maybe B.ByteString -> Quake Int
 modelIndex name = findIndex name Constants.csModels Constants.maxModels True
 
-soundIndex :: B.ByteString -> Quake Int
+soundIndex :: Maybe B.ByteString -> Quake Int
 soundIndex name = findIndex name Constants.csSounds Constants.maxSounds True
 
-imageIndex :: B.ByteString -> Quake Int
+imageIndex :: Maybe B.ByteString -> Quake Int
 imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 
 {-

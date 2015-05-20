@@ -100,7 +100,7 @@ spFuncButton =
     setModel er (edict^.eEdictInfo.eiModel)
 
     when ((edict^.eSounds) /= 1) $ do
-      soundIndex "switches/butn2.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
+      soundIndex (Just "switches/butn2.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
 
     when ((edict^.eEdictPhysics.eSpeed) == 0) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eSpeed .= 40
@@ -178,9 +178,9 @@ spFuncDoor =
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     when ((edict^.eSounds) /= 1) $ do
-      soundIndex "doors/dr1_strt.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
-      soundIndex "doors/dr1_mid.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .=)
-      soundIndex "doors/dr1_end.wav" >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundEnd .=)
+      soundIndex (Just "doors/dr1_strt.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
+      soundIndex (Just "doors/dr1_mid.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .=)
+      soundIndex (Just "doors/dr1_end.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundEnd .=)
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eMoveType .= Constants.moveTypePush
@@ -252,7 +252,7 @@ spFuncDoor =
           eEdictAction.eaDie .= Just doorKilled
       else
         when (isJust (edict^.eEdictInfo.eiTargetName) && isJust (edict^.eEdictInfo.eiMessage)) $ do
-          void $ soundIndex "misc/talk.wav"
+          void $ soundIndex (Just "misc/talk.wav")
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaTouch .= Just doorTouch
 
     Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
@@ -425,7 +425,7 @@ spFuncTrain er@(EdictReference edictIdx) = do
 
     noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
     when (isJust noise) $ do
-      noiseIdx <- soundIndex (fromJust noise)
+      noiseIdx <- soundIndex noise
       gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .= noiseIdx
 
     when ((edict^.eEdictPhysics.eSpeed) == 0) $

@@ -162,7 +162,7 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
           if (edict^.eNoiseIndex) /= 0
             then sound ar Constants.chanAuto (edict^.eNoiseIndex) 1 Constants.attnNorm 0
             else do
-              talkIdx <- soundIndex "misc/talk1.wav"
+              talkIdx <- soundIndex (Just "misc/talk1.wav")
               sound ar Constants.chanAuto talkIdx 1 Constants.attnNorm 0
 
         -- kill killtargets
@@ -241,3 +241,7 @@ mCheckAttack :: EntThink
 mCheckAttack =
   GenericEntThink "M_CheckAttack" $ \_ -> do
     io (putStrLn "GameUtil.mCheckAttack") >> undefined -- TODO
+
+killBox :: EdictReference -> Quake Bool
+killBox _ = do
+    io (putStrLn "GameUtil.killBox") >> undefined -- TODO

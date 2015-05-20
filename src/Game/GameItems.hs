@@ -113,7 +113,7 @@ spawnItem er@(EdictReference edictIdx) gir@(GItemReference itemIdx) = do
           eEntityState.esRenderFx .= Constants.rfGlow
 
         when (isJust (edict^.eEdictInfo.eiModel)) $
-          void (modelIndex (fromJust $ edict^.eEdictInfo.eiModel))
+          void (modelIndex (edict^.eEdictInfo.eiModel))
 
 {-
 - =============== PrecacheItem
@@ -135,16 +135,16 @@ precacheItem it = do
       Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
 
       when (isJust (item^.giPickupSound)) $
-        void (soundIndex $ fromJust (item^.giPickupSound))
+        void (soundIndex (item^.giPickupSound))
 
       when (isJust (item^.giWorldModel)) $
-        void (modelIndex $ fromJust (item^.giWorldModel))
+        void (modelIndex (item^.giWorldModel))
 
       when (isJust (item^.giViewModel)) $
-        void (modelIndex $ fromJust (item^.giViewModel))
+        void (modelIndex (item^.giViewModel))
 
       when (isJust (item^.giIcon)) $
-        void (imageIndex $ fromJust (item^.giIcon))
+        void (imageIndex (item^.giIcon))
 
       -- parse everything for its ammo
       when (isJust (item^.giAmmo) && B.length (fromJust $ item^.giAmmo) > 0) $ do
@@ -169,16 +169,16 @@ precacheItem it = do
             else -- determine type based on extension
               if | "md2" `BC.isSuffixOf` token -> do
                      let modelIndex = gameImport^.giModelIndex
-                     void $ modelIndex token
+                     void $ modelIndex (Just token)
                  | "sp2" `BC.isSuffixOf` token -> do
                      let modelIndex = gameImport^.giModelIndex
-                     void $ modelIndex token
+                     void $ modelIndex (Just token)
                  | "wav" `BC.isSuffixOf` token -> do
                      let soundIndex = gameImport^.giSoundIndex
-                     void $ soundIndex token
+                     void $ soundIndex (Just token)
                  | "pcx" `BC.isSuffixOf` token -> do
                      let imageIndex = gameImport^.giImageIndex
-                     void $ imageIndex token
+                     void $ imageIndex (Just token)
                  | otherwise -> do
                      let err = gameImport^.giError
                      err $ "PrecacheItem: bad precache string: " `B.append` token
@@ -360,7 +360,7 @@ spItemHealth er@(EdictReference edictIdx) = do
         findItem "Health" >>= (spawnItem er) . fromJust
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
-        void $ soundIndex "items/n_health.wav"
+        void $ soundIndex (Just "items/n_health.wav")
 
 -- QUAKED item_health_small (.3 .3 1) (-16 -16 -16) (16 16 16)
 spItemHealthSmall :: EdictReference -> Quake ()
@@ -380,7 +380,7 @@ spItemHealthSmall er@(EdictReference edictIdx) = do
         gameBaseGlobals.gbGEdicts.ix edictIdx.eStyle .= Constants.healthIgnoreMax
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
-        void $ soundIndex "items/s_health.wav"
+        void $ soundIndex (Just "items/s_health.wav")
 
 -- QUAKED item_health_large (.3 .3 1) (-16 -16 -16) (16 16 16)
 spItemHealthLarge :: EdictReference -> Quake ()
@@ -398,7 +398,7 @@ spItemHealthLarge er@(EdictReference edictIdx) = do
         findItem "Health" >>= (spawnItem er) . fromJust
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
-        void $ soundIndex "items/l_health.wav"
+        void $ soundIndex (Just "items/l_health.wav")
 
 spItemHealthMega :: EdictReference -> Quake ()
 spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- TODO
@@ -496,7 +496,7 @@ touchItem =
         Just itemRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eItem
         let Just (GItemReference itemIdx) = itemRef
         Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
-        icon <- imageIndex (fromJust $ item^.giIcon)
+        icon <- imageIndex (item^.giIcon)
         time <- use $ gameBaseGlobals.gbLevel.llTime
 
         zoom (gameBaseGlobals.gbGame.glClients.ix otherClientIdx) $ do
@@ -514,16 +514,16 @@ touchItem =
           Just (PickupHealth _ _) -> do
             Just count <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eCount
 
-            soundIdx <- if | count == 2 -> soundIndex "items/s_health.wav"
-                           | count == 10 -> soundIndex "items/n_health.wav"
-                           | count == 25 -> soundIndex "items/l_health.wav"
-                           | otherwise -> soundIndex "items/m_health.wav"
+            soundIdx <- if | count == 2 -> soundIndex (Just "items/s_health.wav")
+                           | count == 10 -> soundIndex (Just "items/n_health.wav")
+                           | count == 25 -> soundIndex (Just "items/l_health.wav")
+                           | otherwise -> soundIndex (Just "items/m_health.wav")
 
             sound otherRef Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
           _ -> do
             when (isJust $ item^.giPickupSound) $ do
-              pickupSound <- soundIndex (fromJust $ item^.giPickupSound)
+              pickupSound <- soundIndex (item^.giPickupSound)
               sound otherRef Constants.chanItem pickupSound 1 Constants.attnNorm 0
 
       Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags

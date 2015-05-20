@@ -281,8 +281,8 @@ spFuncExplosive er@(EdictReference edictIdx) = do
 
         gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= Constants.moveTypePush
 
-        void $ modelIndex "models/objects/debris1/tris.md2"
-        void $ modelIndex "models/objects/debris2/tris.md2"
+        void $ modelIndex (Just "models/objects/debris1/tris.md2")
+        void $ modelIndex (Just "models/objects/debris2/tris.md2")
 
         Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
@@ -329,12 +329,12 @@ spMiscExploBox er@(EdictReference edictIdx) = do
         let modelIndex = gameImport^.giModelIndex
             linkEntity = gameImport^.giLinkEntity
 
-        void $ modelIndex "models/objects/debris1/tris.md2"
-        void $ modelIndex "models/objects/debris2/tris.md2"
-        void $ modelIndex "models/objects/debris3/tris.md2"
+        void $ modelIndex (Just "models/objects/debris1/tris.md2")
+        void $ modelIndex (Just "models/objects/debris2/tris.md2")
+        void $ modelIndex (Just "models/objects/debris3/tris.md2")
 
         let trisModel = "models/objects/barrels/tris.md2"
-        tris <- modelIndex trisModel
+        tris <- modelIndex (Just trisModel)
 
         time <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -386,7 +386,7 @@ spMiscBanner edictRef@(EdictReference edictIdx) = do
     let modelIndex = gameImport^.giModelIndex
         linkEntity = gameImport^.giLinkEntity
 
-    tris <- modelIndex "models/objects/banner/tris.md2"
+    tris <- modelIndex (Just "models/objects/banner/tris.md2")
     r <- Lib.rand
     time <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -413,7 +413,7 @@ spMiscDeadSoldier er@(EdictReference edictIdx) = do
         let modelIndex = gameImport^.giModelIndex
             linkEntity = gameImport^.giLinkEntity
 
-        tris <- modelIndex "models/deadbods/dude/tris.md2"
+        tris <- modelIndex (Just "models/deadbods/dude/tris.md2")
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eMoveType .= Constants.moveTypeNone
@@ -467,7 +467,7 @@ spMiscStroggShip edictRef@(EdictReference edictIdx) = do
         GameUtil.freeEdict edictRef
 
       Just _ -> do
-        tris <- modelIndex "models/ships/strogg1/tris.md2"
+        tris <- modelIndex (Just "models/ships/strogg1/tris.md2")
         time <- use $ gameBaseGlobals.gbLevel.llTime
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do

@@ -241,7 +241,7 @@ physicsToss er@(EdictReference edictIdx) = do
           let positionedSound = gameImport^.giPositionedSound
               soundIndex = gameImport^.giSoundIndex
 
-          hitwav <- soundIndex "misc/h2ohit1.wav"
+          hitwav <- soundIndex (Just "misc/h2ohit1.wav")
 
           if | not wasInWater && isInWater ->
                  positionedSound oldOrigin er Constants.chanAuto hitwav 1 1 0

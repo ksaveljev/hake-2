@@ -649,91 +649,91 @@ spWorldSpawn =
       else configString Constants.csStatusBar singleStatusBar
 
     -- help icon for statusbar
-    void $ imageIndex "i_help"
-    imageIndex "i_health" >>= (gameBaseGlobals.gbLevel.llPicHealth .=)
-    void $ imageIndex "help"
-    void $ imageIndex "field_3"
+    void $ imageIndex (Just "i_help")
+    imageIndex (Just "i_health") >>= (gameBaseGlobals.gbLevel.llPicHealth .=)
+    void $ imageIndex (Just "help")
+    void $ imageIndex (Just "field_3")
 
     if (spawnTemp^.stGravity) == ""
       then void $ cvarSet "sv_gravity" "800"
       else void $ cvarSet "sv_gravity" (spawnTemp^.stGravity)
 
-    soundIndex "player/fry.wav" >>= (gameBaseGlobals.gbSndFry .=)
+    soundIndex (Just "player/fry.wav") >>= (gameBaseGlobals.gbSndFry .=)
 
     -- standing in lava / slime
     GameItems.findItem "Blaster" >>= GameItems.precacheItem
-    void $ soundIndex "player/lava1.wav"
-    void $ soundIndex "player/lava2.wav"
-    void $ soundIndex "misc/pc_up.wav"
-    void $ soundIndex "misc/talk1.wav"
-    void $ soundIndex "misc/udeath.wav"
+    void $ soundIndex (Just "player/lava1.wav")
+    void $ soundIndex (Just "player/lava2.wav")
+    void $ soundIndex (Just "misc/pc_up.wav")
+    void $ soundIndex (Just "misc/talk1.wav")
+    void $ soundIndex (Just "misc/udeath.wav")
     -- gibs
-    void $ soundIndex "items/respawn1.wav"
+    void $ soundIndex (Just "items/respawn1.wav")
     -- sexed sounds
-    void $ soundIndex "*death1.wav"
-    void $ soundIndex "*death2.wav"
-    void $ soundIndex "*death3.wav"
-    void $ soundIndex "*death4.wav"
-    void $ soundIndex "*fall1.wav"
-    void $ soundIndex "*fall2.wav"
-    void $ soundIndex "*gurp1.wav"
+    void $ soundIndex (Just "*death1.wav")
+    void $ soundIndex (Just "*death2.wav")
+    void $ soundIndex (Just "*death3.wav")
+    void $ soundIndex (Just "*death4.wav")
+    void $ soundIndex (Just "*fall1.wav")
+    void $ soundIndex (Just "*fall2.wav")
+    void $ soundIndex (Just "*gurp1.wav")
     -- drowning damage
-    void $ soundIndex "*gurp2.wav"
-    void $ soundIndex "*jump1.wav"
+    void $ soundIndex (Just "*gurp2.wav")
+    void $ soundIndex (Just "*jump1.wav")
     -- player jump
-    void $ soundIndex "*pain25_1.wav"
-    void $ soundIndex "*pain25_2.wav"
-    void $ soundIndex "*pain50_1.wav"
-    void $ soundIndex "*pain50_2.wav"
-    void $ soundIndex "*pain75_1.wav"
-    void $ soundIndex "*pain75_2.wav"
-    void $ soundIndex "*pain100_1.wav"
-    void $ soundIndex "*pain100_2.wav"
+    void $ soundIndex (Just "*pain25_1.wav")
+    void $ soundIndex (Just "*pain25_2.wav")
+    void $ soundIndex (Just "*pain50_1.wav")
+    void $ soundIndex (Just "*pain50_2.wav")
+    void $ soundIndex (Just "*pain75_1.wav")
+    void $ soundIndex (Just "*pain75_2.wav")
+    void $ soundIndex (Just "*pain100_1.wav")
+    void $ soundIndex (Just "*pain100_2.wav")
     -- sexed models
     -- THIS ORDER MUST MATCH THE DEFINES IN g_local.h
     -- you can add more, max 15
-    void $ modelIndex "#w_blaster.md2"
-    void $ modelIndex "#w_shotgun.md2"
-    void $ modelIndex "#w_sshotgun.md2"
-    void $ modelIndex "#w_machinegun.md2"
-    void $ modelIndex "#w_chaingun.md2"
-    void $ modelIndex "#a_grenades.md2"
-    void $ modelIndex "#w_glauncher.md2"
-    void $ modelIndex "#w_rlauncher.md2"
-    void $ modelIndex "#w_hyperblaster.md2"
-    void $ modelIndex "#w_railgun.md2"
-    void $ modelIndex "#w_bfg.md2"
+    void $ modelIndex (Just "#w_blaster.md2")
+    void $ modelIndex (Just "#w_shotgun.md2")
+    void $ modelIndex (Just "#w_sshotgun.md2")
+    void $ modelIndex (Just "#w_machinegun.md2")
+    void $ modelIndex (Just "#w_chaingun.md2")
+    void $ modelIndex (Just "#a_grenades.md2")
+    void $ modelIndex (Just "#w_glauncher.md2")
+    void $ modelIndex (Just "#w_rlauncher.md2")
+    void $ modelIndex (Just "#w_hyperblaster.md2")
+    void $ modelIndex (Just "#w_railgun.md2")
+    void $ modelIndex (Just "#w_bfg.md2")
     -- --------------
-    void $ soundIndex "player/gasp1.wav"
+    void $ soundIndex (Just "player/gasp1.wav")
     -- gasping for air
-    void $ soundIndex "player/gasp2.wav"
+    void $ soundIndex (Just "player/gasp2.wav")
     -- head breaking surface, not gasping
-    void $ soundIndex "player/watr_in.wav"
+    void $ soundIndex (Just "player/watr_in.wav")
     -- feet hitting water
-    void $ soundIndex "player/watr_out.wav"
+    void $ soundIndex (Just "player/watr_out.wav")
     -- feet leaving water
-    void $ soundIndex "player/watr_un.wav"
+    void $ soundIndex (Just "player/watr_un.wav")
     -- head going underwater
-    void $ soundIndex "player/u_breath1.wav"
-    void $ soundIndex "player/u_breath2.wav"
-    void $ soundIndex "items/pkup.wav"
+    void $ soundIndex (Just "player/u_breath1.wav")
+    void $ soundIndex (Just "player/u_breath2.wav")
+    void $ soundIndex (Just "items/pkup.wav")
     -- bonus item pickup
-    void $ soundIndex "world/land.wav"
+    void $ soundIndex (Just "world/land.wav")
     -- landing thud
-    void $ soundIndex "misc/h2ohit1.wav"
+    void $ soundIndex (Just "misc/h2ohit1.wav")
     -- landing splash
-    void $ soundIndex "items/damage.wav"
-    void $ soundIndex "items/protect.wav"
-    void $ soundIndex "items/protect4.wav"
-    void $ soundIndex "weapons/noammo.wav"
-    void $ soundIndex "infantry/inflies1.wav"
-    modelIndex "models/objects/gibs/sm_meat/tris.md2" >>= (gameBaseGlobals.gbSmMeatIndex .=)
-    void $ modelIndex "models/objects/gibs/arm/tris.md2"
-    void $ modelIndex "models/objects/gibs/bone/tris.md2"
-    void $ modelIndex "models/objects/gibs/bone2/tris.md2"
-    void $ modelIndex "models/objects/gibs/chest/tris.md2"
-    void $ modelIndex "models/objects/gibs/skull/tris.md2"
-    void $ modelIndex "models/objects/gibs/head2/tris.md2"
+    void $ soundIndex (Just "items/damage.wav")
+    void $ soundIndex (Just "items/protect.wav")
+    void $ soundIndex (Just "items/protect4.wav")
+    void $ soundIndex (Just "weapons/noammo.wav")
+    void $ soundIndex (Just "infantry/inflies1.wav")
+    modelIndex (Just "models/objects/gibs/sm_meat/tris.md2") >>= (gameBaseGlobals.gbSmMeatIndex .=)
+    void $ modelIndex (Just "models/objects/gibs/arm/tris.md2")
+    void $ modelIndex (Just "models/objects/gibs/bone/tris.md2")
+    void $ modelIndex (Just "models/objects/gibs/bone2/tris.md2")
+    void $ modelIndex (Just "models/objects/gibs/chest/tris.md2")
+    void $ modelIndex (Just "models/objects/gibs/skull/tris.md2")
+    void $ modelIndex (Just "models/objects/gibs/head2/tris.md2")
 
     --
     -- Setup light animation tables. 'a' is total darkness, 'z' is

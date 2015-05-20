@@ -9,7 +9,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isNothing)
-import Linear (V3(..))
+import Linear (V3(..), _y)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -26,6 +26,7 @@ import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
 import qualified Game.PlayerHud as PlayerHud
 import qualified Game.PlayerView as PlayerView
+import qualified Game.PlayerWeapon as PlayerWeapon
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -449,12 +450,80 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
       eEdictMinMax.eMins         .= V3 (-16) (-16) (-24)
       eEdictMinMax.eMaxs         .= V3 16 16 32
       eEdictPhysics.eVelocity    .= V3 0 0 0
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    fov <- if deathmatchValue /= 0 && (dmFlagsValue .&. Constants.dfFixedFov) /= 0
+             then
+               return 90
+             else do
+               v <- Info.valueForKey (saved^.cpUserInfo) "fov"
+               let fov = Lib.atoi v
+               return $ if | fov < 1 -> 90
+                           | fov > 160 -> 160
+                           | otherwise -> fov
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    let Just (GItemReference weaponIdx) = saved^.cpWeapon
+    Just weaponModel <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+    gunIndex <- modelIndex (weaponModel^.giViewModel)
+
+    -- clear entity state values
+    let spawnOrigin' = let V3 a b c = spawnOrigin in V3 a (b + 1) c -- make sure off ground
+        {- TODO: decide how to better setup Angles using pitch/yaw/roll
+        ent.s.angles[Defines.PITCH] = 0;
+        ent.s.angles[Defines.YAW] = spawn_angles[Defines.YAW];
+        ent.s.angles[Defines.ROLL] = 0;
+        -}
+        angles = V3 0 (spawnAngles^._y) 0
       
     zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
-      gcPlayerState .= newPlayerStateT
-      gcPlayerState.psPMoveState.pmsOrigin .= fmap (truncate . (* 8)) spawnOrigin
+      gcPlayerState                             .= newPlayerStateT
+      gcPlayerState.psPMoveState.pmsOrigin      .= fmap (truncate . (* 8)) spawnOrigin
+      gcPlayerState.psFOV                       .= fromIntegral fov
+      gcPlayerState.psGunIndex                  .= gunIndex
+      gcPlayerState.psPMoveState.pmsDeltaAngles .= fmap Math3D.angleToShort (spawnAngles - (resp^.crCmdAngles))
+      gcPlayerState.psViewAngles                .= angles
+      gcVAngle                                  .= angles
 
-    io (putStrLn "PlayerClient.putClientInServer") >> undefined -- TODO
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+      esEffects     .= 0
+      esModelIndex  .= 255 -- will use the skin specified model
+      esModelIndex2 .= 255 -- custom gun model
+      -- sknum is player num and weapon number
+      -- weapon number will be added in changeweapon
+      esSkinNum     .= edictIdx - 1
+      esFrame       .= 0
+      esOrigin      .= spawnOrigin'
+      esOldOrigin   .= spawnOrigin'
+      esAngles      .= angles
+
+    -- spawn a spectator
+    if saved^.cpSpectator
+      then do
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcChaseTarget .= Nothing
+          gcResp.crSpectator .= True
+          gcPlayerState.psGunIndex .= 0
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eMoveType .= Constants.moveTypeNoClip
+          eSolid .= Constants.solidNot
+          eSvFlags %= (.|. Constants.svfNoClient)
+
+        linkEntity edictRef
+      else do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crSpectator .= True
+
+        void $ GameUtil.killBox edictRef
+
+        linkEntity edictRef
+
+        -- force the current weapon up
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= saved^.cpWeapon
+        PlayerWeapon.changeWeapon edictRef
 
 selectSpawnPoint :: EdictReference -> Quake (V3 Float, V3 Float)
 selectSpawnPoint _ = do

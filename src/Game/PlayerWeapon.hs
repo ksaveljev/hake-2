@@ -2,6 +2,7 @@
 module Game.PlayerWeapon where
 
 import Quake
+import QuakeState
 import Game.Adapters
 
 useWeapon :: ItemUse
@@ -73,3 +74,7 @@ weaponBFG :: EntThink
 weaponBFG =
   GenericEntThink "Weapon_BFG" $ \_ -> do
     io (putStrLn "PlayerWeapon.weaponBFG") >> undefined -- TODO
+
+changeWeapon :: EdictReference -> Quake ()
+changeWeapon _ = do
+    io (putStrLn "PlayerWeapon.changeWeapon") >> undefined -- TODO

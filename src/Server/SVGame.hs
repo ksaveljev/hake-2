@@ -98,7 +98,7 @@ setModel er@(EdictReference edictIdx) name = do
       Com.comError Constants.errDrop "PF_setmodel: NULL"
 
     let modelName = fromJust name
-    idx <- SVInit.modelIndex modelName
+    idx <- SVInit.modelIndex name
 
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esModelIndex .= idx
 

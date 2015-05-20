@@ -32,8 +32,7 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
                         | otherwise -> Nothing
 
     when (isJust noiseIndex) $ do
-      let Just idx = noiseIndex
-      si <- soundIndex idx
+      si <- soundIndex noiseIndex
       gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .= si
 
     when ((edict^.eWait) == 0) $

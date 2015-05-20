@@ -4,13 +4,13 @@ import qualified Data.ByteString as B
 
 import Quake
 
-findIndex :: B.ByteString -> Int -> Int -> Bool -> Quake Int
+findIndex :: Maybe B.ByteString -> Int -> Int -> Bool -> Quake Int
 
-modelIndex :: B.ByteString -> Quake Int
+modelIndex :: Maybe B.ByteString -> Quake Int
 
-soundIndex :: B.ByteString -> Quake Int
+soundIndex :: Maybe B.ByteString -> Quake Int
 
-imageIndex :: B.ByteString -> Quake Int
+imageIndex :: Maybe B.ByteString -> Quake Int
 
 createBaseline :: Quake ()
 

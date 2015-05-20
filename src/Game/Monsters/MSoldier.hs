@@ -907,7 +907,7 @@ spMonsterSoldierX =
         modelIndex = gameImport^.giModelIndex
         linkEntity = gameImport^.giLinkEntity
 
-    tris <- modelIndex "models/monsters/soldier/tris.md2"
+    tris <- modelIndex (Just "models/monsters/soldier/tris.md2")
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eEntityState.esModelIndex .= tris
@@ -917,10 +917,10 @@ spMonsterSoldierX =
       eMoveType .= Constants.moveTypeStep
       eSolid .= Constants.solidBbox
 
-    soundIndex "soldier/solidle1.wav" >>= (mSoldierGlobals.msSoundIdle .=)
-    soundIndex "soldier/solsght1.wav" >>= (mSoldierGlobals.msSoundSight1 .=)
-    soundIndex "soldier/solsrch1.wav" >>= (mSoldierGlobals.msSoundSight2 .=)
-    soundIndex "infantry/infatck3.wav" >>= (mSoldierGlobals.msSoundCock .=)
+    soundIndex (Just "soldier/solidle1.wav") >>= (mSoldierGlobals.msSoundIdle .=)
+    soundIndex (Just "soldier/solsght1.wav") >>= (mSoldierGlobals.msSoundSight1 .=)
+    soundIndex (Just "soldier/solsrch1.wav") >>= (mSoldierGlobals.msSoundSight2 .=)
+    soundIndex (Just "infantry/infatck3.wav") >>= (mSoldierGlobals.msSoundCock .=)
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eEdictPhysics.eMass .= 100
@@ -963,9 +963,9 @@ spMonsterSoldier =
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
 
-        soundIndex "soldier/solpain1.wav" >>= (mSoldierGlobals.msSoundPain .=)
-        soundIndex "soldier/soldeth1.wav" >>= (mSoldierGlobals.msSoundDeath .=)
-        void $ soundIndex "soldier/solatck1.wav"
+        soundIndex (Just "soldier/solpain1.wav") >>= (mSoldierGlobals.msSoundPain .=)
+        soundIndex (Just "soldier/soldeth1.wav") >>= (mSoldierGlobals.msSoundDeath .=)
+        void $ soundIndex (Just "soldier/solatck1.wav")
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 2
@@ -990,9 +990,9 @@ spMonsterSoldierSS =
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
 
-        soundIndex "soldier/solpain3.wav" >>= (mSoldierGlobals.msSoundPainSS .=)
-        soundIndex "soldier/soldeth3.wav" >>= (mSoldierGlobals.msSoundDeathSS .=)
-        void $ soundIndex "soldier/solatck3.wav"
+        soundIndex (Just "soldier/solpain3.wav") >>= (mSoldierGlobals.msSoundPainSS .=)
+        soundIndex (Just "soldier/soldeth3.wav") >>= (mSoldierGlobals.msSoundDeathSS .=)
+        void $ soundIndex (Just "soldier/solatck3.wav")
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 4
@@ -1019,11 +1019,11 @@ spMonsterSoldierLight =
         let soundIndex = gameImport^.giSoundIndex
             modelIndex = gameImport^.giModelIndex
 
-        soundIndex "soldier/solpain2.wav" >>= (mSoldierGlobals.msSoundPainLight .=)
-        soundIndex "soldier/soldeth2.wav" >>= (mSoldierGlobals.msSoundDeathLight .=)
-        void $ modelIndex "models/objects/laser/tris.md2"
-        void $ soundIndex "misc/lasfly.wav"
-        void $ soundIndex "soldier/solatck2.wav"
+        soundIndex (Just "soldier/solpain2.wav") >>= (mSoldierGlobals.msSoundPainLight .=)
+        soundIndex (Just "soldier/soldeth2.wav") >>= (mSoldierGlobals.msSoundDeathLight .=)
+        void $ modelIndex (Just "models/objects/laser/tris.md2")
+        void $ soundIndex (Just "misc/lasfly.wav")
+        void $ soundIndex (Just "soldier/solatck2.wav")
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 0

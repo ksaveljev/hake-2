@@ -422,7 +422,7 @@ infantryDie =
     -- check for gib
     if (self^.eEdictStatus.eHealth) <= (self^.eEdictStatus.eGibHealth)
       then do
-        udeath <- soundIndex "misc/udeath.wav"
+        udeath <- soundIndex (Just "misc/udeath.wav")
         sound er Constants.chanVoice udeath 1 Constants.attnNorm 0
 
         -- IMPROVE? repetition here
@@ -483,21 +483,21 @@ spMonsterInfantry er@(EdictReference edictIdx) = do
             modelIndex = gameImport^.giModelIndex
             linkEntity = gameImport^.giLinkEntity
 
-        soundIndex "infantry/infpain1.wav" >>= (mInfantryGlobals.miSoundPain1 .=)
-        soundIndex "infantry/infpain2.wav" >>= (mInfantryGlobals.miSoundPain2 .=)
-        soundIndex "infantry/infdeth1.wav" >>= (mInfantryGlobals.miSoundDie1 .=)
-        soundIndex "infantry/infdeth2.wav" >>= (mInfantryGlobals.miSoundDie2 .=)
+        soundIndex (Just "infantry/infpain1.wav") >>= (mInfantryGlobals.miSoundPain1 .=)
+        soundIndex (Just "infantry/infpain2.wav") >>= (mInfantryGlobals.miSoundPain2 .=)
+        soundIndex (Just "infantry/infdeth1.wav") >>= (mInfantryGlobals.miSoundDie1 .=)
+        soundIndex (Just "infantry/infdeth2.wav") >>= (mInfantryGlobals.miSoundDie2 .=)
 
-        soundIndex "infantry/infatck1.wav" >>= (mInfantryGlobals.miSoundGunShot .=)
-        soundIndex "infantry/infatck3.wav" >>= (mInfantryGlobals.miSoundWeaponCock .=)
-        soundIndex "infantry/infatck2.wav" >>= (mInfantryGlobals.miSoundPunchSwing .=)
-        soundIndex "infantry/melee2.wav" >>= (mInfantryGlobals.miSoundPunchHit .=)
+        soundIndex (Just "infantry/infatck1.wav") >>= (mInfantryGlobals.miSoundGunShot .=)
+        soundIndex (Just "infantry/infatck3.wav") >>= (mInfantryGlobals.miSoundWeaponCock .=)
+        soundIndex (Just "infantry/infatck2.wav") >>= (mInfantryGlobals.miSoundPunchSwing .=)
+        soundIndex (Just "infantry/melee2.wav") >>= (mInfantryGlobals.miSoundPunchHit .=)
 
-        soundIndex "infantry/infsght1.wav" >>= (mInfantryGlobals.miSoundSight .=)
-        soundIndex "infantry/infsrch1.wav" >>= (mInfantryGlobals.miSoundSearch .=)
-        soundIndex "infantry/infidle1.wav" >>= (mInfantryGlobals.miSoundIdle .=)
+        soundIndex (Just "infantry/infsght1.wav") >>= (mInfantryGlobals.miSoundSight .=)
+        soundIndex (Just "infantry/infsrch1.wav") >>= (mInfantryGlobals.miSoundSearch .=)
+        soundIndex (Just "infantry/infidle1.wav") >>= (mInfantryGlobals.miSoundIdle .=)
 
-        tris <- modelIndex "models/monsters/infantry/tris.md2"
+        tris <- modelIndex (Just "models/monsters/infantry/tris.md2")
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eMoveType                 .= Constants.moveTypeStep

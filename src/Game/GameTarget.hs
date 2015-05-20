@@ -41,7 +41,7 @@ spTargetSpeaker er@(EdictReference edictIdx) = do
                        then noiseStr
                        else noiseStr `B.append` ".wav"
 
-        noiseIndex <- soundIndex buffer
+        noiseIndex <- soundIndex (Just buffer)
         gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .= noiseIndex
 
         when ((edict^.eVolume) == 0) $
@@ -96,7 +96,7 @@ spTargetSecret er@(EdictReference edictIdx) = do
         when (isNothing noise) $
           gameBaseGlobals.gbSpawnTemp.stNoise .= Just "misc/secret.wav"
 
-        noiseStr <- liftM fromJust (use $ gameBaseGlobals.gbSpawnTemp.stNoise)
+        noiseStr <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
         noiseIndex <- soundIndex noiseStr
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
@@ -124,7 +124,7 @@ spTargetGoal er@(EdictReference edictIdx) = do
 
         gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetGoal
 
-        noise <- (use $ gameBaseGlobals.gbSpawnTemp.stNoise) >>= \n -> if isJust n then return (fromJust n) else return "misc/secret.wav"
+        noise <- (use $ gameBaseGlobals.gbSpawnTemp.stNoise) >>= \n -> if isJust n then return n else return (Just "misc/secret.wav")
 
         soundIndex noise >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .=)
         gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient

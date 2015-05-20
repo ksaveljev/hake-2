@@ -33,7 +33,7 @@ fliesOn =
     unless ((edict^.eWaterLevel) /= 0) $ do
       time <- use $ gameBaseGlobals.gbLevel.llTime
       soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
-      inflies <- soundIndex "infantry/inflies1.wav"
+      inflies <- soundIndex (Just "infantry/inflies1.wav")
 
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
         eEntityState.esEffects %= (.|. Constants.efFlies)
