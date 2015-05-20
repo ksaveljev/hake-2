@@ -8,7 +8,7 @@ import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromJust)
 import Linear (V3(..), _y)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -19,6 +19,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.Info as Info
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
@@ -525,9 +526,68 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= saved^.cpWeapon
         PlayerWeapon.changeWeapon edictRef
 
+-- Chooses a player start, deathmatch start, coop start, etc.
 selectSpawnPoint :: EdictReference -> Quake (V3 Float, V3 Float)
-selectSpawnPoint _ = do
-    io (putStrLn "PlayerClient.selectSpawnPoint") >> undefined -- TODO
+selectSpawnPoint edictRef = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+    spawnPoint <- use $ gameBaseGlobals.gbGame.glSpawnPoint
+
+    spot <- if | deathmatchValue /= 0 -> selectDeathmatchSpawnPoint
+               | coopValue /= 0 -> selectCoopSpawnPoint edictRef
+               | otherwise -> do
+                   -- find a single player start spot
+                   spot <- findPlayerStart (BC.map toLower spawnPoint) Nothing
+                   case spot of
+                     Nothing -> do
+                       if B.length spawnPoint == 0
+                         then
+                           -- there wasn't a spawnpoint without a target,
+                           -- so use any
+                           GameBase.gFind Nothing GameBase.findByClass "info_player_start"
+                         else
+                           return Nothing
+                     Just _ ->
+                       return spot
+
+    case spot of
+      Nothing -> do
+        err <- use $ gameBaseGlobals.gbGameImport.giError
+        err ("Couldn't find spawn point " `B.append` spawnPoint `B.append` "\n")
+        return (V3 0 0 0, V3 0 0 0)
+
+      Just (EdictReference edictIdx) -> do
+        Just entityState <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState
+        let origin = let V3 a b c = entityState^.esOrigin in V3 a b (c + 9)
+            angles = entityState^.esAngles
+
+        return (origin, angles)
+
+  where findPlayerStart :: B.ByteString -> Maybe EdictReference -> Quake (Maybe EdictReference)
+        findPlayerStart spawnPoint eRef = do
+          es <- GameBase.gFind eRef GameBase.findByClass "info_player_start"
+
+          case es of
+            Nothing -> return Nothing
+            Just ref@(EdictReference edictIdx) -> do
+              Just targetName <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiTargetName
+
+              if | B.length spawnPoint == 0 && isNothing targetName ->
+                     return $ Just ref
+                 | B.length spawnPoint == 0 || isNothing targetName ->
+                     findPlayerStart spawnPoint es
+                 | spawnPoint == BC.map toLower (fromJust targetName) ->
+                     return $ Just ref
+                 | otherwise ->
+                     findPlayerStart spawnPoint es
+
+selectDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectDeathmatchSpawnPoint = do
+    io (putStrLn "PlayerClient.selectDeathmatchSpawnPoint") >> undefined -- TODO
+
+selectCoopSpawnPoint :: EdictReference -> Quake (Maybe EdictReference)
+selectCoopSpawnPoint _ = do
+    io (putStrLn "PlayerClient.selectCoopSpawnPoint") >> undefined -- TODO
 
 fetchClientEntData :: EdictReference -> Quake ()
 fetchClientEntData _ = do

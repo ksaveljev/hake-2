@@ -37,10 +37,12 @@ spawn = do
     let foundIndex = findFreeEdict (V.drop maxClientsValue edicts) time numEdicts
 
     case foundIndex of
-      Just er@(EdictReference idx) -> do
-        gameBaseGlobals.gbGEdicts.ix idx .= newEdictT idx
-        initEdict er
-        return er
+      --Just er@(EdictReference idx) -> do
+      Just idx -> do
+        let idx' = idx + maxClientsValue
+        gameBaseGlobals.gbGEdicts.ix idx' .= newEdictT idx'
+        initEdict (EdictReference idx')
+        return (EdictReference idx')
       Nothing -> do
         maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
 
@@ -53,14 +55,14 @@ spawn = do
         initEdict (EdictReference numEdicts)
         return (EdictReference numEdicts)
 
-  where findFreeEdict :: V.Vector EdictT -> Float -> Int -> Maybe EdictReference
+  where findFreeEdict :: V.Vector EdictT -> Float -> Int -> Maybe Int
         findFreeEdict edicts levelTime numEdicts =
           let found = V.findIndex (\edict -> (not $ edict^.eInUse) && ((edict^.eFreeTime) < 2 || levelTime - (edict^.eFreeTime) > 0.5)) edicts
           in case found of
                Nothing -> Nothing
                Just idx -> if idx >= numEdicts
                              then Nothing
-                             else Just $ EdictReference idx
+                             else Just idx
 
 initEdict :: EdictReference -> Quake ()
 initEdict er@(EdictReference idx) = do
