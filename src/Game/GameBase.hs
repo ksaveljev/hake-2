@@ -136,6 +136,9 @@ findByTarget e s =
       else let Just targetName = e^.eEdictInfo.eiTargetName
            in BC.map toLower targetName == BC.map toLower s
 
+findByClass :: EdictT -> B.ByteString -> Bool
+findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
+
 gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
 gFind ref findBy str = do
     let (EdictReference edictIdx) = case ref of
