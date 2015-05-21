@@ -1373,3 +1373,7 @@ pointContents p headNode = do
         idx <- pointLeafNumR p headNode
         Just contents <- preuse $ cmGlobals.cmMapLeafs.ix idx.clContents
         return contents
+
+transformedPointContents :: V3 Float -> Int -> V3 Float -> V3 Float -> Quake Int
+transformedPointContents _ _ _ _ = do
+    io (putStrLn "CM.transformedPointContents") >> undefined -- TODO

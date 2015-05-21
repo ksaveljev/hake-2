@@ -497,5 +497,25 @@ hullForEntity edict = do
       else CM.headnodeForBox (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs)
 
 pointContents :: V3 Float -> Quake Int
-pointContents _ = do
-    io (putStrLn "SVWorld.pointContents") >> undefined -- TODO
+pointContents p = do
+    -- get base contents from world
+    Just (CModelReference cModelIdx) <- preuse $ svGlobals.svServer.sModels.ix 1
+    Just headNode <- preuse $ cmGlobals.cmMapCModels.ix cModelIdx.cmHeadNode
+    contents <- CM.pointContents p headNode
+    -- or in contents from all the other entities
+    num <- areaEdicts p p (svGlobals.svTouch) Constants.maxEdicts Constants.areaSolid
+
+    collectContents contents 0 num
+
+  where collectContents :: Int -> Int -> Int -> Quake Int
+        collectContents contents idx maxIdx
+          | idx >= maxIdx = return contents
+          | otherwise = do
+              Just (EdictReference edictIdx) <- preuse $ svGlobals.svTouch.ix idx
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              -- might intersect, so do an exact clip
+              headNode <- hullForEntity edict
+              when ((edict^.eSolid) /= Constants.solidBsp) $
+                return () -- TODO: find out why this is here
+              c2 <- CM.transformedPointContents p headNode (edict^.eEntityState.esOrigin) (edict^.eEntityState.esAngles)
+              collectContents (contents .|. c2) (idx + 1) maxIdx
