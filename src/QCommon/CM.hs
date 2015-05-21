@@ -1360,3 +1360,16 @@ testBoxInBrush mins maxs p1 traceLens brush = do
                   d1 = dot p1 (plane^.cpNormal) - dist
 
               return (d1 > 0)
+
+-- Returns a tag that describes the content of the point
+pointContents :: V3 Float -> Int -> Quake Int
+pointContents p headNode = do
+    numNodes <- use $ cmGlobals.cmNumNodes
+
+    if numNodes == 0 -- map not loaded
+      then
+        return 0
+      else do
+        idx <- pointLeafNumR p headNode
+        Just contents <- preuse $ cmGlobals.cmMapLeafs.ix idx.clContents
+        return contents
