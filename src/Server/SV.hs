@@ -5,7 +5,7 @@ module Server.SV where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom)
 import Control.Monad (unless, when, void, liftM)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z, dot)
 
@@ -131,7 +131,55 @@ physicsStep edictRef@(EdictReference edictIdx) = do
     -- friction for flying monsters that have been given vertical velocity
     checkSwimmingFriction
 
-    io (putStrLn "SV.physicsStep") >> undefined -- TODO
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let V3 a b c = edict^.eEdictPhysics.eVelocity
+
+    if a /= 0 || b /= 0 || c /= 0
+      then do
+        -- apply friction
+        -- let dead monsters who aren't completely onground slide
+        when (wasOnGround || (edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
+          ok <- M.checkBottom edictRef
+          when (not ((edict^.eEdictStatus.eHealth) <= 0 && not ok)) $ do
+            let vel = edict^.eEdictPhysics.eVelocity
+                speed = sqrt $ (vel^._x) * (vel^._x) + (vel^._y) * (vel^._y)
+
+            when (speed /= 0) $ do
+              let friction = Constants.svFriction
+                  control = if speed < Constants.svStopSpeed
+                              then Constants.svStopSpeed
+                              else speed
+                  newSpeed = speed - Constants.frameTime * control * friction
+                  newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
+
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._x %= (* newSpeed')
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._y %= (* newSpeed')
+
+        let mask = if (edict^.eSvFlags) .&. Constants.svfMonster /= 0
+                     then Constants.maskMonsterSolid
+                     else Constants.maskSolid
+
+        void $ flyMove edictRef Constants.frameTime mask
+
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        let linkEntity = gameImport^.giLinkEntity
+            sound = gameImport^.giSound
+            soundIndex = gameImport^.giSoundIndex
+
+        linkEntity edictRef
+        GameBase.touchTriggers edictRef
+
+        Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+        when (edict'^.eInUse) $ do
+          when (isJust (edict'^.eEdictOther.eoGroundEntity) && not wasOnGround && hitSound) $ do
+            wavIdx <- soundIndex (Just "world/land.wav")
+            sound edictRef 0 wavIdx 1 1 0
+
+          void $ runThink edictRef
+
+      else
+        void $ runThink edictRef
 
   where checkGroundEntity :: Quake Bool
         checkGroundEntity = do
@@ -726,3 +774,7 @@ testEntityPosition (EdictReference edictIdx) = do
 addRotationalFriction :: EdictReference -> Quake ()
 addRotationalFriction _ = do
     io (putStrLn "SV.addRotationalFriction") >> undefined -- TODO
+
+flyMove :: EdictReference -> Float -> Int -> Quake Int
+flyMove _ _ _ = do
+    io (putStrLn "SV.flyMove") >> undefined -- TODO

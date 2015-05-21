@@ -99,3 +99,7 @@ dropToFloor :: EntThink
 dropToFloor =
   GenericEntThink "m_drop_to_floor" $ \_ -> do
     io (putStrLn "M.dropToFloor") >> undefined -- TODO
+
+checkBottom :: EdictReference -> Quake Bool
+checkBottom _ = do
+    io (putStrLn "M.checkBottom") >> undefined -- TODO
