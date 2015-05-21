@@ -7,17 +7,21 @@ import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom)
 import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3(..), _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot, cross)
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
 import qualified Client.M as M
-import qualified Game.GameBase as GameBase
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
 import qualified Util.Math3D as Math3D
+
+maxClipPlanes :: Int
+maxClipPlanes = 5
 
 {-
 - 
@@ -283,7 +287,8 @@ physicsToss er@(EdictReference edictIdx) = do
                             else 1
 
             Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
-            void $ GameBase.clipVelocity velocity (trace^.tPlane.cpNormal) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity) backoff
+            let (_, out) = GameBase.clipVelocity velocity (trace^.tPlane.cpNormal) backoff
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= out
 
             -- stop if on ground
             stopIfOnGround moveType trace
@@ -775,6 +780,145 @@ addRotationalFriction :: EdictReference -> Quake ()
 addRotationalFriction _ = do
     io (putStrLn "SV.addRotationalFriction") >> undefined -- TODO
 
+{-
+- SV_FlyMove
+- 
+- The basic solid body movement clip that slides along multiple planes
+- Returns the clipflags if the velocity was modified (hit something solid)
+- 1 = floor 2 = wall / step 4 = dead stop
+-}
 flyMove :: EdictReference -> Float -> Int -> Quake Int
-flyMove _ _ _ = do
-    io (putStrLn "SV.flyMove") >> undefined -- TODO
+flyMove edictRef@(EdictReference edictIdx) time mask = do
+    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+    let planes = V.replicate 6 (V3 0 0 0)
+
+    v <- doFlyMove velocity velocity planes time 0 0 0 4
+    io (putStrLn "HIHIHI")
+    io (print v)
+    return v
+
+  where doFlyMove :: V3 Float -> V3 Float -> V.Vector (V3 Float) -> Float -> Int -> Int -> Int -> Int -> Quake Int
+        doFlyMove primalVelocity originalVelocity planes timeLeft numPlanes blockedMask idx maxIdx
+          | idx >= maxIdx = return blockedMask
+          | otherwise = do
+              traceT <- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
+                          let end = (edict^.eEntityState.esOrigin) + fmap (* timeLeft) (edict^.eEdictPhysics.eVelocity)
+                          trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+                          trace (edict^.eEntityState.esOrigin)
+                                (Just $ edict^.eEdictMinMax.eMins)
+                                (Just $ edict^.eEdictMinMax.eMaxs)
+                                end edictRef mask
+
+              if (traceT^.tAllSolid) -- entity is trapped in another solid
+                then do
+                  use (globals.vec3Origin) >>= \v3o ->
+                    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                  return 3
+                else do
+                  (numPlanes', originalVelocity') <- if (traceT^.tFraction) > 0 -- actually covered some distance
+                                                       then do
+                                                         gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
+                                                         Just v <- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity)
+                                                         return (0, v)
+                                                       else
+                                                         return (numPlanes, originalVelocity)
+
+                  if (traceT^.tFraction) == 1 -- moved the entire distance
+                    then
+                      return blockedMask
+                    else do
+                      let Just (EdictReference hitIdx) = traceT^.tEnt
+                      blockedMask' <- if traceT^.tPlane.cpNormal._z > 0.7
+                                        then do
+                                          preuse (gameBaseGlobals.gbGEdicts.ix hitIdx) >>= \(Just hit) -> do
+                                            when ((hit^.eSolid) == Constants.solidBsp) $ do
+                                              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT^.tEnt
+                                              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= hit^.eLinkCount
+
+                                            return (blockedMask .|. 1) -- floor
+                                        else
+                                          return $ if (traceT^.tPlane.cpNormal._z) == 0
+                                                     then blockedMask .|. 2 -- step
+                                                     else blockedMask
+
+                      -- run the impact function
+                      impact edictRef traceT
+
+                      Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+
+                      if not inUse -- removed by the impact function
+                        then
+                          return blockedMask'
+                        else do
+                          let timeLeft' = timeLeft - timeLeft * (traceT^.tFraction)
+
+                          -- cliped to another plane
+                          if numPlanes' >= maxClipPlanes -- this shouldn't really happen
+                            then do
+                              use (globals.vec3Origin) >>= \v3o ->
+                                gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                              return 3
+                            else do
+                              let planes' = planes V.// [(numPlanes', traceT^.tPlane.cpNormal)]
+                                  numPlanes'' = numPlanes' + 1
+
+                              -- modify original_velocity so it parallels all of the clip planes
+                              let (i, newVelocity) = modifyOriginVelocity planes' originalVelocity' 0 numPlanes'' (V3 0 0 0)
+
+                              if i /= numPlanes'' -- go along this plane
+                                then do
+                                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= newVelocity
+
+                                  -- if original velocity is against the original velocity, stop dead
+                                  -- to avoid tiny occilations in sloping corners
+                                  if newVelocity `dot` primalVelocity <= 0
+                                    then do
+                                      use (globals.vec3Origin) >>= \v3o ->
+                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                      return blockedMask'
+                                    else
+                                      doFlyMove primalVelocity originalVelocity' planes' timeLeft' numPlanes'' blockedMask' (idx + 1) maxIdx
+
+                                else do -- go along the crease
+                                  if numPlanes'' /= 2
+                                    then do
+                                      use (globals.vec3Origin) >>= \v3o ->
+                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                      return 7
+                                    else do
+                                      Just entVelocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+                                      let dir = (planes' V.! 0) `cross` (planes' V.! 1)
+                                          d = dir `dot` entVelocity
+
+                                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= fmap (* d) dir
+
+                                      -- if original velocity is against the original velocity, stop dead
+                                      -- to avoid tiny occilations in sloping corners
+                                      if newVelocity `dot` primalVelocity <= 0
+                                        then do
+                                          use (globals.vec3Origin) >>= \v3o ->
+                                            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                          return blockedMask'
+                                        else
+                                          doFlyMove primalVelocity originalVelocity' planes' timeLeft' numPlanes'' blockedMask' (idx + 1) maxIdx
+
+        modifyOriginVelocity :: V.Vector (V3 Float) -> V3 Float -> Int -> Int -> V3 Float -> (Int, V3 Float)
+        modifyOriginVelocity planes originalVelocity idx maxIdx newVelocity
+          | idx >= maxIdx = (idx, newVelocity)
+          | otherwise =
+              let (_, newVelocity') = GameBase.clipVelocity originalVelocity (planes V.! idx) 1
+                  j = checkPlanes planes newVelocity' idx 0 maxIdx
+              in if j == maxIdx
+                   then (idx, newVelocity')
+                   else modifyOriginVelocity planes originalVelocity (idx + 1) maxIdx newVelocity'
+
+        checkPlanes :: V.Vector (V3 Float) -> V3 Float -> Int -> Int -> Int -> Int
+        checkPlanes planes newVelocity i idx maxIdx
+          | idx >= maxIdx = idx
+          | otherwise =
+              if idx /= i && (planes V.! idx) /= (planes V.! i)
+                then if newVelocity `dot` (planes V.! idx) < 0 -- not ok
+                       then idx
+                       else checkPlanes planes newVelocity i (idx + 1) maxIdx
+                else checkPlanes planes newVelocity i (idx + 1) maxIdx

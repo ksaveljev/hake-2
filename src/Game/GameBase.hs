@@ -308,8 +308,8 @@ pickTarget targetName = do
                   let Just foundEdictRef = edictRef
                   searchForTargets edictRef findBy (foundEdictRef : foundRefs) (num + 1)
 
-clipVelocity :: V3 Float -> V3 Float -> Traversal' QuakeState (V3 Float) -> Float -> Quake Int
-clipVelocity v3in normal v3outLens overbounce = do
+clipVelocity :: V3 Float -> V3 Float -> Float -> (Int, V3 Float)
+clipVelocity v3in normal overbounce =
     let isBlocked = if | normal^._z > 0 -> 1 -- floor
                        | normal^._z == 0 -> 2 -- step
                        | otherwise -> 0
@@ -317,10 +317,9 @@ clipVelocity v3in normal v3outLens overbounce = do
         backoff = (dot v3in normal) * overbounce
         change = fmap (* backoff) normal
         out = v3in - change
+        v3out = fmap (\v -> if v > (-stopEpsilon) && v < stopEpsilon then 0 else v) out
 
-    v3outLens .= fmap (\v -> if v > (-stopEpsilon) && v < stopEpsilon then 0 else v) out
-
-    return isBlocked
+    in (isBlocked, v3out)
 
 touchTriggers :: EdictReference -> Quake ()
 touchTriggers er@(EdictReference edictIdx) = do
