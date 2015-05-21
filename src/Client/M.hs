@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.M where
 
-import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=))
+import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
 import Control.Monad (unless, when)
 import Data.Bits ((.|.), (.&.), complement)
 import Linear (V3(..), _z)
@@ -127,5 +127,28 @@ walkMove _ _ _ = do
     io (putStrLn "M.walkMove") >> undefined -- TODO
 
 catagorizePosition :: EdictReference -> Quake ()
-catagorizePosition _ = do
-    io (putStrLn "M.catagorizePosition") >> undefined -- TODO
+catagorizePosition (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
+
+    let point = let V3 a b c = edict^.eEntityState.esOrigin in V3 a b (c + (edict^.eEdictMinMax.eMins._z) + 1)
+    cont <- pointContents point
+
+    if cont .&. Constants.maskWater == 0
+      then do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 0
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterType .= 0
+      else do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 1
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterType .= cont
+
+        let point' = _z %~ (+26) $ point
+        cont' <- pointContents point'
+
+        unless (cont' .&. Constants.maskWater == 0) $ do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 2
+          let point'' = _z %~ (+22) $ point'
+          cont'' <- pointContents point''
+
+          when (cont'' .&. Constants.maskWater /= 0) $
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 3
