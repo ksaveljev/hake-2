@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.M where
 
-import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=))
+import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=))
 import Control.Monad (unless, when)
 import Data.Bits ((.|.), (.&.), complement)
 import Linear (V3(..), _z)
@@ -97,8 +97,26 @@ flyCheck =
 
 dropToFloor :: EntThink
 dropToFloor =
-  GenericEntThink "m_drop_to_floor" $ \_ -> do
-    io (putStrLn "M.dropToFloor") >> undefined -- TODO
+  GenericEntThink "m_drop_to_floor" $ \edictRef@(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin._z += 1
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let end' = let V3 a b c = edict^.eEntityState.esOrigin in V3 a b (c - 256)
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let trace = gameImport^.giTrace
+        linkEntity = gameImport^.giLinkEntity
+
+    traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end' edictRef Constants.maskMonsterSolid
+
+    if (traceT^.tFraction) == 1 || (traceT^.tAllSolid)
+      then
+        return True
+      else do
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
+        linkEntity edictRef
+        checkGround edictRef
+        catagorizePosition edictRef
+        return True
 
 checkBottom :: EdictReference -> Quake Bool
 checkBottom _ = do
@@ -107,3 +125,7 @@ checkBottom _ = do
 walkMove :: EdictReference -> Float -> Float -> Quake Bool
 walkMove _ _ _ = do
     io (putStrLn "M.walkMove") >> undefined -- TODO
+
+catagorizePosition :: EdictReference -> Quake ()
+catagorizePosition _ = do
+    io (putStrLn "M.catagorizePosition") >> undefined -- TODO
