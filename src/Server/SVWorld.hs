@@ -495,3 +495,7 @@ hullForEntity edict = do
         return (model^.cmHeadNode)
       -- create a temp hull from bounding box sizes
       else CM.headnodeForBox (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs)
+
+pointContents :: V3 Float -> Quake Int
+pointContents _ = do
+    io (putStrLn "SVWorld.pointContents") >> undefined -- TODO

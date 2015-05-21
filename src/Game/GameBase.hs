@@ -23,6 +23,7 @@ import qualified Game.PlayerClient as PlayerClient
 import qualified Game.PlayerView as PlayerView
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Server.SV as SV
+import qualified Server.SVWorld as SVWorld
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -120,14 +121,7 @@ runFrame = do
 -}
 getGameApi :: GameImportT -> Quake ()
 getGameApi imp =
-    gameBaseGlobals.gbGameImport .= imp
-    {- TODO:
-        gi.pointcontents = new pmove_t.PointContentsAdapter() {
-            public int pointcontents(float[] o) {
-                return SV_WORLD.SV_PointContents(o);
-            }
-        };
-    -} 
+    gameBaseGlobals.gbGameImport .= imp { _giPointContents = SVWorld.pointContents }
 
 findByTarget :: EdictT -> B.ByteString -> Bool
 findByTarget e s =
