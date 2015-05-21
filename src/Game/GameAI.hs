@@ -3,15 +3,18 @@
 module Game.GameAI where
 
 import Control.Lens (use, (^.), ix, preuse, (.=))
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Bits ((.&.))
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
+import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
+import qualified Client.M as M
 import qualified Game.Monster as Monster
+import qualified Util.Lib as Lib
 
 aiStand :: AI
 aiStand =
@@ -83,5 +86,30 @@ aiSetSightClient = do
 
 walkMonsterStartGo :: EntThink
 walkMonsterStartGo =
-  GenericEntThink "walkmonster_start_go" $ \_ -> do
-    io (putStrLn "GameAI.walkMonsterStartGo") >> undefined -- TODO
+  GenericEntThink "walkmonster_start_go" $ \selfRef@(EdictReference selfIdx) -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+
+    when (spawnFlags .&. 2 == 0 && levelTime < 1) $ do
+      void $ think M.dropToFloor selfRef
+      Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoGroundEntity
+      when (isJust groundEntity) $ do
+        ok <- M.walkMove selfRef 0 0
+        when (not ok) $ do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+          dprintf ((self^.eClassName) `B.append` " in solid at " `B.append` (Lib.vtos (self^.eEntityState.esOrigin)) `B.append` "\n")
+          
+    Just yawSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eYawSpeed
+    when (yawSpeed == 0) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eYawSpeed .= 40
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus.eViewHeight .= 25
+
+    Monster.monsterStartGo selfRef
+
+    Just spawnFlags' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+    when (spawnFlags' .&. 2 /= 0) $
+      void $ think Monster.monsterTriggeredStart selfRef
+
+    return True

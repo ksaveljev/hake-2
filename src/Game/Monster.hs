@@ -10,6 +10,7 @@ import qualified Data.ByteString as B
 import Quake
 import QuakeState
 import CVarVariables
+import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
@@ -91,3 +92,12 @@ monsterStart edictRef@(EdictReference edictIdx) = do
             let Just move = currentMove
                 frame = (move^.mmFirstFrame) + ((fromIntegral r) `div` ((move^.mmLastFrame) - (move^.mmFirstFrame) + 1))
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= frame
+
+monsterStartGo :: EdictReference -> Quake ()
+monsterStartGo _ = do
+    io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+
+monsterTriggeredStart :: EntThink
+monsterTriggeredStart =
+  GenericEntThink "monster_triggered_start" $ \_ -> do
+    io (putStrLn "Monster.monsterTriggeredStart") >> undefined -- TODO

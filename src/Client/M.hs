@@ -103,3 +103,7 @@ dropToFloor =
 checkBottom :: EdictReference -> Quake Bool
 checkBottom _ = do
     io (putStrLn "M.checkBottom") >> undefined -- TODO
+
+walkMove :: EdictReference -> Float -> Float -> Quake Bool
+walkMove _ _ _ = do
+    io (putStrLn "M.walkMove") >> undefined -- TODO
