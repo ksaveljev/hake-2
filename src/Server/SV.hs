@@ -922,3 +922,16 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
                        then idx
                        else checkPlanes planes newVelocity i (idx + 1) maxIdx
                 else checkPlanes planes newVelocity i (idx + 1) maxIdx
+
+{-
+- Called by monster program code. The move will be adjusted for slopes and
+- stairs, but if the move isn't possible, no move is done, false is
+- returned, and pr_global_struct.trace_normal is set to the normal of the
+- blocking wall.
+-}
+
+-- FIXME: since we need to test end position contents here, can we avoid
+-- doing it again later in catagorize position?
+moveStep :: EdictReference -> V3 Float -> Bool -> Quake Bool
+moveStep _ _ _ = do
+    io (putStrLn "SV.moveStep") >> undefined -- TODO

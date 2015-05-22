@@ -4,12 +4,14 @@ module Client.M where
 import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
 import Control.Monad (unless, when)
 import Data.Bits ((.|.), (.&.), complement)
+import Data.Maybe (isNothing)
 import Linear (V3(..), _z)
 
 import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
+import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
 
 checkGround :: EdictReference -> Quake ()
@@ -123,8 +125,16 @@ checkBottom _ = do
     io (putStrLn "M.checkBottom") >> undefined -- TODO
 
 walkMove :: EdictReference -> Float -> Float -> Quake Bool
-walkMove _ _ _ = do
-    io (putStrLn "M.walkMove") >> undefined -- TODO
+walkMove edictRef@(EdictReference edictIdx) yaw dist = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    if isNothing (edict^.eEdictOther.eoGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
+      then
+        return False
+      else do
+        let yaw' = yaw * pi * 2 / 360
+            move = V3 ((cos yaw) * dist) ((sin yaw) * dist) 0
+        SV.moveStep edictRef move True
+
 
 catagorizePosition :: EdictReference -> Quake ()
 catagorizePosition (EdictReference edictIdx) = do

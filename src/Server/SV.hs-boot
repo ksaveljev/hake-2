@@ -16,3 +16,5 @@ physicsStep :: EdictReference -> Quake ()
 physicsToss :: EdictReference -> Quake ()
 
 push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
+
+moveStep :: EdictReference -> V3 Float -> Bool -> Quake Bool
