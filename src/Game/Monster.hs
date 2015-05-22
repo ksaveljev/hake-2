@@ -2,9 +2,9 @@
 module Game.Monster where
 
 import Control.Lens ((^.), preuse, (%=), ix, (+=), use, zoom, (.=))
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, unless)
 import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isNothing, isJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import qualified Data.ByteString as B
 
 import Quake
@@ -12,6 +12,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
@@ -94,8 +95,51 @@ monsterStart edictRef@(EdictReference edictIdx) = do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= frame
 
 monsterStartGo :: EdictReference -> Quake ()
-monsterStartGo _ = do
-    io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+monsterStartGo selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    unless ((self^.eEdictStatus.eHealth) <= 0) $ do
+      -- check for target to combat_point and change to combattarget
+      when (isJust (self^.eEdictInfo.eiTarget)) $
+        checkTarget (fromJust $ self^.eEdictInfo.eiTarget)
+
+      -- validate combattarget
+      Just combatTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiCombatTarget
+      when (isJust combatTarget) $
+        validateCombatTarget (fromJust combatTarget)
+
+      io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+
+  where checkTarget :: B.ByteString -> Quake ()
+        checkTarget targetName = do
+          (notCombat, fixup) <- checkTargets targetName False False Nothing
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          when (notCombat && isJust (self^.eEdictInfo.eiCombatTarget)) $ do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf $ (self^.eClassName) `B.append` " at " `B.append` (Lib.vtos (self^.eEntityState.esOrigin)) `B.append` " has target with mixed types\n"
+
+          when fixup $
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+
+        checkTargets :: B.ByteString -> Bool -> Bool -> Maybe EdictReference -> Quake (Bool, Bool)
+        checkTargets targetName notCombat fixup ref = do
+          foundRef <- GameBase.gFind ref GameBase.findByTarget targetName
+
+          case foundRef of
+            Nothing -> return (notCombat, fixup)
+            targetRef@(Just (EdictReference targetIdx)) -> do
+              Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
+              if (target^.eClassName) == "point_combat"
+                then do
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiCombatTarget .= Just targetName
+                  checkTargets targetName notCombat True targetRef
+                else
+                  checkTargets targetName True fixup targetRef
+
+        validateCombatTarget :: B.ByteString -> Quake ()
+        validateCombatTarget _ = do
+          io (putStrLn "Monster.monsterStartGo#validateCombatTarget") >> undefined -- TODO
 
 monsterTriggeredStart :: EntThink
 monsterTriggeredStart =
