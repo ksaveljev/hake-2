@@ -132,7 +132,7 @@ walkMove edictRef@(EdictReference edictIdx) yaw dist = do
         return False
       else do
         let yaw' = yaw * pi * 2 / 360
-            move = V3 ((cos yaw) * dist) ((sin yaw) * dist) 0
+            move = V3 ((cos yaw') * dist) ((sin yaw') * dist) 0
         SV.moveStep edictRef move True
 
 

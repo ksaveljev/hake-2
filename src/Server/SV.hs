@@ -5,7 +5,7 @@ module Server.SV where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom, (%~))
 import Control.Monad (unless, when, void, liftM)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z, dot, cross)
 import qualified Data.Vector as V
@@ -949,7 +949,41 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
           Just v -> return v
 
       else do
-        io (putStrLn "SV.moveStep") >> undefined -- TODO
+        -- push down from a step height above the wished position
+        let stepSize = if (edict^.eMonsterInfo.miAIFlags) .&. Constants.aiNoStep == 0
+                         then fromIntegral $ Constants.stepSize
+                         else 1
+            newOrg' = _z %~ (+ stepSize) $ newOrg
+            end = _z %~ (subtract (stepSize * 2)) $ newOrg'
+
+        trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+        traceT <- trace newOrg' (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end edictRef Constants.maskMonsterSolid
+
+        done <- checkAllSolid traceT
+                  >>= checkStartSolid edict traceT newOrg' end stepSize
+                  >>= checkWaterLevel edict
+                  >>= checkAnotherFraction edict
+                  >>= checkBottom oldOrg
+
+        case done of
+          (Just v, _, _) -> return v
+          (Nothing, traceT', newOrg'') -> do
+            Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            when ((edict'^.eFlags) .&. Constants.flPartialGround /= 0) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flPartialGround))
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT^.tEnt
+            let Just (EdictReference traceEntIdx) = traceT^.tEnt
+            Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= traceEnt^.eLinkCount
+
+            -- the move is ok
+            when relink $ do
+              linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+              linkEntity edictRef
+              GameBase.touchTriggers edictRef
+
+            return True
 
   where doFlyingStep :: Int -> Int -> Quake (Maybe Bool)
         doFlyingStep idx maxIdx
@@ -960,8 +994,6 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 
               let newOrg = (edict^.eEntityState.esOrigin) + move
                   trace = gameImport^.giTrace
-                  pointContents = gameImport^.giPointContents
-                  linkEntity = gameImport^.giLinkEntity
 
               newOrg' <- updateNewOrg idx edict newOrg
 
@@ -969,7 +1001,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 
               done <- checkFlyingMonsters edict traceT
                       >>= checkSwimmingMonsters edict traceT
-                      >>= checkFraction edict traceT
+                      >>= checkFraction traceT
 
               case done of
                 Just _ -> return done
@@ -1039,9 +1071,9 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
             else
               return Nothing
 
-        checkFraction :: EdictT -> TraceT -> Maybe Bool -> Quake (Maybe Bool)
-        checkFraction _ _ done@(Just _) = return done
-        checkFraction edict traceT _ = do
+        checkFraction :: TraceT -> Maybe Bool -> Quake (Maybe Bool)
+        checkFraction _ done@(Just _) = return done
+        checkFraction traceT _ = do
           if (traceT^.tFraction) == 1
             then do
               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
@@ -1054,3 +1086,87 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
               return (Just True)
             else
               return Nothing
+
+        checkAllSolid :: TraceT -> Quake (Maybe Bool)
+        checkAllSolid traceT =
+          return $ if traceT^.tAllSolid
+                     then Just False
+                     else Nothing
+
+        checkStartSolid :: EdictT -> TraceT -> V3 Float -> V3 Float -> Float -> Maybe Bool -> Quake (Maybe Bool, TraceT, V3 Float)
+        checkStartSolid _ traceT newOrg _ _ done@(Just _) = return (done, traceT, newOrg)
+        checkStartSolid edict traceT newOrg end stepSize _ = do
+          if traceT^.tStartSolid
+            then do
+              let newOrg' = _z %~ (subtract stepSize) $ newOrg
+              trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+              traceT' <- trace newOrg' (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end edictRef Constants.maskMonsterSolid
+              return $ if (traceT'^.tAllSolid) || (traceT'^.tStartSolid)
+                         then (Just False, traceT', newOrg')
+                         else (Nothing, traceT', newOrg')
+            else
+              return (Nothing, traceT, newOrg)
+
+        -- don't go in to water
+        checkWaterLevel :: EdictT -> (Maybe Bool, TraceT, V3 Float) -> Quake (Maybe Bool, TraceT, V3 Float)
+        checkWaterLevel _ done@((Just _), _, _) = return done
+        checkWaterLevel edict (_, traceT, newOrg) = do
+          if (edict^.eWaterLevel) == 0
+            then do
+              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
+              contents <- pointContents test
+
+              return $ if contents .&. Constants.maskWater /= 0
+                         then (Just False, traceT, newOrg)
+                         else (Nothing, traceT, newOrg)
+            else
+              return (Nothing, traceT, newOrg)
+
+        checkAnotherFraction :: EdictT -> (Maybe Bool, TraceT, V3 Float) -> Quake (Maybe Bool, TraceT, V3 Float)
+        checkAnotherFraction _ done@(Just _, _, _) = return done
+        checkAnotherFraction edict (_, traceT, newOrg) = do
+          if (traceT^.tFraction) == 1
+            then do
+              -- if monster had the ground pulled out, go ahead and fall
+              if (edict^.eFlags) .&. Constants.flPartialGround /= 0
+                then do
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin += move
+
+                  when relink $ do
+                    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+                    linkEntity edictRef
+                    GameBase.touchTriggers edictRef
+                  
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+                  return (Just True, traceT, newOrg)
+                else
+                  return (Just False, traceT, newOrg) -- walked off an edge
+            else
+              return (Nothing, traceT, newOrg)
+
+        checkBottom :: V3 Float -> (Maybe Bool, TraceT, V3 Float) -> Quake (Maybe Bool, TraceT, V3 Float)
+        checkBottom _ done@(Just _, _, _) = return done
+        checkBottom oldOrg (_, traceT, newOrg) = do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
+
+          ok <- M.checkBottom edictRef
+
+          if not ok
+            then do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              if (edict^.eFlags) .&. Constants.flPartialGround /= 0
+                then do
+                  -- entity had floor mostly pulled out from underneath
+                  -- it and is trying to correct
+                  when relink $ do
+                    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+                    linkEntity edictRef
+                    GameBase.touchTriggers edictRef
+
+                  return (Just True, traceT, newOrg)
+                else do
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= oldOrg
+                  return (Just False, traceT, newOrg)
+            else
+              return (Nothing, traceT, newOrg)
