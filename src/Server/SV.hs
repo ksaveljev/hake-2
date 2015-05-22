@@ -967,13 +967,13 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 
         case done of
           (Just v, _, _) -> return v
-          (Nothing, traceT', newOrg'') -> do
+          (Nothing, traceT', _) -> do
             Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
             when ((edict'^.eFlags) .&. Constants.flPartialGround /= 0) $
               gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flPartialGround))
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT^.tEnt
-            let Just (EdictReference traceEntIdx) = traceT^.tEnt
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT'^.tEnt
+            let Just (EdictReference traceEntIdx) = traceT'^.tEnt
             Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
             gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= traceEnt^.eLinkCount
 

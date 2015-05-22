@@ -5,7 +5,7 @@ import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
 import Control.Monad (unless, when)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing)
-import Linear (V3(..), _z)
+import Linear (V3(..), _x, _y, _z)
 
 import Quake
 import QuakeState
@@ -120,9 +120,94 @@ dropToFloor =
         catagorizePosition edictRef
         return True
 
+{-
+- Returns false if any part of the bottom of the entity is off an edge that
+- is not a staircase.
+-}
 checkBottom :: EdictReference -> Quake Bool
-checkBottom _ = do
-    io (putStrLn "M.checkBottom") >> undefined -- TODO
+checkBottom edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let mins = (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMins)
+        maxs = (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMaxs)
+
+    -- if all of the points under the corners are solid world, don't bother
+    -- with the tougher checks
+    -- the corners must be within 16 of the midpoint
+    done <- doChecks ((mins^._z) - 1) mins maxs 0 2 0 2
+
+    case done of
+      Just v -> return v
+      Nothing -> do
+        gameBaseGlobals.gbCYes += 1
+        return True -- we got out easy
+
+  where doChecks :: Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake (Maybe Bool)
+        doChecks c mins maxs x maxX y maxY
+          | x >= maxX = return Nothing
+          | y >= maxY = doChecks c mins maxs (x + 1) maxX 0 maxY
+          | otherwise = do
+              let a = if x /= 0 then maxs^._x else mins^._x
+                  b = if y /= 0 then maxs^._y else mins^._y
+                  start = V3 a b c
+
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+              let pointContents = gameImport^.giPointContents
+                  trace = gameImport^.giTrace
+              contents <- pointContents start
+
+              if contents /= Constants.contentsSolid
+                then do
+                  gameBaseGlobals.gbCNo += 1
+                  -- check it for real
+                  let a' = ((mins^._x) + (maxs^._x)) * 0.5
+                      b' = ((mins^._y) + (maxs^._y)) * 0.5
+                      start' = V3 a' b' (mins^._z)
+                      stop' = V3 a' b' ((mins^._z) - 2 * (fromIntegral Constants.stepSize))
+
+                  v3o <- use $ globals.vec3Origin
+                  traceT <- trace start' (Just v3o) (Just v3o) stop' edictRef Constants.maskMonsterSolid
+
+                  if (traceT^.tFraction) == 1
+                    then
+                      return (Just False)
+                    else do
+                      let mid = traceT^.tEndPos._z
+                          bottom = traceT^.tEndPos._z
+
+                      -- the corners must be withing 16 of the midpoint
+                      done <- checkCorners mins maxs start' stop' mid bottom 0 2 0 2
+
+                      case done of
+                        Just _ -> return done
+                        Nothing -> do
+                          gameBaseGlobals.gbCYes += 1
+                          return (Just True)
+
+                else
+                  doChecks c mins maxs x maxX (y + 1) maxY
+
+        checkCorners :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Float -> Float -> Int -> Int -> Int -> Int -> Quake (Maybe Bool)
+        checkCorners mins maxs start stop mid bottom x maxX y maxY
+          | x >= maxX = return Nothing
+          | y >= maxY = checkCorners mins maxs start stop mid bottom (x + 1) maxX 0 maxY
+          | otherwise = do
+              let a = if x /= 0 then maxs^._x else mins^._x
+                  b = if y /= 0 then maxs^._y else mins^._y
+                  start' = V3 a b (start^._z)
+                  stop' = V3 a b (stop^._z)
+
+              v3o <- use $ globals.vec3Origin
+              trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+              traceT <- trace start' (Just v3o) (Just v3o) stop' edictRef Constants.maskMonsterSolid
+
+              let bottom' = if (traceT^.tFraction) /= 1 && (traceT^.tEndPos._z) > bottom
+                              then traceT^.tEndPos._z
+                              else bottom
+
+              if (traceT^.tFraction) == 1 || mid - (traceT^.tEndPos._z) > fromIntegral Constants.stepSize
+                then return (Just False)
+                else checkCorners mins maxs start' stop' mid bottom' x maxX (y + 1) maxY
 
 walkMove :: EdictReference -> Float -> Float -> Quake Bool
 walkMove edictRef@(EdictReference edictIdx) yaw dist = do
