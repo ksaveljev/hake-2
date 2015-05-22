@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.SV where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom)
+import Control.Lens (use, preuse, ix, (^.), (.=), (+=), (-=), (%=), zoom, (%~))
 import Control.Monad (unless, when, void, liftM)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -933,5 +933,124 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
 -- FIXME: since we need to test end position contents here, can we avoid
 -- doing it again later in catagorize position?
 moveStep :: EdictReference -> V3 Float -> Bool -> Quake Bool
-moveStep _ _ _ = do
-    io (putStrLn "SV.moveStep") >> undefined -- TODO
+moveStep edictRef@(EdictReference edictIdx) move relink = do
+    -- try the move
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let oldOrg = edict^.eEntityState.esOrigin
+        newOrg = oldOrg + move
+
+    -- flying monsters don't step up
+    if (edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0
+      then do
+        done <- doFlyingStep 0 1
+
+        case done of
+          Nothing -> return False
+          Just v -> return v
+
+      else do
+        io (putStrLn "SV.moveStep") >> undefined -- TODO
+
+  where doFlyingStep :: Int -> Int -> Quake (Maybe Bool)
+        doFlyingStep idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+
+              let newOrg = (edict^.eEntityState.esOrigin) + move
+                  trace = gameImport^.giTrace
+                  pointContents = gameImport^.giPointContents
+                  linkEntity = gameImport^.giLinkEntity
+
+              newOrg' <- updateNewOrg idx edict newOrg
+
+              traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) newOrg' edictRef Constants.maskMonsterSolid
+
+              done <- checkFlyingMonsters edict traceT
+                      >>= checkSwimmingMonsters edict traceT
+                      >>= checkFraction edict traceT
+
+              case done of
+                Just _ -> return done
+                Nothing -> do
+                  if isNothing (edict^.eEdictOther.eoEnemy)
+                    then return Nothing
+                    else doFlyingStep (idx + 1) maxIdx
+
+        updateNewOrg :: Int -> EdictT -> V3 Float -> Quake (V3 Float)
+        updateNewOrg idx edict newOrg = do
+          if idx == 0 && isJust (edict^.eEdictOther.eoEnemy)
+            then do
+              goalEntity <- if isNothing (edict^.eGoalEntity)
+                              then do
+                                gameBaseGlobals.gbGEdicts.ix edictIdx.eGoalEntity .= (edict^.eEdictOther.eoEnemy)
+                                let Just (EdictReference goalEntityIdx) = edict^.eEdictOther.eoEnemy
+                                Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
+                                return goalEntity
+                              else do
+                                let Just (EdictReference goalEntityIdx) = edict^.eGoalEntity
+                                Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
+                                return goalEntity
+
+              let dz = (edict^.eEntityState.esOrigin._z) - (goalEntity^.eEntityState.esOrigin._z)
+
+              if isJust (goalEntity^.eClient)
+                then do
+                  let newOrg' = if dz > 40 then (_z %~ (subtract 8) $ newOrg) else newOrg
+                  if not ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eWaterLevel) < 2) && dz < 30
+                    then return (_z %~ (+ 8) $ newOrg')
+                    else return newOrg'
+                else do
+                  return $ if | dz > 8 -> _z %~ (subtract 8) $ newOrg
+                              | dz > 0 -> _z %~ (subtract dz) $ newOrg
+                              | dz < (-8) -> _z %~ (+ 8) $ newOrg
+                              | otherwise -> _z %~ (+ dz) $ newOrg
+
+            else
+              return newOrg
+
+        -- fly monsters don't enter water voluntarily
+        checkFlyingMonsters :: EdictT -> TraceT -> Quake (Maybe Bool)
+        checkFlyingMonsters edict traceT = do
+          if (edict^.eFlags) .&. Constants.flFly /= 0 && (edict^.eWaterLevel) == 0
+            then do
+              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
+              contents <- pointContents test
+              return $ if contents .&. Constants.maskWater /= 0
+                         then Just False
+                         else Nothing
+            else
+              return Nothing
+
+        -- swim monsters don't exit water voluntarily
+        checkSwimmingMonsters :: EdictT -> TraceT -> Maybe Bool -> Quake (Maybe Bool)
+        checkSwimmingMonsters _ _ done@(Just _) = return done
+        checkSwimmingMonsters edict traceT _ = do
+          if (edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eWaterLevel) < 2
+            then do
+              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
+              contents <- pointContents test
+              return $ if contents .&. Constants.maskWater == 0
+                         then Just False
+                         else Nothing
+            else
+              return Nothing
+
+        checkFraction :: EdictT -> TraceT -> Maybe Bool -> Quake (Maybe Bool)
+        checkFraction _ _ done@(Just _) = return done
+        checkFraction edict traceT _ = do
+          if (traceT^.tFraction) == 1
+            then do
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
+
+              when relink $ do
+                linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+                linkEntity edictRef
+                GameBase.touchTriggers edictRef
+
+              return (Just True)
+            else
+              return Nothing
