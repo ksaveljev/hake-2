@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Util.Math3D where
 
 import Control.Lens (preuse, ix, (^.), Const)
@@ -117,3 +118,16 @@ calcFov fovX width height =
     let x = width / tan (fovX * piRatio)
         a = atan (height / x)
     in a / piRatio
+
+vectorYaw :: V3 Float -> Float
+vectorYaw vec =
+    let pitchAccess = v3Access Constants.pitch
+        yawAccess = v3Access Constants.yaw
+    in if vec^.pitchAccess == 0
+         then if | vec^.yawAccess > 0 -> 90
+                 | vec^.yawAccess < 0 -> -90
+                 | otherwise -> 0
+         else let yaw :: Int = truncate $ (atan2 (vec^.yawAccess) (vec^.pitchAccess)) * 180 / pi
+              in fromIntegral $ if yaw < 0
+                                  then yaw + 360
+                                  else yaw
