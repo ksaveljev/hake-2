@@ -106,9 +106,36 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
       -- validate combattarget
       Just combatTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiCombatTarget
       when (isJust combatTarget) $
-        validateCombatTarget (fromJust combatTarget)
+        validateCombatTarget (fromJust combatTarget) Nothing
 
-      io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      case self'^.eEdictInfo.eiTarget of
+        Just target -> do
+          pickedTarget <- GameBase.pickTarget (Just target)
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= pickedTarget
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= pickedTarget
+
+          case pickedTarget of
+            Nothing -> do
+              io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+
+            Just (EdictReference targetIdx) -> do
+              Just targetEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
+              if (targetEdict^.eClassName) == "path_corner"
+                then do
+                  io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+                else do
+                  io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+
+        Nothing -> do
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= 100000000
+          think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
+
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
+        eaThink .= Just monsterThink
+        eaNextThink .= levelTime + Constants.frameTime
 
   where checkTarget :: B.ByteString -> Quake ()
         checkTarget targetName = do
@@ -137,11 +164,27 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
                 else
                   checkTargets targetName True fixup targetRef
 
-        validateCombatTarget :: B.ByteString -> Quake ()
-        validateCombatTarget _ = do
-          io (putStrLn "Monster.monsterStartGo#validateCombatTarget") >> undefined -- TODO
+        validateCombatTarget :: B.ByteString -> Maybe EdictReference -> Quake ()
+        validateCombatTarget combatTarget ref = do
+          foundRef <- GameBase.gFind ref GameBase.findByTarget combatTarget
+
+          case foundRef of
+            Nothing -> return ()
+            Just (EdictReference foundIdx) -> do
+              Just foundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix foundIdx
+
+              when ((foundEdict^.eClassName) /= "point_combat") $ do
+                dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+                dprintf "IMPLEMENT ME! bad combattarget" -- TODO
+
+              validateCombatTarget combatTarget foundRef
 
 monsterTriggeredStart :: EntThink
 monsterTriggeredStart =
   GenericEntThink "monster_triggered_start" $ \_ -> do
     io (putStrLn "Monster.monsterTriggeredStart") >> undefined -- TODO
+
+monsterThink :: EntThink
+monsterThink =
+  GenericEntThink "monster_think" $ \_ -> do
+    io (putStrLn "Monster.monsterThink") >> undefined -- TODO
