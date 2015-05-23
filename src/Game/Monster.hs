@@ -2,9 +2,10 @@
 module Game.Monster where
 
 import Control.Lens ((^.), preuse, (%=), ix, (+=), use, zoom, (.=))
-import Control.Monad (liftM, when, unless)
+import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
+import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 
 import Quake
@@ -16,6 +17,7 @@ import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 monsterStart :: EdictReference -> Quake Bool
 monsterStart edictRef@(EdictReference edictIdx) = do
@@ -111,26 +113,51 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
       case self'^.eEdictInfo.eiTarget of
         Just target -> do
-          pickedTarget <- GameBase.pickTarget (Just target)
+          pickedTargetRef <- GameBase.pickTarget (Just target)
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= pickedTarget
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= pickedTarget
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= pickedTargetRef
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= pickedTargetRef
 
-          case pickedTarget of
+          case pickedTargetRef of
             Nothing -> do
-              io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+              dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+              dprintf "IMPLEMENT ME! can't find target" -- TODO
+              gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+              gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= 100000000
+
+              void $ think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
 
             Just (EdictReference targetIdx) -> do
               Just targetEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
               if (targetEdict^.eClassName) == "path_corner"
                 then do
-                  io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+                  let Just (EdictReference goalEntityIdx) = pickedTargetRef
+                  Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
+                  let v = (goalEntity^.eEntityState.esOrigin) - (self'^.eEntityState.esOrigin)
+                      yaw = Math3D.vectorYaw v
+                      access = case Constants.yaw of
+                                 0 -> _x
+                                 1 -> _y
+                                 2 -> _z
+                                 _ -> undefined -- shouldn't happen
+
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles.access .= yaw
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= yaw
+                  
+                  void $ think (fromJust $ self'^.eMonsterInfo.miWalk) selfRef
+
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+
                 else do
-                  io (putStrLn "Monster.monsterStartGo") >> undefined -- TODO
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= Nothing
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= Nothing
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= 100000000
+
+                  void $ think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
 
         Nothing -> do
           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= 100000000
-          think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
+          void $ think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
 
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
