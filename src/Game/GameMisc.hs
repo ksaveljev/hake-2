@@ -646,7 +646,14 @@ funcWallUse =
   GenericEntUse "func_wall_use" $ \_ _ _ -> do
     io (putStrLn "GameMisc.funcWallUse") >> undefined -- TODO
 
+{-
+- QUAKED misc_banner (1 .5 0) (-4 -4 -4) (4 4 4) The origin is the bottom
+- of the banner. The banner is 128 tall.
+-}
 miscBannerThink :: EntThink
 miscBannerThink =
-  GenericEntThink "misc_banner_think" $ \_ -> do
-    io (putStrLn "GameMisc.miscBannerThink") >> undefined -- TODO
+  GenericEntThink "misc_banner_think" $ \edictRef@(EdictReference edictIdx) -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame %= (`mod` 16) . (+ 1)
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+    return True
