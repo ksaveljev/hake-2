@@ -1146,32 +1146,33 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
     unless ((brush^.cbNumSides) == 0) $ do
       globals.cBrushTraces += 1
 
-      (enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide) <- findIntersections (-1) 1 Nothing False False Nothing 0 (brush^.cbNumSides)
+      (done, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide) <- findIntersections (-1) 1 Nothing False False Nothing 0 (brush^.cbNumSides)
 
-      if not startOut -- origin point was inside brush
-        then do
-          traceLens.tStartSolid .= True
-          unless getOut $ traceLens.tAllSolid .= True
-        else
-          when (enterFrac < leaveFrac) $ do
-            traceT <- use $ traceLens
+      unless done $ do
+        if not startOut -- origin point was inside brush
+          then do
+            traceLens.tStartSolid .= True
+            unless getOut $ traceLens.tAllSolid .= True
+          else
+            when (enterFrac < leaveFrac) $ do
+              traceT <- use $ traceLens
 
-            when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
-              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ clipPlane)
-              Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
-              let Just surfaceIdx = brushSide^.cbsSurface
-              Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
+              when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
+                Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ clipPlane)
+                Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
+                let Just surfaceIdx = brushSide^.cbsSurface
+                Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
 
-              traceLens.tFraction .= if enterFrac < 0 then 0 else enterFrac
-              traceLens.tPlane .= plane
-              traceLens.tSurface .= Just (surface^.msCSurface) -- TODO: this might be an issue! maybe hold the reference to mapSurfaceT ?
-              traceLens.tContents .= (brush^.cbContents)
+                traceLens.tFraction .= if enterFrac < 0 then 0 else enterFrac
+                traceLens.tPlane .= plane
+                traceLens.tSurface .= Just (surface^.msCSurface) -- TODO: this might be an issue! maybe hold the reference to mapSurfaceT ?
+                traceLens.tContents .= (brush^.cbContents)
         
         -- 3rd argument is index of cmGlobals.cmMapPlanes
         -- 6th argument is index of cmGlobals.cmMapBrushSides
-  where findIntersections :: Float -> Float -> Maybe Int -> Bool -> Bool -> Maybe Int -> Int -> Int -> Quake (Float, Float, Maybe Int, Bool, Bool, Maybe Int)
+  where findIntersections :: Float -> Float -> Maybe Int -> Bool -> Bool -> Maybe Int -> Int -> Int -> Quake (Bool, Float, Float, Maybe Int, Bool, Bool, Maybe Int)
         findIntersections enterFrac leaveFrac clipPlane getOut startOut leadSide idx maxIdx
-          | idx >= maxIdx = return (enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
+          | idx >= maxIdx = return (False, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix ((brush^.cbFirstBrushSide) + idx)
               Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ side^.cbsPlane)
@@ -1202,7 +1203,7 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
                                 then True
                                 else startOut
 
-              if | d1 > 0 && d2 >= d1 -> return (enterFrac, leaveFrac, clipPlane, getOut', startOut', leadSide) -- completely in front of face, no intersection
+              if | d1 > 0 && d2 >= d1 -> return (True, enterFrac, leaveFrac, clipPlane, getOut', startOut', leadSide) -- completely in front of face, no intersection
                  | d1 <= 0 && d2 <= 0 -> findIntersections enterFrac leaveFrac clipPlane getOut' startOut' leadSide (idx + 1) maxIdx
                  | d1 > d2 -> do -- crosses face
                      let f = (d1 - distEpsilon) / (d1 - d2)
