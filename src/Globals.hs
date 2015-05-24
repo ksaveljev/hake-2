@@ -1,17 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Globals ( module Globals
-               , module Client.CEntityT
-               , module Client.ClientStaticT
-               , module Client.ClientStateT
-               , module Client.ConsoleT
-               , module Client.RefExportT
-               , module Client.VidDefT
-               , module Client.VRectT
-               , module Game.CmdAliasT
-               , module Game.CVarT
-               , module QCommon.SizeBufT
-               , module Render.Renderer
+               , module X
                ) where
 
 import Control.Lens (makeLenses)
@@ -22,19 +12,19 @@ import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Client.CEntityT
-import Client.ClientStaticT
-import Client.ClientStateT
-import Client.ConsoleT
-import Client.RefExportT
-import Client.VidDefT
-import Client.VRectT
-import Game.CmdAliasT
-import Game.CVarT
+import Client.CEntityT as X
+import Client.ClientStaticT as X
+import Client.ClientStateT as X
+import Client.ConsoleT as X
+import Client.RefExportT as X
+import Client.VidDefT as X
+import Client.VRectT as X
+import Game.CmdAliasT as X
+import Game.CVarT as X
 import QCommon.NetAdrT
-import QCommon.SizeBufT
+import QCommon.SizeBufT as X
 import Render.DummyRenderer
-import Render.Renderer
+import Render.Renderer as X
 import qualified Constants
 
 import Internal
