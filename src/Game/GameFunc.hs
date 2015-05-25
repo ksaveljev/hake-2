@@ -826,7 +826,7 @@ doorUseAreaPortals (EdictReference selfIdx) open = do
 
           case maybeFoundRef of
             Nothing -> return ()
-            Just foundRef@(EdictReference foundIdx) -> do
+            Just (EdictReference foundIdx) -> do
               Just foundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix foundIdx
               when (BC.map toLower (foundEdict^.eClassName) == "func_areaportal") $ do
                 setAreaPortalState <- use $ gameBaseGlobals.gbGameImport.giSetAreaPortalState

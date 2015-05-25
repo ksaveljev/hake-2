@@ -767,7 +767,14 @@ readPortalState :: QuakeFile -> Quake ()
 readPortalState _ = io (putStrLn "CM.readPortalState") >> undefined -- TODO
 
 setAreaPortalState :: Int -> Bool -> Quake ()
-setAreaPortalState _ _ = io (putStrLn "CM.setAreaPortalState") >> undefined -- TODO
+setAreaPortalState portalNum open = do
+    numAreaPortals <- use $ cmGlobals.cmNumAreaPortals
+
+    when (portalNum > numAreaPortals) $
+      Com.comError Constants.errDrop "areaportal > numareaportals"
+
+    cmGlobals.cmPortalOpen.ix portalNum .= open
+    floodAreaConnections
 
 areasConnected :: Int -> Int -> Quake Bool
 areasConnected _ _ = io (putStrLn "CM.areasConnected") >> undefined -- TODO
