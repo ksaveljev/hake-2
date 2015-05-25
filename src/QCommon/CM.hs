@@ -1376,9 +1376,29 @@ pointContents p headNode = do
         Just contents <- preuse $ cmGlobals.cmMapLeafs.ix idx.clContents
         return contents
 
+{-
+- ================== CM_TransformedPointContents
+- 
+- Handles offseting and rotation of the end points for moving and rotating
+- entities ==================
+-}
 transformedPointContents :: V3 Float -> Int -> V3 Float -> V3 Float -> Quake Int
-transformedPointContents _ _ _ _ = do
-    io (putStrLn "CM.transformedPointContents") >> undefined -- TODO
+transformedPointContents p headNode origin angles = do
+    -- subtract origin offset
+    let pL = p - origin
+
+    boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
+
+    -- rotate start and end into the models frame of reference
+    let pL' = if headNode /= boxHeadNode && ((angles^._x) /= 0 || (angles^._y) /= 0 || (angles^._z) /= 0)
+                then let (Just forward, Just right, Just up) = Math3D.angleVectors angles True True True
+                         temp = pL
+                     in V3 (temp `dot` forward) (-(temp `dot` right)) (temp `dot` up)
+                else pL
+
+    idx <- pointLeafNumR pL' headNode
+    Just contents <- preuse $ cmGlobals.cmMapLeafs.ix idx.clContents
+    return contents
 
 transformedBoxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> V3 Float -> V3 Float -> Quake TraceT
 transformedBoxTrace _ _ _ _ _ _ _ _ = do
