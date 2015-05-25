@@ -6,9 +6,11 @@ module Game.GameFunc where
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
+import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z, normalize, quadrance)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -811,7 +813,25 @@ touchDoorTrigger =
 -}
 
 doorUseAreaPortals :: EdictReference -> Bool -> Quake ()
-doorUseAreaPortals _ _ = io (putStrLn "GameFunc.doorUseAreaPortals") >> undefined -- TODO
+doorUseAreaPortals (EdictReference selfIdx) open = do
+    Just maybeTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget
+
+    case maybeTarget of
+      Nothing -> return ()
+      Just target -> setAreaPortals target Nothing
+
+  where setAreaPortals :: B.ByteString -> Maybe EdictReference -> Quake ()
+        setAreaPortals target ref = do
+          maybeFoundRef <- GameBase.gFind ref GameBase.findByTarget target
+
+          case maybeFoundRef of
+            Nothing -> return ()
+            Just foundRef@(EdictReference foundIdx) -> do
+              Just foundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix foundIdx
+              when (BC.map toLower (foundEdict^.eClassName) == "func_areaportal") $ do
+                setAreaPortalState <- use $ gameBaseGlobals.gbGameImport.giSetAreaPortalState
+                setAreaPortalState (foundEdict^.eStyle) open
+              setAreaPortals target maybeFoundRef
 
 trainResume :: EdictReference -> Quake ()
 trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
