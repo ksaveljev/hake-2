@@ -1414,8 +1414,7 @@ transformedPointContents p headNode origin angles = do
     -- rotate start and end into the models frame of reference
     let pL' = if headNode /= boxHeadNode && ((angles^._x) /= 0 || (angles^._y) /= 0 || (angles^._z) /= 0)
                 then let (Just forward, Just right, Just up) = Math3D.angleVectors angles True True True
-                         temp = pL
-                     in V3 (temp `dot` forward) (-(temp `dot` right)) (temp `dot` up)
+                     in V3 (pL `dot` forward) (-(pL `dot` right)) (pL `dot` up)
                 else pL
 
     idx <- pointLeafNumR pL' headNode

@@ -45,42 +45,6 @@ trainBlockStops = 4
 - 
 -}
 
-platLowTrigger :: Int
-platLowTrigger = 1
-
-stateTop :: Int
-stateTop = 0
-
-stateBottom :: Int
-stateBottom = 1
-
-stateUp :: Int
-stateUp = 2
-
-stateDown :: Int
-stateDown = 3
-
-doorStartOpen :: Int
-doorStartOpen = 1
-
-doorReverse :: Int
-doorReverse = 2
-
-doorCrusher :: Int
-doorCrusher = 4
-
-doorNoMonster :: Int
-doorNoMonster = 8
-
-doorToggle :: Int
-doorToggle = 32
-
-doorXAxis :: Int
-doorXAxis = 64
-
-doorYAxis :: Int
-doorYAxis = 128
-
 spFuncButton :: EntThink
 spFuncButton =
   GenericEntThink "sp_func_button" $ \er@(EdictReference edictIdx) -> do
@@ -152,7 +116,7 @@ spFuncButton =
     Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-      miState .= stateBottom
+      miState .= Constants.stateBottom
       miSpeed .= (updatedEdict^.eEdictPhysics.eSpeed)
       miAccel .= (updatedEdict^.eEdictPhysics.eAccel)
       miDecel .= (updatedEdict^.eEdictPhysics.eDecel)
@@ -236,13 +200,13 @@ spFuncDoor =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.ePos2 .= pos2
 
     -- if it starts open, switch the positions
-    when ((edict^.eSpawnFlags) .&. doorStartOpen /= 0) $ do
+    when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $ do
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
         eEntityState.esOrigin .= pos2
         eEdictPhysics.ePos2 .= origin
         eEdictPhysics.ePos1 .= pos2
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miState .= stateBottom
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miState .= Constants.stateBottom
 
     if (edict^.eEdictStatus.eHealth) /= 0
       then
@@ -674,7 +638,7 @@ thinkSpawnDoorTrigger =
       linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
       linkEntity otherRef
 
-      when ((edict^.eSpawnFlags) .&. doorStartOpen /= 0) $
+      when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $
         doorUseAreaPortals er True
         
       void $ think thinkCalcMoveSpeed er
@@ -727,7 +691,7 @@ trainNext =
       let dest = (ent^.eEntityState.esOrigin) - (edict^.eEdictMinMax.eMins)
 
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-        miState .= stateTop
+        miState .= Constants.stateTop
         miStartOrigin .= (edict^.eEntityState.esOrigin)
         miEndOrigin .= dest
 
@@ -780,8 +744,21 @@ trainNext =
 
 touchDoorTrigger :: EntTouch
 touchDoorTrigger =
-  GenericEntTouch "touch_door_trigger" $ \_ _ _ _ -> do
-    io (putStrLn "GameFunc.touchDoorTrigger") >> undefined -- TODO
+  GenericEntTouch "touch_door_trigger" $ \(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just ownerRef@(EdictReference ownerIdx) = self^.eOwner
+    Just owner <- preuse $ gameBaseGlobals.gbGEdicts.ix ownerIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let skip = (other^.eEdictStatus.eHealth) <= 0 
+            || ((other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient))
+            || ((owner^.eSpawnFlags) .&. Constants.doorNoMonster /= 0 && (other^.eSvFlags) .&. Constants.svfMonster /= 0)
+            || levelTime < (self^.eEdictTiming.etTouchDebounceTime)
+
+    unless skip $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictTiming.etTouchDebounceTime .= levelTime + 1
+      entUse doorUse ownerRef (Just otherRef) (Just otherRef)
 
 {-
 - DOORS
