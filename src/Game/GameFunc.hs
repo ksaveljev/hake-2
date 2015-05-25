@@ -546,8 +546,32 @@ funcTrainFind =
 
 doorUse :: EntUse
 doorUse =
-  GenericEntUse "door_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.doorUse") >> undefined -- TODO
+  GenericEntUse "door_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    unless ((self^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+      done <- if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
+                then if (self^.eMoveInfo.miState) == Constants.stateUp || (self^.eMoveInfo.miState) == Constants.stateTop
+                       then do
+                         -- trigger all paired doors
+                         triggerPairedDoors activatorRef (Just selfRef)
+                         return True
+                       else return False
+                else return False
+
+      unless done $ do
+        -- trigger all paired doors
+        triggerPairedDoors activatorRef (Just selfRef)
+
+  where triggerPairedDoors :: Maybe EdictReference -> Maybe EdictReference -> Quake ()
+        triggerPairedDoors _ Nothing = return ()
+        triggerPairedDoors activatorRef (Just edictRef@(EdictReference edictIdx)) = do
+          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoTeamChain
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eEdictInfo.eiMessage .= Nothing
+            eEdictAction.eaTouch .= Nothing
+          doorGoUp edictRef activatorRef
+          triggerPairedDoors activatorRef teamChain
 
 doorBlocked :: EntBlocked
 doorBlocked =
@@ -975,3 +999,7 @@ rotatingTouch :: EntTouch
 rotatingTouch =
   GenericEntTouch "rotating_touch" $ \_ _ _ _ -> do
     io (putStrLn "GameFunc.rotatingTouch") >> undefined -- TODO
+
+doorGoUp :: EdictReference -> Maybe EdictReference -> Quake ()
+doorGoUp _ _ = do
+    io (putStrLn "GameFunc.doorGoUp") >> undefined -- TODO
