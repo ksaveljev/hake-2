@@ -2,10 +2,11 @@
 module Client.M where
 
 import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
-import Control.Monad (unless, when)
+import Control.Monad (unless, when, void)
 import Data.Bits ((.|.), (.&.), complement)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z)
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -248,8 +249,77 @@ catagorizePosition (EdictReference edictIdx) = do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 3
 
 moveFrame :: EdictReference -> Quake ()
-moveFrame _ = do
-    io (putStrLn "M.moveFrame") >> undefined -- TODO
+moveFrame selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+
+    let Just move = self^.eMonsterInfo.miCurrentMove
+
+    done <- if (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame)
+              then do
+                zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                  eEntityState.esFrame .= self^.eMonsterInfo.miNextFrame
+                  eMonsterInfo.miNextFrame .= 0
+
+                return False
+              else do
+                done <- if (self^.eEntityState.esFrame) == move^.mmLastFrame && isJust (move^.mmEndFunc)
+                          then do
+                            void $ think (fromJust $ move^.mmEndFunc) selfRef
+
+                            Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+                            -- check for death
+                            if (self'^.eSvFlags) .&. Constants.svfDeadMonster /= 0
+                              then return True
+                              else return False
+
+                          else
+                            return False
+
+                if done
+                  then
+                    return True
+                  else do
+                    -- regrab move, endfunc is very likely to change it
+                    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+                    let Just move' = self'^.eMonsterInfo.miCurrentMove
+
+                    if (self'^.eEntityState.esFrame) < (move'^.mmFirstFrame) || (self'^.eEntityState.esFrame) > (move'^.mmLastFrame)
+                      then do
+                        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                          eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
+                          eEntityState.esFrame .= move'^.mmFirstFrame
+
+                        return False
+                      else do
+                        when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0) $ do
+                          if (self'^.eEntityState.esFrame) + 1 > move'^.mmLastFrame
+                            then
+                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame .= move'^.mmFirstFrame
+                            else
+                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame += 1
+
+                        return False
+
+    unless done $ do
+      -- regrab move, endfunc is very likely to change it
+      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      let Just move' = self'^.eMonsterInfo.miCurrentMove
+          index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
+          frame = (move'^.mmFrame) V.! index
+
+      when (isJust (frame^.mfAI)) $
+        if (self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0
+          then
+            ai (fromJust $ frame^.mfAI) selfRef ((frame^.mfDist) * (self'^.eMonsterInfo.miScale))
+          else
+            ai (fromJust $ frame^.mfAI) selfRef 0
+
+      when (isJust (frame^.mfThink)) $
+        void $ think (fromJust $ frame^.mfThink) selfRef
 
 worldEffects :: EdictReference -> Quake ()
 worldEffects _ = do
