@@ -911,6 +911,10 @@ moveCalc er@(EdictReference edictIdx) dest func = do
           eEdictAction.eaThink .= Just thinkAccelMove
           eEdictAction.eaNextThink .= time + Constants.frameTime
 
+angleMoveCalc :: EdictReference -> EntThink -> Quake ()
+angleMoveCalc _ _ = do
+    io (putStrLn "GameFunc.angleMoveCalc") >> undefined -- TODO
+
 moveBegin :: EntThink
 moveBegin =
   GenericEntThink "move_begin" $ \edictRef@(EdictReference edictIdx) -> do
@@ -1001,5 +1005,33 @@ rotatingTouch =
     io (putStrLn "GameFunc.rotatingTouch") >> undefined -- TODO
 
 doorGoUp :: EdictReference -> Maybe EdictReference -> Quake ()
-doorGoUp _ _ = do
-    io (putStrLn "GameFunc.doorGoUp") >> undefined -- TODO
+doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    unless ((self^.eMoveInfo.miState) == Constants.stateUp) $ do
+      if (self^.eMoveInfo.miState) == Constants.stateTop
+        then do
+          -- reset top wait time
+          when ((self^.eMoveInfo.miWait) >= 0) $ do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + (self^.eMoveInfo.miWait)
+        else do
+          when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+            when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
+              sound <- use $ gameBaseGlobals.gbGameImport.giSound
+              sound selfRef (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= self^.eMoveInfo.miSoundMiddle
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateUp
+
+          if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miEndOrigin) doorHitTop
+             | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitTop
+             | otherwise -> return ()
+
+          GameUtil.useTargets selfRef activatorRef
+          doorUseAreaPortals selfRef True
+
+doorHitTop :: EntThink
+doorHitTop =
+  GenericEntThink "door_hit_top" $ \_ -> do
+    io (putStrLn "GameFunc.doorHitTop") >> undefined -- TODO
