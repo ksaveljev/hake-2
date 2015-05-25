@@ -1379,3 +1379,7 @@ pointContents p headNode = do
 transformedPointContents :: V3 Float -> Int -> V3 Float -> V3 Float -> Quake Int
 transformedPointContents _ _ _ _ = do
     io (putStrLn "CM.transformedPointContents") >> undefined -- TODO
+
+transformedBoxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> V3 Float -> V3 Float -> Quake TraceT
+transformedBoxTrace _ _ _ _ _ _ _ _ = do
+    io (putStrLn "CM.transformedBoxTrace") >> undefined -- TODO

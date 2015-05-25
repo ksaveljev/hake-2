@@ -4,7 +4,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVWorld where
 
-import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2, Lens')
+import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2, Lens', (&), (.~))
 import Control.Monad (void, unless, when)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -444,35 +444,67 @@ clipMoveToEntities initialClip = do
               Just touchRef@(EdictReference touchIdx) <- preuse $ svGlobals.svTouchList.ix idx
               Just touchEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix touchIdx
 
-              skip <- shouldSkip touchRef touchEdict clip
+              (done, skip) <- shouldSkip touchRef touchEdict clip
 
-              if skip
-                then tryClipping (idx + 1) maxIdx clip
+              if done
+                then
+                  return clip
                 else do
-                  -- might intersect, so do an exact clip
-                  headNode <- hullForEntity touchEdict
-                  vec3origin <- use $ globals.vec3Origin
-                  let angles = if (touchEdict^.eSolid) /= Constants.solidBsp
-                                 then vec3origin -- boxes don't rotate
-                                 else touchEdict^.eEntityState.esAngles
-                  io (putStrLn "SVWorld.tryClipping") >> undefined -- TODO
+                  if skip
+                    then tryClipping (idx + 1) maxIdx clip
+                    else do
+                      -- might intersect, so do an exact clip
+                      headNode <- hullForEntity touchEdict
+                      v3o <- use $ globals.vec3Origin
+                      let angles = if (touchEdict^.eSolid) /= Constants.solidBsp
+                                     then v3o -- boxes don't rotate
+                                     else touchEdict^.eEntityState.esAngles
+                      traceT <- if (touchEdict^.eSvFlags) .&. Constants.svfMonster /= 0
+                                  then CM.transformedBoxTrace (clip^.mcStart)
+                                                              (clip^.mcEnd)
+                                                              (clip^.mcMins2)
+                                                              (clip^.mcMaxs2)
+                                                              headNode
+                                                              (clip^.mcContentMask)
+                                                              (touchEdict^.eEntityState.esOrigin)
+                                                              angles
+                                  else CM.transformedBoxTrace (clip^.mcStart)
+                                                              (clip^.mcEnd)
+                                                              (clip^.mcMins)
+                                                              (clip^.mcMaxs)
+                                                              headNode
+                                                              (clip^.mcContentMask)
+                                                              (touchEdict^.eEntityState.esOrigin)
+                                                              angles
 
-        shouldSkip :: EdictReference -> EdictT -> MoveClipT -> Quake Bool
+                      let clip' = if | (traceT^.tAllSolid) || (traceT^.tStartSolid) || (traceT^.tFraction) < clip^.mcTrace.tFraction ->
+                                         let traceT' = traceT { _tEnt = Just touchRef }
+                                         in if clip^.mcTrace.tStartSolid
+                                              then clip { _mcTrace = traceT' { _tStartSolid = True } }
+                                              else clip { _mcTrace = traceT' }
+                                     | traceT^.tStartSolid ->
+                                         clip & (mcTrace.tStartSolid) .~ True
+                                     | otherwise ->
+                                         clip
+
+                      tryClipping (idx + 1) maxIdx clip'
+
+        shouldSkip :: EdictReference -> EdictT -> MoveClipT -> Quake (Bool, Bool)
         shouldSkip touchRef touchEdict clip =
-          if | (touchEdict^.eSolid) == Constants.solidNot -> return True
-             | (Just touchRef) == (clip^.mcPassEdict) -> return True
-             | clip^.mcTrace.tAllSolid -> return True
-             | ((clip^.mcContentMask) .&. Constants.contentsDeadMonster == 0) && ((touchEdict^.eSvFlags) .&. Constants.svfDeadMonster /= 0) -> return True
+          if | (touchEdict^.eSolid) == Constants.solidNot -> return (False, True)
+             | (Just touchRef) == (clip^.mcPassEdict) -> return (False, True)
+             | clip^.mcTrace.tAllSolid -> return (True, False)
+             | ((clip^.mcContentMask) .&. Constants.contentsDeadMonster == 0) && ((touchEdict^.eSvFlags) .&. Constants.svfDeadMonster /= 0) -> return (False, True)
              | isJust (clip^.mcPassEdict) -> do
                  if (touchEdict^.eOwner) == (clip^.mcPassEdict)
-                   then return True -- don't clip against own missiles
+                   then return (False, True) -- don't clip against own missiles
                    else do
                      let Just (EdictReference passEdictIdx) = clip^.mcPassEdict
                      Just passEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix passEdictIdx
                      if passEdict^.eOwner == (Just touchRef)
-                       then return True -- don't clip against owner
-                       else return False
-             | otherwise -> return False
+                       then return (False, True) -- don't clip against owner
+                       else return (False, False)
+             | otherwise -> return (False, False)
 
 {-
 - ================ SV_HullForEntity
