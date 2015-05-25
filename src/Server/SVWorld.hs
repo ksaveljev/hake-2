@@ -324,9 +324,9 @@ areaEdictsR nodeIdx = do
           in if (absmin^._x) > (maxs^._x) ||
                 (absmin^._y) > (maxs^._y) ||
                 (absmin^._z) > (maxs^._z) ||
-                (absmax^._x) > (mins^._x) ||
-                (absmax^._y) > (mins^._y) ||
-                (absmax^._z) > (mins^._z)
+                (absmax^._x) < (mins^._x) ||
+                (absmax^._y) < (mins^._y) ||
+                (absmax^._z) < (mins^._z)
                 then True
                 else False
 
