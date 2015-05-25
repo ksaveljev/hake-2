@@ -1223,6 +1223,24 @@ headnodeForBox :: V3 Float -> V3 Float -> Quake Int
 headnodeForBox mins maxs = do
     boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
 
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    let newDistances = V.fromList [ maxs^._x
+                                  , - (maxs^._x)
+                                  , mins^._x
+                                  , - (mins^._x)
+                                  , maxs^._y
+                                  , - (maxs^._y)
+                                  , mins^._y
+                                  , - (mins^._y)
+                                  , maxs^._z
+                                  , - (maxs^._z)
+                                  , mins^._z
+                                  , - (mins^._z)
+                                  ]
+        updates = map (updateDist mapPlanes newDistances boxHeadNode) [0..11]
+
+    cmGlobals.cmMapPlanes %= (V.// updates)
+{-
     zoom (cmGlobals.cmMapPlanes) $ do
       ix (boxHeadNode +  0).cpDist .= (maxs^._x)
       ix (boxHeadNode +  1).cpDist .= (- (maxs^._x))
@@ -1236,8 +1254,12 @@ headnodeForBox mins maxs = do
       ix (boxHeadNode +  9).cpDist .= (- (maxs^._z))
       ix (boxHeadNode + 10).cpDist .= (mins^._z)
       ix (boxHeadNode + 11).cpDist .= (- (mins^._z))
+      -}
 
     return boxHeadNode
+
+  where updateDist :: V.Vector CPlaneT -> V.Vector Float -> Int -> Int -> (Int, CPlaneT)
+        updateDist planes distances boxHeadNode idx = (boxHeadNode + idx, (planes V.! (boxHeadNode + idx)) { _cpDist = distances V.! idx })
 
 -- Searches the leaf number that contains the 3d point
 pointLeafNum :: V3 Float -> Quake Int
