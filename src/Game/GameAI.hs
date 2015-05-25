@@ -16,6 +16,10 @@ import qualified Client.M as M
 import qualified Game.Monster as Monster
 import qualified Util.Lib as Lib
 
+{-
+- Used for standing around and looking for players Distance is for slight
+- position adjustments needed by the animations. 
+-}
 aiStand :: AI
 aiStand =
   GenericAI "ai_stand" $ \_ _ -> do

@@ -12,7 +12,6 @@ import Quake
 import QuakeState
 import CVarVariables
 import Game.Adapters
-import Game.MFrameT
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
