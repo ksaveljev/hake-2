@@ -652,7 +652,7 @@ funcWallUse =
 -}
 miscBannerThink :: EntThink
 miscBannerThink =
-  GenericEntThink "misc_banner_think" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "misc_banner_think" $ \(EdictReference edictIdx) -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame %= (`mod` 16) . (+ 1)
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime

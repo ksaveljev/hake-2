@@ -16,6 +16,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
+import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -208,10 +209,27 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
 
 monsterTriggeredStart :: EntThink
 monsterTriggeredStart =
-  GenericEntThink "monster_triggered_start" $ \_ -> do
-    io (putStrLn "Monster.monsterTriggeredStart") >> undefined -- TODO
+  GenericEntThink "monster_triggered_start" $ \(EdictReference selfIdx) -> do
+    Just index <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eIndex
+
+    when (index == 312) $
+      Com.printf "monster_triggered_start\n"
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSolid .= Constants.solidNot
+      eMoveType .= Constants.moveTypeNone
+      eSvFlags %= (.|. Constants.svfNoClient)
+      eEdictAction.eaNextThink .= 0
+      eEdictAction.eaUse .= Just monsterTriggeredSpawnUse
+
+    return True
 
 monsterThink :: EntThink
 monsterThink =
   GenericEntThink "monster_think" $ \_ -> do
     io (putStrLn "Monster.monsterThink") >> undefined -- TODO
+
+monsterTriggeredSpawnUse :: EntUse
+monsterTriggeredSpawnUse =
+  GenericEntUse "monster_trigger_spawn_use" $ \_ _ _ -> do
+    io (putStrLn "Monster.monsterTriggeredSpawnUse") >> undefined -- TODO
