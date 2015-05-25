@@ -229,7 +229,7 @@ useTargetSpeaker =
         -- use a positioned_sound, because this entity won't normally be
         -- sent to any clients because it is invisible
         positionedSound <- use $ gameBaseGlobals.gbGameImport.giPositionedSound
-        positionedSound (edict^.eEntityState.esOrigin) edictRef chan (edict^.eNoiseIndex) (edict^.eVolume) (edict^.eAttenuation) 0
+        positionedSound (Just $ edict^.eEntityState.esOrigin) edictRef chan (edict^.eNoiseIndex) (edict^.eVolume) (edict^.eAttenuation) 0
 
 useTargetSecret :: EntUse
 useTargetSecret =

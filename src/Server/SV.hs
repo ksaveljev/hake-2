@@ -178,7 +178,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
         when (edict'^.eInUse) $ do
           when (isJust (edict'^.eEdictOther.eoGroundEntity) && not wasOnGround && hitSound) $ do
             wavIdx <- soundIndex (Just "world/land.wav")
-            sound edictRef 0 wavIdx 1 1 0
+            sound (Just edictRef) 0 wavIdx 1 1 0
 
           void $ runThink edictRef
 
@@ -389,9 +389,9 @@ physicsToss er@(EdictReference edictIdx) = do
           hitwav <- soundIndex (Just "misc/h2ohit1.wav")
 
           if | not wasInWater && isInWater ->
-                 positionedSound oldOrigin er Constants.chanAuto hitwav 1 1 0
+                 positionedSound (Just oldOrigin) er Constants.chanAuto hitwav 1 1 0
              | wasInWater && not isInWater ->
-                 positionedSound (edict^.eEntityState.esOrigin) er Constants.chanAuto hitwav 1 1 0
+                 positionedSound (Just $ edict^.eEntityState.esOrigin) er Constants.chanAuto hitwav 1 1 0
              | otherwise -> return ()
 
         moveTeamSlaves :: V3 Float -> Maybe EdictReference -> Quake ()

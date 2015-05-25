@@ -709,7 +709,7 @@ trainNext =
       when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
         when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
           sound <- use $ gameBaseGlobals.gbGameImport.giSound
-          sound er (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+          sound (Just er) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
         gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= (edict^.eMoveInfo.miSoundMiddle)
 
       let dest = (ent^.eEntityState.esOrigin) - (edict^.eEdictMinMax.eMins)
@@ -846,7 +846,7 @@ trainWait =
           when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
             when ((edict^.eMoveInfo.miSoundEnd) /= 0) $ do
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
-              sound edictRef (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+              sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= 0
 
@@ -1019,7 +1019,7 @@ doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
           when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
             when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
-              sound selfRef (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+              sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
             gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= self^.eMoveInfo.miSoundMiddle
 
           gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateUp

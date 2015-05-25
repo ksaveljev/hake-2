@@ -198,8 +198,8 @@ If origin is null, the origin is determined from the entity origin
 or the midpoint of the entity box for bmodels.
 ==================
 -}
-startSound :: V3 Float -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound origin (EdictReference edictIdx) channel soundIndex volume attenuation timeOfs = do
+startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound maybeOrigin (EdictReference edictIdx) channel soundIndex volume attenuation timeOfs = do
     when (volume < 0 || volume > 1) $
       Com.comError Constants.errFatal ("SV_StartSound: volume = " `B.append` BC.pack (show volume)) -- IMPROVE?
 
@@ -220,20 +220,16 @@ startSound origin (EdictReference edictIdx) channel soundIndex volume attenuatio
 
     flags <- composeFlags
 
-    -- TODO: do we need this?
-    {-
-      // use the entity origin unless it is a bmodel or explicitly specified
-      if (origin == null) {
-              origin = origin_v;
-              if (entity.solid == Defines.SOLID_BSP) {
-                      for (i = 0; i < 3; i++)
-                              origin_v[i] = entity.s.origin[i] + 0.5f * (entity.mins[i] + entity.maxs[i]);
-              }
-              else {
-                      Math3D.VectorCopy(entity.s.origin, origin_v);
-              }
-      }
-    -}
+    -- use the entity origin unless it is a bmodel or explicitly specified
+    origin <- case maybeOrigin of
+                Just orgn -> return orgn
+                Nothing -> do
+                  Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+                  if (edict^.eSolid) == Constants.solidBsp
+                    then
+                      return $ (edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eEdictMinMax.eMins) + (edict^.eEdictMinMax.eMaxs))
+                    else
+                      return (edict^.eEntityState.esOrigin)
 
     MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcSound)
     MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral flags)

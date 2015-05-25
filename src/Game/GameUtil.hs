@@ -160,10 +160,10 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
         when (isJust (edict^.eEdictInfo.eiMessage) && ((activator^.eSvFlags) .&. Constants.svfMonster) == 0) $ do
           centerPrintf ar (fromJust (edict^.eEdictInfo.eiMessage))
           if (edict^.eNoiseIndex) /= 0
-            then sound ar Constants.chanAuto (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+            then sound (Just ar) Constants.chanAuto (edict^.eNoiseIndex) 1 Constants.attnNorm 0
             else do
               talkIdx <- soundIndex (Just "misc/talk1.wav")
-              sound ar Constants.chanAuto talkIdx 1 Constants.attnNorm 0
+              sound (Just ar) Constants.chanAuto talkIdx 1 Constants.attnNorm 0
 
         -- kill killtargets
         done <- if (isJust (edict^.eEdictInfo.eiKillTarget))

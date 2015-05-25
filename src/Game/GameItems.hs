@@ -519,12 +519,12 @@ touchItem =
                            | count == 25 -> soundIndex (Just "items/l_health.wav")
                            | otherwise -> soundIndex (Just "items/m_health.wav")
 
-            sound otherRef Constants.chanItem soundIdx 1 Constants.attnNorm 0
+            sound (Just otherRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
           _ -> do
             when (isJust $ item^.giPickupSound) $ do
               pickupSound <- soundIndex (item^.giPickupSound)
-              sound otherRef Constants.chanItem pickupSound 1 Constants.attnNorm 0
+              sound (Just otherRef) Constants.chanItem pickupSound 1 Constants.attnNorm 0
 
       Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
 

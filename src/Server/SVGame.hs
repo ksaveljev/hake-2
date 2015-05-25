@@ -174,8 +174,11 @@ inPVS _ _ = io (putStrLn "SVGame.inPVS") >> undefined -- TODO
 inPHS :: V3 Float -> V3 Float -> Quake Bool
 inPHS _ _ = io (putStrLn "SVGame.inPHS") >> undefined -- TODO
 
-startSound :: EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound _ _ _ _ _ _ = io (putStrLn "SVGame.startSound") >> undefined -- TODO
+startSound :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound maybeEdictRef channel soundNum volume attenuation timeOfs = do
+    case maybeEdictRef of
+      Nothing -> return ()
+      Just edictRef -> SVSend.startSound Nothing edictRef channel soundNum volume attenuation timeOfs
 
 {-
 -  SV_ShutdownGameProgs
