@@ -220,7 +220,6 @@ walkMove edictRef@(EdictReference edictIdx) yaw dist = do
             move = V3 ((cos yaw') * dist) ((sin yaw') * dist) 0
         SV.moveStep edictRef move True
 
-
 catagorizePosition :: EdictReference -> Quake ()
 catagorizePosition (EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
@@ -247,3 +246,15 @@ catagorizePosition (EdictReference edictIdx) = do
 
           when (cont'' .&. Constants.maskWater /= 0) $
             gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 3
+
+moveFrame :: EdictReference -> Quake ()
+moveFrame _ = do
+    io (putStrLn "M.moveFrame") >> undefined -- TODO
+
+worldEffects :: EdictReference -> Quake ()
+worldEffects _ = do
+    io (putStrLn "M.worldEffects") >> undefined -- TODO
+
+setEffects :: EdictReference -> Quake ()
+setEffects _ = do
+    io (putStrLn "M.setEffects") >> undefined -- TODO

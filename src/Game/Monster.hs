@@ -13,6 +13,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
@@ -226,8 +227,20 @@ monsterTriggeredStart =
 
 monsterThink :: EntThink
 monsterThink =
-  GenericEntThink "monster_think" $ \_ -> do
-    io (putStrLn "Monster.monsterThink") >> undefined -- TODO
+  GenericEntThink "monster_think" $ \selfRef@(EdictReference selfIdx) -> do
+    M.moveFrame selfRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eLinkCount) /= (self^.eMonsterInfo.miLinkCount)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miLinkCount .= self^.eLinkCount
+      M.checkGround selfRef
+
+    M.catagorizePosition selfRef
+    M.worldEffects selfRef
+    M.setEffects selfRef
+
+    return True
 
 monsterTriggeredSpawnUse :: EntUse
 monsterTriggeredSpawnUse =
