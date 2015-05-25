@@ -328,3 +328,7 @@ worldEffects _ = do
 setEffects :: EdictReference -> Quake ()
 setEffects _ = do
     io (putStrLn "M.setEffects") >> undefined -- TODO
+
+changeYaw :: EdictReference -> Quake ()
+changeYaw _ = do
+    io (putStrLn "M.changeYaw") >> undefined -- TODO

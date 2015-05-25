@@ -249,3 +249,7 @@ killBox _ = do
 visible :: EdictReference -> EdictReference -> Quake Bool
 visible _ _ = do
     io (putStrLn "GameUtil.visible") >> undefined -- TODO
+
+findTarget :: EdictReference -> Quake Bool
+findTarget _ = do
+    io (putStrLn "GameUtil.findTarget") >> undefined -- TODO

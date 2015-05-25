@@ -2,10 +2,10 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameAI where
 
-import Control.Lens (use, (^.), ix, preuse, (.=))
+import Control.Lens (use, (^.), ix, preuse, (.=), (%=))
 import Control.Monad (void, when)
-import Data.Bits ((.&.))
-import Data.Maybe (isNothing, isJust)
+import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isNothing, isJust, fromJust)
 import qualified Data.ByteString as B
 
 import Quake
@@ -13,8 +13,10 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
+import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 {-
 - Used for standing around and looking for players Distance is for slight
@@ -22,8 +24,76 @@ import qualified Util.Lib as Lib
 -}
 aiStand :: AI
 aiStand =
-  GenericAI "ai_stand" $ \_ _ -> do
-    io (putStrLn "GameAI.aiStand") >> undefined -- TODO
+  GenericAI "ai_stand" $ \selfRef@(EdictReference selfIdx) dist -> do
+    when (dist /= 0) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
+
+    checkAIStandGround selfRef
+      >>= checkFindTarget selfRef
+      >>= checkPauseTime selfRef
+      >>= tryToIdle selfRef
+
+  where checkAIStandGround :: EdictReference -> Quake Bool
+        checkAIStandGround selfRef@(EdictReference selfIdx) = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+            then do
+              case self^.eEdictOther.eoEnemy of
+                Just (EdictReference enemyIdx) -> do
+                  Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                  let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+                      idealYaw = Math3D.vectorYaw v
+
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= idealYaw
+
+                  when ((self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) /= idealYaw && (self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $ do
+                    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround)))
+                    void $ think (fromJust $ self^.eMonsterInfo.miRun) selfRef
+
+                  M.changeYaw selfRef
+                  void $ aiCheckAttack selfRef 0
+
+                Nothing ->
+                  void $ GameUtil.findTarget selfRef
+              
+              return True
+            else
+              return False
+
+        checkFindTarget :: EdictReference -> Bool -> Quake Bool
+        checkFindTarget _ True = return True
+        checkFindTarget selfRef _ = GameUtil.findTarget selfRef
+
+        checkPauseTime :: EdictReference -> Bool -> Quake Bool
+        checkPauseTime _ True = return True
+        checkPauseTime selfRef@(EdictReference selfIdx) _ = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+          if levelTime > (self^.eMonsterInfo.miPauseTime)
+            then do
+              void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
+              return True
+            else
+              return False
+
+        tryToIdle :: EdictReference -> Bool -> Quake ()
+        tryToIdle _ True = return ()
+        tryToIdle selfRef@(EdictReference selfIdx) _ = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+          when ((self^.eSpawnFlags) .&. 1 == 0 && isJust (self^.eMonsterInfo.miIdle) && levelTime > (self^.eMonsterInfo.miIdleTime)) $ do
+            rf <- Lib.randomF
+
+            if (self^.eMonsterInfo.miIdleTime) /= 0
+              then do
+                void $ think (fromJust $ self^.eMonsterInfo.miIdle) selfRef
+                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + 15 + rf * 15
+              else do
+                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + rf * 15
 
 aiCharge :: AI
 aiCharge =
@@ -117,3 +187,7 @@ walkMonsterStartGo =
       void $ think Monster.monsterTriggeredStart selfRef
 
     return True
+
+aiCheckAttack :: EdictReference -> Float -> Quake Bool
+aiCheckAttack _ _ = do
+    io (putStrLn "GameAI.aiCheckAttack") >> undefined -- TODO
