@@ -523,8 +523,10 @@ loadBrushSides lump = do
           when (j >= numTexInfo) $
             Com.comError Constants.errDrop "Bad brushside texinfo"
 
+          -- j == -1 case should be handled someway
+          -- we simply point to a hacky empty MapSurfaceT
           let cbrushside = CBrushSideT { _cbsPlane   = Just num
-                                       , _cbsSurface = Just j
+                                       , _cbsSurface = Just (if j == -1 then Constants.maxMapTexInfo else j)
                                        }
 
           whenQ (use $ cmGlobals.cmDebugLoadMap) $
@@ -606,7 +608,6 @@ loadAreaPortals lump = do
             io (putStrLn "CM.loadAreaPortals#readMapAreaPortal") >> undefined -- TODO
 
           return (idx, areaPortal)
-
 
 loadVisibility :: LumpT -> Quake ()
 loadVisibility lump = do
