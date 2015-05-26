@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -139,40 +140,40 @@ newtype MNodeReference = MNodeReference Int
 newtype SfxReference = SfxReference Int
 
 -- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
-data ModelReference = ModInlineReference Int | ModKnownReference Int
+data ModelReference = ModInlineReference !Int | ModKnownReference !Int
 
-data MNodeChild = MNodeChildReference Int | MLeafChildReference Int
+data MNodeChild = MNodeChildReference !Int | MLeafChildReference !Int
 
 data ModelExtra = AliasModelExtra DMdlT | SpriteModelExtra DSpriteT
 
 data QuakeState =
-  QuakeState { _globals               :: !Globals
-             , _comGlobals            :: !ComGlobals
-             , _cmdGlobals            :: !CmdGlobals
-             , _keyGlobals            :: !KeyGlobals
-             , _fsGlobals             :: !FSGlobals
-             , _svGlobals             :: !SVGlobals
-             , _gameBaseGlobals       :: !GameBaseGlobals
-             , _pMoveGlobals          :: !PMoveGlobals
-             , _scrGlobals            :: !SCRGlobals
-             , _netGlobals            :: !NETGlobals
-             , _cmGlobals             :: !CMGlobals
-             , _gameItemsGlobals      :: !GameItemsGlobals
-             , _mSoldierGlobals       :: !MSoldierGlobals
-             , _mInfantryGlobals      :: !MInfantryGlobals
-             , _playerTrailGlobals    :: !PlayerTrailGlobals
-             , _vidGlobals            :: !VIDGlobals
-             , _inGlobals             :: !INGlobals
-             , _glfwbGlobals          :: !GLFWbGlobals
-             , _kbdGlobals            :: !KBDGlobals
-             , _basicRenderAPIGlobals :: !BasicRenderAPIGlobals
-             , _fastRenderAPIGlobals  :: !FastRenderAPIGlobals
-             , _particleTGlobals      :: !ParticleTGlobals
-             , _menuGlobals           :: !MenuGlobals
-             , _clientGlobals         :: !ClientGlobals
-             , _vGlobals              :: !VGlobals
-             , _netChannelGlobals     :: !NetChannelGlobals
-             , _clTEntGlobals         :: !CLTEntGlobals
+  QuakeState { _globals               :: Globals
+             , _comGlobals            :: ComGlobals
+             , _cmdGlobals            :: CmdGlobals
+             , _keyGlobals            :: KeyGlobals
+             , _fsGlobals             :: FSGlobals
+             , _svGlobals             :: SVGlobals
+             , _gameBaseGlobals       :: GameBaseGlobals
+             , _pMoveGlobals          :: PMoveGlobals
+             , _scrGlobals            :: SCRGlobals
+             , _netGlobals            :: NETGlobals
+             , _cmGlobals             :: CMGlobals
+             , _gameItemsGlobals      :: GameItemsGlobals
+             , _mSoldierGlobals       :: MSoldierGlobals
+             , _mInfantryGlobals      :: MInfantryGlobals
+             , _playerTrailGlobals    :: PlayerTrailGlobals
+             , _vidGlobals            :: VIDGlobals
+             , _inGlobals             :: INGlobals
+             , _glfwbGlobals          :: GLFWbGlobals
+             , _kbdGlobals            :: KBDGlobals
+             , _basicRenderAPIGlobals :: BasicRenderAPIGlobals
+             , _fastRenderAPIGlobals  :: FastRenderAPIGlobals
+             , _particleTGlobals      :: ParticleTGlobals
+             , _menuGlobals           :: MenuGlobals
+             , _clientGlobals         :: ClientGlobals
+             , _vGlobals              :: VGlobals
+             , _netChannelGlobals     :: NetChannelGlobals
+             , _clTEntGlobals         :: CLTEntGlobals
              }
 
 data Globals =
@@ -185,63 +186,63 @@ data Globals =
           , _cPointContents     :: !Int
           , _serverState        :: !Int
 
-          , _netMessage         :: !SizeBufT
-          , _netMessageBuffer   :: !B.ByteString
-          , _cmdText            :: !SizeBufT
-          , _deferTextBuf       :: !B.ByteString -- length 8192
-          , _cmdTextBuf         :: !B.ByteString -- length 8192
-          , _cmdAlias           :: !(Seq CmdAliasT)
+          , _netMessage         :: SizeBufT
+          , _netMessageBuffer   :: B.ByteString
+          , _cmdText            :: SizeBufT
+          , _deferTextBuf       :: B.ByteString -- length 8192
+          , _cmdTextBuf         :: B.ByteString -- length 8192
+          , _cmdAlias           :: Seq CmdAliasT
 
           , _timeBeforeGame     :: !Int
           , _timeAfterGame      :: !Int
           , _timeBeforeRef      :: !Int
           , _timeAfterRef       :: !Int
 
-          , _logStatsFile       :: !(Maybe Handle)
+          , _logStatsFile       :: Maybe Handle
 
-          , _cls                :: !ClientStaticT
-          , _cl                 :: !ClientStateT
-          , _clEntities         :: !(V.Vector CEntityT)
+          , _cls                :: ClientStaticT
+          , _cl                 :: ClientStateT
+          , _clEntities         :: V.Vector CEntityT
 
           , _userInfoModified   :: !Bool
 
-          , _cvarVars           :: !(M.Map B.ByteString CVarT)
-          , _con                :: !ConsoleT
+          , _cvarVars           :: M.Map B.ByteString CVarT
+          , _con                :: ConsoleT
           , _vidDef             :: VidDefT
-          , _re                 :: !(Maybe Renderer)
+          , _re                 :: Maybe Renderer
 
-          , _keyBindings        :: !(V.Vector (Maybe B.ByteString))
-          , _keyDown            :: !(UV.Vector Bool)
+          , _keyBindings        :: V.Vector (Maybe B.ByteString)
+          , _keyDown            :: UV.Vector Bool
           , _chatTeam           :: !Bool
-          , _chatBuffer         :: !B.ByteString
-          , _keyLines           :: !(V.Vector B.ByteString)
+          , _chatBuffer         :: B.ByteString
+          , _keyLines           :: V.Vector B.ByteString
           , _keyLinePos         :: !Int
           , _editLine           :: !Int
 
           , _scrVRect           :: VRectT
-          , _sysFrameTime       :: Int
-          , _netFrom            :: !NetAdrT
+          , _sysFrameTime       :: !Int
+          , _netFrom            :: NetAdrT
 
-          , _vec3Origin         :: !(V3 Float)
+          , _vec3Origin         :: V3 Float
 
-          , _rnd                :: !StdGen
+          , _rnd                :: StdGen
           }
 
 data ComGlobals =
   ComGlobals { _cgComArgc       :: !Int
-             , _cgComArgv       :: !(V.Vector B.ByteString)
+             , _cgComArgv       :: V.Vector B.ByteString
              , _cgRecursive     :: !Bool
-             , _cgMsg           :: !B.ByteString
-             , _cgDebugContext  :: !B.ByteString
-             , _cgDebugContext2 :: !B.ByteString
-             , _cgRdTarget      :: Int
+             , _cgMsg           :: B.ByteString
+             , _cgDebugContext  :: B.ByteString
+             , _cgDebugContext2 :: B.ByteString
+             , _cgRdTarget      :: !Int
              }
 
 data CmdGlobals =
-  CmdGlobals { _cgCmdFunctions :: !(Seq CmdFunctionT)
+  CmdGlobals { _cgCmdFunctions :: Seq CmdFunctionT
              , _cgCmdArgc      :: !Int
-             , _cgCmdArgv      :: !(V.Vector B.ByteString)
-             , _cgCmdArgs      :: !B.ByteString
+             , _cgCmdArgv      :: V.Vector B.ByteString
+             , _cgCmdArgs      :: B.ByteString
              }
 
 data KeyGlobals =
@@ -249,70 +250,70 @@ data KeyGlobals =
              , _kgKeyWaiting  :: !Int
              , _kgHistoryLine :: !Int
              , _kgShiftDown   :: !Bool
-             , _kgKeyRepeats  :: !(UV.Vector Int)
-             , _kgMenuBound   :: !(UV.Vector Bool)
-             , _kgConsoleKeys :: !(UV.Vector Bool)
-             , _kgKeyNames    :: !(V.Vector (Maybe B.ByteString))
+             , _kgKeyRepeats  :: UV.Vector Int
+             , _kgMenuBound   :: UV.Vector Bool
+             , _kgConsoleKeys :: UV.Vector Bool
+             , _kgKeyNames    :: V.Vector (Maybe B.ByteString)
              }
 
 data FSGlobals =
-  FSGlobals { _fsGameDir         :: !B.ByteString
-            , _fsUserDir         :: !B.ByteString
-            , _fsLinks           :: !(Seq FileLinkT)
-            , _fsSearchPaths     :: !([SearchPathT])
-            , _fsBaseSearchPaths :: !([SearchPathT])
+  FSGlobals { _fsGameDir         :: B.ByteString
+            , _fsUserDir         :: B.ByteString
+            , _fsLinks           :: Seq FileLinkT
+            , _fsSearchPaths     :: [SearchPathT]
+            , _fsBaseSearchPaths :: [SearchPathT]
             , _fsFileFromPak     :: !Int
             }
 
 data SVGlobals =
-  SVGlobals { _svMasterAdr            :: !(V.Vector NetAdrT)
-            , _svClient               :: !(Maybe ClientReference)
-            , _svServer               :: !ServerT
-            , _svServerStatic         :: !ServerStaticT
-            , _svPlayer               :: !(Maybe EdictReference)
-            , _svFirstMap             :: !B.ByteString
-            , _svMsgBuf               :: !B.ByteString
+  SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
+            , _svClient               :: Maybe ClientReference
+            , _svServer               :: ServerT
+            , _svServerStatic         :: ServerStaticT
+            , _svPlayer               :: Maybe EdictReference
+            , _svFirstMap             :: B.ByteString
+            , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: !Int
-            , _svAreaNodes            :: !(V.Vector AreaNodeT)
-            , _svAreaMins             :: !(V3 Float)
-            , _svAreaMaxs             :: !(V3 Float)
-            , _svAreaList             :: !(V.Vector EdictReference)
+            , _svAreaNodes            :: V.Vector AreaNodeT
+            , _svAreaMins             :: V3 Float
+            , _svAreaMaxs             :: V3 Float
+            , _svAreaList             :: V.Vector EdictReference
             , _svAreaCount            :: !Int
             , _svAreaMaxCount         :: !Int
             , _svAreaType             :: !Int
-            , _svLeafs                :: !(UV.Vector Int)
-            , _svClusters             :: !(UV.Vector Int)
-            , _svTouch                :: !(V.Vector EdictReference)
-            , _svTouchList            :: !(V.Vector EdictReference)
-            , _svLinks                :: !(V.Vector LinkT)
+            , _svLeafs                :: UV.Vector Int
+            , _svClusters             :: UV.Vector Int
+            , _svTouch                :: V.Vector EdictReference
+            , _svTouchList            :: V.Vector EdictReference
+            , _svLinks                :: V.Vector LinkT
             }
 
 data CmdFunctionT =
-  CmdFunctionT { _cfName     :: !B.ByteString
-               , _cfFunction :: !(Maybe XCommandT)
+  CmdFunctionT { _cfName     :: B.ByteString
+               , _cfFunction :: Maybe XCommandT
                }
 
 data EdictActionT =
   EdictActionT { _eaNextThink :: !Float
-               , _eaPrethink  :: !(Maybe EntThink)
-               , _eaThink     :: !(Maybe EntThink)
-               , _eaBlocked   :: !(Maybe EntBlocked)
-               , _eaTouch     :: !(Maybe EntTouch)
-               , _eaUse       :: !(Maybe EntUse)
-               , _eaPain      :: !(Maybe EntPain)
-               , _eaDie       :: !(Maybe EntDie)
+               , _eaPrethink  :: Maybe EntThink
+               , _eaThink     :: Maybe EntThink
+               , _eaBlocked   :: Maybe EntBlocked
+               , _eaTouch     :: Maybe EntTouch
+               , _eaUse       :: Maybe EntUse
+               , _eaPain      :: Maybe EntPain
+               , _eaDie       :: Maybe EntDie
                }
 
 data EdictOtherT =
-  EdictOtherT { _eoChain        :: !(Maybe EdictReference)
-              , _eoEnemy        :: !(Maybe EdictReference)
-              , _eoOldEnemy     :: !(Maybe EdictReference)
-              , _eoActivator    :: !(Maybe EdictReference)
-              , _eoGroundEntity :: !(Maybe EdictReference)
-              , _eoTeamChain    :: !(Maybe EdictReference)
-              , _eoTeamMaster   :: !(Maybe EdictReference)
-              , _eoMyNoise      :: !(Maybe EdictReference)
-              , _eoMyNoise2     :: !(Maybe EdictReference)
+  EdictOtherT { _eoChain        :: Maybe EdictReference
+              , _eoEnemy        :: Maybe EdictReference
+              , _eoOldEnemy     :: Maybe EdictReference
+              , _eoActivator    :: Maybe EdictReference
+              , _eoGroundEntity :: Maybe EdictReference
+              , _eoTeamChain    :: Maybe EdictReference
+              , _eoTeamMaster   :: Maybe EdictReference
+              , _eoMyNoise      :: Maybe EdictReference
+              , _eoMyNoise2     :: Maybe EdictReference
               }
 
 data EdictTimingT =
@@ -324,24 +325,24 @@ data EdictTimingT =
                }
 
 data EdictMinMaxT =
-  EdictMinMaxT { _eMins   :: !(V3 Float)
-               , _eMaxs   :: !(V3 Float)
-               , _eAbsMin :: !(V3 Float)
-               , _eAbsMax :: !(V3 Float)
-               , _eSize   :: !(V3 Float)
+  EdictMinMaxT { _eMins   :: V3 Float
+               , _eMaxs   :: V3 Float
+               , _eAbsMin :: V3 Float
+               , _eAbsMax :: V3 Float
+               , _eSize   :: V3 Float
                }
 
 data EdictInfoT =
-  EdictInfoT { _eiModel        :: !(Maybe B.ByteString)
-             , _eiMessage      :: !(Maybe B.ByteString)
-             , _eiTarget       :: !(Maybe B.ByteString)
-             , _eiTargetName   :: !(Maybe B.ByteString)
-             , _eiKillTarget   :: !(Maybe B.ByteString)
-             , _eiTeam         :: !(Maybe B.ByteString)
-             , _eiPathTarget   :: !(Maybe B.ByteString)
-             , _eiDeathTarget  :: !(Maybe B.ByteString)
-             , _eiCombatTarget :: !(Maybe B.ByteString)
-             , _eiMap          :: !(Maybe B.ByteString)
+  EdictInfoT { _eiModel        :: Maybe B.ByteString
+             , _eiMessage      :: Maybe B.ByteString
+             , _eiTarget       :: Maybe B.ByteString
+             , _eiTargetName   :: Maybe B.ByteString
+             , _eiKillTarget   :: Maybe B.ByteString
+             , _eiTeam         :: Maybe B.ByteString
+             , _eiPathTarget   :: Maybe B.ByteString
+             , _eiDeathTarget  :: Maybe B.ByteString
+             , _eiCombatTarget :: Maybe B.ByteString
+             , _eiMap          :: Maybe B.ByteString
              }
 
 data EdictPhysicsT =
@@ -349,11 +350,11 @@ data EdictPhysicsT =
                 , _eSpeed       :: !Float
                 , _eAccel       :: !Float
                 , _eDecel       :: !Float
-                , _eMoveDir     :: !(V3 Float)
-                , _ePos1        :: !(V3 Float)
-                , _ePos2        :: !(V3 Float)
-                , _eVelocity    :: !(V3 Float)
-                , _eAVelocity   :: !(V3 Float)
+                , _eMoveDir     :: V3 Float
+                , _ePos1        :: V3 Float
+                , _ePos2        :: V3 Float
+                , _eVelocity    :: V3 Float
+                , _eAVelocity   :: V3 Float
                 , _eMass        :: !Int
                 , _eAirFinished :: !Float
                 , _eGravity     :: !Float
@@ -379,13 +380,13 @@ data EdictStatusT =
 -- for makeLenses not to generate A LOT of code which eats up
 -- A LOT of memory
 data EdictT =
-  EdictT { _eEntityState           :: !EntityStateT
+  EdictT { _eEntityState           :: EntityStateT
          , _eInUse                 :: !Bool
-         , _eClassName             :: !B.ByteString
+         , _eClassName             :: B.ByteString
          , _eLinkCount             :: !Int
-         , _eArea                  :: !LinkReference
+         , _eArea                  :: LinkReference
          , _eNumClusters           :: !Int
-         , _eClusterNums           :: !(UV.Vector Int)
+         , _eClusterNums           :: UV.Vector Int
          , _eHeadNode              :: !Int
          , _eAreaNum               :: !Int
          , _eAreaNum2              :: !Int
@@ -397,17 +398,17 @@ data EdictT =
          , _eFreeTime              :: !Float
          , _eSpawnFlags            :: !Int
          , _eTimeStamp             :: !Float
-         , _eEdictPhysics          :: !EdictPhysicsT
-         , _eTargetEnt             :: !(Maybe EdictReference)
-         , _eGoalEntity            :: !(Maybe EdictReference)
-         , _eMoveTarget            :: !(Maybe EdictReference)
-         , _eEdictAction           :: !EdictActionT
-         , _eEdictTiming           :: !EdictTimingT
-         , _eEdictStatus           :: !EdictStatusT
+         , _eEdictPhysics          :: EdictPhysicsT
+         , _eTargetEnt             :: Maybe EdictReference
+         , _eGoalEntity            :: Maybe EdictReference
+         , _eMoveTarget            :: Maybe EdictReference
+         , _eEdictAction           :: EdictActionT
+         , _eEdictTiming           :: EdictTimingT
+         , _eEdictStatus           :: EdictStatusT
          , _eSounds                :: !Int
          , _eCount                 :: !Int
          , _eGroundEntityLinkCount :: !Int
-         , _eEdictOther            :: !EdictOtherT
+         , _eEdictOther            :: EdictOtherT
          , _eNoiseIndex            :: !Int
          , _eNoiseIndex2           :: !Int
          , _eVolume                :: !Float
@@ -418,25 +419,25 @@ data EdictT =
          , _eTeleportTime          :: !Float
          , _eWaterType             :: !Int
          , _eWaterLevel            :: !Int
-         , _eMoveOrigin            :: !(V3 Float)
-         , _eMoveAngles            :: !(V3 Float)
+         , _eMoveOrigin            :: V3 Float
+         , _eMoveAngles            :: V3 Float
          , _eLightLevel            :: !Int
          , _eStyle                 :: !Int
-         , _eItem                  :: !(Maybe GItemReference)
-         , _eMoveInfo              :: !MoveInfoT
-         , _eMonsterInfo           :: !MonsterInfoT
-         , _eClient                :: !(Maybe GClientReference)
-         , _eOwner                 :: !(Maybe EdictReference)
+         , _eItem                  :: Maybe GItemReference
+         , _eMoveInfo              :: MoveInfoT
+         , _eMonsterInfo           :: MonsterInfoT
+         , _eClient                :: Maybe GClientReference
+         , _eOwner                 :: Maybe EdictReference
          , _eIndex                 :: !Int
-         , _eEdictInfo             :: !EdictInfoT
-         , _eEdictMinMax           :: !EdictMinMaxT
+         , _eEdictInfo             :: EdictInfoT
+         , _eEdictMinMax           :: EdictMinMaxT
          }
 
 data EntityStateT =
   EntityStateT { _esNumber         :: !Int
-               , _esOrigin         :: !(V3 Float)
-               , _esAngles         :: !(V3 Float)
-               , _esOldOrigin      :: !(V3 Float)
+               , _esOrigin         :: V3 Float
+               , _esAngles         :: V3 Float
+               , _esOldOrigin      :: V3 Float
                , _esModelIndex     :: !Int
                , _esModelIndex2    :: !Int
                , _esModelIndex3    :: !Int
@@ -448,15 +449,15 @@ data EntityStateT =
                , _esSolid          :: !Int
                , _esSound          :: !Int
                , _esEvent          :: !Int
-               , _esSurroundingEnt :: !(Maybe EdictReference)
+               , _esSurroundingEnt :: Maybe EdictReference
                }
 
 data GClientT =
-  GClientT { _gcPlayerState        :: !PlayerStateT
+  GClientT { _gcPlayerState        :: PlayerStateT
            , _gcPing               :: !Int
-           , _gcPers               :: !ClientPersistantT
-           , _gcResp               :: !ClientRespawnT
-           , _gcOldPMove           :: !PMoveStateT
+           , _gcPers               :: ClientPersistantT
+           , _gcResp               :: ClientRespawnT
+           , _gcOldPMove           :: PMoveStateT
            , _gcShowScores         :: !Bool
            , _gcShowInventory      :: !Bool
            , _gcShowHelp           :: !Bool
@@ -466,16 +467,16 @@ data GClientT =
            , _gcOldButtons         :: !Int
            , _gcLatchedButtons     :: !Int
            , _gcWeaponThunk        :: !Bool
-           , _gcNewWeapon          :: !(Maybe GItemReference)
+           , _gcNewWeapon          :: Maybe GItemReference
            , _gcDamageArmor        :: !Int
            , _gcDamagePArmor       :: !Int
            , _gcDamageBlood        :: !Int
            , _gcDamageKnockback    :: !Int
-           , _gcDamageFrom         :: !(V3 Float)
+           , _gcDamageFrom         :: V3 Float
            , _gcKillerYaw          :: !Float
            , _gcWeaponState        :: !Int
-           , _gcKickAngles         :: !(V3 Float)
-           , _gcKickOrigin         :: !(V3 Float)
+           , _gcKickAngles         :: V3 Float
+           , _gcKickOrigin         :: V3 Float
            , _gcVDmgRoll           :: !Float
            , _gcVDmgPitch          :: !Float
            , _gcVDmgTime           :: !Float
@@ -483,11 +484,11 @@ data GClientT =
            , _gcFallValue          :: !Float
            , _gcDamageAlpha        :: !Float
            , _gcBonusAlpha         :: !Float
-           , _gcDamageBlend        :: !(V3 Float)
-           , _gcVAngle             :: !(V3 Float)
+           , _gcDamageBlend        :: V3 Float
+           , _gcVAngle             :: V3 Float
            , _gcBobTime            :: !Float
-           , _gcOldViewAngles      :: !(V3 Float)
-           , _gcOldVelocity        :: !(V3 Float)
+           , _gcOldViewAngles      :: V3 Float
+           , _gcOldVelocity        :: V3 Float
            , _gcNextDrownTime      :: !Float
            , _gcOldWaterLevel      :: !Int
            , _gcBreatherSound      :: !Int
@@ -506,55 +507,55 @@ data GClientT =
            , _gcWeaponSound        :: !Int
            , _gcPickupMsgTime      :: !Float
            , _gcFloodLockTill      :: !Float
-           , _gcFloodWhen          :: !(UV.Vector Float)
+           , _gcFloodWhen          :: UV.Vector Float
            , _gcFloodWhenHead      :: !Int
            , _gcRespawnTime        :: !Float
-           , _gcChaseTarget        :: !(Maybe EdictReference)
+           , _gcChaseTarget        :: Maybe EdictReference
            , _gcUpdateChase        :: !Bool
            , _gcIndex              :: !Int
            }
 
 data ClientT =
   ClientT { _cState         :: !Int
-          , _cUserInfo      :: !B.ByteString
+          , _cUserInfo      :: B.ByteString
           , _cLastFrame     :: !Int
-          , _cLastCmd       :: !UserCmdT
+          , _cLastCmd       :: UserCmdT
           , _cCommandMsec   :: !Int
-          , _cFrameLatency  :: !(UV.Vector Int)
+          , _cFrameLatency  :: UV.Vector Int
           , _cPing          :: !Int
-          , _cMessageSize   :: !(UV.Vector Int)
+          , _cMessageSize   :: UV.Vector Int
           , _cRate          :: !Int
           , _cSurpressCount :: !Int
-          , _cEdict         :: !(Maybe EdictReference)
-          , _cName          :: !B.ByteString
+          , _cEdict         :: Maybe EdictReference
+          , _cName          :: B.ByteString
           , _cMessageLevel  :: !Int
-          , _cDatagram      :: !SizeBufT
-          , _cDatagramBuf   :: !B.ByteString
-          , _cFrames        :: !(V.Vector ClientFrameT)
-          , _cDownload      :: !(Maybe B.ByteString)
+          , _cDatagram      :: SizeBufT
+          , _cDatagramBuf   :: B.ByteString
+          , _cFrames        :: V.Vector ClientFrameT
+          , _cDownload      :: Maybe B.ByteString
           , _cDownloadSize  :: !Int
           , _cDownloadCount :: !Int
           , _cLastMessage   :: !Int
           , _cLastConnect   :: !Int
           , _cChallenge     :: !Int
-          , _cNetChan       :: !NetChanT
+          , _cNetChan       :: NetChanT
           , _cServerIndex   :: !Int
           }
 
 data ServerStaticT =
   ServerStaticT { _ssInitialized        :: !Bool
                 , _ssRealTime           :: !Int
-                , _ssMapCmd             :: !B.ByteString
+                , _ssMapCmd             :: B.ByteString
                 , _ssSpawnCount         :: !Int
-                , _ssClients            :: !(V.Vector ClientT)
+                , _ssClients            :: V.Vector ClientT
                 , _ssNumClientEntities  :: !Int
                 , _ssNextClientEntities :: !Int
-                , _ssClientEntities     :: !(V.Vector EntityStateT)
+                , _ssClientEntities     :: V.Vector EntityStateT
                 , _ssLastHeartbeat      :: !Int
-                , _ssChallenges         :: !(V.Vector ChallengeT)
-                , _ssDemoFile           :: !(Maybe Handle)
-                , _ssDemoMulticast      :: !SizeBufT
-                , _ssDemoMulticastBuf   :: !B.ByteString
+                , _ssChallenges         :: V.Vector ChallengeT
+                , _ssDemoFile           :: Maybe Handle
+                , _ssDemoMulticast      :: SizeBufT
+                , _ssDemoMulticastBuf   :: B.ByteString
                 }
 
 data ServerT =
@@ -563,22 +564,22 @@ data ServerT =
           , _sLoadGame      :: !Bool
           , _sTime          :: !Int
           , _sFrameNum      :: !Int
-          , _sName          :: !B.ByteString
-          , _sModels        :: !(V.Vector CModelReference)
-          , _sConfigStrings :: !(V.Vector B.ByteString)
-          , _sBaselines     :: !(V.Vector EntityStateT)
-          , _sMulticast     :: !SizeBufT
-          , _sMulticastBuf  :: !B.ByteString
-          , _sDemoFile      :: !(Maybe Handle)
+          , _sName          :: B.ByteString
+          , _sModels        :: V.Vector CModelReference
+          , _sConfigStrings :: V.Vector B.ByteString
+          , _sBaselines     :: V.Vector EntityStateT
+          , _sMulticast     :: SizeBufT
+          , _sMulticastBuf  :: B.ByteString
+          , _sDemoFile      :: Maybe Handle
           , _sTimeDemo      :: !Int
           }
 
 data GameLocalsT =
-  GameLocalsT { _glHelpMessage1 :: !B.ByteString
-              , _glHelpMessage2 :: !B.ByteString
+  GameLocalsT { _glHelpMessage1 :: B.ByteString
+              , _glHelpMessage2 :: B.ByteString
               , _glHelpChanged  :: !Int
-              , _glClients      :: !(V.Vector GClientT)
-              , _glSpawnPoint   :: !B.ByteString
+              , _glClients      :: V.Vector GClientT
+              , _glSpawnPoint   :: B.ByteString
               , _glMaxClients   :: !Int
               , _glMaxEntities  :: !Int
               , _glServerFlags  :: !Int
@@ -589,20 +590,20 @@ data GameLocalsT =
 data LevelLocalsT =
   LevelLocalsT { _llFrameNum             :: !Int
                , _llTime                 :: !Float
-               , _llLevelName            :: !B.ByteString
-               , _llMapName              :: !B.ByteString
-               , _llNextMap              :: !B.ByteString
+               , _llLevelName            :: B.ByteString
+               , _llMapName              :: B.ByteString
+               , _llNextMap              :: B.ByteString
                , _llIntermissionTime     :: !Float
-               , _llChangeMap            :: !B.ByteString
+               , _llChangeMap            :: B.ByteString
                , _llExitIntermission     :: !Bool
-               , _llIntermissionOrigin   :: !(V3 Float)
-               , _llIntermissionAngle    :: !(V3 Float)
-               , _llSightClient          :: !(Maybe EdictReference)
-               , _llSightEntity          :: !(Maybe EdictReference)
+               , _llIntermissionOrigin   :: V3 Float
+               , _llIntermissionAngle    :: V3 Float
+               , _llSightClient          :: Maybe EdictReference
+               , _llSightEntity          :: Maybe EdictReference
                , _llSightEntityFrameNum  :: !Int
-               , _llSoundEntity          :: !(Maybe EdictReference)
+               , _llSoundEntity          :: Maybe EdictReference
                , _llSoundEntityFrameNum  :: !Int
-               , _llSound2Entity         :: !(Maybe EdictReference)
+               , _llSound2Entity         :: Maybe EdictReference
                , _llSound2EntityFrameNum :: !Int
                , _llPicHealth            :: !Int
                , _llTotalSecrets         :: !Int
@@ -611,7 +612,7 @@ data LevelLocalsT =
                , _llFoundGoals           :: !Int
                , _llTotalMonsters        :: !Int
                , _llKilledMonsters       :: !Int
-               , _llCurrentEntity        :: !(Maybe EdictReference)
+               , _llCurrentEntity        :: Maybe EdictReference
                , _llBodyQue              :: !Int
                , _llPowerCubes           :: !Int
                }
@@ -659,24 +660,24 @@ data TraceT =
   TraceT { _tAllSolid   :: !Bool
          , _tStartSolid :: !Bool
          , _tFraction   :: !Float
-         , _tEndPos     :: !(V3 Float)
-         , _tPlane      :: !CPlaneT
-         , _tSurface    :: !(Maybe CSurfaceT)
+         , _tEndPos     :: V3 Float
+         , _tPlane      :: CPlaneT
+         , _tSurface    :: Maybe CSurfaceT
          , _tContents   :: !Int
-         , _tEnt        :: !(Maybe EdictReference)
+         , _tEnt        :: Maybe EdictReference
          }
 
 data PMoveT =
-  PMoveT { _pmState         :: !PMoveStateT
-         , _pmCmd           :: !UserCmdT
+  PMoveT { _pmState         :: PMoveStateT
+         , _pmCmd           :: UserCmdT
          , _pmSnapInitial   :: !Bool
          , _pmNumTouch      :: !Int
-         , _pmTouchEnts     :: !(V.Vector EdictReference)
-         , _pmViewAngles    :: !(V3 Float)
+         , _pmTouchEnts     :: V.Vector EdictReference
+         , _pmViewAngles    :: V3 Float
          , _pmViewHeight    :: !Float
-         , _pmMins          :: !(V3 Float)
-         , _pmMaxs          :: !(V3 Float)
-         , _pmGroundEntity  :: !(Maybe EdictReference)
+         , _pmMins          :: V3 Float
+         , _pmMaxs          :: V3 Float
+         , _pmGroundEntity  :: Maybe EdictReference
          , _pmWaterType     :: !Int
          , _pmWaterLevel    :: !Int
          , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
@@ -684,29 +685,29 @@ data PMoveT =
          }
 
 data GameBaseGlobals =
-  GameBaseGlobals { _gbDummyPlane        :: !CPlaneT
-                  , _gbGame              :: !GameLocalsT
-                  , _gbLevel             :: !LevelLocalsT
-                  , _gbGameImport        :: !GameImportT
-                  , _gbSpawnTemp         :: !SpawnTempT
+  GameBaseGlobals { _gbDummyPlane        :: CPlaneT
+                  , _gbGame              :: GameLocalsT
+                  , _gbLevel             :: LevelLocalsT
+                  , _gbGameImport        :: GameImportT
+                  , _gbSpawnTemp         :: SpawnTempT
                   , _gbSmMeatIndex       :: !Int
                   , _gbSndFry            :: !Int
                   , _gbMeansOfDeath      :: !Int
                   , _gbNumEdicts         :: !Int
-                  , _gbGEdicts           :: !(V.Vector EdictT)
-                  , _gbItemList          :: !(V.Vector GItemT)
-                  , _gbPushed            :: !(V.Vector PushedT)
+                  , _gbGEdicts           :: V.Vector EdictT
+                  , _gbItemList          :: V.Vector GItemT
+                  , _gbPushed            :: V.Vector PushedT
                   , _gbPushedP           :: !Int
-                  , _gbObstacle          :: !(Maybe EdictReference)
+                  , _gbObstacle          :: Maybe EdictReference
                   , _gbCYes              :: !Int
                   , _gbCNo               :: !Int
-                  , _gbTouch             :: !(V.Vector EdictReference)
+                  , _gbTouch             :: V.Vector EdictReference
                   }
 
 data PMoveGlobals =
-  PMoveGlobals { _pmPM              :: !PMoveT
-               , _pmPML             :: !PmlT
-               , _pmPlanes          :: !(V.Vector (V3 Float))
+  PMoveGlobals { _pmPM              :: PMoveT
+               , _pmPML             :: PmlT
+               , _pmPlanes          :: V.Vector (V3 Float)
                , _pmStopSpeed       :: !Float
                , _pmMaxSpeed        :: !Float
                , _pmDuckSpeed       :: !Float
@@ -719,26 +720,26 @@ data PMoveGlobals =
                }
 
 data MonsterInfoT =
-  MonsterInfoT { _miCurrentMove     :: !(Maybe MMoveT)
+  MonsterInfoT { _miCurrentMove     :: Maybe MMoveT
                , _miAIFlags         :: !Int
                , _miNextFrame       :: !Int
                , _miScale           :: !Float
-               , _miStand           :: !(Maybe EntThink)
-               , _miIdle            :: !(Maybe EntThink)
-               , _miSearch          :: !(Maybe EntThink)
-               , _miWalk            :: !(Maybe EntThink)
-               , _miRun             :: !(Maybe EntThink)
-               , _miDodge           :: !(Maybe EntDodge)
-               , _miAttack          :: !(Maybe EntThink)
-               , _miMelee           :: !(Maybe EntThink)
-               , _miSight           :: !(Maybe EntInteract)
-               , _miCheckAttack     :: !(Maybe EntThink)
+               , _miStand           :: Maybe EntThink
+               , _miIdle            :: Maybe EntThink
+               , _miSearch          :: Maybe EntThink
+               , _miWalk            :: Maybe EntThink
+               , _miRun             :: Maybe EntThink
+               , _miDodge           :: Maybe EntDodge
+               , _miAttack          :: Maybe EntThink
+               , _miMelee           :: Maybe EntThink
+               , _miSight           :: Maybe EntInteract
+               , _miCheckAttack     :: Maybe EntThink
                , _miPauseTime       :: !Float
                , _miAttackFinished  :: !Float
-               , _miSavedGoal       :: !(V3 Float)
+               , _miSavedGoal       :: V3 Float
                , _miSearchTime      :: !Float
                , _miTrailTime       :: !Float
-               , _miLastSighting    :: !(V3 Float)
+               , _miLastSighting    :: V3 Float
                , _miAttackState     :: !Int
                , _miLefty           :: !Int
                , _miIdleTime        :: !Float
@@ -755,71 +756,71 @@ data ClientStateT =
                , _csSoundPrepped           :: !Bool
                , _csForceRefDef            :: !Bool
                , _csParseEntities          :: !Int
-               , _csCmd                    :: !UserCmdT
-               , _csCmds                   :: !(V.Vector UserCmdT)
-               , _csCmdTime                :: !(UV.Vector Int)
-               , _csPredictedOrigins       :: !(UV.Vector (V3 Int16))
+               , _csCmd                    :: UserCmdT
+               , _csCmds                   :: V.Vector UserCmdT
+               , _csCmdTime                :: UV.Vector Int
+               , _csPredictedOrigins       :: UV.Vector (V3 Int16)
                , _csPredictedStep          :: !Float
                , _csPredictedStepTime      :: !Int
-               , _csPredictedOrigin        :: !(V3 Float)
-               , _csPredictedAngles        :: !(V3 Float)
-               , _csPredictionError        :: !(V3 Float)
-               , _csFrame                  :: !FrameT
+               , _csPredictedOrigin        :: V3 Float
+               , _csPredictedAngles        :: V3 Float
+               , _csPredictionError        :: V3 Float
+               , _csFrame                  :: FrameT
                , _csSurpressCount          :: !Int
-               , _csFrames                 :: !(V.Vector FrameT)
-               , _csViewAngles             :: !(V3 Float)
+               , _csFrames                 :: V.Vector FrameT
+               , _csViewAngles             :: V3 Float
                , _csTime                   :: !Int
                , _csLerpFrac               :: !Float
-               , _csRefDef                 :: !RefDefT
-               , _csVForward               :: !(V3 Float)
-               , _csVRight                 :: !(V3 Float)
-               , _csVUp                    :: !(V3 Float)
-               , _csLayout                 :: !B.ByteString
-               , _csInventory              :: !(UV.Vector Int)
-               , _csCinematicFile          :: !(Maybe B.ByteString)
+               , _csRefDef                 :: RefDefT
+               , _csVForward               :: V3 Float
+               , _csVRight                 :: V3 Float
+               , _csVUp                    :: V3 Float
+               , _csLayout                 :: B.ByteString
+               , _csInventory              :: UV.Vector Int
+               , _csCinematicFile          :: Maybe B.ByteString
                , _csCinematicTime          :: !Int
                , _csCinematicFrame         :: !Int
-               , _csCinematicPalette       :: !B.ByteString
+               , _csCinematicPalette       :: B.ByteString
                , _csCinematicPaletteActive :: !Bool
                , _csAttractLoop            :: !Bool
                , _csServerCount            :: !Int
-               , _csGameDir                :: !B.ByteString
+               , _csGameDir                :: B.ByteString
                , _csPlayerNum              :: !Int
-               , _csConfigStrings          :: !(V.Vector B.ByteString)
-               , _csModelDraw              :: !(V.Vector (Maybe ModelReference))
-               , _csModelClip              :: !(V.Vector (Maybe CModelReference))
-               , _csSoundPrecache          :: !(V.Vector SfxT)
-               , _csImagePrecache          :: !(V.Vector (Maybe ImageReference))
-               , _csClientInfo             :: !(V.Vector ClientInfoT)
-               , _csBaseClientInfo         :: !ClientInfoT
+               , _csConfigStrings          :: V.Vector B.ByteString
+               , _csModelDraw              :: V.Vector (Maybe ModelReference)
+               , _csModelClip              :: V.Vector (Maybe CModelReference)
+               , _csSoundPrecache          :: V.Vector SfxT
+               , _csImagePrecache          :: V.Vector (Maybe ImageReference)
+               , _csClientInfo             :: V.Vector ClientInfoT
+               , _csBaseClientInfo         :: ClientInfoT
                }
 
 data GLPolyT =
-  GLPolyT { _glpNext           :: !(Maybe GLPolyReference)
-          , _glpChain          :: !(Maybe GLPolyReference)
+  GLPolyT { _glpNext           :: Maybe GLPolyReference
+          , _glpChain          :: Maybe GLPolyReference
           , _glpNumVerts       :: !Int
           , _glpFlags          :: !Int
           , _glpPos            :: !Int
           }
 
 data MTexInfoT =
-  MTexInfoT { _mtiVecs      :: !(V4 Float, V4 Float)
+  MTexInfoT { _mtiVecs      :: (V4 Float, V4 Float)
             , _mtiFlags     :: !Int
             , _mtiNumFrames :: !Int
-            , _mtiNext      :: !(Maybe Int)
-            , _mtiImage     :: !(Maybe ImageReference)
+            , _mtiNext      :: Maybe Int
+            , _mtiImage     :: Maybe ImageReference
             }
 
 data ImageT =
   ImageT { _iId                   :: !Int
-         , _iName                 :: !B.ByteString
+         , _iName                 :: B.ByteString
          , _iType                 :: !Int
          , _iWidth                :: !Int
          , _iHeight               :: !Int
          , _iUploadWidth          :: !Int
          , _iUploadHeight         :: !Int
          , _iRegistrationSequence :: !Int
-         , _iTextureChain         :: !(Maybe MSurfaceT)
+         , _iTextureChain         :: Maybe MSurfaceT
          , _iTexNum               :: !Int
          , _iSL                   :: !Float
          , _iTL                   :: !Float
@@ -837,123 +838,123 @@ data RefDefT =
           , _rdHeight       :: !Int
           , _rdFovX         :: !Float
           , _rdFovY         :: !Float
-          , _rdViewOrg      :: !(V3 Float)
-          , _rdViewAngles   :: !(V3 Float)
-          , _rdBlend        :: !(V4 Float)
+          , _rdViewOrg      :: V3 Float
+          , _rdViewAngles   :: V3 Float
+          , _rdBlend        :: V4 Float
           , _rdTime         :: !Float
           , _rdRdFlags      :: !Int
-          , _rdAreaBits     :: !(UV.Vector Word8)
-          , _rdLightStyles  :: !(V.Vector LightStyleT)
+          , _rdAreaBits     :: UV.Vector Word8
+          , _rdLightStyles  :: V.Vector LightStyleT
           , _rdNumEntities  :: !Int
-          , _rdEntities     :: !(V.Vector EntityT)
+          , _rdEntities     :: V.Vector EntityT
           , _rdNumDLights   :: !Int
-          , _rdDLights      :: !(V.Vector DLightT)
+          , _rdDLights      :: V.Vector DLightT
           , _rdNumParticles :: !Int
           }
 
 data EntityT =
-  EntityT { _eModel      :: !(Maybe Int) -- index to some modelT vector
-          , _eAngles     :: !(V3 Float)
-          , _eOrigin     :: !(V3 Float)
+  EntityT { _eModel      :: Maybe Int -- index to some modelT vector
+          , _eAngles     :: V3 Float
+          , _eOrigin     :: V3 Float
           , _eFrame      :: !Int
-          , _eOldOrigin  :: !(V3 Float)
+          , _eOldOrigin  :: V3 Float
           , _eOldFrame   :: !Int
           , _eBackLerp   :: !Float
           , _eSkinNum    :: !Int
           , _eLightStyle :: !Int
           , _eAlpha      :: !Float
-          , _eSkin       :: !(Maybe Int) -- index to some imageT vector
+          , _eSkin       :: Maybe Int -- index to some imageT vector
           , _enFlags     :: !Int -- name clash with EdictT._eFlags
           }
 
 data ModelT =
-  ModelT { _mName                 :: !B.ByteString
+  ModelT { _mName                 :: B.ByteString
          , _mRegistrationSequence :: !Int
          , _mType                 :: !Int
          , _mNumFrames            :: !Int
          , _mFlags                :: !Int
-         , _mMins                 :: !(V3 Float)
-         , _mMaxs                 :: !(V3 Float)
+         , _mMins                 :: V3 Float
+         , _mMaxs                 :: V3 Float
          , _mRadius               :: !Float
          , _mClipBox              :: !Bool
-         , _mClipMins             :: !(V3 Float)
-         , _mClipMaxs             :: !(V3 Float)
+         , _mClipMins             :: V3 Float
+         , _mClipMaxs             :: V3 Float
          , _mFirstModelSurface    :: !Int
          , _mNumModelSurfaces     :: !Int
          , _mLightmap             :: !Int
          , _mNumSubModels         :: !Int
-         , _mSubModels            :: !(V.Vector MModelT)
+         , _mSubModels            :: V.Vector MModelT
          , _mNumPlanes            :: !Int
-         , _mPlanes               :: !(V.Vector CPlaneT)
+         , _mPlanes               :: V.Vector CPlaneT
          , _mNumLeafs             :: !Int
-         , _mLeafs                :: !(V.Vector MLeafT)
+         , _mLeafs                :: V.Vector MLeafT
          , _mNumVertexes          :: !Int
-         , _mVertexes             :: !(V.Vector MVertexT)
+         , _mVertexes             :: V.Vector MVertexT
          , _mNumEdges             :: !Int
-         , _mEdges                :: !(V.Vector MEdgeT)
+         , _mEdges                :: V.Vector MEdgeT
          , _mNumNodes             :: !Int
          , _mFirstNode            :: !Int
-         , _mNodes                :: !(V.Vector MNodeT)
+         , _mNodes                :: V.Vector MNodeT
          , _mNumTexInfo           :: !Int
-         , _mTexInfo              :: !(V.Vector MTexInfoT)
+         , _mTexInfo              :: V.Vector MTexInfoT
          , _mNumSurfaces          :: !Int
-         , _mSurfaces             :: !(V.Vector MSurfaceT)
+         , _mSurfaces             :: V.Vector MSurfaceT
          , _mNumSurfEdges         :: !Int
-         , _mSurfEdges            :: !(V.Vector Int)
+         , _mSurfEdges            :: V.Vector Int
          , _mNumMarkSurfaces      :: !Int
-         , _mMarkSurfaces         :: !(V.Vector MSurfaceT)
-         , _mVis                  :: !(Maybe DVisT)
-         , _mLightdata            :: !(Maybe B.ByteString)
-         , _mSkins                :: !(V.Vector (Maybe ImageReference))
+         , _mMarkSurfaces         :: V.Vector MSurfaceT
+         , _mVis                  :: Maybe DVisT
+         , _mLightdata            :: Maybe B.ByteString
+         , _mSkins                :: V.Vector (Maybe ImageReference)
          , _mExtraDataSize        :: !Int
-         , _mExtraData            :: !(Maybe ModelExtra)
+         , _mExtraData            :: Maybe ModelExtra
          }
 
 data MSurfaceT =
   MSurfaceT { _msVisFrame           :: !Int
-            , _msPlane              :: !(Maybe CPlaneT)
+            , _msPlane              :: Maybe CPlaneT
             , _msFlags              :: !Int
             , _msFirstEdge          :: !Int
             , _msNumEdges           :: !Int
-            , _msTextureMins        :: !(Int16, Int16)
-            , _msExtents            :: !(Int16, Int16)
+            , _msTextureMins        :: (Int16, Int16)
+            , _msExtents            :: (Int16, Int16)
             , _msLightS             :: !Int
             , _msLightT             :: !Int
             , _msDLightS            :: !Int
             , _msDLightT            :: !Int
-            , _msPolys              :: !(Maybe GLPolyReference)
-            , _msTextureChain       :: !(Maybe MSurfaceReference)
-            , _msLightmapChain      :: !(Maybe MSurfaceReference)
+            , _msPolys              :: Maybe GLPolyReference
+            , _msTextureChain       :: Maybe MSurfaceReference
+            , _msLightmapChain      :: Maybe MSurfaceReference
             , _msTexInfo            :: MTexInfoT -- !(Maybe (ModelReference, MTexInfoReference))
             , _msDLightFrame        :: !Int
             , _msDLightBits         :: !Int
             , _msLightmapTextureNum :: !Int
-            , _msStyles             :: !B.ByteString
-            , _msCachedLight        :: !(UV.Vector Float)
-            , _msSamples            :: !(Maybe B.ByteString)
+            , _msStyles             :: B.ByteString
+            , _msCachedLight        :: UV.Vector Float
+            , _msSamples            :: Maybe B.ByteString
             }
 
 data MLeafT =
   MLeafT { _mlContents        :: !Int
          , _mlVisFrame        :: !Int
-         , _mlMins            :: !(V3 Float)
-         , _mlMaxs            :: !(V3 Float)
-         , _mlParent          :: !(Maybe MNodeReference)
+         , _mlMins            :: V3 Float
+         , _mlMaxs            :: V3 Float
+         , _mlParent          :: Maybe MNodeReference
          , _mlCluster         :: !Int
          , _mlArea            :: !Int
          , _mlNumMarkSurfaces :: !Int
          , _mlMarkIndex       :: !Int
-         , _mlMarkSurfaces    :: !(V.Vector MSurfaceT)
+         , _mlMarkSurfaces    :: V.Vector MSurfaceT
          }
 
 data ClientInfoT =
-  ClientInfoT { _ciName        :: !B.ByteString
-              , _ciCInfo       :: !B.ByteString
-              , _ciSkin        :: !(Maybe ImageReference) -- index to some imageT vector
-              , _ciIcon        :: !(Maybe ImageReference) -- index to some imageT vector
-              , _ciIconName    :: !B.ByteString
-              , _ciModel       :: !(Maybe ModelReference) -- index to some modelT vector
-              , _ciWeaponModel :: !(V.Vector (Maybe ModelReference)) -- index to some modelT vector
+  ClientInfoT { _ciName        :: B.ByteString
+              , _ciCInfo       :: B.ByteString
+              , _ciSkin        :: Maybe ImageReference -- index to some imageT vector
+              , _ciIcon        :: Maybe ImageReference -- index to some imageT vector
+              , _ciIconName    :: B.ByteString
+              , _ciModel       :: Maybe ModelReference -- index to some modelT vector
+              , _ciWeaponModel :: V.Vector (Maybe ModelReference) -- index to some modelT vector
               }
 
 data SCRGlobals =
@@ -961,16 +962,16 @@ data SCRGlobals =
              , _scrConLines        :: !Float
              , _scrInitialized     :: !Bool
              , _scrDrawLoading     :: !Int
-             , _scrDirty           :: !DirtyT
-             , _scrOldDirty        :: !(DirtyT, DirtyT)
-             , _scrCrosshairPic    :: !B.ByteString
+             , _scrDirty           :: DirtyT
+             , _scrOldDirty        :: (DirtyT, DirtyT)
+             , _scrCrosshairPic    :: B.ByteString
              , _scrCrosshairWidth  :: !Int
              , _scrCrosshairHeight :: !Int
              , _scrCenterTimeOff   :: !Float
              , _scrLastFrames      :: !Int
              , _scrLastTime        :: !Int
-             , _scrFPSValue        :: !B.ByteString
-             , _scrCin             :: !CinematicsT
+             , _scrFPSValue        :: B.ByteString
+             , _scrCin             :: CinematicsT
              }
 
 data RefExportT =
@@ -1002,33 +1003,33 @@ data RefExportT =
              }
 
 data NETGlobals =
-  NETGlobals { _ngLoopbackClient :: !LoopbackT
-             , _ngLoopbackServer :: !LoopbackT
-             , _ngIpSocketClient :: !(Maybe Socket)
-             , _ngIpSocketServer :: !(Maybe Socket)
-             , _ngSend           :: !SizeBufT
+  NETGlobals { _ngLoopbackClient :: LoopbackT
+             , _ngLoopbackServer :: LoopbackT
+             , _ngIpSocketClient :: Maybe Socket
+             , _ngIpSocketServer :: Maybe Socket
+             , _ngSend           :: SizeBufT
              }
 
 data GItemT =
-  GItemT { _giClassName       :: !B.ByteString
-         , _giPickup          :: !(Maybe EntInteract)
-         , _giUse             :: !(Maybe ItemUse)
-         , _giDrop            :: !(Maybe ItemDrop)
-         , _giWeaponThink     :: !(Maybe EntThink)
-         , _giPickupSound     :: !(Maybe B.ByteString)
-         , _giWorldModel      :: !(Maybe B.ByteString)
+  GItemT { _giClassName       :: B.ByteString
+         , _giPickup          :: Maybe EntInteract
+         , _giUse             :: Maybe ItemUse
+         , _giDrop            :: Maybe ItemDrop
+         , _giWeaponThink     :: Maybe EntThink
+         , _giPickupSound     :: Maybe B.ByteString
+         , _giWorldModel      :: Maybe B.ByteString
          , _giWorldModelFlags :: !Int
-         , _giViewModel       :: !(Maybe B.ByteString)
-         , _giIcon            :: !(Maybe B.ByteString)
-         , _giPickupName      :: !(Maybe B.ByteString)
+         , _giViewModel       :: Maybe B.ByteString
+         , _giIcon            :: Maybe B.ByteString
+         , _giPickupName      :: Maybe B.ByteString
          , _giCountWidth      :: !Int
          , _giQuantity        :: !Int
-         , _giAmmo            :: !(Maybe B.ByteString)
+         , _giAmmo            :: Maybe B.ByteString
          , _giFlags           :: !Int
          , _giWeaponModel     :: !Int
-         , _giInfo            :: !(Maybe GItemArmorT)
+         , _giInfo            :: Maybe GItemArmorT
          , _giTag             :: !Int
-         , _giPrecaches       :: !B.ByteString
+         , _giPrecaches       :: B.ByteString
          , _giIndex           :: !Int
          }
 
@@ -1208,31 +1209,31 @@ instance AIAdapter AI where
     ai (GenericAI _ _ai) = _ai
 
 data ClientRespawnT =
-  ClientRespawnT { _crCoopRespawn :: !ClientPersistantT
+  ClientRespawnT { _crCoopRespawn :: ClientPersistantT
                  , _crEnterFrame  :: !Int
                  , _crScore       :: !Int
-                 , _crCmdAngles   :: !(V3 Float)
+                 , _crCmdAngles   :: V3 Float
                  , _crSpectator   :: !Bool
                  }
 
 data ClientPersistantT =
-  ClientPersistantT { _cpUserInfo        :: !B.ByteString
-                    , _cpNetName         :: !B.ByteString
+  ClientPersistantT { _cpUserInfo        :: B.ByteString
+                    , _cpNetName         :: B.ByteString
                     , _cpHand            :: !Int
                     , _cpConnected       :: !Bool
                     , _cpHealth          :: !Int
                     , _cpMaxHealth       :: !Int
                     , _cpSavedFlags      :: !Int
                     , _cpSelectedItem    :: !Int
-                    , _cpInventory       :: !(UV.Vector Int)
+                    , _cpInventory       :: UV.Vector Int
                     , _cpMaxBullets      :: !Int
                     , _cpMaxShells       :: !Int
                     , _cpMaxRockets      :: !Int
                     , _cpMaxGrenades     :: !Int
                     , _cpMaxCells        :: !Int
                     , _cpMaxSlugs        :: !Int
-                    , _cpWeapon          :: !(Maybe GItemReference)
-                    , _cpLastWeapon      :: !(Maybe GItemReference)
+                    , _cpWeapon          :: Maybe GItemReference
+                    , _cpLastWeapon      :: Maybe GItemReference
                     , _cpPowerCubes      :: !Int
                     , _cpScore           :: !Int
                     , _cpGameHelpChanged :: !Int
@@ -1242,63 +1243,63 @@ data ClientPersistantT =
 
 data CMGlobals =
   CMGlobals { _cmCheckCount      :: !Int
-            , _cmMapName         :: !B.ByteString
+            , _cmMapName         :: B.ByteString
             , _cmNumBrushSides   :: !Int
-            , _cmMapBrushSides   :: !(V.Vector CBrushSideT)
+            , _cmMapBrushSides   :: V.Vector CBrushSideT
             , _cmNumTexInfo      :: !Int
-            , _cmMapSurfaces     :: !(V.Vector MapSurfaceT)
+            , _cmMapSurfaces     :: V.Vector MapSurfaceT
             , _cmNumPlanes       :: !Int
-            , _cmMapPlanes       :: !(V.Vector CPlaneT)
+            , _cmMapPlanes       :: V.Vector CPlaneT
             , _cmNumNodes        :: !Int
-            , _cmMapNodes        :: !(V.Vector CNodeT)
+            , _cmMapNodes        :: V.Vector CNodeT
             , _cmNumLeafs        :: !Int
-            , _cmMapLeafs        :: !(V.Vector CLeafT)
+            , _cmMapLeafs        :: V.Vector CLeafT
             , _cmEmptyLeaf       :: !Int
             , _cmSolidLeaf       :: !Int
             , _cmNumLeafBrushes  :: !Int
-            , _cmMapLeafBrushes  :: !(UV.Vector Word16)
+            , _cmMapLeafBrushes  :: UV.Vector Word16
             , _cmNumCModels      :: !Int
-            , _cmMapCModels      :: !(V.Vector CModelT)
+            , _cmMapCModels      :: V.Vector CModelT
             , _cmNumBrushes      :: !Int
-            , _cmMapBrushes      :: !(V.Vector CBrushT)
+            , _cmMapBrushes      :: V.Vector CBrushT
             , _cmNumVisibility   :: !Int
-            , _cmMapVisibility   :: !BL.ByteString
-            , _cmMapVis          :: !DVisT
+            , _cmMapVisibility   :: BL.ByteString
+            , _cmMapVis          :: DVisT
             , _cmNumEntityChars  :: !Int
-            , _cmMapEntityString :: !B.ByteString
+            , _cmMapEntityString :: B.ByteString
             , _cmNumAreas        :: !Int
-            , _cmMapAreas        :: !(V.Vector CAreaT)
+            , _cmMapAreas        :: V.Vector CAreaT
             , _cmNumAreaPortals  :: !Int
-            , _cmMapAreaPortals  :: !(V.Vector DAreaPortalT)
+            , _cmMapAreaPortals  :: V.Vector DAreaPortalT
             , _cmNumClusters     :: !Int
             , _cmFloodValid      :: !Int
-            , _cmPortalOpen      :: !(UV.Vector Bool)
-            , _cmCModBase        :: !(Maybe BL.ByteString)
+            , _cmPortalOpen      :: UV.Vector Bool
+            , _cmCModBase        :: Maybe BL.ByteString
             , _cmChecksum        :: !Int
             , _cmLastChecksum    :: !Int
             , _cmDebugLoadMap    :: !Bool
             , _cmBoxHeadNode     :: !Int
             , _cmLeafCount       :: !Int
             , _cmLeafMaxCount    :: !Int
-            , _cmLeafMins        :: !(V3 Float)
-            , _cmLeafMaxs        :: !(V3 Float)
+            , _cmLeafMins        :: V3 Float
+            , _cmLeafMaxs        :: V3 Float
             , _cmLeafTopNode     :: !Int
-            , _cmTraceStart      :: !(V3 Float)
-            , _cmTraceEnd        :: !(V3 Float)
-            , _cmTraceMins       :: !(V3 Float)
-            , _cmTraceMaxs       :: !(V3 Float)
-            , _cmTraceExtents    :: !(V3 Float)
-            , _cmTraceTrace      :: !TraceT
+            , _cmTraceStart      :: V3 Float
+            , _cmTraceEnd        :: V3 Float
+            , _cmTraceMins       :: V3 Float
+            , _cmTraceMaxs       :: V3 Float
+            , _cmTraceExtents    :: V3 Float
+            , _cmTraceTrace      :: TraceT
             , _cmTraceContents   :: !Int
             , _cmTraceIsPoint    :: !Bool
-            , _cmLeafs           :: !(UV.Vector Int) -- tmp for CM.boxTrace
+            , _cmLeafs           :: UV.Vector Int -- tmp for CM.boxTrace
             }
 
 data MoveInfoT =
-  MoveInfoT { _miStartOrigin       :: !(V3 Float)
-            , _miStartAngles       :: !(V3 Float)
-            , _miEndOrigin         :: !(V3 Float)
-            , _miEndAngles         :: !(V3 Float)
+  MoveInfoT { _miStartOrigin       :: V3 Float
+            , _miStartAngles       :: V3 Float
+            , _miEndOrigin         :: V3 Float
+            , _miEndAngles         :: V3 Float
             , _miSoundStart        :: !Int
             , _miSoundMiddle       :: !Int
             , _miSoundEnd          :: !Int
@@ -1308,55 +1309,55 @@ data MoveInfoT =
             , _miDistance          :: !Float
             , _miWait              :: !Float
             , _miState             :: !Int
-            , _miDir               :: !(V3 Float)
+            , _miDir               :: V3 Float
             , _miCurrentSpeed      :: !Float
             , _miMoveSpeed         :: !Float
             , _miNextSpeed         :: !Float
             , _miRemainingDistance :: !Float
             , _miDecelDistance     :: !Float
-            , _miEndFunc           :: !(Maybe EntThink)
+            , _miEndFunc           :: Maybe EntThink
             }
 
 data CEntityT =
-  CEntityT { _ceBaseline    :: !EntityStateT
-           , _ceCurrent     :: !EntityStateT
-           , _cePrev        :: !EntityStateT
+  CEntityT { _ceBaseline    :: EntityStateT
+           , _ceCurrent     :: EntityStateT
+           , _cePrev        :: EntityStateT
            , _ceServerFrame :: !Int
            , _ceTrailCount  :: !Int
-           , _ceLerpOrigin  :: !(V3 Float)
+           , _ceLerpOrigin  :: V3 Float
            , _ceFlyStopTime :: !Int
            }
 
 data AreaNodeT =
   AreaNodeT { _anAxis          :: !Int
             , _anDist          :: !Float
-            , _anChildren      :: !(Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes
-            , _anTriggerEdicts :: !LinkReference
-            , _anSolidEdicts   :: !LinkReference
+            , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes
+            , _anTriggerEdicts :: LinkReference
+            , _anSolidEdicts   :: LinkReference
             }
 
 data LinkT =
   LinkT { _lIndex :: !Int
-        , _lPrev  :: !(Maybe LinkReference)
-        , _lNext  :: !(Maybe LinkReference)
-        , _lEdict :: !(Maybe EdictReference)
+        , _lPrev  :: Maybe LinkReference
+        , _lNext  :: Maybe LinkReference
+        , _lEdict :: Maybe EdictReference
         }
 
 data SpawnT =
-  SpawnT { _spName  :: !B.ByteString
-         , _spSpawn :: !EntThink
+  SpawnT { _spName  :: B.ByteString
+         , _spSpawn :: EntThink
          }
 
 data GameItemsGlobals =
-  GameItemsGlobals { _giJacketArmorInfo      :: !GItemArmorT
-                   , _giCombatArmorInfo      :: !GItemArmorT
-                   , _giBodyArmorInfo        :: !GItemArmorT
+  GameItemsGlobals { _giJacketArmorInfo      :: GItemArmorT
+                   , _giCombatArmorInfo      :: GItemArmorT
+                   , _giBodyArmorInfo        :: GItemArmorT
                    , _giQuakeDropTimeoutHack :: !Int
-                   , _giJacketArmorIndex     :: !GItemReference
-                   , _giCombatArmorIndex     :: !GItemReference
-                   , _giBodyArmorIndex       :: !GItemReference
-                   , _giPowerScreenIndex     :: !GItemReference
-                   , _giPowerShieldIndex     :: !GItemReference
+                   , _giJacketArmorIndex     :: GItemReference
+                   , _giCombatArmorIndex     :: GItemReference
+                   , _giBodyArmorIndex       :: GItemReference
+                   , _giPowerScreenIndex     :: GItemReference
+                   , _giPowerShieldIndex     :: GItemReference
                    }
 
 data MSoldierGlobals =
@@ -1387,38 +1388,38 @@ data MInfantryGlobals =
                    }
 
 data MFrameT =
-  MFrameT { _mfAI    :: !(Maybe AI)
+  MFrameT { _mfAI    :: Maybe AI
           , _mfDist  :: !Float
-          , _mfThink :: !(Maybe EntThink)
+          , _mfThink :: Maybe EntThink
           }
 
 data MMoveT =
-  MMoveT { _mmId         :: !B.ByteString -- to check for equality
+  MMoveT { _mmId         :: B.ByteString -- to check for equality
          , _mmFirstFrame :: !Int
          , _mmLastFrame  :: !Int
-         , _mmFrame      :: !(V.Vector MFrameT)
-         , _mmEndFunc    :: !(Maybe EntThink)
+         , _mmFrame      :: V.Vector MFrameT
+         , _mmEndFunc    :: Maybe EntThink
          }
 
 data PlayerTrailGlobals =
-  PlayerTrailGlobals { _ptTrail       :: !(V.Vector EdictReference)
+  PlayerTrailGlobals { _ptTrail       :: V.Vector EdictReference
                      , _ptTrailHead   :: !Int
                      , _ptTrailActive :: !Bool
                      }
 
 data PushedT =
-  PushedT { _pEnt      :: !(Maybe EdictReference)
-          , _pOrigin   :: !(V3 Float)
-          , _pAngles   :: !(V3 Float)
+  PushedT { _pEnt      :: Maybe EdictReference
+          , _pOrigin   :: V3 Float
+          , _pAngles   :: V3 Float
           , _pDeltaYaw :: !Float
           }
 
 data VIDGlobals =
   VIDGlobals { _vgVidModes           :: V.Vector VidModeT
-             , _vgRefLibActive       :: Bool
+             , _vgRefLibActive       :: !Bool
              , _vgFSModes            :: Maybe (V.Vector VidModeT)
              , _vgFSResolutions      :: V.Vector B.ByteString
-             , _vgModeX              :: Int
+             , _vgModeX              :: !Int
              , _vgRefs               :: V.Vector B.ByteString
              , _vgDrivers            :: V.Vector B.ByteString
              , _vgCurrentMenu        :: Maybe MenuFrameworkSReference
@@ -1480,14 +1481,14 @@ data RenderAPI =
             }
 
 data INGlobals =
-  INGlobals { _inMouseAvail          :: Bool
-            , _inMouseActive         :: Bool
-            , _inIgnoreFirst         :: Bool
-            , _inMouseButtonState    :: Int
-            , _inMouseOldButtonState :: Int
-            , _inOldMouseX           :: Int
-            , _inOldMouseY           :: Int
-            , _inMLooking            :: Bool
+  INGlobals { _inMouseAvail          :: !Bool
+            , _inMouseActive         :: !Bool
+            , _inIgnoreFirst         :: !Bool
+            , _inMouseButtonState    :: !Int
+            , _inMouseOldButtonState :: !Int
+            , _inOldMouseX           :: !Int
+            , _inOldMouseY           :: !Int
+            , _inMLooking            :: !Bool
             }
 
 data GLFWKBDEvent =
@@ -1502,84 +1503,84 @@ data GLFWKBDEvent =
 data GLFWbGlobals =
   GLFWbGlobals { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
                , _glfwbWindow         :: Maybe GLFW.Window
-               , _glfwbWindowXPos     :: Int
-               , _glfwbWindowYPos     :: Int
+               , _glfwbWindowXPos     :: !Int
+               , _glfwbWindowYPos     :: !Int
                , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
                }
 
 data KBDGlobals =
-  KBDGlobals { _kbdMx    :: Int
-             , _kbdMy    :: Int
-             , _kbdWinx  :: Int
-             , _kbdWiny  :: Int
+  KBDGlobals { _kbdMx    :: !Int
+             , _kbdMy    :: !Int
+             , _kbdWinx  :: !Int
+             , _kbdWiny  :: !Int
              }
 
 data BasicRenderAPIGlobals =
   BasicRenderAPIGlobals
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin           :: Float
-                       , _frGLDepthMax           :: Float
+  FastRenderAPIGlobals { _frGLDepthMin           :: !Float
+                       , _frGLDepthMax           :: !Float
                        , _frGLConfig             :: GLConfigT
                        , _frGLState              :: GLStateT
                        , _frd8to24table          :: UV.Vector Int
                        , _frVid                  :: VidDefT
-                       , _frColorTableEXT        :: Bool
-                       , _frActiveTextureARB     :: Bool
-                       , _frPointParameterEXT    :: Bool
-                       , _frLockArraysEXT        :: Bool
-                       , _frSwapIntervalEXT      :: Bool
-                       , _frTexture0             :: Int
-                       , _frTexture1             :: Int
-                       , _frGLTexSolidFormat     :: Int
-                       , _frGLTexAlphaFormat     :: Int
-                       , _frGLFilterMin          :: Int
-                       , _frGLFilterMax          :: Int
-                       , _frNumGLTextures        :: Int
+                       , _frColorTableEXT        :: !Bool
+                       , _frActiveTextureARB     :: !Bool
+                       , _frPointParameterEXT    :: !Bool
+                       , _frLockArraysEXT        :: !Bool
+                       , _frSwapIntervalEXT      :: !Bool
+                       , _frTexture0             :: !Int
+                       , _frTexture1             :: !Int
+                       , _frGLTexSolidFormat     :: !Int
+                       , _frGLTexAlphaFormat     :: !Int
+                       , _frGLFilterMin          :: !Int
+                       , _frGLFilterMax          :: !Int
+                       , _frNumGLTextures        :: !Int
                        , _frGLTextures           :: V.Vector ImageT
                        , _frLastModes            :: (Int, Int)
-                       , _frRegistrationSequence :: Int
+                       , _frRegistrationSequence :: !Int
                        , _frGammaTable           :: B.ByteString
                        , _frIntensityTable       :: B.ByteString
                        , _frModKnown             :: V.Vector ModelT
-                       , _frModNumKnown          :: Int
+                       , _frModNumKnown          :: !Int
                        , _frLoadModel            :: ModelReference
                        , _frCurrentModel         :: ModelReference
                        , _frModInline            :: V.Vector ModelT
                        , _frModNoVis             :: B.ByteString
                        , _frNoTexture            :: ImageReference
                        , _frParticleTexture      :: ImageReference
-                       , _frUploadWidth          :: Int
-                       , _frUploadHeight         :: Int
-                       , _frUploadedPaletted     :: Bool
+                       , _frUploadWidth          :: !Int
+                       , _frUploadHeight         :: !Int
+                       , _frUploadedPaletted     :: !Bool
                        , _frDrawChars            :: Maybe ImageReference
-                       , _frTrickFrame           :: Int
-                       , _frScrapDirty           :: Bool
-                       , _frViewCluster          :: Int
-                       , _frViewCluster2         :: Int
-                       , _frOldViewCluster       :: Int
-                       , _frOldViewCluster2      :: Int
+                       , _frTrickFrame           :: !Int
+                       , _frScrapDirty           :: !Bool
+                       , _frViewCluster          :: !Int
+                       , _frViewCluster2         :: !Int
+                       , _frOldViewCluster       :: !Int
+                       , _frOldViewCluster2      :: !Int
                        , _frWorldModel           :: Maybe ModelReference
                        , _frModelTextureCoordBuf :: MV.IOVector Float
                        , _frModelVertexIndexBuf  :: MV.IOVector Int32
-                       , _frModelTextureCoordIdx :: Int
-                       , _frModelVertexIndexIdx  :: Int
+                       , _frModelTextureCoordIdx :: !Int
+                       , _frModelVertexIndexIdx  :: !Int
                        , _frPolygonS1Old         :: UV.Vector Float
                        , _frPolygonBuffer        :: MV.IOVector Float
                        , _frPolygonCache         :: V.Vector GLPolyT
-                       , _frPolygonBufferIndex   :: Int
-                       , _frPolygonCount         :: Int
+                       , _frPolygonBufferIndex   :: !Int
+                       , _frPolygonCount         :: !Int
                        , _frGLLms                :: GLLightMapStateT
                        , _frNewRefDef            :: RefDefT
-                       , _frFrameCount           :: Int
+                       , _frFrameCount           :: !Int
                        , _frWarpFace             :: Maybe MSurfaceT
                        , _frModelVisibility      :: B.ByteString
                        , _frSkyName              :: B.ByteString
-                       , _frSkyRotate            :: Float
+                       , _frSkyRotate            :: !Float
                        , _frSkyAxis              :: V3 Float
                        , _frSkyImages            :: V.Vector (Maybe ImageReference)
-                       , _frSkyMin               :: Float
-                       , _frSkyMax               :: Float
+                       , _frSkyMin               :: !Float
+                       , _frSkyMax               :: !Float
                        }
 
 data ParticleTGlobals =
@@ -1587,26 +1588,26 @@ data ParticleTGlobals =
                    }
 
 data MenuFrameworkS =
-  MenuFrameworkS { _mfX          :: Int
-                 , _mfY          :: Int
-                 , _mfCursor     :: Int
-                 , _mfNItems     :: Int
-                 , _mfNSlots     :: Int
+  MenuFrameworkS { _mfX          :: !Int
+                 , _mfY          :: !Int
+                 , _mfCursor     :: !Int
+                 , _mfNItems     :: !Int
+                 , _mfNSlots     :: !Int
                  , _mfItems      :: V.Vector (Maybe MenuItemReference)
                  , _mfStatusBar  :: B.ByteString
                  , _mfCursorDraw :: Maybe (Quake ())
                  }
 
 data MenuCommonS =
-  MenuCommonS { _mcType          :: Int
+  MenuCommonS { _mcType          :: !Int
               , _mcName          :: B.ByteString
-              , _mcX             :: Int
-              , _mcY             :: Int
+              , _mcX             :: !Int
+              , _mcY             :: !Int
               , _mcParent        :: Maybe MenuFrameworkSReference
-              , _mcCursorOffset  :: Int
+              , _mcCursorOffset  :: !Int
               , _mcLocalData     :: V4 Int
-              , _mcFlags         :: Int
-              , _mcN             :: Int
+              , _mcFlags         :: !Int
+              , _mcN             :: !Int
               , _mcStatusBar     :: B.ByteString
               , _mcCallback      :: Maybe (Quake ())
               , _mcStatusBarFunc :: Maybe (Quake ())
@@ -1616,14 +1617,14 @@ data MenuCommonS =
 
 data MenuItem =
     MenuListS { _mlGeneric   :: MenuCommonS
-              , _mlCurValue  :: Int
+              , _mlCurValue  :: !Int
               , _mlItemNames :: Maybe (V.Vector B.ByteString)
               }
   | MenuSliderS { _msGeneric  :: MenuCommonS
-                , _msMinValue :: Float
-                , _msMaxValue :: Float
-                , _msCurValue :: Float
-                , _msRange    :: Float
+                , _msMinValue :: !Float
+                , _msMaxValue :: !Float
+                , _msCurValue :: !Float
+                , _msRange    :: !Float
                 }
   | MenuActionS { _maGeneric :: MenuCommonS
                 }
@@ -1633,7 +1634,7 @@ data MenuGlobals =
               , _mgMenuItems      :: V.Vector MenuItem
               , _mgLayers         :: V.Vector MenuLayerT
               , _mgDrawFunc       :: Maybe XCommandT
-              , _mgEnterSound     :: Bool
+              , _mgEnterSound     :: !Bool
               }
 
 data MenuLayerT =
@@ -1642,11 +1643,11 @@ data MenuLayerT =
              }
 
 data ClientGlobals =
-  ClientGlobals { _cgExtraTime          :: Int
-                , _cgNumCheatVars       :: Int
+  ClientGlobals { _cgExtraTime          :: !Int
+                , _cgNumCheatVars       :: !Int
                 , _cgBuf                :: SizeBufT
-                , _cgFrameMsec          :: Int64
-                , _cgOldSysFrameTime    :: Int64
+                , _cgFrameMsec          :: !Int64
+                , _cgOldSysFrameTime    :: !Int64
                 , _cgInKLook            :: KButtonT
                 , _cgInLeft             :: KButtonT
                 , _cgInRight            :: KButtonT
@@ -1662,61 +1663,61 @@ data ClientGlobals =
                 , _cgInAttack           :: KButtonT
                 , _cgInUp               :: KButtonT
                 , _cgInDown             :: KButtonT
-                , _cgInImpulse          :: Int
+                , _cgInImpulse          :: !Int
                 , _cgDLights            :: V.Vector CDLightT
                 , _cgLightStyle         :: V.Vector CLightStyleT
-                , _cgLastOfs            :: Int
-                , _cgCR                 :: Int -- from Console.hs
+                , _cgLastOfs            :: !Int
+                , _cgCR                 :: !Int -- from Console.hs
                 , _cgParticles          :: V.Vector CParticleT
                 , _cgActiveParticles    :: Maybe CParticleReference
                 , _cgFreeParticles      :: CParticleReference
-                , _cgPrecacheCheck      :: Int
-                , _cgPrecacheSpawnCount :: Int
-                , _cgPrecacheTex        :: Int
-                , _cgPrecacheModelSkin  :: Int
+                , _cgPrecacheCheck      :: !Int
+                , _cgPrecacheSpawnCount :: !Int
+                , _cgPrecacheTex        :: !Int
+                , _cgPrecacheModelSkin  :: !Int
                 , _cgPrecacheModel      :: Maybe B.ByteString
-                , _cgNumCLWeaponModels  :: Int
+                , _cgNumCLWeaponModels  :: !Int
                 , _cgWeaponModels       :: V.Vector B.ByteString
                 }
 
 data VRectT =
-  VRectT { _vrX      :: Int
-         , _vrY      :: Int
-         , _vrWidth  :: Int
-         , _vrHeight :: Int
+  VRectT { _vrX      :: !Int
+         , _vrY      :: !Int
+         , _vrWidth  :: !Int
+         , _vrHeight :: !Int
          }
 
 data VGlobals =
-  VGlobals { _vgRNumDLights   :: Int
-           , _vgRNumEntities  :: Int
-           , _vgRNumParticles :: Int
+  VGlobals { _vgRNumDLights   :: !Int
+           , _vgRNumEntities  :: !Int
+           , _vgRNumParticles :: !Int
            , _vgRLightStyles  :: V.Vector LightStyleT
            , _vgREntities     :: V.Vector EntityT
            , _vgRDLights      :: V.Vector DLightT
            }
 
 data CDLightT =
-  CDLightT { _cdlKey      :: Int
+  CDLightT { _cdlKey      :: !Int
            , _cdlColor    :: V3 Float
            , _cdlOrigin   :: V3 Float
-           , _cdlRadius   :: Float
-           , _cdlDie      :: Float
-           , _cdlMinLight :: Float
+           , _cdlRadius   :: !Float
+           , _cdlDie      :: !Float
+           , _cdlMinLight :: !Float
            }
 
 data CLightStyleT =
-  CLightStyleT { _clsLength :: Int
+  CLightStyleT { _clsLength :: !Int
                , _clsValue  :: V3 Float
                , _clsMap    :: UV.Vector Float
                }
 
 data CinematicsT =
-  CinematicsT { _cRestartSound :: Bool
-              , _cSRate        :: Int
-              , _cSWidth       :: Int
-              , _cSChannels    :: Int
-              , _cWidth        :: Int
-              , _cHeight       :: Int
+  CinematicsT { _cRestartSound :: !Bool
+              , _cSRate        :: !Int
+              , _cSWidth       :: !Int
+              , _cSChannels    :: !Int
+              , _cWidth        :: !Int
+              , _cHeight       :: !Int
               , _cPic          :: Maybe B.ByteString
               , _cPicPending   :: Maybe B.ByteString
               , _cHNodes1      :: Maybe (UV.Vector Int)
@@ -1731,73 +1732,73 @@ data NetChannelGlobals =
                     }
 
 data CParticleT =
-  CParticleT { _cpTime     :: Float
+  CParticleT { _cpTime     :: !Float
              , _cpOrg      :: V3 Float
              , _cpVel      :: V3 Float
              , _cpAccel    :: V3 Float
-             , _cpColor    :: Float
-             , _cpAlpha    :: Float
-             , _cpAlphaVel :: Float
+             , _cpColor    :: !Float
+             , _cpAlpha    :: !Float
+             , _cpAlphaVel :: !Float
              , _cpNext     :: Maybe CParticleReference
              }
 
 data GLLightMapStateT =
-  GLLightMapStateT { _lmsInternalFormat         :: Int
-                   , _lmsCurrentLightmapTexture :: Int
+  GLLightMapStateT { _lmsInternalFormat         :: !Int
+                   , _lmsCurrentLightmapTexture :: !Int
                    , _lmsLightmapSurfaces       :: V.Vector Int -- TODO: reference ?
                    , _lmsAllocated              :: UV.Vector Int
                    , _lmsLightmapBuffer         :: MV.IOVector Word8
                    }
 
 data MNodeT =
-  MNodeT { _mnContents     :: Int
-         , _mnVisFrame     :: Int
+  MNodeT { _mnContents     :: !Int
+         , _mnVisFrame     :: !Int
          , _mnMins         :: V3 Float
          , _mnMaxs         :: V3 Float
          , _mnParent       :: Maybe MNodeReference
          , _mnPlane        :: CPlaneT
          , _mnChildren     :: (MNodeChild, MNodeChild)
-         , _mnFirstSurface :: Int
-         , _mnNumSurfaces  :: Int
+         , _mnFirstSurface :: !Int
+         , _mnNumSurfaces  :: !Int
          }
 
 data BeamT =
-  BeamT { _bEntity     :: Int
-        , _bDestEntity :: Int
+  BeamT { _bEntity     :: !Int
+        , _bDestEntity :: !Int
         , _bModel      :: Maybe ModelReference
-        , _bEndTime    :: Int
+        , _bEndTime    :: !Int
         , _bOffset     :: V3 Float
         , _bStart      :: V3 Float
         , _bEnd        :: V3 Float
         }
 
 data CLSustainT =
-  CLSustainT { _clsId            :: Int
-             , _clsType          :: Int
-             , _clsEndTime       :: Int
-             , _clsNextThink     :: Int
-             , _clsThinkInterval :: Int
+  CLSustainT { _clsId            :: !Int
+             , _clsType          :: !Int
+             , _clsEndTime       :: !Int
+             , _clsNextThink     :: !Int
+             , _clsThinkInterval :: !Int
              , _clsOrg           :: V3 Float
              , _clsDir           :: V3 Float
-             , _clsColor         :: Int
-             , _clsCount         :: Int
-             , _clsMagnitude     :: Int
+             , _clsColor         :: !Int
+             , _clsCount         :: !Int
+             , _clsMagnitude     :: !Int
              , _clsThink         :: Maybe EntThink
              }
 
 data LaserT =
   LaserT { _lEnt     :: EntityT
-         , _lEndTime :: Int
+         , _lEndTime :: !Int
          }
 
 data ExplosionT =
-  ExplosionT { _eType       :: Int
+  ExplosionT { _eType       :: !Int
              , _eEnt        :: EntityT
-             , _eFrames     :: Int
+             , _eFrames     :: !Int
              , _eLight      :: Float
              , _eLightColor :: V3 Float
              , _eStart      :: Float
-             , _eBaseFrame  :: Int
+             , _eBaseFrame  :: !Int
              }
 
 data CLTEntGlobals =
