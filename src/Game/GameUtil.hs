@@ -111,15 +111,15 @@ range self other =
 
 {-
 - Use the targets.
-- 
+-
 - The global "activator" should be set to the entity that initiated the
 - firing.
-- 
+-
 - If self.delay is set, a DelayedUse entity will be created that will
 - actually do the SUB_UseTargets after that many seconds have passed.
-- 
+-
 - Centerprints any self.message to the activator.
-- 
+-
 - Search for (string)targetname in all entities that match
 - (string)self.target and call their .use function
 -}
@@ -132,7 +132,7 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
         sound = gameImport^.giSound
         soundIndex = gameImport^.giSoundIndex
         centerPrintf = gameImport^.giCenterPrintf
-    
+
     -- check for a delay
     if (edict^.eDelay) /= 0
       then do
@@ -208,7 +208,7 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
 
                 if foundEdictIdx == edictIdx
                   then dprintf "WARNING: Entity used iteself.\n"
-                  else 
+                  else
                     when (isJust $ foundEdict^.eEdictAction.eaUse) $
                       entUse (fromJust $ foundEdict^.eEdictAction.eaUse) fr (Just er) activatorReference
 
@@ -250,6 +250,119 @@ visible :: EdictReference -> EdictReference -> Quake Bool
 visible _ _ = do
     io (putStrLn "GameUtil.visible") >> undefined -- TODO
 
+{-
+- Finds a target.
+-
+- Self is currently not attacking anything, so try to find a target
+-
+- Returns TRUE if an enemy was sighted
+-
+- When a player fires a missile, the point of impact becomes a fakeplayer
+- so that monsters that see the impact will respond as if they had seen the
+- player.
+-
+- To avoid spending too much time, only a single client (or fakeclient) is
+- checked each frame. This means multi player games will have slightly
+- slower noticing monsters.
+-}
 findTarget :: EdictReference -> Quake Bool
-findTarget _ = do
-    io (putStrLn "GameUtil.findTarget") >> undefined -- TODO
+findTarget selfRef@(EdictReference selfIdx) = checkGoodGuy
+  where checkGoodGuy :: Quake Bool
+        checkGoodGuy = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0
+            then
+              -- we skip this chunk of code here cause we always returns False
+              {-
+                if (self.goalentity != null && self.goalentity.inuse
+                      && self.goalentity.classname != null) {
+                  if (self.goalentity.classname.equals("target_actor"))
+                      return false;
+                }
+              -}
+
+              -- FIXME: look for monsters?
+              return False
+            else
+              checkCombatPoint self
+
+        checkCombatPoint :: EdictT -> Quake Bool
+        checkCombatPoint self = do
+          -- if we're going to a combat point, just proceed
+          if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0
+            then return False
+            else checkHearNoise self
+
+        checkHearNoise :: EdictT -> Quake Bool
+        checkHearNoise self = do
+          -- if the first spawnflag bit is set, the monster will only wake up on
+          -- really seeing the player, not another monster getting angry or
+          -- hearing something
+          -- revised behavior so they will wake up if they "see" a player make a
+          -- noise but not weapon impact/explosion noises
+          level <- use $ gameBaseGlobals.gbLevel
+
+          if | (level^.llSightEntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 == 0 -> do
+                 let Just clientRef@(EdictReference clientIdx) = level^.llSightEntity
+                 Just client <- preuse $ gameBaseGlobals.gbGEdicts.ix clientIdx
+                 if (client^.eEdictOther.eoEnemy) == (self^.eEdictOther.eoEnemy)
+                   then return False
+                   else checkClientInUse clientRef False
+
+             | (level^.llSoundEntityFrameNum) >= ((level^.llFrameNum) - 1) ->
+                 checkClientInUse (fromJust $ level^.llSoundEntity) True
+
+             | isJust (self^.eEdictOther.eoEnemy) && (level^.llSound2EntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 /= 0 ->
+                 checkClientInUse (fromJust $ level^.llSound2Entity) True
+
+             | otherwise -> do
+                 case level^.llSightClient of
+                   Nothing -> return False -- no clients to get mad at
+                   Just clientRef -> checkClientInUse clientRef False
+
+        checkClientInUse :: EdictReference -> Bool -> Quake Bool
+        checkClientInUse clientRef@(EdictReference clientIdx) heardIt = do
+          -- if the entity went away, forget it
+          Just client <- preuse $ gameBaseGlobals.gbGEdicts.ix clientIdx
+          if not (client^.eInUse)
+            then return False
+            else checkClientFlags clientRef client heardIt
+
+        checkClientFlags :: EdictReference -> EdictT -> Bool -> Quake Bool
+        checkClientFlags clientRef client heardIt = do
+          if | isJust (client^.eClient) ->
+                 if (client^.eFlags) .&. Constants.flNoTarget /= 0
+                   then return False
+                   else actBasedOnHeardIt clientRef heardIt
+
+             | (client^.eSvFlags) .&. Constants.svfMonster /= 0 ->
+                 case client^.eEdictOther.eoEnemy of
+                   Nothing -> return False
+                   Just (EdictReference enemyIdx) -> do
+                     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                     if (enemy^.eFlags) .&. Constants.flNoTarget /= 0
+                       then return False
+                       else actBasedOnHeardIt clientRef heardIt
+
+             | heardIt -> do
+                 let Just (EdictReference ownerIdx) = client^.eOwner
+                 Just owner <- preuse $ gameBaseGlobals.gbGEdicts.ix ownerIdx
+
+                 if (owner^.eFlags) .&. Constants.flNoTarget /= 0
+                   then return False
+                   else actBasedOnHeardIt clientRef heardIt
+
+             | otherwise -> return False
+
+        actBasedOnHeardIt :: EdictReference -> Bool -> Quake Bool
+        actBasedOnHeardIt clientRef@(EdictReference clientIdx) heardIt = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          Just client <- preuse $ gameBaseGlobals.gbGEdicts.ix clientIdx
+
+          if not heardIt
+            then do
+              let r = range self client
+              undefined -- TODO
+            else do
+              undefined -- TODO
