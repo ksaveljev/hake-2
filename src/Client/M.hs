@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Client.M where
 
 import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
@@ -12,6 +14,7 @@ import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameCombat as GameCombat
 import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
 
@@ -322,8 +325,115 @@ moveFrame selfRef@(EdictReference selfIdx) = do
         void $ think (fromJust $ frame^.mfThink) selfRef
 
 worldEffects :: EdictReference -> Quake ()
-worldEffects _ = do
-    io (putStrLn "M.worldEffects") >> undefined -- TODO
+worldEffects edictRef@(EdictReference edictIdx) = do
+    checkWaterDamage
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if edict^.eWaterLevel == 0
+      then do
+        when ((edict^.eFlags) .&. Constants.flInWater /= 0) $ do
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+          let sound = gameImport^.giSound
+              soundIndex = gameImport^.giSoundIndex
+          idx <- soundIndex (Just "player/watr_out.wav")
+          sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flInWater))
+      else do
+        checkLava
+        checkSlime
+        checkInWater
+
+  where checkWaterDamage :: Quake ()
+        checkWaterDamage = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eEdictStatus.eHealth) > 0) $ do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            -- TODO: refactor, too much same stuff here
+            if (edict^.eFlags) .&. Constants.flSwim == 0
+              then if | (edict^.eWaterLevel) < 3 ->
+                          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAirFinished .= levelTime + 12
+
+                      | (edict^.eEdictPhysics.eAirFinished) < levelTime -> do
+                          -- drown!
+                          when ((edict^.eEdictTiming.etPainDebounceTime) < levelTime) $ do
+                            let dmg :: Int = 2 + 2 * floor (levelTime - (edict^.eEdictPhysics.eAirFinished))
+                                dmg' = if dmg > 15 then 15 else dmg
+
+                            v3o <- use $ globals.vec3Origin
+                            GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+                            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime + 1
+
+                      | otherwise -> return ()
+
+              else if | (edict^.eWaterLevel) > 0 ->
+                          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAirFinished .= levelTime + 9
+
+                      | (edict^.eEdictPhysics.eAirFinished) < levelTime -> do
+                          -- suffocate!
+                          when ((edict^.eEdictTiming.etPainDebounceTime) < levelTime) $ do
+                            let dmg :: Int = 2 + 2 * floor (levelTime - (edict^.eEdictPhysics.eAirFinished))
+                                dmg' = if dmg > 15 then 15 else dmg
+
+                            v3o <- use $ globals.vec3Origin
+                            GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+                            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime + 1
+
+                      | otherwise -> return ()
+
+        checkLava :: Quake ()
+        checkLava = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eWaterType) .&. Constants.contentsLava /= 0 && (edict^.eFlags) .&. Constants.flImmuneLava == 0) $ do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            when ((edict^.eEdictTiming.etDamageDebounceTime) < levelTime) $ do
+              v3o <- use $ globals.vec3Origin
+              GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o (10 * (edict^.eWaterLevel)) 0 0 Constants.modLava
+
+        checkSlime :: Quake ()
+        checkSlime = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eWaterType) .&. Constants.contentsSlime /= 0 && (edict^.eFlags) .&. Constants.flImmuneSlime == 0) $ do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            when ((edict^.eEdictTiming.etDamageDebounceTime) < levelTime) $ do
+              v3o <- use $ globals.vec3Origin
+              GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o (4 * (edict^.eWaterLevel)) 0 0 Constants.modSlime
+
+        checkInWater :: Quake ()
+        checkInWater = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eFlags) .&. Constants.flInWater == 0) $ do
+            when ((edict^.eSvFlags) .&. Constants.svfDeadMonster == 0) $ do
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+              let sound = gameImport^.giSound
+                  soundIndex = gameImport^.giSoundIndex
+
+              if | (edict^.eWaterType) .&. Constants.contentsLava /= 0 -> do
+                     r <- Lib.randomF
+                     idx <- if r <= 0.5
+                              then soundIndex (Just "player/lava1.wav")
+                              else soundIndex (Just "player/lava2.wav")
+                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+
+                 | (edict^.eWaterType) .&. Constants.contentsSlime /= 0 -> do
+                     idx <- soundIndex (Just "player/watr_in.wav")
+                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+
+                 | (edict^.eWaterType) .&. Constants.contentsWater /= 0 -> do
+                     idx <- soundIndex (Just "player/watr_in.wav")
+                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+
+                 | otherwise -> return ()
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flInWater)
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etDamageDebounceTime .= 0
 
 setEffects :: EdictReference -> Quake ()
 setEffects _ = do
