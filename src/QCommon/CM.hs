@@ -1428,6 +1428,37 @@ transformedPointContents p headNode origin angles = do
     Just contents <- preuse $ cmGlobals.cmMapLeafs.ix idx.clContents
     return contents
 
+{-
+- CM_TransformedBoxTrace handles offseting and rotation of the end points
+- for moving and rotating entities.
+-}
 transformedBoxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> V3 Float -> V3 Float -> Quake TraceT
-transformedBoxTrace _ _ _ _ _ _ _ _ = do
-    io (putStrLn "CM.transformedBoxTrace") >> undefined -- TODO
+transformedBoxTrace start end mins maxs headNode brushMask origin angles = do
+    -- subtract origin offset
+    let startL = start - origin
+        endL = end - origin
+
+    -- rotate start and end into the models frame of reference
+    boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
+    let rotated = if headNode /= boxHeadNode && ((angles^._x) /= 0 || (angles^._y) /= 0 || (angles^._z) /= 0)
+                    then True
+                    else False
+
+        (startL', endL') = if rotated
+                             then let (Just forward, Just right, Just up) = Math3D.angleVectors angles True True True
+                                      s = V3 (startL `dot` forward) (- (startL `dot` right)) (startL `dot` up)
+                                      e = V3 (endL `dot` forward) (- (endL `dot` right)) (endL `dot` up)
+                                  in (s, e)
+                             else (startL, endL)
+
+    -- sweep the box through the model
+    traceT <- boxTrace startL' endL' mins maxs headNode brushMask
+
+    let traceT' = if rotated && (traceT^.tFraction) /= 1
+                    then let (Just forward, Just right, Just up) = Math3D.angleVectors angles True True True
+                             temp = traceT^.tPlane.cpNormal
+                         in traceT { _tPlane = (traceT^.tPlane) { _cpNormal = V3 (temp `dot` forward) (- (temp `dot` right)) (temp `dot` up) } }
+                    else traceT
+        endPos = start + fmap (* (traceT^.tFraction)) (end - start)
+
+    return $ traceT' { _tEndPos = endPos }
