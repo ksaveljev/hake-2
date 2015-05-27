@@ -64,8 +64,9 @@ writeString sizeBufLens s = do
     SZ.write sizeBufLens s (B.length s)
     writeByteI sizeBufLens 0
 
-writeCoord :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
-writeCoord _ _ = io (putStrLn "MSG.writeCoord") >> undefined -- TODO
+writeCoord :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeCoord sizeBufLens f =
+    writeShort sizeBufLens (truncate $ f * 8)
 
 writePos :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
 writePos sizeBufLens pos = do
