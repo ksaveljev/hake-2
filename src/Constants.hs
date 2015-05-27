@@ -1073,22 +1073,22 @@ uNumber16  = 1 `shiftL`  8 :: Int -- NUMBER8 is implicit if not set
 uOrigin3   = 1 `shiftL`  9 :: Int
 uAngle1    = 1 `shiftL` 10 :: Int
 uModel     = 1 `shiftL` 11 :: Int
-uRenderfx8 = 1 `shiftL` 12 :: Int -- fullbright, etc 
+uRenderFx8 = 1 `shiftL` 12 :: Int -- fullbright, etc 
 uEffects8  = 1 `shiftL` 14 :: Int -- autorotate, trails, etc 
-uMorebits2 = 1 `shiftL` 15 :: Int -- read one additional byte 
+uMoreBits2 = 1 `shiftL` 15 :: Int -- read one additional byte 
 
 -- third byte
 uSkin8      = 1 `shiftL` 16 :: Int
 uFrame16    = 1 `shiftL` 17 :: Int -- frame is a short 
-uRenderfx16 = 1 `shiftL` 18 :: Int -- 8 + 16 = 32 
+uRenderFx16 = 1 `shiftL` 18 :: Int -- 8 + 16 = 32 
 uEffects16  = 1 `shiftL` 19 :: Int -- 8 + 16 = 32 
 uModel2     = 1 `shiftL` 20 :: Int -- weapons, flags, etc 
 uModel3     = 1 `shiftL` 21 :: Int
 uModel4     = 1 `shiftL` 22 :: Int
-uMorebits3  = 1 `shiftL` 23 :: Int -- read one additional byte 
+uMoreBits3  = 1 `shiftL` 23 :: Int -- read one additional byte 
 
 -- fourth byte
-uOldorigin = 1 `shiftL` 24 :: Int -- FIXME: get rid of this 
+uOldOrigin = 1 `shiftL` 24 :: Int -- FIXME: get rid of this 
 uSkin16    = 1 `shiftL` 25 :: Int
 uSound     = 1 `shiftL` 26 :: Int
 uSolid     = 1 `shiftL` 27 :: Int

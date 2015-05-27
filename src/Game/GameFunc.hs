@@ -1053,5 +1053,31 @@ doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
 
 doorHitTop :: EntThink
 doorHitTop =
-  GenericEntThink "door_hit_top" $ \_ -> do
-    io (putStrLn "GameFunc.doorHitTop") >> undefined -- TODO
+  GenericEntThink "door_hit_top" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+      when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= 0
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateTop
+
+    if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
+      then
+        return True
+      else do
+        when ((self^.eMoveInfo.miWait) >= 0) $ do
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
+            eaThink .= Just doorGoDown
+            eaNextThink .= levelTime + (self^.eMoveInfo.miWait)
+
+        return True
+
+doorGoDown :: EntThink
+doorGoDown =
+  GenericEntThink "door_go_down" $ \_ -> do
+    io (putStrLn "GameFunc.doorGoDown") >> undefined -- TODO
