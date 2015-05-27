@@ -95,8 +95,9 @@ writeDir sizeBufLens dir = do
                    then calcBest d idx (idx + 1) maxIdx
                    else calcBest bestd best (idx + 1) maxIdx
 
-writeAngle :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
-writeAngle _ _ = io (putStrLn "MSG.writeAngle") >> undefined -- TODO
+writeAngle :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeAngle sizeBufLens f =
+    writeByteI sizeBufLens ((truncate $ f * 256 / 360) .&. 255)
 
 writeAngle16 :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle16 _ _ = io (putStrLn "MSG.writeAngle16") >> undefined -- TODO
