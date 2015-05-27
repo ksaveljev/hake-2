@@ -3,7 +3,7 @@
 module Game.GameAI where
 
 import Control.Lens (use, (^.), ix, preuse, (.=), (%=))
-import Control.Monad (void, when)
+import Control.Monad (void, when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
 import qualified Data.ByteString as B
@@ -105,10 +105,28 @@ aiMove =
   GenericAI "ai_move" $ \_ _ -> do
     io (putStrLn "GameAI.aiMove") >> undefined -- TODO
 
+-- The monster is walking it's beat.
 aiWalk :: AI
 aiWalk =
-  GenericAI "ai_walk" $ \_ _ -> do
-    io (putStrLn "GameAI.aiWalk") >> undefined -- TODO
+  GenericAI "ai_walk" $ \selfRef@(EdictReference selfIdx) dist -> do
+    M.moveToGoal selfRef dist
+
+    -- check for noticing a player
+    found <- GameUtil.findTarget selfRef
+
+    unless found $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      when (isJust (self^.eMonsterInfo.miSearch) && levelTime > (self^.eMonsterInfo.miIdleTime)) $ do
+        r <- Lib.randomF
+
+        if (self^.eMonsterInfo.miIdleTime) /= 0
+          then do
+            void $ think (fromJust $ self^.eMonsterInfo.miSearch) selfRef
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + 15 + r * 15
+          else
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + r * 15
 
 aiRun :: AI
 aiRun =

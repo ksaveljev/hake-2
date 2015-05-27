@@ -465,3 +465,7 @@ setEffects (EdictReference edictIdx) = do
 changeYaw :: EdictReference -> Quake ()
 changeYaw _ = do
     io (putStrLn "M.changeYaw") >> undefined -- TODO
+
+moveToGoal :: EdictReference -> Float -> Quake ()
+moveToGoal _ _ = do
+    io (putStrLn "M.moveToGoal") >> undefined -- TODO
