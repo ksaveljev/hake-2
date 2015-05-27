@@ -95,7 +95,7 @@ parseServerMessage = do
 
                      | cmd == Constants.svcSound -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcSound") >> undefined -- TODO
 
-                     | cmd == Constants.svcSpawnBaseline -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcSpawnBaseline") >> undefined -- TODO
+                     | cmd == Constants.svcSpawnBaseline -> parseBaseline
 
                      | cmd == Constants.svcTempEntity -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcTempEntity") >> undefined -- TODO
 
@@ -425,3 +425,7 @@ registerSounds :: Quake ()
 registerSounds = do
     io (putStrLn "IMPLEMENT ME!!! CLParse.registerSounds") >> return ()
     --io (putStrLn "CLParse.registerSounds") >> undefined -- TODO
+
+parseBaseline :: Quake ()
+parseBaseline = do
+    io (putStrLn "CLParse.parseBaseline") >> undefined -- TODO
