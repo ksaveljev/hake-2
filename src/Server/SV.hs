@@ -1170,3 +1170,15 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
                   return (Just False, traceT, newOrg)
             else
               return (Nothing, traceT, newOrg)
+
+stepDirection :: EdictReference -> Float -> Float -> Quake Bool
+stepDirection _ _ _ = do
+    io (putStrLn "SV.stepDirection") >> undefined -- TODO
+
+closeEnough :: EdictReference -> EdictReference -> Float -> Quake Bool
+closeEnough _ _ _ = do
+    io (putStrLn "SV.closeEnough") >> undefined -- TODO
+
+newChaseDir :: EdictReference -> Maybe EdictReference -> Float -> Quake ()
+newChaseDir _ _ _ = do
+    io (putStrLn "SV.newChaseDir") >> undefined -- TODO

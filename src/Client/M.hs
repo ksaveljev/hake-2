@@ -467,5 +467,26 @@ changeYaw _ = do
     io (putStrLn "M.changeYaw") >> undefined -- TODO
 
 moveToGoal :: EdictReference -> Float -> Quake ()
-moveToGoal _ _ = do
-    io (putStrLn "M.moveToGoal") >> undefined -- TODO
+moveToGoal edictRef@(EdictReference edictIdx) dist = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let skip = isNothing (edict^.eEdictOther.eoGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
+    -- if the next step hits the enemy, return immediately
+    skip' <- if isJust (edict^.eEdictOther.eoEnemy)
+               then SV.closeEnough edictRef (fromJust $ edict^.eEdictOther.eoEnemy) dist
+               else return False
+
+    when (skip || skip') $ do
+      Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      -- bump around
+      r <- Lib.rand
+      if r .&. 3 == 1
+        then do
+          when (edict'^.eInUse) $
+            SV.newChaseDir edictRef (edict'^.eGoalEntity) dist
+        else do
+          v <- SV.stepDirection edictRef (edict'^.eEdictPhysics.eIdealYaw) dist
+          when v $ do
+            Just edict'' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            when (edict''^.eInUse) $
+              SV.newChaseDir edictRef (edict''^.eGoalEntity) dist
