@@ -436,8 +436,31 @@ worldEffects edictRef@(EdictReference edictIdx) = do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etDamageDebounceTime .= 0
 
 setEffects :: EdictReference -> Quake ()
-setEffects _ = do
-    io (putStrLn "M.setEffects") >> undefined -- TODO
+setEffects (EdictReference edictIdx) = do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+      esEffects %= (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
+      esRenderFx %= (.&. (complement (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue)))
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eMonsterInfo.miAIFlags) .&. Constants.aiResurrecting /= 0) $ do
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+        esEffects %= (.|. Constants.efColorShell)
+        esRenderFx %= (.|. Constants.rfShellRed)
+
+    unless ((edict^.eEdictStatus.eHealth) <= 0) $ do
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      when ((edict^.eEdictStatus.ePowerArmorTime) > levelTime) $
+        if | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorScreen ->
+               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPowerScreen)
+
+           | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorShield ->
+               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+                 esEffects %= (.|. Constants.efColorShell)
+                 esRenderFx %= (.|. Constants.rfShellGreen)
+
+           | otherwise -> return ()
 
 changeYaw :: EdictReference -> Quake ()
 changeYaw _ = do
