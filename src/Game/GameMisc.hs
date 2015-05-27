@@ -4,7 +4,7 @@ module Game.GameMisc where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~))
 import Control.Monad (liftM, when, void, unless)
-import Data.Bits ((.|.), (.&.))
+import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _z)
 import qualified Data.ByteString as B
@@ -636,10 +636,22 @@ pointCombatTouch =
   GenericEntTouch "point_combat_touch" $ \_ _ _ _ -> do
     io (putStrLn "GameMisc.pointCombatTouch") >> undefined -- TODO
 
+{-
+- QUAKED misc_strogg_ship (1 .5 0) (-16 -16 0) (16 16 32) This is a Storgg
+- ship for the flybys. It is trigger_spawned, so you must have something
+- use it for it to show up. There must be a path for it to follow once it
+- is activated.
+- 
+- "speed" How fast it should fly
+-}
 miscStroggShipUse :: EntUse
 miscStroggShipUse =
-  GenericEntUse "misc_strogg_ship_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.miscStroggShipUse") >> undefined -- TODO
+  GenericEntUse "misc_strogg_ship_use" $ \selfRef@(EdictReference selfIdx) otherRef activatorRef -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eEdictAction.eaUse .= Just GameFunc.trainUse
+
+    entUse GameFunc.trainUse selfRef otherRef activatorRef
 
 funcWallUse :: EntUse
 funcWallUse =
