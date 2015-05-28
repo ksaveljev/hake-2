@@ -20,6 +20,7 @@ import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameFunc as GameFunc
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 {-
 - QUAKED light (0 1 0) (-8 -8 -8) (8 8 8) START_OFF Non-displayed light.
@@ -87,16 +88,18 @@ pathCornerTouch =
           gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miPauseTime .= time + wait
           void $ think (fromJust stand) otherRef
         else do
-          Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMoveTarget
+          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
 
-          if isNothing moveTarget
+          if isNothing (other^.eMoveTarget)
             then do
               time <- use $ gameBaseGlobals.gbLevel.llTime
-              Just stand <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miStand
               gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo.miPauseTime .= time + 100000000
-              void $ think (fromJust stand) otherRef
+              void $ think (fromJust $ other^.eMonsterInfo.miStand) otherRef
             else do
-              io (putStrLn "GameMisc.pathCornerTouch") >> undefined -- TODO
+              let Just (EdictReference goalIdx) = other^.eGoalEntity
+              Just goal <- preuse $ gameBaseGlobals.gbGEdicts.ix goalIdx
+              let v = (goal^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)
+              gameBaseGlobals.gbGEdicts.ix otherIdx.eEdictPhysics.eIdealYaw .= Math3D.vectorYaw v
 
   where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
         shouldReturn selfRef (EdictReference otherIdx) = do
