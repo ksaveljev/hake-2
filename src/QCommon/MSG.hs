@@ -7,9 +7,9 @@ module QCommon.MSG where
 import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
-import Data.Int (Int8, Int32)
+import Data.Int (Int8, Int16, Int32)
 import Data.Monoid (mempty, mappend)
-import Data.Word (Word8)
+import Data.Word (Word8, Word32)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -41,16 +41,23 @@ writeByteF sizeBufLens c = do
 
 writeShort :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeShort sizeBufLens c = do
-    let a :: Word8 = fromIntegral (c .&. 0xFF)
-        b :: Word8 = fromIntegral ((c `shiftR` 8) .&. 0xFF)
+    let c' :: Word32 = fromIntegral c
+        a :: Word8 = fromIntegral (c' .&. 0xFF)
+        b :: Word8 = fromIntegral ((c' `shiftR` 8) .&. 0xFF)
+        a' :: Int8 = fromIntegral a
+        b' :: Int8 = fromIntegral b
+    io (print "WRITE SHORT")
+    io (print a')
+    io (print b')
     SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeInt sizeBufLens v = do
-    let a :: Word8 = fromIntegral (v .&. 0xFF)
-        b :: Word8 = fromIntegral ((v `shiftR` 8) .&. 0xFF)
-        c :: Word8 = fromIntegral ((v `shiftR` 16) .&. 0xFF)
-        d :: Word8 = fromIntegral ((v `shiftR` 24) .&. 0xFF)
+    let v' :: Word32 = fromIntegral v
+        a :: Word8 = fromIntegral (v' .&. 0xFF)
+        b :: Word8 = fromIntegral ((v' `shiftR` 8) .&. 0xFF)
+        c :: Word8 = fromIntegral ((v' `shiftR` 16) .&. 0xFF)
+        d :: Word8 = fromIntegral ((v' `shiftR` 24) .&. 0xFF)
     SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
 
 writeLong :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
@@ -334,11 +341,15 @@ readShort sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int = fromIntegral $ B.index buf readCount
-            b :: Int = fromIntegral $ B.index buf (readCount + 1)
-            result = a .|. (b `shiftL` 8)
+            a :: Int8 = fromIntegral $ B.index buf readCount
+            b :: Int8 = fromIntegral $ B.index buf (readCount + 1)
+            b' :: Int16 = fromIntegral b `shiftL` 8
+            result = fromIntegral a .|. (b' `shiftL` 8)
+
+        io (print "READ SHORT")
+        io (print result)
         sizeBufLens.sbReadCount += 2
-        return result 
+        return (fromIntegral result)
 
 readChar :: Lens' QuakeState SizeBufT -> Quake Int8
 readChar sizeBufLens = do
@@ -417,3 +428,16 @@ readDeltaUserCmd sizeBufLens from = do
                 , _ucMsec        = fromIntegral msec
                 , _ucLightLevel  = fromIntegral lightLevel
                 }
+
+readCoord :: Lens' QuakeState SizeBufT -> Quake Float
+readCoord sizeBufLens = liftM ((* (1.0 / 8.0)) . fromIntegral) (readShort sizeBufLens)
+
+readAngle :: Lens' QuakeState SizeBufT -> Quake Float
+readAngle sizeBufLens = liftM ((* (360.0 / 256)) . fromIntegral) (readChar sizeBufLens)
+
+readPos :: Lens' QuakeState SizeBufT -> Quake (V3 Float)
+readPos sizeBufLens = do
+    a <- readCoord sizeBufLens
+    b <- readCoord sizeBufLens
+    c <- readCoord sizeBufLens
+    return (V3 a b c)

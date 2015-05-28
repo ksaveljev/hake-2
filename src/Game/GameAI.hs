@@ -109,6 +109,8 @@ aiMove =
 aiWalk :: AI
 aiWalk =
   GenericAI "ai_walk" $ \selfRef@(EdictReference selfIdx) dist -> do
+    io (print "GameAI.aiWalk!")
+    io (print $ "dist = " ++ show dist)
     M.moveToGoal selfRef dist
 
     -- check for noticing a player
