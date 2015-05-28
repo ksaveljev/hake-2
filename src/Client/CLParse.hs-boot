@@ -19,3 +19,5 @@ registerSounds :: Quake ()
 parseClientInfo :: Int -> Quake ()
 
 loadClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> Quake ()
+
+parseBaseline :: Quake ()
