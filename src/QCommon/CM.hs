@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2)
@@ -1231,6 +1232,37 @@ headnodeForBox mins maxs = do
     boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
 
     mapPlanes <- use $ cmGlobals.cmMapPlanes
+    -- this version is much better from the point of view of memory
+    -- consumption than two versions below
+    let !a = mapPlanes V.! (boxHeadNode +  0)
+        !b = mapPlanes V.! (boxHeadNode +  1)
+        !c = mapPlanes V.! (boxHeadNode +  2)
+        !d = mapPlanes V.! (boxHeadNode +  3)
+        !e = mapPlanes V.! (boxHeadNode +  4)
+        !f = mapPlanes V.! (boxHeadNode +  5)
+        !g = mapPlanes V.! (boxHeadNode +  6)
+        !h = mapPlanes V.! (boxHeadNode +  7)
+        !i = mapPlanes V.! (boxHeadNode +  8)
+        !j = mapPlanes V.! (boxHeadNode +  9)
+        !k = mapPlanes V.! (boxHeadNode + 10)
+        !l = mapPlanes V.! (boxHeadNode + 11)
+
+    cmGlobals.cmMapPlanes %= (V.// [ (boxHeadNode +  0, a { _cpDist = maxs^._x })
+                                   , (boxHeadNode +  1, b { _cpDist = - (maxs^._x) })
+                                   , (boxHeadNode +  2, c { _cpDist = mins^._x })
+                                   , (boxHeadNode +  3, d { _cpDist = - (mins^._x) })
+                                   , (boxHeadNode +  4, e { _cpDist = maxs^._y })
+                                   , (boxHeadNode +  5, f { _cpDist = - (maxs^._y) })
+                                   , (boxHeadNode +  6, g { _cpDist = mins^._y })
+                                   , (boxHeadNode +  7, h { _cpDist = - (mins^._y) })
+                                   , (boxHeadNode +  8, i { _cpDist = maxs^._z })
+                                   , (boxHeadNode +  9, j { _cpDist = - (maxs^._z) })
+                                   , (boxHeadNode + 10, k { _cpDist = mins^._z })
+                                   , (boxHeadNode + 11, l { _cpDist = - (mins^._z) })
+                                   ])
+    {-
+    - this version builds a lot of thunks which reside in memory
+    -
     let newDistances = V.fromList [ maxs^._x
                                   , - (maxs^._x)
                                   , mins^._x
@@ -1247,7 +1279,11 @@ headnodeForBox mins maxs = do
         updates = map (updateDist mapPlanes newDistances boxHeadNode) [0..11]
 
     cmGlobals.cmMapPlanes %= (V.// updates)
-{-
+    -}
+
+{- 
+-   this version is simply crazy from the allocation rate point of view
+-
     zoom (cmGlobals.cmMapPlanes) $ do
       ix (boxHeadNode +  0).cpDist .= (maxs^._x)
       ix (boxHeadNode +  1).cpDist .= (- (maxs^._x))
@@ -1265,8 +1301,10 @@ headnodeForBox mins maxs = do
 
     return boxHeadNode
 
+{-
   where updateDist :: V.Vector CPlaneT -> V.Vector Float -> Int -> Int -> (Int, CPlaneT)
         updateDist planes distances boxHeadNode idx = (boxHeadNode + idx, (planes V.! (boxHeadNode + idx)) { _cpDist = distances V.! idx })
+        -}
 
 -- Searches the leaf number that contains the 3d point
 pointLeafNum :: V3 Float -> Quake Int
