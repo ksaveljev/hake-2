@@ -1079,5 +1079,29 @@ doorHitTop =
 
 doorGoDown :: EntThink
 doorGoDown =
-  GenericEntThink "door_go_down" $ \_ -> do
-    io (putStrLn "GameFunc.doorGoDown") >> undefined -- TODO
+  GenericEntThink "door_go_down" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+      when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= self^.eMoveInfo.miSoundMiddle
+
+    when ((self^.eEdictStatus.eMaxHealth) /= 0) $ do
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus) $ do
+        eTakeDamage .= Constants.damageYes
+        eHealth .= self^.eEdictStatus.eMaxHealth
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateDown
+
+    if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miStartOrigin) doorHitBottom
+       | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitBottom
+       | otherwise -> return ()
+
+    return True
+
+doorHitBottom :: EntThink
+doorHitBottom =
+  GenericEntThink "door_hit_bottom" $ \_ -> do
+    io (putStrLn "GameFunc.doorHitBottom") >> undefined -- TODO
