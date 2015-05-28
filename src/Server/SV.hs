@@ -9,6 +9,7 @@ import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..), _x, _y, _z, dot, cross)
 import qualified Data.Vector as V
+import qualified Data.ByteString as B
 
 import Quake
 import QuakeState
@@ -19,6 +20,8 @@ import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
 import qualified Util.Math3D as Math3D
+
+import Game.Adapters
 
 maxClipPlanes :: Int
 maxClipPlanes = 5
@@ -117,6 +120,9 @@ physicsNoClip _ = io (putStrLn "SV.physicsNoClip") >> undefined -- TODO
 -}
 physicsStep :: EdictReference -> Quake ()
 physicsStep edictRef@(EdictReference edictIdx) = do
+    io (print "PHYSICS STEP")
+    io (print edictIdx)
+
     -- airborn monsters should always check for ground
     wasOnGround <- checkGroundEntity
 
@@ -137,6 +143,8 @@ physicsStep edictRef@(EdictReference edictIdx) = do
 
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     let V3 a b c = edict^.eEdictPhysics.eVelocity
+
+    io (print $ "VELOCITY = " ++ show a ++ " " ++ show b ++ " " ++ show c)
 
     if a /= 0 || b /= 0 || c /= 0
       then do
@@ -668,6 +676,8 @@ runThink er@(EdictReference edictIdx) = do
         when (isNothing (edict^.eEdictAction.eaThink)) $
           Com.comError Constants.errFatal "NULL ent.think"
 
+        let GenericEntThink sdf _ = fromJust $ edict^.eEdictAction.eaThink
+        io (print $ "THINK FUNCTION = " `B.append` sdf)
         void $ think (fromJust $ edict^.eEdictAction.eaThink) er
 
         return False
@@ -1171,9 +1181,37 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
             else
               return (Nothing, traceT, newOrg)
 
+{-
+- Turns to the movement direction, and walks the current distance if facing
+- it.
+-}
 stepDirection :: EdictReference -> Float -> Float -> Quake Bool
-stepDirection _ _ _ = do
-    io (putStrLn "SV.stepDirection") >> undefined -- TODO
+stepDirection edictRef@(EdictReference edictIdx) yaw dist = do
+    io (print "SV.stepDirection")
+    io (print $ "yaw = " ++ show yaw ++ " dist = " ++ show dist)
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eIdealYaw .= yaw
+    M.changeYaw edictRef
+
+    let yaw' = yaw * pi  * 2 / 360
+        move = V3 ((cos yaw') * dist) ((sin yaw') * dist) 0
+
+    Just oldOrigin <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
+    moveDone <- moveStep edictRef move False
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+
+    if moveDone
+      then do
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        let delta = (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) - (edict^.eEdictPhysics.eIdealYaw)
+        when (delta > 45 && delta < 315) $ -- not turned far enough, so don't take the step
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= oldOrigin
+        linkEntity edictRef
+        GameBase.touchTriggers edictRef
+        return True
+      else do
+        linkEntity edictRef
+        GameBase.touchTriggers edictRef
+        return False
 
 closeEnough :: EdictReference -> EdictReference -> Float -> Quake Bool
 closeEnough _ _ _ = do
