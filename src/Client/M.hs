@@ -253,6 +253,7 @@ catagorizePosition (EdictReference edictIdx) = do
 
 moveFrame :: EdictReference -> Quake ()
 moveFrame selfRef@(EdictReference selfIdx) = do
+    io (print "M.moveFrame")
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -307,6 +308,8 @@ moveFrame selfRef@(EdictReference selfIdx) = do
 
                         return False
 
+    io (print $ "DONE = " ++ show done)
+
     unless done $ do
       -- regrab move, endfunc is very likely to change it
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
@@ -314,7 +317,10 @@ moveFrame selfRef@(EdictReference selfIdx) = do
           index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
           frame = (move'^.mmFrame) V.! index
 
-      when (isJust (frame^.mfAI)) $
+      io (print $ "INDEX = " ++ show index)
+
+      when (isJust (frame^.mfAI)) $ do
+        io (print "YUP, calling AI")
         if (self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0
           then
             ai (fromJust $ frame^.mfAI) selfRef ((frame^.mfDist) * (self'^.eMonsterInfo.miScale))
@@ -470,13 +476,16 @@ moveToGoal :: EdictReference -> Float -> Quake ()
 moveToGoal edictRef@(EdictReference edictIdx) dist = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    let skip = isNothing (edict^.eEdictOther.eoGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
+    let skip = isNothing (edict^.eEdictOther.eoGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
     -- if the next step hits the enemy, return immediately
     skip' <- if isJust (edict^.eEdictOther.eoEnemy)
                then SV.closeEnough edictRef (fromJust $ edict^.eEdictOther.eoEnemy) dist
                else return False
 
-    when (skip || skip') $ do
+    io (print "M.moveToGoal")
+    io (print $ "skip = " ++ show skip ++ " skip' = " ++ show skip')
+
+    unless (skip || skip') $ do
       Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
       -- bump around
       r <- Lib.rand
