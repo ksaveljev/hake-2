@@ -20,6 +20,7 @@ import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CL as CL
+import qualified Client.CLEnts as CLEnts
 import qualified Client.CLFX as CLFX
 import qualified Client.CLView as CLView
 import {-# SOURCE #-} qualified Client.SCR as SCR
@@ -428,4 +429,6 @@ registerSounds = do
 
 parseBaseline :: Quake ()
 parseBaseline = do
-    io (putStrLn "CLParse.parseBaseline") >> undefined -- TODO
+    let nullState = newEntityStateT Nothing
+    (newNum, bits) <- CLEnts.parseEntityBits [0]
+    CLEnts.parseDelta nullState (globals.clEntities.ix newNum.ceBaseline) newNum (head bits)
