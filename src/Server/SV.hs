@@ -23,6 +23,9 @@ import qualified Util.Math3D as Math3D
 
 import Game.Adapters
 
+diNoDir :: Float
+diNoDir = -1
+
 maxClipPlanes :: Int
 maxClipPlanes = 5
 
@@ -1218,5 +1221,49 @@ closeEnough _ _ _ = do
     io (putStrLn "SV.closeEnough") >> undefined -- TODO
 
 newChaseDir :: EdictReference -> Maybe EdictReference -> Float -> Quake ()
-newChaseDir _ _ _ = do
-    io (putStrLn "SV.newChaseDir") >> undefined -- TODO
+newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
+    -- FIXME: how did we get here with no enemy
+    case maybeEnemyRef of
+      Nothing -> do
+        Com.dprintf "SV_NewChaseDir without enemy!\n"
+      Just (EdictReference enemyIdx) -> do
+        Just actor <- preuse $ gameBaseGlobals.gbGEdicts.ix actorIdx
+        Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+        let tmp :: Int = truncate $ (actor^.eEdictPhysics.eIdealYaw) / 45
+            oldDir = Math3D.angleMod (fromIntegral $ tmp * 45)
+            turnAround = Math3D.angleMod (oldDir - 180)
+
+            deltaX = (enemy^.eEntityState.esOrigin._x) - (actor^.eEntityState.esOrigin._x)
+            deltaY = (enemy^.eEntityState.esOrigin._y) - (actor^.eEntityState.esOrigin._y)
+
+            a = if | deltaX > 10 -> 0
+                   | deltaX < -10 -> 180
+                   | otherwise -> diNoDir
+
+            b = if | deltaY < -10 -> 270
+                   | deltaY > 10 -> 90
+                   | otherwise -> diNoDir
+
+            d = V3 0 a b
+
+        done <- tryDirectRoute turnAround d
+
+        unless done $ do
+          io (putStrLn "SV.newChaseDir") >> undefined -- TODO
+
+  where tryDirectRoute :: Float -> V3 Float -> Quake Bool
+        tryDirectRoute turnAround d = do
+          if (d^._y) /= diNoDir && (d^._z) /= diNoDir
+            then do
+              let tdir = if (d^._y) == 0
+                           then if (d^._z) == 90 then 45 else 315
+                           else if (d^._z) == 90 then 135 else 215
+
+              if tdir /= turnAround
+                then do
+                  v <- stepDirection actorRef tdir dist
+                  return $ if v then True else False
+                else
+                  return False
+            else return False
