@@ -33,8 +33,17 @@ startOff = 1
 
 lightUse :: EntUse
 lightUse =
-  GenericEntUse "light_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.lightUse") >> undefined -- TODO
+  GenericEntUse "light_use" $ \(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
+
+    if (self^.eSpawnFlags) .&. startOff /= 0
+      then do
+        configString (Constants.csLights + (self^.eStyle)) "m"
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags %= (.&. (complement startOff))
+      else do
+        configString (Constants.csLights + (self^.eStyle)) "a"
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags %= (.|. startOff)
 
 spPathCorner :: EdictReference -> Quake ()
 spPathCorner er@(EdictReference edictIdx) = do
