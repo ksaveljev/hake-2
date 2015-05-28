@@ -1103,5 +1103,15 @@ doorGoDown =
 
 doorHitBottom :: EntThink
 doorHitBottom =
-  GenericEntThink "door_hit_bottom" $ \_ -> do
-    io (putStrLn "GameFunc.doorHitBottom") >> undefined -- TODO
+  GenericEntThink "door_hit_bottom" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+      when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= 0
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateBottom
+    doorUseAreaPortals selfRef False
+    return True
