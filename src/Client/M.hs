@@ -17,6 +17,7 @@ import qualified Constants
 import qualified Game.GameCombat as GameCombat
 import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 checkGround :: EdictReference -> Quake ()
 checkGround edictRef@(EdictReference edictIdx) = do
@@ -469,8 +470,29 @@ setEffects (EdictReference edictIdx) = do
            | otherwise -> return ()
 
 changeYaw :: EdictReference -> Quake ()
-changeYaw _ = do
-    io (putStrLn "M.changeYaw") >> undefined -- TODO
+changeYaw (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let current = Math3D.angleMod (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw))
+        ideal = edict^.eEdictPhysics.eIdealYaw
+
+    unless (current == ideal) $ do
+      let move = ideal - current
+          speed = edict^.eEdictPhysics.eYawSpeed
+          move' = if ideal > current
+                    then if move >= 180 then move - 360 else move
+                    else if move <= -180 then move + 360 else move
+          move'' = if move' > 0
+                     then if move' > speed then speed else move'
+                     else if move' < -speed then -speed else move'
+
+          access = case Constants.yaw of
+                     0 -> _x
+                     1 -> _y
+                     2 -> _z
+                     _ -> undefined -- shouldn't happen
+
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.access .= Math3D.angleMod (current + move'')
 
 moveToGoal :: EdictReference -> Float -> Quake ()
 moveToGoal edictRef@(EdictReference edictIdx) dist = do

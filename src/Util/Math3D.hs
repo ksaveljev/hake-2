@@ -4,6 +4,7 @@
 module Util.Math3D where
 
 import Control.Lens (preuse, ix, (^.), Const)
+import Data.Bits ((.&.))
 import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z)
 
@@ -131,3 +132,7 @@ vectorYaw vec =
               in fromIntegral $ if yaw < 0
                                   then yaw + 360
                                   else yaw
+
+angleMod :: Float -> Float
+angleMod a = let b :: Int = truncate (a / shortRatio)
+             in shortRatio * fromIntegral (b .&. 65535)
