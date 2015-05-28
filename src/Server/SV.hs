@@ -19,6 +19,7 @@ import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified QCommon.Com as Com
 import qualified Server.SVGame as SVGame
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 import Game.Adapters
@@ -1247,12 +1248,19 @@ newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
 
             d = V3 0 a b
 
-        done <- tryDirectRoute turnAround d
+        maybeTDir <- tryDirectRoute turnAround d
 
-        unless done $ do
-          io (putStrLn "SV.newChaseDir") >> undefined -- TODO
+        case maybeTDir of
+          Nothing -> return ()
+          Just tdir -> do
+            -- try other directions
+            r <- Lib.rand
+            let (d', tdir') = if (r .&. 3) .&. 1 /= 0 || abs deltaY > abs deltaX
+                                then (V3 (d^._x) (d^._z) tdir, d^._y)
+                                else (d, tdir)
+            io (putStrLn "SV.newChaseDir") >> undefined -- TODO
 
-  where tryDirectRoute :: Float -> V3 Float -> Quake Bool
+  where tryDirectRoute :: Float -> V3 Float -> Quake (Maybe Float)
         tryDirectRoute turnAround d = do
           if (d^._y) /= diNoDir && (d^._z) /= diNoDir
             then do
@@ -1263,7 +1271,7 @@ newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
               if tdir /= turnAround
                 then do
                   v <- stepDirection actorRef tdir dist
-                  return $ if v then True else False
+                  return $ if v then Just tdir else Nothing
                 else
-                  return False
-            else return False
+                  return Nothing
+            else return Nothing
