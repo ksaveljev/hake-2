@@ -636,8 +636,18 @@ selectCoopSpawnPoint _ = do
     io (putStrLn "PlayerClient.selectCoopSpawnPoint") >> undefined -- TODO
 
 fetchClientEntData :: EdictReference -> Quake ()
-fetchClientEntData _ = do
-    io (putStrLn "PlayerClient.fetchClientEntData") >> undefined -- TODO
+fetchClientEntData (EdictReference edictIdx) = do
+    coopValue <- liftM (^.cvValue) coopCVar
+    Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictStatus.eHealth .= gClient^.gcPers.cpHealth
+      eEdictStatus.eMaxHealth .= gClient^.gcPers.cpMaxHealth
+      eFlags %= (.|. (gClient^.gcPers.cpSavedFlags))
+
+    when (coopValue /= 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crScore .= (gClient^.gcPers.cpScore)
 
 playerPain :: EntPain
 playerPain = 
