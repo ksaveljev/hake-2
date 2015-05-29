@@ -9,7 +9,7 @@ import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int8, Int16, Int32)
 import Data.Monoid (mempty, mappend)
-import Data.Word (Word8, Word32)
+import Data.Word (Word8, Word16, Word32)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -33,7 +33,11 @@ writeCharF = writeByteF
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = do
-    SZ.write sizeBufLens (B.pack [fromIntegral (c .&. 0xFF)]) 1
+    io (print "WRITE BYTE")
+    let c' :: Word32 = fromIntegral c
+        c'' :: Word8 = fromIntegral (c' .&. 0xFF)
+    io (print c'')
+    SZ.write sizeBufLens (B.pack [c'']) 1
 
 writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeByteF sizeBufLens c = do
@@ -310,10 +314,10 @@ readLong sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int32 = fromIntegral $ B.index buf readCount
-            b :: Int32 = fromIntegral $ B.index buf (readCount + 1)
-            c :: Int32 = fromIntegral $ B.index buf (readCount + 2)
-            d :: Int32 = fromIntegral $ B.index buf (readCount + 3)
+            a :: Word32 = fromIntegral $ B.index buf readCount
+            b :: Word32 = fromIntegral $ B.index buf (readCount + 1)
+            c :: Word32 = fromIntegral $ B.index buf (readCount + 2)
+            d :: Word32 = fromIntegral $ B.index buf (readCount + 3)
             result = a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
@@ -341,12 +345,14 @@ readShort sizeBufLens = do
       else do
         let buf = sizeBuf^.sbData
             readCount = sizeBuf^.sbReadCount
-            a :: Int8 = fromIntegral $ B.index buf readCount
-            b :: Int8 = fromIntegral $ B.index buf (readCount + 1)
-            b' :: Int16 = fromIntegral b `shiftL` 8
-            result = fromIntegral a .|. (b' `shiftL` 8)
+            a :: Word8 = B.index buf readCount
+            b :: Word8 = B.index buf (readCount + 1)
+            b' :: Word16 = (fromIntegral b) `shiftL` 8
+            result = (fromIntegral a) .|. b'
 
         io (print "READ SHORT")
+        io (print a)
+        io (print b)
         io (print result)
         sizeBufLens.sbReadCount += 2
         return (fromIntegral result)

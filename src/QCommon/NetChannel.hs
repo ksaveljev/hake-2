@@ -89,6 +89,7 @@ transmit netChanLens len buf = do
         -- send the qport if we are a client
         when ((chan^.ncSock) == Constants.nsClient) $ do
           qport <- liftM (truncate . (^.cvValue)) qportCVar
+          io (print $ "sending qport = " ++ show qport)
           MSG.writeShort (netChannelGlobals.ncSend) qport
 
         Just chan' <- preuse netChanLens
