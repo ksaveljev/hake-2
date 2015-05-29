@@ -14,7 +14,7 @@ useWeapon =
 
 weaponBlaster :: EntThink
 weaponBlaster =
-  GenericEntThink "Weapon_Blaster" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "Weapon_Blaster" $ \edictRef -> do
     let pauseFrames = UV.fromList [19, 32, 0]
         fireFrames = UV.fromList [5, 0]
 
@@ -38,23 +38,59 @@ dropWeapon =
 
 weaponShotgun :: EntThink
 weaponShotgun =
-  GenericEntThink "Weapon_Shotgun" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponShotgun") >> undefined -- TODO
+  GenericEntThink "Weapon_Shotgun" $ \edictRef -> do
+    let pauseFrames = UV.fromList [22, 28, 34, 0]
+        fireFrames = UV.fromList [8, 9, 0]
+
+    weaponGeneric edictRef 7 18 36 39 pauseFrames fireFrames weaponShotgunFire
+    return True
+
+weaponShotgunFire :: EntThink
+weaponShotgunFire =
+  GenericEntThink "weapon_shotgun_fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponShotgunFire") >> undefined -- TODO
 
 weaponSuperShotgun :: EntThink
 weaponSuperShotgun = 
-  GenericEntThink "Weapon_SuperShotgun" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponSuperShotgun") >> undefined -- TODO
+  GenericEntThink "Weapon_SuperShotgun" $ \edictRef -> do
+    let pauseFrames = UV.fromList [29, 42, 57, 0]
+        fireFrames = UV.fromList [7, 0]
+
+    weaponGeneric edictRef 6 17 57 61 pauseFrames fireFrames weaponSuperShotgunFire
+    return True
+
+weaponSuperShotgunFire :: EntThink
+weaponSuperShotgunFire =
+  GenericEntThink "weapon_supershotgun_fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponSuperShotgunFire") >> undefined -- TODO
 
 weaponMachinegun :: EntThink
 weaponMachinegun = 
-  GenericEntThink "Weapon_Machinegun" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponMachinegun") >> undefined -- TODO
+  GenericEntThink "Weapon_Machinegun" $ \edictRef -> do
+    let pauseFrames = UV.fromList [23, 45, 0]
+        fireFrames = UV.fromList [4, 5, 0]
+
+    weaponGeneric edictRef 3 5 45 49 pauseFrames fireFrames machinegunFire
+    return True
+
+machinegunFire :: EntThink
+machinegunFire =
+  GenericEntThink "Machinegun_Fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.machinegunFire") >> undefined -- TODO
 
 weaponChaingun :: EntThink
 weaponChaingun = 
-  GenericEntThink "Weapon_Chaingun" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponChaingun") >> undefined -- TODO
+  GenericEntThink "Weapon_Chaingun" $ \edictRef -> do
+    let pauseFrames = UV.fromList [38, 43, 51, 61, 0]
+        fireFrames = UV.fromList [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 0]
+
+    weaponGeneric edictRef 4 31 61 64 pauseFrames fireFrames chaingunFire
+    return True
+
+chaingunFire :: EntThink
+chaingunFire =
+  GenericEntThink "Chaingun_Fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.chaingunFire") >> undefined -- TODO
 
 weaponGrenade :: EntThink
 weaponGrenade = 
@@ -63,28 +99,73 @@ weaponGrenade =
 
 weaponGrenadeLauncher :: EntThink
 weaponGrenadeLauncher = 
-  GenericEntThink "Weapon_GrenadeLauncher" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponGrenadeLauncher") >> undefined -- TODO
+  GenericEntThink "Weapon_GrenadeLauncher" $ \edictRef -> do
+    let pauseFrames = UV.fromList [34, 51, 59, 0]
+        fireFrames = UV.fromList [6, 0]
+
+    weaponGeneric edictRef 5 16 59 64 pauseFrames fireFrames weaponGrenadeLauncherFire
+    return True
+
+weaponGrenadeLauncherFire :: EntThink
+weaponGrenadeLauncherFire =
+  GenericEntThink "weapon_grenadelauncher_fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponGrenadeLauncherFire") >> undefined -- TODO
 
 weaponRocketLauncher :: EntThink
 weaponRocketLauncher = 
-  GenericEntThink "Weapon_RocketLauncher" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponRocketLauncher") >> undefined -- TODO
+  GenericEntThink "Weapon_RocketLauncher" $ \edictRef -> do
+    let pauseFrames = UV.fromList [25, 33, 42, 50, 0]
+        fireFrames = UV.fromList [5, 0]
+
+    weaponGeneric edictRef 4 12 50 54 pauseFrames fireFrames weaponRocketLauncherFire
+    return True
+
+weaponRocketLauncherFire :: EntThink
+weaponRocketLauncherFire =
+  GenericEntThink "Weapon_RocketLauncher_Fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponRocketLauncherFire") >> undefined -- TODO
 
 weaponHyperBlaster :: EntThink
 weaponHyperBlaster = 
-  GenericEntThink "Weapon_HyperBlaster" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponHyperBlaster") >> undefined -- TODO
+  GenericEntThink "Weapon_HyperBlaster" $ \edictRef -> do
+    let pauseFrames = UV.fromList [0]
+        fireFrames = UV.fromList [6, 7, 8, 9, 10, 11, 0]
+
+    weaponGeneric edictRef 5 20 49 53 pauseFrames fireFrames weaponHyperBlasterFire
+    return True
+
+weaponHyperBlasterFire :: EntThink
+weaponHyperBlasterFire =
+  GenericEntThink "Weapon_HyperBlaster_Fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponHyperBlasterFire") >> undefined -- TODO
 
 weaponRailgun :: EntThink
 weaponRailgun = 
-  GenericEntThink "Weapon_Railgun" $ \_ -> do
+  GenericEntThink "Weapon_Railgun" $ \edictRef -> do
+    let pauseFrames = UV.fromList [56, 0]
+        fireFrames = UV.fromList [4, 0]
+
+    weaponGeneric edictRef 3 18 56 61 pauseFrames fireFrames weaponRailgunFire
     io (putStrLn "PlayerWeapon.weaponRailgun") >> undefined -- TODO
+
+weaponRailgunFire :: EntThink
+weaponRailgunFire =
+  GenericEntThink "weapon_railgun_fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponRailgunFire") >> undefined -- TODO
 
 weaponBFG :: EntThink
 weaponBFG =
-  GenericEntThink "Weapon_BFG" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponBFG") >> undefined -- TODO
+  GenericEntThink "Weapon_BFG" $ \edictRef -> do
+    let pauseFrames = UV.fromList [39, 45, 50, 55, 0]
+        fireFrames = UV.fromList [9, 17, 0]
+
+    weaponGeneric edictRef 8 32 55 58 pauseFrames fireFrames weaponBFGFire
+    return True
+
+weaponBFGFire :: EntThink
+weaponBFGFire =
+  GenericEntThink "weapon_bfg_fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponBFGFire") >> undefined -- TODO
 
 changeWeapon :: EdictReference -> Quake ()
 changeWeapon _ = do
