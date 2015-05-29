@@ -392,8 +392,38 @@ spFuncRotating =
 
 triggerElevatorInit :: EntThink
 triggerElevatorInit =
-  GenericEntThink "trigger_elevator_init" $ \_ -> do
-    io (putStrLn "GameFunc.triggerElevatorInit") >> undefined -- TODO
+  GenericEntThink "trigger_elevator_init" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+
+    case self^.eEdictInfo.eiTarget of
+      Nothing -> do
+        dprintf "trigger_elevator has no target\n"
+        return True
+
+      Just target -> do
+        maybeMoveTargetRef <- GameBase.pickTarget (self^.eEdictInfo.eiTarget)
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= maybeMoveTargetRef
+
+        case maybeMoveTargetRef of
+          Nothing -> do
+            dprintf ("trigger_elevator unable to find target " `B.append` target `B.append` "\n")
+            return True
+            
+          Just moveTargetRef -> do
+            let (EdictReference moveTargetIdx) = moveTargetRef
+            Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix moveTargetIdx
+
+            if (moveTarget^.eClassName) /= "func_train"
+              then do
+                dprintf ("trigger_elevator target " `B.append` target `B.append` " is not a train\n")
+                return True
+              else do
+                zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                  eEdictAction.eaUse .= Just triggerElevatorUse
+                  eSvFlags .= Constants.svfNoClient
+
+                return True
 
 spTriggerElevator :: EntThink
 spTriggerElevator =
@@ -1186,3 +1216,8 @@ funcConveyorUse =
     Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
     when (spawnFlags .&. 2 == 0) $
       gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= 0
+
+triggerElevatorUse :: EntUse
+triggerElevatorUse =
+  GenericEntUse "trigger_elevator_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.triggerElevatorUse") >> undefined -- TODO
