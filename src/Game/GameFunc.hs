@@ -268,8 +268,27 @@ spFuncDoorRotating =
 
 spFuncConveyor :: EntThink
 spFuncConveyor =
-  GenericEntThink "sp_func_conveyor" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncConveyor") >> undefined -- TODO
+  GenericEntThink "sp_func_conveyor" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eEdictPhysics.eSpeed) == 0) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eSpeed .= 100
+
+    when ((self^.eSpawnFlags) .&. 1 == 0) $ do
+      Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eSpeed
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= truncate speed
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eSpeed .= 0
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaUse .= Just funcConveyorUse
+    
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    setModel selfRef (self^.eEdictInfo.eiModel)
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eSolid .= Constants.solidBsp
+    linkEntity selfRef
+    return True
 
 spFuncKillBox :: EntThink
 spFuncKillBox =
@@ -1115,3 +1134,8 @@ doorHitBottom =
     gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateBottom
     doorUseAreaPortals selfRef False
     return True
+
+funcConveyorUse :: EntUse
+funcConveyorUse =
+  GenericEntUse "func_conveyor_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.funcConveyorUse") >> undefined -- TODO
