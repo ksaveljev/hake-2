@@ -390,11 +390,21 @@ spFuncRotating =
           when ((edict^.eEdictStatus.eDmg) == 0) $
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 2
 
+triggerElevatorInit :: EntThink
+triggerElevatorInit =
+  GenericEntThink "trigger_elevator_init" $ \_ -> do
+    io (putStrLn "GameFunc.triggerElevatorInit") >> undefined -- TODO
 
 spTriggerElevator :: EntThink
 spTriggerElevator =
-  GenericEntThink "sp_trigger_elevator" $ \_ -> do
-    io (putStrLn "GameFunc.spTriggerElevator") >> undefined -- TODO
+  GenericEntThink "sp_trigger_elevator" $ \(EdictReference selfIdx) -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
+      eaThink .= Just triggerElevatorInit
+      eaNextThink .= levelTime + Constants.frameTime
+
+    return True
 
 spFuncPlat :: EdictReference -> Quake ()
 spFuncPlat _ = io (putStrLn "GameFunc.spFuncPlat") >> undefined -- TODO
