@@ -184,6 +184,11 @@ walkMonsterStartGo =
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
 
+    preuse (gameBaseGlobals.gbGEdicts.ix selfIdx) >>= \(Just blah) -> do
+      io (print "GameAI: BEFORE")
+      io (print $ "self.frame = " ++ show (blah^.eEntityState.esFrame))
+      io (print $ "move.firstframe = " ++ show ((fromJust $ blah^.eMonsterInfo.miCurrentMove)^.mmFirstFrame))
+
     when (spawnFlags .&. 2 == 0 && levelTime < 1) $ do
       void $ think M.dropToFloor selfRef
       Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoGroundEntity
@@ -205,6 +210,11 @@ walkMonsterStartGo =
     Just spawnFlags' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
     when (spawnFlags' .&. 2 /= 0) $
       void $ think Monster.monsterTriggeredStart selfRef
+
+    preuse (gameBaseGlobals.gbGEdicts.ix selfIdx) >>= \(Just blah) -> do
+      io (print "GameAI: AFTER")
+      io (print $ "self.frame = " ++ show (blah^.eEntityState.esFrame))
+      io (print $ "move.firstframe = " ++ show ((fromJust $ blah^.eMonsterInfo.miCurrentMove)^.mmFirstFrame))
 
     return True
 

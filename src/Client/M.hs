@@ -254,13 +254,16 @@ catagorizePosition (EdictReference edictIdx) = do
 
 moveFrame :: EdictReference -> Quake ()
 moveFrame selfRef@(EdictReference selfIdx) = do
-    io (print "M.moveFrame")
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
 
     let Just move = self^.eMonsterInfo.miCurrentMove
+
+    io (print "BEFORE")
+    io (print $ "self.frame = " ++ show (self^.eEntityState.esFrame))
+    io (print $ "move.firstframe = " ++ show (move^.mmFirstFrame))
 
     done <- if (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame)
               then do
@@ -309,8 +312,6 @@ moveFrame selfRef@(EdictReference selfIdx) = do
 
                         return False
 
-    io (print $ "DONE = " ++ show done)
-
     unless done $ do
       -- regrab move, endfunc is very likely to change it
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
@@ -318,6 +319,9 @@ moveFrame selfRef@(EdictReference selfIdx) = do
           index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
           frame = (move'^.mmFrame) V.! index
 
+      io (print "AFTER")
+      io (print $ "self.frame = " ++ show (self'^.eEntityState.esFrame))
+      io (print $ "move.firstframe = " ++ show (move'^.mmFirstFrame))
       io (print $ "INDEX = " ++ show index)
 
       when (isJust (frame^.mfAI)) $ do
