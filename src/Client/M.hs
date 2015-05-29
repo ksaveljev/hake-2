@@ -37,7 +37,7 @@ checkGround edictRef@(EdictReference edictIdx) = do
                          (Just $ edict^.eEdictMinMax.eMins)
                          (Just $ edict^.eEdictMinMax.eMaxs)
                          point
-                         edictRef
+                         (Just edictRef)
                          Constants.maskMonsterSolid
 
           -- check steepness
@@ -113,7 +113,12 @@ dropToFloor =
     let trace = gameImport^.giTrace
         linkEntity = gameImport^.giLinkEntity
 
-    traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end' edictRef Constants.maskMonsterSolid
+    traceT <- trace (edict^.eEntityState.esOrigin)
+                    (Just $ edict^.eEdictMinMax.eMins)
+                    (Just $ edict^.eEdictMinMax.eMaxs)
+                    end'
+                    (Just edictRef)
+                    Constants.maskMonsterSolid
 
     if (traceT^.tFraction) == 1 || (traceT^.tAllSolid)
       then
@@ -171,7 +176,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
                       stop' = V3 a' b' ((mins^._z) - 2 * (fromIntegral Constants.stepSize))
 
                   v3o <- use $ globals.vec3Origin
-                  traceT <- trace start' (Just v3o) (Just v3o) stop' edictRef Constants.maskMonsterSolid
+                  traceT <- trace start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
 
                   if (traceT^.tFraction) == 1
                     then
@@ -204,7 +209,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
 
               v3o <- use $ globals.vec3Origin
               trace <- use $ gameBaseGlobals.gbGameImport.giTrace
-              traceT <- trace start' (Just v3o) (Just v3o) stop' edictRef Constants.maskMonsterSolid
+              traceT <- trace start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
 
               let bottom' = if (traceT^.tFraction) /= 1 && (traceT^.tEndPos._z) > bottom
                               then traceT^.tEndPos._z

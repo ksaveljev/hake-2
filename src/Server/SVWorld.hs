@@ -359,7 +359,7 @@ areaEdicts mins maxs listLens maxCount areaType = do
 - 
 - ==================
 -}
-trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> EdictReference -> Int -> Quake TraceT
+trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictReference -> Int -> Quake TraceT
 trace start maybeMins maybeMaxs end passEdict contentMask = do
     vec3origin <- use $ globals.vec3Origin
 
@@ -385,7 +385,7 @@ trace start maybeMins maybeMaxs end passEdict contentMask = do
                                , _mcEnd = end
                                , _mcMins = mins
                                , _mcMaxs = maxs
-                               , _mcPassEdict = Just passEdict
+                               , _mcPassEdict = passEdict
                                , _mcMins2 = mins
                                , _mcMaxs2 = maxs
                                }

@@ -18,6 +18,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameCombat as GameCombat
 
 {-
 - Either finds a free edict, or allocates a new one. Try to avoid reusing
@@ -242,9 +243,45 @@ mCheckAttack =
   GenericEntThink "M_CheckAttack" $ \_ -> do
     io (putStrLn "GameUtil.mCheckAttack") >> undefined -- TODO
 
+{-
+- Kills all entities that would touch the proposed new positioning of ent.
+- Ent should be unlinked before calling this!
+-}
 killBox :: EdictReference -> Quake Bool
-killBox _ = do
-    io (putStrLn "GameUtil.killBox") >> undefined -- TODO
+killBox edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+    traceT <- trace (edict^.eEntityState.esOrigin)
+                    (Just $ edict^.eEdictMinMax.eMins)
+                    (Just $ edict^.eEdictMinMax.eMaxs)
+                    (edict^.eEntityState.esOrigin)
+                    Nothing
+                    Constants.maskPlayerSolid
+
+    if isNothing (traceT^.tEnt) || (traceT^.tEnt) == Just (EdictReference 0)
+      then
+        return True
+      else do
+        -- nail it
+        v3o <- use $ globals.vec3Origin
+        let Just traceEntRef@(EdictReference traceEntIdx) = traceT^.tEnt
+        GameCombat.damage traceEntRef
+                          edictRef
+                          edictRef
+                          v3o
+                          (edict^.eEntityState.esOrigin)
+                          v3o
+                          100000
+                          0
+                          Constants.damageNoProtection
+                          Constants.modTelefrag
+
+        -- if we didnt' kill it, fail
+        Just solid <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx.eSolid
+        if solid /= 0
+          then return False
+          else killBox edictRef
 
 visible :: EdictReference -> EdictReference -> Quake Bool
 visible _ _ = do

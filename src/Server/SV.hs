@@ -738,7 +738,12 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
           let trace = gameImport^.giTrace
               linkEntity = gameImport^.giLinkEntity
 
-          traceT <- trace start (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end er mask
+          traceT <- trace start
+                          (Just $ edict^.eEdictMinMax.eMins)
+                          (Just $ edict^.eEdictMinMax.eMaxs)
+                          end
+                          (Just er)
+                          mask
 
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (traceT^.tEndPos)
           linkEntity er
@@ -785,7 +790,12 @@ testEntityPosition (EdictReference edictIdx) = do
                  else Constants.maskSolid
 
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
-    traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) (edict^.eEntityState.esOrigin) (EdictReference edictIdx) mask
+    traceT <- trace (edict^.eEntityState.esOrigin)
+                    (Just $ edict^.eEdictMinMax.eMins)
+                    (Just $ edict^.eEdictMinMax.eMaxs)
+                    (edict^.eEntityState.esOrigin)
+                    (Just $ EdictReference edictIdx)
+                    mask
 
     return (traceT^.tStartSolid)
 
@@ -822,7 +832,9 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
                           trace (edict^.eEntityState.esOrigin)
                                 (Just $ edict^.eEdictMinMax.eMins)
                                 (Just $ edict^.eEdictMinMax.eMaxs)
-                                end edictRef mask
+                                end
+                                (Just edictRef)
+                                mask
 
               if (traceT^.tAllSolid) -- entity is trapped in another solid
                 then do
@@ -971,7 +983,12 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
             end = _z %~ (subtract (stepSize * 2)) $ newOrg'
 
         trace <- use $ gameBaseGlobals.gbGameImport.giTrace
-        traceT <- trace newOrg' (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end edictRef Constants.maskMonsterSolid
+        traceT <- trace newOrg'
+                        (Just $ edict^.eEdictMinMax.eMins)
+                        (Just $ edict^.eEdictMinMax.eMaxs)
+                        end
+                        (Just edictRef)
+                        Constants.maskMonsterSolid
 
         done <- checkAllSolid traceT
                   >>= checkStartSolid edict traceT newOrg' end stepSize
@@ -1011,7 +1028,12 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 
               newOrg' <- updateNewOrg idx edict newOrg
 
-              traceT <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) newOrg' edictRef Constants.maskMonsterSolid
+              traceT <- trace (edict^.eEntityState.esOrigin)
+                              (Just $ edict^.eEdictMinMax.eMins)
+                              (Just $ edict^.eEdictMinMax.eMaxs)
+                              newOrg'
+                              (Just edictRef)
+                              Constants.maskMonsterSolid
 
               done <- checkFlyingMonsters edict traceT
                       >>= checkSwimmingMonsters edict traceT
@@ -1114,7 +1136,12 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
             then do
               let newOrg' = _z %~ (subtract stepSize) $ newOrg
               trace <- use $ gameBaseGlobals.gbGameImport.giTrace
-              traceT' <- trace newOrg' (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) end edictRef Constants.maskMonsterSolid
+              traceT' <- trace newOrg'
+                               (Just $ edict^.eEdictMinMax.eMins)
+                               (Just $ edict^.eEdictMinMax.eMaxs)
+                               end
+                               (Just edictRef)
+                               Constants.maskMonsterSolid
               return $ if (traceT'^.tAllSolid) || (traceT'^.tStartSolid)
                          then (Just False, traceT', newOrg')
                          else (Nothing, traceT', newOrg')

@@ -432,7 +432,7 @@ dropToFloor =
 
     let dest = (V3 0 0 (-128)) + (edict^.eEntityState.esOrigin)
 
-    tr <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) dest er Constants.maskSolid
+    tr <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) dest (Just er) Constants.maskSolid
 
     if tr^.tStartSolid
       then do
