@@ -290,10 +290,28 @@ spFuncConveyor =
     linkEntity selfRef
     return True
 
+{-
+- QUAKED func_killbox (1 0 0) ? Kills everything inside when fired,
+- irrespective of protection.
+-}
+useKillBox :: EntUse
+useKillBox =
+  GenericEntUse "use_killbox" $ \selfRef _ _ ->
+    void $ GameUtil.killBox selfRef
+
 spFuncKillBox :: EntThink
 spFuncKillBox =
-  GenericEntThink "sp_func_killbox" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncKillBox") >> undefined -- TODO
+  GenericEntThink "sp_func_killbox" $ \edictRef@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
+
+    setModel edictRef (edict^.eEdictInfo.eiModel)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEdictAction.eaUse .= Just useKillBox
+      eSvFlags .= Constants.svfNoClient
+
+    return True
 
 spFuncRotating :: EntThink
 spFuncRotating =
@@ -1135,6 +1153,11 @@ doorHitBottom =
     doorUseAreaPortals selfRef False
     return True
 
+{-
+- QUAKED func_conveyor (0 .5 .8) ? START_ON TOGGLE Conveyors are stationary
+- brushes that move what's on them. The brush should be have a surface with
+- at least one current content enabled. speed default 100
+-}
 funcConveyorUse :: EntUse
 funcConveyorUse =
   GenericEntUse "func_conveyor_use" $ \(EdictReference selfIdx) _ _ -> do
