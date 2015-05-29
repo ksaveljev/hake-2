@@ -1137,5 +1137,19 @@ doorHitBottom =
 
 funcConveyorUse :: EntUse
 funcConveyorUse =
-  GenericEntUse "func_conveyor_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.funcConveyorUse") >> undefined -- TODO
+  GenericEntUse "func_conveyor_use" $ \(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. 1 /= 0
+      then do
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEdictPhysics.eSpeed .= 0
+          eSpawnFlags %= (.&. (complement 1))
+      else do
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEdictPhysics.eSpeed .= fromIntegral (self^.eCount)
+          eSpawnFlags %= (.|. 1)
+
+    Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+    when (spawnFlags .&. 2 == 0) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= 0
