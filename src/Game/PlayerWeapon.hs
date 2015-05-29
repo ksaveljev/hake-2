@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
+import qualified Data.Vector.Unboxed as UV
+
 import Quake
 import QuakeState
 import Game.Adapters
@@ -12,8 +14,17 @@ useWeapon =
 
 weaponBlaster :: EntThink
 weaponBlaster =
-  GenericEntThink "Weapon_Blaster" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponBlaster") >> undefined -- TODO
+  GenericEntThink "Weapon_Blaster" $ \edictRef@(EdictReference edictIdx) -> do
+    let pauseFrames = UV.fromList [19, 32, 0]
+        fireFrames = UV.fromList [5, 0]
+
+    weaponGeneric edictRef 4 8 52 55 pauseFrames fireFrames weaponBlasterFire
+    return True
+
+weaponBlasterFire :: EntThink
+weaponBlasterFire =
+  GenericEntThink "Weapon_Blaster_Fire" $ \_ -> do
+    io (putStrLn "PlayerWeapon.weaponBlasterFire") >> undefined -- TODO
 
 pickupWeapon :: EntInteract
 pickupWeapon =
@@ -82,3 +93,7 @@ changeWeapon _ = do
 thinkWeapon :: EdictReference -> Quake ()
 thinkWeapon _ = do
     io (putStrLn "PlayerWeapon.thinkWeapon") >> undefined -- TODO
+
+weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
+weaponGeneric _ _ _ _ _ _ _ _ = do
+    io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
