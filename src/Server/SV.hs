@@ -1252,13 +1252,7 @@ newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
 
         case maybeTDir of
           Nothing -> return ()
-          Just tdir -> do
-            -- try other directions
-            r <- Lib.rand
-            let (d', tdir') = if (r .&. 3) .&. 1 /= 0 || abs deltaY > abs deltaX
-                                then (V3 (d^._x) (d^._z) tdir, d^._y)
-                                else (d, tdir)
-            io (putStrLn "SV.newChaseDir") >> undefined -- TODO
+          Just _ -> tryOtherDirections actorRef dist oldDir turnAround deltaX deltaY d
 
   where tryDirectRoute :: Float -> V3 Float -> Quake (Maybe Float)
         tryDirectRoute turnAround d = do
@@ -1275,3 +1269,96 @@ newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
                 else
                   return Nothing
             else return Nothing
+
+tryOtherDirections :: EdictReference -> Float -> Float -> Float -> Float -> Float -> V3 Float -> Quake ()
+tryOtherDirections actorRef@(EdictReference actorIdx) dist oldDir turnAround deltaX deltaY d = do
+  r <- Lib.rand
+  let d' = if (r .&. 3) .&. 1 /= 0 || abs deltaY > abs deltaX
+             then V3 (d^._x) (d^._z) (d^._y)
+             else d
+
+  if (d'^._y) /= diNoDir && (d'^._y) /= turnAround
+    then do
+      ok <- stepDirection actorRef (d'^._y) dist
+      unless ok $ tryD2Direction d'
+    else do
+      tryD2Direction d'
+
+  where tryD2Direction :: V3 Float -> Quake ()
+        tryD2Direction d' = do
+          if (d'^._z) /= diNoDir && (d'^._z) /= turnAround
+            then do
+              ok <- stepDirection actorRef (d'^._z) dist
+              unless ok tryOldDirDirection
+            else
+              tryOldDirDirection
+
+        -- there is no direct path to the player, so pick another direction
+        tryOldDirDirection :: Quake ()
+        tryOldDirDirection = do
+          if oldDir /= diNoDir
+            then do
+              ok <- stepDirection actorRef oldDir dist
+              unless ok determineSearchDirection
+            else
+              determineSearchDirection
+
+        determineSearchDirection :: Quake ()
+        determineSearchDirection = do
+          -- randomly determine direction of search
+          r <- Lib.rand
+          if r .&. 1 /= 0
+            then do
+              ok <- tryFromBeginning 0 315
+              unless ok tryTurnAroundDirection
+            else do
+              ok <- tryFromEnd 315 0
+              unless ok tryTurnAroundDirection
+
+        tryFromBeginning :: Float -> Float -> Quake Bool
+        tryFromBeginning tdir maxTDir
+          | tdir > maxTDir = return False
+          | otherwise = do
+              if tdir /= turnAround
+                then do
+                  ok <- stepDirection actorRef tdir dist
+                  if ok
+                    then return True
+                    else tryFromBeginning (tdir + 45) maxTDir
+                else
+                  tryFromBeginning (tdir + 45) maxTDir
+
+        tryFromEnd :: Float -> Float -> Quake Bool
+        tryFromEnd tdir minTDir
+          | tdir < 0 = return False
+          | otherwise = do
+              if tdir /= turnAround
+                then do
+                  ok <- stepDirection actorRef tdir dist
+                  if ok
+                    then return True
+                    else tryFromEnd (tdir - 45) minTDir
+                else
+                  tryFromEnd (tdir - 45) minTDir
+
+        tryTurnAroundDirection :: Quake ()
+        tryTurnAroundDirection = do
+          if turnAround /= diNoDir
+            then do
+              ok <- stepDirection actorRef turnAround dist
+              unless ok $ cannotMove
+            else
+              cannotMove
+
+        cannotMove :: Quake ()
+        cannotMove = do
+          gameBaseGlobals.gbGEdicts.ix actorIdx.eEdictPhysics.eIdealYaw .= oldDir -- can't move
+
+          -- if a bridge was pulled out from underneath a monster, it may
+          -- not have a valid standing position at all
+          ok <- M.checkBottom actorRef
+          unless ok $ fixCheckBottom actorRef
+
+fixCheckBottom :: EdictReference -> Quake ()
+fixCheckBottom (EdictReference edictIdx) =
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flPartialGround)
