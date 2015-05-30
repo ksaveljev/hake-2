@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.CLInput where
 
-import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=), (*=), zoom)
+import Control.Lens ((^.), use, ix, (.=), preuse, Lens', (%=), (-=), (+=), (*=), zoom, _1, _2)
 import Control.Monad (void, unless, when, liftM)
 import Data.Bits ((.&.), xor, (.|.), complement)
 import Linear (_x, _y, _z)
@@ -25,6 +25,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 nullcmd :: UserCmdT
@@ -68,10 +69,10 @@ initInput = do
     void $ CVar.get "cl_nodelta" "0" 0
 
 upDown :: XCommandT
-upDown = io (putStrLn "CLInput.upDown") >> undefined -- TODO
+upDown = inputKeyDown (clientGlobals.cgInUp)
 
 upUp :: XCommandT
-upUp = io (putStrLn "CLInput.upUp") >> undefined -- TODO
+upUp = inputKeyUp (clientGlobals.cgInUp)
 
 downDown :: XCommandT
 downDown = io (putStrLn "CLInput.downDown") >> undefined -- TODO
@@ -521,3 +522,80 @@ clampPitch = do
     use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
       when (v + pitch < (-89)) $
         globals.cl.csViewAngles.access2 .= (-89) - pitch
+
+inputKeyDown :: Lens' QuakeState KButtonT -> Quake ()
+inputKeyDown buttonLens = do
+    b <- use buttonLens
+    c <- Cmd.argv 1
+
+    let k = if B.length c > 0
+              then Lib.atoi c
+              else -1 -- typed manually at the console for continuous down
+
+    unless ((b^.kbDown._1) == k || (b^.kbDown._2) == k) $ do -- repeating key
+      done <- if | (b^.kbDown._1) == 0 -> do
+                     buttonLens.kbDown._1 .= k
+                     return False
+                 | (b^.kbDown._2) == 0 -> do
+                     buttonLens.kbDown._2 .= k
+                     return False
+                 | otherwise -> do
+                     Com.printf "Three keys down for a button!\n"
+                     return True
+
+      unless done $ do
+        unless ((b^.kbState) .&. 1 /= 0) $ do -- unless still down
+          -- save timestamp
+          t <- Cmd.argv 2
+          let downtime = Lib.atoi t
+          buttonLens.kbDownTime .= fromIntegral downtime
+
+          when (downtime == 0) $ do
+            frameTime <- use $ globals.sysFrameTime
+            buttonLens.kbDownTime .= fromIntegral (frameTime - 100)
+
+          buttonLens.kbState %= (.|. 3) -- down + impulse down
+
+inputKeyUp :: Lens' QuakeState KButtonT -> Quake ()
+inputKeyUp buttonLens = do
+    c <- Cmd.argv 1
+
+    if B.length c <= 0
+      then do
+        -- typed manually at the console, assume for unsticking, so clear
+        -- all
+        buttonLens.kbDown .= (0, 0)
+        buttonLens.kbState .= 4 -- impulse up
+      else do
+        let k = Lib.atoi c
+
+        b <- use buttonLens
+
+        done <- if | (b^.kbDown._1) == k -> do
+                       buttonLens.kbDown._1 .= 0
+                       return False
+                   | (b^.kbDown._2) == k -> do
+                       buttonLens.kbDown._2 .= 0
+                       return False
+                   | otherwise -> return True -- key up without coresponding down (menu pass through)
+
+        skip <- shouldSkip
+
+        unless (done || skip) $ do
+          -- save timestamp
+          t <- Cmd.argv 2
+          let uptime = Lib.atoi t
+
+          if uptime /= 0
+            then buttonLens.kbMsec += fromIntegral uptime - (b^.kbDownTime)
+            else buttonLens.kbMsec += 10
+
+          buttonLens.kbState %= (.&. (complement 1)) -- now up
+          buttonLens.kbState %= (.|. 4) -- impulse up
+
+  where shouldSkip :: Quake Bool
+        shouldSkip = do
+          b <- use buttonLens
+          if | (b^.kbDown._1) /= 0 || (b^.kbDown._2) /= 0 -> return True -- some other key is still hoding it down
+             | (b^.kbState) .&. 1 == 0 -> return True -- still up (this should not happen)
+             | otherwise -> return False
