@@ -410,7 +410,9 @@ stopF :: XCommandT
 stopF = io (putStrLn "CL.stopF") >> undefined -- TODO
 
 quitF :: XCommandT
-quitF = io (putStrLn "CL.quitF") >> undefined -- TODO
+quitF = do
+    disconnect
+    Com.quit
 
 connectF :: XCommandT
 connectF = io (putStrLn "CL.connectF") >> undefined -- TODO

@@ -274,3 +274,7 @@ stripExtension str =
     in case i of
          Nothing -> str
          Just idx -> B.take idx str
+
+quit :: Quake ()
+quit = do
+    io (putStrLn "Com.quit") >> undefined -- TODO
