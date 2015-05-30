@@ -75,91 +75,93 @@ upUp :: XCommandT
 upUp = inputKeyUp (clientGlobals.cgInUp)
 
 downDown :: XCommandT
-downDown = io (putStrLn "CLInput.downDown") >> undefined -- TODO
+downDown = inputKeyDown (clientGlobals.cgInDown)
 
 downUp :: XCommandT
-downUp = io (putStrLn "CLInput.downUp") >> undefined -- TODO
+downUp = inputKeyUp (clientGlobals.cgInDown)
 
 leftDown :: XCommandT
-leftDown = io (putStrLn "CLInput.leftDown") >> undefined -- TODO
+leftDown = inputKeyDown (clientGlobals.cgInLeft)
 
 leftUp :: XCommandT
-leftUp = io (putStrLn "CLInput.leftUp") >> undefined -- TODO
+leftUp = inputKeyUp (clientGlobals.cgInLeft)
 
 rightDown :: XCommandT
-rightDown = io (putStrLn "CLInput.rightDown") >> undefined -- TODO
+rightDown = inputKeyDown (clientGlobals.cgInRight)
 
 rightUp :: XCommandT
-rightUp = io (putStrLn "CLInput.rightUp") >> undefined -- TODO
+rightUp = inputKeyUp (clientGlobals.cgInRight)
 
 forwardDown :: XCommandT
-forwardDown = io (putStrLn "CLInput.forwardDown") >> undefined -- TODO
+forwardDown = inputKeyDown (clientGlobals.cgInForward)
 
 forwardUp :: XCommandT
-forwardUp = io (putStrLn "CLInput.forwardUp") >> undefined -- TODO
+forwardUp = inputKeyUp (clientGlobals.cgInForward)
 
 backDown :: XCommandT
-backDown = io (putStrLn "CLInput.backDown") >> undefined -- TODO
+backDown = inputKeyDown (clientGlobals.cgInBack)
 
 backUp :: XCommandT
-backUp = io (putStrLn "CLInput.backUp") >> undefined -- TODO
+backUp = inputKeyUp (clientGlobals.cgInBack)
 
 lookUpDown :: XCommandT
-lookUpDown = io (putStrLn "CLInput.lookUpDown") >> undefined -- TODO
+lookUpDown = inputKeyDown (clientGlobals.cgInLookUp)
 
 lookUpUp :: XCommandT
-lookUpUp = io (putStrLn "CLInput.lookUpUp") >> undefined -- TODO
+lookUpUp = inputKeyUp (clientGlobals.cgInLookUp)
 
 lookDownDown :: XCommandT
-lookDownDown = io (putStrLn "CLInput.lookDownDown") >> undefined -- TODO
+lookDownDown = inputKeyDown (clientGlobals.cgInLookDown)
 
 lookDownUp :: XCommandT
-lookDownUp = io (putStrLn "CLInput.lookDownUp") >> undefined -- TODO
+lookDownUp = inputKeyUp (clientGlobals.cgInLookDown)
 
 strafeDown :: XCommandT
-strafeDown = io (putStrLn "CLInput.strafeDown") >> undefined -- TODO
+strafeDown = inputKeyDown (clientGlobals.cgInStrafe)
 
 strafeUp :: XCommandT
-strafeUp = io (putStrLn "CLInput.strafeUp") >> undefined -- TODO
+strafeUp = inputKeyUp (clientGlobals.cgInStrafe)
 
 moveLeftDown :: XCommandT
-moveLeftDown = io (putStrLn "CLInput.moveLeftDown") >> undefined -- TODO
+moveLeftDown = inputKeyDown (clientGlobals.cgInMoveLeft)
 
 moveLeftUp :: XCommandT
-moveLeftUp = io (putStrLn "CLInput.moveLeftUp") >> undefined -- TODO
+moveLeftUp = inputKeyUp (clientGlobals.cgInMoveLeft)
 
 moveRightDown :: XCommandT
-moveRightDown = io (putStrLn "CLInput.moveRightDown") >> undefined -- TODO
+moveRightDown = inputKeyDown (clientGlobals.cgInMoveRight)
 
 moveRightUp :: XCommandT
-moveRightUp = io (putStrLn "CLInput.moveRightUp") >> undefined -- TODO
+moveRightUp = inputKeyUp (clientGlobals.cgInMoveRight)
 
 speedDown :: XCommandT
-speedDown = io (putStrLn "CLInput.speedDown") >> undefined -- TODO
+speedDown = inputKeyDown (clientGlobals.cgInSpeed)
 
 speedUp :: XCommandT
-speedUp = io (putStrLn "CLInput.speedUp") >> undefined -- TODO
+speedUp = inputKeyUp (clientGlobals.cgInSpeed)
 
 attackDown :: XCommandT
-attackDown = io (putStrLn "CLInput.attackDown") >> undefined -- TODO
+attackDown = inputKeyDown (clientGlobals.cgInAttack)
 
 attackUp :: XCommandT
-attackUp = io (putStrLn "CLInput.attackUp") >> undefined -- TODO
+attackUp = inputKeyUp (clientGlobals.cgInAttack)
 
 useDown :: XCommandT
-useDown = io (putStrLn "CLInput.useDown") >> undefined -- TODO
+useDown = inputKeyDown (clientGlobals.cgInUse)
 
 useUp :: XCommandT
-useUp = io (putStrLn "CLInput.useUp") >> undefined -- TODO
+useUp = inputKeyUp (clientGlobals.cgInUse)
 
 impulse :: XCommandT
-impulse = io (putStrLn "CLInput.impulse") >> undefined -- TODO
+impulse = do
+    v1 <- Cmd.argv 1
+    clientGlobals.cgInImpulse .= Lib.atoi v1
 
 kLookDown :: XCommandT
-kLookDown = io (putStrLn "CLInput.kLookDown") >> undefined -- TODO
+kLookDown = inputKeyDown (clientGlobals.cgInKLook)
 
 kLookUp :: XCommandT
-kLookUp = io (putStrLn "CLInput.kLookUp") >> undefined -- TODO
+kLookUp = inputKeyUp (clientGlobals.cgInKLook)
 
 sendCmd :: Quake ()
 sendCmd = do
