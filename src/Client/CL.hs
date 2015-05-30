@@ -389,11 +389,10 @@ pauseF = do
 
     if maxClientsValue > 1 || state == 0
       then
-        CVar.setValue "paused" 0
+        CVar.setValueI "paused" 0
       else do
         pausedValue <- liftM (^.cvValue) clPausedCVar
         CVar.setValueF "paused" pausedValue
-
 
 pingServersF :: XCommandT
 pingServersF = io (putStrLn "CL.pingServersF") >> undefined -- TODO
@@ -407,8 +406,18 @@ userInfoF = io (putStrLn "CL.userInfoF") >> undefined -- TODO
 sndRestartF :: XCommandT
 sndRestartF = io (putStrLn "CL.sndRestartF") >> undefined -- TODO
 
+-- Just sent as a hint to the client that they should drop to full console.
 changingF :: XCommandT
-changingF = io (putStrLn "CL.changingF") >> undefined -- TODO
+changingF = do
+    -- if we are downloading, we don't change!
+    -- This is so we don't suddenly stop downloading a map
+    download <- use $ globals.cls.csDownload
+
+    when (isNothing download) $ do
+      SCR.beginLoadingPlaque
+      globals.cls.csState .= Constants.caConnected -- not active anymore, but not disconnected
+
+      Com.printf "\nChanging map...\n"
 
 disconnectF :: XCommandT
 disconnectF = Com.comError Constants.errDrop "Disconnected from server"
