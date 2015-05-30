@@ -383,7 +383,17 @@ forwardToServerF = do
           SZ.print (globals.cls.csNetChan.ncMessage) args
 
 pauseF :: XCommandT
-pauseF = io (putStrLn "CL.pauseF") >> undefined -- TODO
+pauseF = do
+    maxClientsValue <- CVar.variableValue "maxclients"
+    state <- use $ globals.serverState
+
+    if maxClientsValue > 1 || state == 0
+      then
+        CVar.setValue "paused" 0
+      else do
+        pausedValue <- liftM (^.cvValue) clPausedCVar
+        CVar.setValueF "paused" pausedValue
+
 
 pingServersF :: XCommandT
 pingServersF = io (putStrLn "CL.pingServersF") >> undefined -- TODO
