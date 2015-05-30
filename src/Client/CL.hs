@@ -401,7 +401,7 @@ changingF :: XCommandT
 changingF = io (putStrLn "CL.changingF") >> undefined -- TODO
 
 disconnectF :: XCommandT
-disconnectF = io (putStrLn "CL.disconnectF") >> undefined -- TODO
+disconnectF = Com.comError Constants.errDrop "Disconnected from server"
 
 recordF :: XCommandT
 recordF = io (putStrLn "CL.recordF") >> undefined -- TODO
