@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom)
+import Control.Monad (when)
+import Data.Bits ((.&.), (.|.), shiftL)
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -168,8 +171,48 @@ weaponBFGFire =
     io (putStrLn "PlayerWeapon.weaponBFGFire") >> undefined -- TODO
 
 changeWeapon :: EdictReference -> Quake ()
-changeWeapon _ = do
+changeWeapon edictRef@(EdictReference edictIdx) = do
+    Just (Just gClientRef@(GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+
+    checkGrenadeTime gClientRef
+
+    preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gClient) -> 
+      zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+        gcPers.cpLastWeapon .= gClient^.gcPers.cpWeapon
+        gcPers.cpWeapon .= gClient^.gcNewWeapon
+        gcNewWeapon .= Nothing
+        gcMachinegunShots .= 0
+
+    -- set visible model
+    setVisibleModel gClientRef
+
     io (putStrLn "PlayerWeapon.changeWeapon") >> undefined -- TODO
+
+  where checkGrenadeTime :: GClientReference -> Quake ()
+        checkGrenadeTime (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          when (gClient^.gcGrenadeTime /= 0) $ do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcGrenadeTime .= levelTime
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
+            weaponGrenadeFire edictRef False
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcGrenadeTime .= 0
+
+        setVisibleModel :: GClientReference -> Quake ()
+        setVisibleModel (GClientReference gClientIdx) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          when ((edict^.eEntityState.esModelIndex) == 255) $ do
+            Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+            i <- case gClient^.gcPers.cpWeapon of
+                   Nothing -> return 0
+                   Just (GItemReference weaponIdx) -> do
+                     Just weaponModel <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx.giWeaponModel
+                     return $ (weaponModel .&. 0xFF) `shiftL` 8
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= (edictIdx - 1) .|. i
 
 thinkWeapon :: EdictReference -> Quake ()
 thinkWeapon _ = do
@@ -178,3 +221,7 @@ thinkWeapon _ = do
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
 weaponGeneric _ _ _ _ _ _ _ _ = do
     io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+
+weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
+weaponGrenadeFire _ _ = do
+    io (putStrLn "PlayerWeapon.weaponGrenadeFire") >> undefined -- TODO
