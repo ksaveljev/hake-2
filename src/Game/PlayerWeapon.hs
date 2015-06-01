@@ -3,7 +3,7 @@
 module Game.PlayerWeapon where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=))
-import Control.Monad (when, liftM, void)
+import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3)
@@ -15,6 +15,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
+import qualified Game.Monsters.MPlayer as MPlayer
 
 useWeapon :: ItemUse
 useWeapon =
@@ -217,7 +218,19 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
     -- set visible model
     setVisibleModel gClientRef
 
-    io (putStrLn "PlayerWeapon.changeWeapon") >> undefined -- TODO
+    done <- setAmmoAndGunIndex gClientRef
+
+    unless done $ do
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animPain
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+        then do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain1
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
+        else do
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain301
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain304
 
   where checkGrenadeTime :: GClientReference -> Quake ()
         checkGrenadeTime (GClientReference gClientIdx) = do
@@ -244,6 +257,43 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
                      return $ (weaponModel .&. 0xFF) `shiftL` 8
 
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= (edictIdx - 1) .|. i
+
+        setAmmoAndGunIndex :: GClientReference -> Quake Bool
+        setAmmoAndGunIndex (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          case gClient^.gcPers.cpWeapon of
+            Nothing -> do
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAmmoIndex .= 0
+
+            Just (GItemReference weaponIdx) -> do
+              Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+
+              case weapon^.giAmmo of
+                Nothing -> do
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAmmoIndex .= 0
+
+                Just ammo -> do
+                  Just (GItemReference ammoItemIdx) <- GameItems.findItem ammo
+                  Just ammoItem <- preuse $ gameBaseGlobals.gbItemList.ix ammoItemIdx
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAmmoIndex .= ammoItem^.giIndex
+
+          case gClient^.gcPers.cpWeapon of
+            Nothing -> do -- dead
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunIndex .= 0
+              return True
+
+            Just (GItemReference weaponIdx) -> do
+              Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+              modelIndex <- use $ gameBaseGlobals.gbGameImport.giModelIndex
+              gunIndex <- modelIndex (weapon^.giViewModel)
+
+              zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+                gcWeaponState .= Constants.weaponActivating
+                gcPlayerState.psGunFrame .= 0
+                gcPlayerState.psGunIndex .= gunIndex
+
+              return False
 
 {-
 - ================= 
