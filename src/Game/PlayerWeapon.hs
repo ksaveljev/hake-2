@@ -1,14 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom)
-import Control.Monad (when)
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=))
+import Control.Monad (when, liftM)
 import Data.Bits ((.&.), (.|.), shiftL)
+import Linear (V3)
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
+import qualified Constants
 
 useWeapon :: ItemUse
 useWeapon =
@@ -26,8 +29,18 @@ weaponBlaster =
 
 weaponBlasterFire :: EntThink
 weaponBlasterFire =
-  GenericEntThink "Weapon_Blaster_Fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponBlasterFire") >> undefined -- TODO
+  GenericEntThink "Weapon_Blaster_Fire" $ \edictRef@(EdictReference edictIdx) -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    let damage = if deathmatchValue /= 0 then 15 else 10
+    v3o <- use $ globals.vec3Origin
+
+    blasterFire edictRef v3o damage False Constants.efBlaster
+
+    Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+    return True
 
 pickupWeapon :: EntInteract
 pickupWeapon =
@@ -225,3 +238,7 @@ weaponGeneric _ _ _ _ _ _ _ _ = do
 weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
 weaponGrenadeFire _ _ = do
     io (putStrLn "PlayerWeapon.weaponGrenadeFire") >> undefined -- TODO
+
+blasterFire :: EdictReference -> V3 Float -> Int -> Bool -> Int -> Quake ()
+blasterFire _ _ _ _ _ = do
+    io (putStrLn "PlayerWeapon.blasterFire") >> undefined -- TODO
