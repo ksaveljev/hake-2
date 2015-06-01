@@ -11,6 +11,7 @@ module Game.GameBaseGlobals ( module Game.GameBaseGlobals
                             ) where
 
 import Control.Lens (makeLenses)
+import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Internal
@@ -49,4 +50,13 @@ initialGameBaseGlobals =
                   , _gbTouch             = V.replicate Constants.maxEdicts (EdictReference (-1))
                   , _gbIsQuad            = False
                   , _gbIsSilenced        = 0
+                  , _gbCurrentPlayer     = Nothing
+                  , _gbCurrentClient     = Nothing
+                  , _gbForward           = V3 0 0 0
+                  , _gbRight             = V3 0 0 0
+                  , _gbUp                = V3 0 0 0
+                  , _gbXYSpeed           = 0
+                  , _gbBobMove           = 0
+                  , _gbBobCycle          = 0
+                  , _gbBobFracSin        = 0
                   }

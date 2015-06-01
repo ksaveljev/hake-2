@@ -704,6 +704,15 @@ data GameBaseGlobals =
                   , _gbTouch             :: V.Vector EdictReference
                   , _gbIsQuad            :: Bool
                   , _gbIsSilenced        :: Int
+                  , _gbCurrentPlayer     :: Maybe EdictReference
+                  , _gbCurrentClient     :: Maybe GClientReference
+                  , _gbForward           :: V3 Float
+                  , _gbRight             :: V3 Float
+                  , _gbUp                :: V3 Float
+                  , _gbXYSpeed           :: Float
+                  , _gbBobMove           :: Float
+                  , _gbBobCycle          :: Int
+                  , _gbBobFracSin        :: Float
                   }
 
 data PMoveGlobals =
