@@ -58,7 +58,7 @@ cprintfHigh _ _ = io (putStrLn "SVGame.cprintfHigh") >> undefined -- TODO
 - 
 - Print to a single client.
 -}
-cprintf :: EdictT -> Int -> B.ByteString -> Quake ()
+cprintf :: EdictReference -> Int -> B.ByteString -> Quake ()
 cprintf _ _ _ = io (putStrLn "SVGame.cprintf") >>  undefined -- TODO
 
 {-

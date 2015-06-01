@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=))
-import Control.Monad (when, liftM)
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=))
+import Control.Monad (when, liftM, void)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Linear (V3)
 import qualified Data.Vector.Unboxed as UV
@@ -12,6 +13,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Game.GameItems as GameItems
 
 useWeapon :: ItemUse
 useWeapon =
@@ -49,8 +51,23 @@ pickupWeapon =
 
 dropWeapon :: ItemDrop
 dropWeapon =
-  GenericItemDrop "Drop_Weapon" $ \_ _ -> do
-    io (putStrLn "PlayerWeapon.dropWeapon") >> undefined -- TODO
+  GenericItemDrop "Drop_Weapon" $ \edictRef@(EdictReference edictIdx) itemRef@(GItemReference gItemIdx) -> do
+    dmFlagsValue :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    when (dmFlagsValue .&. Constants.dfWeaponsStay == 0) $ do
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      let index = gItem^.giIndex
+
+      if ((Just itemRef) == (gClient^.gcPers.cpWeapon) || (Just itemRef) == (gClient^.gcNewWeapon)) && ((gClient^.gcPers.cpInventory) UV.! index) == 1
+        then do
+          cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
+          cprintf edictRef Constants.printHigh "Can't drop current weapon\n"
+        else do
+          void $ GameItems.dropItem edictRef itemRef
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix index -= 1
 
 weaponShotgun :: EntThink
 weaponShotgun =

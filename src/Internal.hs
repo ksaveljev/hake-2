@@ -620,7 +620,7 @@ data LevelLocalsT =
 data GameImportT =
   GameImportT { _giBprintf            :: Int -> B.ByteString -> Quake ()
               , _giDprintf            :: B.ByteString -> Quake ()
-              , _giCprintf            :: EdictT -> Int -> B.ByteString -> Quake ()
+              , _giCprintf            :: EdictReference -> Int -> B.ByteString -> Quake ()
               , _giCenterPrintf       :: EdictReference -> B.ByteString -> Quake ()
               , _giSound              :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
               , _giPositionedSound    :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
@@ -1064,7 +1064,7 @@ class ItemUseAdapter a where
     itemUse :: a -> EdictReference -> GItemT -> Quake ()
 
 class ItemDropAdapter a where
-    drop :: a -> EdictReference   -> GItemT -> Quake ()
+    drop :: a -> EdictReference -> GItemReference -> Quake ()
 
 class AIAdapter a where
     ai :: a -> EdictReference -> Float -> Quake ()
@@ -1122,7 +1122,7 @@ data ItemUse =
 
 data ItemDrop =
   GenericItemDrop { _gidId :: B.ByteString
-                  , _gidDrop :: EdictReference -> GItemT -> Quake ()
+                  , _gidDrop :: EdictReference -> GItemReference -> Quake ()
                   }
 
 data AI =

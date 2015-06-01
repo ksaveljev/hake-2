@@ -573,3 +573,7 @@ useItem :: EntUse
 useItem =
   GenericEntUse "use_item" $ \_ _ _ -> do
     io (putStrLn "GameItems.useItem") >> undefined -- TODO
+
+dropItem :: EdictReference -> GItemReference -> Quake EdictReference
+dropItem _ _ = do
+    io (putStrLn "GameItems.dropItem") >> undefined -- TODO
