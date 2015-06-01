@@ -47,4 +47,6 @@ initialGameBaseGlobals =
                   , _gbCYes              = 0
                   , _gbCNo               = 0
                   , _gbTouch             = V.replicate Constants.maxEdicts (EdictReference (-1))
+                  , _gbIsQuad            = False
+                  , _gbIsSilenced        = 0
                   }

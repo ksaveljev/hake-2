@@ -702,6 +702,8 @@ data GameBaseGlobals =
                   , _gbCYes              :: !Int
                   , _gbCNo               :: !Int
                   , _gbTouch             :: V.Vector EdictReference
+                  , _gbIsQuad            :: Bool
+                  , _gbIsSilenced        :: Int
                   }
 
 data PMoveGlobals =

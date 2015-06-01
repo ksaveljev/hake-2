@@ -5,6 +5,7 @@ module Game.PlayerWeapon where
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=))
 import Control.Monad (when, liftM, void)
 import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Maybe (isJust, fromJust)
 import Linear (V3)
 import qualified Data.Vector.Unboxed as UV
 
@@ -244,9 +245,38 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
 
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= (edictIdx - 1) .|. i
 
+{-
+- ================= 
+- Think_Weapon
+- 
+- Called by ClientBeginServerFrame and ClientThink 
+- =================
+-}
 thinkWeapon :: EdictReference -> Quake ()
-thinkWeapon _ = do
-    io (putStrLn "PlayerWeapon.thinkWeapon") >> undefined -- TODO
+thinkWeapon edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+
+    -- if just died, put the weapon away
+    when ((edict^.eEdictStatus.eHealth) < 1) $ do
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Nothing
+      changeWeapon edictRef
+
+    -- call active weapon think routine
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    when (isJust (gClient^.gcPers.cpWeapon)) $ do
+      let Just (GItemReference weaponIdx) = gClient^.gcPers.cpWeapon
+      Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+
+      when (isJust (weapon^.giWeaponThink)) $ do
+        frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+        gameBaseGlobals.gbIsQuad .= (truncate (gClient^.gcQuadFrameNum) > frameNum)
+        gameBaseGlobals.gbIsSilenced .= if (gClient^.gcSilencerShots) /= 0
+                                          then Constants.mzSilenced
+                                          else 0
+        
+        void $ think (fromJust $ weapon^.giWeaponThink) edictRef
 
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
 weaponGeneric _ _ _ _ _ _ _ _ = do
