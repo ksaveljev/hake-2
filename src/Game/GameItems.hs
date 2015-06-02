@@ -577,3 +577,6 @@ useItem =
 dropItem :: EdictReference -> GItemReference -> Quake EdictReference
 dropItem _ _ = do
     io (putStrLn "GameItems.dropItem") >> undefined -- TODO
+
+powerArmorType :: EdictT -> Int
+powerArmorType _ = undefined -- TODO -- GameItems.powerArmorType

@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerView where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
 import Control.Monad (unless, when)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, isNothing)
@@ -11,6 +11,7 @@ import Linear (V3, _x, _y, _z)
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Game.GameItems as GameItems
 import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Game.PlayerHud as PlayerHud
 import qualified Util.Math3D as Math3D
@@ -210,8 +211,48 @@ setClientEvent _ = do
     io (putStrLn "PlayerView.setClientEvent") >> undefined -- TODO
 
 setClientEffects :: EdictReference -> Quake ()
-setClientEffects _ = do
-    io (putStrLn "PlayerView.setClientEffects") >> undefined -- TODO
+setClientEffects (EdictReference edictIdx) = do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+      esEffects .= 0
+      esRenderFx .= 0
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+
+    unless ((edict^.eEdictStatus.eHealth) <= 0 || intermissionTime /= 0) $ do
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      when ((edict^.eEdictStatus.ePowerArmorTime) > levelTime) $ do
+        let paType = GameItems.powerArmorType edict
+
+        if | paType == Constants.powerArmorScreen ->
+               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPowerScreen)
+
+           | paType == Constants.powerArmorShield -> do
+               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efColorShell)
+               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esRenderFx %= (.|. Constants.rfShellGreen)
+
+           | otherwise -> return ()
+
+      let Just (GClientReference gClientIdx) = edict^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+      when (truncate (gClient^.gcQuadFrameNum) > frameNum) $ do
+        let remaining = truncate (gClient^.gcQuadFrameNum) - frameNum
+        when (remaining > 30 || (remaining .&. 4) /= 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efQuad)
+
+      when (truncate (gClient^.gcInvincibleFrameNum) > frameNum) $ do
+        let remaining = truncate (gClient^.gcInvincibleFrameNum) - frameNum
+        when (remaining > 30 || (remaining .&. 4) /= 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPent)
+
+      -- show cheaters!!!
+      when ((edict^.eFlags) .&. Constants.flGodMode /= 0) $ do
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
+          esEffects %= (.|. Constants.efColorShell)
+          esRenderFx %= (.|. (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue))
 
 setClientSound :: EdictReference -> Quake ()
 setClientSound edictRef@(EdictReference edictIdx) = do
