@@ -1,15 +1,16 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerView where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=))
 import Control.Monad (unless, when)
 import Data.Bits ((.&.))
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing)
 import Linear (V3, _x, _y, _z)
 
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Game.PlayerHud as PlayerHud
 import qualified Util.Math3D as Math3D
 
@@ -216,5 +217,103 @@ setClientSound _ = do
     io (putStrLn "PlayerView.setClientSound") >> undefined -- TODO
 
 setClientFrame :: EdictReference -> Quake ()
-setClientFrame _ = do
-    io (putStrLn "PlayerView.setClientFrame") >> undefined -- TODO
+setClientFrame (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    -- only when we are in the player model
+    when ((edict^.eEntityState.esModelIndex) == 255) $ do
+      let Just (GClientReference gClientIdx) = edict^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      let duck = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                   then True
+                   else False
+
+      xyspeed <- use $ gameBaseGlobals.gbXYSpeed
+
+      let run = if xyspeed /= 0 then True else False
+          skip = checkSkip edict gClient duck run
+
+      done <- checkIfDone edict gClient
+
+      unless done $ do
+        -- return to either a running or standing frame
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcAnimPriority .= Constants.animBasic
+          gcAnimDuck .= duck
+          gcAnimRun .= run
+
+        if | isNothing (edict^.eEdictOther.eoGroundEntity) -> do
+               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animJump
+               when ((edict^.eEntityState.esFrame) /= MPlayer.frameJump2) $
+                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameJump1
+               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameJump2
+
+           | run -> do -- running
+               if duck
+                 then do
+                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRWalk1
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRWalk6
+                 else do
+                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameRun1
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameRun6
+
+           | otherwise -> do -- standing
+               if duck
+                 then do
+                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRStnd01
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRStnd19
+                 else do
+                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameStand01
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameStand40
+
+  where checkSkip :: EdictT -> GClientT -> Bool -> Bool -> Bool
+        checkSkip edict gClient duck run =
+          let a = if duck /= (gClient^.gcAnimDuck) && (gClient^.gcAnimPriority) < Constants.animDeath
+                    then True
+                    else False
+              b = if run /= (gClient^.gcAnimRun) && (gClient^.gcAnimPriority) == Constants.animBasic
+                    then True
+                    else False
+              c = if isNothing (edict^.eEdictOther.eoGroundEntity) && (gClient^.gcAnimPriority) <= Constants.animWave
+                    then True
+                    else False
+          in a || b || c
+
+        checkIfDone :: EdictT -> GClientT -> Quake Bool
+        checkIfDone edict gClient = do
+          if (gClient^.gcAnimPriority) == Constants.animReverse
+            then if (edict^.eEntityState.esFrame) > (gClient^.gcAnimEnd)
+                   then do
+                     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame -= 1
+                     return True
+                   else
+                     checkDeath edict gClient
+
+            else if (edict^.eEntityState.esFrame) < (gClient^.gcAnimEnd) -- continue an animation
+                   then do
+                     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame += 1
+                     return True
+                   else
+                     checkDeath edict gClient
+
+        checkDeath :: EdictT -> GClientT -> Quake Bool
+        checkDeath edict gClient =
+          if (gClient^.gcAnimPriority) == Constants.animDeath
+            then return True -- stay there
+            else checkJump edict gClient
+
+        checkJump :: EdictT -> GClientT -> Quake Bool
+        checkJump edict gClient = do
+          if (gClient^.gcAnimPriority) == Constants.animJump
+            then do
+              if isNothing (edict^.eEdictOther.eoGroundEntity)
+                then return True -- stay there
+                else do
+                  let Just (GClientReference gClientIdx) = edict^.eClient
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animWave
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameJump3
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameJump6
+                  return True
+            else
+              return False
