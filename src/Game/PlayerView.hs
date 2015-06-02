@@ -1,9 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerView where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=))
 import Control.Monad (unless, when)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust, isNothing)
 import Linear (V3, _x, _y, _z)
 
@@ -213,8 +214,67 @@ setClientEffects _ = do
     io (putStrLn "PlayerView.setClientEffects") >> undefined -- TODO
 
 setClientSound :: EdictReference -> Quake ()
-setClientSound _ = do
-    io (putStrLn "PlayerView.setClientSound") >> undefined -- TODO
+setClientSound edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just gClientRef = edict^.eClient
+
+    checkHelpChanged gClientRef
+
+    -- help beep (no more than three times)
+    helpBeep gClientRef
+
+    setSound gClientRef
+
+  where checkHelpChanged :: GClientReference -> Quake ()
+        checkHelpChanged (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+          helpChanged <- use $ gameBaseGlobals.gbGame.glHelpChanged
+
+          when ((gClient^.gcPers.cpGameHelpChanged) /= helpChanged) $ do
+            zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers) $ do
+              cpGameHelpChanged .= helpChanged
+              cpHelpChanged .= 1
+
+        helpBeep :: GClientReference -> Quake ()
+        helpBeep (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+          frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+          when ((gClient^.gcPers.cpHelpChanged) /= 0 && (gClient^.gcPers.cpHelpChanged) <= 3 && (frameNum .&. 63) == 0) $ do
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpHelpChanged += 1
+            gameImport <- use $ gameBaseGlobals.gbGameImport
+            let sound = gameImport^.giSound
+                soundIndex = gameImport^.giSoundIndex
+
+            idx <- soundIndex (Just "misc/pc_up.wav")
+
+            sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnStatic 0
+
+        setSound :: GClientReference -> Quake ()
+        setSound (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          weap <- case gClient^.gcPers.cpWeapon of
+                    Nothing -> return ""
+                    Just (GItemReference weaponIdx) -> do
+                      Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+                      return $ weapon^.giClassName
+
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+
+          snd <- if | (edict^.eWaterLevel) /= 0 && (edict^.eWaterType) .&. (Constants.contentsLava .|. Constants.contentsSlime) /= 0 ->
+                        use $ gameBaseGlobals.gbSndFry
+
+                    | weap == "weapon_railgun" -> soundIndex (Just "weapons/rg_hum.wav")
+
+                    | weap == "weapon_bfg" -> soundIndex (Just "weapons/bfg_hum.wav")
+
+                    | (gClient^.gcWeaponSound) /= 0 -> return (gClient^.gcWeaponSound)
+
+                    | otherwise -> return 0
+
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= snd
 
 setClientFrame :: EdictReference -> Quake ()
 setClientFrame (EdictReference edictIdx) = do
