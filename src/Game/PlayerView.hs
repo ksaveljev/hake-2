@@ -207,8 +207,19 @@ calcBlend _ = do
     io (putStrLn "PlayerView.calcBlend") >> undefined -- TODO
 
 setClientEvent :: EdictReference -> Quake ()
-setClientEvent _ = do
-    io (putStrLn "PlayerView.setClientEvent") >> undefined -- TODO
+setClientEvent (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    unless ((edict^.eEntityState.esEvent) /= 0) $ do
+      xyspeed <- use $ gameBaseGlobals.gbXYSpeed
+
+      when (isJust (edict^.eEdictOther.eoGroundEntity) && xyspeed > 225) $ do
+        Just (GClientReference currentClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+        Just bobTime <- preuse $ gameBaseGlobals.gbGame.glClients.ix currentClientIdx.gcBobTime
+        bobMove <- use $ gameBaseGlobals.gbBobMove
+        bobCycle <- use $ gameBaseGlobals.gbBobCycle
+        when (truncate (bobTime + bobMove) /= bobCycle) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFootstep
 
 setClientEffects :: EdictReference -> Quake ()
 setClientEffects (EdictReference edictIdx) = do
