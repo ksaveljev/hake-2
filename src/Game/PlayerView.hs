@@ -178,9 +178,71 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
         setCameraStuff = do
           io (putStrLn "PlayerView.setCameraSTuff") >> undefined -- TODO
 
+-- General effect handling for a player.
 worldEffects :: Quake ()
 worldEffects = do
-    io (putStrLn "PlayerView.worldEffects") >> undefined -- TODO
+    Just edictRef@(EdictReference edictIdx) <- use $ gameBaseGlobals.gbCurrentPlayer
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if (edict^.eMoveType) == Constants.moveTypeNoClip
+      then do
+        -- don't need air
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAirFinished .= levelTime + 12
+      else do
+        Just gClientRef@(GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+        let waterLevel = edict^.eWaterLevel
+            oldWaterLevel = gClient^.gcOldWaterLevel
+        
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcOldWaterLevel .= waterLevel
+
+        let breater = truncate (gClient^.gcBreatherFrameNum) > frameNum
+            enviroSuit = truncate (gClient^.gcEnviroFrameNum) > frameNum
+
+        -- if just entered a water volume, play a sound
+        waterEnterPlaySound edictRef waterLevel oldWaterLevel
+
+        -- if just completely exited a water volume, play a sound
+        waterExitPlaySound edictRef waterLevel oldWaterLevel
+
+        -- check for head just going under water
+        checkHeadUnderWater edictRef waterLevel oldWaterLevel
+
+        -- check for head just coming out of water
+        checkHeadOutOfWater edictRef waterLevel oldWaterLevel
+
+        -- check for drowning
+        checkForDrowning edictRef gClientRef waterLevel
+
+        -- check for sizzle damage
+        checkForSizzleDamage edictRef gClientRef waterLevel
+
+  where waterEnterPlaySound :: EdictReference -> Int -> Int -> Quake ()
+        waterEnterPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
+          io (putStrLn "PlayerView.worldEffects#waterEnterPlaySound") >> undefined -- TODO
+
+        waterExitPlaySound :: EdictReference -> Int -> Int -> Quake ()
+        waterExitPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
+          io (putStrLn "PlayerView.worldEffects#waterExitPlaySound") >> undefined -- TODO
+
+        checkHeadUnderWater :: EdictReference -> Int -> Int -> Quake ()
+        checkHeadUnderWater edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
+          io (putStrLn "PlayerView.worldEffects#checkHeadUnderWater") >> undefined -- TODO
+
+        checkHeadOutOfWater :: EdictReference -> Int -> Int -> Quake ()
+        checkHeadOutOfWater edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
+          io (putStrLn "PlayerView.worldEffects#checkHeadOutOfWater") >> undefined -- TODO
+
+        checkForDrowning :: EdictReference -> GClientReference -> Int -> Quake ()
+        checkForDrowning edictRef gClientRef waterLevel = do
+          io (putStrLn "PlayerView.worldEffects#checkForDrowning") >> undefined -- TODO
+
+        checkForSizzleDamage :: EdictReference -> GClientReference -> Int -> Quake ()
+        checkForSizzleDamage edictRef gClientRef waterLevel = do
+          io (putStrLn "PlayerView.worldEffects#checkForSizzleDamage") >> undefined -- TODO
 
 calcRoll :: V3 Float -> V3 Float -> Quake Float
 calcRoll _ _ = do
