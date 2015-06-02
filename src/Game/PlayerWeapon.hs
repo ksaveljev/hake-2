@@ -339,3 +339,7 @@ weaponGrenadeFire _ _ = do
 blasterFire :: EdictReference -> V3 Float -> Int -> Bool -> Int -> Quake ()
 blasterFire _ _ _ _ _ = do
     io (putStrLn "PlayerWeapon.blasterFire") >> undefined -- TODO
+
+playerNoise :: EdictReference -> V3 Float -> Int -> Quake ()
+playerNoise _ _ _ = do
+    io (putStrLn "PlayerWeapon.playerNoise") >> undefined -- TODO

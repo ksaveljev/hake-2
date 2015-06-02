@@ -879,9 +879,9 @@ sflCrossTrigger8    = 0x00000080 :: Int
 sflCrossTriggerMask = 0x000000ff :: Int
 
 -- noise types for PlayerNoise
-pnoiseSelf   = 0 :: Int
-pnoiseWeapon = 1 :: Int
-pnoiseImpact = 2 :: Int
+pNoiseSelf   = 0 :: Int
+pNoiseWeapon = 1 :: Int
+pNoiseImpact = 2 :: Int
 
 -- gitem_t->flags
 itWeapon    =  1 :: Int -- use makes active weapon 

@@ -4,8 +4,8 @@ module Game.PlayerView where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
 import Control.Monad (unless, when)
-import Data.Bits ((.&.), (.|.))
-import Data.Maybe (isJust, isNothing)
+import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3, _x, _y, _z)
 
 import Quake
@@ -14,6 +14,7 @@ import qualified Constants
 import qualified Game.GameItems as GameItems
 import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Game.PlayerHud as PlayerHud
+import qualified Game.PlayerWeapon as PlayerWeapon
 import qualified Util.Math3D as Math3D
 
 {-
@@ -221,12 +222,49 @@ worldEffects = do
         checkForSizzleDamage edictRef gClientRef waterLevel
 
   where waterEnterPlaySound :: EdictReference -> Int -> Int -> Quake ()
-        waterEnterPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
-          io (putStrLn "PlayerView.worldEffects#waterEnterPlaySound") >> undefined -- TODO
+        waterEnterPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel =
+          when (oldWaterLevel == 0 && waterLevel /= 0) $ do
+            Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            gameImport <- use $ gameBaseGlobals.gbGameImport
+            let sound = gameImport^.giSound
+                soundIndex = gameImport^.giSoundIndex
+
+            PlayerWeapon.playerNoise edictRef (edict^.eEntityState.esOrigin) Constants.pNoiseSelf
+
+            idx <- if | (edict^.eWaterType) .&. Constants.contentsLava /= 0 ->
+                          soundIndex (Just "player/lava_in.wav") >>= return . Just
+
+                      | (edict^.eWaterType) .&. Constants.contentsSlime /= 0 ->
+                          soundIndex (Just "player/watr_in.wav") >>= return . Just
+
+                      | (edict^.eWaterType) .&. Constants.contentsWater /= 0 ->
+                          soundIndex (Just "player/watr_in.wav") >>= return . Just
+                         
+                      | otherwise -> return Nothing
+
+            when (isJust idx) $
+              sound (Just edictRef) Constants.chanBody (fromJust idx) 1 Constants.attnNorm 0
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flInWater)
+
+            -- clear damage_debounce, so the pain sound will play immediately
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etDamageDebounceTime .= levelTime - 1
 
         waterExitPlaySound :: EdictReference -> Int -> Int -> Quake ()
-        waterExitPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
-          io (putStrLn "PlayerView.worldEffects#waterExitPlaySound") >> undefined -- TODO
+        waterExitPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel =
+          when (oldWaterLevel /= 0 && waterLevel == 0) $ do
+            Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            gameImport <- use $ gameBaseGlobals.gbGameImport
+            let sound = gameImport^.giSound
+                soundIndex = gameImport^.giSoundIndex
+
+            PlayerWeapon.playerNoise edictRef (edict^.eEntityState.esOrigin) Constants.pNoiseSelf
+
+            idx <- soundIndex (Just "player/watr_out.wav")
+            sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flInWater))
 
         checkHeadUnderWater :: EdictReference -> Int -> Int -> Quake ()
         checkHeadUnderWater edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel = do
