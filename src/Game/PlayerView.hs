@@ -1,12 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerView where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), (.|.), complement, xor)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3, _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot)
 
 import Quake
 import QuakeState
@@ -458,9 +459,76 @@ calcRoll angles velocity = do
 
     return (side'' * sign)
 
+-- Calculated damage and effect when a player falls down.
 fallingDamage :: EdictReference -> Quake ()
-fallingDamage _ = do
-    io (putStrLn "PlayerView.fallingDamage") >> undefined -- TODO
+fallingDamage edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    unless ((edict^.eEntityState.esModelIndex) /= 255 || (edict^.eMoveType) == Constants.moveTypeNoClip) $ do
+      let Just (GClientReference gClientIdx) = edict^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eEdictPhysics.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eEdictOther.eoGroundEntity)
+                         then Just (gClient^.gcOldVelocity._z)
+                         else if isNothing (edict^.eEdictOther.eoGroundEntity)
+                                then Nothing
+                                else Just ((edict^.eEdictPhysics.eVelocity._z) - (gClient^.gcOldVelocity._z))
+
+      case maybeDelta of
+        Nothing -> return () -- we are done
+        Just delta -> do
+          maybeDelta' <- updateDelta edict (delta * delta * 0.0001)
+
+          case maybeDelta' of
+            Nothing -> return () -- we are done
+            Just delta' -> do
+              levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcFallValue %= (\x -> if delta' * 0.5 > 40 then 40 else delta' * 0.5)
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcFallTime .= levelTime + Constants.fallTime
+
+              if delta' > 30
+                then do
+                  when ((edict^.eEdictStatus.eHealth) > 0) $
+                    if (edict^.eEdictStatus.eHealth) >= 55
+                      then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFallFar
+                      else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFall
+
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime -- no normal pain sound
+
+                  let damage :: Int = truncate ((delta' - 30) / 2)
+                      damage' = if damage < 1 then 1 else damage
+                      dir = V3 0 0 1
+
+                  deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+                  dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+                  when (deathmatchValue == 0 || dmFlagsValue .&. Constants.dfNoFalling == 0) $ do
+                    v3o <- use $ globals.vec3Origin
+                    GameCombat.damage edictRef
+                                      (EdictReference 0)
+                                      (EdictReference 0)
+                                      dir
+                                      (edict^.eEntityState.esOrigin)
+                                      v3o
+                                      damage'
+                                      0
+                                      0
+                                      Constants.modFalling
+                else
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFallShort
+
+  where updateDelta :: EdictT -> Float -> Quake (Maybe Float)
+        updateDelta edict delta =
+          -- never take falling damage if completely underwater
+          if (edict^.eWaterLevel) == 3
+            then return Nothing
+            else let delta' = if | (edict^.eWaterLevel) == 2 -> delta * 0.25
+                                 | (edict^.eWaterLevel) == 1 -> delta * 0.5
+                                 | otherwise -> delta
+                 in if | delta' < 1 -> return Nothing
+                       | delta' < 15 -> do
+                           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFootstep
+                           return Nothing
+                       | otherwise -> return (Just delta')
 
 damageFeedback :: EdictReference -> Quake ()
 damageFeedback _ = do
