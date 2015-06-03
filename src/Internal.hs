@@ -24,7 +24,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import qualified Data.Vector as V
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.UI.GLFW as GLFW
 
@@ -1572,13 +1573,13 @@ data FastRenderAPIGlobals =
                        , _frOldViewCluster       :: !Int
                        , _frOldViewCluster2      :: !Int
                        , _frWorldModel           :: Maybe ModelReference
-                       , _frModelTextureCoordBuf :: MV.IOVector Float
-                       , _frModelVertexIndexBuf  :: MV.IOVector Int32
+                       , _frModelTextureCoordBuf :: MSV.IOVector Float
+                       , _frModelVertexIndexBuf  :: MSV.IOVector Int32
                        , _frModelTextureCoordIdx :: !Int
                        , _frModelVertexIndexIdx  :: !Int
                        , _frPolygonS1Old         :: UV.Vector Float
-                       , _frPolygonBuffer        :: MV.IOVector Float
-                       , _frPolygonCache         :: V.Vector GLPolyT
+                       , _frPolygonBuffer        :: MSV.IOVector Float
+                       , _frPolygonCache         :: MV.IOVector GLPolyT
                        , _frPolygonBufferIndex   :: !Int
                        , _frPolygonCount         :: !Int
                        , _frGLLms                :: GLLightMapStateT
@@ -1758,7 +1759,7 @@ data GLLightMapStateT =
                    , _lmsCurrentLightmapTexture :: !Int
                    , _lmsLightmapSurfaces       :: V.Vector Int -- TODO: reference ?
                    , _lmsAllocated              :: UV.Vector Int
-                   , _lmsLightmapBuffer         :: MV.IOVector Word8
+                   , _lmsLightmapBuffer         :: MSV.IOVector Word8
                    }
 
 data MNodeT =

@@ -1,22 +1,25 @@
 module Render.Fast.Polygon where
 
 import Control.Lens (use, (.=), (+=), ix, (^.), preuse)
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 
 import Quake
 import QuakeState
 
 getPolygonBufferValue :: Int -> GLPolyReference -> Int -> Quake Float
 getPolygonBufferValue offset (GLPolyReference polyIdx) idx = do
-    Just poly <- preuse $ fastRenderAPIGlobals.frPolygonCache.ix polyIdx
+    polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+    poly <- io $ MV.read polygonCache polyIdx
     use (fastRenderAPIGlobals.frPolygonBuffer) >>= \buffer -> 
-      io $ MV.read buffer ((idx + (poly^.glpPos)) * stride + offset)
+      io $ MSV.read buffer ((idx + (poly^.glpPos)) * stride + offset)
 
 setPolygonBufferValue :: Int -> GLPolyReference -> Int -> Float -> Quake ()
 setPolygonBufferValue offset (GLPolyReference polyIdx) idx value = do
-    Just poly <- preuse $ fastRenderAPIGlobals.frPolygonCache.ix polyIdx
+    polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+    poly <- io $ MV.read polygonCache polyIdx
     use (fastRenderAPIGlobals.frPolygonBuffer) >>= \buffer ->
-      io $ MV.write buffer ((idx + (poly^.glpPos)) * stride + offset) value
+      io $ MSV.write buffer ((idx + (poly^.glpPos)) * stride + offset) value
 
 getPolyX :: GLPolyReference -> Int -> Quake Float
 getPolyX = getPolygonBufferValue 2
@@ -77,7 +80,10 @@ create :: Int -> Quake GLPolyReference
 create numVerts = do
     polyCount <- use $ fastRenderAPIGlobals.frPolygonCount
     bufferIndex <- use $ fastRenderAPIGlobals.frPolygonBufferIndex
-    fastRenderAPIGlobals.frPolygonCache.ix polyCount .= newGLPolyT { _glpNumVerts = numVerts, _glpPos = bufferIndex }
+
+    use (fastRenderAPIGlobals.frPolygonCache) >>= \polygonCache ->
+      io $ MV.write polygonCache polyCount newGLPolyT { _glpNumVerts = numVerts, _glpPos = bufferIndex }
+
     fastRenderAPIGlobals.frPolygonCount += 1
     fastRenderAPIGlobals.frPolygonBufferIndex += numVerts
     return (GLPolyReference polyCount)

@@ -11,6 +11,7 @@ import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -79,7 +80,11 @@ subdividePolygon numVerts verts = do
       polyRef@(GLPolyReference polyIdx) <- Polygon.create (numVerts + 2)
       Just surface <- use $ fastRenderAPIGlobals.frWarpFace
 
-      fastRenderAPIGlobals.frPolygonCache.ix polyIdx.glpNext .= (surface^.msPolys)
+      use (fastRenderAPIGlobals.frPolygonCache) >>= \polygonCache -> do
+        io $ do
+          poly <- MV.read polygonCache polyIdx
+          MV.write polygonCache polyIdx poly { _glpNext = surface^.msPolys }
+
       fastRenderAPIGlobals.frWarpFace .= Just (surface { _msPolys = Just polyRef })
 
       (total, totalS, totalT) <- countTotals polyRef (surface^.msTexInfo.mtiVecs) (V3 0 0 0) 0 0 0

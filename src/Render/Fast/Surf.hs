@@ -10,7 +10,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
@@ -114,8 +115,10 @@ glBuildPolygonFromSurface surface = do
     Just image <- preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx
     polyRef@(GLPolyReference polyIdx) <- Polygon.create lNumVerts
     
-    fastRenderAPIGlobals.frPolygonCache.ix polyIdx.glpNext .= surface^.msPolys
-    fastRenderAPIGlobals.frPolygonCache.ix polyIdx.glpFlags .= surface^.msFlags
+    use (fastRenderAPIGlobals.frPolygonCache) >>= \polygonCache ->
+      io $ do
+        poly <- MV.read polygonCache polyIdx
+        MV.write polygonCache polyIdx poly { _glpNext = surface^.msPolys, _glpFlags = surface^.msFlags }
 
     let surface' = surface { _msPolys = Just polyRef }
 
@@ -180,7 +183,7 @@ lmUploadBlock dynamic = do
         let h = UV.maximum (lms^.lmsAllocated)
             height = if h < 0 then 0 else h
 
-        io $ MV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+        io $ MSV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
           GL.glTexSubImage2D GL.gl_TEXTURE_2D
                              0
                              0
@@ -191,7 +194,7 @@ lmUploadBlock dynamic = do
                              GL.gl_UNSIGNED_BYTE
                              ptr
       else do
-        io $ MV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+        io $ MSV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
           GL.glTexImage2D GL.gl_TEXTURE_2D
                           0
                           (fromIntegral $ lms^.lmsInternalFormat)

@@ -15,7 +15,8 @@ import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
@@ -82,13 +83,13 @@ initialFastRenderAPIGlobals =
                        , _frOldViewCluster       = 0
                        , _frOldViewCluster2      = 0
                        , _frWorldModel           = Nothing
-                       , _frModelTextureCoordBuf = unsafePerformIO $ MV.new (modelBufferSize * 2)
-                       , _frModelVertexIndexBuf  = unsafePerformIO $ MV.new modelBufferSize
+                       , _frModelTextureCoordBuf = unsafePerformIO $ MSV.new (modelBufferSize * 2)
+                       , _frModelVertexIndexBuf  = unsafePerformIO $ MSV.new modelBufferSize
                        , _frModelTextureCoordIdx = 0
                        , _frModelVertexIndexIdx  = 0
                        , _frPolygonS1Old         = UV.replicate maxVertices 0
-                       , _frPolygonBuffer        = unsafePerformIO $ MV.new (maxBufferVertices * stride)
-                       , _frPolygonCache         = V.replicate maxPolys newGLPolyT
+                       , _frPolygonBuffer        = unsafePerformIO $ MSV.new (maxBufferVertices * stride)
+                       , _frPolygonCache         = unsafePerformIO $ MV.new maxPolys
                        , _frPolygonBufferIndex   = 0
                        , _frPolygonCount         = 0
                        , _frGLLms                = newGLLightMapStateT
