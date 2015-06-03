@@ -165,9 +165,15 @@ loadPCX fileName returnPalette returnDimensions = do
                    then let runLength = fromIntegral $ dataByte .&. 0x3F
                             byte = B.index raw (idx + 1)
                             -- write runLength pixel
-                        in decodePCX raw (idx + 2) (x + runLength) y maxX maxY (acc `mappend` mconcat (replicate runLength (BB.word8 byte)))
+                        -- in decodePCX raw (idx + 2) (x + runLength) y maxX maxY (acc `mappend` mconcat (replicate runLength (BB.word8 byte)))
+                        in decodePCX raw (idx + 2) (x + runLength) y maxX maxY (buildAcc acc (BB.word8 byte) runLength) -- (acc `mappend` mconcat (replicate runLength (BB.word8 byte)))
                    else -- write one pixel
                      decodePCX raw (idx + 1) (x + 1) y maxX maxY (acc `mappend` BB.word8 dataByte)
+
+        buildAcc :: BB.Builder -> BB.Builder -> Int -> BB.Builder
+        buildAcc acc byte idx
+          | idx <= 0 = acc
+          | otherwise = buildAcc (acc `mappend` byte) byte (idx - 1)
 
 glImageListF :: XCommandT
 glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
@@ -728,7 +734,8 @@ glResampleTexture img width height scaledWidth scaledHeight =
                   g :: Word8 = fromIntegral $ (g1 + fromIntegral (img `B.index` (pix2 + 1)) + fromIntegral (img `B.index` (pix3 + 1)) + fromIntegral (img `B.index` (pix4 + 1))) `shiftR` 2
                   b :: Word8 = fromIntegral $ (b1 + fromIntegral (img `B.index` (pix2 + 2)) + fromIntegral (img `B.index` (pix3 + 2)) + fromIntegral (img `B.index` (pix4 + 2))) `shiftR` 2
                   a :: Word8 = fromIntegral $ (a1 + fromIntegral (img `B.index` (pix2 + 3)) + fromIntegral (img `B.index` (pix3 + 3)) + fromIntegral (img `B.index` (pix4 + 3))) `shiftR` 2
-              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [r, g, b, a])))
+              -- in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [r, g, b, a])))
+              in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` BB.word8 r `mappend` BB.word8 g `mappend` BB.word8 b `mappend` BB.word8 a)
 
 {-
 ================
@@ -776,7 +783,8 @@ glLightScaleTexture img width height onlyGamma = do
                   a = gammaTable `B.index` (fromIntegral i0)
                   b = gammaTable `B.index` (fromIntegral i1)
                   c = gammaTable `B.index` (fromIntegral i2)
-              in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
+              -- in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
+              in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 c `mappend` BB.word8 p3)
 
 {-
 ================
@@ -924,14 +932,16 @@ loadTGA name = do
                 then let b = buf `B.index` (idx + 0)
                          g = buf `B.index` (idx + 1)
                          r = buf `B.index` (idx + 2)
-                     in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [255, b, g, r])))
+                     --in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [255, b, g, r])))
+                     in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (BB.word8 255 `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r))
 
                 -- pixelSize == 32
                 else let b = buf `B.index` (idx + 0)
                          g = buf `B.index` (idx + 1)
                          r = buf `B.index` (idx + 2)
                          a = buf `B.index` (idx + 3)
-                     in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [a, b, g, r])))
+                     --in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [a, b, g, r])))
+                     in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r))
 
 scrapUpload :: Quake ()
 scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO
