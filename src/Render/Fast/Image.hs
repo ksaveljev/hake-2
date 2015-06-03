@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
 module Render.Fast.Image where
 
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom, (%=))
@@ -722,10 +723,15 @@ glResampleTexture img width height scaledWidth scaledHeight =
         buildRow p1 p2 inRow inRow2 idx maxIdx acc
           | idx >= maxIdx = acc
           | otherwise =
-              let pix1 = inRow  + (p1 UV.! idx)
-                  pix2 = inRow  + (p2 UV.! idx)
-                  pix3 = inRow2 + (p1 UV.! idx)
-                  pix4 = inRow2 + (p2 UV.! idx)
+              let !pix1 = inRow  + (p1 UV.! idx)
+                  !pix2 = inRow  + (p2 UV.! idx)
+                  !pix3 = inRow2 + (p1 UV.! idx)
+                  !pix4 = inRow2 + (p2 UV.! idx)
+                  !r = ((img `B.index` (pix1 + 0)) + (img `B.index` (pix2 + 0)) + (img `B.index` (pix3 + 0)) + (img `B.index` (pix4 + 0))) `shiftR` 2
+                  !g = ((img `B.index` (pix1 + 1)) + (img `B.index` (pix2 + 1)) + (img `B.index` (pix3 + 1)) + (img `B.index` (pix4 + 1))) `shiftR` 2
+                  !b = ((img `B.index` (pix1 + 2)) + (img `B.index` (pix2 + 2)) + (img `B.index` (pix3 + 2)) + (img `B.index` (pix4 + 2))) `shiftR` 2
+                  !a = ((img `B.index` (pix1 + 3)) + (img `B.index` (pix2 + 3)) + (img `B.index` (pix3 + 3)) + (img `B.index` (pix4 + 3))) `shiftR` 2
+                  {-
                   r1 :: Int = fromIntegral (img `B.index` (pix1 + 0))
                   g1 :: Int = fromIntegral (img `B.index` (pix1 + 1))
                   b1 :: Int = fromIntegral (img `B.index` (pix1 + 2))
@@ -734,6 +740,7 @@ glResampleTexture img width height scaledWidth scaledHeight =
                   g :: Word8 = fromIntegral $ (g1 + fromIntegral (img `B.index` (pix2 + 1)) + fromIntegral (img `B.index` (pix3 + 1)) + fromIntegral (img `B.index` (pix4 + 1))) `shiftR` 2
                   b :: Word8 = fromIntegral $ (b1 + fromIntegral (img `B.index` (pix2 + 2)) + fromIntegral (img `B.index` (pix3 + 2)) + fromIntegral (img `B.index` (pix4 + 2))) `shiftR` 2
                   a :: Word8 = fromIntegral $ (a1 + fromIntegral (img `B.index` (pix2 + 3)) + fromIntegral (img `B.index` (pix3 + 3)) + fromIntegral (img `B.index` (pix4 + 3))) `shiftR` 2
+                  -}
               -- in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [r, g, b, a])))
               in buildRow p1 p2 inRow inRow2 (idx + 1) maxIdx (acc `mappend` BB.word8 r `mappend` BB.word8 g `mappend` BB.word8 b `mappend` BB.word8 a)
 
