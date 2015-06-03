@@ -531,22 +531,22 @@ glUpload8 image width height mipmap isSky = do
         constructTrans d8to24table idx maxIdx acc
           | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
-              let p = image `B.index` idx
-                  t = d8to24table UV.! (fromIntegral p)
-                  p' = if p == 0xFF
-                         -- transparent, so scan around for another color
-                         -- to avoid alpha fringes
-                         -- FIXME: do a full flood fill so mips work...
-                         then if | idx > width && (image `B.index` (idx - width)) /= 0xFF -> image `B.index` (idx - width)
-                                 | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF -> image `B.index` (idx + width)
-                                 | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF -> image `B.index` (idx - 1)
-                                 | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF -> image `B.index` (idx + 1)
-                                 | otherwise -> 0
-                         else p
-                  t' :: Int32 = fromIntegral $ if p == 0xFF
-                                                 -- copy rgb components
-                                                 then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
-                                                 else t
+              let !p = image `B.index` idx
+                  !t = d8to24table UV.! (fromIntegral p)
+                  !p' = if p == 0xFF
+                          -- transparent, so scan around for another color
+                          -- to avoid alpha fringes
+                          -- FIXME: do a full flood fill so mips work...
+                          then if | idx > width && (image `B.index` (idx - width)) /= 0xFF -> image `B.index` (idx - width)
+                                  | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF -> image `B.index` (idx + width)
+                                  | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF -> image `B.index` (idx - 1)
+                                  | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF -> image `B.index` (idx + 1)
+                                  | otherwise -> 0
+                          else p
+                  (!t') :: Int32 = fromIntegral $ if p == 0xFF
+                                                    -- copy rgb components
+                                                    then (d8to24table UV.! (fromIntegral p')) .&. 0x00FFFFFF
+                                                    else t
               in constructTrans d8to24table (idx + 1) maxIdx (acc `mappend` (BB.int32LE t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
