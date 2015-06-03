@@ -446,15 +446,15 @@ rFloodFillSkin skin skinWidth skinHeight = do
                                                  _ -> undefined -- shouldn't happen
         fifo :: MV.IOVector (Int, Int) <- io $ MV.replicate floodFillFifoSize (0, 0)
 
-        floodFill skinMutable fifo (fromIntegral filledColor) (fromIntegral fillColor) 1 0
+        io $ floodFill skinMutable fifo (fromIntegral filledColor) (fromIntegral fillColor) 1 0
 
         return $ case skinMutable of MSV.MVector n ptr -> BI.PS ptr 0 n
 
-  where floodFill :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Word8 -> Word8 -> Int -> Int -> Quake ()
+  where floodFill :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Word8 -> Word8 -> Int -> Int -> IO ()
         floodFill skinMutable fifo filledColor fillColor inpt outpt
           | inpt == outpt = return ()
           | otherwise = do
-              (x, y) <- io $ MV.read fifo outpt
+              (x, y) <- MV.read fifo outpt
               let fdc = filledColor
                   pos = x + skinWidth * y
                   outpt' = (outpt + 1) .&. floodFillFifoMask
@@ -475,16 +475,16 @@ rFloodFillSkin skin skinWidth skinHeight = do
                                  then floodFillStep skinMutable fifo inpt3 pos x y fillColor fdc3 skinWidth 0 1
                                  else return (inpt3, fdc3)
 
-              io $ MSV.write skinMutable (x + skinWidth * y) fdc4
+              MSV.write skinMutable (x + skinWidth * y) fdc4
               floodFill skinMutable fifo filledColor fillColor inpt4 outpt'
 
-        floodFillStep :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Int -> Int -> Int -> Int -> Word8 -> Word8 -> Int -> Int -> Int -> Quake (Int, Word8)
+        floodFillStep :: MSV.IOVector Word8 -> MV.IOVector (Int, Int) -> Int -> Int -> Int -> Int -> Word8 -> Word8 -> Int -> Int -> Int -> IO (Int, Word8)
         floodFillStep skinMutable fifo inpt pos x y fillColor fdc off dx dy = do
-          b <- io $ MSV.read skinMutable (pos + off)
+          b <- MSV.read skinMutable (pos + off)
 
           if | b == fillColor -> do
-               io $ MSV.write skinMutable (pos + off) 255
-               io $ MV.write fifo inpt (x + dx, y + dy)
+               MSV.write skinMutable (pos + off) 255
+               MV.write fifo inpt (x + dx, y + dy)
                return ((inpt + 1) .&. floodFillFifoMask, fdc)
 
              | b /= 255 -> return (inpt, b)
