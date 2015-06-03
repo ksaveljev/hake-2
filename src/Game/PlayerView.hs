@@ -3,13 +3,14 @@
 module Game.PlayerView where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
-import Control.Monad (unless, when)
+import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), (.|.), complement, xor)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3, _x, _y, _z)
+import Linear (V3, _x, _y, _z, dot)
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified Game.GameCombat as GameCombat
 import qualified Game.GameItems as GameItems
@@ -441,8 +442,21 @@ worldEffects = do
                                   Constants.modSlime
 
 calcRoll :: V3 Float -> V3 Float -> Quake Float
-calcRoll _ _ = do
-    io (putStrLn "PlayerView.calcRoll") >> undefined -- TODO
+calcRoll angles velocity = do
+    right <- use $ gameBaseGlobals.gbRight
+
+    let side = velocity `dot` right
+        sign = if side < 0 then -1 else 1
+        side' = abs side
+
+    rollAngleValue <- liftM (^.cvValue) svRollAngleCVar
+    rollSpeedValue <- liftM (^.cvValue) svRollSpeedCVar
+
+    let side'' = if side' < rollSpeedValue
+                   then side' * rollAngleValue / rollSpeedValue
+                   else rollAngleValue
+
+    return (side'' * sign)
 
 fallingDamage :: EdictReference -> Quake ()
 fallingDamage _ = do
