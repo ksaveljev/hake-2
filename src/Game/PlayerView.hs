@@ -801,14 +801,79 @@ calcViewOffset (EdictReference edictIdx) = do
           return angles''
 
         access = \x -> case x of
-                   0 -> _x
-                   1 -> _y
-                   2 -> _z
-                   _ -> undefined -- shouldn't happen
+                         0 -> _x
+                         1 -> _y
+                         2 -> _z
+                         _ -> undefined -- shouldn't happen
 
+-- Calculates where to draw the gun.
 calcGunOffset :: EdictReference -> Quake ()
-calcGunOffset _ = do
-    io (putStrLn "PlayerView.calcGunOffset") >> undefined -- TODO
+calcGunOffset (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+
+    xyspeed <- use $ gameBaseGlobals.gbXYSpeed
+    bobFracSin <- use $ gameBaseGlobals.gbBobFracSin
+    bobCycle <- use $ gameBaseGlobals.gbBobCycle
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.roll) .= xyspeed * bobFracSin * 0.005
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.yaw) .= xyspeed * bobFracSin * 0.01
+
+    when (bobCycle .&. 1 /= 0) $ do
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.roll) %= negate
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.yaw) %= negate
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.pitch) .= xyspeed * bobFracSin * 0.005
+
+    -- gun angles from delta movement
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    setGunAngles gClientRef gClient 0 3
+
+    forward <- use $ gameBaseGlobals.gbForward
+    right <- use $ gameBaseGlobals.gbRight
+    up <- use $ gameBaseGlobals.gbUp
+
+    gunX <- liftM (^.cvValue) gunXCVar
+    gunY <- liftM (^.cvValue) gunYCVar
+    gunZ <- liftM (^.cvValue) gunZCVar
+
+    let offset = getGunOffset forward right up (V3 0 0 0) gunX gunY gunZ 0 3
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunOffset .= offset
+
+  where access = \x -> case x of
+                         0 -> _x
+                         1 -> _y
+                         2 -> _z
+                         _ -> undefined -- shouldn't happen
+
+        setGunAngles :: GClientReference -> GClientT -> Int -> Int -> Quake ()
+        setGunAngles gClientRef@(GClientReference gClientIdx) gClient idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let delta = (gClient^.gcOldViewAngles.(Math3D.v3Access idx)) - (gClient^.gcPlayerState.psViewAngles.(Math3D.v3Access idx))
+                  delta' = if delta > 180 then delta - 360 else delta
+                  delta'' = if delta' < -180 then delta' + 360 else delta'
+                  delta''' = if delta'' > 45 then 45 else delta''
+                  delta'''' = if delta''' < -45 then -45 else delta'''
+
+              when (idx == Constants.yaw) $
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access Constants.roll) += 0.1 * delta''''
+
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunAngles.(access idx) += 0.2 * delta''''
+
+              setGunAngles gClientRef gClient (idx + 1) maxIdx
+
+        getGunOffset :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Float -> Float -> Float -> Int -> Int -> V3 Float
+        getGunOffset forward right up acc gunX gunY gunZ idx maxIdx
+          | idx >= maxIdx = acc
+          | otherwise =
+              let a = (forward^.(Math3D.v3Access idx)) * gunY
+                  b = (right^.(Math3D.v3Access idx)) * gunX
+                  c = (up^.(Math3D.v3Access idx)) * (negate gunZ)
+                  V3 a' b' c' = acc
+              in getGunOffset forward right up (V3 (a + a') (b + b') (c + c')) gunX gunY gunZ (idx + 1) maxIdx
+
 
 calcBlend :: EdictReference -> Quake ()
 calcBlend _ = do
