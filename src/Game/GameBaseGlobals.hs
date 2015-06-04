@@ -59,4 +59,5 @@ initialGameBaseGlobals =
                   , _gbBobMove           = 0
                   , _gbBobCycle          = 0
                   , _gbBobFracSin        = 0
+                  , _gbXxxi              = 0
                   }

@@ -7,7 +7,9 @@ import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), (.|.), complement, xor)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3(..), _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot, normalize)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -531,8 +533,138 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
                        | otherwise -> return (Just delta')
 
 damageFeedback :: EdictReference -> Quake ()
-damageFeedback _ = do
-    io (putStrLn "PlayerView.damageFeedback") >> undefined -- TODO
+damageFeedback playerRef@(EdictReference playerIdx) = do
+    Just player <- preuse $ gameBaseGlobals.gbGEdicts.ix playerIdx
+
+    let Just (GClientReference gClientIdx) = player^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    -- flash the backgrounds behind the status numbers
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statFlashes .= 0
+
+    when ((gClient^.gcDamageBlood) /= 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statFlashes %= (.|. 1)
+
+    when ((gClient^.gcDamageArmor) /= 0 && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statFlashes %= (.|. 2)
+
+    -- total points of damage shot at the player this frame
+    let count = (gClient^.gcDamageBlood) + (gClient^.gcDamageArmor) + (gClient^.gcDamagePArmor)
+
+    unless (count == 0) $ do -- unless (didn't take any damage)
+      -- start a pain animation if still in the player model
+      when ((gClient^.gcAnimPriority) < Constants.animPain && (player^.eEntityState.esModelIndex) == 255) $ do
+        if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+          then do
+            gameBaseGlobals.gbGEdicts.ix playerIdx.eEntityState.esFrame .= MPlayer.frameCRPain1 - 1
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
+          else do
+            gameBaseGlobals.gbXxxi %= (\x -> (x + 1) `mod` 3)
+            xxxi <- use $ gameBaseGlobals.gbXxxi
+
+            case xxxi of
+              0 -> do
+                gameBaseGlobals.gbGEdicts.ix playerIdx.eEntityState.esFrame .= MPlayer.framePain101 - 1
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain104
+
+              1 -> do
+                gameBaseGlobals.gbGEdicts.ix playerIdx.eEntityState.esFrame .= MPlayer.framePain201 - 1
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain204
+
+              2 -> do
+                gameBaseGlobals.gbGEdicts.ix playerIdx.eEntityState.esFrame .= MPlayer.framePain301 - 1
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain304
+
+              _ -> undefined -- shouldn't ever happen
+
+      let realCount = count
+          count' = if count < 10 then 10 else count -- always make a visible effect
+
+      -- play an apropriate pain sound
+      when (levelTime > (player^.eEdictTiming.etPainDebounceTime) && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $ do
+        r <- Lib.rand
+        let r' = 1 + (r .&. 1)
+
+        gameBaseGlobals.gbGEdicts.ix playerIdx.eEdictTiming.etPainDebounceTime .= levelTime + 0.7
+
+        let l = if | (player^.eEdictStatus.eHealth) < 25 -> 25
+                   | (player^.eEdictStatus.eHealth) < 50 -> 50
+                   | (player^.eEdictStatus.eHealth) < 75 -> 75
+                   | otherwise -> 100
+
+
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        let sound = gameImport^.giSound
+            soundIndex = gameImport^.giSoundIndex
+
+        idx <- soundIndex (Just ("*pain" `B.append` BC.pack (show l) `B.append` "_" `B.append` BC.pack (show r') `B.append` ".wav")) -- IMPROVE?
+        sound (Just playerRef) Constants.chanVoice idx 1 Constants.attnNorm 0
+
+      -- the total alpha of the blend is always proportional to count
+      when ((gClient^.gcDamageAlpha) < 0) $
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageAlpha .= 0
+
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageAlpha += fromIntegral count' * 0.01
+      preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageAlpha) >>= \(Just damageAlpha) ->
+        if | damageAlpha < 0.2 ->gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageAlpha .= 0.2
+           | damageAlpha > 0.6 ->gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageAlpha .= 0.6 -- don't go too saturated
+           | otherwise -> return ()
+
+      -- the color of the blend will vary based on how much was absorbed by
+      -- different armors
+      let powerColor :: V3 Float = V3 0 1 0
+          aColor :: V3 Float = V3 1 1 1
+          bColor :: V3 Float = V3 1 0 0
+
+          realCountF :: Float = fromIntegral realCount
+
+          v :: V3 Float = V3 0 0 0
+          v' = if (gClient^.gcDamagePArmor) /= 0
+                 then v + fmap (* (fromIntegral (gClient^.gcDamagePArmor) / realCountF)) powerColor
+                 else v
+          v'' = if (gClient^.gcDamageArmor) /= 0
+                  then v' + fmap (* (fromIntegral (gClient^.gcDamageArmor) / realCountF)) aColor
+                  else v'
+          v''' = if (gClient^.gcDamageBlood) /= 0
+                   then v'' + fmap (* (fromIntegral (gClient^.gcDamageBlood) / realCountF)) bColor
+                   else v''
+
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcDamageBlend .= v'''
+
+      -- calculate view angle kicks
+      let kick = abs (gClient^.gcDamageKnockback)
+
+      when (kick /= 0 && (player^.eEdictStatus.eHealth) > 0) $ do -- kick of 0 means no view adjust at all
+        right <- use $ gameBaseGlobals.gbRight
+        forward <- use $ gameBaseGlobals.gbForward
+
+        let kick' :: Float = (fromIntegral kick) * 100 / (fromIntegral $ player^.eEdictStatus.eHealth)
+            kick'' = if kick' < fromIntegral count' * 0.5
+                       then fromIntegral count' * 0.5
+                       else kick'
+            kick''' = if kick'' > 50
+                        then 50
+                        else kick''
+            
+            vv = (gClient^.gcDamageFrom) - (player^.eEntityState.esOrigin)
+            vv' = normalize vv
+            side = vv `dot` right
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVDmgRoll .= kick''' * side * 0.3
+
+        let side' = negate (vv `dot` forward)
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVDmgPitch .= kick''' * side' * 0.3
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVDmgTime .= levelTime + Constants.damageTime
+
+      -- clear totals
+      zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+        gcDamageBlood .= 0
+        gcDamageArmor .= 0
+        gcDamagePArmor .= 0
+        gcDamageKnockback .= 0
 
 calcViewOffset :: EdictReference -> Quake ()
 calcViewOffset _ = do

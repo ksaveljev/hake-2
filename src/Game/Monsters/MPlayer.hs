@@ -12,6 +12,18 @@ frameRun1 = 40
 frameRun6 :: Int
 frameRun6 = 45
 
+framePain101 :: Int
+framePain101 = 54
+
+framePain104 :: Int
+framePain104 = 57
+
+framePain201 :: Int
+framePain201 = 58
+
+framePain204 :: Int
+framePain204 = 61
+
 framePain301 :: Int
 framePain301 = 62
 

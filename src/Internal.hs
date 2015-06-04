@@ -714,6 +714,7 @@ data GameBaseGlobals =
                   , _gbBobMove           :: Float
                   , _gbBobCycle          :: Int
                   , _gbBobFracSin        :: Float
+                  , _gbXxxi              :: Int
                   }
 
 data PMoveGlobals =
