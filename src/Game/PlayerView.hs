@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerView where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (*=), (+=), (-=), (%=), (%~))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), (.|.), complement, xor)
 import Data.Maybe (isJust, isNothing, fromJust)
@@ -532,6 +532,13 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
                            return Nothing
                        | otherwise -> return (Just delta')
 
+{-
+- =============== 
+- P_DamageFeedback
+- 
+- Handles color blends and view kicks 
+- ===============
+-}
 damageFeedback :: EdictReference -> Quake ()
 damageFeedback playerRef@(EdictReference playerIdx) = do
     Just player <- preuse $ gameBaseGlobals.gbGEdicts.ix playerIdx
@@ -666,9 +673,138 @@ damageFeedback playerRef@(EdictReference playerIdx) = do
         gcDamagePArmor .= 0
         gcDamageKnockback .= 0
 
+{-
+- 
+- fall from 128: 400 = 160000 
+- fall from 256: 580 = 336400 
+- fall from 384: 720 = 518400 
+- fall from 512: 800 = 640000 
+- fall from 640: 960 =  
+- damage = deltavelocity*deltavelocity * 0.0001
+-}
 calcViewOffset :: EdictReference -> Quake ()
-calcViewOffset _ = do
-    io (putStrLn "PlayerView.calcViewOffset") >> undefined -- TODO
+calcViewOffset (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    -- if dead, fix the angle and don't add any kick
+    angles <- if (edict^.eEdictStatus.eDeadFlag) /= 0
+                then do
+                  zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewAngles) $ do
+                    access Constants.roll .= 40
+                    access Constants.pitch .= -15
+                    access Constants.yaw .= gClient^.gcKillerYaw
+
+                  return (V3 0 0 0)
+                else do
+                  right <- use $ gameBaseGlobals.gbRight
+                  forward <- use $ gameBaseGlobals.gbForward
+
+                      -- add angles based on weapon kick
+                  let angles = gClient^.gcKickAngles
+
+                  -- add angles based on damage kick
+                  angles' <- addDamageKickAngles gClientRef angles
+                  -- add angles based on fall kick
+                  angles'' <- addFallKickAngles gClientRef angles'
+                  -- add angles based on velocity
+                  angles''' <- addVelocityAngles angles''
+                  -- add angles based on bob
+                  angles'''' <- addBobAngles gClientRef angles'''
+
+                  return angles'''
+
+    bobFracSin <- use $ gameBaseGlobals.gbBobFracSin
+    xyspeed <- use $ gameBaseGlobals.gbXYSpeed
+    bobUpValue <- liftM (^.cvValue) bobUpCVar
+    let bob :: Float = bobFracSin * xyspeed * bobUpValue
+        bob' = if bob > 6 then 6 else bob
+        V3 a b c = (V3 0 0 (fromIntegral (edict^.eEdictStatus.eViewHeight) + bob')) + (gClient^.gcKickOrigin)
+        a' = if | a < -14 -> -14
+                | a > 14 -> 14
+                | otherwise -> a
+        b' = if | b < -14 -> -14
+                | b > 14 -> 14
+                | otherwise -> b
+        c' = if | c < -22 -> -22
+                | c > 30 -> 30
+                | otherwise -> c
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewOffset .= V3 a' b' c'
+
+  where addDamageKickAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
+        addDamageKickAngles (GClientReference gClientIdx) angles = do
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+          let ratio = ((gClient^.gcVDmgTime) - levelTime) / Constants.damageTime
+          ratio' <- if ratio < 0
+                      then do
+                        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVDmgPitch .= 0
+                        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVDmgRoll .= 0
+                        return 0
+                      else
+                        return ratio
+
+          let angles' = (access Constants.pitch) %~ (+ (ratio' * (gClient^.gcVDmgPitch))) $ angles
+              angles'' = (access Constants.roll) %~ (+ (ratio' * (gClient^.gcVDmgRoll))) $ angles'
+
+          return angles''
+
+        addFallKickAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
+        addFallKickAngles (GClientReference gClientIdx) angles = do
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+          let ratio = ((gClient^.gcFallTime) - levelTime) / Constants.fallTime
+              ratio' = if ratio < 0 then 0 else ratio
+              angles' = (access Constants.pitch) %~ (+ (ratio' * (gClient^.gcFallValue))) $ angles
+
+          return angles'
+
+        addVelocityAngles :: V3 Float -> Quake (V3 Float)
+        addVelocityAngles angles = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          runPitchValue <- liftM (^.cvValue) runPitchCVar
+          runRollValue <- liftM (^.cvValue) runRollCVar
+          forward <- use $ gameBaseGlobals.gbForward
+          right <- use $ gameBaseGlobals.gbRight
+
+          let delta = (edict^.eEdictPhysics.eVelocity) `dot` forward
+              delta' = (edict^.eEdictPhysics.eVelocity) `dot` right
+              angles' = (access Constants.pitch) %~ (+ (delta * runPitchValue)) $ angles
+              angles'' = (access Constants.roll) %~ (+ (delta' * runRollValue)) $ angles'
+
+          return angles''
+
+        addBobAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
+        addBobAngles (GClientReference gClientIdx) angles = do
+          bobFracSin <- use $ gameBaseGlobals.gbBobFracSin
+          bobCycle <- use $ gameBaseGlobals.gbBobCycle
+          xyspeed <- use $ gameBaseGlobals.gbXYSpeed
+          bobPitchValue <- liftM (^.cvValue) bobPitchCVar
+          bobRollValue <- liftM (^.cvValue) bobRollCVar
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          let delta = bobFracSin * bobPitchValue * xyspeed
+              delta' = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                         then delta * 6 -- crouching
+                         else delta
+              angles' = (access Constants.pitch) %~ (+ delta') $ angles
+
+              delta'' = bobFracSin * bobRollValue * xyspeed
+              delta''' = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                           then delta'' * 6 -- crouching
+                           else delta''
+              delta'''' = if bobCycle .&. 1 /= 0 then negate delta''' else delta'''
+              angles'' = (access Constants.roll) %~ (+ delta'''') $ angles'
+
+          return angles''
+
+        access = \x -> case x of
+                   0 -> _x
+                   1 -> _y
+                   2 -> _z
+                   _ -> undefined -- shouldn't happen
 
 calcGunOffset :: EdictReference -> Quake ()
 calcGunOffset _ = do
