@@ -155,4 +155,6 @@ executeText _ _ = io (putStrLn "CBuf.executeText") >> undefined -- TODO
 
 insertFromDefer :: Quake ()
 insertFromDefer = do
-    io (putStrLn "CBuf.insertFromDefer") >> undefined -- TODO
+    buf <- use $ globals.deferTextBuf
+    insertText buf
+    globals.deferTextBuf .= ""
