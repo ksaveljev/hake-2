@@ -562,7 +562,7 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
 
         linkEntity edictRef
       else do
-        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crSpectator .= True
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crSpectator .= False
 
         void $ GameUtil.killBox edictRef
 
