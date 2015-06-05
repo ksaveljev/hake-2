@@ -183,7 +183,13 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
 
         setCameraStuff :: Quake ()
         setCameraStuff = do
-          io (putStrLn "PlayerView.setCameraSTuff") >> undefined -- TODO
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          let Just (GClientReference gClientIdx) = edict^.eClient
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          if gClient^.gcResp.crSpectator
+            then PlayerHud.setSpectatorStats edictRef
+            else PlayerHud.setStats edictRef
 
 -- General effect handling for a player.
 worldEffects :: Quake ()
@@ -877,7 +883,8 @@ calcGunOffset (EdictReference edictIdx) = do
 
 calcBlend :: EdictReference -> Quake ()
 calcBlend _ = do
-    io (putStrLn "PlayerView.calcBlend") >> undefined -- TODO
+    return ()
+    -- io (putStrLn "PlayerView.calcBlend") >> undefined -- TODO
 
 setClientEvent :: EdictReference -> Quake ()
 setClientEvent (EdictReference edictIdx) = do
@@ -895,7 +902,7 @@ setClientEvent (EdictReference edictIdx) = do
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFootstep
 
 setClientEffects :: EdictReference -> Quake ()
-setClientEffects (EdictReference edictIdx) = do
+setClientEffects edictRef@(EdictReference edictIdx) = do
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
       esEffects .= 0
       esRenderFx .= 0
@@ -907,7 +914,7 @@ setClientEffects (EdictReference edictIdx) = do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
       when ((edict^.eEdictStatus.ePowerArmorTime) > levelTime) $ do
-        let paType = GameItems.powerArmorType edict
+        paType <- GameItems.powerArmorType edictRef
 
         if | paType == Constants.powerArmorScreen ->
                gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPowerScreen)

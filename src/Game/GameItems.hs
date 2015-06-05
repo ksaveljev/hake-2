@@ -12,6 +12,7 @@ import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -578,5 +579,32 @@ dropItem :: EdictReference -> GItemReference -> Quake EdictReference
 dropItem _ _ = do
     io (putStrLn "GameItems.dropItem") >> undefined -- TODO
 
-powerArmorType :: EdictT -> Int
-powerArmorType _ = undefined -- TODO -- GameItems.powerArmorType
+powerArmorType :: EdictReference -> Quake Int
+powerArmorType (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    case edict^.eClient of
+      Nothing -> return Constants.powerArmorNone
+      Just (GClientReference gClientIdx) -> do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        GItemReference powerShieldIndex <- use $ gameItemsGlobals.giPowerShieldIndex
+        GItemReference powerScreenIndex <- use $ gameItemsGlobals.giPowerScreenIndex
+        Just powerShield <- preuse $ gameBaseGlobals.gbItemList.ix powerShieldIndex
+        Just powerScreen <- preuse $ gameBaseGlobals.gbItemList.ix powerScreenIndex
+
+        return $ if | (edict^.eFlags) .&. Constants.flPowerArmor == 0 -> Constants.powerArmorNone
+                    | (gClient^.gcPers.cpInventory) UV.! (powerShield^.giIndex) > 0 -> Constants.powerArmorShield
+                    | (gClient^.gcPers.cpInventory) UV.! (powerScreen^.giIndex) > 0 -> Constants.powerArmorScreen
+                    | otherwise -> Constants.powerArmorNone
+
+armorIndex :: EdictReference -> Quake Int
+armorIndex _ = do
+    io (putStrLn "GameItems.armorIndex") >> undefined -- TODO
+
+getItemByIndex :: Int -> Quake (Maybe GItemT)
+getItemByIndex index = do
+    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+
+    if index == 0 || index >= numItems
+      then return Nothing
+      else preuse $ gameBaseGlobals.gbItemList.ix index
