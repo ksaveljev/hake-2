@@ -587,10 +587,13 @@ powerArmorType (EdictReference edictIdx) = do
       Nothing -> return Constants.powerArmorNone
       Just (GClientReference gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
         GItemReference powerShieldIndex <- use $ gameItemsGlobals.giPowerShieldIndex
         GItemReference powerScreenIndex <- use $ gameItemsGlobals.giPowerScreenIndex
-        Just powerShield <- preuse $ gameBaseGlobals.gbItemList.ix powerShieldIndex
-        Just powerScreen <- preuse $ gameBaseGlobals.gbItemList.ix powerScreenIndex
+
+        itemList <- use $ gameBaseGlobals.gbItemList
+        let powerShield = itemList V.! powerShieldIndex
+            powerScreen = itemList V.! powerScreenIndex
 
         return $ if | (edict^.eFlags) .&. Constants.flPowerArmor == 0 -> Constants.powerArmorNone
                     | (gClient^.gcPers.cpInventory) UV.! (powerShield^.giIndex) > 0 -> Constants.powerArmorShield
@@ -598,8 +601,27 @@ powerArmorType (EdictReference edictIdx) = do
                     | otherwise -> Constants.powerArmorNone
 
 armorIndex :: EdictReference -> Quake Int
-armorIndex _ = do
-    io (putStrLn "GameItems.armorIndex") >> undefined -- TODO
+armorIndex (EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    case edict^.eClient of
+      Nothing -> return 0
+      Just (GClientReference gClientIdx) -> do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+        (GItemReference jacketArmorIndex) <- use $ gameItemsGlobals.giJacketArmorIndex
+        (GItemReference combatArmorIndex) <- use $ gameItemsGlobals.giCombatArmorIndex
+        (GItemReference bodyArmorIndex) <- use $ gameItemsGlobals.giBodyArmorIndex
+
+        itemList <- use $ gameBaseGlobals.gbItemList
+        let jacketArmor = itemList V.! jacketArmorIndex
+            combatArmor = itemList V.! combatArmorIndex
+            bodyArmor = itemList V.! bodyArmorIndex
+
+        return $ if | (gClient^.gcPers.cpInventory) UV.! (jacketArmor^.giIndex) > 0 -> jacketArmor^.giIndex
+                    | (gClient^.gcPers.cpInventory) UV.! (combatArmor^.giIndex) > 0 -> combatArmor^.giIndex
+                    | (gClient^.gcPers.cpInventory) UV.! (bodyArmor^.giIndex) > 0 -> bodyArmor^.giIndex
+                    | otherwise -> 0
 
 getItemByIndex :: Int -> Quake (Maybe GItemT)
 getItemByIndex index = do
