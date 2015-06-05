@@ -6,6 +6,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
 import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -242,5 +243,25 @@ setSpectatorStats _ = do
     io (putStrLn "PlayerHud.setSpectatorStats") >> undefined -- TODO
 
 checkChaseStats :: EdictReference -> Quake ()
-checkChaseStats _ = do
-    io (putStrLn "PlayerHud.checkChaseStats") >> undefined -- TODO
+checkChaseStats edictRef@(EdictReference edictIdx) = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    clients <- use $ gameBaseGlobals.gbGame.glClients
+    maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+    setChaseStats edicts clients 1 maxClientsValue
+
+  where setChaseStats :: V.Vector EdictT -> V.Vector GClientT -> Int -> Int -> Quake ()
+        setChaseStats edicts clients idx maxIdx
+          | idx > maxIdx = return ()
+          | otherwise = do
+              let Just (GClientReference gClientIdx) = (edicts V.! idx)^.eClient
+
+              if not((edicts V.! idx)^.eInUse) || ((clients V.! gClientIdx)^.gcChaseTarget) /= Just edictRef
+                then setChaseStats edicts clients (idx + 1) maxIdx
+                else do
+                  let Just (GClientReference edictClientIdx) = (edicts V.! edictIdx)^.eClient
+
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats .= ((clients V.! edictClientIdx)^.gcPlayerState.psStats)
+
+                  setSpectatorStats (EdictReference idx)
+                  setChaseStats edicts clients (idx + 1) maxIdx
