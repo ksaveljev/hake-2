@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.PlayerWeapon where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=))
@@ -329,8 +330,42 @@ thinkWeapon edictRef@(EdictReference edictIdx) = do
         void $ think (fromJust $ weapon^.giWeaponThink) edictRef
 
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
-weaponGeneric _ _ _ _ _ _ _ _ = do
-    io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFirstLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    if | (edict^.eEdictStatus.eDeadFlag) /= 0 || (edict^.eEntityState.esModelIndex) /= 255 ->
+           return () -- VWep animations screw up corpses
+
+       | (gClient^.gcWeaponState) == Constants.weaponDropping -> do
+           if | (gClient^.gcPlayerState.psGunFrame) == frameDeactivateLast ->
+                  changeWeapon edictRef
+
+              | frameDeactivateLast - (gClient^.gcPlayerState.psGunFrame) == 4 -> do
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animReverse
+
+                  if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                    then do
+                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
+                      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
+                    else do
+                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain304 + 1
+                      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain301
+
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+              | otherwise ->
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+       | (gClient^.gcWeaponState) == Constants.weaponActivating -> do
+           undefined -- TODO
+
+       | isJust (gClient^.gcNewWeapon) && (gClient^.gcWeaponState) /= Constants.weaponFiring -> do
+           undefined -- TODO
+
+       | otherwise -> do
+           io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
 
 weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
 weaponGrenadeFire _ _ = do
