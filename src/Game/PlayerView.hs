@@ -89,7 +89,23 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
 
       setClientFrame edictRef
 
-      io (putStrLn "PlayerView.clientEndServerFrame") >> undefined -- TODO
+      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      let Just (GClientReference gClientIdx) = edict^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+        gcOldVelocity .= (edict^.eEdictPhysics.eVelocity)
+        gcOldViewAngles .= (gClient^.gcPlayerState.psViewAngles)
+        gcKickOrigin .= V3 0 0 0
+        gcKickAngles .= V3 0 0 0
+
+      frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+      -- if the scoreboard is up, update it
+      when ((gClient^.gcShowScores) && frameNum .&. 31 == 0) $ do
+        PlayerHud.deathmatchScoreboardMessage edictRef (edict^.eEdictOther.eoEnemy)
+        unicast <- use $ gameBaseGlobals.gbGameImport.giUnicast
+        unicast edictRef False
 
   where setCurrentPlayerAndClient :: Quake ()
         setCurrentPlayerAndClient = do

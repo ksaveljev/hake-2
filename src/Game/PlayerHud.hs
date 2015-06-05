@@ -265,3 +265,7 @@ checkChaseStats edictRef@(EdictReference edictIdx) = do
 
                   setSpectatorStats (EdictReference idx)
                   setChaseStats edicts clients (idx + 1) maxIdx
+
+deathmatchScoreboardMessage :: EdictReference -> Maybe EdictReference -> Quake ()
+deathmatchScoreboardMessage _ _ = do
+    io (putStrLn "PlayerHud.deathmatchScoreboardMessage") >> undefined -- TODO
