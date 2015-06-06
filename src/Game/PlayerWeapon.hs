@@ -330,10 +330,14 @@ thinkWeapon edictRef@(EdictReference edictIdx) = do
         void $ think (fromJust $ weapon^.giWeaponThink) edictRef
 
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
-weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFirstLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
+weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    let frameFireFirst = frameActiveLast + 1
+        frameIdleFirst = frameFireLast + 1
+        frameDeactivateFirst = frameIdleLast + 1
 
     if | (edict^.eEdictStatus.eDeadFlag) /= 0 || (edict^.eEntityState.esModelIndex) /= 255 ->
            return () -- VWep animations screw up corpses
@@ -359,10 +363,29 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFirstLast 
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
 
        | (gClient^.gcWeaponState) == Constants.weaponActivating -> do
-           undefined -- TODO
+           if (gClient^.gcPlayerState.psGunFrame) == frameActiveLast
+             then do
+               zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+                 gcWeaponState .= Constants.weaponReady
+                 gcPlayerState.psGunFrame .= frameIdleFirst
+             else do
+               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
 
        | isJust (gClient^.gcNewWeapon) && (gClient^.gcWeaponState) /= Constants.weaponFiring -> do
-           undefined -- TODO
+           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+             gcWeaponState .= Constants.weaponDropping
+             gcPlayerState.psGunFrame .= frameDeactivateFirst
+
+           when (frameDeactivateLast - frameDeactivateFirst < 4) $ do
+             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animReverse
+
+             if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+               then do
+                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
+                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
+               else do
+                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain304 + 1
+                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain301
 
        | otherwise -> do
            io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
