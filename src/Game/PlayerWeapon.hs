@@ -388,7 +388,25 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain301
 
        | otherwise -> do
-           io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+           done <- if (gClient^.gcWeaponState) == Constants.weaponReady
+                     then do
+                       if ((gClient^.gcLatchedButtons) .|. (gClient^.gcButtons)) .&. Constants.buttonAttack /= 0
+                         then do
+                           io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+
+                         else do
+                           if (gClient^.gcPlayerState.psGunFrame) == frameIdleLast
+                             then do
+                               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= frameIdleFirst
+                               return True
+                             else do
+                               io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+                     else
+                       return False
+
+           unless done $ do
+             when ((gClient^.gcWeaponState) == Constants.weaponFiring) $ do
+               io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
 
 weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
 weaponGrenadeFire _ _ = do
