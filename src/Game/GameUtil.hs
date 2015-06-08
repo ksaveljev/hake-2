@@ -2,9 +2,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameUtil where
 
-import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom)
-import Control.Monad (liftM, when, unless)
-import Data.Bits ((.&.))
+import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom, (%=))
+import Control.Monad (liftM, when, unless, void)
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (norm)
@@ -17,8 +17,10 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameCombat as GameCombat
+import qualified Util.Math3D as Math3D
 
 {-
 - Either finds a free edict, or allocates a new one. Try to avoid reusing
@@ -303,28 +305,26 @@ visible _ _ = do
 - slower noticing monsters.
 -}
 findTarget :: EdictReference -> Quake Bool
-findTarget selfRef@(EdictReference selfIdx) = checkGoodGuy
-  where checkGoodGuy :: Quake Bool
-        checkGoodGuy = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+findTarget selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-          if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0
-            then
-              -- we skip this chunk of code here cause we always returns False
-              {-
-                if (self.goalentity != null && self.goalentity.inuse
-                      && self.goalentity.classname != null) {
-                  if (self.goalentity.classname.equals("target_actor"))
-                      return false;
-                }
-              -}
+    if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0
+      then
+        -- we skip this chunk of code here cause we always returns False
+        {-
+          if (self.goalentity != null && self.goalentity.inuse
+                && self.goalentity.classname != null) {
+            if (self.goalentity.classname.equals("target_actor"))
+                return false;
+          }
+        -}
 
-              -- FIXME: look for monsters?
-              return False
-            else
-              checkCombatPoint self
+        -- FIXME: look for monsters?
+        return False
+      else
+        checkCombatPoint self
 
-        checkCombatPoint :: EdictT -> Quake Bool
+  where checkCombatPoint :: EdictT -> Quake Bool
         checkCombatPoint self = do
           -- if we're going to a combat point, just proceed
           if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0
@@ -400,6 +400,111 @@ findTarget selfRef@(EdictReference selfIdx) = checkGoodGuy
           if not heardIt
             then do
               let r = range self client
-              undefined -- TODO
+
+              if | r == Constants.rangeFar ->
+                     return False
+                 | client^.eLightLevel <= 5 ->
+                     return False
+
+                 | otherwise -> do
+                     vis <- visible selfRef clientRef
+                     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+                     if | not vis ->
+                            return False
+
+                        | r == Constants.rangeNear && fromIntegral (client^.eEdictStatus.eShowHostile) < levelTime && not (inFront self client) ->
+                            return False
+
+                        | r == Constants.rangeMid && not (inFront self client) ->
+                            return False
+
+                        | Just clientRef == (self^.eEdictOther.eoEnemy) ->
+                            return True -- JDC false
+
+                        | otherwise -> do
+                            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just clientRef
+
+                            if (client^.eClassName) /= "player_noise"
+                              then do
+                                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiSoundTarget))
+
+                                case client^.eClient of
+                                  Nothing -> do
+                                    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= client^.eEdictOther.eoEnemy
+                                    let Just (EdictReference enemyIdx) = client^.eEdictOther.eoEnemy
+                                    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+                                    case enemy^.eClient of
+                                      Nothing -> do
+                                        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Nothing
+                                        return False
+
+                                      _ -> finishFindTarget
+
+                                  _ -> finishFindTarget
+                              else
+                                finishFindTarget
             else do
-              undefined -- TODO
+              -- heard it
+              vis <- visible selfRef clientRef
+
+              if (self^.eSpawnFlags) .&. 1 /= 0 && not vis
+                then return False
+                else do
+                  inPHS <- use $ gameBaseGlobals.gbGameImport.giInPHS
+                  v <- inPHS (self^.eEntityState.esOrigin) (client^.eEntityState.esOrigin)
+
+                  if not v
+                    then return False
+                    else do
+                      let temp = (client^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+
+                      if norm temp > 1000 -- too far to hear
+                        then return False
+                        else do
+                          -- check area portals - if they are different and
+                          -- not connected then we can't hear it
+                          done <- if (client^.eAreaNum) /= (self^.eAreaNum)
+                                    then do
+                                      areasConnected <- use $ gameBaseGlobals.gbGameImport.giAreasConnected
+                                      connected <- areasConnected (self^.eAreaNum) (client^.eAreaNum)
+                                      if not connected
+                                        then return True
+                                        else return False
+                                    else
+                                      return False
+
+                          if done
+                            then return False
+                            else do
+                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= Math3D.vectorYaw temp
+                              M.changeYaw selfRef
+
+                              -- hunt the sound for a bit; hopefully find
+                              -- the real player
+                              gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiSoundTarget)
+
+                              if Just clientRef == (self^.eEdictOther.eoEnemy)
+                                then return True
+                                else do
+                                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just clientRef
+                                  finishFindTarget
+
+        finishFindTarget :: Quake Bool
+        finishFindTarget = do
+          -- got one
+          foundTarget selfRef
+
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget == 0 && isJust (self^.eMonsterInfo.miSight)) $
+            void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEdictOther.eoEnemy) -- TODO: are we sure eoEnemy is Just ?
+
+          return True
+
+inFront :: EdictT -> EdictT -> Bool
+inFront self other = undefined -- TODO GameUtil.inFront
+
+foundTarget :: EdictReference -> Quake ()
+foundTarget _ = do
+    io (putStrLn "GameUtil.foundTarget") >> undefined -- TODO
