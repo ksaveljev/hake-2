@@ -62,10 +62,10 @@ glfwbKBD :: KBD
 glfwbKBD =
   KBD { _kbdInit           = glfwbKBDInit
       , _kbdUpdate         = glfwbKBDUpdate
-      , _kbdClose          = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+      , _kbdClose          = io (putStrLn "glfwbKBD.kbdClose") >> undefined -- TODO
       , _kbdDoKeyEvent     = (\_ _ -> io (putStrLn "glfwbKBD.kbdDoKeyEvent") >> undefined) -- TODO
-      , _kbdInstallGrabs   = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
-      , _kbdUninstallGrabs = io (putStrLn "glfwbKBD.kbdUpdate") >> undefined -- TODO
+      , _kbdInstallGrabs   = glfwbKBDInstallGrabs
+      , _kbdUninstallGrabs = glfwbKBDUninstallGrabs
       }
 
 glfwbInit :: RenderAPI -> Int -> Int -> Quake Bool
@@ -200,3 +200,13 @@ cursorPosCallback _ _ _ _ = putStrLn "GLFWbRenderer.cursorPosCallback" >> undefi
 
 scrollCallback :: TChan GLFWKBDEvent -> GLFW.Window -> Double -> Double -> IO ()
 scrollCallback _ _ _ _ = putStrLn "GLFWbRenderer.scrollCallback" >> undefined -- TODO
+
+glfwbKBDInstallGrabs :: Quake ()
+glfwbKBDInstallGrabs = do
+    Just window <- use $ glfwbGlobals.glfwbWindow
+    io $ GLFW.setCursorInputMode window GLFW.CursorInputMode'Disabled
+
+glfwbKBDUninstallGrabs :: Quake ()
+glfwbKBDUninstallGrabs = do
+    Just window <- use $ glfwbGlobals.glfwbWindow
+    io $ GLFW.setCursorInputMode window GLFW.CursorInputMode'Normal
