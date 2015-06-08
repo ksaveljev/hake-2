@@ -327,7 +327,14 @@ bandwidth estimation and should not be sent another packet
 =======================
 -}
 rateDrop :: ClientReference -> Quake Bool
-rateDrop _ = io (putStrLn "SVSend.rateDrop") >> undefined -- TODO
+rateDrop (ClientReference clientIdx) = do
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+
+    -- never drop over the loopback
+    if (client^.cNetChan.ncRemoteAddress.naType) == Constants.naLoopback
+      then return False
+      else do
+        io (putStrLn "SVSend.rateDrop") >> undefined -- TODO
 
 {-
 =======================
