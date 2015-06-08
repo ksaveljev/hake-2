@@ -394,7 +394,7 @@ sendClientMessages = do
             if | elem state [Constants.ssCinematic, Constants.ssDemo, Constants.ssPic] -> do
                    msg <- use $ svGlobals.svMsgBuf
                    NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) (B.length msg) msg
-               | state == Constants.csSpawned -> do
+               | (client^.cState) == Constants.csSpawned -> do
                    flooded <- rateDrop clientRef
                    -- don't overrun bandwidth
                    unless flooded $ sendClientDatagram clientRef
