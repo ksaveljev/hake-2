@@ -95,7 +95,7 @@ createBaseline = do
           | idx >= maxIdx = return ()
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
-              if not (edict^.eInUse) || (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0
+              if not (edict^.eInUse) || ((edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0)
                 then edictBaseline (idx + 1) maxIdx
                 else do
                   gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esNumber .= idx
@@ -104,6 +104,8 @@ createBaseline = do
                   gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
                   Just entityState <- preuse $ gameBaseGlobals.gbGEdicts.ix idx.eEntityState
                   svGlobals.svServer.sBaselines.ix idx .= entityState
+
+                  edictBaseline (idx + 1) maxIdx
 
 checkForSavegame :: Quake ()
 checkForSavegame = do
