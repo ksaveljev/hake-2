@@ -21,6 +21,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.CSurfaceT
 import QCommon.LumpT
 import QCommon.QFiles.BSP.DAreaT
@@ -777,8 +778,24 @@ setAreaPortalState portalNum open = do
     cmGlobals.cmPortalOpen.ix portalNum .= open
     floodAreaConnections
 
+-- CM_AreasConnected returns true, if two areas are connected.
 areasConnected :: Int -> Int -> Quake Bool
-areasConnected _ _ = io (putStrLn "CM.areasConnected") >> undefined -- TODO
+areasConnected area1 area2 = do
+    noAreasValue <- liftM (^.cvValue) mapNoAreasCVar
+
+    if noAreasValue /= 0
+      then return True
+      else do
+        numAreas <- use $ cmGlobals.cmNumAreas
+
+        when (area1 > numAreas || area2 > numAreas) $
+          Com.comError Constants.errDrop "area > numareas"
+
+        mapAreas <- use $ cmGlobals.cmMapAreas
+
+        if ((mapAreas V.! area1)^.caFloodNum) == ((mapAreas V.! area2)^.caFloodNum)
+          then return True
+          else return False
 
 floodAreaR :: Int -> Int -> Quake ()
 floodAreaR areaIdx floodNum = do
