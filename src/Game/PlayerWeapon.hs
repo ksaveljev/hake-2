@@ -3,9 +3,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=))
 import Control.Monad (when, liftM, void, unless)
-import Data.Bits ((.&.), (.|.), shiftL)
+import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3)
 import qualified Data.Vector.Unboxed as UV
@@ -17,6 +17,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
 import qualified Game.Monsters.MPlayer as MPlayer
+import qualified Util.Lib as Lib
 
 useWeapon :: ItemUse
 useWeapon =
@@ -332,7 +333,7 @@ thinkWeapon edictRef@(EdictReference edictIdx) = do
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
 weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let frameFireFirst = frameActiveLast + 1
@@ -392,7 +393,39 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
                      then do
                        if ((gClient^.gcLatchedButtons) .|. (gClient^.gcButtons)) .&. Constants.buttonAttack /= 0
                          then do
-                           io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+                           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcLatchedButtons %= (.&. (complement Constants.buttonAttack))
+                           let Just (GItemReference weaponIdx) = gClient^.gcPers.cpWeapon
+                           Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+
+                           if (gClient^.gcAmmoIndex) == 0 || ((gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex)) >= (weapon^.giQuantity)
+                             then do
+                               zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+                                 gcPlayerState.psGunFrame .= frameFireFirst
+                                 gcWeaponState .= Constants.weaponFiring
+                                 -- start the animation
+                                 gcAnimPriority .= Constants.animAttack
+
+                               if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                 then do
+                                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRAttack1 - 1
+                                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRAttack9
+                                 else do
+                                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameAttack1 - 1
+                                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameAttack8
+
+                               return False
+
+                             else do
+                               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+                               when (levelTime >= (edict^.eEdictTiming.etPainDebounceTime)) $ do
+                                 soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+                                 sound <- use $ gameBaseGlobals.gbGameImport.giSound
+                                 soundIdx <- soundIndex (Just "weapons/noammo.wav")
+                                 sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+                                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime + 1
+
+                               noAmmoWeaponChange edictRef
+                               return False
 
                          else do
                            if (gClient^.gcPlayerState.psGunFrame) == frameIdleLast
@@ -400,13 +433,59 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
                                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= frameIdleFirst
                                return True
                              else do
-                               io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+                               -- TODO: do we need this?
+                               -- if (pause_frames != null) {
+                               done <- checkPauseFrames gClient pauseFrames 0
+                               if done
+                                 then return True
+                                 else do
+                                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+                                   return True
                      else
                        return False
 
            unless done $ do
              when ((gClient^.gcWeaponState) == Constants.weaponFiring) $ do
-               io (putStrLn "PlayerWeapon.weaponGeneric") >> undefined -- TODO
+               idx <- checkFireFrames gClientRef fireFrames 0
+               when (fireFrames UV.! idx == 0) $
+                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+               preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame) >>= \(Just gunFrame) ->
+                 when (gunFrame == frameIdleFirst + 1) $
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponState .= Constants.weaponReady
+
+  where checkFireFrames :: GClientReference -> UV.Vector Int -> Int -> Quake Int
+        checkFireFrames gClientRef@(GClientReference gClientIdx) fireFrames idx
+          | fireFrames UV.! idx == 0 = return idx
+          | otherwise = do
+              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+              if (gClient^.gcPlayerState.psGunFrame) == fireFrames UV.! idx
+                then do
+                  frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+                  when (truncate (gClient^.gcQuadFrameNum) > frameNum) $ do
+                    soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+                    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+                    soundIdx <- soundIndex (Just "items/damage3.wav")
+                    sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
+
+                  think fire edictRef
+                  return idx
+                else
+                  checkFireFrames gClientRef fireFrames (idx + 1)
+
+        checkPauseFrames :: GClientT -> UV.Vector Int -> Int -> Quake Bool
+        checkPauseFrames gClient pauseFrames idx
+          | pauseFrames UV.! idx == 0 = return False
+          | otherwise = do
+              if (gClient^.gcPlayerState.psGunFrame) == pauseFrames UV.! idx
+                then do
+                  r <- Lib.rand
+                  if r .&. 15 /= 0
+                    then return True
+                    else checkPauseFrames gClient pauseFrames (idx + 1)
+                else
+                  checkPauseFrames gClient pauseFrames (idx + 1)
+
 
 weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
 weaponGrenadeFire _ _ = do
@@ -419,3 +498,7 @@ blasterFire _ _ _ _ _ = do
 playerNoise :: EdictReference -> V3 Float -> Int -> Quake ()
 playerNoise _ _ _ = do
     io (putStrLn "PlayerWeapon.playerNoise") >> undefined -- TODO
+
+noAmmoWeaponChange :: EdictReference -> Quake ()
+noAmmoWeaponChange _ = do
+    io (putStrLn "PlayerWeapon.noAmmoWeaponChange") >> undefined -- TODO
