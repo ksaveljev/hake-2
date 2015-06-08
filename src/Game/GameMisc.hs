@@ -213,6 +213,10 @@ spFuncWall :: EdictReference -> Quake ()
 spFuncWall edictRef@(EdictReference edictIdx) = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let linkEntity = gameImport^.giLinkEntity
+        setModel = gameImport^.giSetModel
+
+    preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) ->
+      setModel edictRef (edict^.eEdictInfo.eiModel)
 
     gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= Constants.moveTypePush
 
