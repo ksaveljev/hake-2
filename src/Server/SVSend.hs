@@ -26,6 +26,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
+import qualified Server.SVEnts as SVEnts
 import qualified Server.SVMain as SVMain
 import qualified Server.SVUser as SVUser
 
@@ -295,8 +296,43 @@ startSound maybeOrigin (EdictReference edictIdx) channel soundIndex volume atten
 SV_SendClientDatagram
 =======================
 -}
-sendClientDatagram :: ClientReference -> Quake ()
-sendClientDatagram _ = io (putStrLn "SVSend.sendClientDatagram") >> undefined -- TODO
+sendClientDatagram :: ClientReference -> Quake Bool
+sendClientDatagram clientRef@(ClientReference clientIdx) = do
+    SVEnts.buildClientFrame clientRef
+
+    SZ.init (svGlobals.svMsg) "" Constants.maxMsgLen
+    svGlobals.svMsg.sbAllowOverflow .= True
+
+    -- send over all the relevant entity_state_t
+    -- and the player_state_t
+    SVEnts.writeFrameToClient clientRef (svGlobals.svMsg)
+
+    -- copy the accumulated multicast datagram
+    -- for this client out to the message
+    -- it is necessary for this to be after the WriteEntities
+    -- so that entity references will be current
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+
+    if client^.cDatagram.sbOverflowed
+      then Com.printf ("WARNING: datagram overflowed for " `B.append` (client^.cName) `B.append` "\n")
+      else SZ.write (svGlobals.svMsg) (client^.cDatagram.sbData) (client^.cDatagram.sbCurSize)
+
+    SZ.clear (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram)
+
+    use (svGlobals.svMsg) >>= \msg ->
+      when (msg^.sbOverflowed) $ do -- must have room left for the packet header
+        Com.printf ("WARNING: msg overflowed for " `B.append` (client^.cName) `B.append` "\n")
+        SZ.clear (svGlobals.svMsg)
+
+    -- send the datagram
+    msg <- use $ svGlobals.svMsg
+    NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) (msg^.sbCurSize) (msg^.sbData)
+
+    -- record the size for rate estimation
+    frameNum <- use $ svGlobals.svServer.sFrameNum
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cMessageSize.ix (frameNum `mod` Constants.rateMessages) .= (msg^.sbCurSize)
+
+    return True
 
 {-
 ==================
@@ -404,7 +440,8 @@ sendClientMessages = do
                | (client^.cState) == Constants.csSpawned -> do
                    flooded <- rateDrop clientRef
                    -- don't overrun bandwidth
-                   unless flooded $ sendClientDatagram clientRef
+                   unless flooded $
+                     void $ sendClientDatagram clientRef
                | otherwise -> do
                    Just netChan <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan
                    curTime <- use $ globals.curtime

@@ -1,6 +1,7 @@
+{-# LANGUAGE Rank2Types #-}
 module Server.SVEnts where
 
-import Control.Lens (use)
+import Control.Lens (use, Lens')
 import Control.Monad (when)
 import Data.Maybe (isJust)
 
@@ -17,3 +18,11 @@ recordDemoMessage = do
 
     when (isJust demoFile) $ do
       io (putStrLn "SVEnts.recordDemoMessage") >> undefined -- TODO
+
+writeFrameToClient :: ClientReference -> Lens' QuakeState SizeBufT -> Quake ()
+writeFrameToClient _ _ = do
+    io (putStrLn "SVEnts.writeFrameToClient") >> undefined -- TODO
+
+buildClientFrame :: ClientReference -> Quake ()
+buildClientFrame _ = do
+    io (putStrLn "SVEnts.buildClientFrame") >> undefined -- TODO
