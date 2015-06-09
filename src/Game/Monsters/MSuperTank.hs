@@ -8,3 +8,8 @@ spMonsterSuperTank :: EntThink
 spMonsterSuperTank =
   GenericEntThink "SP_monster_supertank" $ \_ -> do
     io (putStrLn "MSuperTank.spMonsterSuperTank") >> undefined -- TODO
+
+bossExplode :: EntThink
+bossExplode =
+  GenericEntThink "BossExplode" $ \_ -> do
+    io (putStrLn "MSuperTank.bossExplode") >> undefined -- TODO
