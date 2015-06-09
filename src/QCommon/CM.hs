@@ -5,13 +5,13 @@
 {-# LANGUAGE BangPatterns #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2)
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2, Traversal')
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Functor ((<$>))
 import Data.Int (Int8, Int64)
 import Data.Maybe (isNothing, fromJust)
-import Data.Word (Word16)
+import Data.Word (Word8, Word16)
 import Linear (V3(..), _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -1517,3 +1517,7 @@ transformedBoxTrace start end mins maxs headNode brushMask origin angles = do
         endPos = start + fmap (* (traceT^.tFraction)) (end - start)
 
     return $ traceT' { _tEndPos = endPos }
+
+writeAreaBits :: Traversal' QuakeState (UV.Vector Word8) -> Int -> Quake Int
+writeAreaBits _ _ = do
+    io (putStrLn "CM.writeAreaBits") >> undefined -- TODO
