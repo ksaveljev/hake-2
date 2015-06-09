@@ -163,6 +163,7 @@ data QuakeState =
              , _mSoldierGlobals       :: MSoldierGlobals
              , _mInfantryGlobals      :: MInfantryGlobals
              , _mBoss31Globals        :: MBoss31Globals
+             , _mBoss2Globals         :: MBoss2Globals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1852,6 +1853,7 @@ data CLTEntGlobals =
                 , _clteModMonsterHeatBeam :: Maybe ModelReference
                 , _clteModExplo4Big       :: Maybe ModelReference
                 }
+
 data MBoss31Globals =
   MBoss31Globals { _mb31SoundPain1     :: Int
                  , _mb31SoundPain2     :: Int
@@ -1868,3 +1870,11 @@ data MBoss31Globals =
                  , _mb31SoundStepRight :: Int
                  , _mb31SoundDeathHit  :: Int
                  }
+
+data MBoss2Globals =
+  MBoss2Globals { _mb2SoundPain1   :: Int
+                , _mb2SoundPain2   :: Int
+                , _mb2SoundPain3   :: Int
+                , _mb2SoundDeath   :: Int
+                , _mb2SoundSearch1 :: Int
+                }

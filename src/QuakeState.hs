@@ -16,6 +16,7 @@ module QuakeState ( QuakeState(..)
                   , mSoldierGlobals
                   , mInfantryGlobals
                   , mBoss31Globals
+                  , mBoss2Globals
                   , playerTrailGlobals
                   , vidGlobals
                   , inGlobals
@@ -72,6 +73,7 @@ module QuakeState ( QuakeState(..)
                   , module Sys.INGlobals
                   , module Sys.NETGlobals
                   , module Game.GameItemsGlobals
+                  , module Game.Monsters.MBoss2Globals
                   , module Game.Monsters.MBoss31Globals
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.Monsters.MInfantryGlobals
@@ -87,13 +89,6 @@ import Control.Lens (makeLenses)
 
 import Internal
 import Globals
-import Game.CmdGlobals
-import Game.GameBaseGlobals
-import Game.GameItemsGlobals
-import Game.Monsters.MBoss31Globals
-import Game.Monsters.MInfantryGlobals
-import Game.Monsters.MSoldierGlobals
-import Game.PlayerTrailGlobals
 import Client.ClientGlobals
 import Client.CLTEntGlobals
 import Client.KeyGlobals
@@ -102,7 +97,14 @@ import Client.ParticleTGlobals
 import Client.SCRGlobals
 import Client.VIDGlobals
 import Client.VGlobals
-import Server.SVGlobals
+import Game.CmdGlobals
+import Game.GameBaseGlobals
+import Game.GameItemsGlobals
+import Game.Monsters.MBoss2Globals
+import Game.Monsters.MBoss31Globals
+import Game.Monsters.MInfantryGlobals
+import Game.Monsters.MSoldierGlobals
+import Game.PlayerTrailGlobals
 import QCommon.CMGlobals
 import QCommon.ComGlobals
 import QCommon.FSGlobals
@@ -111,6 +113,7 @@ import QCommon.PMoveGlobals
 import Render.Basic.BasicRenderAPIGlobals
 import Render.Fast.FastRenderAPIGlobals
 import Render.GLFWbGlobals
+import Server.SVGlobals
 import Sys.KBDGlobals
 import Sys.INGlobals
 import Sys.NETGlobals
@@ -134,6 +137,7 @@ initialQuakeState =
              , _mSoldierGlobals       = initialMSoldierGlobals
              , _mInfantryGlobals      = initialMInfantryGlobals
              , _mBoss31Globals        = initialMBoss31Globals
+             , _mBoss2Globals         = initialMBoss2Globals
              , _playerTrailGlobals    = initialPlayerTrailGlobals
              , _vidGlobals            = initialVIDGlobals
              , _inGlobals             = initialINGlobals
