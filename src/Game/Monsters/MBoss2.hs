@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MBoss2 where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
@@ -12,7 +13,65 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monsters.MSuperTank as MSuperTank
 import qualified Util.Lib as Lib
+
+frameStand30 :: Int
+frameStand30 = 0
+
+frameStand50 :: Int
+frameStand50 = 20
+
+frameStand1 :: Int
+frameStand1 = 21
+
+frameWalk1 :: Int
+frameWalk1 = 50
+
+frameWalk20 :: Int
+frameWalk20 = 69
+
+frameAttack1 :: Int
+frameAttack1 = 70
+
+frameAttack9 :: Int
+frameAttack9 = 78
+
+frameAttack10 :: Int
+frameAttack10 = 79
+
+frameAttack15 :: Int
+frameAttack15 = 84
+
+frameAttack16 :: Int
+frameAttack16 = 85
+
+frameAttack19 :: Int
+frameAttack19 = 88
+
+frameAttack20 :: Int
+frameAttack20 = 89
+
+frameAttack40 :: Int
+frameAttack40 = 109
+
+framePain2 :: Int
+framePain2 = 110
+
+framePain19 :: Int
+framePain19 = 127
+
+framePain20 :: Int
+framePain20 = 128
+
+framePain23 :: Int
+framePain23 = 131
+
+frameDeath2 :: Int
+frameDeath2 = 132
+
+frameDeath50 :: Int
+frameDeath50 = 180
 
 boss2Stand :: EntThink
 boss2Stand =
@@ -113,8 +172,8 @@ boss2Die =
     sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNone 0
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eDeadFlag .= Constants.deadDead
-      eTakeDamage .= Constants.damageNo
+      eEdictStatus.eDeadFlag .= Constants.deadDead
+      eEdictStatus.eTakeDamage .= Constants.damageNo
       eCount .= 0
       eMonsterInfo.miCurrentMove .= Just boss2MoveDeath
 
@@ -289,6 +348,151 @@ boss2FramesAttackPreMg =
 
 boss2MoveAttackPreMg :: MMoveT
 boss2MoveAttackPreMg = MMoveT "boss2MoveAttackPreMg" frameAttack1 frameAttack9 boss2FramesAttackPreMg Nothing
+
+-- Loop this
+boss2FramesAttackMg :: V.Vector MFrameT
+boss2FramesAttackMg =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 1 (Just boss2MachineGun)
+               , MFrameT (Just GameAI.aiCharge) 1 (Just boss2MachineGun)
+               , MFrameT (Just GameAI.aiCharge) 1 (Just boss2MachineGun)
+               , MFrameT (Just GameAI.aiCharge) 1 (Just boss2MachineGun)
+               , MFrameT (Just GameAI.aiCharge) 1 (Just boss2MachineGun)
+               , MFrameT (Just GameAI.aiCharge) 1 (Just boss2ReAttackMg)
+               ]
+
+boss2MoveAttackMg :: MMoveT
+boss2MoveAttackMg = MMoveT "boss2MoveAttackMg" frameAttack10 frameAttack15 boss2FramesAttackMg Nothing
+
+boss2FramesAttackPostMg :: V.Vector MFrameT
+boss2FramesAttackPostMg =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 1 Nothing
+               , MFrameT (Just GameAI.aiCharge) 1 Nothing
+               , MFrameT (Just GameAI.aiCharge) 1 Nothing
+               , MFrameT (Just GameAI.aiCharge) 1 Nothing
+               ]
+
+boss2MoveAttackPostMg :: MMoveT
+boss2MoveAttackPostMg = MMoveT "boss2MoveAttackPostMg" frameAttack16 frameAttack19 boss2FramesAttackPostMg (Just boss2Run)
+
+boss2FramesAttackRocket :: V.Vector MFrameT
+boss2FramesAttackRocket =
+    V.fromList [ MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiMove)   (-20) (Just boss2Rocket)
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               ]
+
+boss2MoveAttackRocket :: MMoveT
+boss2MoveAttackRocket = MMoveT "boss2MoveAttackRocket" frameAttack20 frameAttack40 boss2FramesAttackRocket (Just boss2Run)
+
+boss2FramesPainHeavy :: V.Vector MFrameT
+boss2FramesPainHeavy =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+boss2MovePainHeavy :: MMoveT
+boss2MovePainHeavy = MMoveT "boss2MovePainHeavy" framePain2 framePain19 boss2FramesPainHeavy (Just boss2Run)
+
+boss2FramesPainLight :: V.Vector MFrameT
+boss2FramesPainLight =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+boss2MovePainLight :: MMoveT
+boss2MovePainLight = MMoveT "boss2MovePainLight" framePain20 framePain23 boss2FramesPainLight (Just boss2Run)
+
+boss2FramesDeath :: V.Vector MFrameT
+boss2FramesDeath =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 (Just MSuperTank.bossExplode)
+               ]
+
+boss2MoveDeath :: MMoveT
+boss2MoveDeath = MMoveT "boss2MoveDeath" frameDeath2 frameDeath50 boss2FramesDeath (Just boss2Dead)
 
 spMonsterBoss2 :: EdictReference -> Quake ()
 spMonsterBoss2 _ = io (putStrLn "MBoss2.spMonsterBoss2") >> undefined -- TODO
