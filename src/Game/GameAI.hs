@@ -19,6 +19,22 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 {-
+- Don't move, but turn towards ideal_yaw Distance is for slight position
+- adjustments needed by the animations.
+-}
+aiTurn :: AI
+aiTurn =
+  GenericAI "ai_turn" $ \selfRef@(EdictReference selfIdx) dist -> do
+    when (dist /= 0) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
+
+    v <- GameUtil.findTarget selfRef
+
+    unless v $
+      M.changeYaw selfRef
+
+{-
 - Used for standing around and looking for players Distance is for slight
 - position adjustments needed by the animations. 
 -}
