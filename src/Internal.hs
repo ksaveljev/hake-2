@@ -160,6 +160,7 @@ data QuakeState =
              , _netGlobals            :: NETGlobals
              , _cmGlobals             :: CMGlobals
              , _gameItemsGlobals      :: GameItemsGlobals
+             , _mBerserkGlobals       :: MBerserkGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
              , _mInfantryGlobals      :: MInfantryGlobals
              , _mBoss31Globals        :: MBoss31Globals
@@ -1878,3 +1879,12 @@ data MBoss2Globals =
                 , _mb2SoundDeath   :: Int
                 , _mb2SoundSearch1 :: Int
                 }
+
+data MBerserkGlobals =
+  MBerserkGlobals { _mbSoundPain   :: Int
+                  , _mbSoundDie    :: Int
+                  , _mbSoundIdle   :: Int
+                  , _mbSoundPunch  :: Int
+                  , _mbSoundSight  :: Int
+                  , _mbSoundSearch :: Int
+                  }

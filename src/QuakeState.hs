@@ -13,6 +13,7 @@ module QuakeState ( QuakeState(..)
                   , netGlobals
                   , cmGlobals
                   , gameItemsGlobals
+                  , mBerserkGlobals
                   , mSoldierGlobals
                   , mInfantryGlobals
                   , mBoss31Globals
@@ -73,6 +74,7 @@ module QuakeState ( QuakeState(..)
                   , module Sys.INGlobals
                   , module Sys.NETGlobals
                   , module Game.GameItemsGlobals
+                  , module Game.Monsters.MBerserkGlobals
                   , module Game.Monsters.MBoss2Globals
                   , module Game.Monsters.MBoss31Globals
                   , module Game.Monsters.MSoldierGlobals
@@ -100,6 +102,7 @@ import Client.VGlobals
 import Game.CmdGlobals
 import Game.GameBaseGlobals
 import Game.GameItemsGlobals
+import Game.Monsters.MBerserkGlobals
 import Game.Monsters.MBoss2Globals
 import Game.Monsters.MBoss31Globals
 import Game.Monsters.MInfantryGlobals
@@ -134,6 +137,7 @@ initialQuakeState =
              , _netGlobals            = initialNETGlobals
              , _cmGlobals             = initialCMGlobals
              , _gameItemsGlobals      = initialGameItemsGlobals
+             , _mBerserkGlobals       = initialMBerserkGlobals
              , _mSoldierGlobals       = initialMSoldierGlobals
              , _mInfantryGlobals      = initialMInfantryGlobals
              , _mBoss31Globals        = initialMBoss31Globals
