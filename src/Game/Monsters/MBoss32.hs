@@ -2,7 +2,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss32 where
 
-import Control.Lens (use, preuse, ix, (^.), (.=))
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
+import Data.Bits ((.|.))
+import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Quake
@@ -163,6 +165,55 @@ makronFramesStand =
 
 makronMoveStand :: MMoveT
 makronMoveStand = MMoveT "makronMoveStand" frameStand201 frameStand260 makronFramesStand Nothing
+
+makronFramesRun :: V.Vector MFrameT
+makronFramesRun =
+    V.fromList [ MFrameT (Just GameAI.aiRun)  3 (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiRun) 12 Nothing
+               , MFrameT (Just GameAI.aiRun)  8 Nothing
+               , MFrameT (Just GameAI.aiRun)  8 Nothing
+               , MFrameT (Just GameAI.aiRun)  8 (Just makronStepRight)
+               , MFrameT (Just GameAI.aiRun)  6 Nothing
+               , MFrameT (Just GameAI.aiRun) 12 Nothing
+               , MFrameT (Just GameAI.aiRun)  9 Nothing
+               , MFrameT (Just GameAI.aiRun)  6 Nothing
+               , MFrameT (Just GameAI.aiRun) 12 Nothing
+               ]
+
+makronMoveRun :: MMoveT
+makronMoveRun = MMoveT "makronMoveRun" frameWalk204 frameWalk213 makronFramesRun Nothing
+
+makronFramesWalk :: V.Vector MFrameT
+makronFramesWalk =
+    V.fromList [ MFrameT (Just GameAI.aiWalk)  3 (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiWalk) 12 Nothing
+               , MFrameT (Just GameAI.aiWalk)  8 Nothing
+               , MFrameT (Just GameAI.aiWalk)  8 Nothing
+               , MFrameT (Just GameAI.aiWalk)  8 (Just makronStepRight)
+               , MFrameT (Just GameAI.aiWalk)  6 Nothing
+               , MFrameT (Just GameAI.aiWalk) 12 Nothing
+               , MFrameT (Just GameAI.aiWalk)  9 Nothing
+               , MFrameT (Just GameAI.aiWalk)  6 Nothing
+               , MFrameT (Just GameAI.aiWalk) 12 Nothing
+               ]
+
+makronMoveWalk :: MMoveT
+makronMoveWalk = MMoveT "makronMoveWalk" frameWalk204 frameWalk213 makronFramesRun Nothing
+
+makronDead :: EntThink
+makronDead =
+  GenericEntThink "makron_dead" $ \selfRef@(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEdictMinMax.eMins .= V3 (-60) (-60) 0
+      eEdictMinMax.eMaxs .= V3 60 60 72
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfDeadMonster)
+      eEdictAction.eaNextThink .= 0
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    return True
 
 makronToss :: EntThink
 makronToss =
