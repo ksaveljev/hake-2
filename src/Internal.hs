@@ -163,8 +163,9 @@ data QuakeState =
              , _mBerserkGlobals       :: MBerserkGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
              , _mInfantryGlobals      :: MInfantryGlobals
-             , _mBoss31Globals        :: MBoss31Globals
              , _mBoss2Globals         :: MBoss2Globals
+             , _mBoss31Globals        :: MBoss31Globals
+             , _mBoss32Globals        :: MBoss32Globals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1888,3 +1889,20 @@ data MBerserkGlobals =
                   , _mbSoundSight  :: Int
                   , _mbSoundSearch :: Int
                   }
+
+data MBoss32Globals =
+  MBoss32Globals { _mb32SoundPain4        :: Int
+                 , _mb32SoundPain5        :: Int
+                 , _mb32SoundPain6        :: Int
+                 , _mb32SoundDeath        :: Int
+                 , _mb32SoundStepLeft     :: Int
+                 , _mb32SoundStepRight    :: Int
+                 , _mb32SoundAttackBfg    :: Int
+                 , _mb32SoundBrainSplorch :: Int
+                 , _mb32SoundPreRailGun   :: Int
+                 , _mb32SoundPopUp        :: Int
+                 , _mb32SoundTaunt1       :: Int
+                 , _mb32SoundTaunt2       :: Int
+                 , _mb32SoundTaunt3       :: Int
+                 , _mb32SoundHit          :: Int
+                 }
