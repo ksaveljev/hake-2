@@ -767,29 +767,29 @@ glLightScaleTexture img width height onlyGamma = do
         buildFromGammaTable gammaTable idx p maxIdx acc
           | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
-              let p0 = img `B.index` p
-                  p1 = img `B.index` (p + 1)
-                  p2 = img `B.index` (p + 2)
-                  p3 = img `B.index` (p + 3)
-                  a = gammaTable `B.index` (fromIntegral p0)
-                  b = gammaTable `B.index` (fromIntegral p1)
-                  c = gammaTable `B.index` (fromIntegral p2)
+              let !p0 = img `B.index` p
+                  !p1 = img `B.index` (p + 1)
+                  !p2 = img `B.index` (p + 2)
+                  !p3 = img `B.index` (p + 3)
+                  !a = gammaTable `B.index` (fromIntegral p0)
+                  !b = gammaTable `B.index` (fromIntegral p1)
+                  !c = gammaTable `B.index` (fromIntegral p2)
               in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
 
         buildFromGammaAndIntesityTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         buildFromGammaAndIntesityTable gammaTable intensityTable idx p maxIdx acc
           | idx >= maxIdx = BL.toStrict $ BB.toLazyByteString acc
           | otherwise =
-              let p0 = img `B.index` p
-                  p1 = img `B.index` (p + 1)
-                  p2 = img `B.index` (p + 2)
-                  p3 = img `B.index` (p + 3)
-                  i0 = intensityTable `B.index` (fromIntegral p0)
-                  i1 = intensityTable `B.index` (fromIntegral p1)
-                  i2 = intensityTable `B.index` (fromIntegral p2)
-                  a = gammaTable `B.index` (fromIntegral i0)
-                  b = gammaTable `B.index` (fromIntegral i1)
-                  c = gammaTable `B.index` (fromIntegral i2)
+              let !p0 = img `B.index` p
+                  !p1 = img `B.index` (p + 1)
+                  !p2 = img `B.index` (p + 2)
+                  !p3 = img `B.index` (p + 3)
+                  !i0 = intensityTable `B.index` (fromIntegral p0)
+                  !i1 = intensityTable `B.index` (fromIntegral p1)
+                  !i2 = intensityTable `B.index` (fromIntegral p2)
+                  !a = gammaTable `B.index` (fromIntegral i0)
+                  !b = gammaTable `B.index` (fromIntegral i1)
+                  !c = gammaTable `B.index` (fromIntegral i2)
               -- in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
               in buildFromGammaAndIntesityTable gammaTable intensityTable (idx + 1) (p + 4) maxIdx (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 c `mappend` BB.word8 p3)
 
