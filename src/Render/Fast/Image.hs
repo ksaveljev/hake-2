@@ -774,7 +774,7 @@ glLightScaleTexture img width height onlyGamma = do
                   !a = gammaTable `B.index` (fromIntegral p0)
                   !b = gammaTable `B.index` (fromIntegral p1)
                   !c = gammaTable `B.index` (fromIntegral p2)
-              in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, p3])))
+              in buildFromGammaTable gammaTable (idx + 1) (p + 4) maxIdx (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 c `mappend` BB.word8 p3)
 
         buildFromGammaAndIntesityTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
         buildFromGammaAndIntesityTable gammaTable intensityTable idx p maxIdx acc
@@ -817,12 +817,12 @@ glMipMap img width height =
         forJ inIdx j maxJ acc
           | j >= maxJ = (inIdx, acc)
           | otherwise =
-              let w = width `shiftL` 2
-                  a = ((img `B.index` (inIdx + 0)) + (img `B.index` (inIdx + 4)) + (img `B.index` (inIdx + w + 0)) + (img `B.index` (inIdx + w + 4))) `shiftR` 2
-                  b = ((img `B.index` (inIdx + 1)) + (img `B.index` (inIdx + 5)) + (img `B.index` (inIdx + w + 1)) + (img `B.index` (inIdx + w + 5))) `shiftR` 2
-                  c = ((img `B.index` (inIdx + 2)) + (img `B.index` (inIdx + 6)) + (img `B.index` (inIdx + w + 2)) + (img `B.index` (inIdx + w + 6))) `shiftR` 2
-                  d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
-              in forJ (inIdx + 8) (j + 8) maxJ (acc `mappend` (mconcat (fmap BB.word8 [a, b, c, d])))
+              let !w = width `shiftL` 2
+                  !a = ((img `B.index` (inIdx + 0)) + (img `B.index` (inIdx + 4)) + (img `B.index` (inIdx + w + 0)) + (img `B.index` (inIdx + w + 4))) `shiftR` 2
+                  !b = ((img `B.index` (inIdx + 1)) + (img `B.index` (inIdx + 5)) + (img `B.index` (inIdx + w + 1)) + (img `B.index` (inIdx + w + 5))) `shiftR` 2
+                  !c = ((img `B.index` (inIdx + 2)) + (img `B.index` (inIdx + 6)) + (img `B.index` (inIdx + w + 2)) + (img `B.index` (inIdx + w + 6))) `shiftR` 2
+                  !d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
+              in forJ (inIdx + 8) (j + 8) maxJ (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 c `mappend` BB.word8 d)
 
 glFindImage :: B.ByteString -> Int -> Quake (Maybe ImageReference)
 glFindImage imgName imgType = do
@@ -940,7 +940,7 @@ loadTGA name = do
                          g = buf `B.index` (idx + 1)
                          r = buf `B.index` (idx + 2)
                      --in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [255, b, g, r])))
-                     in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (BB.word8 255 `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r))
+                     in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` BB.word8 255 `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r)
 
                 -- pixelSize == 32
                 else let b = buf `B.index` (idx + 0)
@@ -948,7 +948,7 @@ loadTGA name = do
                          r = buf `B.index` (idx + 2)
                          a = buf `B.index` (idx + 3)
                      --in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [a, b, g, r])))
-                     in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r))
+                     in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r)
 
 scrapUpload :: Quake ()
 scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO
