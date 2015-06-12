@@ -84,7 +84,7 @@ frameDeathC8 = 243
 berserkSight :: EntInteract
 berserkSight =
   GenericEntInteract "berserk_sight" $ \selfRef _ -> do
-    soundSight <- use $ mBerserkGlobals.mbSoundSight
+    soundSight <- use $ mBerserkGlobals.mBerserkSoundSight
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanVoice soundSight 1 Constants.attnNorm 0
     return True
@@ -92,7 +92,7 @@ berserkSight =
 berserkSearch :: EntThink
 berserkSearch =
   GenericEntThink "berserk_search" $ \selfRef -> do
-    soundSearch <- use $ mBerserkGlobals.mbSoundSearch
+    soundSearch <- use $ mBerserkGlobals.mBerserkSoundSearch
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanVoice soundSearch 1 Constants.attnNorm 0
     return True
@@ -111,7 +111,7 @@ berserkFidget =
           then return True
           else do
             gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just berserkMoveStandFidget
-            soundIdle <- use $ mBerserkGlobals.mbSoundIdle
+            soundIdle <- use $ mBerserkGlobals.mBerserkSoundIdle
             sound <- use $ gameBaseGlobals.gbGameImport.giSound
             sound (Just selfRef) Constants.chanWeapon soundIdle 1 Constants.attnIdle 0
             return True
@@ -246,7 +246,7 @@ berserkAttackSpike =
 berserkSwing :: EntThink
 berserkSwing =
   GenericEntThink "berserk_swing" $ \selfRef -> do
-    soundPunch <- use $ mBerserkGlobals.mbSoundPunch
+    soundPunch <- use $ mBerserkGlobals.mBerserkSoundPunch
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanWeapon soundPunch 1 Constants.attnNorm 0
     return True

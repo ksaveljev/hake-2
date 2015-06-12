@@ -166,6 +166,7 @@ data QuakeState =
              , _mBoss2Globals         :: MBoss2Globals
              , _mBoss31Globals        :: MBoss31Globals
              , _mBoss32Globals        :: MBoss32Globals
+             , _mBrainGlobals         :: MBrainGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1883,12 +1884,12 @@ data MBoss2Globals =
                 }
 
 data MBerserkGlobals =
-  MBerserkGlobals { _mbSoundPain   :: Int
-                  , _mbSoundDie    :: Int
-                  , _mbSoundIdle   :: Int
-                  , _mbSoundPunch  :: Int
-                  , _mbSoundSight  :: Int
-                  , _mbSoundSearch :: Int
+  MBerserkGlobals { _mBerserkSoundPain   :: Int
+                  , _mBerserkSoundDie    :: Int
+                  , _mBerserkSoundIdle   :: Int
+                  , _mBerserkSoundPunch  :: Int
+                  , _mBerserkSoundSight  :: Int
+                  , _mBerserkSoundSearch :: Int
                   }
 
 data MBoss32Globals =
@@ -1907,3 +1908,20 @@ data MBoss32Globals =
                  , _mb32SoundTaunt3       :: Int
                  , _mb32SoundHit          :: Int
                  }
+
+data MBrainGlobals =
+  MBrainGlobals { _mBrainSoundChestOpen        :: Int
+                , _mBrainSoundTentaclesExtend  :: Int
+                , _mBrainSoundTentaclesRetract :: Int
+                , _mBrainSoundDeath            :: Int
+                , _mBrainSoundIdle1            :: Int
+                , _mBrainSoundIdle2            :: Int
+                , _mBrainSoundIdle3            :: Int
+                , _mBrainSoundPain1            :: Int
+                , _mBrainSoundPain2            :: Int
+                , _mBrainSoundSight            :: Int
+                , _mBrainSoundSearch           :: Int
+                , _mBrainSoundMelee1           :: Int
+                , _mBrainSoundMelee2           :: Int
+                , _mBrainSoundMelee3           :: Int
+                }
