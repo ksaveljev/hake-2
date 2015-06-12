@@ -7,7 +7,7 @@ module QCommon.CM where
 
 import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2, Traversal')
 import Control.Monad (void, when, unless, liftM)
-import Data.Bits ((.|.), (.&.), shiftR)
+import Data.Bits ((.|.), (.&.), shiftR, shiftL)
 import Data.Functor ((<$>))
 import Data.Int (Int8, Int64)
 import Data.Maybe (isNothing, fromJust)
@@ -1518,6 +1518,37 @@ transformedBoxTrace start end mins maxs headNode brushMask origin angles = do
 
     return $ traceT' { _tEndPos = endPos }
 
+{-
+- CM_WriteAreaBits writes a length byte followed by a bit vector of all the areas that area
+- in the same flood as the area parameter
+- 
+- This is used by the client refreshes to cull visibility.
+-}
 writeAreaBits :: Traversal' QuakeState (UV.Vector Word8) -> Int -> Quake Int
-writeAreaBits _ _ = do
-    io (putStrLn "CM.writeAreaBits") >> undefined -- TODO
+writeAreaBits bufferLens area = do
+    numAreas <- use $ cmGlobals.cmNumAreas
+
+    let bytes = (numAreas + 7) `shiftR` 3
+
+    noAreasValue <- liftM (^.cvValue) mapNoAreasCVar
+    Just buffer <- preuse bufferLens
+
+    if noAreasValue /= 0
+      then
+        -- for debugging, send everything
+        bufferLens .= (UV.replicate bytes 255) UV.++ (UV.drop bytes buffer)
+      else do
+        let buffer' = (UV.replicate bytes 0) UV.++ (UV.drop bytes buffer)
+        mapAreas <- use $ cmGlobals.cmMapAreas
+        let floodNum = (mapAreas V.! area)^.caFloodNum
+        bufferLens .= constructAreaBits floodNum mapAreas buffer' 0 numAreas
+
+    return bytes
+
+  where constructAreaBits :: Int -> V.Vector CAreaT -> UV.Vector Word8 -> Int -> Int -> UV.Vector Word8
+        constructAreaBits floodNum mapAreas buffer idx maxIdx
+          | idx >= maxIdx = buffer
+          | otherwise =
+              if ((mapAreas V.! idx)^.caFloodNum) == floodNum || area == 0
+                then constructAreaBits floodNum mapAreas (buffer UV.// [(idx `shiftR` 3, (buffer UV.! (idx `shiftR` 3)) .|. (1 `shiftL` (fromIntegral idx .&. 7)))]) (idx + 1) maxIdx
+                else constructAreaBits floodNum mapAreas buffer (idx + 1) maxIdx
