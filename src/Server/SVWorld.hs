@@ -161,11 +161,11 @@ linkEdict er@(EdictReference edictIdx) = do
         eAreaNum2 .= 0
 
       Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-      (numLeafs, iw) <- CM.boxLeafNums (updatedEdict^.eEdictMinMax.eAbsMin)
-                                      (updatedEdict^.eEdictMinMax.eAbsMax)
-                                      (svGlobals.svLeafs)
-                                      128
-                                      [0]
+      (numLeafs, Just iw) <- CM.boxLeafNums (updatedEdict^.eEdictMinMax.eAbsMin)
+                                           (updatedEdict^.eEdictMinMax.eAbsMax)
+                                           (svGlobals.svLeafs)
+                                           128
+                                           (Just [0])
 
       let topnode = head iw
 

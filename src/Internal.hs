@@ -292,6 +292,7 @@ data SVGlobals =
             , _svTouchList            :: V.Vector EdictReference
             , _svLinks                :: V.Vector LinkT
             , _svMsg                  :: SizeBufT
+            , _svLeafsTmp             :: UV.Vector Int
             }
 
 data CmdFunctionT =

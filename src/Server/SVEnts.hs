@@ -1,10 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVEnts where
 
 import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=))
 import Control.Monad (when)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Data.Maybe (isJust)
 import Linear (V3)
 
@@ -12,6 +13,7 @@ import Quake
 import QuakeState
 import qualified Constants
 import qualified QCommon.CM as CM
+import qualified QCommon.Com as Com
 
 {-
 - Save everything in the world out without deltas. Used for recording
@@ -99,6 +101,24 @@ buildClientFrame (ClientReference clientIdx) = do
                        else do
                          undefined -- TODO
 
+{-
+- The client will interpolate the view position, so we can't use a single
+- PVS point. 
+-}
 fatPVS :: V3 Float -> Quake ()
-fatPVS _ = do
+fatPVS org = do
+    let mins = fmap (subtract 8) org
+        maxs = fmap (+ 8) org
+
+    (count, _) <- CM.boxLeafNums mins maxs (svGlobals.svLeafsTmp) 64 Nothing
+
+    when (count < 1) $
+      Com.comError Constants.errFatal "SV_FatPVS: count < 1"
+
+    numClusters <- use $ cmGlobals.cmNumClusters
+    let longs = (numClusters + 31) `shiftR` 5
+
+    -- convert leafs to clusters
+    leafs <- use $ svGlobals.svLeafsTmp
+    -- leafs' <- UV.generateM 64 ()
     io (putStrLn "SVEnts.fatPVS") >> undefined -- TODO

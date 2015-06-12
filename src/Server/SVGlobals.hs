@@ -51,4 +51,5 @@ initialSVGlobals =
             , _svTouchList            = V.replicate Constants.maxEdicts (EdictReference (-1))
             , _svLinks                = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (EdictReference (i - 2 * Constants.areaNodes)) } else newLinkT i)
             , _svMsg                  = newSizeBufT
+            , _svLeafsTmp             = UV.replicate 64 0
             }

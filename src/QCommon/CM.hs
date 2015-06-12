@@ -848,13 +848,13 @@ floodAreaConnections = do
                   flood floodValid (idx + 1) maxIdx (floodNum + 1)
 
 -- fills in a list of all the leafs touched
-boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> [Int] -> Quake (Int, [Int])
+boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
 boxLeafNums mins maxs list listSize topnode = do
     Just headnode <- preuse $ cmGlobals.cmMapCModels.ix 0.cmHeadNode
     boxLeafNumsHeadnode mins maxs list listSize headnode topnode
 
 -- fills in a list of all the leafs touched and starts with the head node
-boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> [Int] -> Quake (Int, [Int])
+boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
 boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
     zoom cmGlobals $ do
       cmLeafCount .= 0
@@ -865,7 +865,9 @@ boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
     leafCount <- use $ cmGlobals.cmLeafCount
     leafTopNode <- use $ cmGlobals.cmLeafTopNode
 
-    return (leafCount, leafTopNode : tail topnode)
+    return $ case topnode of
+               Nothing -> (leafCount, Nothing)
+               Just x -> (leafCount, Just (leafTopNode : tail x))
 
 -- recursively fills in a list of all the leafs touched
 boxLeafNumsR :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Quake ()
@@ -961,7 +963,7 @@ boxTrace start end mins maxs headNode brushMask = do
             let c1 = fmap (subtract 1) (start + mins)
                 c2 = fmap (+ 1) (start + maxs)
 
-            (numLeafs, _) <- boxLeafNumsHeadnode c1 c2 (cmGlobals.cmLeafs) 1024 headNode [0]
+            (numLeafs, _) <- boxLeafNumsHeadnode c1 c2 (cmGlobals.cmLeafs) 1024 headNode (Just [0])
 
             checkLeafs 0 numLeafs
 
