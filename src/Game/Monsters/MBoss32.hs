@@ -2,9 +2,9 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss32 where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
-import Data.Bits ((.|.))
-import Linear (V3(..))
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (+=))
+import Data.Bits ((.|.), (.&.))
+import Linear (V3(..), norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -14,11 +14,71 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Util.Lib as Lib
 
+frameActive01 :: Int
+frameActive01 = 188
+
+frameActive13 :: Int
+frameActive13 = 200
+
+frameAttack301 :: Int
+frameAttack301 = 201
+
+frameAttack308 :: Int
+frameAttack308 = 208
+
+frameAttack401 :: Int
+frameAttack401 = 209
+
+frameAttack426 :: Int
+frameAttack426 = 234
+
+frameAttack501 :: Int
+frameAttack501 = 235
+
+frameAttack516 :: Int
+frameAttack516 = 250
+
+frameDeath201 :: Int
+frameDeath201 = 251
+
+frameDeath295 :: Int
+frameDeath295 = 345
+
+frameDeath301 :: Int
+frameDeath301 = 346
+
+frameDeath320 :: Int
+frameDeath320 = 365
+
+framePain401 :: Int
+framePain401 = 379
+
+framePain404 :: Int
+framePain404 = 382
+
+framePain501 :: Int
+framePain501 = 383
+
+framePain504 :: Int
+framePain504 = 386
+
+framePain601 :: Int
+framePain601 = 387
+
+framePain627 :: Int
+framePain627 = 413
+
 frameStand201 :: Int
 frameStand201 = 414
 
 frameStand260 :: Int
 frameStand260 = 473
+
+frameWalk204 :: Int
+frameWalk204 = 477
+
+frameWalk213 :: Int
+frameWalk213 = 486
 
 makronTaunt :: EntThink
 makronTaunt =
@@ -215,7 +275,442 @@ makronDead =
 
     return True
 
+makronWalk :: EntThink
+makronWalk =
+  GenericEntThink "makron_walk" $ \(EdictReference selfIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just makronMoveWalk
+    return True
+
+makronRun :: EntThink
+makronRun =
+  GenericEntThink "makron_run" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+                   then makronMoveStand
+                   else makronMoveRun
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    return True
+
+makronFramesPain6 :: V.Vector MFrameT
+makronFramesPain6 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+                 -- 10
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 (Just makronPopUp)
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+                 -- 20
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 (Just makronTaunt)
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMovePain6 :: MMoveT
+makronMovePain6 = MMoveT "makronMovePain6" framePain601 framePain627 makronFramesPain6 (Just makronRun)
+
+makronFramesPain5 :: V.Vector MFrameT
+makronFramesPain5 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMovePain5 :: MMoveT
+makronMovePain5 = MMoveT "makronMovePain5" framePain501 framePain504 makronFramesPain5 (Just makronRun)
+
+makronFramesPain4 :: V.Vector MFrameT
+makronFramesPain4 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMovePain4 :: MMoveT
+makronMovePain4 = MMoveT "makronMovePain4" framePain401 framePain404 makronFramesPain4 (Just makronRun)
+
+makronFramesDeath2 :: V.Vector MFrameT
+makronFramesDeath2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-15) Nothing
+               , MFrameT (Just GameAI.aiMove)    3  Nothing
+               , MFrameT (Just GameAI.aiMove) (-12) Nothing
+               , MFrameT (Just GameAI.aiMove)    0  (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+                 -- 10
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove) 11 Nothing
+               , MFrameT (Just GameAI.aiMove) 12 Nothing
+               , MFrameT (Just GameAI.aiMove) 11 (Just makronStepRight)
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+                 -- 20
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+                 -- 30
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   5  Nothing
+               , MFrameT (Just GameAI.aiMove)   7  Nothing
+               , MFrameT (Just GameAI.aiMove)   6  (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+                 -- 40
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+                 -- 50
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-6) Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove) (-6) (Just makronStepRight)
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+                 -- 60
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) (Just makronStepRight)
+               , MFrameT (Just GameAI.aiMove) (-8) Nothing
+               , MFrameT (Just GameAI.aiMove) (-3) (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiMove) (-7) Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) (Just makronStepRight)
+                 -- 70
+               , MFrameT (Just GameAI.aiMove) (-6) Nothing
+               , MFrameT (Just GameAI.aiMove) (-7) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  (Just makronStepLeft)
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+                 -- 80
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+                 -- 90
+               , MFrameT (Just GameAI.aiMove) 27 (Just makronHit)
+               , MFrameT (Just GameAI.aiMove) 26 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 (Just makronBrainSplorch)
+               , MFrameT (Just GameAI.aiMove)  0 Nothing
+               , MFrameT (Just GameAI.aiMove)  0 Nothing -- 95
+               ]
+
+makronMoveDeath2 :: MMoveT
+makronMoveDeath2 = MMoveT "makronMoveDeath2" frameDeath201 frameDeath295 makronFramesDeath2 (Just makronDead)
+
+makronFramesDeath3 :: V.Vector MFrameT
+makronFramesDeath3 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMoveDeath3 :: MMoveT
+makronMoveDeath3 = MMoveT "makronMoveDeath3" frameDeath301 frameDeath320 makronFramesDeath3 Nothing
+
+makronFramesSight :: V.Vector MFrameT
+makronFramesSight =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMoveSight :: MMoveT
+makronMoveSight = MMoveT "makronMoveSight" frameActive01 frameActive13 makronFramesSight (Just makronRun)
+
+makronBFG :: EntThink
+makronBFG =
+  GenericEntThink "makronBFG" $ \selfRef@(EdictReference selfIdx) -> do
+    io (putStrLn "MBoss32.makronBFG") >> undefined -- TODO
+
+makronSaveLoc :: EntThink
+makronSaveLoc =
+  GenericEntThink "MakronSaveloc" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = (enemy^.eEntityState.esOrigin)
+
+    -- save for aiming the shot
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.ePos1 .= V3 a b (c + fromIntegral (enemy^.eEdictStatus.eViewHeight))
+    return True
+
+-- FIXME: He's not firing from the proper Z
+makronRailGun :: EntThink
+makronRailGun =
+  GenericEntThink "MakronRailgun" $ \selfRef@(EdictReference selfIdx) -> do
+    io (putStrLn "MBoss32.makronRailGun") >> undefined -- TODO
+
+-- FIXME: This is all wrong. He's not firing at the proper angles.
+makronHyperBlaster :: EntThink
+makronHyperBlaster =
+  GenericEntThink "MakronHyperblaster" $ \selfRef@(EdictReference selfIdx) -> do
+    io (putStrLn "MBoss32.makronHyperBlaster") >> undefined -- TODO
+
+makronPain :: EntPain
+makronPain =
+  GenericEntPain "makron_pain" $ \_ _ _ _ -> do
+    io (putStrLn "MBoss32.makronPain") >> undefined -- TODO
+
+makronSight :: EntInteract
+makronSight =
+  GenericEntInteract "makron_sight" $ \(EdictReference selfIdx) _ -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just makronMoveSight
+    return True
+
+makronAttack :: EntThink
+makronAttack =
+  GenericEntThink "makron_attack" $ \(EdictReference selfIdx) -> do
+    r <- Lib.randomF
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+        range = norm vec
+
+    let action = if | r <= 0.3 -> makronMoveAttack3
+                    | r <= 0.6 -> makronMoveAttack4
+                    | otherwise -> makronMoveAttack5
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    return True
+
+-- Makron Torso. This needs to be spawned in
+makronTorsoThink :: EntThink
+makronTorsoThink =
+  GenericEntThink "makron_torso_think" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eEntityState.esFrame) < 365
+      then gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame += 1
+      else gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame .= 346
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+
+    return True
+
+makronTorso :: EntThink
+makronTorso =
+  GenericEntThink "makron_torso" $ \edictRef@(EdictReference edictIdx) -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
+    soundIdx <- soundIndex (Just "makron/spine.wav")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidNot
+      eEdictMinMax.eMins .= V3 (-8) (-8) 0
+      eEdictMinMax.eMaxs .= V3 8 8 8
+      eEntityState.esFrame .= 346
+      eEntityState.esModelIndex .= modelIdx
+      eEdictAction.eaThink .= Just makronTorsoThink
+      eEdictAction.eaNextThink .= levelTime + 2 * Constants.frameTime
+      eEntityState.esSound .= soundIdx
+
+    linkEntity edictRef
+
+    return True
+
+makronDie :: EntDie
+makronDie =
+  GenericEntDie "makron_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "MBoss32.makronDie") >> undefined -- TODO
+
+makronCheckAttack :: EntThink
+makronCheckAttack =
+  GenericEntThink "Makron_CheckAttack" $ \_ -> do
+    io (putStrLn "MBoss32.makronCheckAttack") >> undefined -- TODO
+
+makronFramesAttack3 :: V.Vector MFrameT
+makronFramesAttack3 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just makronBFG)
+                 -- FIXME: BFG Attack here
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+makronMoveAttack3 :: MMoveT
+makronMoveAttack3 = MMoveT "makronMoveAttack3" frameAttack301 frameAttack308 makronFramesAttack3 (Just makronRun)
+
+makronFramesAttack4 :: V.Vector MFrameT
+makronFramesAttack4 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronHyperBlaster) -- fire
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               ]
+
+makronMoveAttack4 :: MMoveT
+makronMoveAttack4 = MMoveT "makronMoveAttack4" frameAttack401 frameAttack426 makronFramesAttack4 (Just makronRun)
+
+makronFramesAttack5 :: V.Vector MFrameT
+makronFramesAttack5 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 0 (Just makronPreRailGun)
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just makronSaveLoc)
+               , MFrameT (Just GameAI.aiMove)   0 (Just makronRailGun) -- Fire railgun
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               , MFrameT (Just GameAI.aiMove)   0 Nothing
+               ]
+
+makronMoveAttack5 :: MMoveT
+makronMoveAttack5 = MMoveT "makronMoveAttack5" frameAttack501 frameAttack516 makronFramesAttack5 (Just makronRun)
+
+makronSpawn :: EntThink
+makronSpawn =
+  GenericEntThink "MakronSpawn" $ \_ -> do
+    io (putStrLn "MBoss32.makronSpawn") >> undefined -- TODO
+
 makronToss :: EntThink
 makronToss =
   GenericEntThink "MakronToss" $ \_ -> do
     io (putStrLn "MBoss32.makronToss") >> undefined -- TODO
+
+makronPrecache :: Quake ()
+makronPrecache = do
+    io (putStrLn "MBoss32.makronPrecache") >> undefined -- TODO
+
+{-
+- QUAKED monster_makron (1 .5 0) (-30 -30 0) (30 30 90) Ambush
+- Trigger_Spawn Sight
+-}
+spMonsterMakron :: Quake ()
+spMonsterMakron = do
+    io (putStrLn "MBoss32.spMonsterMakron") >> undefined -- TODO
