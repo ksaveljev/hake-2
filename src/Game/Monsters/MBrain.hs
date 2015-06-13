@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MBrain where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=))
-import Data.Bits ((.&.), (.|.))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=), (+=))
+import Control.Monad (unless, when)
+import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isNothing)
 import Linear (_z)
 import qualified Data.Vector as V
 
@@ -11,6 +13,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Util.Lib as Lib
 
 brainSight :: EntInteract
 brainSight =
@@ -192,6 +195,48 @@ brainDuckDown =
         linkEntity selfRef
 
         return True
+
+brainDuckHold :: EntThink
+brainDuckHold =
+  GenericEntThink "brain_duck_hold" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if levelTime >= (self^.eMonsterInfo.miPauseTime)
+      then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
+      else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
+
+    return True
+
+brainDuckUp :: EntThink
+brainDuckUp =
+  GenericEntThink "brain_duck_up" $ \selfRef@(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
+      eEdictMinMax.eMaxs._z += 32
+      eTakeDamage .= Constants.damageAim
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    return True
+
+brainDodge :: EntDodge
+brainDodge =
+  GenericEntDodge "brain_dodge" $ \(EdictReference selfIdx) attackerRef eta -> do
+    r <- Lib.randomF
+
+    unless (r > 0.25) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      when (isNothing (self^.eEdictOther.eoEnemy)) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= attackerRef
+
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+        miPauseTime .= levelTime + eta + 0.5
+        miCurrentMove .= Just brainMoveDuck
 
 spMonsterBrain :: EdictReference -> Quake ()
 spMonsterBrain _ = io (putStrLn "MBrain.spMonsterBrain") >> undefined -- TODO
