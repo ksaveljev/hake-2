@@ -5,7 +5,7 @@ import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=), (+=))
 import Control.Monad (unless, when)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
-import Linear (_z)
+import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
 import Quake
@@ -237,6 +237,169 @@ brainDodge =
       zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
         miPauseTime .= levelTime + eta + 0.5
         miCurrentMove .= Just brainMoveDuck
+
+brainFramesDeath2 :: V.Vector MFrameT
+brainFramesDeath2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 9 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+brainDead :: EntThink
+brainDead =
+  GenericEntThink "brain_dead" $ \selfRef@(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
+      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfDeadMonster)
+      eEdictAction.eaNextThink .= 0
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    return True
+
+brainMoveDeath2 :: MMoveT
+brainMoveDeath2 = MMoveT "brainMoveDeath2" frameDeath201 frameDeath205 brainFramesDeath2 (Just brainDead)
+
+brainFramesDeath1 :: V.Vector MFrameT
+brainFramesDeath1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   9  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+brainMoveDeath1 :: MMoveT
+brainMoveDeath1 = MMoveT "brainMoveDeath1" frameDeath101 frameDeath118 brainFramesDeath1 (Just brainDead)
+
+brainSwingRight :: EntThink
+brainSwingRight =
+  GenericEntThink "brain_swing_right" $ \selfRef -> do
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundMelee1 <- use $ mBrainGlobals.mBrainSoundMelee1
+    sound (Just selfRef) Constants.chanBody soundMelee1 1 Constants.attnNorm 0
+    return True
+
+brainHitRight :: EntThink
+brainHitRight =
+  GenericEntThink "brain_hit_right" $ \_ -> do
+    io (putStrLn "MBrain.brainHitRight") >> undefined -- TODO
+
+brainSwingLeft :: EntThink
+brainSwingLeft =
+  GenericEntThink "brain_swing_left" $ \selfRef -> do
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundMelee2 <- use $ mBrainGlobals.mBrainSoundMelee2
+    sound (Just selfRef) Constants.chanBody soundMelee2 1 Constants.attnNorm 0
+    return True
+
+brainHitLeft :: EntThink
+brainHitLeft =
+  GenericEntThink "brain_hit_left" $ \_ -> do
+    io (putStrLn "MBrain.brainHitLeft") >> undefined -- TODO
+
+brainChestOpen :: EntThink
+brainChestOpen =
+  GenericEntThink "brain_chest_open" $ \selfRef@(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSpawnFlags %= (.&. (complement 65536))
+      eMonsterInfo.miPowerArmorType .= Constants.powerArmorNone
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundChestOpen <- use $ mBrainGlobals.mBrainSoundChestOpen
+    sound (Just selfRef) Constants.chanBody soundChestOpen 1 Constants.attnNorm 0
+    return True
+
+brainTentacleAttack :: EntThink
+brainTentacleAttack =
+  GenericEntThink "brain_tentacle_attack" $ \_ -> do
+    io (putStrLn "MBrain.brainTentacleAttack") >> undefined -- TODO
+
+brainFramesAttack1 :: V.Vector MFrameT
+brainFramesAttack1 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge)    8  Nothing
+               , MFrameT (Just GameAI.aiCharge)    3  Nothing
+               , MFrameT (Just GameAI.aiCharge)    5  Nothing
+               , MFrameT (Just GameAI.aiCharge)    0  Nothing
+               , MFrameT (Just GameAI.aiCharge)  (-3) (Just brainSwingRight)
+               , MFrameT (Just GameAI.aiCharge)    0  Nothing
+               , MFrameT (Just GameAI.aiCharge)  (-5) Nothing
+               , MFrameT (Just GameAI.aiCharge)  (-7) (Just brainHitRight)
+               , MFrameT (Just GameAI.aiCharge)    0  Nothing
+               , MFrameT (Just GameAI.aiCharge)    6  (Just brainSwingLeft)
+               , MFrameT (Just GameAI.aiCharge)    1  Nothing
+               , MFrameT (Just GameAI.aiCharge)    2  (Just brainHitLeft)
+               , MFrameT (Just GameAI.aiCharge)  (-3) Nothing
+               , MFrameT (Just GameAI.aiCharge)    6  Nothing
+               , MFrameT (Just GameAI.aiCharge)  (-1) Nothing
+               , MFrameT (Just GameAI.aiCharge)  (-3) Nothing
+               , MFrameT (Just GameAI.aiCharge)    2  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-11) Nothing
+               ]
+
+brainChestClosed :: EntThink
+brainChestClosed =
+  GenericEntThink "brain_chest_closed" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPowerArmorType .= Constants.powerArmorScreen
+    when ((self^.eSpawnFlags) .&. 65536 /= 0) $
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+        eSpawnFlags %= (.&. (complement 65536))
+        eMonsterInfo.miCurrentMove .= Just brainMoveAttack1
+
+    return True
+
+brainFramesAttack2 :: V.Vector MFrameT
+brainFramesAttack2 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge)   5  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-4) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-4) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-3) Nothing
+               , MFrameT (Just GameAI.aiCharge)   0  (Just brainChestOpen)
+               , MFrameT (Just GameAI.aiCharge)   0  Nothing
+               , MFrameT (Just GameAI.aiCharge)  13  (Just brainTentacleAttack)
+               , MFrameT (Just GameAI.aiCharge)   0  Nothing
+               , MFrameT (Just GameAI.aiCharge)   2  Nothing
+               , MFrameT (Just GameAI.aiCharge)   0  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-9) (Just brainChestClosed)
+               , MFrameT (Just GameAI.aiCharge)   0  Nothing
+               , MFrameT (Just GameAI.aiCharge)   4  Nothing
+               , MFrameT (Just GameAI.aiCharge)   3  Nothing
+               , MFrameT (Just GameAI.aiCharge)   2  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-3) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-6) Nothing
+               ]
+
+brainMelee :: EntThink
+brainMelee =
+  GenericEntThink "brain_melee" $ \(EdictReference selfIdx) -> do
+    r <- Lib.randomF
+
+    let action = if r <= 0.5
+                   then brainMoveAttack1
+                   else brainMoveAttack2
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    return True
 
 spMonsterBrain :: EdictReference -> Quake ()
 spMonsterBrain _ = io (putStrLn "MBrain.spMonsterBrain") >> undefined -- TODO
