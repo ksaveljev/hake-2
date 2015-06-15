@@ -168,6 +168,7 @@ data QuakeState =
              , _mBoss32Globals        :: MBoss32Globals
              , _mBrainGlobals         :: MBrainGlobals
              , _mChickGlobals         :: MChickGlobals
+             , _mFlipperGlobals       :: MFlipperGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1944,3 +1945,14 @@ data MChickGlobals =
                 , _mChickSoundSight            :: Int
                 , _mChickSoundSearch           :: Int
                 }
+
+data MFlipperGlobals =
+  MFlipperGlobals { _mFlipperSoundChomp  :: Int
+                  , _mFlipperSoundAttack :: Int
+                  , _mFlipperSoundPain1  :: Int
+                  , _mFlipperSoundPain2  :: Int
+                  , _mFlipperSoundDeath  :: Int
+                  , _mFlipperSoundIdle   :: Int
+                  , _mFlipperSoundSearch :: Int
+                  , _mFlipperSoundSight  :: Int
+                  }
