@@ -167,6 +167,7 @@ data QuakeState =
              , _mBoss31Globals        :: MBoss31Globals
              , _mBoss32Globals        :: MBoss32Globals
              , _mBrainGlobals         :: MBrainGlobals
+             , _mChickGlobals         :: MChickGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1924,4 +1925,22 @@ data MBrainGlobals =
                 , _mBrainSoundMelee1           :: Int
                 , _mBrainSoundMelee2           :: Int
                 , _mBrainSoundMelee3           :: Int
+                }
+
+data MChickGlobals =
+  MChickGlobals { _mChickSoundMissilePrelaunch :: Int
+                , _mChickSoundMissileLaunch    :: Int
+                , _mChickSoundMeleeSwing       :: Int
+                , _mChickSoundMeleeHit         :: Int
+                , _mChickSoundMissileReload    :: Int
+                , _mChickSoundDeath1           :: Int
+                , _mChickSoundDeath2           :: Int
+                , _mChickSoundFallDown         :: Int
+                , _mChickSoundIdle1            :: Int
+                , _mChickSoundIdle2            :: Int
+                , _mChickSoundPain1            :: Int
+                , _mChickSoundPain2            :: Int
+                , _mChickSoundPain3            :: Int
+                , _mChickSoundSight            :: Int
+                , _mChickSoundSearch           :: Int
                 }
