@@ -15,6 +15,78 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Util.Lib as Lib
 
+frameWalk101 :: Int
+frameWalk101 = 0
+
+frameWalk111 :: Int
+frameWalk111 = 10
+
+frameAttack101 :: Int
+frameAttack101 = 53
+
+frameAttack118 :: Int
+frameAttack118 = 70
+
+frameAttack201 :: Int
+frameAttack201 = 71
+
+frameAttack217 :: Int
+frameAttack217 = 87
+
+framePain101 :: Int
+framePain101 = 88
+
+framePain121 :: Int
+framePain121 = 108
+
+framePain201 :: Int
+framePain201 = 109
+
+framePain208 :: Int
+framePain208 = 116
+
+framePain301 :: Int
+framePain301 = 117
+
+framePain306 :: Int
+framePain306 = 122
+
+frameDeath101 :: Int
+frameDeath101 = 123
+
+frameDeath118 :: Int
+frameDeath118 = 140
+
+frameDeath201 :: Int
+frameDeath201 = 141
+
+frameDeath205 :: Int
+frameDeath205 = 145
+
+frameDuck01 :: Int
+frameDuck01 = 146
+
+frameDuck08 :: Int
+frameDuck08 = 153
+
+frameDefense01 :: Int
+frameDefense01 = 154
+
+frameDefense08 :: Int
+frameDefense08 = 161
+
+frameStand01 :: Int
+frameStand01 = 162
+
+frameStand30 :: Int
+frameStand30 = 191
+
+frameStand31 :: Int
+frameStand31 = 192
+
+frameStand60 :: Int
+frameStand60 = 221
+
 brainSight :: EntInteract
 brainSight =
   GenericEntInteract "brain_sight" $ \selfRef _ -> do
@@ -189,7 +261,7 @@ brainDuckDown =
         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
           eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
           eEdictMinMax.eMaxs._z -= 32
-          eTakeDamage .= Constants.damageYes
+          eEdictStatus.eTakeDamage .= Constants.damageYes
 
         linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
         linkEntity selfRef
@@ -214,7 +286,7 @@ brainDuckUp =
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
       eEdictMinMax.eMaxs._z += 32
-      eTakeDamage .= Constants.damageAim
+      eEdictStatus.eTakeDamage .= Constants.damageAim
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -230,7 +302,7 @@ brainDodge =
       Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
       when (isNothing (self^.eEdictOther.eoEnemy)) $
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= attackerRef
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just attackerRef
 
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -401,5 +473,145 @@ brainMelee =
     gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
     return True
 
+brainFramesRun :: V.Vector MFrameT
+brainFramesRun =
+    V.fromList [ MFrameT (Just GameAI.aiRun)   9  Nothing
+               , MFrameT (Just GameAI.aiRun)   2  Nothing
+               , MFrameT (Just GameAI.aiRun)   3  Nothing
+               , MFrameT (Just GameAI.aiRun)   3  Nothing
+               , MFrameT (Just GameAI.aiRun)   1  Nothing
+               , MFrameT (Just GameAI.aiRun)   0  Nothing
+               , MFrameT (Just GameAI.aiRun)   0  Nothing
+               , MFrameT (Just GameAI.aiRun)  10  Nothing
+               , MFrameT (Just GameAI.aiRun) (-4) Nothing
+               , MFrameT (Just GameAI.aiRun) (-1) Nothing
+               , MFrameT (Just GameAI.aiRun)   2  Nothing
+               ]
+
+brainMoveRun :: MMoveT
+brainMoveRun = MMoveT "brainMoveRun" frameWalk101 frameWalk111 brainFramesRun Nothing
+
+brainRun :: EntThink
+brainRun =
+  GenericEntThink "brain_run" $ \(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPowerArmorType .= Constants.powerArmorScreen
+
+    let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+                   then brainMoveStand
+                   else brainMoveRun
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    return True
+
+brainFramesDefense :: V.Vector MFrameT
+brainFramesDefense =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+brainMoveDefense :: MMoveT
+brainMoveDefense = MMoveT "brainMoveDefense" frameDefense01 frameDefense08 brainFramesDefense Nothing
+
+brainFramesPain3 :: V.Vector MFrameT
+brainFramesPain3 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-4) Nothing
+               ]
+
+brainMovePain3 :: MMoveT
+brainMovePain3 = MMoveT "brainMovePain3" framePain301 framePain306 brainFramesPain3 (Just brainRun)
+
+brainFramesPain2 :: V.Vector MFrameT
+brainFramesPain2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               ]
+
+brainMovePain2 :: MMoveT
+brainMovePain2 = MMoveT "brainMovePain2" framePain201 framePain208 brainFramesPain2 (Just brainRun)
+
+brainFramesPain1 :: V.Vector MFrameT
+brainFramesPain1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-6) Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) Nothing
+               , MFrameT (Just GameAI.aiMove) (-6) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   2  Nothing
+               , MFrameT (Just GameAI.aiMove)   1  Nothing
+               , MFrameT (Just GameAI.aiMove)   7  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) Nothing
+               ]
+
+brainMovePain1 :: MMoveT
+brainMovePain1 = MMoveT "brainMovePain1" framePain101 framePain121 brainFramesPain1 (Just brainRun)
+
+brainFramesDuck :: V.Vector MFrameT
+brainFramesDuck =
+    V.fromList [ MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-2) (Just brainDuckDown)
+               , MFrameT (Just GameAI.aiMove)  17  (Just brainDuckHold)
+               , MFrameT (Just GameAI.aiMove) (-3) Nothing
+               , MFrameT (Just GameAI.aiMove) (-1) (Just brainDuckUp)
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-6) Nothing
+               , MFrameT (Just GameAI.aiMove) (-6) Nothing
+               ]
+
+brainMoveDuck :: MMoveT
+brainMoveDuck = MMoveT "brainMoveDuck" frameDuck01 frameDuck08 brainFramesDuck (Just brainRun)
+
+brainPain :: EntPain
+brainPain =
+  GenericEntPain "brain_pain" $ \_ _ _ _ -> do
+    io (putStrLn "MBrain.brainPain") >> undefined -- TODO
+
+brainDie :: EntDie
+brainDie =
+  GenericEntDie "brain_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "MBrain.brainDie") >> undefined -- TODO
+
+brainMoveAttack1 :: MMoveT
+brainMoveAttack1 = MMoveT "brainMoveAttack1" frameAttack101 frameAttack118 brainFramesAttack1 (Just brainRun)
+
+brainMoveAttack2 :: MMoveT
+brainMoveAttack2 = MMoveT "brainMoveAttack2" frameAttack201 frameAttack217 brainFramesAttack2 (Just brainRun)
+
+{-
+- QUAKED monster_brain (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
+- Trigger_Spawn Sight
+-}
 spMonsterBrain :: EdictReference -> Quake ()
-spMonsterBrain _ = io (putStrLn "MBrain.spMonsterBrain") >> undefined -- TODO
+spMonsterBrain _ = do
+    io (putStrLn "MBrain.spMonsterBrain") >> undefined -- TODO
