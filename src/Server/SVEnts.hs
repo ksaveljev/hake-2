@@ -8,6 +8,7 @@ import Control.Monad (when)
 import Data.Bits ((.&.), shiftR)
 import Data.Maybe (isJust)
 import Linear (V3)
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -120,5 +121,6 @@ fatPVS org = do
 
     -- convert leafs to clusters
     leafs <- use $ svGlobals.svLeafsTmp
-    -- leafs' <- UV.generateM 64 ()
+    clusters <- UV.generateM count (\idx -> CM.leafCluster (leafs UV.! idx))
+
     io (putStrLn "SVEnts.fatPVS") >> undefined -- TODO
