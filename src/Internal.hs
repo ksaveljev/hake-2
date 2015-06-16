@@ -173,6 +173,7 @@ data QuakeState =
              , _mFlyerGlobals         :: MFlyerGlobals
              , _mGladiatorGlobals     :: MGladiatorGlobals
              , _mGunnerGlobals        :: MGunnerGlobals
+             , _mHoverGlobals         :: MHoverGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -2004,3 +2005,13 @@ data MGunnerGlobals =
                  , _mGunnerSoundSearch :: Int
                  , _mGunnerSoundSight  :: Int
                  }
+
+data MHoverGlobals =
+  MHoverGlobals { _mHoverSoundPain1   :: Int
+                , _mHoverSoundPain2   :: Int
+                , _mHoverSoundDeath1  :: Int
+                , _mHoverSoundDeath2  :: Int
+                , _mHoverSoundSight   :: Int
+                , _mHoverSoundSearch1 :: Int
+                , _mHoverSoundSearch2 :: Int
+                }
