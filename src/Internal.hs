@@ -171,6 +171,7 @@ data QuakeState =
              , _mFlipperGlobals       :: MFlipperGlobals
              , _mFloatGlobals         :: MFloatGlobals
              , _mFlyerGlobals         :: MFlyerGlobals
+             , _mGladiatorGlobals     :: MGladiatorGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1979,3 +1980,16 @@ data MFlyerGlobals =
                 , _mFlyerSoundSproing :: Int
                 , _mFlyerSoundDie     :: Int
                 }
+
+data MGladiatorGlobals =
+  MGladiatorGlobals { _mGladiatorSoundPain1        :: Int
+                    , _mGladiatorSoundPain2        :: Int
+                    , _mGladiatorSoundDie          :: Int
+                    , _mGladiatorSoundGun          :: Int
+                    , _mGladiatorSoundCleaverSwing :: Int
+                    , _mGladiatorSoundCleaverHit   :: Int
+                    , _mGladiatorSoundCleaverMiss  :: Int
+                    , _mGladiatorSoundIdle         :: Int
+                    , _mGladiatorSoundSearch       :: Int
+                    , _mGladiatorSoundSight        :: Int
+                    }

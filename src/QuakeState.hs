@@ -14,8 +14,6 @@ module QuakeState ( QuakeState(..)
                   , cmGlobals
                   , gameItemsGlobals
                   , mBerserkGlobals
-                  , mSoldierGlobals
-                  , mInfantryGlobals
                   , mBoss2Globals
                   , mBoss31Globals
                   , mBoss32Globals
@@ -24,6 +22,9 @@ module QuakeState ( QuakeState(..)
                   , mFlipperGlobals
                   , mFloatGlobals
                   , mFlyerGlobals
+                  , mGladiatorGlobals
+                  , mInfantryGlobals
+                  , mSoldierGlobals
                   , playerTrailGlobals
                   , vidGlobals
                   , inGlobals
@@ -89,6 +90,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.Monsters.MFlipperGlobals
                   , module Game.Monsters.MFloatGlobals
                   , module Game.Monsters.MFlyerGlobals
+                  , module Game.Monsters.MGladiatorGlobals
                   , module Game.Monsters.MInfantryGlobals
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.PlayerTrailGlobals
@@ -123,6 +125,7 @@ import Game.Monsters.MChickGlobals
 import Game.Monsters.MFlipperGlobals
 import Game.Monsters.MFloatGlobals
 import Game.Monsters.MFlyerGlobals
+import Game.Monsters.MGladiatorGlobals
 import Game.Monsters.MInfantryGlobals
 import Game.Monsters.MSoldierGlobals
 import Game.PlayerTrailGlobals
@@ -166,6 +169,7 @@ initialQuakeState =
              , _mFlipperGlobals       = initialMFlipperGlobals
              , _mFloatGlobals         = initialMFloatGlobals
              , _mFlyerGlobals         = initialMFlyerGlobals
+             , _mGladiatorGlobals     = initialMGladiatorGlobals
              , _playerTrailGlobals    = initialPlayerTrailGlobals
              , _vidGlobals            = initialVIDGlobals
              , _inGlobals             = initialINGlobals
