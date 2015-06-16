@@ -172,6 +172,7 @@ data QuakeState =
              , _mFloatGlobals         :: MFloatGlobals
              , _mFlyerGlobals         :: MFlyerGlobals
              , _mGladiatorGlobals     :: MGladiatorGlobals
+             , _mGunnerGlobals        :: MGunnerGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -1993,3 +1994,13 @@ data MGladiatorGlobals =
                     , _mGladiatorSoundSearch       :: Int
                     , _mGladiatorSoundSight        :: Int
                     }
+
+data MGunnerGlobals =
+  MGunnerGlobals { _mGunnerSoundPain   :: Int
+                 , _mGunnerSoundPain2  :: Int
+                 , _mGunnerSoundDeath  :: Int
+                 , _mGunnerSoundIdle   :: Int
+                 , _mGunnerSoundOpen   :: Int
+                 , _mGunnerSoundSearch :: Int
+                 , _mGunnerSoundSight  :: Int
+                 }
