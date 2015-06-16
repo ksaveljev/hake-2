@@ -161,8 +161,6 @@ data QuakeState =
              , _cmGlobals             :: CMGlobals
              , _gameItemsGlobals      :: GameItemsGlobals
              , _mBerserkGlobals       :: MBerserkGlobals
-             , _mSoldierGlobals       :: MSoldierGlobals
-             , _mInfantryGlobals      :: MInfantryGlobals
              , _mBoss2Globals         :: MBoss2Globals
              , _mBoss31Globals        :: MBoss31Globals
              , _mBoss32Globals        :: MBoss32Globals
@@ -174,6 +172,9 @@ data QuakeState =
              , _mGladiatorGlobals     :: MGladiatorGlobals
              , _mGunnerGlobals        :: MGunnerGlobals
              , _mHoverGlobals         :: MHoverGlobals
+             , _mInfantryGlobals      :: MInfantryGlobals
+             , _mInsaneGlobals        :: MInsaneGlobals
+             , _mSoldierGlobals       :: MSoldierGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -2015,3 +2016,10 @@ data MHoverGlobals =
                 , _mHoverSoundSearch1 :: Int
                 , _mHoverSoundSearch2 :: Int
                 }
+
+data MInsaneGlobals =
+  MInsaneGlobals { _mInsaneSoundFist   :: Int
+                 , _mInsaneSoundShake  :: Int
+                 , _mInsaneSoundMoan   :: Int
+                 , _mInsaneSoundScream :: UV.Vector Int
+                 }
