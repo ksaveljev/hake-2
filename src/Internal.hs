@@ -174,6 +174,7 @@ data QuakeState =
              , _mHoverGlobals         :: MHoverGlobals
              , _mInfantryGlobals      :: MInfantryGlobals
              , _mInsaneGlobals        :: MInsaneGlobals
+             , _mMedicGlobals         :: MMedicGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
@@ -2023,3 +2024,16 @@ data MInsaneGlobals =
                  , _mInsaneSoundMoan   :: Int
                  , _mInsaneSoundScream :: UV.Vector Int
                  }
+
+data MMedicGlobals =
+  MMedicGlobals { _mMedicSoundIdle1       :: Int
+                , _mMedicSoundPain1       :: Int
+                , _mMedicSoundPain2       :: Int
+                , _mMedicSoundDie         :: Int
+                , _mMedicSoundSight       :: Int
+                , _mMedicSoundSearch      :: Int
+                , _mMedicSoundHookLaunch  :: Int
+                , _mMedicSoundHookHit     :: Int
+                , _mMedicSoundHookHeal    :: Int
+                , _mMedicSoundHookRetract :: Int
+                }

@@ -27,6 +27,7 @@ module QuakeState ( QuakeState(..)
                   , mHoverGlobals
                   , mInfantryGlobals
                   , mInsaneGlobals
+                  , mMedicGlobals
                   , mSoldierGlobals
                   , playerTrailGlobals
                   , vidGlobals
@@ -98,6 +99,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.Monsters.MHoverGlobals
                   , module Game.Monsters.MInfantryGlobals
                   , module Game.Monsters.MInsaneGlobals
+                  , module Game.Monsters.MMedicGlobals
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.PlayerTrailGlobals
                   , module Client.VIDGlobals
@@ -136,6 +138,7 @@ import Game.Monsters.MGunnerGlobals
 import Game.Monsters.MHoverGlobals
 import Game.Monsters.MInfantryGlobals
 import Game.Monsters.MInsaneGlobals
+import Game.Monsters.MMedicGlobals
 import Game.Monsters.MSoldierGlobals
 import Game.PlayerTrailGlobals
 import QCommon.CMGlobals
@@ -181,6 +184,7 @@ initialQuakeState =
              , _mHoverGlobals         = initialMHoverGlobals
              , _mInfantryGlobals      = initialMInfantryGlobals
              , _mInsaneGlobals        = initialMInsaneGlobals
+             , _mMedicGlobals         = initialMMedicGlobals
              , _mSoldierGlobals       = initialMSoldierGlobals
              , _playerTrailGlobals    = initialPlayerTrailGlobals
              , _vidGlobals            = initialVIDGlobals
