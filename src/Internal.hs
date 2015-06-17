@@ -176,6 +176,7 @@ data QuakeState =
              , _mInsaneGlobals        :: MInsaneGlobals
              , _mMedicGlobals         :: MMedicGlobals
              , _mMutantGlobals        :: MMutantGlobals
+             , _mParasiteGlobals      :: MParasiteGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
@@ -2054,3 +2055,17 @@ data MMutantGlobals =
                  , _mMutantSoundStep3  :: Int
                  , _mMutantSoundThud   :: Int
                  }
+
+data MParasiteGlobals =
+  MParasiteGlobals { _mParasiteSoundPain1   :: Int
+                   , _mParasiteSoundPain2   :: Int
+                   , _mParasiteSoundDie     :: Int
+                   , _mParasiteSoundLaunch  :: Int
+                   , _mParasiteSoundImpact  :: Int
+                   , _mParasiteSoundSuck    :: Int
+                   , _mParasiteSoundReelIn  :: Int
+                   , _mParasiteSoundSight   :: Int
+                   , _mParasiteSoundTap     :: Int
+                   , _mParasiteSoundScratch :: Int
+                   , _mParasiteSoundSearch  :: Int
+                   }
