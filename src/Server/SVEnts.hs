@@ -3,13 +3,14 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVEnts where
 
-import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=))
+import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=))
 import Control.Monad (when)
 import Data.Bits ((.&.), (.|.), shiftR)
 import Data.Maybe (isJust)
 import Data.Word (Word8)
 import Linear (V3)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -78,18 +79,18 @@ buildClientFrame (ClientReference clientIdx) = do
 
         numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
-        collectEdicts clEntRef 1 numEdicts
+        collectEdicts clEntRef frame 1 numEdicts
 
-  where collectEdicts :: EdictReference -> Int -> Int -> Quake ()
-        collectEdicts clEntRef idx maxIdx
+  where --collectEdicts :: EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
+        collectEdicts clEntRef frame idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
                    -- ignore ents without visible models
-              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts clEntRef (idx + 1) maxIdx
+              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts clEntRef frame (idx + 1) maxIdx
                    -- ignore ents without visible models unless they have an effect
-                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts clEntRef (idx + 1) maxIdx
+                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts clEntRef frame (idx + 1) maxIdx
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
@@ -100,9 +101,26 @@ buildClientFrame (ClientReference clientIdx) = do
                                  return False
 
                      if skip
-                       then collectEdicts clEntRef (idx + 1) maxIdx
+                       then collectEdicts clEntRef frame (idx + 1) maxIdx
                        else do
-                         undefined -- TODO
+                         serverStatic <- use $ svGlobals.svServerStatic
+                         let index = (serverStatic^.ssNextClientEntities) `mod` (serverStatic^.ssNumClientEntities)
+                             -- state = (serverStatic^.ssClientEntities) V.! index
+                        
+                         when ((edict^.eEntityState.esNumber) /= idx) $ do
+                           Com.dprintf "FIXING ENT.S.NUMBER!!!\n"
+                           gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esNumber .= idx
+
+                         preuse (gameBaseGlobals.gbGEdicts.ix idx.eEntityState) >>= \(Just entityState) ->
+                           svGlobals.svServerStatic.ssClientEntities.ix index .= entityState
+
+                         -- don't mark players missiles as solid
+                         preuse (svGlobals.svServerStatic.ssClients.ix clientIdx) >>= \(Just client) ->
+                           when ((edict^.eOwner) == (client^.cEdict)) $
+                             svGlobals.svServerStatic.ssClientEntities.ix index.esSolid .= 0
+
+                         svGlobals.svServerStatic.ssNextClientEntities += 1
+                         frame.cfNumEntities += 1
 
 {-
 - The client will interpolate the view position, so we can't use a single
