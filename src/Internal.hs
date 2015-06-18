@@ -178,6 +178,7 @@ data QuakeState =
              , _mMutantGlobals        :: MMutantGlobals
              , _mParasiteGlobals      :: MParasiteGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
+             , _mSuperTankGlobals     :: MSuperTankGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -2069,3 +2070,13 @@ data MParasiteGlobals =
                    , _mParasiteSoundScratch :: Int
                    , _mParasiteSoundSearch  :: Int
                    }
+
+data MSuperTankGlobals =
+  MSuperTankGlobals { _mSuperTankSoundPain1   :: Int
+                    , _mSuperTankSoundPain2   :: Int
+                    , _mSuperTankSoundPain3   :: Int
+                    , _mSuperTankSoundDeath   :: Int
+                    , _mSuperTankSoundSearch1 :: Int
+                    , _mSuperTankSoundSearch2 :: Int
+                    , _mSuperTankTreadSound   :: Int
+                    }
