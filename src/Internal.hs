@@ -307,6 +307,7 @@ data SVGlobals =
             , _svLinks                :: V.Vector LinkT
             , _svMsg                  :: SizeBufT
             , _svLeafsTmp             :: UV.Vector Int
+            , _svFatPVS               :: UV.Vector Word8
             }
 
 data CmdFunctionT =

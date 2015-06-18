@@ -5,9 +5,11 @@ module Server.SVEnts where
 
 import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=))
 import Control.Monad (when)
-import Data.Bits ((.&.), shiftR)
+import Data.Bits ((.&.), (.|.), shiftR)
 import Data.Maybe (isJust)
+import Data.Word (Word8)
 import Linear (V3)
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -121,6 +123,53 @@ fatPVS org = do
 
     -- convert leafs to clusters
     leafs <- use $ svGlobals.svLeafsTmp
-    clusters <- UV.generateM count (\idx -> CM.leafCluster (leafs UV.! idx))
+    leafs' <- UV.generateM count (\idx -> CM.leafCluster (leafs UV.! idx))
 
-    io (putStrLn "SVEnts.fatPVS") >> undefined -- TODO
+    pvs <- CM.clusterPVS (leafs' UV.! 0)
+    fatPVS <- use $ svGlobals.svFatPVS
+
+    -- System.arraycopy(CM.CM_ClusterPVS(leafs[0]), 0, SV_ENTS.fatpvs, 0, longs << 2);
+    let updatedFatPVS = UV.generate (UV.length fatPVS) (updateFatPVS pvs fatPVS (longs * 4))
+
+    newFatPVS <- calcNewFatPVS updatedFatPVS leafs' longs 1 count
+
+    svGlobals.svFatPVS .= newFatPVS
+
+  where updateFatPVS :: B.ByteString -> UV.Vector Word8 -> Int -> Int -> Word8
+        updateFatPVS pvs fatPVS longs idx =
+          if idx < longs
+            then pvs `B.index` idx
+            else fatPVS UV.! idx
+
+        calcNewFatPVS :: UV.Vector Word8 -> UV.Vector Int -> Int -> Int -> Int -> Quake (UV.Vector Word8)
+        calcNewFatPVS fatPVS leafs longs i count
+          | i >= count = return fatPVS
+          | otherwise = do
+              let j = getJ leafs 0 i
+
+              if j /= i
+                then calcNewFatPVS fatPVS leafs longs (i + 1) count -- already have the cluster we want
+                else do
+                  src <- CM.clusterPVS (leafs UV.! i)
+
+                  let updates = constructFatPVSUpdates fatPVS src 0 0 longs []
+
+                  calcNewFatPVS (fatPVS UV.// updates) leafs longs (i + 1) count
+
+        getJ :: UV.Vector Int -> Int -> Int -> Int
+        getJ leafs i j
+          | j >= i = j
+          | otherwise =
+              if (leafs UV.! i) == (leafs UV.! j)
+                then j
+                else getJ leafs i (j + 1)
+
+        constructFatPVSUpdates :: UV.Vector Word8 -> B.ByteString -> Int -> Int -> Int -> [(Int, Word8)] -> [(Int, Word8)]
+        constructFatPVSUpdates fatPVS src k j longs acc
+          | j >= longs = acc
+          | otherwise =
+              constructFatPVSUpdates fatPVS src (k + 4) (j + 1) longs ((k + 0, (fatPVS UV.! (k + 0)) .|. (src `B.index` (k + 0))) 
+                                                                     : (k + 1, (fatPVS UV.! (k + 1)) .|. (src `B.index` (k + 1)))
+                                                                     : (k + 2, (fatPVS UV.! (k + 2)) .|. (src `B.index` (k + 2)))
+                                                                     : (k + 3, (fatPVS UV.! (k + 3)) .|. (src `B.index` (k + 3))) 
+                                                                     : acc)

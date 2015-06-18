@@ -52,4 +52,5 @@ initialSVGlobals =
             , _svLinks                = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (EdictReference (i - 2 * Constants.areaNodes)) } else newLinkT i)
             , _svMsg                  = newSizeBufT
             , _svLeafsTmp             = UV.replicate 64 0
+            , _svFatPVS               = UV.replicate (65536 `div` 8) 0
             }
