@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Server.SVEnts where
 
 import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=))
@@ -18,6 +19,8 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
+import qualified QCommon.MSG as MSG
+import qualified QCommon.SZ as SZ
 
 {-
 - Save everything in the world out without deltas. Used for recording
@@ -30,9 +33,47 @@ recordDemoMessage = do
     when (isJust demoFile) $ do
       io (putStrLn "SVEnts.recordDemoMessage") >> undefined -- TODO
 
+-- Writes a frame to a client system.
 writeFrameToClient :: ClientReference -> Lens' QuakeState SizeBufT -> Quake ()
-writeFrameToClient _ _ = do
-    io (putStrLn "SVEnts.writeFrameToClient") >> undefined -- TODO
+writeFrameToClient (ClientReference clientIdx) sizeBufLens = do
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+    frameNum <- use $ svGlobals.svServer.sFrameNum
+
+    let frameIdx = frameNum .&. Constants.updateMask
+        frame = svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix frameIdx :: Traversal' QuakeState ClientFrameT
+        (oldFrame, lastFrame) = if | (client^.cLastFrame) <= 0 -> -- client is asking for a retransmit
+                                       (Nothing, -1)
+                                   | frameNum - (client^.cLastFrame) >= (Constants.updateBackup - 3) ->
+                                       -- client hasn't gotten a good message though in a long time
+                                       (Nothing, -1)
+                                   | otherwise -> -- we have a valid message to delta from
+                                       (Just (svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix ((client^.cLastFrame) .&. Constants.updateMask)), client^.cLastFrame)
+
+    MSG.writeByteI sizeBufLens Constants.svcFrame
+    MSG.writeLong sizeBufLens frameNum
+    MSG.writeLong sizeBufLens lastFrame -- what we are delta'ing from
+    MSG.writeByteI sizeBufLens (client^.cSurpressCount) -- rate dropped packets
+
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cSurpressCount .= 0
+
+    -- send over the areabits
+    Just frame' <- preuse frame
+    MSG.writeByteI sizeBufLens (frame'^.cfAreaBytes)
+    SZ.write sizeBufLens (frame'^.cfAreaBits) (frame'^.cfAreaBytes)
+
+    -- delta encode the playerstate
+    writePlayerStateToClient oldFrame frame sizeBufLens
+
+    -- delta encode the entities
+    emitPacketEntities oldFrame frame sizeBufLens
+
+-- writePlayerStateToClient :: Maybe (Traversal' QuakeState ClientFrameT) -> Traversal' QuakeState ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+writePlayerStateToClient _ _ _ = do
+  io (putStrLn "SVEnts.writePlayerStateToClient") >> undefined -- TODO
+
+-- emitPacketEntities :: Maybe (Traversal' QuakeState ClientFrameT) -> Traversal' QuakeState ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+emitPacketEntities _ _ _ = do
+    io (putStrLn "SVEnts.writePlayerStateToClient") >> undefined -- TODO
 
 {-
 - Decides which entities are going to be visible to the client, and copies
