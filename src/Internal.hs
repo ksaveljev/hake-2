@@ -179,6 +179,7 @@ data QuakeState =
              , _mParasiteGlobals      :: MParasiteGlobals
              , _mSoldierGlobals       :: MSoldierGlobals
              , _mSuperTankGlobals     :: MSuperTankGlobals
+             , _mTankGlobals          :: MTankGlobals
              , _playerTrailGlobals    :: PlayerTrailGlobals
              , _vidGlobals            :: VIDGlobals
              , _inGlobals             :: INGlobals
@@ -2080,3 +2081,14 @@ data MSuperTankGlobals =
                     , _mSuperTankSoundSearch2 :: Int
                     , _mSuperTankTreadSound   :: Int
                     }
+
+data MTankGlobals =
+  MTankGlobals { _mTankSoundThud   :: Int
+               , _mTankSoundPain   :: Int
+               , _mTankSoundIdle   :: Int
+               , _mTankSoundDie    :: Int
+               , _mTankSoundStep   :: Int
+               , _mTankSoundSight  :: Int
+               , _mTankSoundWindUp :: Int
+               , _mTankSoundStrike :: Int
+               }

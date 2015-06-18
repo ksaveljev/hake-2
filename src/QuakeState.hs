@@ -32,6 +32,7 @@ module QuakeState ( QuakeState(..)
                   , mParasiteGlobals
                   , mSoldierGlobals
                   , mSuperTankGlobals
+                  , mTankGlobals
                   , playerTrailGlobals
                   , vidGlobals
                   , inGlobals
@@ -107,6 +108,7 @@ module QuakeState ( QuakeState(..)
                   , module Game.Monsters.MParasiteGlobals
                   , module Game.Monsters.MSoldierGlobals
                   , module Game.Monsters.MSuperTankGlobals
+                  , module Game.Monsters.MTankGlobals
                   , module Game.PlayerTrailGlobals
                   , module Client.VIDGlobals
                   , module Render.Basic.BasicRenderAPIGlobals
@@ -149,6 +151,7 @@ import Game.Monsters.MMutantGlobals
 import Game.Monsters.MParasiteGlobals
 import Game.Monsters.MSoldierGlobals
 import Game.Monsters.MSuperTankGlobals
+import Game.Monsters.MTankGlobals
 import Game.PlayerTrailGlobals
 import QCommon.CMGlobals
 import QCommon.ComGlobals
@@ -198,6 +201,7 @@ initialQuakeState =
              , _mParasiteGlobals      = initialMParasiteGlobals
              , _mSoldierGlobals       = initialMSoldierGlobals
              , _mSuperTankGlobals     = initialMSuperTankGlobals
+             , _mTankGlobals          = initialMTankGlobals
              , _playerTrailGlobals    = initialPlayerTrailGlobals
              , _vidGlobals            = initialVIDGlobals
              , _inGlobals             = initialINGlobals
