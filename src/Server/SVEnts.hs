@@ -5,9 +5,9 @@
 module Server.SVEnts where
 
 import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=))
-import Control.Monad (when)
+import Control.Monad (when, liftM)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.Word (Word8)
 import Linear (V3, _x, _y, _z, _w)
 import qualified Data.ByteString as B
@@ -18,6 +18,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
@@ -208,9 +209,70 @@ writePlayerStateToClient from to sizeBufLens = do
 
               writeStats ps statbits (idx + 1) maxIdx
 
+-- Writes a delta update of an entity_state_t list to the message
 emitPacketEntities :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
-emitPacketEntities _ _ _ = do
-    io (putStrLn "SVEnts.emitPacketEntities") >> undefined -- TODO
+emitPacketEntities from to sizeBufLens = do
+    MSG.writeByteI sizeBufLens Constants.svcPacketEntities
+
+    let fromNumEntites = case from of
+                           Nothing -> 0
+                           Just clientFrame -> clientFrame^.cfNumEntities
+
+    maxClientsValue <- liftM (^.cvValue) maxClientsCVar
+    numClientEntities <- use $ svGlobals.svServerStatic.ssNumClientEntities
+    sendEntities (truncate maxClientsValue) numClientEntities fromNumEntites Nothing Nothing 0 0
+
+    MSG.writeShort sizeBufLens 0 -- end of packetentities
+
+  where sendEntities :: Int -> Int -> Int -> Maybe EntityStateT -> Maybe EntityStateT -> Int -> Int -> Quake ()
+        sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt newEnt oldIndex newIndex
+          | newIndex >= (to^.cfNumEntities) && oldIndex >= fromNumEntites = return ()
+          | otherwise = do
+              (newEnt', newNum) <- if newIndex >= (to^.cfNumEntities)
+                                     then return (fromJust newEnt, 9999)
+                                     else do
+                                       let idx = ((to^.cfFirstEntity) + newIndex) `mod` numClientEntities
+                                       Just newEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
+                                       return (newEnt', newEnt'^.esNumber)
+
+              (oldEnt', oldNum) <- if oldIndex >= fromNumEntites
+                                     then return (fromJust oldEnt, 9999)
+                                     else do
+                                       let idx = (((fromJust from)^.cfFirstEntity) + oldIndex) `mod` numClientEntities
+                                       Just oldEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
+                                       return (oldEnt', oldEnt'^.esNumber)
+
+              if | newNum == oldNum -> do
+                     -- delta update from old position
+                     -- because the force parm is false, this will not result
+                     -- in any bytes being emited if the entity has not changed at
+                     -- all note that players are always 'newentities', this updates
+                     -- their oldorigin always
+                     -- and prevents warping
+                     MSG.writeDeltaEntity oldEnt' newEnt' sizeBufLens False ((newEnt'^.esNumber) <= maxClientsValue)
+                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) (newIndex + 1)
+
+                 | newNum < oldNum -> do
+                     -- this is a new entity, send it from the baseline
+                     Just baseline <- preuse $ svGlobals.svServer.sBaselines.ix newNum
+                     MSG.writeDeltaEntity baseline newEnt' sizeBufLens True True
+                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') oldIndex (newIndex + 1)
+
+                 | newNum > oldNum -> do
+                     -- the old entity isn't present in the new message
+                     let bits = if oldNum >= 256
+                                  then Constants.uRemove .|. Constants.uNumber16 .|. Constants.uMoreBits1
+                                  else Constants.uRemove
+
+                     MSG.writeByteI sizeBufLens (bits .&. 255)
+                     when (bits .&. 0x0000FF00 /= 0) $
+                       MSG.writeByteI sizeBufLens ((bits `shiftR` 8) .&. 255)
+
+                     if bits .&. Constants.uNumber16 /= 0
+                       then MSG.writeShort sizeBufLens oldNum
+                       else MSG.writeByteI sizeBufLens oldNum
+
+                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) newIndex
 
 {-
 - Decides which entities are going to be visible to the client, and copies
