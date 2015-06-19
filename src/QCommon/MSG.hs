@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.MSG where
 
-import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=))
+import Control.Lens (ASetter', Traversal', Lens', (.=), use, (^.), (+=), (%=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), shiftR, shiftL, (.|.))
 import Data.Int (Int8, Int16, Int32)
@@ -16,6 +16,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -448,3 +449,15 @@ readPos sizeBufLens = do
     b <- readCoord sizeBufLens
     c <- readCoord sizeBufLens
     return (V3 a b c)
+
+readData :: Lens' QuakeState SizeBufT -> Lens' QuakeState (UV.Vector Word8) -> Int -> Quake ()
+readData sizeBufLens bufLens len = do
+    updates <- collectUpdates 0 []
+    bufLens %= (UV.// updates)
+
+  where collectUpdates :: Int -> [(Int, Word8)] -> Quake [(Int, Word8)]
+        collectUpdates idx acc
+          | idx >= len = return acc
+          | otherwise = do
+              w <- readByte sizeBufLens
+              collectUpdates (idx + 1) ((idx, fromIntegral w) : acc)
