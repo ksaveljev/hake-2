@@ -3,12 +3,17 @@ module Client.CLParse where
 
 import Control.Lens (Traversal')
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import QCommon.XCommandT
 
+svcStrings :: V.Vector B.ByteString
+
 downloadF :: XCommandT
+
+showNet :: B.ByteString -> Quake ()
 
 parseServerMessage :: Quake ()
 

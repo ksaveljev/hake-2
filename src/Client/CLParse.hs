@@ -33,6 +33,17 @@ import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
 import {-# SOURCE #-} qualified Util.Lib as Lib
 
+svcStrings :: V.Vector B.ByteString
+svcStrings =
+    V.fromList [ "svc_bad", "svc_muzzleflash", "svc_muzzlflash2"
+               , "svc_temp_entity", "svc_layout", "svc_inventory"
+               , "svc_nop", "svc_disconnect", "svc_reconnect"
+               , "svc_sound", "svc_print", "svc_stufftext"
+               , "svc_serverdata", "svc_configstring", "svc_spawnbaseline"
+               , "svc_centerprint", "svc_download", "svc_playerinfo"
+               , "svc_packetentities", "svc_deltapacketentities", "svc_frame"
+               ]
+
 downloadF :: XCommandT
 downloadF = io (putStrLn "CLParse.downloadF") >> undefined -- TODO
 
@@ -106,7 +117,7 @@ parseServerMessage = do
 
                      | cmd == Constants.svcDownload -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcDownload") >> undefined -- TODO
 
-                     | cmd == Constants.svcFrame -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcFrame") >> undefined -- TODO
+                     | cmd == Constants.svcFrame -> CLEnts.parseFrame
 
                      | cmd == Constants.svcInventory -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcInventory") >> undefined -- TODO
 

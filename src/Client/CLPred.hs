@@ -46,3 +46,7 @@ predictMovement = do
             else do
               -- copy current state to pmove
               io (putStrLn "CLPred.predictMovement") >> undefined -- TODO
+
+checkPredictionError :: Quake ()
+checkPredictionError = do
+    io (putStrLn "CLPred.checkPredictionError") >> undefined -- TODO
