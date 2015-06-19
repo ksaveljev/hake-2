@@ -320,7 +320,7 @@ readLong sizeBufLens = do
             b :: Word32 = fromIntegral $ B.index buf (readCount + 1)
             c :: Word32 = fromIntegral $ B.index buf (readCount + 2)
             d :: Word32 = fromIntegral $ B.index buf (readCount + 3)
-            result = a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)
+            result :: Int32 = fromIntegral $ a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)
         sizeBufLens.sbReadCount += 4
         return $ fromIntegral result 
 
