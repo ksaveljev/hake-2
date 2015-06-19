@@ -22,6 +22,7 @@ import QuakeState
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.SZ as SZ
+import qualified Util.Math3D as Math3D
 
 -- IMPROVE: use binary package for conversion to ByteString?
 
@@ -110,8 +111,8 @@ writeAngle :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle sizeBufLens f =
     writeByteI sizeBufLens ((truncate $ f * 256 / 360) .&. 255)
 
-writeAngle16 :: ASetter' QuakeState SizeBufT -> Float -> Quake ()
-writeAngle16 _ _ = io (putStrLn "MSG.writeAngle16") >> undefined -- TODO
+writeAngle16 :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeAngle16 sizeBufLens f = writeShort sizeBufLens (fromIntegral $ Math3D.angleToShort f)
 
 writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
 writeDeltaUserCmd sizeBufLens from cmd = do

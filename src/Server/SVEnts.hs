@@ -210,7 +210,7 @@ writePlayerStateToClient from to sizeBufLens = do
 
 emitPacketEntities :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
 emitPacketEntities _ _ _ = do
-    io (putStrLn "SVEnts.writePlayerStateToClient") >> undefined -- TODO
+    io (putStrLn "SVEnts.emitPacketEntities") >> undefined -- TODO
 
 {-
 - Decides which entities are going to be visible to the client, and copies
