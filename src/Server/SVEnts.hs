@@ -6,12 +6,14 @@ module Server.SVEnts where
 
 import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=))
 import Control.Monad (when)
-import Data.Bits ((.&.), (.|.), shiftR)
+import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Maybe (isJust)
 import Data.Word (Word8)
-import Linear (V3)
+import Linear (V3, _x, _y, _z, _w)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Internal as BI
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -35,19 +37,21 @@ recordDemoMessage = do
 
 -- Writes a frame to a client system.
 writeFrameToClient :: ClientReference -> Lens' QuakeState SizeBufT -> Quake ()
-writeFrameToClient (ClientReference clientIdx) sizeBufLens = do
+writeFrameToClient clientRef@(ClientReference clientIdx) sizeBufLens = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     frameNum <- use $ svGlobals.svServer.sFrameNum
 
     let frameIdx = frameNum .&. Constants.updateMask
         frame = svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix frameIdx :: Traversal' QuakeState ClientFrameT
-        (oldFrame, lastFrame) = if | (client^.cLastFrame) <= 0 -> -- client is asking for a retransmit
-                                       (Nothing, -1)
-                                   | frameNum - (client^.cLastFrame) >= (Constants.updateBackup - 3) ->
-                                       -- client hasn't gotten a good message though in a long time
-                                       (Nothing, -1)
-                                   | otherwise -> -- we have a valid message to delta from
-                                       (Just (svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix ((client^.cLastFrame) .&. Constants.updateMask)), client^.cLastFrame)
+
+    (oldFrame, lastFrame) <- if | (client^.cLastFrame) <= 0 -> -- client is asking for a retransmit
+                                    return (Nothing, -1)
+                                | frameNum - (client^.cLastFrame) >= (Constants.updateBackup - 3) ->
+                                    -- client hasn't gotten a good message though in a long time
+                                    return (Nothing, -1)
+                                | otherwise -> do -- we have a valid message to delta from
+                                    oldFrame <- preuse (svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix ((client^.cLastFrame) .&. Constants.updateMask))
+                                    return (oldFrame, client^.cLastFrame)
 
     MSG.writeByteI sizeBufLens Constants.svcFrame
     MSG.writeLong sizeBufLens frameNum
@@ -59,19 +63,152 @@ writeFrameToClient (ClientReference clientIdx) sizeBufLens = do
     -- send over the areabits
     Just frame' <- preuse frame
     MSG.writeByteI sizeBufLens (frame'^.cfAreaBytes)
-    SZ.write sizeBufLens (frame'^.cfAreaBits) (frame'^.cfAreaBytes)
+    let (ptr, n) = VS.unsafeToForeignPtr0 (frame'^.cfAreaBits)
+        areaBits = BI.PS ptr 0 n
+    SZ.write sizeBufLens areaBits (frame'^.cfAreaBytes)
 
     -- delta encode the playerstate
-    writePlayerStateToClient oldFrame frame sizeBufLens
-
+    writePlayerStateToClient oldFrame frame' sizeBufLens
     -- delta encode the entities
-    emitPacketEntities oldFrame frame sizeBufLens
+    emitPacketEntities oldFrame frame' sizeBufLens
 
--- writePlayerStateToClient :: Maybe (Traversal' QuakeState ClientFrameT) -> Traversal' QuakeState ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
-writePlayerStateToClient _ _ _ = do
-  io (putStrLn "SVEnts.writePlayerStateToClient") >> undefined -- TODO
+-- Writes the status of a player to a client system.
+writePlayerStateToClient :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+writePlayerStateToClient from to sizeBufLens = do
+    let ps = to^.cfPlayerState
+        ops = case from of
+                Nothing -> newPlayerStateT
+                Just clientFrame -> clientFrame^.cfPlayerState
 
--- emitPacketEntities :: Maybe (Traversal' QuakeState ClientFrameT) -> Traversal' QuakeState ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+    -- determine what needs to be sent
+    let a = if (ps^.psPMoveState.pmsPMType) /= (ops^.psPMoveState.pmsPMType)
+              then Constants.psMType else 0
+        b = if (ps^.psPMoveState.pmsOrigin) /= (ops^.psPMoveState.pmsOrigin)
+              then Constants.psMOrigin else 0
+        c = if (ps^.psPMoveState.pmsVelocity) /= (ops^.psPMoveState.pmsVelocity)
+              then Constants.psMVelocity else 0
+        d = if (ps^.psPMoveState.pmsPMTime) /= (ops^.psPMoveState.pmsPMTime)
+              then Constants.psMTime else 0
+        e = if (ps^.psPMoveState.pmsPMFlags) /= (ops^.psPMoveState.pmsPMFlags)
+              then Constants.psMFlags else 0
+        f = if (ps^.psPMoveState.pmsGravity) /= (ops^.psPMoveState.pmsGravity)
+              then Constants.psMGravity else 0
+        g = if (ps^.psPMoveState.pmsDeltaAngles) /= (ops^.psPMoveState.pmsDeltaAngles)
+              then Constants.psMDeltaAngles else 0
+        h = if (ps^.psViewAngles) /= (ops^.psViewAngles)
+              then Constants.psViewAngles else 0
+        i = if (ps^.psViewOffset) /= (ops^.psViewOffset)
+              then Constants.psViewOffset else 0
+        j = if (ps^.psKickAngles) /= (ops^.psKickAngles)
+              then Constants.psKickAngles else 0
+        k = if (ps^.psBlend) /= (ops^.psBlend)
+              then Constants.psBlend else 0
+        l = if (ps^.psFOV) /= (ops^.psFOV)
+              then Constants.psFov else 0
+        m = if (ps^.psRDFlags) /= (ops^.psRDFlags)
+              then Constants.psRdFlags else 0
+        n = if (ps^.psGunFrame) /= (ops^.psGunFrame)
+              then Constants.psWeaponFrame else 0
+        o = Constants.psWeaponIndex
+
+        pflags = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h .|. i .|. j .|. k .|. l .|. m .|. n .|. o
+
+    -- write it
+    MSG.writeByteI sizeBufLens Constants.svcPlayerInfo
+    MSG.writeShort sizeBufLens pflags
+
+    -- write the pmove_state_t
+    when (pflags .&. Constants.psMType /= 0) $
+      MSG.writeByteI sizeBufLens (ps^.psPMoveState.pmsPMType)
+
+    when (pflags .&. Constants.psMOrigin /= 0) $ do
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._x)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._y)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._z)
+
+    when (pflags .&. Constants.psMVelocity /= 0) $ do
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._x)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._y)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._z)
+
+    when (pflags .&. Constants.psMTime /= 0) $
+      MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMTime)
+
+    when (pflags .&. Constants.psMFlags /= 0) $
+      MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMFlags)
+
+    when (pflags .&. Constants.psMGravity /= 0) $
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsGravity)
+
+    when (pflags .&. Constants.psMDeltaAngles /= 0) $ do
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._x)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._y)
+      MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._z)
+
+    -- write the rest of the player_state_t
+    when (pflags .&. Constants.psViewOffset /= 0) $ do
+      MSG.writeCharF sizeBufLens ((ps^.psViewOffset._x) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psViewOffset._y) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psViewOffset._z) * 4)
+
+    when (pflags .&. Constants.psViewAngles /= 0) $ do
+      MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._x)
+      MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._y)
+      MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._z)
+
+    when (pflags .&. Constants.psKickAngles /= 0) $ do
+      MSG.writeCharF sizeBufLens ((ps^.psKickAngles._x) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psKickAngles._y) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psKickAngles._z) * 4)
+
+    when (pflags .&. Constants.psWeaponIndex /= 0) $ do
+      MSG.writeByteI sizeBufLens (ps^.psGunIndex)
+
+    when (pflags .&. Constants.psWeaponFrame /= 0) $ do
+      MSG.writeByteI sizeBufLens (ps^.psGunFrame)
+      MSG.writeCharF sizeBufLens ((ps^.psGunOffset._x) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psGunOffset._y) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psGunOffset._z) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psGunAngles._x) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psGunAngles._y) * 4)
+      MSG.writeCharF sizeBufLens ((ps^.psGunAngles._z) * 4)
+
+    when (pflags .&. Constants.psBlend /= 0) $ do
+      MSG.writeByteF sizeBufLens ((ps^.psBlend._x) * 255)
+      MSG.writeByteF sizeBufLens ((ps^.psBlend._y) * 255)
+      MSG.writeByteF sizeBufLens ((ps^.psBlend._z) * 255)
+      MSG.writeByteF sizeBufLens ((ps^.psBlend._w) * 255)
+
+    when (pflags .&. Constants.psFov /= 0) $
+      MSG.writeByteF sizeBufLens (ps^.psFOV)
+
+    when (pflags .&. Constants.psRdFlags /= 0) $
+      MSG.writeByteI sizeBufLens (ps^.psRDFlags)
+
+    -- send stats
+    let statbits = calcStatBits ps ops 0 0 Constants.maxStats
+
+    MSG.writeLong sizeBufLens statbits
+
+    writeStats ps statbits 0 Constants.maxStats
+
+  where calcStatBits :: PlayerStateT -> PlayerStateT -> Int -> Int -> Int -> Int
+        calcStatBits ps ops statbits idx maxIdx
+          | idx >= maxIdx = statbits
+          | otherwise = if ((ps^.psStats) UV.! idx) /= ((ops^.psStats) UV.! idx)
+                          then calcStatBits ps ops (statbits .|. (1 `shiftL` idx)) (idx + 1) maxIdx
+                          else calcStatBits ps ops statbits (idx + 1) maxIdx
+
+        writeStats :: PlayerStateT -> Int -> Int -> Int -> Quake ()
+        writeStats ps statbits idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              when (statbits .&. (1 `shiftL` idx) /= 0) $
+                MSG.writeShort sizeBufLens (fromIntegral $ (ps^.psStats) UV.! idx)
+
+              writeStats ps statbits (idx + 1) maxIdx
+
+emitPacketEntities :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
 emitPacketEntities _ _ _ = do
     io (putStrLn "SVEnts.writePlayerStateToClient") >> undefined -- TODO
 

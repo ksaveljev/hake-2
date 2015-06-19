@@ -17,6 +17,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -1526,7 +1527,7 @@ transformedBoxTrace start end mins maxs headNode brushMask origin angles = do
 - 
 - This is used by the client refreshes to cull visibility.
 -}
-writeAreaBits :: Traversal' QuakeState (UV.Vector Word8) -> Int -> Quake Int
+writeAreaBits :: Traversal' QuakeState (VS.Vector Word8) -> Int -> Quake Int
 writeAreaBits bufferLens area = do
     numAreas <- use $ cmGlobals.cmNumAreas
 
@@ -1538,19 +1539,19 @@ writeAreaBits bufferLens area = do
     if noAreasValue /= 0
       then
         -- for debugging, send everything
-        bufferLens .= (UV.replicate bytes 255) UV.++ (UV.drop bytes buffer)
+        bufferLens .= (VS.replicate bytes 255) VS.++ (VS.drop bytes buffer)
       else do
-        let buffer' = (UV.replicate bytes 0) UV.++ (UV.drop bytes buffer)
+        let buffer' = (VS.replicate bytes 0) VS.++ (VS.drop bytes buffer)
         mapAreas <- use $ cmGlobals.cmMapAreas
         let floodNum = (mapAreas V.! area)^.caFloodNum
         bufferLens .= constructAreaBits floodNum mapAreas buffer' 0 numAreas
 
     return bytes
 
-  where constructAreaBits :: Int -> V.Vector CAreaT -> UV.Vector Word8 -> Int -> Int -> UV.Vector Word8
+  where constructAreaBits :: Int -> V.Vector CAreaT -> VS.Vector Word8 -> Int -> Int -> VS.Vector Word8
         constructAreaBits floodNum mapAreas buffer idx maxIdx
           | idx >= maxIdx = buffer
           | otherwise =
               if ((mapAreas V.! idx)^.caFloodNum) == floodNum || area == 0
-                then constructAreaBits floodNum mapAreas (buffer UV.// [(idx `shiftR` 3, (buffer UV.! (idx `shiftR` 3)) .|. (1 `shiftL` (fromIntegral idx .&. 7)))]) (idx + 1) maxIdx
+                then constructAreaBits floodNum mapAreas (buffer VS.// [(idx `shiftR` 3, (buffer VS.! (idx `shiftR` 3)) .|. (1 `shiftL` (fromIntegral idx .&. 7)))]) (idx + 1) maxIdx
                 else constructAreaBits floodNum mapAreas buffer (idx + 1) maxIdx
