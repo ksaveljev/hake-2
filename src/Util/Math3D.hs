@@ -102,7 +102,7 @@ angleVectors angles setForward setRight setUp =
                else Nothing
     in (forward, right, up)
 
-shortToAngle :: Int16 -> Float
+shortToAngle :: Int -> Float
 shortToAngle x = (fromIntegral x) * shortRatio
 
 angleToShort :: Float -> Int16

@@ -32,7 +32,7 @@ predictMovement = do
           -- just set angles
           viewAngles <- use $ globals.cl.csViewAngles
           deltaAngles <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles
-          globals.cl.csPredictedAngles .= viewAngles + (fmap Math3D.shortToAngle deltaAngles)
+          globals.cl.csPredictedAngles .= viewAngles + (fmap (Math3D.shortToAngle. fromIntegral) deltaAngles)
         else do
           ack <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
           current <- use $ globals.cls.csNetChan.ncOutgoingSequence

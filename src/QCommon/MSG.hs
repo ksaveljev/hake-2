@@ -443,6 +443,11 @@ readCoord sizeBufLens = liftM ((* (1.0 / 8.0)) . fromIntegral) (readShort sizeBu
 readAngle :: Lens' QuakeState SizeBufT -> Quake Float
 readAngle sizeBufLens = liftM ((* (360.0 / 256)) . fromIntegral) (readChar sizeBufLens)
 
+readAngle16 :: Lens' QuakeState SizeBufT -> Quake Float
+readAngle16 sizeBufLens = do
+    v <- readShort sizeBufLens
+    return (Math3D.shortToAngle v)
+
 readPos :: Lens' QuakeState SizeBufT -> Quake (V3 Float)
 readPos sizeBufLens = do
     a <- readCoord sizeBufLens

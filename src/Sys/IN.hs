@@ -117,7 +117,7 @@ centerView = do
                    _ -> undefined -- shouldn't happen
 
     Just angle <- preuse $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.(Math3D.v3Access Constants.pitch)
-    globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle angle))
+    globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle (fromIntegral angle)))
 
 frame :: Quake ()
 frame = do

@@ -498,7 +498,7 @@ clampPitch = do
                    _ -> undefined -- shouldn't happen
 
     angle <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.access
-    let p = Math3D.shortToAngle angle
+    let p = Math3D.shortToAngle (fromIntegral angle)
         pitch = if p > 180
                   then p - 360
                   else p

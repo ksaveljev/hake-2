@@ -6,7 +6,7 @@ module Client.CLEnts where
 import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens')
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, (.&.), (.|.))
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -310,7 +310,131 @@ parseFrame = do
       CLPred.checkPredictionError
 
 parsePlayerState :: Maybe FrameT -> Lens' QuakeState FrameT -> Quake ()
-parsePlayerState _ _ = do
+parsePlayerState oldFrame newFrameLens = do
+    let state = case oldFrame of
+                  Nothing -> newPlayerStateT
+                  Just frame -> frame^.fPlayerState
+
+    flags <- MSG.readShort (globals.netMessage)
+
+    -- parse the pmove_state_t
+    pmType <- if flags .&. Constants.psMType /= 0
+                then MSG.readByte (globals.netMessage)
+                else return (state^.psPMoveState.pmsPMType)
+
+    origin <- if flags .&. Constants.psMOrigin /= 0
+                then do
+                  x <- MSG.readShort (globals.netMessage)
+                  y <- MSG.readShort (globals.netMessage)
+                  z <- MSG.readShort (globals.netMessage)
+                  return $ fmap fromIntegral (V3 x y z)
+                else
+                  return (state^.psPMoveState.pmsOrigin)
+
+    velocity <- if flags .&. Constants.psMVelocity /= 0
+                  then do
+                    x <- MSG.readShort (globals.netMessage)
+                    y <- MSG.readShort (globals.netMessage)
+                    z <- MSG.readShort (globals.netMessage)
+                    return $ fmap fromIntegral (V3 x y z)
+                  else
+                    return (state^.psPMoveState.pmsVelocity)
+
+    pmTime <- if flags .&. Constants.psMTime /= 0
+                then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+                else return (state^.psPMoveState.pmsPMTime)
+
+    pmFlags <- if flags .&. Constants.psMFlags /= 0
+                 then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+                 else return (state^.psPMoveState.pmsPMFlags)
+
+    gravity <- if flags .&. Constants.psMGravity /= 0
+                 then liftM fromIntegral $ MSG.readShort (globals.netMessage)
+                 else return (state^.psPMoveState.pmsGravity)
+
+    deltaAngles <- if flags .&. Constants.psMDeltaAngles /= 0
+                     then do
+                       x <- MSG.readShort (globals.netMessage)
+                       y <- MSG.readShort (globals.netMessage)
+                       z <- MSG.readShort (globals.netMessage)
+                       return $ fmap fromIntegral (V3 x y z)
+                     else
+                       return (state^.psPMoveState.pmsDeltaAngles)
+
+    attractLoop <- use $ globals.cl.csAttractLoop
+    let pmType' = if attractLoop
+                    then Constants.pmFreeze -- demo playback
+                    else pmType
+
+    -- parse the rest of the player_state_t
+    viewOffset <- if flags .&. Constants.psViewOffset /= 0
+                    then do
+                      x <- MSG.readChar (globals.netMessage)
+                      y <- MSG.readChar (globals.netMessage)
+                      z <- MSG.readChar (globals.netMessage)
+                      return $ fmap ((* 0.25) . fromIntegral) (V3 x y z)
+                    else
+                      return (state^.psViewOffset)
+
+    viewAngles <- if flags .&. Constants.psViewAngles /= 0
+                    then do
+                      x <- MSG.readAngle16 (globals.netMessage)
+                      y <- MSG.readAngle16 (globals.netMessage)
+                      z <- MSG.readAngle16 (globals.netMessage)
+                      return (V3 x y z)
+                    else
+                      return (state^.psViewAngles)
+
+    kickAngles <- if flags .&. Constants.psKickAngles /= 0
+                    then do
+                      x <- MSG.readChar (globals.netMessage)
+                      y <- MSG.readChar (globals.netMessage)
+                      z <- MSG.readChar (globals.netMessage)
+                      return $ fmap ((* 0.25) . fromIntegral) (V3 x y z)
+                    else
+                      return (state^.psKickAngles)
+
+    gunIndex <- if flags .&. Constants.psWeaponIndex /= 0
+                  then MSG.readByte (globals.netMessage)
+                  else return (state^.psGunIndex)
+
+    (gunFrame, gunOffset, gunAngles) <- if flags .&. Constants.psWeaponFrame /= 0
+                                          then do
+                                            gunFrame <- MSG.readByte (globals.netMessage)
+
+                                            x <- MSG.readChar (globals.netMessage)
+                                            y <- MSG.readChar (globals.netMessage)
+                                            z <- MSG.readChar (globals.netMessage)
+
+                                            x' <- MSG.readChar (globals.netMessage)
+                                            y' <- MSG.readChar (globals.netMessage)
+                                            z' <- MSG.readChar (globals.netMessage)
+
+                                            return (gunFrame, fmap ((* 0.25) . fromIntegral) (V3 x y z), fmap ((* 0.25) . fromIntegral) (V3 x' y' z'))
+                                          else
+                                            return (state^.psGunFrame, state^.psGunOffset, state^.psGunAngles)
+
+    blend <- if flags .&. Constants.psBlend /= 0
+               then do
+                 x <- MSG.readByte (globals.netMessage)
+                 y <- MSG.readByte (globals.netMessage)
+                 z <- MSG.readByte (globals.netMessage)
+                 w <- MSG.readByte (globals.netMessage)
+                 return $ fmap ((/ 255) . fromIntegral) (V4 x y z w)
+               else
+                 return (state^.psBlend)
+
+    fov <- if flags .&. Constants.psFov /= 0
+             then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+             else return (state^.psFOV)
+
+    rdFlags <- if flags .&. Constants.psRdFlags /= 0
+                 then MSG.readByte (globals.netMessage)
+                 else return (state^.psRDFlags)
+
+    -- parse stats
+    statbits <- MSG.readLong (globals.netMessage)
+
     io (putStrLn "CLEnts.parsePlayerState") >> undefined -- TODO
 
 parsePacketEntities :: Maybe FrameT -> Lens' QuakeState FrameT -> Quake ()
