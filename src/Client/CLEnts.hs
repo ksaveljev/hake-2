@@ -6,10 +6,12 @@ module Client.CLEnts where
 import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens')
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, (.&.), (.|.))
+import Data.Int (Int16)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -434,8 +436,40 @@ parsePlayerState oldFrame newFrameLens = do
 
     -- parse stats
     statbits <- MSG.readLong (globals.netMessage)
+    updates <- readStats statbits 0 Constants.maxStats []
 
-    io (putStrLn "CLEnts.parsePlayerState") >> undefined -- TODO
+    newFrameLens.fPlayerState .=
+      PlayerStateT { _psPMoveState = PMoveStateT { _pmsPMType      = pmType
+                                                 , _pmsOrigin      = origin
+                                                 , _pmsVelocity    = velocity
+                                                 , _pmsPMFlags     = pmFlags
+                                                 , _pmsPMTime      = pmTime
+                                                 , _pmsGravity     = gravity
+                                                 , _pmsDeltaAngles = deltaAngles
+                                                 }
+                   , _psViewAngles = viewAngles
+                   , _psViewOffset = viewOffset
+                   , _psKickAngles = kickAngles
+                   , _psGunAngles  = gunAngles
+                   , _psGunOffset  = gunOffset
+                   , _psGunIndex   = gunIndex
+                   , _psGunFrame   = gunFrame
+                   , _psBlend      = blend
+                   , _psFOV        = fov
+                   , _psRDFlags    = rdFlags
+                   , _psStats      = (state^.psStats) UV.// updates
+                   }
+
+  where readStats :: Int -> Int -> Int -> [(Int, Int16)] -> Quake [(Int, Int16)]
+        readStats statbits idx maxIdx acc
+          | idx >= maxIdx = return acc
+          | otherwise = do
+              if statbits .&. (1 `shiftL` idx) /= 0
+                then do
+                  v <- MSG.readShort (globals.netMessage)
+                  readStats statbits (idx + 1) maxIdx ((idx, fromIntegral v) : acc)
+                else
+                  readStats statbits (idx + 1) maxIdx acc
 
 parsePacketEntities :: Maybe FrameT -> Lens' QuakeState FrameT -> Quake ()
 parsePacketEntities _ _ = do
