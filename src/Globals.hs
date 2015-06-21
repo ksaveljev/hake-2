@@ -21,6 +21,7 @@ import Client.VidDefT as X
 import Client.VRectT as X
 import Game.CmdAliasT as X
 import Game.CVarT as X
+import Game.EntityStateT as X
 import QCommon.NetAdrT
 import QCommon.SizeBufT as X
 import Render.DummyRenderer
@@ -59,6 +60,7 @@ initialGlobals =
           , _cls                = newClientStaticT
           , _cl                 = newClientStateT
           , _clEntities         = V.replicate Constants.maxEdicts newCEntityT
+          , _clParseEntities    = V.replicate Constants.maxParseEntities (newEntityStateT Nothing)
 
           , _userInfoModified   = False
 

@@ -112,3 +112,11 @@ setLightStyle csIdx = do
           | otherwise =
               let a :: Float = fromIntegral $ ord (str `BC.index` idx) - ord 'a'
               in Just (a / d, (str, d, idx + 1))
+
+teleporterParticles :: EntityStateT -> Quake ()
+teleporterParticles _ = do
+    io (putStrLn "CLFX.teleporterParticles") >> undefined -- TODO
+
+entityEvent :: EntityStateT -> Quake ()
+entityEvent _ = do
+    io (putStrLn "CLFX.entityEvent") >> undefined -- TODO

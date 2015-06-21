@@ -17,6 +17,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import qualified Client.CLFX as CLFX
 import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
 import {-# SOURCE #-} qualified Client.SCR as SCR
@@ -476,5 +477,22 @@ parsePacketEntities _ _ = do
     io (putStrLn "CLEnts.parsePacketEntities") >> undefined -- TODO
 
 fireEntityEvents :: FrameT -> Quake ()
-fireEntityEvents _ = do
-    io (putStrLn "CLEnts.fireEntityEvents") >> undefined -- TODO
+fireEntityEvents frame = do
+    parseEntities <- use $ globals.clParseEntities
+    goThrouhEntities parseEntities 0 (frame^.fNumEntities)
+
+  where goThrouhEntities :: V.Vector EntityStateT -> Int -> Int -> Quake ()
+        goThrouhEntities parseEntities pnum maxPnum
+          | pnum >= maxPnum = return ()
+          | otherwise = do
+              let num = ((frame^.fParseEntities) + pnum) .&. (Constants.maxParseEntities - 1)
+                  s1 = parseEntities V.! num
+
+              when ((s1^.esEvent) /= 0) $
+                CLFX.entityEvent s1
+
+              -- EF_TELEPORTER acts like an event, but is not cleared each frame
+              when ((s1^.esEffects) .&. Constants.efTeleporter /= 0) $
+                CLFX.teleporterParticles s1
+
+              goThrouhEntities parseEntities (pnum + 1) maxPnum
