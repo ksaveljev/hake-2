@@ -472,9 +472,44 @@ parsePlayerState oldFrame newFrameLens = do
                 else
                   readStats statbits (idx + 1) maxIdx acc
 
+{-
+- ================== CL_ParsePacketEntities ==================
+- 
+- An svc_packetentities has just been parsed, deal with the rest of the
+- data stream.
+-}
 parsePacketEntities :: Maybe FrameT -> Lens' QuakeState FrameT -> Quake ()
-parsePacketEntities _ _ = do
-    io (putStrLn "CLEnts.parsePacketEntities") >> undefined -- TODO
+parsePacketEntities oldFrame newFrameLens = do
+    use (globals.cl.csParseEntities) >>= \parseEntities -> do
+      newFrameLens.fParseEntities .= parseEntities
+      newFrameLens.fNumEntities .= 0
+
+    -- delta from the entities present in oldframe
+    parseEntities <- use $ globals.clParseEntities
+    let (oldNum, oldState) = case oldFrame of
+                               Nothing -> (99999, Nothing)
+                               Just frame -> let idx = (frame^.fParseEntities) .&. (Constants.maxParseEntities - 1)
+                                                 oldState = parseEntities V.! idx
+                                             in (oldState^.esNumber, Just oldState)
+
+    parse parseEntities oldNum oldState 0
+
+  where parse :: V.Vector EntityStateT -> Int -> Maybe EntityStateT -> Int -> Quake ()
+        parse parseEntities oldNum oldState bits = do
+          (newNum, iw) <- parseEntityBits [bits]
+          let bits' = head iw
+
+          when (newNum >= Constants.maxEdicts) $
+            Com.comError Constants.errDrop ("CL_ParsePacketEntities: bad number:" `B.append` (BC.pack $ show newNum)) -- IMPROVE?
+
+          use (globals.netMessage) >>= \netMsg ->
+            when ((netMsg^.sbReadCount) > (netMsg^.sbCurSize)) $
+              Com.comError Constants.errDrop "CL_ParsePacketEntities: end of message"
+
+          if newNum == 0
+            then undefined -- TODO
+            else do
+              undefined -- TODO
 
 fireEntityEvents :: FrameT -> Quake ()
 fireEntityEvents frame = do
