@@ -7,6 +7,7 @@ import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens')
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, (.&.), (.|.))
 import Data.Int (Int16)
+import Data.Maybe (fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -492,10 +493,10 @@ parsePacketEntities oldFrame newFrameLens = do
                                                  oldState = parseEntities V.! idx
                                              in (oldState^.esNumber, Just oldState)
 
-    parse parseEntities oldNum oldState 0
+    parse oldNum oldState 0 0
 
-  where parse :: V.Vector EntityStateT -> Int -> Maybe EntityStateT -> Int -> Quake ()
-        parse parseEntities oldNum oldState bits = do
+  where parse :: Int -> Maybe EntityStateT -> Int -> Int -> Quake ()
+        parse oldNum oldState oldIndex bits = do
           (newNum, iw) <- parseEntityBits [bits]
           let bits' = head iw
 
@@ -509,6 +510,24 @@ parsePacketEntities oldFrame newFrameLens = do
           if newNum == 0
             then undefined -- TODO
             else do
+              -- one or more entities from the old packet are unchanged
+              showNetValue <- liftM (^.cvValue) clShowNetCVar
+              (oldIndex', oldNum', oldState') <- deltaEntityPackets showNetValue oldNum newNum oldState oldIndex
+              undefined -- TODO
+
+        deltaEntityPackets :: Float -> Int -> Int -> Maybe EntityStateT -> Int -> Quake (Int, Int, Maybe EntityStateT)
+        deltaEntityPackets showNetValue oldNum newNum oldState oldIndex = do
+          when (showNetValue == 3) $
+            Com.printf ("   unchanged: " `B.append` BC.pack (show oldNum) `B.append` "\n") -- IMPROVE ?
+
+          let Just oldFrame' = oldFrame
+          deltaEntity newFrameLens oldNum (fromJust oldState) 0
+
+          if (oldIndex + 1) >= (oldFrame'^.fNumEntities)
+            then
+              deltaEntityPackets showNetValue 99999 newNum oldState (oldIndex + 1)
+            else do
+              let idx = ((oldFrame'^.fParseEntities) + (oldIndex + 1)) .&. (Constants.maxParseEntities - 1)
               undefined -- TODO
 
 fireEntityEvents :: FrameT -> Quake ()
@@ -531,3 +550,7 @@ fireEntityEvents frame = do
                 CLFX.teleporterParticles s1
 
               goThrouhEntities parseEntities (pnum + 1) maxPnum
+
+deltaEntity :: Traversal' QuakeState FrameT -> Int -> EntityStateT -> Int -> Quake ()
+deltaEntity _ _ _ _ = do
+    io (putStrLn "CLEnts.deltaEntity") >> undefined -- TODO
