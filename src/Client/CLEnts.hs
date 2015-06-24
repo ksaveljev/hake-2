@@ -516,19 +516,22 @@ parsePacketEntities oldFrame newFrameLens = do
               undefined -- TODO
 
         deltaEntityPackets :: Float -> Int -> Int -> Maybe EntityStateT -> Int -> Quake (Int, Int, Maybe EntityStateT)
-        deltaEntityPackets showNetValue oldNum newNum oldState oldIndex = do
-          when (showNetValue == 3) $
-            Com.printf ("   unchanged: " `B.append` BC.pack (show oldNum) `B.append` "\n") -- IMPROVE ?
+        deltaEntityPackets showNetValue oldNum newNum oldState oldIndex
+          | oldNum >= newNum = return (oldIndex, oldNum, oldState)
+          | otherwise = do
+              when (showNetValue == 3) $
+                Com.printf ("   unchanged: " `B.append` BC.pack (show oldNum) `B.append` "\n") -- IMPROVE ?
 
-          let Just oldFrame' = oldFrame
-          deltaEntity newFrameLens oldNum (fromJust oldState) 0
+              let Just oldFrame' = oldFrame
+              deltaEntity newFrameLens oldNum (fromJust oldState) 0
 
-          if (oldIndex + 1) >= (oldFrame'^.fNumEntities)
-            then
-              deltaEntityPackets showNetValue 99999 newNum oldState (oldIndex + 1)
-            else do
-              let idx = ((oldFrame'^.fParseEntities) + (oldIndex + 1)) .&. (Constants.maxParseEntities - 1)
-              undefined -- TODO
+              if (oldIndex + 1) >= (oldFrame'^.fNumEntities)
+                then
+                  deltaEntityPackets showNetValue 99999 newNum oldState (oldIndex + 1)
+                else do
+                  let idx = ((oldFrame'^.fParseEntities) + (oldIndex + 1)) .&. (Constants.maxParseEntities - 1)
+                  Just oldState' <- preuse $ globals.clParseEntities.ix idx
+                  deltaEntityPackets showNetValue (oldState'^.esNumber) newNum (Just oldState') (oldIndex + 1)
 
 fireEntityEvents :: FrameT -> Quake ()
 fireEntityEvents frame = do
