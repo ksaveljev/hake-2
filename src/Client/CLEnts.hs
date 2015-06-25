@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.CLEnts where
 
-import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens')
+import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, (.&.), (.|.))
 import Data.Int (Int16)
@@ -618,6 +618,54 @@ fireEntityEvents frame = do
 
               goThrouhEntities parseEntities (pnum + 1) maxPnum
 
+{-
+- ================== CL_DeltaEntity ==================
+- 
+- Parses deltas from the given base and adds the resulting entity to the
+- current frame
+-}
 deltaEntity :: Traversal' QuakeState FrameT -> Int -> EntityStateT -> Int -> Quake ()
-deltaEntity _ _ _ _ = do
-    io (putStrLn "CLEnts.deltaEntity") >> undefined -- TODO
+deltaEntity frameLens newNum old bits = do
+    parseEntities <- use $ globals.cl.csParseEntities
+    let idx = parseEntities .&. (Constants.maxParseEntities - 1)
+    globals.cl.csParseEntities += 1
+    frameLens.fNumEntities += 1
+
+    parseDelta old (globals.clParseEntities.ix idx) newNum bits
+
+    Just state <- preuse $ globals.clParseEntities.ix idx
+
+    preuse (globals.clEntities.ix newNum) >>= \(Just ent) ->
+      when ((state^.esModelIndex) /= (ent^.ceCurrent.esModelIndex) ||
+            (state^.esModelIndex2) /= (ent^.ceCurrent.esModelIndex2) ||
+            (state^.esModelIndex3) /= (ent^.ceCurrent.esModelIndex3) ||
+            (state^.esModelIndex4) /= (ent^.ceCurrent.esModelIndex4) ||
+            abs((state^.esOrigin._x) - (ent^.ceCurrent.esOrigin._x)) > 512 ||
+            abs((state^.esOrigin._y) - (ent^.ceCurrent.esOrigin._y)) > 512 ||
+            abs((state^.esOrigin._z) - (ent^.ceCurrent.esOrigin._z)) > 512 ||
+            (state^.esEvent) == Constants.evPlayerTeleport ||
+            (state^.esEvent) == Constants.evOtherTeleport) $
+        globals.clEntities.ix newNum.ceServerFrame .= -99
+
+    Just ent <- preuse $ globals.clEntities.ix newNum
+    serverFrame <- use $ globals.cl.csFrame.fServerFrame
+
+    if (ent^.ceServerFrame) /= serverFrame - 1
+      then do -- wasn't in last update, so initialize some things
+        globals.clEntities.ix newNum.ceTrailCount .= 1024 -- for diminishing rocket / grenade trails
+        -- duplicate the current state so lerping doesn't hurt anything
+        globals.clEntities.ix newNum.cePrev .= state
+
+        if (state^.esEvent) == Constants.evOtherTeleport
+          then do
+            globals.clEntities.ix newNum.cePrev.esOrigin .= (state^.esOrigin)
+            globals.clEntities.ix newNum.ceLerpOrigin .= (state^.esOrigin)
+          else do
+            globals.clEntities.ix newNum.cePrev.esOrigin .= (state^.esOldOrigin)
+            globals.clEntities.ix newNum.ceLerpOrigin .= (state^.esOldOrigin)
+      else -- shuffle the last state to previous Copy !
+        globals.clEntities.ix newNum.cePrev .= (ent^.ceCurrent)
+
+    globals.clEntities.ix newNum.ceServerFrame .= serverFrame
+    -- Copy !
+    globals.clEntities.ix newNum.ceCurrent .= state
