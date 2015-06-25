@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.CLPred where
 
-import Control.Lens (use, (^.), (.=))
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=))
 import Control.Monad (liftM, unless, when)
 import Data.Bits ((.&.))
+import Linear (V3(..), _x, _y, _z)
 
 import Quake
 import QuakeState
@@ -49,4 +50,29 @@ predictMovement = do
 
 checkPredictionError :: Quake ()
 checkPredictionError = do
-    io (putStrLn "CLPred.checkPredictionError") >> undefined -- TODO
+    predictValue <- liftM (^.cvValue) clPredictCVar
+    flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
+
+    unless (predictValue == 0 || (fromIntegral flags .&. pmfNoPrediction) /= 0) $ do
+      -- calculate the last usercmd_t we sent that the server has processed
+      globals.cls.csNetChan.ncIncomingAcknowledged %= (.&. (Constants.cmdBackup - 1))
+      frame <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
+
+      -- compare what the server returned with what we had predicted it to be
+      origin <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsOrigin
+      Just predictedOrigin <- preuse $ globals.cl.csPredictedOrigins.ix frame
+      let delta = origin - predictedOrigin
+
+      -- save the prediction error for interpolation
+      let len = abs (delta^._x) + abs (delta^._y) + abs (delta^._z)
+
+      if len > 640 -- 80 world units
+        then -- a teleport or something
+          globals.cl.csPredictionError .= V3 0 0 0
+        else do
+          -- TODO: show prediction miss here! (not implemented)
+
+          globals.cl.csPredictedOrigins.ix frame .= origin
+
+          -- save for error interpolation
+          globals.cl.csPredictionError .= fmap ((* 0.125) . fromIntegral) delta
