@@ -98,7 +98,9 @@ beginLoadingPlaque = do
       globals.cls.csDisableServerCount .= serverCount
 
 endLoadingPlaque :: Quake ()
-endLoadingPlaque = io (putStrLn "SCR.endLoadingPlaque") >> undefined -- TODO
+endLoadingPlaque = do
+    globals.cls.csDisableScreen .= 0
+    Console.clearNotify
 
 updateScreenF :: XCommandT
 updateScreenF = updateScreen2
