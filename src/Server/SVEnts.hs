@@ -350,29 +350,48 @@ buildClientFrame (ClientReference clientIdx) = do
         numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
         io (print "collecting edicts")
-        collectEdicts clEntRef frame 1 numEdicts
+        collectEdicts clientPHS clientArea clEntRef frame 1 numEdicts
 
-  where --collectEdicts :: EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
-        collectEdicts clEntRef frame idx maxIdx
+  where --collectEdicts :: Int -> EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
+        collectEdicts clientPHS clientArea clEntRef frame idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
                    -- ignore ents without visible models
-              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts clEntRef frame (idx + 1) maxIdx
+              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                    -- ignore ents without visible models unless they have an effect
-                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts clEntRef frame (idx + 1) maxIdx
+                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
                      skip <- if (EdictReference idx) /= clEntRef
                                then do
-                                 io (putStrLn "SVEnts.buildClientFrame") >> undefined -- TODO
+                                 blocked <- isBlockedByDoor clientArea edict
+
+                                 if blocked
+                                   then return True
+                                   else do
+                                     -- beams just check one point for PHS
+                                     if (edict^.eEntityState.esRenderFx) .&. Constants.rfBeam /= 0
+                                       then do
+                                         let l = (edict^.eClusterNums) UV.! 0
+                                         if (clientPHS `B.index` (l `shiftR` 3)) .&. (1 `shiftL` (l .&. 7)) == 0
+                                           then return True
+                                           else return False
+
+                                       else do
+                                         -- FIXME: if an ent has a model and a sound, but isn't
+                                         -- in the PVS, only the PHS, clear the model
+                                         bitVector <- if (edict^.eEntityState.esSound) == 0
+                                                        then use $ svGlobals.svFatPVS -- return clientPHS
+                                                        else use $ svGlobals.svFatPVS
+                                         io (putStrLn "SVEnts.buildClientFrame") >> undefined -- TODO
                                else
                                  return False
 
                      if skip
-                       then collectEdicts clEntRef frame (idx + 1) maxIdx
+                       then collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                        else do
                          serverStatic <- use $ svGlobals.svServerStatic
                          let index = (serverStatic^.ssNextClientEntities) `mod` (serverStatic^.ssNumClientEntities)
@@ -393,7 +412,22 @@ buildClientFrame (ClientReference clientIdx) = do
                          svGlobals.svServerStatic.ssNextClientEntities += 1
                          frame.cfNumEntities += 1
 
-                         collectEdicts clEntRef frame (idx + 1) maxIdx
+                         collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+
+        isBlockedByDoor :: Int -> EdictT -> Quake Bool
+        isBlockedByDoor clientArea edict = do
+          connected <- CM.areasConnected clientArea (edict^.eAreaNum)
+          if not connected
+            then do
+              if (edict^.eAreaNum2) == 0
+                then return True
+                else do
+                  connected2 <- CM.areasConnected clientArea (edict^.eAreaNum2)
+                  if not connected2
+                    then return True
+                    else return False
+            else
+              return False
 
 {-
 - The client will interpolate the view position, so we can't use a single
