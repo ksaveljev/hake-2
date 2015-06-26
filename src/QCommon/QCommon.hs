@@ -118,7 +118,7 @@ init args = do
 
     added <- CBuf.addLateCommands
 
-    if added
+    if not added
       then do
         dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
