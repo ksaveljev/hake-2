@@ -125,7 +125,7 @@ parseServerMessage = do
 
                      | cmd == Constants.svcPlayerInfo || cmd == Constants.svcPacketEntities || cmd == Constants.svcDeltaPacketEntities -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcFinalErrorSmth") >> undefined -- TODO
 
-                     | otherwise -> io (putStrLn "CLParse.otherwise") >> undefined -- TODO
+                     | otherwise -> io (print cmd) >> Com.comError Constants.errDrop "CL_ParseServerMessage: Illegible server message\n"
 
                   parseMessage
 

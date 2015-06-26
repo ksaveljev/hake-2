@@ -308,7 +308,7 @@ readPackets = do
           MSG.beginReading (globals.netMessage)
           void $ MSG.readLong (globals.netMessage) -- sequence number
           void $ MSG.readLong (globals.netMessage) -- sequence number
-          qport <- MSG.readShort (globals.netMessage)
+          qport <- liftM (.&. 0xFFFF) (MSG.readShort (globals.netMessage))
 
           -- check for packets from connected clients
           maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
@@ -395,6 +395,7 @@ giveMsec = do
 
 runGameFrame :: Quake ()
 runGameFrame = do
+    io (print "runGameFrame")
     setTimeBeforeGame
 
     -- we always need to bump framenum, even if we

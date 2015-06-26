@@ -36,10 +36,11 @@ writeCharF = writeByteF
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = do
     io (print "WRITE BYTE")
-    let c' :: Word32 = fromIntegral c
-        c'' :: Word8 = fromIntegral (c' .&. 0xFF)
+    let -- c' :: Word32 = fromIntegral c
+        c' :: Word8 = fromIntegral (c .&. 0xFF)
+        c'' :: Int8 = fromIntegral c'
     io (print c'')
-    SZ.write sizeBufLens (B.pack [c'']) 1
+    SZ.write sizeBufLens (B.pack [c']) 1
 
 writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeByteF sizeBufLens c = do
@@ -167,6 +168,9 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
     when ((to^.esNumber) >= Constants.maxEdicts) $
       Com.comError Constants.errFatal "Entity number >= MAX_EDICTS"
 
+    io (print $ "from origin = " ++ show (from^.esOrigin))
+    io (print $ "to origin = " ++ show (to^.esOrigin))
+
     -- send an update
     let a = if (to^.esNumber) >= 256 then Constants.uNumber16 else 0 -- number8 is implicit otherwise
         b = if (to^.esOrigin._x) /= (from^.esOrigin._x) then Constants.uOrigin1 else 0
@@ -207,6 +211,8 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
 
         bits = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h .|. i .|. j .|. k .|. l .|. m .|. n .|. o .|. p .|. q .|. r .|. s
 
+    io (print $ "bits = " ++ show bits)
+
     -- write the message
     unless (bits == 0 && not force) $ do
       let finalBits = if | bits .&. 0xFF000000 /= 0 -> bits .|. Constants.uMoreBits3 .|. Constants.uMoreBits2 .|. Constants.uMoreBits1
@@ -214,6 +220,7 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
                          | bits .&. 0x0000FF00 /= 0 -> bits .|. Constants.uMoreBits1
                          | otherwise -> bits
 
+      io (print $ "finalBits = " ++ show finalBits)
       writeByteI sizeBufLens (finalBits .&. 255)
 
       if | finalBits .&. 0xFF000000 /= 0 -> do
@@ -334,6 +341,9 @@ readByte sizeBufLens = do
 
     sizeBufLens.sbReadCount += 1
 
+    io (print "READ BYTE")
+    io (print c)
+
     return c
 
 readShort :: Lens' QuakeState SizeBufT -> Quake Int
@@ -350,11 +360,9 @@ readShort sizeBufLens = do
             a :: Word8 = B.index buf readCount
             b :: Word8 = B.index buf (readCount + 1)
             b' :: Word16 = (fromIntegral b) `shiftL` 8
-            result = (fromIntegral a) .|. b'
+            result :: Int16 = fromIntegral $ (fromIntegral a) .|. b'
 
         io (print "READ SHORT")
-        io (print a)
-        io (print b)
         io (print result)
         sizeBufLens.sbReadCount += 2
         return (fromIntegral result)

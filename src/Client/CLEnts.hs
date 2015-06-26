@@ -217,6 +217,11 @@ parseFrame = do
     let serverTime = serverFrame * 100
     globals.cl.csFrame.fServerTime .= serverTime
 
+    io (print "SERVER FRAME")
+    io (print serverFrame)
+    io (print "DELTA FRAME")
+    io (print deltaFrame)
+
     -- BIG HACK to let old demos continue to work
     serverProtocol <- use $ globals.cls.csServerProtocol
     when (serverProtocol /= 26) $ do
@@ -509,6 +514,9 @@ parsePacketEntities oldFrame newFrameLens = do
 
           showNetValue <- liftM (^.cvValue) clShowNetCVar
 
+          io (print $ "BITS = " ++ show bits')
+          io (print $ "NEW NUM = " ++ show newNum)
+
           if newNum == 0
             then
               -- any remaining entities in the old frame are copied over
@@ -558,7 +566,7 @@ parsePacketEntities oldFrame newFrameLens = do
 
                        return (oldIndex', oldNum', oldState')
 
-              parse oldNum'' oldState'' oldIndex'' bits
+              parse oldNum'' oldState'' oldIndex'' bits'
 
         deltaEntityPackets :: Float -> Int -> Int -> Maybe EntityStateT -> Int -> Quake (Int, Int, Maybe EntityStateT)
         deltaEntityPackets showNetValue oldNum newNum oldState oldIndex

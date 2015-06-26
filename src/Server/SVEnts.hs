@@ -42,6 +42,8 @@ writeFrameToClient clientRef@(ClientReference clientIdx) sizeBufLens = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     frameNum <- use $ svGlobals.svServer.sFrameNum
 
+    io (print $ "frameNum = " ++ show frameNum)
+
     let frameIdx = frameNum .&. Constants.updateMask
         frame = svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix frameIdx :: Traversal' QuakeState ClientFrameT
 
@@ -119,53 +121,65 @@ writePlayerStateToClient from to sizeBufLens = do
     MSG.writeShort sizeBufLens pflags
 
     -- write the pmove_state_t
-    when (pflags .&. Constants.psMType /= 0) $
+    when (pflags .&. Constants.psMType /= 0) $ do
+      io (print "PS_M_TYPE")
       MSG.writeByteI sizeBufLens (ps^.psPMoveState.pmsPMType)
 
     when (pflags .&. Constants.psMOrigin /= 0) $ do
+      io (print "PS_M_ORIGIN")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._z)
 
     when (pflags .&. Constants.psMVelocity /= 0) $ do
+      io (print "PS_M_VELOCITY")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._z)
 
-    when (pflags .&. Constants.psMTime /= 0) $
+    when (pflags .&. Constants.psMTime /= 0) $ do
+      io (print "PS_M_TIME")
       MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMTime)
 
-    when (pflags .&. Constants.psMFlags /= 0) $
+    when (pflags .&. Constants.psMFlags /= 0) $ do
+      io (print "PS_M_FLAGS")
       MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMFlags)
 
-    when (pflags .&. Constants.psMGravity /= 0) $
+    when (pflags .&. Constants.psMGravity /= 0) $ do
+      io (print "PS_M_GRAVITY")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsGravity)
 
     when (pflags .&. Constants.psMDeltaAngles /= 0) $ do
+      io (print "PS_M_DELTA_ANGLES")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._z)
 
     -- write the rest of the player_state_t
     when (pflags .&. Constants.psViewOffset /= 0) $ do
+      io (print "PS_VIEWOFFSET")
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._y) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._z) * 4)
 
     when (pflags .&. Constants.psViewAngles /= 0) $ do
+      io (print "PS_VIEWANGLES")
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._x)
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._y)
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._z)
 
     when (pflags .&. Constants.psKickAngles /= 0) $ do
+      io (print "PS_KICKANGLES")
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._y) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._z) * 4)
 
     when (pflags .&. Constants.psWeaponIndex /= 0) $ do
+      io (print "PS_WEAPONINDEX")
       MSG.writeByteI sizeBufLens (ps^.psGunIndex)
 
     when (pflags .&. Constants.psWeaponFrame /= 0) $ do
+      io (print "PS_WEAPONFRAME")
       MSG.writeByteI sizeBufLens (ps^.psGunFrame)
       MSG.writeCharF sizeBufLens ((ps^.psGunOffset._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psGunOffset._y) * 4)
@@ -175,20 +189,24 @@ writePlayerStateToClient from to sizeBufLens = do
       MSG.writeCharF sizeBufLens ((ps^.psGunAngles._z) * 4)
 
     when (pflags .&. Constants.psBlend /= 0) $ do
+      io (print "PS_BLEND")
       MSG.writeByteF sizeBufLens ((ps^.psBlend._x) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._y) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._z) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._w) * 255)
 
-    when (pflags .&. Constants.psFov /= 0) $
+    when (pflags .&. Constants.psFov /= 0) $ do
+      io (print "PS_FOV")
       MSG.writeByteF sizeBufLens (ps^.psFOV)
 
-    when (pflags .&. Constants.psRdFlags /= 0) $
+    when (pflags .&. Constants.psRdFlags /= 0) $ do
+      io (print "PS_RDFLAGS")
       MSG.writeByteI sizeBufLens (ps^.psRDFlags)
 
     -- send stats
     let statbits = calcStatBits ps ops 0 0 Constants.maxStats
 
+    io (print "statbits")
     MSG.writeLong sizeBufLens statbits
 
     writeStats ps statbits 0 Constants.maxStats
@@ -228,6 +246,12 @@ emitPacketEntities from to sizeBufLens = do
         sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt newEnt oldIndex newIndex
           | newIndex >= (to^.cfNumEntities) && oldIndex >= fromNumEntites = return ()
           | otherwise = do
+              io (print $ "maxClientsValue = " ++ show maxClientsValue)
+              io (print $ "numClientEntities = " ++ show numClientEntities)
+              io (print $ "fromNumEntites = " ++ show fromNumEntites)
+              io (print $ "cfNumEntities = " ++ show (to^.cfNumEntities))
+              io (print $ "newIndex = " ++ show newIndex)
+              io (print $ "oldIndex = " ++ show oldIndex)
               (newEnt', newNum) <- if newIndex >= (to^.cfNumEntities)
                                      then return (fromJust newEnt, 9999)
                                      else do
@@ -242,7 +266,10 @@ emitPacketEntities from to sizeBufLens = do
                                        Just oldEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
                                        return (oldEnt', oldEnt'^.esNumber)
 
+              io (print $ "oldNum = " ++ show oldNum ++ " newNum = " ++ show newNum)
+
               if | newNum == oldNum -> do
+                     io (print "newNum == oldNum")
                      -- delta update from old position
                      -- because the force parm is false, this will not result
                      -- in any bytes being emited if the entity has not changed at
@@ -253,12 +280,14 @@ emitPacketEntities from to sizeBufLens = do
                      sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) (newIndex + 1)
 
                  | newNum < oldNum -> do
+                     io (print "newNum < oldNum")
                      -- this is a new entity, send it from the baseline
                      Just baseline <- preuse $ svGlobals.svServer.sBaselines.ix newNum
                      MSG.writeDeltaEntity baseline newEnt' sizeBufLens True True
                      sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') oldIndex (newIndex + 1)
 
                  | newNum > oldNum -> do
+                     io (print "newNum > oldNum")
                      -- the old entity isn't present in the new message
                      let bits = if oldNum >= 256
                                   then Constants.uRemove .|. Constants.uNumber16 .|. Constants.uMoreBits1
@@ -280,6 +309,7 @@ emitPacketEntities from to sizeBufLens = do
 -}
 buildClientFrame :: ClientReference -> Quake ()
 buildClientFrame (ClientReference clientIdx) = do
+    io (print "buildClientFrame")
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     let Just clEntRef@(EdictReference clEntIdx) = client^.cEdict
     Just clEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix clEntIdx
@@ -319,6 +349,7 @@ buildClientFrame (ClientReference clientIdx) = do
 
         numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
+        io (print "collecting edicts")
         collectEdicts clEntRef frame 1 numEdicts
 
   where --collectEdicts :: EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
@@ -361,6 +392,8 @@ buildClientFrame (ClientReference clientIdx) = do
 
                          svGlobals.svServerStatic.ssNextClientEntities += 1
                          frame.cfNumEntities += 1
+
+                         collectEdicts clEntRef frame (idx + 1) maxIdx
 
 {-
 - The client will interpolate the view position, so we can't use a single
