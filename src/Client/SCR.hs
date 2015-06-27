@@ -25,9 +25,14 @@ import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
+import qualified QCommon.SZ as SZ
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
+
+statLayouts :: Int
+statLayouts = 13
 
 sbNums1 :: V.Vector B.ByteString
 sbNums1 =
@@ -248,13 +253,17 @@ timeRefreshF :: XCommandT
 timeRefreshF = io (putStrLn "SCR.timeRefreshF") >> undefined -- TODO
 
 loadingF :: XCommandT
-loadingF = io (putStrLn "SCR.loadingF") >> undefined -- TODO
+loadingF = beginLoadingPlaque
 
 sizeUpF :: XCommandT
-sizeUpF = io (putStrLn "SCR.sizeUpF") >> undefined -- TODO
+sizeUpF = do
+    v <- liftM (^.cvValue) viewSizeCVar
+    CVar.setValueF "viewsize" (v + 10)
 
 sizeDownF :: XCommandT
-sizeDownF = io (putStrLn "SCR.sizeDownF") >> undefined -- TODO
+sizeDownF = do
+    v <- liftM (^.cvValue) viewSizeCVar
+    CVar.setValueF "viewsize" (v - 10)
 
 skyF :: XCommandT
 skyF = io (putStrLn "SCR.skyF") >> undefined -- TODO
@@ -318,8 +327,17 @@ stopCinematic = do
       S.disableStreaming
       scrGlobals.scrCin.cRestartSound .= False
 
+{-
+- FinishCinematic
+- 
+- Called when either the cinematic completes, or it is aborted
+-}
 finishCinematic :: Quake ()
-finishCinematic = io (putStrLn "SCR.finishCinematic") >> undefined -- TODO
+finishCinematic = do
+    -- tell the server to advance to the next map / cinematic
+    MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+    serverCount <- use $ globals.cl.csServerCount
+    SZ.print (globals.cls.csNetChan.ncMessage) ("nextserver " `B.append` BC.pack (show serverCount) `B.append` "\n") -- IMPROVE?
 
 runConsole :: Quake ()
 runConsole = do
@@ -494,7 +512,10 @@ drawStats = do
 
 drawLayout :: Quake ()
 drawLayout = do
-    io (putStrLn "SCR.drawLayout") >> undefined -- TODO
+    Just v <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix statLayouts
+    when (v /= 0) $ do
+      layout <- use $ globals.cl.csLayout
+      executeLayoutString layout
 
 drawNet :: Quake ()
 drawNet = do
@@ -612,7 +633,11 @@ drawLoading = do
       (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) (((vidDef'^.vdHeight) - height) `div` 2) "loading"
 
 dirtyScreen :: Quake ()
-dirtyScreen = io (putStrLn "SCR.dirtyScreen") >> undefined -- TODO
+dirtyScreen = do
+    vidDef' <- use $ globals.vidDef
+
+    addDirtyPoint 0 0
+    addDirtyPoint ((vidDef'^.vdWidth) - 1) ((vidDef'^.vdHeight) - 1)
 
 addDirtyPoint :: Int -> Int -> Quake ()
 addDirtyPoint x y = do
