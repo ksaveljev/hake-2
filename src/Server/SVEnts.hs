@@ -262,7 +262,7 @@ emitPacketEntities from to sizeBufLens = do
               (oldEnt', oldNum) <- if oldIndex >= fromNumEntites
                                      then return (fromJust oldEnt, 9999)
                                      else do
-                                       let idx = (((fromJust from)^.cfFirstEntity) + oldIndex) `mod` numClientEntities
+                                       let idx = ((fromJust from^.cfFirstEntity) + oldIndex) `mod` numClientEntities
                                        Just oldEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
                                        return (oldEnt', oldEnt'^.esNumber)
 
@@ -365,13 +365,13 @@ buildClientFrame (ClientReference clientIdx) = do
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
-                     skip <- if (EdictReference idx) /= clEntRef
+                     skip <- if EdictReference idx /= clEntRef
                                then do
                                  blocked <- isBlockedByDoor clientArea edict
 
                                  if blocked
                                    then return True
-                                   else do
+                                   else
                                      -- beams just check one point for PHS
                                      if (edict^.eEntityState.esRenderFx) .&. Constants.rfBeam /= 0
                                        then do
@@ -418,7 +418,7 @@ buildClientFrame (ClientReference clientIdx) = do
         isBlockedByDoor clientArea edict = do
           connected <- CM.areasConnected clientArea (edict^.eAreaNum)
           if not connected
-            then do
+            then
               if (edict^.eAreaNum2) == 0
                 then return True
                 else do
