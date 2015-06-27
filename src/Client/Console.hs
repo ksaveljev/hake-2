@@ -110,13 +110,19 @@ toggleChatF :: XCommandT
 toggleChatF = io (putStrLn "Console.toggleChatF") >> undefined -- TODO
 
 messageModeF :: XCommandT
-messageModeF = io (putStrLn "Console.messageModeF") >> undefined -- TODO
+messageModeF = do
+    globals.chatTeam .= False
+    globals.cls.csKeyDest .= Constants.keyMessage
 
 messageMode2F :: XCommandT
-messageMode2F = io (putStrLn "Console.messageMode2F") >> undefined -- TODO
+messageMode2F = do
+    globals.chatTeam .= True
+    globals.cls.csKeyDest .= Constants.keyMessage
 
 clearF :: XCommandT
-clearF = io (putStrLn "Console.clearF") >> undefined -- TODO
+clearF = do
+    text <- io $ MV.replicate Constants.conTextSize ' '
+    globals.con.cText .= text
 
 dumpF :: XCommandT
 dumpF = io (putStrLn "Console.dumpF") >> undefined -- TODO
