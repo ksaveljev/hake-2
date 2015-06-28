@@ -522,8 +522,22 @@ spFuncTimer er@(EdictReference edictIdx) = do
 
 funcTimerUse :: EntUse
 funcTimerUse =
-  GenericEntUse "func_timer_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.funcTimerUse") >> undefined -- TODO
+  GenericEntUse "func_timer_use" $ \selfRef@(EdictReference selfIdx) _ activator -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoActivator .= activator
+
+    -- if on, turn it off
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    if (self^.eEdictAction.eaNextThink) /= 0
+      then
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= 0
+      else
+        -- turn it on
+        if (self^.eDelay) /= 0
+          then do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + (self^.eDelay)
+          else
+            void $ think funcTimerThink selfRef
 
 {-
 - QUAKED func_timer (0.3 0.1 0.6) (-8 -8 -8) (8 8 8) START_ON "wait" base
@@ -758,8 +772,9 @@ thinkSpawnDoorTrigger =
 
 buttonUse :: EntUse
 buttonUse =
-  GenericEntUse "button_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.buttonUse") >> undefined -- TODO
+  GenericEntUse "button_use" $ \selfRef@(EdictReference selfIdx) _ activator -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoActivator .= activator
+    void $ think buttonFire selfRef
 
 buttonTouch :: EntTouch
 buttonTouch =
@@ -768,8 +783,20 @@ buttonTouch =
 
 buttonKilled :: EntDie
 buttonKilled =
-  GenericEntDie "button_killed" $ \_ _ _ _ _ -> do
-    io (putStrLn "GameFunc.buttonKilled") >> undefined -- TODO
+  GenericEntDie "button_killed" $ \selfRef@(EdictReference selfIdx) _ attacker _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEdictOther.eoActivator .= Just attacker
+      eEdictStatus.eHealth .= (self^.eEdictStatus.eMaxHealth)
+      eEdictStatus.eTakeDamage .= Constants.damageNo
+
+    void $ think buttonFire selfRef
+
+buttonFire :: EntThink
+buttonFire =
+  GenericEntThink "button_fire" $ \_ -> do
+    io (putStrLn "GameFunc.buttonFire") >> undefined -- TODO
 
 trainNext :: EntThink
 trainNext =
