@@ -428,6 +428,9 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
     -- do it before setting health back up, so farthest
     -- ranging doesn't count this client
     (spawnOrigin, spawnAngles) <- selectSpawnPoint edictRef
+    io (print "putClientInServer")
+    io (print spawnOrigin)
+    io (print spawnAngles)
     let gClientIdx = edictIdx - 1
 
     -- deathmatch wipes most client data every spawn

@@ -593,47 +593,47 @@ trainUse =
 
 funcTrainFind :: EntThink
 funcTrainFind =
-  GenericEntThink "func_train_find" $ \er@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "func_train_find" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let dprintf = gameImport^.giDprintf
         linkEntity = gameImport^.giLinkEntity
 
-    if isNothing (edict^.eEdictInfo.eiTarget)
+    if isNothing (self^.eEdictInfo.eiTarget)
       then
         dprintf "train_find: no target\n"
       else do
-        entRef <- GameBase.pickTarget (edict^.eEdictInfo.eiTarget)
+        entRef <- GameBase.pickTarget (self^.eEdictInfo.eiTarget)
 
         if isNothing entRef
           then
-            dprintf $ "train_find: target " `B.append` (fromJust $ edict^.eEdictInfo.eiTarget) `B.append` " not found\n"
+            dprintf $ "train_find: target " `B.append` (fromJust $ self^.eEdictInfo.eiTarget) `B.append` " not found\n"
           else do
             let Just (EdictReference entIdx) = entRef
             Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
 
-            let origin = edict^.eEntityState.esOrigin
-                mins = edict^.eEdictMinMax.eMins
+            let origin = ent^.eEntityState.esOrigin
+                mins = self^.eEdictMinMax.eMins
 
-            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
               eEdictInfo.eiTarget .= (ent^.eEdictInfo.eiTarget)
               eEntityState.esOrigin .= (origin - mins)
 
-            linkEntity er
+            linkEntity selfRef
 
             -- if not triggered, start immediately
-            when (isNothing (edict^.eEdictInfo.eiTargetName)) $
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. trainStartOn)
+            when (isNothing (self^.eEdictInfo.eiTargetName)) $
+              gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags %= (.|. trainStartOn)
 
-            Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            Just updatedSelf <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-            when ((updatedEdict^.eSpawnFlags) .&. trainStartOn /= 0) $ do
+            when ((updatedSelf^.eSpawnFlags) .&. trainStartOn /= 0) $ do
               time <- use $ gameBaseGlobals.gbLevel.llTime
 
-              zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
                 eEdictAction.eaNextThink .= time + Constants.frameTime
                 eEdictAction.eaThink .= Just trainNext
-                eEdictOther.eoActivator .= Just er
+                eEdictOther.eoActivator .= Just selfRef
 
     return True
 

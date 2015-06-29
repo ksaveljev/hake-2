@@ -107,6 +107,9 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
         unicast <- use $ gameBaseGlobals.gbGameImport.giUnicast
         unicast edictRef False
 
+      preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just ed) ->
+        io (print "PEWPEWPEW") >> io (print (ed^.eEntityState.esOrigin))
+
   where setCurrentPlayerAndClient :: Quake ()
         setCurrentPlayerAndClient = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
@@ -120,6 +123,11 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState) $ do
             pmsOrigin .= fmap (truncate . (* 8.0)) (edict^.eEntityState.esOrigin)
             pmsVelocity .= fmap (truncate . (* 8.0)) (edict^.eEdictPhysics.eVelocity)
+
+          io (print "updatePMoveValues")
+          io (print (edict^.eEntityState.esOrigin))
+          preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gc) ->
+            io (print (gc^.gcPlayerState.psPMoveState.pmsOrigin))
 
         checkIntermissionTime :: Quake Bool
         checkIntermissionTime = do
@@ -150,15 +158,15 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) > 180
-            then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin.(v3setter Constants.pitch) .= ((-360) + (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch))) / 3
-            else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin.(v3setter Constants.pitch) .= (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) / 3
+            then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.pitch) .= ((-360) + (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch))) / 3
+            else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.pitch) .= (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) / 3
 
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin.(v3setter Constants.yaw) .= (gClient^.gcVAngle.(Math3D.v3Access Constants.yaw))
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin.(v3setter Constants.roll) .= 0
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.yaw) .= (gClient^.gcVAngle.(Math3D.v3Access Constants.yaw))
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.roll) .= 0
 
           preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
             roll <- calcRoll (edict^.eEntityState.esAngles) (edict^.eEdictPhysics.eVelocity)
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin.(v3setter Constants.roll) .= roll * 4
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.roll) .= roll * 4
 
         v3setter x = case x of
                        0 -> _x

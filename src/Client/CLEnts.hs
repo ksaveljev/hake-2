@@ -526,7 +526,7 @@ parsePacketEntities oldFrame newFrameLens = do
               (oldIndex', oldNum', oldState') <- deltaEntityPackets showNetValue oldNum newNum oldState oldIndex
 
               (oldIndex'', oldNum'', oldState'') <- 
-                if | bits .&. Constants.uRemove /= 0 -> do -- the entity present in oldframe is not in the current frame
+                if | bits' .&. Constants.uRemove /= 0 -> do -- the entity present in oldframe is not in the current frame
                        when (showNetValue == 3) $
                          Com.printf ("   remove: " `B.append` BC.pack (show newNum) `B.append` "\n") -- IMPROVE ?
 
@@ -546,7 +546,7 @@ parsePacketEntities oldFrame newFrameLens = do
                        when (showNetValue == 3) $
                          Com.printf ("   delta: " `B.append` BC.pack (show newNum) `B.append` "\n") -- IMPROVE ?
 
-                       deltaEntity newFrameLens newNum (fromJust oldState) bits
+                       deltaEntity newFrameLens newNum (fromJust oldState) bits'
 
                        let Just oldFrame' = oldFrame
                        if (oldIndex' + 1) >= oldFrame'^.fNumEntities
@@ -562,7 +562,7 @@ parsePacketEntities oldFrame newFrameLens = do
                          Com.printf ("   baseline: " `B.append` BC.pack (show newNum) `B.append` "\n") -- IMPROVE ?
 
                        Just baseline <- preuse $ globals.clEntities.ix newNum.ceBaseline
-                       deltaEntity newFrameLens newNum baseline bits
+                       deltaEntity newFrameLens newNum baseline bits'
 
                        return (oldIndex', oldNum', oldState')
 

@@ -205,6 +205,8 @@ linkEdict er@(EdictReference edictIdx) = do
           area <- CM.leafArea (leafs UV.! idx)
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
+          io (print $ "idx = " ++ show edictIdx ++ " area = " ++ show area)
+
           when (area /= 0) $
             -- doors may legally straggle two areas,
             -- but nothing should ever need more than that
@@ -215,8 +217,10 @@ linkEdict er@(EdictReference edictIdx) = do
                 when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
                   Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eEdictMinMax.eAbsMin)) `B.append` "\n"
 
+                io (print $ "setting areanum2 = " ++ show area)
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
-              else 
+              else do
+                io (print $ "setting areanum = " ++ show area)
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum .= area
 
         setHeadNode :: Int -> Int -> Int -> Quake ()

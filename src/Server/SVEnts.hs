@@ -326,6 +326,8 @@ buildClientFrame (ClientReference clientIdx) = do
 
         -- find the client's PVS
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        io (print (gClient^.gcPlayerState.psViewOffset))
+        io (print (gClient^.gcPlayerState.psPMoveState.pmsOrigin))
         let org = (gClient^.gcPlayerState.psViewOffset) + fmap ((* 0.125) . fromIntegral) (gClient^.gcPlayerState.psPMoveState.pmsOrigin)
 
         leafNum <- CM.pointLeafNum org
@@ -358,10 +360,16 @@ buildClientFrame (ClientReference clientIdx) = do
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
+              io (print $ "working through edict " ++ show idx)
+
                    -- ignore ents without visible models
-              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> do
+                     io (print "skip svFlags")
+                     collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                    -- ignore ents without visible models unless they have an effect
-                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> do
+                     io (print "skip modelIndex or effects or ...")
+                     collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
@@ -370,14 +378,18 @@ buildClientFrame (ClientReference clientIdx) = do
                                  blocked <- isBlockedByDoor clientArea edict
 
                                  if blocked
-                                   then return True
+                                   then do
+                                     io (print "skip door blocked")
+                                     return True
                                    else
                                      -- beams just check one point for PHS
                                      if (edict^.eEntityState.esRenderFx) .&. Constants.rfBeam /= 0
                                        then do
                                          let l = (edict^.eClusterNums) UV.! 0
                                          if (clientPHS `B.index` (l `shiftR` 3)) .&. (1 `shiftL` (l .&. 7)) == 0
-                                           then return True
+                                           then do
+                                             io (print "skip beam PHS")
+                                             return True
                                            else return False
 
                                        else do
@@ -390,13 +402,17 @@ buildClientFrame (ClientReference clientIdx) = do
                                          done <- if (edict^.eNumClusters) == -1 -- too many leafs for individual check, go by headnode
                                                    then do
                                                      visible <- CM.headNodeVisible (edict^.eHeadNode) bitVector
+                                                     io (print $ "headnode visible = " ++ show visible)
                                                      return (not visible)
                                                    else do -- check individual leafs
                                                      let visible = checkBitVector edict bitVector 0 (edict^.eNumClusters)
+                                                     io (print $ "bitvector visible = " ++ show visible)
                                                      return (not visible)
 
                                          if done
-                                           then return True
+                                           then do
+                                             io (print "skip headnode visible")
+                                             return True
                                            else
                                              if (edict^.eEntityState.esModelIndex) == 0 -- don't send sounds if they will be attenuated away
                                                then do
@@ -404,7 +420,9 @@ buildClientFrame (ClientReference clientIdx) = do
                                                      len = norm delta
 
                                                  if len > 400
-                                                   then return True
+                                                   then do
+                                                     io (print "skip len")
+                                                     return True
                                                    else return False
                                                else
                                                  return False
@@ -412,8 +430,11 @@ buildClientFrame (ClientReference clientIdx) = do
                                  return False
 
                      if skip
-                       then collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+                       then do
+                         io (print "skip because SKIP")
+                         collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                        else do
+                         io (print "not skipped")
                          serverStatic <- use $ svGlobals.svServerStatic
                          let index = (serverStatic^.ssNextClientEntities) `mod` (serverStatic^.ssNumClientEntities)
                              -- state = (serverStatic^.ssClientEntities) V.! index
@@ -437,6 +458,9 @@ buildClientFrame (ClientReference clientIdx) = do
 
         isBlockedByDoor :: Int -> EdictT -> Quake Bool
         isBlockedByDoor clientArea edict = do
+          io (print $ "clientArea = " ++ show clientArea)
+          io (print $ "areanum = " ++ show (edict^.eAreaNum))
+          io (print $ "areanum2 = " ++ show (edict^.eAreaNum2))
           connected <- CM.areasConnected clientArea (edict^.eAreaNum)
           if not connected
             then
@@ -465,16 +489,19 @@ buildClientFrame (ClientReference clientIdx) = do
 -}
 fatPVS :: V3 Float -> Quake ()
 fatPVS org = do
+    io (print org)
     let mins = fmap (subtract 8) org
         maxs = fmap (+ 8) org
 
     (count, _) <- CM.boxLeafNums mins maxs (svGlobals.svLeafsTmp) 64 Nothing
+    io (print $ "count = " ++ show count)
 
     when (count < 1) $
       Com.comError Constants.errFatal "SV_FatPVS: count < 1"
 
     numClusters <- use $ cmGlobals.cmNumClusters
     let longs = (numClusters + 31) `shiftR` 5
+    io (print $ "longs = " ++ show longs)
 
     -- convert leafs to clusters
     leafs <- use $ svGlobals.svLeafsTmp
