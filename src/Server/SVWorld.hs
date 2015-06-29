@@ -198,10 +198,11 @@ linkEdict er@(EdictReference edictIdx) = do
 
   where setAreas :: Int -> Quake ()
         setAreas idx = do
-          leafCluster <- CM.leafCluster idx
+          leafs <- use $ svGlobals.svLeafs
+          leafCluster <- CM.leafCluster (leafs UV.! idx)
           svGlobals.svClusters.ix idx .= leafCluster
 
-          area <- CM.leafArea idx
+          area <- CM.leafArea (leafs UV.! idx)
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
           when (area /= 0) $
