@@ -30,4 +30,5 @@ registerSound _ = do
 
 startSound :: Maybe (V3 Float) -> EdictReference -> Int -> SfxT -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = do
-    io (putStrLn "S.startSound") >> undefined -- TODO
+    return () -- TODO: don't want to get involved with sound system yet
+    --io (putStrLn "S.startSound") >> undefined -- TODO
