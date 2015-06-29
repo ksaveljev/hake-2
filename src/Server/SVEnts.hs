@@ -9,7 +9,7 @@ import Control.Monad (when, liftM)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Maybe (isJust, fromJust)
 import Data.Word (Word8)
-import Linear (V3, _x, _y, _z, _w)
+import Linear (V3, _x, _y, _z, _w, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
 import qualified Data.Vector as V
@@ -350,18 +350,18 @@ buildClientFrame (ClientReference clientIdx) = do
         numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
         io (print "collecting edicts")
-        collectEdicts clientPHS clientArea clEntRef frame 1 numEdicts
+        collectEdicts org clientPHS clientArea clEntRef frame 1 numEdicts
 
-  where --collectEdicts :: Int -> EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
-        collectEdicts clientPHS clientArea clEntRef frame idx maxIdx
+  where --collectEdicts :: V3Float -> B.ByteString -> Int -> EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
+        collectEdicts org clientPHS clientArea clEntRef frame idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
                    -- ignore ents without visible models
-              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+              if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                    -- ignore ents without visible models unless they have an effect
-                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+                 | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
@@ -386,12 +386,33 @@ buildClientFrame (ClientReference clientIdx) = do
                                          bitVector <- if (edict^.eEntityState.esSound) == 0
                                                         then use $ svGlobals.svFatPVS -- return clientPHS
                                                         else use $ svGlobals.svFatPVS
-                                         io (putStrLn "SVEnts.buildClientFrame") >> undefined -- TODO
+
+                                         done <- if (edict^.eNumClusters) == -1 -- too many leafs for individual check, go by headnode
+                                                   then do
+                                                     visible <- CM.headNodeVisible (edict^.eHeadNode) bitVector
+                                                     return (not visible)
+                                                   else do -- check individual leafs
+                                                     let visible = checkBitVector edict bitVector 0 (edict^.eNumClusters)
+                                                     return (not visible)
+
+                                         if done
+                                           then return True
+                                           else
+                                             if (edict^.eEntityState.esModelIndex) == 0 -- don't send sounds if they will be attenuated away
+                                               then do
+                                                 let delta = org - (edict^.eEntityState.esOrigin)
+                                                     len = norm delta
+
+                                                 if len > 400
+                                                   then return True
+                                                   else return False
+                                               else
+                                                 return False
                                else
                                  return False
 
                      if skip
-                       then collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+                       then collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                        else do
                          serverStatic <- use $ svGlobals.svServerStatic
                          let index = (serverStatic^.ssNextClientEntities) `mod` (serverStatic^.ssNumClientEntities)
@@ -412,7 +433,7 @@ buildClientFrame (ClientReference clientIdx) = do
                          svGlobals.svServerStatic.ssNextClientEntities += 1
                          frame.cfNumEntities += 1
 
-                         collectEdicts clientPHS clientArea clEntRef frame (idx + 1) maxIdx
+                         collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
 
         isBlockedByDoor :: Int -> EdictT -> Quake Bool
         isBlockedByDoor clientArea edict = do
@@ -428,6 +449,15 @@ buildClientFrame (ClientReference clientIdx) = do
                     else return False
             else
               return False
+
+        checkBitVector :: EdictT -> UV.Vector Word8 -> Int -> Int -> Bool
+        checkBitVector edict bitVector idx maxIdx
+          | idx >= maxIdx = False
+          | otherwise =
+              let l = (edict^.eClusterNums) UV.! idx
+              in if (bitVector UV.! (l `shiftR` 3)) .&. (1 `shiftL` (l .&. 7)) /= 0
+                   then True
+                   else checkBitVector edict bitVector (idx + 1) maxIdx
 
 {-
 - The client will interpolate the view position, so we can't use a single

@@ -1367,12 +1367,15 @@ clusterPVS cluster = do
     if cluster == -1
       then do
         numClusters <- use $ cmGlobals.cmNumClusters
-        return $ B.replicate ((numClusters + 7) `shiftR` 3) 0
+        let num = (numClusters + 7) `shiftR` 3
+            empty = B.replicate num 0
+        return $ empty `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - num) 0
       else do
         let access = if Constants.dvisPvs == 0 then _1 else _2
         Just offset <- preuse $ cmGlobals.cmMapVis.dvBitOfs.ix cluster.(access)
         mapVisibility <- use $ cmGlobals.cmMapVisibility
-        decompressVis mapVisibility offset
+        res <- decompressVis mapVisibility offset
+        return $ res `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - (B.length res)) 0
 
 -- IMPROVE: 99% the same with clusterPVS, refactor
 clusterPHS :: Int -> Quake B.ByteString
@@ -1380,12 +1383,15 @@ clusterPHS cluster = do
     if cluster == -1
       then do
         numClusters <- use $ cmGlobals.cmNumClusters
-        return $ B.replicate ((numClusters + 7) `shiftR` 3) 0
+        let num = (numClusters + 7) `shiftR` 3
+            empty = B.replicate num 0
+        return $ empty `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - num) 0
       else do
         let access = if Constants.dvisPhs == 0 then _1 else _2
         Just offset <- preuse $ cmGlobals.cmMapVis.dvBitOfs.ix cluster.(access)
         mapVisibility <- use $ cmGlobals.cmMapVisibility
-        decompressVis mapVisibility offset
+        res <- decompressVis mapVisibility offset
+        return $ res `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - (B.length res)) 0
 
 decompressVis :: BL.ByteString -> Int -> Quake B.ByteString
 decompressVis mapVisibility offset = do
@@ -1555,3 +1561,32 @@ writeAreaBits bufferLens area = do
               if ((mapAreas V.! idx)^.caFloodNum) == floodNum || area == 0
                 then constructAreaBits floodNum mapAreas (buffer VS.// [(idx `shiftR` 3, (buffer VS.! (idx `shiftR` 3)) .|. (1 `shiftL` (fromIntegral idx .&. 7)))]) (idx + 1) maxIdx
                 else constructAreaBits floodNum mapAreas buffer (idx + 1) maxIdx
+
+{-
+- CM_HeadnodeVisible returns true if any leaf under headnode has a cluster that is potentially
+- visible.
+-}
+headNodeVisible :: Int -> UV.Vector Word8 -> Quake Bool
+headNodeVisible nodeNum visbits = do
+    if nodeNum < 0
+      then do
+        mapLeafs <- use $ cmGlobals.cmMapLeafs
+
+        let leafNum = -1 - nodeNum
+            cluster = (mapLeafs V.! leafNum)^.clCluster
+
+        if cluster == -1
+          then
+            return False
+          else
+            if (visbits UV.! (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) /= 0
+              then return True
+              else return False
+      else do
+        mapNodes <- use $ cmGlobals.cmMapNodes
+        let node = mapNodes V.! nodeNum
+
+        v <- headNodeVisible (node^.cnChildren._1) visbits
+        if v
+          then return True
+          else headNodeVisible (node^.cnChildren._2) visbits
