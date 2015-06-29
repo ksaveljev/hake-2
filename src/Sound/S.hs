@@ -4,6 +4,7 @@ import Linear (V3)
 import qualified Data.ByteString as B
 
 import Quake
+import QuakeState
 import Sound.SfxT
 
 init :: Quake ()
@@ -26,3 +27,7 @@ disableStreaming = io (putStrLn "S.disableStreaming") >> undefined -- TODO
 registerSound :: B.ByteString -> Quake SfxT
 registerSound _ = do
     io (putStrLn "S.registerSound") >> undefined -- TODO
+
+startSound :: Maybe (V3 Float) -> EdictReference -> Int -> SfxT -> Float -> Float -> Float -> Quake ()
+startSound _ _ _ _ _ _ _ = do
+    io (putStrLn "S.startSound") >> undefined -- TODO

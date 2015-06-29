@@ -7,6 +7,7 @@ module Client.CLParse where
 import Control.Exception (handle, IOException)
 import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=), Traversal')
 import Control.Monad (when, liftM, void)
+import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.Maybe (isNothing)
 import System.IO (IOMode(ReadWriteMode), hFileSize)
@@ -105,7 +106,7 @@ parseServerMessage = do
 
                      | cmd == Constants.svcConfigString -> parseConfigString
 
-                     | cmd == Constants.svcSound -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcSound") >> undefined -- TODO
+                     | cmd == Constants.svcSound -> parseStartSoundPacket
 
                      | cmd == Constants.svcSpawnBaseline -> parseBaseline
 
@@ -443,3 +444,43 @@ parseBaseline = do
     let nullState = newEntityStateT Nothing
     (newNum, bits) <- CLEnts.parseEntityBits [0]
     CLEnts.parseDelta nullState (globals.clEntities.ix newNum.ceBaseline) newNum (head bits)
+
+parseStartSoundPacket :: Quake ()
+parseStartSoundPacket = do
+    flags <- MSG.readByte (globals.netMessage)
+    soundNum <- MSG.readByte (globals.netMessage)
+
+    volume <- if flags .&. Constants.sndVolume /= 0
+                then liftM ((/ 255) . fromIntegral) (MSG.readByte (globals.netMessage))
+                else return Constants.defaultSoundPacketVolume
+
+    attenuation <- if flags .&. Constants.sndAttenuation /= 0
+                     then liftM ((/ 64) . fromIntegral) (MSG.readByte (globals.netMessage))
+                     else return Constants.defaultSoundPacketAttenuation
+
+    ofs <- if flags .&. Constants.sndOffset /= 0
+             then liftM ((/ 1000) . fromIntegral) (MSG.readByte (globals.netMessage))
+             else return 0
+
+    (channel, ent) <- if flags .&. Constants.sndEnt /= 0 -- entity reletive
+                        then do
+                          channel <- MSG.readShort (globals.netMessage)
+                          let ent = channel `shiftR` 3
+
+                          when (ent > Constants.maxEdicts) $
+                            Com.comError Constants.errDrop ("CL_ParseStartSoundPacket: ent = " `B.append` BC.pack (show ent)) -- IMPROVE?
+
+                          return (channel .&. 7, ent)
+                        else
+                          return (0, 0)
+
+    pos <- if flags .&. Constants.sndPos /= 0 -- positioned in space
+             then liftM Just (MSG.readPos (globals.netMessage))
+             else return Nothing
+
+    Just sound <- preuse $ globals.cl.csSoundPrecache.ix soundNum
+
+    -- TODO: research if we need this:
+    -- if (null == Globals.cl.sound_precache[sound_num])
+    --      return;
+    S.startSound pos (EdictReference ent) channel sound volume attenuation ofs
