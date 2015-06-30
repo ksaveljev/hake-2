@@ -16,25 +16,25 @@ import Game.UserCmdT
 import qualified Constants
 
 pmfDucked :: Int
-pmfDucked        = 1
+pmfDucked = 1
 
 pmfJumpHeld :: Int
-pmfJumpHeld      = 2
+pmfJumpHeld = 2
 
 pmfOnGround :: Int
-pmfOnGround      = 4
+pmfOnGround = 4
 
 pmfTimeWaterJump :: Int
 pmfTimeWaterJump = 8
 
 pmfTimeLand :: Int
-pmfTimeLand      = 16
+pmfTimeLand = 16
 
 pmfTimeTeleport :: Int
-pmfTimeTeleport  = 32
+pmfTimeTeleport = 32
 
 pmfNoPrediction :: Int
-pmfNoPrediction  = 64
+pmfNoPrediction = 64
 
 makeLenses ''PMoveT
 
@@ -53,5 +53,5 @@ newPMoveT =
          , _pmWaterType     = 0
          , _pmWaterLevel    = 0
          , _pmTrace         = \_ _ _ _ -> return Nothing
-         , _pmPointContents = const 0
+         , _pmPointContents = \_ -> return 0
          }

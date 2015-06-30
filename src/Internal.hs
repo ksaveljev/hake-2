@@ -662,7 +662,7 @@ data GameImportT =
               , _giLinkEntity         :: EdictReference -> Quake ()
               , _giUnlinkEntity       :: EdictReference -> Quake ()
               , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
-              , _giPMove              :: PMoveT -> Quake ()
+              , _giPMove              :: PMoveT -> Quake PMoveT
               , _giMulticast          :: V3 Float -> Int -> Quake ()
               , _giUnicast            :: EdictReference -> Bool -> Quake ()
               , _giWriteByte          :: Int -> Quake ()
@@ -704,7 +704,7 @@ data PMoveT =
          , _pmWaterType     :: !Int
          , _pmWaterLevel    :: !Int
          , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
-         , _pmPointContents :: V3 Float -> Int
+         , _pmPointContents :: V3 Float -> Quake Int
          }
 
 data GameBaseGlobals =

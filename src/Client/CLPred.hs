@@ -11,7 +11,10 @@ import QuakeState
 import CVarVariables
 import qualified Constants
 import qualified Game.PMoveT as PMoveT
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
+import qualified QCommon.PMove as PMove
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 {-
@@ -46,7 +49,68 @@ predictMovement = do
                 Com.printf "exceeded CMD_BACKUP\n"
             else do
               -- copy current state to pmove
-              io (putStrLn "CLPred.predictMovement") >> undefined -- TODO
+              playerPMove <- use $ globals.cl.csFrame.fPlayerState.psPMoveState
+              
+              let pm = newPMoveT { _pmTrace = predPMTrace
+                                 , _pmPointContents = predPMPointContents
+                                 , _pmState = playerPMove
+                                 }
+
+              Just airAccel <- preuse $ globals.cl.csConfigStrings.ix Constants.csAirAccel
+              pMoveGlobals.pmAirAccelerate .= Lib.atof airAccel
+              
+              -- run frames
+              pm' <- runFrames pm (ack + 1) current
+
+              let oldFrame = (current - 2) .&. (Constants.cmdBackup - 1)
+              Just oldZ <- preuse $ globals.cl.csPredictedOrigins.ix oldFrame._z
+              let step = (pm'^.pmState.pmsOrigin._z) - oldZ
+
+              when (step > 63 && step < 160 && (fromIntegral (pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0)) $ do
+                realTime <- use $ globals.cls.csRealTime
+                frameTime <- use $ globals.cls.csFrameTime
+                globals.cl.csPredictedStep .= fromIntegral step * 0.125
+                globals.cl.csPredictedStepTime .= truncate (fromIntegral realTime - frameTime * 500)
+
+              -- copy results out for rendering
+              globals.cl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
+              globals.cl.csPredictedAngles .= (pm'^.pmViewAngles)
+
+  where runFrames :: PMoveT -> Int -> Int -> Quake PMoveT
+        runFrames pm ack current
+          | ack >= current = return pm
+          | otherwise = do
+              let frame = ack .&. (Constants.cmdBackup - 1)
+              Just cmd <- preuse $ globals.cl.csCmds.ix frame
+
+              pm' <- PMove.pMove pm { _pmCmd = cmd }
+
+              -- save for debug checking
+              globals.cl.csPredictedOrigins.ix frame .= (pm'^.pmState.pmsOrigin)
+
+              runFrames pm' (ack + 1) current
+
+predPMTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
+predPMTrace start mins maxs end = do
+    -- check against world
+    t <- CM.boxTrace start end mins maxs 0 Constants.maskPlayerSolid
+
+    let t' = if (t^.tFraction) < 1
+               then t { _tEnt = Just (EdictReference (-1)) }
+               else t
+
+    -- check all other solid models
+    liftM Just $ clipMoveToEntities start mins maxs end t'
+
+clipMoveToEntities :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> TraceT -> Quake TraceT
+clipMoveToEntities _ _ _ _ _ = do
+    -- TODO: do not forget that traceT.tEnt might be EdictReference (-1)
+    -- which is a dummy ent.
+    io (putStrLn "CLPred.clipMoveToEntities") >> undefined -- TODO
+
+predPMPointContents :: V3 Float -> Quake Int
+predPMPointContents _ = do
+    io (putStrLn "CLPred.predPMPointContents") >> undefined -- TODO
 
 checkPredictionError :: Quake ()
 checkPredictionError = do
