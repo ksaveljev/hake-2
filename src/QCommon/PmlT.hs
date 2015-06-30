@@ -13,7 +13,7 @@ data PmlT =
        , _pmlRight          :: V3 Float
        , _pmlUp             :: V3 Float
        , _pmlFrameTime      :: Float
-       , _pmlGroundSurface  :: CSurfaceT
+       , _pmlGroundSurface  :: Maybe CSurfaceT
        , _pmlGroundContents :: Int
        , _pmlPreviousOrigin :: V3 Float
        , _pmlLadder         :: Bool
@@ -29,7 +29,7 @@ newPmlT =
        , _pmlRight          = V3 0 0 0
        , _pmlUp             = V3 0 0 0
        , _pmlFrameTime      = 0
-       , _pmlGroundSurface  = newCSurfaceT
+       , _pmlGroundSurface  = Nothing
        , _pmlGroundContents = 0
        , _pmlPreviousOrigin = V3 0 0 0
        , _pmlLadder         = False
