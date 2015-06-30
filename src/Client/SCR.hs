@@ -8,6 +8,7 @@ import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
+import Linear (V3(..))
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -265,8 +266,38 @@ sizeDownF = do
     v <- liftM (^.cvValue) viewSizeCVar
     CVar.setValueF "viewsize" (v - 10)
 
+{-
+- ================= SCR_Sky_f
+- 
+- Set a specific sky and rotation speed =================
+-}
 skyF :: XCommandT
-skyF = io (putStrLn "SCR.skyF") >> undefined -- TODO
+skyF = do
+    c <- Cmd.argc
+
+    if c < 2
+      then
+        Com.printf "Usage: sky <basename> <rotate> <axis x y z>\n"
+      else do
+        rotate <- if c > 2
+                    then do
+                      v <- Cmd.argv 2
+                      return (Lib.atof v)
+                    else
+                      return 0
+
+        axis <- if c == 6
+                  then do
+                    a <- Cmd.argv 3
+                    b <- Cmd.argv 4
+                    c <- Cmd.argv 5
+                    return (V3 (Lib.atof a) (Lib.atof b) (Lib.atof c))
+                  else
+                    return (V3 0 0 1)
+
+        v <- Cmd.argv 1
+        Just renderer <- use $ globals.re
+        (renderer^.rRefExport.reSetSky) v rotate axis
 
 runCinematic :: Quake ()
 runCinematic = do
