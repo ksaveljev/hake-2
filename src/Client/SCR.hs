@@ -217,7 +217,7 @@ updateScreen2 = do
 
                         | otherwise -> do
                             -- TODO: implement cinematics completely
-                            drawCinematic
+                            void $ drawCinematic
 
                  | otherwise -> do
                      -- make sure the game palette is active
@@ -647,9 +647,43 @@ drawConsole = do
                when (keyDest == Constants.keyGame || keyDest == Constants.keyMessage) $
                  Console.drawNotify -- only draw notify in game
            
-drawCinematic :: Quake ()
+{-
+- DrawCinematic
+- 
+- Returns true if a cinematic is active, meaning the view rendering should
+- be skipped.
+-}
+drawCinematic :: Quake Bool
 drawCinematic = do
-    io (putStrLn "SCR.drawCinematic") >> undefined -- TODO
+    cinematicTime <- use $ globals.cl.csCinematicTime
+    keyDest <- use $ globals.cls.csKeyDest
+    Just renderer <- use $ globals.re
+
+    if | cinematicTime <= 0 ->
+           return False
+
+       | keyDest == Constants.keyMenu -> do
+           -- blank screen and pause if menu is up
+           (renderer^.rRefExport.reCinematicSetPalette) Nothing
+           globals.cl.csCinematicPaletteActive .= False
+           return True
+
+       | otherwise -> do
+           cinematicPaletteActive <- use $ globals.cl.csCinematicPaletteActive
+
+           unless cinematicPaletteActive $ do
+             cinematicPalette <- use $ globals.cl.csCinematicPalette
+             (renderer^.rRefExport.reCinematicSetPalette) (Just cinematicPalette)
+             globals.cl.csCinematicPaletteActive .= True
+
+           cin <- use $ scrGlobals.scrCin
+
+           case cin^.cPic of
+             Nothing -> return True
+             Just picture -> do
+               vidDef' <- use $ globals.vidDef
+               (renderer^.rRefExport.reDrawStretchRaw) 0 0 (vidDef'^.vdWidth) (vidDef'^.vdHeight) (cin^.cWidth) (cin^.cHeight) picture
+               return True
 
 drawLoading :: Quake ()
 drawLoading = do

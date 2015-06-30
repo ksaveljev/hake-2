@@ -51,7 +51,7 @@ drawPause :: Quake ()
 
 drawConsole :: Quake ()
 
-drawCinematic :: Quake ()
+drawCinematic :: Quake Bool
 
 drawLoading :: Quake ()
 
