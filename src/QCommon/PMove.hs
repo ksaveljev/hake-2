@@ -75,13 +75,71 @@ pMove pmove = do
 
             checkSpecialMovement
 
-            io (putStrLn "PMove.pMove") >> undefined -- TODO
+            dropTimingCounter
+
+            checkPMFlags
+
+            -- set groundentity, watertype, and waterlevel for final spot
+            catagorizePosition
+            snapPosition
+
+            use (pMoveGlobals.pmPM)
+
+  where dropTimingCounter :: Quake ()
+        dropTimingCounter = do
+          pm <- use $ pMoveGlobals.pmPM
+
+          when ((pm^.pmState.pmsPMTime) /= 0) $ do
+            io (putStrLn "PMove.pMove#dropTimingCounter") >> undefined -- TODO
+
+        checkPMFlags :: Quake ()
+        checkPMFlags = do
+          pm <- use $ pMoveGlobals.pmPM
+
+          if | (pm^.pmState.pmsPMFlags) .&. pmfTimeTeleport /= 0 ->
+                 -- teleport pause stays exactly in place
+                 return ()
+
+             | (pm^.pmState.pmsPMFlags) .&. pmfTimeWaterJump /= 0 -> do
+                 -- waterjump has no control, but falls
+                 pml <- use $ pMoveGlobals.pmPML
+                 let v = (pml^.pmlVelocity._z) - (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
+                 pMoveGlobals.pmPML.pmlVelocity._z .= v
+
+                 when (v < 0) $
+                   zoom (pMoveGlobals.pmPM.pmState) $ do
+                     pmsPMFlags %= (.&. (complement (pmfTimeWaterJump .|. pmfTimeLand .|. pmfTimeTeleport)))
+                     pmsPMTime .= 0
+
+                 stepSlideMove
+
+             | otherwise -> do
+                 checkJump
+
+                 friction
+
+                 if (pm^.pmWaterLevel) >= 2
+                   then
+                     waterMove
+                   else do
+                     -- TODO: think how to use Constants.pitch instead of
+                     -- using _x directly
+                     let V3 a b c = pm^.pmViewAngles
+                         a' = (if a > 180 then (a - 360) else a) / 3
+                         (Just f, Just r, Just u) = Math3D.angleVectors (V3 a' b c) True True True
+
+                     zoom (pMoveGlobals.pmPML) $ do
+                       pmlForward .= f
+                       pmlRight .= r
+                       pmlUp .= u
+
+                     airMove
 
 clampAngles :: Quake ()
 clampAngles = do
     pm <- use $ pMoveGlobals.pmPM
 
-    let pm' = if fromIntegral (pm^.pmState.pmsPMFlags) .&. pmfTimeTeleport /= 0
+    let pm' = if (pm^.pmState.pmsPMFlags) .&. pmfTimeTeleport /= 0
                 then
                   -- TODO: think how to update it using Constants.yaw,
                   -- Constants.pitch and Constants.roll
@@ -127,23 +185,23 @@ checkDuck = do
                                 }
       else do
         pm' <- if | (pm^.pmState.pmsPMType) == Constants.pmDead ->
-                      return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .|. (fromIntegral pmfDucked)} }
+                      return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .|. pmfDucked} }
 
-                  | (pm^.pmCmd.ucUpMove) < 0 && (fromIntegral (pm^.pmState.pmsPMFlags) .&. pmfOnGround /= 0) -> -- duck
-                      return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .|. (fromIntegral pmfDucked)} }
+                  | (pm^.pmCmd.ucUpMove) < 0 && ((pm^.pmState.pmsPMFlags) .&. pmfOnGround /= 0) -> -- duck
+                      return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .|. pmfDucked} }
 
                   | otherwise -> do -- stand up if possible
-                      if fromIntegral (pm^.pmState.pmsPMFlags) .&. pmfDucked /= 0
+                      if (pm^.pmState.pmsPMFlags) .&. pmfDucked /= 0
                         then do
                           pml <- use $ pMoveGlobals.pmPML
                           Just traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (V3 (-16) (-16) (-24)) (V3 16 16 32) (pml^.pmlOrigin)
                           if traceT^.tAllSolid
                             then return pm
-                            else return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .&. (complement (fromIntegral pmfDucked))} }
+                            else return pm { _pmState = (pm^.pmState) { _pmsPMFlags = (pm^.pmState.pmsPMFlags) .&. (complement pmfDucked)} }
                         else
                           return pm
 
-        if fromIntegral (pm'^.pmState.pmsPMFlags) .&. pmfDucked /= 0
+        if (pm'^.pmState.pmsPMFlags) .&. pmfDucked /= 0
           then do
             pMoveGlobals.pmPM .= pm' { _pmMins       = V3 minsX minsY (-24)
                                      , _pmMaxs       = V3 maxsX maxsY 4
@@ -171,7 +229,7 @@ catagorizePosition = do
     if (pml^.pmlVelocity._z) > 180 -- !! ZOID changed from 100 to 180 (ramp accel)
       then do
         zoom (pMoveGlobals.pmPM) $ do
-          pmState.pmsPMFlags %= (.&. (complement (fromIntegral pmfOnGround)))
+          pmState.pmsPMFlags %= (.&. (complement pmfOnGround))
           pmGroundEntity .= Nothing
       else do
         pm <- use $ pMoveGlobals.pmPM
@@ -184,22 +242,22 @@ catagorizePosition = do
           then do
             zoom (pMoveGlobals.pmPM) $ do
               pmGroundEntity .= Nothing
-              pmState.pmsPMFlags %= (.&. (complement (fromIntegral pmfOnGround)))
+              pmState.pmsPMFlags %= (.&. (complement pmfOnGround))
           else do
-            when (fromIntegral (pm^.pmState.pmsPMFlags) .&. pmfTimeWaterJump /= 0) $
+            when ((pm^.pmState.pmsPMFlags) .&. pmfTimeWaterJump /= 0) $
               zoom (pMoveGlobals.pmPM.pmState) $ do
-                pmsPMFlags %= (.&. (complement (fromIntegral (pmfTimeWaterJump .|. pmfTimeLand .|. pmfTimeTeleport))))
+                pmsPMFlags %= (.&. (complement (pmfTimeWaterJump .|. pmfTimeLand .|. pmfTimeTeleport)))
                 pmsPMTime .= 0
 
             pm' <- use $ pMoveGlobals.pmPM
 
-            when (fromIntegral (pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0) $ do
+            when ((pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0) $ do
               -- just hit the ground
-              pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. (fromIntegral pmfOnGround))
+              pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. pmfOnGround)
 
               -- don't do landing time if we were just going down a slope
               when ((pml^.pmlVelocity._z) < -200) $ do
-                pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. (fromIntegral pmfTimeLand))
+                pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. pmfTimeLand)
                 -- don't allow another jump for a little while
                 if (pml^.pmlVelocity._z) < -400
                   then pMoveGlobals.pmPM.pmState.pmsPMTime .= 25
@@ -283,5 +341,65 @@ checkSpecialMovement = do
             -- jump out of water
             zoom pMoveGlobals $ do
               pmPML.pmlVelocity .= V3 (50 * (flatForward^._x)) (50 * (flatForward^._y)) 350
-              pmPM.pmState.pmsPMFlags %= (.|. (fromIntegral pmfTimeWaterJump))
+              pmPM.pmState.pmsPMFlags %= (.|. pmfTimeWaterJump)
               pmPM.pmState.pmsPMTime .= -1 -- was 255
+
+stepSlideMove :: Quake ()
+stepSlideMove = do
+    io (putStrLn "PMove.stepSlideMove") >> undefined -- TODO
+
+checkJump :: Quake ()
+checkJump = do
+    pm <- use $ pMoveGlobals.pmPM
+
+    if | (pm^.pmState.pmsPMFlags) .&. pmfTimeLand /= 0 ->
+           -- hasn't been long enough since landing to jump again
+           return ()
+
+       | (pm^.pmCmd.ucUpMove) < 10 -> -- not holding jump
+           pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement pmfJumpHeld))
+
+       | (pm^.pmState.pmsPMFlags) .&. pmfJumpHeld /= 0 ->
+           -- must wait for jump to be released
+           return ()
+
+       | (pm^.pmState.pmsPMType) == Constants.pmDead ->
+           return ()
+
+       | (pm^.pmWaterLevel) >= 2 -> do
+           -- swimming, not jumping
+           pMoveGlobals.pmPM.pmGroundEntity .= Nothing
+
+           pml <- use $ pMoveGlobals.pmPML
+
+           unless ((pml^.pmlVelocity._z) <= -300) $ do
+             let v = if | (pm^.pmWaterType) == Constants.contentsWater -> 100
+                        | (pm^.pmWaterType) == Constants.contentsSlime -> 80
+                        | otherwise -> 50
+             pMoveGlobals.pmPML.pmlVelocity._z .= v
+
+       | isNothing (pm^.pmGroundEntity) ->
+           -- in air, so no effect
+           return ()
+
+       | otherwise -> do
+           pml <- use $ pMoveGlobals.pmPML
+           let v = (pml^.pmlVelocity._z) + 270
+               v' = if v < 270 then 270 else v
+
+           zoom pMoveGlobals $ do
+             pmPM.pmState.pmsPMFlags %= (.|. pmfJumpHeld)
+             pmPM.pmGroundEntity .= Nothing
+             pmPML.pmlVelocity._z .= v'
+
+friction :: Quake ()
+friction = do
+    io (putStrLn "PMove.friction") >> undefined -- TODO
+
+waterMove :: Quake ()
+waterMove = do
+    io (putStrLn "PMove.waterMove") >> undefined -- TODO
+
+airMove :: Quake ()
+airMove = do
+    io (putStrLn "PMove.airMove") >> undefined -- TODO

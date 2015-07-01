@@ -198,7 +198,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
 
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let bobTime = gClient^.gcBobTime
-              bobTime' = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+              bobTime' = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                            then bobTime * 4
                            else bobTime
 
@@ -593,7 +593,7 @@ damageFeedback playerRef@(EdictReference playerIdx) = do
     unless (count == 0) $ do -- unless (didn't take any damage)
       -- start a pain animation if still in the player model
       when ((gClient^.gcAnimPriority) < Constants.animPain && (player^.eEntityState.esModelIndex) == 255) $ do
-        if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+        if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
           then do
             gameBaseGlobals.gbGEdicts.ix playerIdx.eEntityState.esFrame .= MPlayer.frameCRPain1 - 1
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
@@ -816,13 +816,13 @@ calcViewOffset (EdictReference edictIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           let delta = bobFracSin * bobPitchValue * xyspeed
-              delta' = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+              delta' = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                          then delta * 6 -- crouching
                          else delta
               angles' = (access Constants.pitch) %~ (+ delta') $ angles
 
               delta'' = bobFracSin * bobRollValue * xyspeed
-              delta''' = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+              delta''' = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                            then delta'' * 6 -- crouching
                            else delta''
               delta'''' = if bobCycle .&. 1 /= 0 then negate delta''' else delta'''
@@ -1041,7 +1041,7 @@ setClientFrame (EdictReference edictIdx) = do
       let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
-      let duck = if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+      let duck = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                    then True
                    else False
 

@@ -226,7 +226,7 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animPain
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
-      if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+      if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
         then do
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain1
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
@@ -350,7 +350,7 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
               | frameDeactivateLast - (gClient^.gcPlayerState.psGunFrame) == 4 -> do
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animReverse
 
-                  if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                  if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                     then do
                       gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
                       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
@@ -380,7 +380,7 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
            when (frameDeactivateLast - frameDeactivateFirst < 4) $ do
              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animReverse
 
-             if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+             if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                then do
                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
@@ -405,7 +405,7 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
                                  -- start the animation
                                  gcAnimPriority .= Constants.animAttack
 
-                               if fromIntegral (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                               if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                                  then do
                                    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRAttack1 - 1
                                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRAttack9

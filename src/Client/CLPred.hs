@@ -31,7 +31,7 @@ predictMovement = do
       predictValue <- liftM (^.cvValue) clPredictCVar
       flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
 
-      if predictValue == 0 || (fromIntegral flags .&. PMoveT.pmfNoPrediction) /= 0
+      if predictValue == 0 || (flags .&. PMoveT.pmfNoPrediction) /= 0
         then do
           -- just set angles
           viewAngles <- use $ globals.cl.csViewAngles
@@ -66,7 +66,7 @@ predictMovement = do
               Just oldZ <- preuse $ globals.cl.csPredictedOrigins.ix oldFrame._z
               let step = (pm'^.pmState.pmsOrigin._z) - oldZ
 
-              when (step > 63 && step < 160 && (fromIntegral (pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0)) $ do
+              when (step > 63 && step < 160 && ((pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0)) $ do
                 realTime <- use $ globals.cls.csRealTime
                 frameTime <- use $ globals.cls.csFrameTime
                 globals.cl.csPredictedStep .= fromIntegral step * 0.125
@@ -201,7 +201,7 @@ checkPredictionError = do
     predictValue <- liftM (^.cvValue) clPredictCVar
     flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
 
-    unless (predictValue == 0 || (fromIntegral flags .&. pmfNoPrediction) /= 0) $ do
+    unless (predictValue == 0 || (flags .&. pmfNoPrediction) /= 0) $ do
       -- calculate the last usercmd_t we sent that the server has processed
       globals.cls.csNetChan.ncIncomingAcknowledged %= (.&. (Constants.cmdBackup - 1))
       frame <- use $ globals.cls.csNetChan.ncIncomingAcknowledged

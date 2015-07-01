@@ -6,6 +6,7 @@ module Game.PMoveT ( PMoveT(..)
                    ) where
   
 import Control.Lens (makeLenses)
+import Data.Int (Int8)
 import Linear (V3(..))
 import qualified Data.Vector as V
 
@@ -15,25 +16,25 @@ import Game.TraceT
 import Game.UserCmdT
 import qualified Constants
 
-pmfDucked :: Int
+pmfDucked :: Int8
 pmfDucked = 1
 
-pmfJumpHeld :: Int
+pmfJumpHeld :: Int8
 pmfJumpHeld = 2
 
-pmfOnGround :: Int
+pmfOnGround :: Int8
 pmfOnGround = 4
 
-pmfTimeWaterJump :: Int
+pmfTimeWaterJump :: Int8
 pmfTimeWaterJump = 8
 
-pmfTimeLand :: Int
+pmfTimeLand :: Int8
 pmfTimeLand = 16
 
-pmfTimeTeleport :: Int
+pmfTimeTeleport :: Int8
 pmfTimeTeleport = 32
 
-pmfNoPrediction :: Int
+pmfNoPrediction :: Int8
 pmfNoPrediction = 64
 
 makeLenses ''PMoveT
