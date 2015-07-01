@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.PmlT where
+module QCommon.PmlT ( module QCommon.PmlT
+                    , module Game.CSurfaceT
+                    ) where
 
 import Control.Lens (makeLenses)
 import Linear.V3 (V3(..))

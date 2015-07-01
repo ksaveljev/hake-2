@@ -5,7 +5,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z, normalize)
+import Linear (V3(..), _x, _y, _z, normalize, norm)
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -392,9 +392,40 @@ checkJump = do
              pmPM.pmGroundEntity .= Nothing
              pmPML.pmlVelocity._z .= v'
 
+-- Handles both ground friction and water friction.
 friction :: Quake ()
 friction = do
-    io (putStrLn "PMove.friction") >> undefined -- TODO
+    pml <- use $ pMoveGlobals.pmPML
+
+    let speed = norm (pml^.pmlVelocity)
+
+    if speed < 1
+      then
+        pMoveGlobals.pmPML.pmlVelocity .= V3 0 0 (pml^.pmlVelocity._z)
+      else do
+        pm <- use $ pMoveGlobals.pmPM
+        f <- use $ pMoveGlobals.pmFriction
+        stopSpeed <- use $ pMoveGlobals.pmStopSpeed
+
+        -- apply ground friction
+        let (fric, control, drop) = if isJust (pm^.pmGroundEntity) && isJust (pml^.pmlGroundSurface) && (((fromJust (pml^.pmlGroundSurface))^.csFlags) .&. Constants.surfSlick) == 0
+                                      then
+                                        let control = if speed < stopSpeed then stopSpeed else speed
+                                            drop = control * f * (pml^.pmlFrameTime)
+                                        in (f, control, drop)
+                                      else
+                                        (0, 0, 0)
+
+        -- apply water friction
+        waterFriction <- use $ pMoveGlobals.pmWaterFriction
+        let drop' = if (pm^.pmWaterLevel) /= 0 && not (pml^.pmlLadder)
+                      then drop + speed * waterFriction * (fromIntegral $ pm^.pmWaterLevel) * (pml^.pmlFrameTime)
+                      else drop
+
+        -- scale the velocity
+        let newSpeed = if speed - drop' < 0 then 0 else (speed - drop') / speed
+
+        pMoveGlobals.pmPML.pmlVelocity %= (fmap (* newSpeed))
 
 waterMove :: Quake ()
 waterMove = do
