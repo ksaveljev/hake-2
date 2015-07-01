@@ -5,7 +5,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear.V3 (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, normalize)
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -254,4 +254,34 @@ deadMove = do
 
 checkSpecialMovement :: Quake ()
 checkSpecialMovement = do
-    io (putStrLn "PMove.checkSpecialMovement") >> undefined -- TODO
+    pm <- use $ pMoveGlobals.pmPM
+
+    when ((pm^.pmState.pmsPMTime) == 0) $ do
+      pMoveGlobals.pmPML.pmlLadder .= False
+
+      -- check for ladder
+      pml <- use $ pMoveGlobals.pmPML
+      let flatForward = normalize (V3 (pml^.pmlForward._x) (pml^.pmlForward._y) 0)
+          spot = (pml^.pmlOrigin) + flatForward
+
+      Just traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) spot
+
+      when ((traceT^.tFraction) < 1 && ((traceT^.tContents) .&. Constants.contentsLadder /= 0)) $
+        pMoveGlobals.pmPML.pmlLadder .= True
+
+      -- check for water jump
+      when ((pm^.pmWaterLevel) == 2) $ do
+        let V3 a b c = (pml^.pmlOrigin) + fmap (* 30) flatForward
+            spot' = V3 a b (c + 4)
+
+        cont <- (pm^.pmPointContents) (V3 a b (c + 4))
+
+        unless (cont .&. Constants.contentsSolid == 0) $ do
+          cont' <- (pm^.pmPointContents) (V3 a b (c + 20))
+
+          when (cont' == 0) $ do
+            -- jump out of water
+            zoom pMoveGlobals $ do
+              pmPML.pmlVelocity .= V3 (50 * (flatForward^._x)) (50 * (flatForward^._y)) 350
+              pmPM.pmState.pmsPMFlags %= (.|. (fromIntegral pmfTimeWaterJump))
+              pmPM.pmState.pmsPMTime .= -1 -- was 255
