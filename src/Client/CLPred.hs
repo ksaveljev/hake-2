@@ -3,7 +3,7 @@ module Client.CLPred where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=))
 import Control.Monad (liftM, unless, when)
-import Data.Bits ((.&.), shiftR)
+import Data.Bits ((.&.), shiftR, (.|.))
 import Linear (V3(..), _x, _y, _z)
 
 import Quake
@@ -162,9 +162,39 @@ clipMoveToEntities start mins maxs end tr = do
                             else
                               clipMoveToEntity (traceT { _tStartSolid = True }) (idx + 1) maxIdx
 
+{-
+- ================= PMpointcontents
+- 
+- Returns the content identificator of the point. =================
+-}
 predPMPointContents :: V3 Float -> Quake Int
-predPMPointContents _ = do
-    io (putStrLn "CLPred.predPMPointContents") >> undefined -- TODO
+predPMPointContents point = do
+    contents <- CM.pointContents point 0
+
+    numEntities <- use $ globals.cl.csFrame.fNumEntities
+
+    calcContents contents 0 numEntities
+
+  where calcContents :: Int -> Int -> Int -> Quake Int
+        calcContents contents idx maxIdx
+          | idx >= maxIdx = return contents
+          | otherwise = do
+              parseEntities <- use $ globals.cl.csFrame.fParseEntities
+              let num = (parseEntities + idx) .&. (Constants.maxParseEntities - 1)
+              Just ent <- preuse $ globals.clParseEntities.ix num
+
+              if (ent^.esSolid) /= 31 -- special value for bmodel
+                then
+                  calcContents contents (idx + 1) maxIdx
+                else do
+                  Just maybeCModel <- preuse $ globals.cl.csModelClip.ix (ent^.esModelIndex)
+
+                  case maybeCModel of
+                    Nothing -> calcContents contents (idx + 1) maxIdx
+                    Just (CModelReference modelIdx) -> do
+                      Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
+                      v <- CM.transformedPointContents point (model^.cmHeadNode) (ent^.esOrigin) (ent^.esAngles)
+                      calcContents (contents .|. v) (idx + 1) maxIdx
 
 checkPredictionError :: Quake ()
 checkPredictionError = do
