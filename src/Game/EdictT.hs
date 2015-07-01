@@ -85,7 +85,7 @@ newEdictT idx =
          , _eMonsterInfo           = newMonsterInfoT
          , _eClient                = Nothing
          , _eOwner                 = Nothing
-         , _eIndex                 = idx
+         , _eIndex                 = if idx == Constants.maxEdicts then -1 else idx
          , _eEdictInfo             = newEdictInfoT
          , _eEdictMinMax           = newEdictMinMaxT
          }

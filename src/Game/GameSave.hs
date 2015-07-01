@@ -108,4 +108,4 @@ createClients = do
 createEdicts :: Quake ()
 createEdicts = do
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
-    gameBaseGlobals.gbGEdicts .= V.generate maxEntities newEdictT
+    gameBaseGlobals.gbGEdicts .= V.generate (maxEntities + 1) newEdictT -- one extra as a dummy edict

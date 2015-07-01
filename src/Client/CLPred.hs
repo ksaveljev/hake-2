@@ -3,7 +3,7 @@ module Client.CLPred where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=))
 import Control.Monad (liftM, unless, when)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Linear (V3(..), _x, _y, _z)
 
 import Quake
@@ -96,17 +96,71 @@ predPMTrace start mins maxs end = do
     t <- CM.boxTrace start end mins maxs 0 Constants.maskPlayerSolid
 
     let t' = if (t^.tFraction) < 1
-               then t { _tEnt = Just (EdictReference (-1)) }
+               -- TODO: do not forget about this dummy edict
+               then t { _tEnt = Just (EdictReference (Constants.maxEdicts)) } -- dummy ent
                else t
 
     -- check all other solid models
     liftM Just $ clipMoveToEntities start mins maxs end t'
 
 clipMoveToEntities :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> TraceT -> Quake TraceT
-clipMoveToEntities _ _ _ _ _ = do
-    -- TODO: do not forget that traceT.tEnt might be EdictReference (-1)
-    -- which is a dummy ent.
-    io (putStrLn "CLPred.clipMoveToEntities") >> undefined -- TODO
+clipMoveToEntities start mins maxs end tr = do
+    numEntities <- use $ globals.cl.csFrame.fNumEntities
+    clipMoveToEntity tr 0 numEntities
+
+  where clipMoveToEntity :: TraceT -> Int -> Int -> Quake TraceT
+        clipMoveToEntity traceT idx maxIdx
+          | idx >= maxIdx = return traceT
+          | otherwise = do
+              parseEntities <- use $ globals.cl.csFrame.fParseEntities
+              let num = (parseEntities + idx) .&. (Constants.maxParseEntities - 1)
+              Just ent <- preuse $ globals.clParseEntities.ix num
+              playerNum <- use $ globals.cl.csPlayerNum
+
+              if (ent^.esSolid) == 0 || (ent^.esNumber) == playerNum + 1
+                then
+                  clipMoveToEntity traceT (idx + 1) maxIdx
+                else do
+                  result <- if (ent^.esSolid) == 31 -- special value for bmodel
+                              then do
+                                Just maybeCModel <- preuse $ globals.cl.csModelClip.ix (ent^.esModelIndex)
+
+                                case maybeCModel of
+                                  Nothing -> return Nothing
+                                  Just (CModelReference modelIdx) -> do
+                                    Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
+                                    return (Just (model^.cmHeadNode, ent^.esAngles))
+
+                              else do
+                                let x = 8 * ((ent^.esSolid) .&. 31)
+                                    zd = 8 * (((ent^.esSolid) `shiftR` 5) .&. 31)
+                                    zu = 8 * (((ent^.esSolid) `shiftR` 10) .&. 63) - 32
+                                    bmins = V3 (-x) (-x) (-zd)
+                                    bmaxs = V3 x x zu
+
+                                headNode <- CM.headnodeForBox (fmap fromIntegral bmins) (fmap fromIntegral bmaxs)
+                                angles <- use $ globals.vec3Origin -- boxes don't rotate
+                                return (Just (headNode, angles))
+
+                  case result of
+                    Nothing ->
+                      clipMoveToEntity traceT (idx + 1) maxIdx
+                    Just (headNode, angles) -> do
+                      if (traceT^.tAllSolid)
+                        then
+                          clipMoveToEntity traceT (idx + 1) maxIdx
+                        else do
+                          traceT' <- CM.transformedBoxTrace start end mins maxs headNode Constants.maskPlayerSolid (ent^.esOrigin) angles
+
+                          if (traceT'^.tAllSolid) || (traceT'^.tStartSolid) || (traceT'^.tFraction) < (traceT^.tFraction)
+                            then do
+                              if (traceT^.tStartSolid)
+                                then do
+                                  clipMoveToEntity (traceT' { _tEnt = (ent^.esSurroundingEnt), _tStartSolid = True}) (idx + 1) maxIdx
+                                else do
+                                  clipMoveToEntity (traceT' { _tEnt = (ent^.esSurroundingEnt)}) (idx + 1) maxIdx
+                            else
+                              clipMoveToEntity (traceT { _tStartSolid = True }) (idx + 1) maxIdx
 
 predPMPointContents :: V3 Float -> Quake Int
 predPMPointContents _ = do
