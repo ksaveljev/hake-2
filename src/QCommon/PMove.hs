@@ -509,6 +509,10 @@ stepSlideMove_ = do
                           pMoveGlobals.pmPML.pmlVelocity .= v3o
                           return False
                         else do
+                          let planes' = planes V.// [(numPlanes', traceT^.tPlane.cpNormal)]
+                              numPlanes'' = numPlanes' + 1
+
+                          -- modify original_velocity so it parallels all of the clip planes
                           io (putStrLn "PMove.slideMove") >> undefined -- TODO
 
 checkJump :: Quake ()

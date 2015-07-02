@@ -21,13 +21,58 @@ import qualified Constants
 import qualified Client.CLFX as CLFX
 import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
+import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 
+{-
+- =============== CL_AddEntities
+- 
+- Emits all entities, particles, and lights to the refresh ===============
+-}
 addEntities :: Quake ()
 addEntities = do
-    io (putStrLn "CLEnts.addEntities") >> undefined -- TODO
+    cl' <- use $ globals.cl
+    cls' <- use $ globals.cls
+
+    showClampValue <- liftM (^.cvValue) clShowClampCVar
+
+    when ((cls'^.csState) == Constants.caActive) $ do
+      if | (cl'^.csTime) > (cl'^.csFrame.fServerTime) -> do
+             when (showClampValue /= 0) $
+               Com.printf ("high clamp " `B.append` BC.pack (show ((cl'^.csTime) - (cl'^.csFrame.fServerTime))) `B.append` "\n") -- IMPROVE?
+
+             globals.cl.csTime .= (cl'^.csFrame.fServerTime)
+             globals.cl.csLerpFrac .= 1
+
+         | (cl'^.csTime) < (cl'^.csFrame.fServerTime) - 100 -> do
+             when (showClampValue /= 0) $
+               Com.printf ("low clamp " `B.append` BC.pack (show ((cl'^.csFrame.fServerTime) - 100 - (cl'^.csTime))) `B.append` "\n") -- IMPROVE?
+
+             globals.cl.csTime .= (cl'^.csFrame.fServerTime) - 100
+             globals.cl.csLerpFrac .= 0
+             
+         | otherwise -> do
+             globals.cl.csLerpFrac .= 1 - fromIntegral ((cl'^.csFrame.fServerTime) - (cl'^.csTime)) * 0.01
+
+      timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
+
+      when (timeDemoValue /= 0) $ do
+        globals.cl.csLerpFrac .= 1
+
+      -- is ok.. CL_AddPacketEntities (cl.frame); CL_AddTEnts ();
+      -- CL_AddParticles (); CL_AddDLights (); CL_AddLightStyles ();
+
+      calcViewValues
+      -- PMM - moved this here so the heat beam has the right values for
+      -- the vieworg, and can lock the beam to the gun
+      use (globals.cl.csFrame) >>= \f -> addPacketEntities f
+
+      CLTEnt.addTEnts
+      CLFX.addParticles
+      CLFX.addDLights
+      CLFX.addLightStyles
 
 {-
 - ================= CL_ParseEntityBits
@@ -677,3 +722,11 @@ deltaEntity frameLens newNum old bits = do
     globals.clEntities.ix newNum.ceServerFrame .= serverFrame
     -- Copy !
     globals.clEntities.ix newNum.ceCurrent .= state
+
+calcViewValues :: Quake ()
+calcViewValues = do
+    io (putStrLn "CLEnts.calcViewValues") >> undefined -- TODO
+
+addPacketEntities :: FrameT -> Quake ()
+addPacketEntities _ = do
+    io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO

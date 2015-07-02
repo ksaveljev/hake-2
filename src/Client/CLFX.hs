@@ -120,3 +120,15 @@ teleporterParticles _ = do
 entityEvent :: EntityStateT -> Quake ()
 entityEvent _ = do
     io (putStrLn "CLFX.entityEvent") >> undefined -- TODO
+
+addParticles :: Quake ()
+addParticles = do
+    io (putStrLn "CLFX.addParticles") >> undefined -- TODO
+
+addDLights :: Quake ()
+addDLights = do
+    io (putStrLn "CLFX.addDLights") >> undefined -- TODO
+
+addLightStyles :: Quake ()
+addLightStyles = do
+    io (putStrLn "CLFX.addLightStyles") >> undefined -- TODO

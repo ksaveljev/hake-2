@@ -68,3 +68,7 @@ registerTEntModels = do
       clteModHeatBeam        .= modHeatBeam
       clteModMonsterHeatBeam .= modMonsterHeatBeam
       clteModExplo4Big       .= modExplo4Big
+
+addTEnts :: Quake ()
+addTEnts = do
+    io (putStrLn "CLTEnt.addTEnts") >> undefined -- TODO
