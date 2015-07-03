@@ -23,6 +23,7 @@ import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
 import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.SCR as SCR
+import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified Util.Math3D as Math3D
@@ -808,6 +809,39 @@ addViewWeapon ps ops = do
     -- allow the gun to be completely removed
     -- don't draw gun if in wide angle view
     unless (clGunValue == 0 || (ps^.psFOV) > 90) $ do
+      gunModel' <- use $ globals.gunModel
 
+      model <- case gunModel' of
+                 Nothing -> preuse (globals.cl.csModelDraw.ix (ps^.psGunIndex)) >>= \(Just m) -> return m
+                 Just m -> return gunModel' -- development tool
 
-      io (putStrLn "CLEnts.addViewWeapon") >> undefined -- TODO
+      case model of
+        Nothing -> return ()
+        Just _ -> do
+          -- set up gun position
+          cl' <- use $ globals.cl
+          let origin = (cl'^.csRefDef.rdViewOrg)
+                     + (ops^.psGunOffset)
+                     + (fmap (* (cl'^.csLerpFrac)) ((ps^.psGunOffset) - (ops^.psGunOffset)))
+
+              angles = (cl'^.csRefDef.rdViewAngles)
+                     + (Math3D.lerpAngles (ops^.psGunAngles) (ps^.psGunAngles) (cl'^.csLerpFrac))
+
+          gunFrame' <- use $ globals.gunFrame
+          let (frame, oldFrame) = if gunFrame' /= 0
+                                    then (gunFrame', gunFrame') -- development tool
+                                    else if (ps^.psGunFrame) == 0
+                                           then (0, 0) -- just changed weapons, don't lerp from old
+                                           else (ps^.psGunFrame, ops^.psGunFrame)
+
+              gun = newEntityT { _eModel = model
+                               , _eAngles = angles
+                               , _eOrigin = origin
+                               , _eFrame = frame
+                               , _eOldOrigin = origin
+                               , _eOldFrame = oldFrame
+                               , _eBackLerp = 1 - (cl'^.csLerpFrac)
+                               , _enFlags = Constants.rfMinLight .|. Constants.rfDepthHack .|. Constants.rfWeaponModel
+                               }
+
+          ClientV.addEntity gun

@@ -241,7 +241,8 @@ data Globals =
 
           , _scrVRect           :: VRectT
           , _sysFrameTime       :: !Int
-          , _gunModel           :: Maybe ModelT
+          , _gunFrame           :: Int
+          , _gunModel           :: Maybe ModelReference
           , _netFrom            :: NetAdrT
 
           , _vec3Origin         :: V3 Float
@@ -889,7 +890,7 @@ data RefDefT =
           }
 
 data EntityT =
-  EntityT { _eModel      :: Maybe Int -- index to some modelT vector
+  EntityT { _eModel      :: Maybe ModelReference -- index to some modelT vector
           , _eAngles     :: V3 Float
           , _eOrigin     :: V3 Float
           , _eFrame      :: !Int

@@ -1,6 +1,7 @@
 module Client.V where
 
 import Quake
+import QuakeState
 import QCommon.XCommandT
 
 gunNextF :: XCommandT
@@ -22,3 +23,5 @@ testParticles :: Quake ()
 testEntities :: Quake ()
 
 testLights :: Quake ()
+
+addEntity :: EntityT -> Quake ()

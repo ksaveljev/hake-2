@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.V where
 
-import Control.Lens (use, (^.), (.=), (+=), zoom)
+import Control.Lens (use, (^.), (.=), (+=), zoom, ix)
 import Control.Monad (void, unless, liftM, when)
 import Data.Maybe (isJust)
 import Linear (V3(..), V4(..))
@@ -212,3 +212,10 @@ testEntities = do
 testLights :: Quake ()
 testLights = do
     io (putStrLn "V.testLights") >> undefined -- TODO
+
+addEntity :: EntityT -> Quake ()
+addEntity ent = do
+    numEntities <- use $ vGlobals.vgRNumEntities
+    when (numEntities < Constants.maxEntities) $ do
+      vGlobals.vgREntities.ix numEntities .= ent
+      vGlobals.vgRNumEntities += 1
