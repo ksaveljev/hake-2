@@ -136,3 +136,13 @@ vectorYaw vec =
 angleMod :: Float -> Float
 angleMod a = let b :: Int = truncate (a / shortRatio)
              in shortRatio * fromIntegral (b .&. 65535)
+
+lerpAngles :: V3 Float -> V3 Float -> Float -> V3 Float
+lerpAngles (V3 a b c) (V3 a' b' c') frac =
+    V3 (lerpAngle a a' frac) (lerpAngle b b' frac) (lerpAngle c c' frac)
+
+lerpAngle :: Float -> Float -> Float -> Float
+lerpAngle a2 a1 frac =
+    let a1' = if a1 - a2 > 180 then a1 - 360 else a1
+        a1'' = if a1' - a2 < -180 then a1' + 360 else a1'
+    in a2 + frac * (a1'' - a2)

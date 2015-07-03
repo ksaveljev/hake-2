@@ -79,6 +79,7 @@ initialGlobals =
 
           , _scrVRect           = newVRectT
           , _sysFrameTime       = 0
+          , _gunModel           = Nothing
           , _netFrom            = newNetAdrT
 
           , _vec3Origin         = V3 0 0 0

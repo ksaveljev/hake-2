@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.CLEnts where
 
-import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=))
+import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=), (-=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, (.&.), (.|.))
 import Data.Int (Int16)
@@ -25,6 +25,7 @@ import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
+import qualified Util.Math3D as Math3D
 
 {-
 - =============== CL_AddEntities
@@ -723,10 +724,90 @@ deltaEntity frameLens newNum old bits = do
     -- Copy !
     globals.clEntities.ix newNum.ceCurrent .= state
 
+{-
+- =============== CL_CalcViewValues ===============
+- 
+- Sets cl.refdef view values
+-}
 calcViewValues :: Quake ()
 calcViewValues = do
-    io (putStrLn "CLEnts.calcViewValues") >> undefined -- TODO
+    -- find the previous frame to interpolate from
+    cl' <- use $ globals.cl
+    let ps = cl'^.csFrame.fPlayerState
+        i = ((cl'^.csFrame.fServerFrame) - 1) .&. Constants.updateMask
+        oldFrame = (cl'^.csFrames) V.! i
+        oldFrame' = if (oldFrame^.fServerFrame) /= (cl'^.csFrame.fServerFrame) - 1 || not (oldFrame^.fValid)
+                      then cl'^.csFrame -- previous frame was dropped or invalid
+                      else oldFrame
+        ops = oldFrame'^.fPlayerState
+
+        -- see if the player entity was teleported this frame
+        ops' = if abs ((ops^.psPMoveState.pmsOrigin._x) - (ps^.psPMoveState.pmsOrigin._x)) > 256 * 8 ||
+                  abs ((ops^.psPMoveState.pmsOrigin._y) - (ps^.psPMoveState.pmsOrigin._y)) > 256 * 8 ||
+                  abs ((ops^.psPMoveState.pmsOrigin._z) - (ps^.psPMoveState.pmsOrigin._z)) > 256 * 8
+                  then ps -- don't interpolate
+                  else ops
+
+        lerp = cl'^.csLerpFrac
+
+    -- calculate the origin
+    predictValue <- liftM (^.cvValue) clPredictCVar
+    if predictValue /= 0 && (cl'^.csFrame.fPlayerState.psPMoveState.pmsPMFlags) .&. pmfNoPrediction == 0 -- use predicted values
+      then do
+        let backlerp = 1 - lerp
+        globals.cl.csRefDef.rdViewOrg .= (cl'^.csPredictedOrigin)
+                                       + (ops'^.psViewOffset)
+                                       + (fmap (* (cl'^.csLerpFrac)) ((ps^.psViewOffset) - (ops'^.psViewOffset)))
+                                       - (fmap (* backlerp) (cl'^.csPredictionError))
+
+        -- smooth out stair climbing
+        realTime <- use $ globals.cls.csRealTime
+        let delta = (realTime - (cl'^.csPredictedStepTime))
+        when (delta < 100) $
+          globals.cl.csRefDef.rdViewOrg._z -= (cl'^.csPredictedStep) * fromIntegral (100 - delta) * 0.01
+
+      else do -- juse use interpolated values
+        let v = (fmap ((* 0.125) . fromIntegral) (ps^.psPMoveState.pmsOrigin))
+              + (ps^.psViewOffset)
+              - ((fmap ((* 0.125) . fromIntegral) (ops'^.psPMoveState.pmsOrigin)) + (ops'^.psViewOffset))
+        globals.cl.csRefDef.rdViewOrg .= (fmap ((* 0.125) . fromIntegral) (ops'^.psPMoveState.pmsOrigin))
+                                       + (ops'^.psViewOffset)
+                                       + (fmap (* lerp) v)
+
+    -- if not running a demo or on a locked frame, add the local angle
+    -- movement
+    if (cl'^.csFrame.fPlayerState.psPMoveState.pmsPMType) < Constants.pmDead
+      then globals.cl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
+      else globals.cl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
+
+    globals.cl.csRefDef.rdViewAngles += Math3D.lerpAngles (ops'^.psKickAngles) (ps^.psKickAngles) lerp
+
+    rd <- use $ globals.cl.csRefDef
+    let (Just f, Just r, Just u) = Math3D.angleVectors (rd^.rdViewAngles) True True True
+    globals.cl.csVForward .= f
+    globals.cl.csVRight .= r
+    globals.cl.csVUp .= u
+
+    -- interpolate field of view
+    globals.cl.csRefDef.rdFovX .= (ops'^.psFOV) + lerp * ((ps^.psFOV) - (ops'^.psFOV))
+
+    -- don't interpolate blend color
+    globals.cl.csRefDef.rdBlend .= (ps^.psBlend)
+
+    -- add the weapon
+    addViewWeapon ps ops'
 
 addPacketEntities :: FrameT -> Quake ()
 addPacketEntities _ = do
     io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
+
+addViewWeapon :: PlayerStateT -> PlayerStateT -> Quake ()
+addViewWeapon ps ops = do
+    clGunValue <- liftM (^.cvValue) clGunCVar
+
+    -- allow the gun to be completely removed
+    -- don't draw gun if in wide angle view
+    unless (clGunValue == 0 || (ps^.psFOV) > 90) $ do
+
+
+      io (putStrLn "CLEnts.addViewWeapon") >> undefined -- TODO

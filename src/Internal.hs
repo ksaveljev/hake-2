@@ -241,6 +241,7 @@ data Globals =
 
           , _scrVRect           :: VRectT
           , _sysFrameTime       :: !Int
+          , _gunModel           :: Maybe ModelT
           , _netFrom            :: NetAdrT
 
           , _vec3Origin         :: V3 Float
