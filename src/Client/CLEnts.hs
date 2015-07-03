@@ -5,7 +5,7 @@ module Client.CLEnts where
 
 import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=), (-=))
 import Control.Monad (when, liftM, unless)
-import Data.Bits (shiftL, (.&.), (.|.))
+import Data.Bits (shiftL, (.&.), (.|.), complement)
 import Data.Int (Int16)
 import Data.Maybe (fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
@@ -798,10 +798,6 @@ calcViewValues = do
     -- add the weapon
     addViewWeapon ps ops'
 
-addPacketEntities :: FrameT -> Quake ()
-addPacketEntities _ = do
-    io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
-
 addViewWeapon :: PlayerStateT -> PlayerStateT -> Quake ()
 addViewWeapon ps ops = do
     clGunValue <- liftM (^.cvValue) clGunCVar
@@ -845,3 +841,55 @@ addViewWeapon ps ops = do
                                }
 
           ClientV.addEntity gun
+
+addPacketEntities :: FrameT -> Quake ()
+addPacketEntities frame = do
+    cl' <- use $ globals.cl
+        -- bonus items rotate at a fixed rate
+    let autoRotate = Math3D.angleMod (fromIntegral (cl'^.csTime) / 10)
+        -- brush models can auto animate their frames
+        autoAnim = 2 * (cl'^.csTime) `div` 1000
+
+    addEntity autoRotate autoAnim newEntityT 0 (frame^.fNumEntities)
+
+  where addEntity :: Float -> Int -> EntityT -> Int -> Int -> Quake ()
+        addEntity autoRotate autoAnim ent pNum maxPNum
+          | pNum >= maxPNum = return ()
+          | otherwise = do
+              Just s1 <- preuse $ globals.clParseEntities.ix (((frame^.fParseEntities) + pNum) .&. (Constants.maxParseEntities - 1))
+              Just cent <- preuse $ globals.clEntities.ix (s1^.esNumber)
+
+              cl' <- use $ globals.cl
+              let entFrame = setFrame autoAnim s1 (cl'^.csTime)
+                  (effects, renderfx) = calcEffectsAndRenderFx s1
+                  endOldFrame = cent^.cePrev.esFrame
+                  entBackLerp = 1 - (cl'^.csLerpFrac)
+
+              io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
+
+        setFrame :: Int -> EntityStateT -> Int -> Int
+        setFrame autoAnim s1 time =
+          let effects = s1^.esEffects
+          in if | effects .&. Constants.efAnim01 /= 0 -> autoAnim .&. 1
+                | effects .&. Constants.efAnim23 /= 0 -> 2 + (autoAnim .&. 1)
+                | effects .&. Constants.efAnimAll /= 0 -> autoAnim
+                | effects .&. Constants.efAnimAllFast /= 0 -> time `div` 100
+                | otherwise -> s1^.esFrame
+
+        calcEffectsAndRenderFx :: EntityStateT -> (Int, Int)
+        calcEffectsAndRenderFx s1 =
+          let effects = s1^.esEffects
+              renderfx = s1^.esRenderFx
+              (effects', renderfx') = if effects .&. Constants.efPent /= 0
+                                        then ((effects .&. (complement Constants.efPent)) .|. Constants.efColorShell, renderfx .|. Constants.rfShellRed)
+                                        else (effects, renderfx)
+              (effects'', renderfx'') = if effects' .&. Constants.efQuad /= 0
+                                          then ((effects' .&. (complement Constants.efQuad)) .|. Constants.efColorShell, renderfx' .|. Constants.rfShellBlue)
+                                          else (effects', renderfx')
+              (effects''', renderfx''') = if effects'' .&. Constants.efDouble /= 0
+                                            then ((effects'' .&. (complement Constants.efDouble)) .|. Constants.efColorShell, renderfx'' .|. Constants.rfShellDouble)
+                                            else (effects'', renderfx'')
+              result = if effects''' .&. Constants.efHalfDamage /= 0
+                         then ((effects''' .&. (complement Constants.efHalfDamage)) .|. Constants.efColorShell, renderfx''' .|. Constants.rfShellHalfDam)
+                         else (effects''', renderfx''')
+          in result
