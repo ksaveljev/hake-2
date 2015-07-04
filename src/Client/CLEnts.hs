@@ -5,7 +5,7 @@ module Client.CLEnts where
 
 import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=), (-=))
 import Control.Monad (when, liftM, unless)
-import Data.Bits (shiftL, (.&.), (.|.), complement)
+import Data.Bits (shiftL, shiftR, (.&.), (.|.), complement)
 import Data.Int (Int16)
 import Data.Maybe (fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
@@ -26,6 +26,7 @@ import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 {-
@@ -864,6 +865,9 @@ addPacketEntities frame = do
                   (effects, renderfx) = calcEffectsAndRenderFx s1
                   endOldFrame = cent^.cePrev.esFrame
                   entBackLerp = 1 - (cl'^.csLerpFrac)
+                  (entOrigin, entOldOrigin) = calcOrigin cent renderfx (cl'^.csLerpFrac)
+
+              (entAlpha, entSkinNum, entModel) <- tweakBeamsColor cl' s1 renderfx
 
               io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
 
@@ -893,3 +897,23 @@ addPacketEntities frame = do
                          then ((effects''' .&. (complement Constants.efHalfDamage)) .|. Constants.efColorShell, renderfx''' .|. Constants.rfShellHalfDam)
                          else (effects''', renderfx''')
           in result
+
+        calcOrigin :: CEntityT -> Int -> Float -> (V3 Float, V3 Float)
+        calcOrigin cent renderfx lerpFrac =
+          if renderfx .&. (Constants.rfFrameLerp .|. Constants.rfBeam) /= 0
+            then -- step origin discretely, because the frames
+                 -- do the animation properly
+              (cent^.ceCurrent.esOrigin, cent^.ceCurrent.esOldOrigin)
+            else -- interpolate origin
+              let v = (cent^.cePrev.esOrigin)
+                    + (fmap (* lerpFrac) ((cent^.ceCurrent.esOrigin) - (cent^.cePrev.esOrigin)))
+              in (v, v)
+
+        tweakBeamsColor :: ClientStateT -> EntityStateT -> Int -> Quake (Float, Int, Maybe ModelReference)
+        tweakBeamsColor cl' s1 renderfx = do
+          if renderfx .&. Constants.rfBeam /= 0 -- the four beam colors are encoded in 32 bits of skinnum (hack)
+            then do
+              r <- liftM (`mod` 4) Lib.rand
+              return (0.3, ((s1^.esSkinNum) `shiftR` (fromIntegral r * 8)) .&. 0xFF, Nothing)
+            else do
+              io (putStrLn "CLEnts.tweakBeamsColor") >> undefined -- TODO

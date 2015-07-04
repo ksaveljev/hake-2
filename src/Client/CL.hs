@@ -397,8 +397,28 @@ pauseF = do
 pingServersF :: XCommandT
 pingServersF = io (putStrLn "CL.pingServersF") >> undefined -- TODO
 
+{-
+- Skins_f
+- 
+- Load or download any custom player skins and models.
+-}
 skinsF :: XCommandT
-skinsF = io (putStrLn "CL.skinsF") >> undefined -- TODO
+skinsF = do
+    configStrings <- use $ globals.cl.csConfigStrings
+    loadOrDownload configStrings 0 Constants.maxClients
+
+  where loadOrDownload :: Vec.Vector B.ByteString -> Int -> Int -> XCommandT
+        loadOrDownload configStrings idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              if B.null (configStrings Vec.! (Constants.csPlayerSkins + idx)) -- TODO: jake compares to NULL here
+                then
+                  loadOrDownload configStrings (idx + 1) maxIdx
+                else do
+                  Com.printf ("client " `B.append` BC.pack (show idx) `B.append` ": " `B.append` (configStrings Vec.! (Constants.csPlayerSkins + idx)) `B.append` "\n")
+                  SCR.updateScreen
+                  Sys.sendKeyEvents -- pump message loop
+                  CLParse.parseClientInfo idx
 
 userInfoF :: XCommandT
 userInfoF = io (putStrLn "CL.userInfoF") >> undefined -- TODO
