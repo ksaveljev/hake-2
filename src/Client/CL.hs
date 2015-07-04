@@ -35,6 +35,7 @@ import qualified Client.SCR as SCR
 import qualified Client.V as V
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Game.Info as Info
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
@@ -421,7 +422,10 @@ skinsF = do
                   CLParse.parseClientInfo idx
 
 userInfoF :: XCommandT
-userInfoF = io (putStrLn "CL.userInfoF") >> undefined -- TODO
+userInfoF = do
+    Com.printf "User info settings:\n"
+    userInfo <- CVar.userInfo
+    Info.print userInfo
 
 sndRestartF :: XCommandT
 sndRestartF = io (putStrLn "CL.sndRestartF") >> undefined -- TODO
