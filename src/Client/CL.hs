@@ -44,6 +44,7 @@ import qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
+import qualified Server.SVMain as SVMain
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 import qualified Sys.NET as NET
@@ -467,7 +468,31 @@ quitF = do
     Com.quit
 
 connectF :: XCommandT
-connectF = io (putStrLn "CL.connectF") >> undefined -- TODO
+connectF = do
+    c <- Cmd.argc
+
+    if c /= 2
+      then
+        Com.printf "usage: connect <server>\n"
+      else do
+        ss <- use $ globals.serverState
+
+        if ss /= 0
+          then SVMain.shutdown "Server quit\n" False -- if running a local server, kill it and reissue
+          else disconnect
+
+        server <- Cmd.argv 1
+
+        NET.config True -- allow remote
+
+        disconnect
+
+        zoom (globals.cls) $ do
+          csState .= Constants.caConnecting
+          csServerName .= server
+          csConnectTime .= -99999
+
+        -- CL_CheckForResend() will fire immediately
 
 reconnectF :: XCommandT
 reconnectF = io (putStrLn "CL.reconnectF") >> undefined -- TODO
