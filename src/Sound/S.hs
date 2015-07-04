@@ -10,6 +10,9 @@ import Sound.SfxT
 init :: Quake ()
 init = return () -- TODO: don't want to get involved with sound system yet -- io (putStrLn "S.init") >> undefined -- TODO
 
+shutdown :: Quake ()
+shutdown = return () -- TODO: don't want to get involved with sound system yet -- io (putStrLn "S.shutdown") >> undefined -- TODO
+
 stopAllSounds :: Quake ()
 stopAllSounds = return () -- TODO: don't want to get involved with sound system yet
     -- io (putStrLn "S.stopAllSounds") >> undefined -- TODO

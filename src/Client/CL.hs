@@ -427,8 +427,17 @@ userInfoF = do
     userInfo <- CVar.userInfo
     Info.print userInfo
 
+{-
+- Snd_Restart_f
+- 
+- Restart the sound subsystem so it can pick up new parameters and flush
+- all sounds.
+-}
 sndRestartF :: XCommandT
-sndRestartF = io (putStrLn "CL.sndRestartF") >> undefined -- TODO
+sndRestartF = do
+    S.shutdown
+    S.init
+    CLParse.registerSounds
 
 -- Just sent as a hint to the client that they should drop to full console.
 changingF :: XCommandT
