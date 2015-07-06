@@ -170,7 +170,45 @@ spPointCombat er@(EdictReference edictIdx) = do
         linkEntity er
 
 spViewThing :: EdictReference -> Quake ()
-spViewThing _ = io (putStrLn "GameMisc.spViewThing") >> undefined -- TODO
+spViewThing edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let dprintf = gameImport^.giDprintf
+        linkEntity = gameImport^.giLinkEntity
+        modelIndex = gameImport^.giModelIndex
+
+    modelIdx <- modelIndex (Just "models/objects/banner/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eEntityState.esRenderFx .= Constants.rfFrameLerp
+      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
+      eEdictMinMax.eMaxs .= V3 16 16 32
+      eEntityState.esModelIndex .= modelIdx
+
+    linkEntity edictRef
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+      eaNextThink .= levelTime + 0.5
+      eaThink .= Just thViewThing
+
+{-
+- QUAKED viewthing (0 .5 .8) (-8 -8 -8) (8 8 8) Just for the debugging
+- level. Don't use
+-}
+thViewThing :: EntThink
+thViewThing =
+  GenericEntThink "th_viewthing" $ \(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eEntityState.esFrame .= ((edict^.eEntityState.esFrame) + 1) `mod` 7
+      eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+
+    return True
 
 {-
 - QUAKED info_null (0 0.5 0) (-4 -4 -4) (4 4 4) Used as a positional target
