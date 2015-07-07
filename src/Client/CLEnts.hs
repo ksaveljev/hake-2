@@ -7,7 +7,7 @@ import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=), (-=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.), complement)
 import Data.Int (Int16)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -867,7 +867,16 @@ addPacketEntities frame = do
                   entBackLerp = 1 - (cl'^.csLerpFrac)
                   (entOrigin, entOldOrigin) = calcOrigin cent renderfx (cl'^.csLerpFrac)
 
-              (entAlpha, entSkinNum, entModel) <- tweakBeamsColor cl' s1 renderfx
+              (entAlpha, entSkinNum, entSkin, entModel) <- tweakBeamsColor cl' s1 ent renderfx
+
+                  -- only used for black hole model right now, FIXME: do better
+              let entAlpha' = if renderfx == Constants.rfTranslucent
+                                then 0.7 else entAlpha
+                  -- render effects (fullbright, translucent, etc)
+                  entFlags = if effects .&. Constants.efColorShell /= 0
+                               then 0 -- renderfx go on color shell entity
+                               else renderfx
+              entAngles <- calcAngles cl' s1 cent autoRotate effects
 
               io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
 
@@ -909,11 +918,60 @@ addPacketEntities frame = do
                     + (fmap (* lerpFrac) ((cent^.ceCurrent.esOrigin) - (cent^.cePrev.esOrigin)))
               in (v, v)
 
-        tweakBeamsColor :: ClientStateT -> EntityStateT -> Int -> Quake (Float, Int, Maybe ModelReference)
-        tweakBeamsColor cl' s1 renderfx = do
+        tweakBeamsColor :: ClientStateT -> EntityStateT -> EntityT -> Int -> Quake (Float, Int, Maybe ImageReference, Maybe ModelReference)
+        tweakBeamsColor cl' s1 ent renderfx = do
           if renderfx .&. Constants.rfBeam /= 0 -- the four beam colors are encoded in 32 bits of skinnum (hack)
             then do
               r <- liftM (`mod` 4) Lib.rand
-              return (0.3, ((s1^.esSkinNum) `shiftR` (fromIntegral r * 8)) .&. 0xFF, Nothing)
+              return (0.3, ((s1^.esSkinNum) `shiftR` (fromIntegral r * 8)) .&. 0xFF, ent^.eSkin, Nothing)
             else do
-              io (putStrLn "CLEnts.tweakBeamsColor") >> undefined -- TODO
+              -- set skin
+              if (s1^.esModelIndex) == 255 -- use custom player skin
+                then do
+                  let skinNum = 0
+                      ci = (cl'^.csClientInfo) V.! ((s1^.esSkinNum) .&. 0xFF)
+                      (skin, model) = if isNothing (ci^.ciSkin) || isNothing (ci^.ciModel)
+                                        then (cl'^.csBaseClientInfo.ciSkin, cl'^.csBaseClientInfo.ciModel)
+                                        else (ci^.ciSkin, ci^.ciModel)
+
+                  (skin', model') <- if renderfx .&. Constants.rfUseDisguise /= 0
+                                       then do
+                                         Just renderer <- use $ globals.re
+                                         let registerSkin = renderer^.rRefExport.reRegisterSkin
+                                             registerModel = renderer^.rRefExport.reRegisterModel
+
+                                         Just image <- (renderer^.rRefExport.reGetImage) (fromJust skin)
+
+                                         if | "players/male" `BC.isPrefixOf` (image^.iName) -> do
+                                                s <- registerSkin "players/male/disguise.pcx"
+                                                m <- registerModel "players/male/tris.md2"
+                                                return (s, m)
+                                            | "players/female" `BC.isPrefixOf` (image^.iName) -> do
+                                                s <- registerSkin "players/female/disguise.pcx"
+                                                m <- registerModel "players/female/tris.md2"
+                                                return (s, m)
+                                            | "players/cyborg" `BC.isPrefixOf` (image^.iName) -> do
+                                                s <- registerSkin "players/cyborg/disguise.pcx"
+                                                m <- registerModel "players/cyborg/tris.md2"
+                                                return (s, m)
+                                            | otherwise ->
+                                                return (skin, model)
+                                       else
+                                         return (skin, model)
+
+                  return (ent^.eAlpha, skinNum, skin', model')
+                else
+                  return (ent^.eAlpha, s1^.esSkinNum, Nothing, (cl'^.csModelDraw) V.! (s1^.esModelIndex))
+
+        calcAngles :: ClientStateT -> EntityStateT -> CEntityT -> Float -> Int -> Quake (V3 Float)
+        calcAngles cl' s1 cent autoRotate effects = do
+          if | effects .&. Constants.efRotate /= 0 -> -- some bonus items
+                 return (V3 0 autoRotate 0)
+
+               -- RAFAEL
+             | effects .&. Constants.efSpinningLights /= 0 -> do
+                 undefined -- TODO
+
+               -- interpolate angles
+             | otherwise -> do
+                 undefined -- TODO

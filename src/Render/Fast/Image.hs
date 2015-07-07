@@ -1024,3 +1024,6 @@ glFreeUnusedImages = do
               case update of
                 Nothing -> checkImages glTextures regSeq (idx + 1) maxIdx acc
                 Just u -> checkImages glTextures regSeq (idx + 1) maxIdx (u : acc)
+
+getImage :: ImageReference -> Quake (Maybe ImageT)
+getImage (ImageReference imageIdx) = preuse $ fastRenderAPIGlobals.frGLTextures.ix imageIdx

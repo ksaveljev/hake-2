@@ -900,7 +900,7 @@ data EntityT =
           , _eSkinNum    :: !Int
           , _eLightStyle :: !Int
           , _eAlpha      :: !Float
-          , _eSkin       :: Maybe Int -- index to some imageT vector
+          , _eSkin       :: Maybe ImageReference
           , _enFlags     :: !Int -- name clash with EdictT._eFlags
           }
 
@@ -1037,6 +1037,7 @@ data RefExportT =
              , _reApiVersion          :: Int
              , _reGetModeList         :: Quake (V.Vector VideoMode)
              , _reGetKeyboardHandler  :: KBD
+             , _reGetImage            :: ImageReference -> Quake (Maybe ImageT)
              }
 
 data NETGlobals =
@@ -1515,6 +1516,7 @@ data RenderAPI =
             , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
             , _rBeginFrame        :: GLDriver -> Float -> Quake ()
             , _glScreenShotF      :: GLDriver -> XCommandT
+            , _rGetImage          :: GLDriver -> ImageReference -> Quake (Maybe ImageT)
             }
 
 data INGlobals =

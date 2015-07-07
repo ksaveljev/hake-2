@@ -57,6 +57,7 @@ fastRenderAPI =
               , _rSetPalette        = DT.trace "FastRenderAPI.rSetPalette" undefined -- TODO
               , _rBeginFrame        = fastBeginFrame
               , _glScreenShotF      = DT.trace "FastRenderAPI.glScreenShotF" undefined -- TODO
+              , _rGetImage          = \_ -> Image.getImage
               }
 
 -- fill r_turbsin

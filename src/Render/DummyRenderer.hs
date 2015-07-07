@@ -40,6 +40,7 @@ dummyRefExportT _ =
              , _reApiVersion          = 0
              , _reGetModeList         = return V.empty
              , _reGetKeyboardHandler  = dummyKBD
+             , _reGetImage            = (\_ -> return Nothing)
              }
 
 dummyKBD :: KBD
@@ -75,4 +76,5 @@ dummyRenderAPI =
               , _rSetPalette        = \_ _ -> return ()
               , _rBeginFrame        = \_ _ -> return ()
               , _glScreenShotF      = \_ -> return ()
+              , _rGetImage          = \_ _ -> return Nothing
               }

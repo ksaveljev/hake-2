@@ -56,6 +56,7 @@ glfwbRefExportT kbd renderAPI =
              , _reApiVersion          = Constants.apiVersion
              , _reGetModeList         = glfwbGLDriver^.gldGetModeList
              , _reGetKeyboardHandler  = kbd
+             , _reGetImage            = glfwbGetImage renderAPI
              }
 
 glfwbKBD :: KBD
@@ -210,3 +211,6 @@ glfwbKBDUninstallGrabs :: Quake ()
 glfwbKBDUninstallGrabs = do
     Just window <- use $ glfwbGlobals.glfwbWindow
     io $ GLFW.setCursorInputMode window GLFW.CursorInputMode'Normal
+
+glfwbGetImage :: RenderAPI -> ImageReference -> Quake (Maybe ImageT)
+glfwbGetImage renderAPI = (renderAPI^.rGetImage) glfwbGLDriver
