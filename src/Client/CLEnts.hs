@@ -876,7 +876,7 @@ addPacketEntities frame = do
                   entFlags = if effects .&. Constants.efColorShell /= 0
                                then 0 -- renderfx go on color shell entity
                                else renderfx
-              entAngles <- calcAngles cl' s1 cent autoRotate effects
+              entAngles <- calcAngles cl' s1 ent cent autoRotate effects
 
               io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
 
@@ -963,15 +963,19 @@ addPacketEntities frame = do
                 else
                   return (ent^.eAlpha, s1^.esSkinNum, Nothing, (cl'^.csModelDraw) V.! (s1^.esModelIndex))
 
-        calcAngles :: ClientStateT -> EntityStateT -> CEntityT -> Float -> Int -> Quake (V3 Float)
-        calcAngles cl' s1 cent autoRotate effects = do
+        calcAngles :: ClientStateT -> EntityStateT -> EntityT -> CEntityT -> Float -> Int -> Quake (V3 Float)
+        calcAngles cl' s1 ent cent autoRotate effects = do
           if | effects .&. Constants.efRotate /= 0 -> -- some bonus items
                  return (V3 0 autoRotate 0)
 
                -- RAFAEL
              | effects .&. Constants.efSpinningLights /= 0 -> do
-                 undefined -- TODO
+                 let result = V3 0 (Math3D.angleMod (fromIntegral (cl'^.csTime) / 2) + (s1^.esAngles._y)) 180
+                     (Just forward, _, _) = Math3D.angleVectors (ent^.eAngles) True False False
+                     start = (ent^.eOrigin) + fmap (* 64) forward
+                 ClientV.addLight start 100 1 0 0
+                 return result
 
                -- interpolate angles
-             | otherwise -> do
-                 undefined -- TODO
+             | otherwise ->
+                 return (Math3D.lerpAngles (cent^.cePrev.esAngles) (cent^.ceCurrent.esAngles) (cl'^.csLerpFrac))

@@ -219,3 +219,7 @@ addEntity ent = do
     when (numEntities < Constants.maxEntities) $ do
       vGlobals.vgREntities.ix numEntities .= ent
       vGlobals.vgRNumEntities += 1
+
+addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
+addLight _ _ _ _ _ = do
+    io (putStrLn "V.addLight") >> undefined -- TODO
