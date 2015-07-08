@@ -6,6 +6,7 @@ module Client.CLEnts where
 import Control.Lens (use, (^.), (.=), Traversal', preuse, ix, Lens', (+=), (-=))
 import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.), complement)
+import Data.Char (toLower)
 import Data.Int (Int16)
 import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
@@ -25,6 +26,7 @@ import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -863,7 +865,7 @@ addPacketEntities frame = do
               cl' <- use $ globals.cl
               let entFrame = setFrame autoAnim s1 (cl'^.csTime)
                   (effects, renderfx) = calcEffectsAndRenderFx s1
-                  endOldFrame = cent^.cePrev.esFrame
+                  entOldFrame = cent^.cePrev.esFrame
                   entBackLerp = 1 - (cl'^.csLerpFrac)
                   (entOrigin, entOldOrigin) = calcOrigin cent renderfx (cl'^.csLerpFrac)
 
@@ -876,9 +878,78 @@ addPacketEntities frame = do
                   entFlags = if effects .&. Constants.efColorShell /= 0
                                then 0 -- renderfx go on color shell entity
                                else renderfx
-              entAngles <- calcAngles cl' s1 ent cent autoRotate effects
 
-              io (putStrLn "CLEnts.addPacketEntities") >> undefined -- TODO
+              entAngles <- calcAngles cl' s1 entOrigin cent autoRotate effects
+
+              if | (s1^.esNumber) == (cl'^.csPlayerNum) + 1 -> do
+                     if | effects .&. Constants.efFlag1 /= 0 ->
+                            ClientV.addLight entOrigin 225 1.0 0.1 0.1
+                        | effects .&. Constants.efFlag2 /= 0 ->
+                            ClientV.addLight entOrigin 225 0.1 0.1 1.0
+                        | effects .&. Constants.efTagTrail /= 0 ->
+                            ClientV.addLight entOrigin 225 1.0 1.0 0.0
+                        | effects .&. Constants.efTrackerTrail /= 0 ->
+                            ClientV.addLight entOrigin 225 (-1) (-1) (-1)
+                        | otherwise ->
+                            return ()
+
+                     let ent' = ent { _eFrame     = entFrame
+                                    , _eOldFrame  = entOldFrame
+                                    , _eBackLerp  = entBackLerp
+                                    , _eOrigin    = entOrigin
+                                    , _eOldOrigin = entOldOrigin
+                                    , _eAlpha     = entAlpha'
+                                    , _eSkinNum   = entSkinNum
+                                    , _eModel     = entModel
+                                    , _eSkin      = entSkin
+                                    , _enFlags    = entFlags .|. Constants.rfViewerModel -- only draw from mirrors
+                                    , _eAngles    = entAngles
+                                    }
+
+                     addEntity autoRotate autoAnim ent' (pNum + 1) maxPNum
+
+                 | (s1^.esModelIndex) == 0 -> do
+                     let ent' = ent { _eFrame     = entFrame
+                                    , _eOldFrame  = entOldFrame
+                                    , _eBackLerp  = entBackLerp
+                                    , _eOrigin    = entOrigin
+                                    , _eOldOrigin = entOldOrigin
+                                    , _eAlpha     = entAlpha'
+                                    , _eSkinNum   = entSkinNum
+                                    , _eModel     = entModel
+                                    , _eSkin      = entSkin
+                                    , _enFlags    = entFlags
+                                    , _eAngles    = entAngles
+                                    }
+
+                     addEntity autoRotate autoAnim ent' (pNum + 1) maxPNum
+
+                 | otherwise -> do
+                     let (entFlags', entAlpha'') = updateFlagsAndAlpha entFlags entAlpha' effects
+                         ent' = ent { _eFrame     = entFrame
+                                    , _eOldFrame  = entOldFrame
+                                    , _eBackLerp  = entBackLerp
+                                    , _eOrigin    = entOrigin
+                                    , _eOldOrigin = entOldOrigin
+                                    , _eAlpha     = entAlpha''
+                                    , _eSkinNum   = entSkinNum
+                                    , _eModel     = entModel
+                                    , _eSkin      = entSkin
+                                    , _enFlags    = entFlags'
+                                    , _eAngles    = entAngles
+                                    }
+
+                     -- add to refresh list
+                     ClientV.addEntity ent'
+
+                     -- color shells generate a separate entity for the main model
+                     checkColorShells ent' effects renderfx
+                       >>= checkModelIndex2 s1
+                       >>= checkModelIndex3 s1
+                       >>= checkModelIndex4 s1
+                       >>= checkPowerScreen effects
+                       >>= addAutomaticParticleTrails effects s1 cent
+                       >>= copyOrigin s1
 
         setFrame :: Int -> EntityStateT -> Int -> Int
         setFrame autoAnim s1 time =
@@ -963,19 +1034,194 @@ addPacketEntities frame = do
                 else
                   return (ent^.eAlpha, s1^.esSkinNum, Nothing, (cl'^.csModelDraw) V.! (s1^.esModelIndex))
 
-        calcAngles :: ClientStateT -> EntityStateT -> EntityT -> CEntityT -> Float -> Int -> Quake (V3 Float)
-        calcAngles cl' s1 ent cent autoRotate effects = do
+        calcAngles :: ClientStateT -> EntityStateT -> V3 Float -> CEntityT -> Float -> Int -> Quake (V3 Float)
+        calcAngles cl' s1 entOrigin cent autoRotate effects = do
           if | effects .&. Constants.efRotate /= 0 -> -- some bonus items
                  return (V3 0 autoRotate 0)
 
                -- RAFAEL
              | effects .&. Constants.efSpinningLights /= 0 -> do
                  let result = V3 0 (Math3D.angleMod (fromIntegral (cl'^.csTime) / 2) + (s1^.esAngles._y)) 180
-                     (Just forward, _, _) = Math3D.angleVectors (ent^.eAngles) True False False
-                     start = (ent^.eOrigin) + fmap (* 64) forward
+                     (Just forward, _, _) = Math3D.angleVectors result True False False
+                     start = entOrigin + fmap (* 64) forward
                  ClientV.addLight start 100 1 0 0
                  return result
 
                -- interpolate angles
              | otherwise ->
                  return (Math3D.lerpAngles (cent^.cePrev.esAngles) (cent^.ceCurrent.esAngles) (cl'^.csLerpFrac))
+
+        updateFlagsAndAlpha :: Int -> Float -> Int -> (Int, Float)
+        updateFlagsAndAlpha entFlags entAlpha effects =
+          let (f, a) = if effects .&. Constants.efBFG /= 0
+                         then (entFlags .|. Constants.rfTranslucent, 0.3)
+                         else (entFlags, entAlpha)
+              (f', a') = if effects .&. Constants.efPlasma /= 0
+                           then (f .|. Constants.rfTranslucent, 0.6)
+                           else (f, a)
+              result = if effects .&. Constants.efSphereTrans /= 0
+                             then if effects .&. Constants.efTrackerTrail /= 0
+                                    then (f' .|. Constants.rfTranslucent, 0.6)
+                                    else (f' .|. Constants.rfTranslucent, 0.3)
+                             else (f', a')
+          in result
+
+        checkColorShells :: EntityT -> Int -> Int -> Quake EntityT
+        checkColorShells ent effects renderfx = do
+          when (effects .&. Constants.efColorShell /= 0) $ do
+            {-
+            - PMM - at this point, all of the shells have been handled if
+            - we're in the rogue pack, set up the custom mixing, otherwise
+            - just keep going if(Developer_searchpath(2) == 2) { all of the
+            - solo colors are fine. we need to catch any of the
+            - combinations that look bad (double & half) and turn them into
+            - the appropriate color, and make double/quad something special
+            -}
+            renderfx' <- if renderfx .&. Constants.rfShellHalfDam /= 0
+                           then do
+                             v <- FS.developerSearchPath 2
+                             -- ditch the half damage shell if any of
+                             -- red, blue, or double are on
+                             return $ if v == 2 && renderfx .&. (Constants.rfShellRed .|. Constants.rfShellBlue .|. Constants.rfShellDouble) /= 0
+                                        then renderfx .&. (complement Constants.rfShellHalfDam)
+                                        else renderfx
+                           else
+                             return renderfx
+
+            renderfx'' <- if renderfx' .&. Constants.rfShellDouble /= 0
+                            then do
+                              v <- FS.developerSearchPath 2
+                              if v == 2
+                                then do
+                                      -- lose the yellow shell if we have a red, blue, or green shell
+                                  let r = if renderfx' .&. (Constants.rfShellRed .|. Constants.rfShellBlue .|. Constants.rfShellGreen) /= 0
+                                            then renderfx' .&. (complement Constants.rfShellDouble)
+                                            else renderfx'
+                                                -- if we have a red shell, turn it to purple by adding blue
+                                      r' = if | r .&. Constants.rfShellRed /= 0 ->
+                                                  r .|. Constants.rfShellBlue
+
+                                                -- if we have a blue shell (and not a red shell), turn it to cyan by adding green
+                                              | r .&. Constants.rfShellBlue /= 0 ->
+                                                  -- go to green if it's on already, otherwise do cyan (flash green)
+                                                  if r .&. Constants.rfShellGreen /= 0
+                                                    then r .&. (complement Constants.rfShellBlue)
+                                                    else r .|. Constants.rfShellGreen
+
+                                              | otherwise ->
+                                                  r
+                                  return r'
+                                else
+                                  return renderfx'
+                            else
+                              return renderfx'
+
+            ClientV.addEntity ent { _enFlags = renderfx'' .|. Constants.rfTranslucent
+                                  , _eAlpha  = 0.3
+                                  }
+
+          return ent { _eSkin    = Nothing -- never use a custom skin on others
+                     , _eSkinNum = 0
+                     , _enFlags  = 0
+                     , _eAlpha   = 0
+                     }
+
+        checkModelIndex2 :: EntityStateT -> EntityT -> Quake EntityT
+        checkModelIndex2 s1 ent = do
+          if (s1^.esModelIndex2) /= 0
+            then do
+              model <- if (s1^.esModelIndex2) == 255 -- custom weapon
+                         then do
+                           Just ci <- preuse $ globals.cl.csClientInfo.ix ((s1^.esSkinNum) .&. 0xFF)
+                           let i = (s1^.esSkinNum) `shiftR` 8 -- 0 is default weapon model
+                           clVwepValue <- liftM (^.cvValue) clVwepCVar
+                           let i' = if clVwepValue == 0 || i > Constants.maxClientWeaponModels - 1
+                                      then 0
+                                      else i
+                               model = (ci^.ciWeaponModel) V.! i'
+                           if isNothing model
+                             then do
+                               let m = if i' /= 0
+                                         then (ci^.ciWeaponModel) V.! 0
+                                         else model
+                               if isNothing m
+                                 then do
+                                   Just m' <- preuse $ globals.cl.csBaseClientInfo.ciWeaponModel.ix 0
+                                   return m'
+                                 else return m
+                             else
+                               return model
+
+                         else do
+                           Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex2)
+                           return model
+
+              -- PMM - check for the defender sphere shell .. make it translucent
+              -- replaces the previous version which used the high bit on
+              -- modelindex2 to determine transparency
+              Just configString <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + (s1^.esModelIndex2))
+              if BC.map toLower configString == "models/items/shell/tris.md2"
+                then ClientV.addEntity ent { _eModel  = model
+                                           , _eAlpha  = 0.32
+                                           , _enFlags = Constants.rfTranslucent
+                                           }
+                else ClientV.addEntity ent { _eModel = model }
+
+              -- PGM - make sure these get reset
+              return ent { _eModel  = model
+                         , _eAlpha  = 0
+                         , _enFlags = 0
+                         }
+            else
+              return ent
+
+        checkModelIndex3 :: EntityStateT -> EntityT -> Quake EntityT
+        checkModelIndex3 s1 ent = do
+          if (s1^.esModelIndex3) /= 0
+            then do
+              Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex3)
+              let ent' = ent { _eModel = model }
+              ClientV.addEntity ent'
+              return ent'
+            else
+              return ent
+
+        checkModelIndex4 :: EntityStateT -> EntityT -> Quake EntityT
+        checkModelIndex4 s1 ent = do
+          if (s1^.esModelIndex4) /= 0
+            then do
+              Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex4)
+              let ent' = ent { _eModel = model }
+              ClientV.addEntity ent'
+              return ent'
+            else
+              return ent
+
+        checkPowerScreen :: Int -> EntityT -> Quake EntityT
+        checkPowerScreen effects ent = do
+          if effects .&. Constants.efPowerScreen /= 0
+            then do
+              model <- use $ clTEntGlobals.clteModPowerScreen
+              let ent' = ent { _eModel    = model
+                             , _eOldFrame = 0
+                             , _eFrame    = 0
+                             , _enFlags   = (ent^.enFlags) .|. Constants.rfTranslucent .|. Constants.rfShellGreen
+                             , _eAlpha    = 0.3
+                             }
+              ClientV.addEntity ent'
+              return ent'
+
+            else
+              return ent
+
+        addAutomaticParticleTrails :: Int -> EntityStateT -> CEntityT -> EntityT -> Quake EntityT
+        addAutomaticParticleTrails effects s1 cent ent = do
+          if effects .&. (complement Constants.efRotate) /= 0
+            then do
+              io (putStrLn "CLEnts.addAutomaticParticleTrails") >> undefined -- TODO
+            else
+              return ent
+
+        copyOrigin :: EntityStateT -> EntityT -> Quake ()
+        copyOrigin s1 ent =
+          globals.clEntities.ix (s1^.esNumber).ceLerpOrigin .= (ent^.eOrigin)
