@@ -71,4 +71,30 @@ registerTEntModels = do
 
 addTEnts :: Quake ()
 addTEnts = do
-    io (putStrLn "CLTEnt.addTEnts") >> undefined -- TODO
+    addBeams
+    -- PMM - draw plasma beams
+    addPlayerBeams
+    addExplosions
+    addLasers
+    -- PMM - set up sustain
+    processSustain
+
+addBeams :: Quake ()
+addBeams = do
+    io (putStrLn "CLTEnt.addBeams") >> undefined -- TODO
+
+addPlayerBeams :: Quake ()
+addPlayerBeams = do
+    io (putStrLn "CLTEnt.addPlayerBeams") >> undefined -- TODO
+
+addExplosions :: Quake ()
+addExplosions = do
+    io (putStrLn "CLTEnt.addExplosions") >> undefined -- TODO
+
+addLasers :: Quake ()
+addLasers = do
+    io (putStrLn "CLTEnt.addLasers") >> undefined -- TODO
+
+processSustain :: Quake ()
+processSustain = do
+    io (putStrLn "CLTEnt.processSustain") >> undefined -- TODO
