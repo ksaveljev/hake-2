@@ -538,3 +538,14 @@ fileLinkMatch name fileLink =
     let from = fileLink^.flFrom
         len = fileLink^.flFromLength
     in B.take len name == B.take len from
+
+developerSearchPath :: Int -> Quake Int
+developerSearchPath who = do
+    searchPaths <- use $ fsGlobals.fsSearchPaths
+    return $ findPath searchPaths
+
+  where findPath :: [SearchPathT] -> Int
+        findPath [] = 0
+        findPath (x:xs) = if | "xatrix" `BC.isInfixOf` (x^.spFilename) -> 1
+                             | "rogue" `BC.isInfixOf` (x^.spFilename) -> 2
+                             | otherwise -> findPath xs
