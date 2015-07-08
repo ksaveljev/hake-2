@@ -2,12 +2,13 @@
 module Client.CLTEnt where
 
 import Control.Lens (zoom, (.=), use, (^.))
-import Control.Monad (void)
+import Control.Monad (void, when)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
 import qualified Constants
+import {-# SOURCE #-} qualified Client.V as ClientV
 
 clearTEnts :: Quake ()
 clearTEnts = do
@@ -93,7 +94,20 @@ addExplosions = do
 
 addLasers :: Quake ()
 addLasers = do
-    io (putStrLn "CLTEnt.addLasers") >> undefined -- TODO
+    lasers <- use $ clTEntGlobals.clteLasers
+    time <- use $ globals.cl.csTime
+    addLaser lasers time 0 Constants.maxLasers
+
+  where addLaser :: V.Vector LaserT -> Int -> Int -> Int -> Quake ()
+        addLaser lasers time idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let laser = lasers V.! idx
+
+              when ((laser^.lEndTime) >= time) $
+                ClientV.addEntity (laser^.lEnt)
+
+              addLaser lasers time (idx + 1) maxIdx
 
 processSustain :: Quake ()
 processSustain = do
