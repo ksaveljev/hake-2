@@ -4,7 +4,7 @@ module Client.CLTEnt where
 
 import Control.Lens (zoom, (.=), use, (^.), ix)
 import Control.Monad (void, when)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
 
@@ -198,4 +198,20 @@ addLasers = do
 
 processSustain :: Quake ()
 processSustain = do
-    io (putStrLn "CLTEnt.processSustain") >> undefined -- TODO
+    sustains <- use $ clTEntGlobals.clteSustains
+    time <- use $ globals.cl.csTime
+    process sustains time 0 Constants.maxSustains
+
+  where process :: V.Vector CLSustainT -> Int -> Int -> Int -> Quake ()
+        process sustains time idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let s = sustains V.! idx
+
+              if | (s^.clsEndTime) >= time && time >= (s^.clsNextThink) ->
+                     void $ (fromJust $ s^.clsThink) s
+                 | (s^.clsEndTime) < time ->
+                     clTEntGlobals.clteSustains.ix idx.clsId .= 0
+                 | otherwise -> return ()
+
+              process sustains time (idx + 1) maxIdx

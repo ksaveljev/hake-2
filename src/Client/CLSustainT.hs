@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.CLSustainT where
+module Client.CLSustainT ( CLSustainT(..)
+                         , module Client.CLSustainT
+                         ) where
 
 import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)

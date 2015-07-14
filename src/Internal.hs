@@ -1822,7 +1822,7 @@ data CLSustainT =
              , _clsColor         :: !Int
              , _clsCount         :: !Int
              , _clsMagnitude     :: !Int
-             , _clsThink         :: Maybe EntThink
+             , _clsThink         :: Maybe (CLSustainT -> Quake Bool)
              }
 
 data LaserT =
