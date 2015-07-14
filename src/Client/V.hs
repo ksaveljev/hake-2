@@ -223,8 +223,12 @@ addEntity ent = do
       vGlobals.vgRNumEntities += 1
 
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
-addLight _ _ _ _ _ = do
-    io (putStrLn "V.addLight") >> undefined -- TODO
+addLight org intensity r g b = do
+    numDLights <- use $ vGlobals.vgRNumDLights
+
+    unless (numDLights >= Constants.maxDLights) $ do
+      vGlobals.vgRDLights.ix numDLights .= DLightT org (V3 r g b) intensity
+      vGlobals.vgRNumDLights += 1
 
 addLightStyle :: Int -> Float -> Float -> Float -> Quake ()
 addLightStyle style r g b = do
