@@ -141,7 +141,7 @@ newtype MNodeReference = MNodeReference Int
 newtype SfxReference = SfxReference Int
 
 -- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
-data ModelReference = ModInlineReference !Int | ModKnownReference !Int
+data ModelReference = ModInlineReference !Int | ModKnownReference !Int deriving Eq
 
 data MNodeChild = MNodeChildReference !Int | MLeafChildReference !Int
 
