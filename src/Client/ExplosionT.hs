@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.ExplosionT where
+module Client.ExplosionT ( ExplosionT(..)
+                         , module Client.ExplosionT
+                         ) where
 
 import Control.Lens (makeLenses)
 import Linear (V3(..))

@@ -4,6 +4,7 @@ module Client.CLTEnt where
 
 import Control.Lens (zoom, (.=), use, (^.), ix)
 import Control.Monad (void, when)
+import Data.Bits (shiftR, (.|.))
 import Data.Maybe (isNothing, fromJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
@@ -13,6 +14,27 @@ import QuakeState
 import qualified Constants
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified Util.Lib as Lib
+
+exFree :: Int
+exFree = 0
+
+exExplosion :: Int
+exExplosion = 1
+
+exMisc :: Int
+exMisc = 2
+
+exFlash :: Int
+exFlash = 3
+
+exMFlash :: Int
+exMFlash = 4
+
+exPoly :: Int
+exPoly = 5
+
+exPoly2 :: Int
+exPoly2 = 6
 
 clearTEnts :: Quake ()
 clearTEnts = do
@@ -177,7 +199,91 @@ addPlayerBeams = do
 
 addExplosions :: Quake ()
 addExplosions = do
-    io (putStrLn "CLTEnt.addExplosions") >> undefined -- TODO
+    explosions <- use $ clTEntGlobals.clteExplosions
+    cl' <- use $ globals.cl
+    addExplosion explosions cl' 0 Constants.maxExplosions
+
+  where addExplosion :: V.Vector ExplosionT -> ClientStateT -> Int -> Int -> Quake ()
+        addExplosion explosions cl' idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ex = explosions V.! idx
+
+              if (ex^.eType) == exFree
+                then
+                  addExplosion explosions cl' (idx + 1) maxIdx
+                else do
+                  let frac = (fromIntegral (cl'^.csTime) - (ex^.eStart)) / 100
+                      f = truncate frac :: Int
+
+                  maybeEnt <- if | (ex^.eType) == exMFlash -> do
+                                     return $ if f >= (ex^.eFrames) - 1
+                                                then Nothing
+                                                else Just (ex^.eEnt)
+                 
+                                 | (ex^.eType) == exMisc -> do
+                                     return $ if f >= (ex^.eFrames) - 1
+                                                then Nothing
+                                                else Just $ (ex^.eEnt) { _eAlpha = 1 - frac / fromIntegral ((ex^.eFrames) - 1) }
+                 
+                                 | (ex^.eType) == exFlash -> do
+                                     return $ if f >= 1
+                                                then Nothing
+                                                else Just $ (ex^.eEnt) { _eAlpha = 1 }
+                 
+                                 | (ex^.eType) == exPoly -> do
+                                     return $ if f >= (ex^.eFrames) - 1
+                                                then Nothing
+                                                else let alpha = (16.0 - fromIntegral f) / 16
+                                                         skinNum = if f < 10
+                                                                     then if (f `shiftR` 1) < 0
+                                                                            then 0
+                                                                            else f `shiftR` 1
+                                                                     else if f < 13
+                                                                            then 5
+                                                                            else 6
+                                                         flags = if f < 10
+                                                                   then (ex^.eEnt.enFlags)
+                                                                   else (ex^.eEnt.enFlags) .|. Constants.rfTranslucent
+                                                     in Just $ (ex^.eEnt) { _eAlpha = alpha
+                                                                          , _eSkinNum = skinNum
+                                                                          , _enFlags = flags
+                                                                          }
+                 
+                                 | (ex^.eType) == exPoly2 -> do
+                                     return $ if f >= (ex^.eFrames) - 1
+                                                then Nothing
+                                                else let alpha = (5.0 - fromIntegral f) / 5.0
+                                                         flags = (ex^.eEnt.enFlags) .|. Constants.rfTranslucent
+                                                     in Just $ (ex^.eEnt) { _eAlpha = alpha
+                                                                          , _eSkinNum = 0
+                                                                          , _enFlags = flags
+                                                                          }
+
+                                 | otherwise -> return Nothing -- shouldn't happend tbh
+
+                         
+                  case maybeEnt of
+                    Nothing -> do
+                      clTEntGlobals.clteExplosions.ix idx.eType .= exFree
+                      addExplosion explosions cl' (idx + 1) maxIdx
+                    Just ent -> do
+                      when ((ex^.eLight) /= 0) $
+                        ClientV.addLight (ent^.eOrigin)
+                                         ((ex^.eLight) * (ent^.eAlpha))
+                                         (ex^.eLightColor._x)
+                                         (ex^.eLightColor._y)
+                                         (ex^.eLightColor._z)
+
+                      let f' = if f < 0 then 0 else f
+
+                      ClientV.addEntity ent { _eOldOrigin = ent^.eOrigin
+                                            , _eFrame = (ex^.eBaseFrame) + f' + 1
+                                            , _eOldFrame = (ex^.eBaseFrame) + f'
+                                            , _eBackLerp = 1 - (cl'^.csLerpFrac)
+                                            }
+
+                      addExplosion explosions cl' (idx + 1) maxIdx
 
 addLasers :: Quake ()
 addLasers = do
