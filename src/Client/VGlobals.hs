@@ -1,5 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.VGlobals where
+module Client.VGlobals ( module Client.VGlobals
+                       , module Client.DLightT
+                       , module Client.EntityT
+                       , module Client.LightStyleT
+                       ) where
 
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V

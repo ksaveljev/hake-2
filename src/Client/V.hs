@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.V where
 
-import Control.Lens (use, (^.), (.=), (+=), zoom, ix)
+import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse)
 import Control.Monad (void, unless, liftM, when)
 import Data.Maybe (isJust)
 import Linear (V3(..), V4(..))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
@@ -223,3 +225,10 @@ addEntity ent = do
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
 addLight _ _ _ _ _ = do
     io (putStrLn "V.addLight") >> undefined -- TODO
+
+addLightStyle :: Int -> Float -> Float -> Float -> Quake ()
+addLightStyle style r g b = do
+    when (style < 0 || style > Constants.maxLightStyles) $
+      Com.comError Constants.errDrop ("Bad light style " `B.append` BC.pack (show style)) -- IMPROVE?
+
+    vGlobals.vgRLightStyles.ix style .= LightStyleT (V3 r g b) (r + g + b)
