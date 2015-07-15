@@ -103,4 +103,6 @@ initialFastRenderAPIGlobals =
                        , _frSkyImages            = V.replicate 6 Nothing
                        , _frSkyMin               = 0
                        , _frSkyMax               = 0
+                       , _frCBrushPolys          = 0
+                       , _frCAliasPolys          = 0
                        }

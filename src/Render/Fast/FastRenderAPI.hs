@@ -8,7 +8,7 @@ import Control.Lens ((.=), (^.), use, zoom, (+=))
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 import Foreign.Marshal.Array (withArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import Linear (_x, _y, _z)
@@ -27,11 +27,13 @@ import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified Graphics.Rendering.OpenGL.Raw as GL
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Light as Light
 import qualified Render.Fast.Model as Model
+import qualified Render.Fast.Surf as Surf
 import qualified Render.Fast.Warp as Warp
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
@@ -705,9 +707,59 @@ fastRenderFrame fd = do
     setLightLevel
     setGL2D
 
+{-
+- R_RenderView
+- r_newrefdef must be set before the first call
+-}
 renderView :: RefDefT -> Quake ()
 renderView fd = do
-    io (putStrLn "FastRenderAPI.renderView") >> undefined -- TODO
+    noRefreshValue <- liftM (^.cvValue) noRefreshCVar
+
+    when (noRefreshValue == 0) $ do
+      fastRenderAPIGlobals.frNewRefDef .= fd
+
+      {-
+      when (isNothing fd) $
+        Com.comError Constants.errDrop "R_RenderView: refdef_t fd is null"
+        -}
+
+      worldModel <- use $ fastRenderAPIGlobals.frWorldModel
+
+      when (isNothing worldModel && ((fd^.rdRdFlags) .&. Constants.rdfNoWorldModel) == 0) $
+        Com.comError Constants.errDrop "R_RenderView: NULL worldmodel"
+
+      speedsValue <- liftM (^.cvValue) speedsCVar
+      when (speedsValue /= 0) $ do
+        fastRenderAPIGlobals.frCBrushPolys .= 0
+        fastRenderAPIGlobals.frCAliasPolys .= 0
+
+      Light.rPushDLights
+
+      glFinishValue <- liftM (^.cvValue) glFinishCVar
+      when (glFinishValue /= 0) $
+        GL.glFinish
+
+      rSetupFrame
+
+      rSetFrustum
+
+      rSetupGL
+
+      Surf.rMarkLeaves -- done here so we know if we're in water
+
+      Surf.rDrawWorld
+
+      rDrawEntitiesOnList
+
+      Light.rRenderDLights
+
+      rDrawParticles
+
+      Surf.rDrawAlphaSurfaces
+
+      rFlash
+
+      -- TODO: add VID.printf like in jake2 to print some info
 
 setLightLevel :: Quake ()
 setLightLevel = do
@@ -750,3 +802,27 @@ setGL2D = do
     GL.glDisable GL.gl_BLEND
     GL.glEnable GL.gl_ALPHA_TEST
     GL.glColor4f 1 1 1 1
+
+rSetupFrame :: Quake ()
+rSetupFrame = do
+    io (putStrLn "FastRenderAPI.rSetupFrame") >> undefined -- TODO
+
+rSetFrustum :: Quake ()
+rSetFrustum = do
+    io (putStrLn "FastRenderAPI.rSetFrustum") >> undefined -- TODO
+
+rSetupGL :: Quake ()
+rSetupGL = do
+    io (putStrLn "FastRenderAPI.rSetupGL") >> undefined -- TODO
+
+rDrawEntitiesOnList :: Quake ()
+rDrawEntitiesOnList = do
+    io (putStrLn "FastRenderAPI.rDrawEntitiesOnList") >> undefined -- TODO
+
+rDrawParticles :: Quake ()
+rDrawParticles = do
+    io (putStrLn "FastRenderAPI.rDrawParticles") >> undefined -- TODO
+
+rFlash :: Quake ()
+rFlash = do
+    io (putStrLn "FastRenderAPI.rFlash") >> undefined -- TODO

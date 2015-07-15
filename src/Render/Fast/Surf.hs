@@ -209,3 +209,15 @@ lmUploadBlock dynamic = do
         use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture) >>= \clt ->
           when (clt == Constants.maxLightMaps) $
             Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
+
+rMarkLeaves :: Quake ()
+rMarkLeaves = do
+    io (putStrLn "Surf.rMarkLeaves") >> undefined -- TODO
+
+rDrawWorld :: Quake ()
+rDrawWorld = do
+    io (putStrLn "Surf.rDrawWorld") >> undefined -- TODO
+
+rDrawAlphaSurfaces :: Quake ()
+rDrawAlphaSurfaces = do
+    io (putStrLn "Surf.rDrawAlphaSurfaces") >> undefined -- TODO

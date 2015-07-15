@@ -1620,6 +1620,8 @@ data FastRenderAPIGlobals =
                        , _frSkyImages            :: V.Vector (Maybe ImageReference)
                        , _frSkyMin               :: !Float
                        , _frSkyMax               :: !Float
+                       , _frCBrushPolys          :: !Int
+                       , _frCAliasPolys          :: !Int
                        }
 
 data ParticleTGlobals =
