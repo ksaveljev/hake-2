@@ -45,7 +45,7 @@ fastRenderAPI =
               , _rDrawFindPic       = \_ -> Draw.findPic
               , _rSetSky            = \_ -> Warp.rSetSky
               , _rEndRegistration   = \_ -> Model.rEndRegistration
-              , _rRenderFrame       = DT.trace "FastRenderAPI.rRenderFrame" undefined -- TODO
+              , _rRenderFrame       = \_ -> fastRenderFrame
               , _rDrawGetPicSize    = \_ -> Draw.getPicSize
               , _rDrawPic           = \_ -> Draw.drawPic
               , _rDrawStretchPic    = \_ -> Draw.stretchPic
@@ -713,3 +713,22 @@ rClear = do
     depthMin <- use $ fastRenderAPIGlobals.frGLDepthMin
     depthMax <- use $ fastRenderAPIGlobals.frGLDepthMax
     GL.glDepthRange (realToFrac depthMin) (realToFrac depthMax)
+
+fastRenderFrame :: RefDefT -> Quake ()
+fastRenderFrame fd = do
+    renderView fd
+    setLightLevel
+    setGL2D
+
+renderView :: RefDefT -> Quake ()
+renderView fd = do
+    io (putStrLn "FastRenderAPI.renderView") >> undefined -- TODO
+
+setLightLevel :: Quake ()
+setLightLevel = do
+    io (putStrLn "FastRenderAPI.setLightLevel") >> undefined -- TODO
+
+setGL2D :: Quake ()
+setGL2D = do
+    -- set 2D virtual screen size
+    io (putStrLn "FastRenderAPI.setGL2D") >> undefined -- TODO
