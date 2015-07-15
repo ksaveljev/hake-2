@@ -1622,6 +1622,7 @@ data FastRenderAPIGlobals =
                        , _frSkyMax               :: !Float
                        , _frCBrushPolys          :: !Int
                        , _frCAliasPolys          :: !Int
+                       , _frFrustum              :: V.Vector CPlaneT
                        }
 
 data ParticleTGlobals =

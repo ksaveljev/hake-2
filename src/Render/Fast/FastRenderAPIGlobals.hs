@@ -105,4 +105,5 @@ initialFastRenderAPIGlobals =
                        , _frSkyMax               = 0
                        , _frCBrushPolys          = 0
                        , _frCAliasPolys          = 0
+                       , _frFrustum              = V.replicate 4 newCPlaneT
                        }
