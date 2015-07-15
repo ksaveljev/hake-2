@@ -11,6 +11,7 @@ import Data.Char (toLower, toUpper)
 import Data.Maybe (fromMaybe)
 import Foreign.Marshal.Array (withArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import Linear (_x, _y, _z)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -29,6 +30,7 @@ import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
+import qualified Render.Fast.Light as Light
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Warp as Warp
 import qualified Render.OpenGL.QGLConstants as QGLConstants
@@ -709,7 +711,26 @@ renderView fd = do
 
 setLightLevel :: Quake ()
 setLightLevel = do
-    io (putStrLn "FastRenderAPI.setLightLevel") >> undefined -- TODO
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0) $ do
+      -- save off light value for server to look at (BIG HACK!)
+      light <- Light.rLightPoint (newRefDef^.rdViewOrg)
+
+      -- pick the greatest component, which should be the same
+      -- as the mono value returned by software
+      let v = if (light^._x) > (light^._y)
+                then do
+                  if (light^._x) > (light^._z)
+                    then 150 * (light^._x)
+                    else 150 * (light^._z)
+                else do
+                  if (light^._y) > (light^._z)
+                    then 150 * (light^._y)
+                    else 150 * (light^._z)
+
+      lightLevel <- clLightLevelCVar
+      CVar.update lightLevel { _cvValue = v }
 
 setGL2D :: Quake ()
 setGL2D = do
