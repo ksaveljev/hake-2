@@ -215,6 +215,10 @@ testLights :: Quake ()
 testLights = do
     io (putStrLn "V.testLights") >> undefined -- TODO
 
+addParticle :: V3 Float -> Int -> Float -> Quake ()
+addParticle _ _ _ = do
+    io (putStrLn "V.addParticle") >> undefined -- TODO
+
 addEntity :: EntityT -> Quake ()
 addEntity ent = do
     numEntities <- use $ vGlobals.vgRNumEntities

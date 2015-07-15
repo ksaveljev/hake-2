@@ -26,6 +26,10 @@ testEntities :: Quake ()
 
 testLights :: Quake ()
 
+addParticle :: V3 Float -> Int -> Float -> Quake ()
+
 addEntity :: EntityT -> Quake ()
 
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
+
+addLightStyle :: Int -> Float -> Float -> Float -> Quake ()

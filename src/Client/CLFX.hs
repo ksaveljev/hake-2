@@ -8,7 +8,7 @@ module Client.CLFX where
 import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
 import Control.Monad (unless, when)
 import Data.Char (ord)
-import Linear (V3(..))
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -17,7 +17,11 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import qualified Constants
+import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
+
+instantParticle :: Float
+instantParticle = -10000.0
 
 runDLights :: Quake ()
 runDLights = do
@@ -123,12 +127,88 @@ entityEvent _ = do
 
 addParticles :: Quake ()
 addParticles = do
-    io (putStrLn "CLFX.addParticles") >> undefined -- TODO
+    activeParticles <- use $ clientGlobals.cgActiveParticles
+    cl' <- use $ globals.cl
+    addParticle cl' activeParticles Nothing Nothing 0
+
+  where addParticle :: ClientStateT -> Maybe CParticleReference -> Maybe CParticleReference -> Maybe CParticleReference -> Float -> Quake ()
+        addParticle _ Nothing active _ _ =
+          clientGlobals.cgActiveParticles .= active
+        addParticle cl' (Just pRef@(CParticleReference particleIdx)) active tail time = do
+          Just p <- preuse $ clientGlobals.cgParticles.ix particleIdx
+          let next = p^.cpNext
+
+          (done, time', alpha) <- if (p^.cpAlphaVel) /= instantParticle
+                                    then do
+                                      let time' = (fromIntegral (cl'^.csTime) - (p^.cpTime)) * 0.001
+                                          alpha = (p^.cpAlpha) + time' * (p^.cpAlphaVel)
+
+                                      if alpha <= 0 -- faded out
+                                        then do
+                                          freeParticles <- use $ clientGlobals.cgFreeParticles
+                                          clientGlobals.cgParticles.ix particleIdx.cpNext .= Just freeParticles
+                                          clientGlobals.cgFreeParticles .= pRef
+                                          return (True, time', alpha)
+                                        else
+                                          return (False, time', alpha)
+                                    else
+                                      return (False, time, p^.cpAlpha)
+
+          if done
+            then
+              addParticle cl' next active tail time'
+            else do
+              clientGlobals.cgParticles.ix particleIdx.cpNext .= Nothing
+              (active', tail') <- case tail of
+                                    Nothing ->
+                                      return (Just pRef, Just pRef)
+                                    Just (CParticleReference idx) -> do
+                                      clientGlobals.cgParticles.ix idx.cpNext .= Just pRef
+                                      return (active, Just pRef)
+
+              let alpha' = if alpha > 1 then 1 else alpha
+                  color = truncate (p^.cpColor) :: Int
+                  time2 = time' * time'
+                  org = (p^.cpOrg) + fmap (* time') (p^.cpVel) + fmap (* time2) (p^.cpAccel)
+
+              ClientV.addParticle org color alpha'
+
+              when ((p^.cpAlphaVel) == instantParticle) $
+                zoom (clientGlobals.cgParticles.ix particleIdx) $ do
+                  cpAlphaVel .= 0
+                  cpAlpha .= 0
+
+              addParticle cl' next active' tail' time'
 
 addDLights :: Quake ()
 addDLights = do
-    io (putStrLn "CLFX.addDLights") >> undefined -- TODO
+    -- TODO: currently simplified version... need to update it to reflect
+    -- jake2 version correctly
+    dlights <- use $ clientGlobals.cgDLights
+    addDLight dlights 0 Constants.maxDLights
+
+  where addDLight :: V.Vector CDLightT -> Int -> Int -> Quake ()
+        addDLight dlights idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let dl = dlights V.! idx
+              
+              if (dl^.cdlRadius) == 0
+                then
+                  addDLight dlights (idx + 1) maxIdx
+                else do
+                  ClientV.addLight (dl^.cdlOrigin) (dl^.cdlRadius) (dl^.cdlColor._x) (dl^.cdlColor._y) (dl^.cdlColor._z)
+                  addDLight dlights (idx + 1) maxIdx
 
 addLightStyles :: Quake ()
 addLightStyles = do
-    io (putStrLn "CLFX.addLightStyles") >> undefined -- TODO
+    lightStyles <- use $ clientGlobals.cgLightStyle
+    addLightStyle lightStyles 0 Constants.maxLightStyles
+
+  where addLightStyle :: V.Vector CLightStyleT -> Int -> Int -> Quake ()
+        addLightStyle lightStyles idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ls = lightStyles V.! idx
+              ClientV.addLightStyle idx (ls^.clsValue._x) (ls^.clsValue._y) (ls^.clsValue._z)
+              addLightStyle lightStyles (idx + 1) maxIdx
