@@ -611,7 +611,7 @@ fastBeginFrame glDriver cameraSeparation = do
     (glDriver^.gldBeginFrame) cameraSeparation
 
     -- go into 2D mode
-    goInto2DMode
+    setGL2D
 
     -- draw buffer stuff
     drawBufferStuff
@@ -625,24 +625,7 @@ fastBeginFrame glDriver cameraSeparation = do
     -- clear screen if desired
     rClear
 
-  where goInto2DMode :: Quake ()
-        goInto2DMode = do
-          vid <- use $ fastRenderAPIGlobals.frVid
-          let width = vid^.vdWidth
-              height = vid^.vdHeight
-          GL.glViewport 0 0 (fromIntegral width) (fromIntegral height)
-          GL.glMatrixMode GL.gl_PROJECTION
-          GL.glLoadIdentity
-          GL.glOrtho 0 (fromIntegral width) (fromIntegral height) 0 (-99999) 99999
-          GL.glMatrixMode GL.gl_MODELVIEW
-          GL.glLoadIdentity
-          GL.glDisable GL.gl_DEPTH_TEST
-          GL.glDisable GL.gl_CULL_FACE
-          GL.glDisable GL.gl_BLEND
-          GL.glEnable GL.gl_ALPHA_TEST
-          GL.glColor4f 1 1 1 1
-
-        drawBufferStuff :: Quake ()
+  where drawBufferStuff :: Quake ()
         drawBufferStuff = do
           drawBuffer <- glDrawBufferCVar
 
@@ -730,5 +713,19 @@ setLightLevel = do
 
 setGL2D :: Quake ()
 setGL2D = do
+    vid <- use $ fastRenderAPIGlobals.frVid
+    let width = vid^.vdWidth
+        height = vid^.vdHeight
+
     -- set 2D virtual screen size
-    io (putStrLn "FastRenderAPI.setGL2D") >> undefined -- TODO
+    GL.glViewport 0 0 (fromIntegral width) (fromIntegral height)
+    GL.glMatrixMode GL.gl_PROJECTION
+    GL.glLoadIdentity
+    GL.glOrtho 0 (fromIntegral width) (fromIntegral height) 0 (-99999) 99999
+    GL.glMatrixMode GL.gl_MODELVIEW
+    GL.glLoadIdentity
+    GL.glDisable GL.gl_DEPTH_TEST
+    GL.glDisable GL.gl_CULL_FACE
+    GL.glDisable GL.gl_BLEND
+    GL.glEnable GL.gl_ALPHA_TEST
+    GL.glColor4f 1 1 1 1
