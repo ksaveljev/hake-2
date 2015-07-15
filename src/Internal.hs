@@ -1623,6 +1623,7 @@ data FastRenderAPIGlobals =
                        , _frCBrushPolys          :: !Int
                        , _frCAliasPolys          :: !Int
                        , _frFrustum              :: V.Vector CPlaneT
+                       , _frDLightFrameCount     :: Int
                        }
 
 data ParticleTGlobals =
