@@ -8,13 +8,15 @@ import Control.Lens ((.=), (^.), use, zoom, (+=), preuse, ix)
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
+import Data.Int (Int8)
 import Data.Maybe (fromMaybe, isNothing, fromJust)
 import Foreign.Marshal.Array (withArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, dot)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
@@ -875,7 +877,34 @@ rSetupFrame = do
 
 rSetFrustum :: Quake ()
 rSetFrustum = do
-    io (putStrLn "FastRenderAPI.rSetFrustum") >> undefined -- TODO
+    vup <- use $ fastRenderAPIGlobals.frVUp
+    vright <- use $ fastRenderAPIGlobals.frVRight
+    vpn <- use $ fastRenderAPIGlobals.frVPn
+
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    frustum <- use $ fastRenderAPIGlobals.frFrustum
+
+                               -- rotate VPN right by FOV_X/2 degrees
+    let normals = V.fromList [ Math3D.rotatePointAroundVector vup vpn (0 - (90 - (newRefDef^.rdFovX) / 2))
+                               -- rotate VPN left by FOV_x/2 degrees
+                             , Math3D.rotatePointAroundVector vup vpn (90 - (newRefDef^.rdFovX) / 2)
+                               -- rotate VPN up by FOV_Y/2 degrees
+                             , Math3D.rotatePointAroundVector vright vpn (90 - (newRefDef^.rdFovY) / 2)
+                               -- rotate VPN down by FOV_Y/2 degrees
+                             , Math3D.rotatePointAroundVector vright vpn (0 - (90 - (newRefDef^.rdFovY) / 2))
+                             ]
+
+    origin <- use $ fastRenderAPIGlobals.frOrigin
+    let frustum' = V.imap (updateFrustum normals origin) frustum
+    fastRenderAPIGlobals.frFrustum .= frustum'
+
+  where updateFrustum :: V.Vector (V3 Float) -> V3 Float -> Int -> CPlaneT -> CPlaneT
+        updateFrustum normals origin idx plane =
+          plane { _cpNormal = normals V.! idx
+                , _cpType = fromIntegral Constants.planeAnyZ
+                , _cpDist = origin `dot` (normals V.! idx)
+                , _cpSignBits = signbitsForPlane plane
+                }
 
 rSetupGL :: Quake ()
 rSetupGL = do
@@ -892,3 +921,10 @@ rDrawParticles = do
 rFlash :: Quake ()
 rFlash = do
     io (putStrLn "FastRenderAPI.rFlash") >> undefined -- TODO
+
+signbitsForPlane :: CPlaneT -> Int8
+signbitsForPlane out =
+    let a = if (out^.cpNormal._x) < 0 then 1 else 0
+        b = if (out^.cpNormal._y) < 0 then 2 else 0
+        c = if (out^.cpNormal._z) < 0 then 4 else 0
+    in a .|. b .|. c
