@@ -1614,7 +1614,7 @@ data FastRenderAPIGlobals =
                        , _frNewRefDef            :: RefDefT
                        , _frFrameCount           :: !Int
                        , _frWarpFace             :: Maybe MSurfaceT
-                       , _frModelVisibility      :: B.ByteString
+                       , _frModelVisibility      :: Maybe B.ByteString
                        , _frSkyName              :: B.ByteString
                        , _frSkyRotate            :: !Float
                        , _frSkyAxis              :: V3 Float
@@ -1624,13 +1624,14 @@ data FastRenderAPIGlobals =
                        , _frCBrushPolys          :: !Int
                        , _frCAliasPolys          :: !Int
                        , _frFrustum              :: V.Vector CPlaneT
-                       , _frDLightFrameCount     :: Int
+                       , _frDLightFrameCount     :: !Int
                        , _frOrigin               :: V3 Float
                        , _frVUp                  :: V3 Float
                        , _frVPn                  :: V3 Float
                        , _frVRight               :: V3 Float
                        , _frVBlend               :: V4 Float
                        , _frWorldMatrix          :: [GL.GLfloat]
+                       , _frVisFrameCount        :: !Int
                        }
 
 data ParticleTGlobals =

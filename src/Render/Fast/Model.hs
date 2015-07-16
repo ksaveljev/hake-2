@@ -7,12 +7,14 @@ module Render.Fast.Model where
 import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal', _1, _2)
 import Control.Monad (when, liftM)
 import Data.Binary.IEEE754 (wordToFloat)
-import Data.Bits ((.|.), (.&.), shiftL)
+import Data.Bits ((.|.), (.&.), shiftL, shiftR)
 import Data.Int (Int8, Int32)
 import Data.Maybe (isNothing, fromJust, isJust)
-import Data.Word (Word16, Word32)
+import Data.Monoid ((<>), mempty)
+import Data.Word (Word8, Word16, Word32)
 import Linear (V3(..), V4(..), norm, _x, _y, _z, dot)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
@@ -42,7 +44,7 @@ import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
-import qualified Render.Fast.Surf as Surf
+import {-# SOURCE #-} qualified Render.Fast.Surf as Surf
 import qualified Render.Fast.Warp as Warp
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
@@ -601,7 +603,7 @@ loadVisibility buffer lump = do
             buf' = BL.fromStrict buf
             vis = newDVisT buf'
 
-        fastRenderAPIGlobals.frModelVisibility .= buf
+        fastRenderAPIGlobals.frModelVisibility .= Just buf
         fastRenderAPIGlobals.frModKnown.ix modelIdx.mVis .= Just vis
 
 loadLeafs :: B.ByteString -> LumpT -> Quake ()
@@ -889,3 +891,52 @@ pointInLeaf p model = findLeaf ((model^.mNodes) V.! 0)
           in case child of
                MNodeChildReference idx -> findLeaf ((model^.mNodes) V.! idx)
                MLeafChildReference idx -> (model^.mLeafs) V.! idx
+
+clusterPVS :: Int -> ModelT -> Quake B.ByteString
+clusterPVS cluster model = do
+    if cluster == -1 || isNothing (model^.mVis)
+      then
+        use $ fastRenderAPIGlobals.frModNoVis
+      else do
+        modelVisibility <- use $ fastRenderAPIGlobals.frModelVisibility
+        let vis = fromJust (model^.mVis)
+        -- TODO: instead of directly using _1 we should somehow use Constants.dvisPvs
+        return $ decompressVis modelVisibility (((vis^.dvBitOfs) V.! cluster)^._1) model
+
+decompressVis :: Maybe B.ByteString -> Int -> ModelT -> B.ByteString
+decompressVis maybeModelVisibility offset model =
+    let vis = fromJust (model^.mVis)
+        row = ((vis^.dvNumClusters) + 7) `shiftR` 3
+    in case maybeModelVisibility of
+         Nothing -> B.unfoldr (\idx -> if | idx >= Constants.maxMapLeafs `div` 8 -> Nothing
+                                          | idx < row -> Just (0xFF, idx + 1)
+                                          | otherwise -> Just (0, idx + 1)
+
+                              ) 0
+         Just modelVisibility -> buildVis modelVisibility row offset 0 mempty
+
+  where buildVis :: B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
+        buildVis modelVisibility row inp outp builder =
+          if (modelVisibility `B.index` inp) /= 0
+            then let builder' = builder <> BB.word8 (modelVisibility `B.index` inp)
+                 in if outp + 1 < row
+                      then buildVis modelVisibility row (inp + 1) (outp + 1) builder'
+                      else let result = BL.toStrict (BB.toLazyByteString builder')
+                               diff = Constants.maxMapLeafs `div` 8 - (B.length result)
+                           in if diff > 0
+                                then result `B.append` (B.replicate diff 0)
+                                else result
+            else let c = modelVisibility `B.index` (inp + 1)
+                     builder' = buildEmpty builder c
+                 in if outp + fromIntegral c < row
+                      then buildVis modelVisibility row (inp + 1) (outp + fromIntegral c) builder'
+                      else let result = BL.toStrict (BB.toLazyByteString builder')
+                               diff = Constants.maxMapLeafs `div` 8 - (B.length result)
+                           in if diff > 0
+                                then result `B.append` (B.replicate diff 0)
+                                else result
+
+        buildEmpty :: BB.Builder -> Word8 -> BB.Builder
+        buildEmpty builder c
+          | c <= 0 = builder
+          | otherwise = buildEmpty (builder <> (BB.word8 0)) (c - 1)

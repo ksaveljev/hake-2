@@ -96,7 +96,7 @@ initialFastRenderAPIGlobals =
                        , _frNewRefDef            = newRefDefT
                        , _frFrameCount           = 0
                        , _frWarpFace             = Nothing
-                       , _frModelVisibility      = ""
+                       , _frModelVisibility      = Nothing
                        , _frSkyName              = ""
                        , _frSkyRotate            = 0
                        , _frSkyAxis              = V3 0 0 0
@@ -113,4 +113,5 @@ initialFastRenderAPIGlobals =
                        , _frVRight               = V3 0 0 0
                        , _frVBlend               = V4 0 0 0 0
                        , _frWorldMatrix          = replicate 16 0
+                       , _frVisFrameCount        = 0
                        }

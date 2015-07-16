@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.Surf where
 
-import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=))
-import Control.Monad (when)
+import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=))
+import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toUpper)
+import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -22,6 +23,7 @@ import Client.LightStyleT
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
+import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
@@ -210,9 +212,59 @@ lmUploadBlock dynamic = do
           when (clt == Constants.maxLightMaps) $
             Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
 
+{-
+- R_MarkLeaves
+- Mark the leaves and nodes that are in the PVS for
+- the current cluster
+-}
 rMarkLeaves :: Quake ()
 rMarkLeaves = do
-    io (putStrLn "Surf.rMarkLeaves") >> undefined -- TODO
+    oldViewCluster <- use $ fastRenderAPIGlobals.frOldViewCluster
+    oldViewCluster2 <- use $ fastRenderAPIGlobals.frOldViewCluster2
+    viewCluster <- use $ fastRenderAPIGlobals.frViewCluster
+    viewCluster2 <- use $ fastRenderAPIGlobals.frViewCluster2
+    noVisValue <- liftM (^.cvValue) noVisCVar
+
+    unless (oldViewCluster == viewCluster && oldViewCluster2 == viewCluster2 && noVisValue == 0 && viewCluster /= -1) $ do
+      -- TODO: implement this development stuff
+      -- if (gl_lockpvs.value != 0)
+      --     return;
+
+      zoom fastRenderAPIGlobals $ do
+        frVisFrameCount += 1
+        frOldViewCluster .= viewCluster
+        frOldViewCluster2 .= viewCluster2
+
+      worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      Just worldModel <- case fromJust worldModelRef of
+                           ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                           ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+      if noVisValue /= 0 || viewCluster == -1 || isNothing (worldModel^.mVis)
+        then do
+          -- mark everything
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+          case fromJust worldModelRef of
+            ModKnownReference modelIdx -> do
+              fastRenderAPIGlobals.frModKnown.ix modelIdx.mLeafs %= V.map (\leaf -> leaf { _mlVisFrame = visFrameCount })
+              fastRenderAPIGlobals.frModKnown.ix modelIdx.mNodes %= V.map (\node -> node { _mnVisFrame = visFrameCount })
+
+            ModInlineReference modelIdx -> do
+              fastRenderAPIGlobals.frModInline.ix modelIdx.mLeafs %= V.map (\leaf -> leaf { _mlVisFrame = visFrameCount })
+              fastRenderAPIGlobals.frModInline.ix modelIdx.mNodes %= V.map (\node -> node { _mnVisFrame = visFrameCount })
+        else do
+          let vis = Model.clusterPVS viewCluster worldModel
+
+          -- may have to combine two clusters because of solid water boundaries
+          vis' <- if viewCluster2 /= viewCluster
+                    then combineClusters worldModel viewCluster2
+                    else vis
+
+          io (putStrLn "Surf.rMarkLeaves") >> undefined -- TODO
+
+  where combineClusters :: ModelT -> Int -> Quake B.ByteString
+        combineClusters worldModel viewCluster2 = do
+          undefined -- TODO
 
 rDrawWorld :: Quake ()
 rDrawWorld = do
