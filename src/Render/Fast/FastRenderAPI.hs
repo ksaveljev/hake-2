@@ -4,14 +4,14 @@
 module Render.Fast.FastRenderAPI where
 
 import Control.Exception (handle, IOException)
-import Control.Lens ((.=), (^.), use, zoom, (+=))
+import Control.Lens ((.=), (^.), use, zoom, (+=), preuse, ix)
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (fromMaybe, isNothing, fromJust)
 import Foreign.Marshal.Array (withArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Linear (_x, _y, _z)
+import Linear (V3(..), _x, _y, _z)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -37,6 +37,7 @@ import qualified Render.Fast.Surf as Surf
 import qualified Render.Fast.Warp as Warp
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
+import qualified Util.Math3D as Math3D
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -805,7 +806,72 @@ setGL2D = do
 
 rSetupFrame :: Quake ()
 rSetupFrame = do
-    io (putStrLn "FastRenderAPI.rSetupFrame") >> undefined -- TODO
+    fastRenderAPIGlobals.frFrameCount += 1
+
+    -- build the transformation matrix for the given view angles
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    let (Just vpn, Just vright, Just vup) = Math3D.angleVectors (newRefDef^.rdViewAngles) True True True
+
+    zoom fastRenderAPIGlobals $ do
+      frOrigin .= (newRefDef^.rdViewOrg)
+      frVPn .= vpn
+      frVRight .= vright
+      frVUp .= vup
+
+    -- current viewcluster
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0) $ do
+      viewCluster <- use $ fastRenderAPIGlobals.frViewCluster
+      viewCluster2 <- use $ fastRenderAPIGlobals.frViewCluster2
+
+      fastRenderAPIGlobals.frOldViewCluster .= viewCluster
+      fastRenderAPIGlobals.frOldViewCluster2 .= viewCluster2
+
+      worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      Just worldModel <- case fromJust worldModelRef of
+                           ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                           ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+      let leaf = Model.pointInLeaf (newRefDef^.rdViewOrg) worldModel
+          newViewCluster = leaf^.mlCluster
+
+      fastRenderAPIGlobals.frViewCluster .= newViewCluster
+      fastRenderAPIGlobals.frViewCluster2 .= newViewCluster
+
+      -- check above and below so crossing solid water doesn't draw wrong
+      if (leaf^.mlContents) == 0 -- look down a bit
+        then do
+          let V3 a b c = newRefDef^.rdViewOrg
+              temp = V3 a b (c - 16)
+              leaf' = Model.pointInLeaf temp worldModel
+
+          when ((leaf'^.mlContents) .&. Constants.contentsSolid == 0 && (leaf'^.mlCluster) /= newViewCluster) $
+            fastRenderAPIGlobals.frViewCluster2 .= (leaf'^.mlCluster)
+
+        else do -- look up a bit
+          let V3 a b c = newRefDef^.rdViewOrg
+              temp = V3 a b (c + 16)
+              leaf' = Model.pointInLeaf temp worldModel
+
+          when ((leaf'^.mlContents) .&. Constants.contentsSolid == 0 && (leaf'^.mlCluster) /= newViewCluster) $
+            fastRenderAPIGlobals.frViewCluster2 .= (leaf'^.mlCluster)
+
+    zoom fastRenderAPIGlobals $ do
+      frVBlend .= (newRefDef^.rdBlend)
+      frCBrushPolys .= 0
+      frCAliasPolys .= 0
+
+    -- clear out the portion of the screen that the NOWORLDMODEL defines
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel /= 0) $ do
+      vid <- use $ fastRenderAPIGlobals.frVid
+
+      GL.glEnable GL.gl_SCISSOR_TEST
+      GL.glClearColor 0.3 0.3 0.3 1.0
+      GL.glScissor (fromIntegral $ newRefDef^.rdX)
+                   (fromIntegral $ (vid^.vdHeight) - (newRefDef^.rdHeight) - (newRefDef^.rdY))
+                   (fromIntegral $ newRefDef^.rdWidth)
+                   (fromIntegral $ newRefDef^.rdHeight)
+      GL.glClear (GL.gl_COLOR_BUFFER_BIT .|. GL.gl_DEPTH_BUFFER_BIT)
+      GL.glClearColor 1.0 0.0 0.5 0.5
+      GL.glDisable GL.gl_SCISSOR_TEST
 
 rSetFrustum :: Quake ()
 rSetFrustum = do

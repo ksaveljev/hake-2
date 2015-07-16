@@ -11,7 +11,7 @@ module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobal
                                         ) where
 
 import Control.Lens (makeLenses)
-import Linear (V3(..))
+import Linear (V3(..), V4(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -107,4 +107,9 @@ initialFastRenderAPIGlobals =
                        , _frCAliasPolys          = 0
                        , _frFrustum              = V.replicate 4 newCPlaneT
                        , _frDLightFrameCount     = 0
+                       , _frOrigin               = V3 0 0 0
+                       , _frVUp                  = V3 0 0 0
+                       , _frVPn                  = V3 0 0 0
+                       , _frVRight               = V3 0 0 0
+                       , _frVBlend               = V4 0 0 0 0
                        }

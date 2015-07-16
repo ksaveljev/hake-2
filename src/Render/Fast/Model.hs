@@ -4,14 +4,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.Model where
 
-import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal')
+import Control.Lens ((.=), (+=), preuse, ix, (^.), zoom, use, (%=), Traversal', _1, _2)
 import Control.Monad (when, liftM)
 import Data.Binary.IEEE754 (wordToFloat)
 import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Int (Int8, Int32)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Data.Word (Word16, Word32)
-import Linear (V3(..), V4(..), norm, _x, _y, _z)
+import Linear (V3(..), V4(..), norm, _x, _y, _z, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -656,8 +656,6 @@ loadNodes buffer lump = do
       mNodes .= (nodes V.// nodeUpdates)
       mLeafs %= (V.// leafUpdates)
 
-    --setParent modelIdx nodes (MNodeChildReference 0) Nothing
-
   where getDNodes :: Int -> Get (V.Vector DNodeT)
         getDNodes count = V.replicateM count getDNodeT
 
@@ -697,7 +695,6 @@ setParent nodes leafs childRef parentRef = collectUpdates childRef parentRef [] 
 
             MLeafChildReference idx ->
               (nodeAcc, (idx, (leafs V.! idx) { _mlParent = p }) : leafAcc)
-        
 
 {-
 setParent :: Int -> V.Vector MNodeT -> MNodeChild -> Maybe MNodeReference -> Quake ()
@@ -877,3 +874,18 @@ rEndRegistration = do
               case update of
                 Nothing -> checkModels modKnown regSeq (idx + 1) maxIdx updates
                 Just u -> checkModels modKnown regSeq (idx + 1) maxIdx (u : updates)
+
+-- TODO: make sure this is actually doing what the original does
+pointInLeaf :: V3 Float -> ModelT -> MLeafT
+pointInLeaf p model = findLeaf ((model^.mNodes) V.! 0)
+
+  where findLeaf :: MNodeT -> MLeafT
+        findLeaf node =
+          let plane = node^.mnPlane
+              d = p `dot` (plane^.cpNormal) - (plane^.cpDist)
+              child = if d > 0
+                        then node^.mnChildren._1
+                        else node^.mnChildren._2
+          in case child of
+               MNodeChildReference idx -> findLeaf ((model^.mNodes) V.! idx)
+               MLeafChildReference idx -> (model^.mLeafs) V.! idx

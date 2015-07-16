@@ -1624,6 +1624,11 @@ data FastRenderAPIGlobals =
                        , _frCAliasPolys          :: !Int
                        , _frFrustum              :: V.Vector CPlaneT
                        , _frDLightFrameCount     :: Int
+                       , _frOrigin               :: V3 Float
+                       , _frVUp                  :: V3 Float
+                       , _frVPn                  :: V3 Float
+                       , _frVRight               :: V3 Float
+                       , _frVBlend               :: V4 Float
                        }
 
 data ParticleTGlobals =
