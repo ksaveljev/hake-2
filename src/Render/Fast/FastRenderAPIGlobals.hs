@@ -112,4 +112,5 @@ initialFastRenderAPIGlobals =
                        , _frVPn                  = V3 0 0 0
                        , _frVRight               = V3 0 0 0
                        , _frVBlend               = V4 0 0 0 0
+                       , _frWorldMatrix          = replicate 16 0
                        }

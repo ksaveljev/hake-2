@@ -10,8 +10,9 @@ import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
 import Data.Int (Int8)
 import Data.Maybe (fromMaybe, isNothing, fromJust)
-import Foreign.Marshal.Array (withArray)
+import Foreign.Marshal.Array (withArray, allocaArray, peekArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
+import GHC.Float (float2Double)
 import Linear (V3(..), _x, _y, _z, dot)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
@@ -908,7 +909,56 @@ rSetFrustum = do
 
 rSetupGL :: Quake ()
 rSetupGL = do
-    io (putStrLn "FastRenderAPI.rSetupGL") >> undefined -- TODO
+    -- set up viewport
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    vid <- use $ fastRenderAPIGlobals.frVid
+
+    let x = newRefDef^.rdX
+        x2 = (newRefDef^.rdX) + (newRefDef^.rdWidth)
+        y = (vid^.vdHeight) - (newRefDef^.rdY)
+        y2 = (vid^.vdHeight) - ((newRefDef^.rdY) + (newRefDef^.rdHeight))
+        w = x2 - x
+        h = y - y2
+
+    GL.glViewport (fromIntegral x) (fromIntegral y2) (fromIntegral w) (fromIntegral h)
+
+    -- set up projection matrix
+    let screenAspect = fromIntegral (newRefDef^.rdWidth) / fromIntegral (newRefDef^.rdHeight) :: Float
+
+    GL.glMatrixMode GL.gl_PROJECTION
+    GL.glLoadIdentity
+
+    myGLUPerspective (float2Double $ newRefDef^.rdFovY) (float2Double screenAspect) 4 4096
+
+    GL.glCullFace GL.gl_FRONT
+
+    GL.glMatrixMode GL.gl_MODELVIEW
+    GL.glLoadIdentity
+
+    GL.glRotatef (-90) 1 0 0 -- put Z going up
+    GL.glRotatef 90 0 0 1 -- put Z going up
+    GL.glRotatef (realToFrac $ negate (newRefDef^.rdViewAngles._z)) 1 0 0
+    GL.glRotatef (realToFrac $ negate (newRefDef^.rdViewAngles._x)) 0 1 0
+    GL.glRotatef (realToFrac $ negate (newRefDef^.rdViewAngles._y)) 0 0 1
+    GL.glTranslatef (realToFrac $ negate (newRefDef^.rdViewOrg._x))
+                    (realToFrac $ negate (newRefDef^.rdViewOrg._y))
+                    (realToFrac $ negate (newRefDef^.rdViewOrg._z))
+
+    worldMatrix <- io $ allocaArray 16 $ \ptr -> do
+      GL.glGetFloatv GL.gl_MODELVIEW_MATRIX ptr
+      peekArray 16 ptr
+      -- TODO: clear array in jake2 but no clear in quake2 original
+    
+    fastRenderAPIGlobals.frWorldMatrix .= worldMatrix
+
+    glCullValue <- liftM (^.cvValue) glCullCVar
+    if glCullValue /= 0
+      then GL.glEnable GL.gl_CULL_FACE
+      else GL.glDisable GL.gl_CULL_FACE
+
+    GL.glDisable GL.gl_BLEND
+    GL.glDisable GL.gl_ALPHA_TEST
+    GL.glEnable GL.gl_DEPTH_TEST
 
 rDrawEntitiesOnList :: Quake ()
 rDrawEntitiesOnList = do
@@ -928,3 +978,21 @@ signbitsForPlane out =
         b = if (out^.cpNormal._y) < 0 then 2 else 0
         c = if (out^.cpNormal._z) < 0 then 4 else 0
     in a .|. b .|. c
+
+myGLUPerspective :: Double -> Double -> Double -> Double -> Quake ()
+myGLUPerspective fovY aspect zNear zFar = do
+    glState <- use $ fastRenderAPIGlobals.frGLState
+
+    let ymax = zNear * tan (fovY * pi / 360)
+        ymin = negate ymax
+        xmin = ymin * aspect
+        xmax = ymax * aspect
+        xmin' = xmin - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
+        xmax' = xmax - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
+
+    GL.glFrustum (realToFrac xmin)
+                 (realToFrac xmax)
+                 (realToFrac ymin)
+                 (realToFrac ymax)
+                 (realToFrac zNear)
+                 (realToFrac zFar)

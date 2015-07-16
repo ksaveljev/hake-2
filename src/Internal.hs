@@ -28,6 +28,7 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Client.ClientStaticT
 import Client.ConsoleT
@@ -1629,6 +1630,7 @@ data FastRenderAPIGlobals =
                        , _frVPn                  :: V3 Float
                        , _frVRight               :: V3 Float
                        , _frVBlend               :: V4 Float
+                       , _frWorldMatrix          :: [GL.GLfloat]
                        }
 
 data ParticleTGlobals =
