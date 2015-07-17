@@ -261,3 +261,7 @@ rSetSky name rotate axis = do
 clearSkyBox :: Quake ()
 clearSkyBox = do
     io (putStrLn "Warp.clearSkyBox") >> undefined -- TODO
+
+drawSkyBox :: Quake ()
+drawSkyBox = do
+    io (putStrLn "Warp.drawSkyBox") >> undefined -- TODO

@@ -338,6 +338,7 @@ rDrawWorld = do
       Warp.clearSkyBox
 
       Image.glEnableMultiTexture True
+
       Image.glSelectTexture QGLConstants.glTexture0
       Image.glTexEnv GL.gl_REPLACE
 
@@ -346,21 +347,29 @@ rDrawWorld = do
         GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
 
       Image.glSelectTexture QGLConstants.glTexture1
-      Image.glTexEnv GL.gl_MODULATE
 
       io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
         GL.glTexCoordPointer 2 GL.gl_FLOAT (fromIntegral byteStride) ptr
 
-      GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY
+      lightmapValue <- liftM (^.cvValue) glLightMapCVar
+      if lightmapValue /= 0
+        then Image.glTexEnv GL.gl_REPLACE
+        else Image.glTexEnv GL.gl_MODULATE
 
-      drawInlineBModel
+      Just worldModel <- case fromJust worldModelRef of
+                           ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                           ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+      recursiveWorldNode ((worldModel^.mNodes) V.! 0) -- root node
 
       GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture1)
       GL.glDisableClientState GL.gl_TEXTURE_COORD_ARRAY
 
       Image.glEnableMultiTexture False
 
-      GL.glPopMatrix
+      drawTextureChains
+      Warp.drawSkyBox
+      drawTriangleOutlines
 
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
@@ -369,3 +378,15 @@ rDrawAlphaSurfaces = do
 drawInlineBModel :: Quake ()
 drawInlineBModel = do
     io (putStrLn "Surf.drawInlineBModel") >> undefined -- TODO
+
+drawTextureChains :: Quake ()
+drawTextureChains = do
+    io (putStrLn "Surf.drawTextureChains") >> undefined -- TODO
+
+drawTriangleOutlines :: Quake ()
+drawTriangleOutlines = do
+    io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
+
+recursiveWorldNode :: MNodeT -> Quake ()
+recursiveWorldNode _ = do
+    io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
