@@ -257,3 +257,7 @@ rSetSky name rotate axis = do
                   setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx ((idx, imageRef') : acc) (1 / 256) (255 / 256)
                 else
                   setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx ((idx, imageRef') : acc) (1 / 512) (511 / 512)
+
+clearSkyBox :: Quake ()
+clearSkyBox = do
+    io (putStrLn "Warp.clearSkyBox") >> undefined -- TODO

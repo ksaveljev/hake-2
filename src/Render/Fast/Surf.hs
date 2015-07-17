@@ -25,6 +25,7 @@ import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Polygon as Polygon
+import qualified Render.Fast.Warp as Warp
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 
@@ -320,8 +321,51 @@ rMarkLeaves = do
 
 rDrawWorld :: Quake ()
 rDrawWorld = do
-    io (putStrLn "Surf.rDrawWorld") >> undefined -- TODO
+    drawWorldValue <- liftM (^.cvValue) drawWorldCVar
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+    unless (drawWorldValue == 0 || (newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel /= 0) $ do
+      worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      fastRenderAPIGlobals.frCurrentModel .= fromJust worldModelRef
+
+      fastRenderAPIGlobals.frModelOrg .= (newRefDef^.rdViewOrg)
+      fastRenderAPIGlobals.frCurrentEntity .= newEntityT { _eFrame = truncate ((newRefDef^.rdTime) * 2) }
+
+      fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
+
+      GL.glColor3f 1 1 1
+
+      Warp.clearSkyBox
+
+      Image.glEnableMultiTexture True
+      Image.glSelectTexture QGLConstants.glTexture0
+      Image.glTexEnv GL.gl_REPLACE
+
+      polygonBuffer <- use $ fastRenderAPIGlobals.frPolygonBuffer
+      io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+        GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
+
+      Image.glSelectTexture QGLConstants.glTexture1
+      Image.glTexEnv GL.gl_MODULATE
+
+      io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
+        GL.glTexCoordPointer 2 GL.gl_FLOAT (fromIntegral byteStride) ptr
+
+      GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+      drawInlineBModel
+
+      GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture1)
+      GL.glDisableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+      Image.glEnableMultiTexture False
+
+      GL.glPopMatrix
 
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
     io (putStrLn "Surf.rDrawAlphaSurfaces") >> undefined -- TODO
+
+drawInlineBModel :: Quake ()
+drawInlineBModel = do
+    io (putStrLn "Surf.drawInlineBModel") >> undefined -- TODO

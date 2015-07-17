@@ -15,6 +15,9 @@ maxVertices = 64
 stride :: Int
 stride = 7
 
+byteStride :: Int
+byteStride = 7 * 4 -- 4 = SIZEOF_FLOAT
+
 maxPolys :: Int
 maxPolys = 20000
 

@@ -1632,6 +1632,8 @@ data FastRenderAPIGlobals =
                        , _frVBlend               :: V4 Float
                        , _frWorldMatrix          :: [GL.GLfloat]
                        , _frVisFrameCount        :: !Int
+                       , _frModelOrg             :: V3 Float
+                       , _frCurrentEntity        :: EntityT
                        }
 
 data ParticleTGlobals =

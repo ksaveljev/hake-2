@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Render.Fast.FastRenderAPIGlobals ( module Render.Fast.FastRenderAPIGlobals
+                                        , module Client.EntityT
+                                        , module Client.RefDefT
                                         , module Client.VidDefT
                                         , module Render.Fast.GLLightMapStateT
                                         , module Render.GLConfigT
@@ -20,6 +22,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
+import Client.EntityT
 import Client.RefDefT
 import Client.VidDefT
 import Render.Fast.GLLightMapStateT
@@ -114,4 +117,6 @@ initialFastRenderAPIGlobals =
                        , _frVBlend               = V4 0 0 0 0
                        , _frWorldMatrix          = replicate 16 0
                        , _frVisFrameCount        = 0
+                       , _frModelOrg             = V3 0 0 0
+                       , _frCurrentEntity        = newEntityT
                        }
