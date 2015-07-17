@@ -3,7 +3,7 @@ module Render.Fast.Surf where
 
 import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=))
 import Control.Monad (when, liftM, unless)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Char (toUpper)
 import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
@@ -253,18 +253,70 @@ rMarkLeaves = do
               fastRenderAPIGlobals.frModInline.ix modelIdx.mLeafs %= V.map (\leaf -> leaf { _mlVisFrame = visFrameCount })
               fastRenderAPIGlobals.frModInline.ix modelIdx.mNodes %= V.map (\node -> node { _mnVisFrame = visFrameCount })
         else do
-          let vis = Model.clusterPVS viewCluster worldModel
+          vis <- Model.clusterPVS viewCluster worldModel
 
           -- may have to combine two clusters because of solid water boundaries
           vis' <- if viewCluster2 /= viewCluster
-                    then combineClusters worldModel viewCluster2
-                    else vis
+                    then combineClusters worldModel vis viewCluster2
+                    else return vis
 
-          io (putStrLn "Surf.rMarkLeaves") >> undefined -- TODO
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+          markLeaf (fromJust worldModelRef) vis' visFrameCount 0 (worldModel^.mNumLeafs)
 
-  where combineClusters :: ModelT -> Int -> Quake B.ByteString
-        combineClusters worldModel viewCluster2 = do
-          undefined -- TODO
+  where combineClusters :: ModelT -> B.ByteString -> Int -> Quake B.ByteString
+        combineClusters worldModel vis viewCluster2 = do
+          let len = ((worldModel^.mNumLeafs) + 7) `shiftR` 3
+              fatvis = B.take len vis `B.append` B.replicate ((Constants.maxMapLeafs `div` 8) - len) 0
+              c = (((worldModel^.mNumLeafs) + 31) `shiftR` 5) `shiftL` 2
+
+          vis' <- Model.clusterPVS viewCluster2 worldModel
+
+          let fatvis' = B.pack (B.zipWith (\a b -> a .|. b) (B.take c fatvis) (B.take c vis')) `B.append` (B.drop c fatvis)
+          return fatvis'
+
+        markLeaf :: ModelReference -> B.ByteString -> Int -> Int -> Int -> Quake ()
+        markLeaf worldModelRef vis visFrameCount idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just worldModel <- case worldModelRef of
+                                   ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                                   ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+              let leaf = (worldModel^.mLeafs) V.! idx
+                  cluster = leaf^.mlCluster
+
+              if cluster == -1
+                then
+                  markLeaf worldModelRef vis visFrameCount (idx + 1) maxIdx
+                else do
+                  when ((vis `B.index` (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) /= 0) $ do
+                    when ((leaf^.mlVisFrame) /= visFrameCount) $ do
+                      case worldModelRef of
+                        ModKnownReference modelIdx -> fastRenderAPIGlobals.frModKnown.ix modelIdx.mLeafs.ix idx.mlVisFrame .= visFrameCount
+                        ModInlineReference modelIdx ->fastRenderAPIGlobals.frModInline.ix modelIdx.mLeafs.ix idx.mlVisFrame .= visFrameCount
+
+                      updateNodes worldModelRef (leaf^.mlParent) visFrameCount
+
+                  markLeaf worldModelRef vis visFrameCount (idx + 1) maxIdx
+
+        updateNodes :: ModelReference -> Maybe MNodeReference -> Int -> Quake ()
+        updateNodes _ Nothing _ = return ()
+        updateNodes worldModelRef (Just (MNodeReference nodeIdx)) visFrameCount = do
+          Just worldModel <- case worldModelRef of
+                               ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                               ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+          let node = (worldModel^.mNodes) V.! nodeIdx
+
+          if (node^.mnVisFrame) == visFrameCount
+            then return ()
+            else do
+              case worldModelRef of
+                ModKnownReference modelIdx -> fastRenderAPIGlobals.frModKnown.ix modelIdx.mNodes.ix nodeIdx.mnVisFrame .= visFrameCount
+                ModInlineReference modelIdx -> fastRenderAPIGlobals.frModInline.ix modelIdx.mNodes.ix nodeIdx.mnVisFrame .= visFrameCount
+
+              updateNodes worldModelRef (node^.mnParent) visFrameCount
+
 
 rDrawWorld :: Quake ()
 rDrawWorld = do
