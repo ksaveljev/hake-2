@@ -260,7 +260,8 @@ rSetSky name rotate axis = do
 
 clearSkyBox :: Quake ()
 clearSkyBox = do
-    io (putStrLn "Warp.clearSkyBox") >> undefined -- TODO
+    fastRenderAPIGlobals.frSkyMins .= (V.replicate 6 9999, V.replicate 6 9999)
+    fastRenderAPIGlobals.frSkyMaxs .= (V.replicate 6 (-9999), V.replicate 6 (-9999))
 
 drawSkyBox :: Quake ()
 drawSkyBox = do

@@ -119,4 +119,6 @@ initialFastRenderAPIGlobals =
                        , _frVisFrameCount        = 0
                        , _frModelOrg             = V3 0 0 0
                        , _frCurrentEntity        = newEntityT
+                       , _frSkyMins              = (V.empty, V.empty)
+                       , _frSkyMaxs              = (V.empty, V.empty)
                        }
