@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Surf where
 
 import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=))
@@ -28,6 +29,7 @@ import qualified Render.Fast.Polygon as Polygon
 import qualified Render.Fast.Warp as Warp
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
+import qualified Util.Math3D as Math3D
 
 dummy :: B.ByteString
 dummy = B.replicate (4 * 128 * 128) 0
@@ -388,5 +390,28 @@ drawTriangleOutlines = do
     io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
 
 recursiveWorldNode :: MNodeT -> Quake ()
-recursiveWorldNode _ = do
+recursiveWorldNode node = do
+    nothingToDo <- checkIfNothingToDo
     io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
+
+  where checkIfNothingToDo :: Quake Bool
+        checkIfNothingToDo = do
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+
+          if | (node^.mnContents) == Constants.contentsSolid -> return True
+             | (node^.mnVisFrame) /= visFrameCount -> return True
+             | otherwise -> rCullBox (node^.mnMins) (node^.mnMaxs)
+
+rCullBox :: V3 Float -> V3 Float -> Quake Bool
+rCullBox mins maxs = do
+    noCullValue <- liftM (^.cvValue) noCullCVar
+
+    if noCullValue /= 0
+      then return False
+      else do
+        frustum <- use $ fastRenderAPIGlobals.frFrustum
+        if | Math3D.boxOnPlaneSide mins maxs (frustum V.! 0) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum V.! 1) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum V.! 2) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum V.! 3) == 2 -> return True
+           | otherwise -> return False
