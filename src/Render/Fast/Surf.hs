@@ -392,7 +392,9 @@ drawTriangleOutlines = do
 recursiveWorldNode :: MNodeT -> Quake ()
 recursiveWorldNode node = do
     nothingToDo <- checkIfNothingToDo
-    io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
+
+    unless nothingToDo $ do
+      io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
 
   where checkIfNothingToDo :: Quake Bool
         checkIfNothingToDo = do
