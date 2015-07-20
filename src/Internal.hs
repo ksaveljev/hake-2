@@ -1634,8 +1634,8 @@ data FastRenderAPIGlobals =
                        , _frVisFrameCount        :: !Int
                        , _frModelOrg             :: V3 Float
                        , _frCurrentEntity        :: EntityT
-                       , _frSkyMins              :: (V.Vector Float, V.Vector Float)
-                       , _frSkyMaxs              :: (V.Vector Float, V.Vector Float)
+                       , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
+                       , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
                        }
 
 data ParticleTGlobals =
