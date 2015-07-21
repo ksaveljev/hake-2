@@ -816,3 +816,127 @@ glMipMap img width height =
                   !d = ((img `B.index` (inIdx + 3)) + (img `B.index` (inIdx + 7)) + (img `B.index` (inIdx + w + 3)) + (img `B.index` (inIdx + w + 7))) `shiftR` 2
               in forJ (inIdx + 8) (j + 8) maxJ (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 c `mappend` BB.word8 d)
 
+glFindImage :: B.ByteString -> Int -> Quake (Maybe (IORef ImageT))
+glFindImage imgName imgType = do
+    if B.length imgName < 1
+      then return Nothing
+      else do
+        -- look for it
+        numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+        glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+
+        found <- findImage glTextures 0 numGLTextures
+
+        case found of
+          Just imageRef -> do
+            registrationSequence <- use $ fastRenderAPIGlobals.frRegistrationSequence
+            io $ modifyIORef' imageRef (\v -> v { _iRegistrationSequence = registrationSequence })
+            return found
+          Nothing -> do
+            -- load the pic from disk
+            if | ".pcx" `BC.isSuffixOf` imgName -> do
+                   (pic, _, dimensions) <- loadPCX imgName False True
+                   if isNothing pic
+                     then return Nothing
+                     else do
+                       let Just (width, height) = dimensions
+                       imgRef <- glLoadPic imgName (fromJust pic) width height imgType 8
+                       return $ Just imgRef
+               | ".wal" `BC.isSuffixOf` imgName -> do
+                   imgRef <- glLoadWal imgName
+                   return $ Just imgRef
+               | ".tga" `BC.isSuffixOf` imgName -> do
+                   tga <- loadTGA imgName
+                   case tga of
+                     Nothing -> return Nothing
+                     Just (pic, (width, height)) -> do
+                       imgRef <- glLoadPic imgName pic width height imgType 32
+                       return $ Just imgRef
+               | otherwise -> do
+                   (pic, _, dimensions) <- loadPCX ("pics/" `B.append` imgName `B.append` ".pcx") False True
+                   if isNothing pic
+                     then return Nothing
+                     else do
+                       let Just (width, height) = dimensions
+                       imgRef <- glLoadPic imgName (fromJust pic) width height imgType 8
+                       return $ Just imgRef
+
+  where findImage :: V.Vector (IORef ImageT) -> Int -> Int -> Quake (Maybe (IORef ImageT))
+        findImage textures idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              img <- io $ readIORef (textures V.! idx)
+              if img^.iName == imgName
+                then return $ Just (textures V.! idx)
+                else findImage textures (idx + 1) maxIdx
+
+glLoadWal :: B.ByteString -> Quake (IORef ImageT)
+glLoadWal name = do
+    raw <- FS.loadFile name
+
+    case raw of
+      Nothing -> do
+        VID.printf Constants.printAll ("GL_FindImage: can't load " `B.append` name `B.append` "\n")
+        use $ fastRenderAPIGlobals.frNoTexture
+      Just buf -> do
+        let miptexT = newMiptexT (BL.fromStrict buf)
+            sz = (miptexT^.mWidth) * (miptexT^.mHeight)
+            offset = (miptexT^.mOffsets) UV.! 0
+            imgBuf = B.take sz (B.drop offset buf)
+
+        glLoadPic name imgBuf (miptexT^.mWidth) (miptexT^.mHeight) RenderAPIConstants.itWall 8
+
+loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
+loadTGA name = do
+    raw <- FS.loadFile name
+
+    case raw of
+      Nothing -> do
+        VID.printf Constants.printDeveloper ("Bad tga file " `B.append` name `B.append` "\n")
+        return Nothing
+      Just tgaContents -> do
+        let tgaHeader = newTgaT (BL.fromStrict tgaContents)
+
+        when ((tgaHeader^.tgaImageType) /= 2 && (tgaHeader^.tgaImageType) /= 10) $
+          Com.comError Constants.errDrop "LoadTGA: Only type 2 and 10 targa RGB images supported\n"
+
+        when ((tgaHeader^.tgaColorMapType) /= 0 || ((tgaHeader^.tgaPixelSize) /= 32 && (tgaHeader^.tgaPixelSize) /= 24)) $
+          Com.comError Constants.errDrop "LoadTGA: Only 32 or 24 bit images supported (no colormaps)\n"
+
+        let columns = fromIntegral $ tgaHeader^.tgaWidth
+            rows = fromIntegral $ tgaHeader^.tgaHeight
+            buf = if (tgaHeader^.tgaIdLength) /= 0
+                    then BL.drop (fromIntegral $ tgaHeader^.tgaIdLength) (tgaHeader^.tgaData)
+                    else tgaHeader^.tgaData
+
+        if (tgaHeader^.tgaImageType) == 2
+          then do -- uncompressed, RGB images
+            let pic = readTGA (BL.toStrict buf) (tgaHeader^.tgaPixelSize) 0 0 rows columns mempty
+            return $ Just (pic, (rows, columns))
+          else do -- tgaImageType == 10 -- runlength encoded RGB images
+            io (putStrLn "Image.loadTGA#10") >> undefined -- TODO
+
+  where readTGA :: B.ByteString -> Word8 -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
+        readTGA buf pixelSize idx row maxRow maxColumn acc
+          | row >= maxRow = BL.toStrict $ BB.toLazyByteString acc
+          | otherwise = let tgaRow = readTGARow buf pixelSize idx 0 maxColumn mempty
+                        in readTGA buf pixelSize (idx + maxColumn) (row + 1) maxRow maxColumn (tgaRow `mappend` acc)
+
+        readTGARow :: B.ByteString -> Word8 -> Int -> Int -> Int -> BB.Builder -> BB.Builder
+        readTGARow buf pixelSize idx column maxColumn acc
+          | column >= maxColumn = acc
+          | otherwise =
+              if pixelSize == 24
+                then let b = buf `B.index` (idx + 0)
+                         g = buf `B.index` (idx + 1)
+                         r = buf `B.index` (idx + 2)
+                     --in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [255, b, g, r])))
+                     in readTGARow buf pixelSize (idx + 3) (column + 1) maxColumn (acc `mappend` BB.word8 255 `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r)
+
+                -- pixelSize == 32
+                else let b = buf `B.index` (idx + 0)
+                         g = buf `B.index` (idx + 1)
+                         r = buf `B.index` (idx + 2)
+                         a = buf `B.index` (idx + 3)
+                     --in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [a, b, g, r])))
+                     in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r)
