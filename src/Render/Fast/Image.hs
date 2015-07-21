@@ -940,3 +940,6 @@ loadTGA name = do
                          a = buf `B.index` (idx + 3)
                      --in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` (mconcat (fmap BB.word8 [a, b, g, r])))
                      in readTGARow buf pixelSize (idx + 4) (column + 1) maxColumn (acc `mappend` BB.word8 a `mappend` BB.word8 b `mappend` BB.word8 g `mappend` BB.word8 r)
+
+scrapUpload :: Quake ()
+scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO
