@@ -9,6 +9,7 @@ import Control.Monad (when, liftM)
 import Data.Binary.IEEE754 (wordToFloat)
 import Data.Bits ((.|.), (.&.), shiftL, shiftR)
 import Data.Int (Int8, Int32)
+import Data.IORef (newIORef)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Data.Monoid ((<>), mempty)
 import Data.Word (Word8, Word16, Word32)
@@ -51,3 +52,10 @@ import qualified Util.Lib as Lib
 
 modelListF :: XCommandT
 modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
+
+modInit :: Quake ()
+modInit = do
+    -- init mod_known
+    models <- io $ V.replicateM maxModKnown (newIORef newModelT)
+    fastRenderAPIGlobals.frModKnown .= models
+    fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
