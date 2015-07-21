@@ -387,7 +387,10 @@ drawTextureChains = do
 
 drawTriangleOutlines :: Quake ()
 drawTriangleOutlines = do
-    io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
+    showTrisValue <- liftM (^.cvValue) glShowTrisCVar
+
+    when (showTrisValue /= 0) $ do
+      io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
 
 recursiveWorldNode :: MNodeT -> Quake ()
 recursiveWorldNode node = do
