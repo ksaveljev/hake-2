@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Surf where
 
-import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=))
+import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=), _1, _2)
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Char (toUpper)
@@ -391,18 +391,78 @@ drawTriangleOutlines = do
 
 recursiveWorldNode :: MNodeT -> Quake ()
 recursiveWorldNode node = do
-    nothingToDo <- checkIfNothingToDo
+    nothingToDo <- checkIfNothingToDo (node^.mnContents) (node^.mnVisFrame) (node^.mnMins) (node^.mnMaxs)
 
     unless nothingToDo $ do
+      -- node is just a decision point, so go down the appropriate sides
+      modelOrg <- use $ fastRenderAPIGlobals.frModelOrg
+
+      let dot' = if | (node^.mnPlane.cpType) == Constants.planeX -> (modelOrg^._x) - (node^.mnPlane.cpDist)
+                    | (node^.mnPlane.cpType) == Constants.planeY -> (modelOrg^._y) - (node^.mnPlane.cpDist)
+                    | (node^.mnPlane.cpType) == Constants.planeZ -> (modelOrg^._z) - (node^.mnPlane.cpDist)
+                    | otherwise -> modelOrg `dot` (node^.mnPlane.cpNormal) - (node^.mnPlane.cpDist)
+
+          (side, sidebit) = if dot' > 0
+                              then (0, 0)
+                              else (1, Constants.surfPlaneBack)
+
+      -- recurse down the children, front side first
+      worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      Just worldModel <- case fromJust worldModelRef of
+                           ModKnownReference modelIdx -> preuse $ fastRenderAPIGlobals.frModKnown.ix modelIdx
+                           ModInlineReference modelIdx -> preuse $ fastRenderAPIGlobals.frModInline.ix modelIdx
+
+      let child = if side == 0 then node^.mnChildren._1 else node^.mnChildren._2
+
+      case child of
+        MNodeChildReference childIdx -> do
+          let node' = (worldModel^.mNodes) V.! childIdx
+          recursiveWorldNode node'
+        MLeafChildReference childIdx -> do
+          let leaf = (worldModel^.mLeafs) V.! childIdx
+          drawLeafStuff (fromJust worldModelRef) worldModel leaf
+
+        
       io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
 
-  where checkIfNothingToDo :: Quake Bool
-        checkIfNothingToDo = do
+      -- recurse down the back side
+      let child' = if side == 0 then node^.mnChildren._2 else node^.mnChildren._1
+
+      case child' of
+        MNodeChildReference childIdx -> do
+          let node' = (worldModel^.mNodes) V.! childIdx
+          recursiveWorldNode node'
+        MLeafChildReference childIdx -> do
+          let leaf = (worldModel^.mLeafs) V.! childIdx
+          drawLeafStuff (fromJust worldModelRef) worldModel leaf
+
+  where checkIfNothingToDo :: Int -> Int -> V3 Float -> V3 Float -> Quake Bool
+        checkIfNothingToDo contents visFrame mins maxs = do
           visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
 
-          if | (node^.mnContents) == Constants.contentsSolid -> return True
-             | (node^.mnVisFrame) /= visFrameCount -> return True
-             | otherwise -> rCullBox (node^.mnMins) (node^.mnMaxs)
+          if | contents == Constants.contentsSolid -> return True
+             | visFrame /= visFrameCount -> return True
+             | otherwise -> rCullBox mins maxs
+
+        drawLeafStuff :: ModelReference -> ModelT -> MLeafT -> Quake ()
+        drawLeafStuff worldModelRef worldModel leaf = do
+          nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) (leaf^.mlMins) (leaf^.mlMaxs)
+
+          unless nothingToDo $ do
+            newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+            let notVisible = ((newRefDef^.rdAreaBits) UV.! ((leaf^.mlArea) `shiftR` 3)) .&. (1 `shiftL` ((leaf^.mlArea) .&. 7)) == 0
+
+            unless notVisible $ do
+              let c = leaf^.mlNumMarkSurfaces
+                  idx = leaf^.mlMarkIndex
+
+              frameCount <- use $ fastRenderAPIGlobals.frFrameCount
+              let updatedMarkSurfaces = V.imap (\i s -> if i >= idx && i < idx + c then s { _msVisFrame = frameCount } else s) (worldModel^.mMarkSurfaces)
+
+              case worldModelRef of
+                ModKnownReference modelIdx -> fastRenderAPIGlobals.frModKnown.ix modelIdx.mMarkSurfaces .= updatedMarkSurfaces
+                ModInlineReference modelIdx -> fastRenderAPIGlobals.frModInline.ix modelIdx.mMarkSurfaces .= updatedMarkSurfaces
 
 rCullBox :: V3 Float -> V3 Float -> Quake Bool
 rCullBox mins maxs = do

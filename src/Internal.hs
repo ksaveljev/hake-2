@@ -982,7 +982,7 @@ data MLeafT =
          , _mlArea            :: !Int
          , _mlNumMarkSurfaces :: !Int
          , _mlMarkIndex       :: !Int
-         , _mlMarkSurfaces    :: V.Vector MSurfaceT
+         , _mlMarkSurfaces    :: V.Vector MSurfaceT -- TODO: remove this
          }
 
 data ClientInfoT =

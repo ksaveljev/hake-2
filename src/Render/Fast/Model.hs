@@ -509,7 +509,7 @@ loadFaces buffer lump = do
 
           let planeNum = fromIntegral (dface^.dfPlaneNum)
               side = dface^.dfSide
-              flags = if side /= 0 then Constants.surfPlaneback else 0
+              flags = if side /= 0 then Constants.surfPlaneBack else 0
               i = dface^.dfLightOfs
               texInfoFlags = ((model^.mTexInfo) V.! ti)^.mtiFlags
               initialMSurfaceT = newMSurfaceT { _msFirstEdge = dface^.dfFirstEdge

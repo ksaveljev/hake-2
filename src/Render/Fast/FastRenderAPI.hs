@@ -902,7 +902,7 @@ rSetFrustum = do
   where updateFrustum :: V.Vector (V3 Float) -> V3 Float -> Int -> CPlaneT -> CPlaneT
         updateFrustum normals origin idx plane =
           plane { _cpNormal = normals V.! idx
-                , _cpType = fromIntegral Constants.planeAnyZ
+                , _cpType = Constants.planeAnyZ
                 , _cpDist = origin `dot` (normals V.! idx)
                 , _cpSignBits = signbitsForPlane plane
                 }

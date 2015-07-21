@@ -3,6 +3,7 @@
 module Constants where
 
 import Data.Bits ((.|.), shiftL)
+import Data.Int (Int8)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -967,7 +968,7 @@ maxEntities  =  128 :: Int
 maxParticles = 4096 :: Int
 
 -- gl_model.h
-surfPlaneback      =    2 :: Int
+surfPlaneBack      =    2 :: Int
 surfDrawSky        =    4 :: Int
 surfDrawTurb       = 0x10 :: Int
 surfDrawBackground = 0x40 :: Int
@@ -1187,14 +1188,14 @@ maxKey   =   32 :: Int
 maxValue = 1024 :: Int
 
 -- 0-2 are axial planes
-planeX = 0 :: Int
-planeY = 1 :: Int
-planeZ = 2 :: Int
+planeX = 0 :: Int8
+planeY = 1 :: Int8
+planeZ = 2 :: Int8
 
 -- 3-5 are non-axial planes snapped to the nearest
-planeAnyX = 3 :: Int
-planeAnyY = 4 :: Int
-planeAnyZ = 5 :: Int
+planeAnyX = 3 :: Int8
+planeAnyY = 4 :: Int8
+planeAnyZ = 5 :: Int8
 
 lumpEntities    =  0 :: Int
 lumpPlanes      =  1 :: Int
