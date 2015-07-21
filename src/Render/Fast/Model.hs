@@ -9,7 +9,7 @@ import Control.Monad (when, liftM)
 import Data.Binary.IEEE754 (wordToFloat)
 import Data.Bits ((.|.), (.&.), shiftL, shiftR)
 import Data.Int (Int8, Int32)
-import Data.IORef (newIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.Maybe (isNothing, fromJust, isJust)
 import Data.Monoid ((<>), mempty)
 import Data.Word (Word8, Word16, Word32)
@@ -59,3 +59,37 @@ modInit = do
     models <- io $ V.replicateM maxModKnown (newIORef newModelT)
     fastRenderAPIGlobals.frModKnown .= models
     fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
+
+rBeginRegistration :: B.ByteString -> Quake ()
+rBeginRegistration model = do
+    resetModelArrays
+    Polygon.reset
+
+    fastRenderAPIGlobals.frRegistrationSequence += 1
+    fastRenderAPIGlobals.frOldViewCluster .= (-1) -- force markleafs
+
+    let fullName = "maps/" `B.append` model `B.append` ".bsp"
+
+    -- explicitly free the old map if different
+    -- this guarantees that mod_known[0] is the world map
+    Just flushMap <- CVar.get "flushmap" "0" 0
+    Just modelRef <- preuse $ fastRenderAPIGlobals.frModKnown.ix 0
+    model <- io $ readIORef modelRef
+    let currentName = model^.mName
+
+    when (currentName /= fullName || (flushMap^.cvValue) /= 0) $
+      modFree modelRef
+
+    modelRef <- modForName fullName True
+    fastRenderAPIGlobals.frWorldModel .= modelRef
+
+    fastRenderAPIGlobals.frViewCluster .= (-1)
+
+modFree :: IORef ModelT -> Quake ()
+modFree modelRef = io $ writeIORef modelRef newModelT
+
+resetModelArrays :: Quake ()
+resetModelArrays = do
+    zoom (fastRenderAPIGlobals) $ do
+      frModelTextureCoordIdx .= 0
+      frModelVertexIndexIdx  .= 0
