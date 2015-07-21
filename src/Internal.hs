@@ -15,6 +15,7 @@ import Control.Lens.Internal.Zoom (Zoomed, Focusing)
 import Control.Monad.Except
 import Control.Monad.State.Strict
 import Data.Int (Int16, Int32, Int64)
+import Data.IORef (IORef)
 import Data.Sequence (Seq)
 import Data.Word (Word8, Word16)
 import Linear (V3, V4)
@@ -122,9 +123,6 @@ newtype MenuFrameworkSReference = MenuFrameworkSReference Int
 -- reference to menuGlobals.mgMenuItems
 newtype MenuItemReference = MenuItemReference Int
 
--- reference to (fast/basic)RenderAPIGlobals.frGLTextures
-newtype ImageReference = ImageReference Int
-
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
 
@@ -141,10 +139,7 @@ newtype MNodeReference = MNodeReference Int
 
 newtype SfxReference = SfxReference Int
 
--- reference to (fast/basic)RenderAPIGlobals.(frModInline/frModKnown)
-data ModelReference = ModInlineReference !Int | ModKnownReference !Int deriving Eq
-
-data MNodeChild = MNodeChildReference !Int | MLeafChildReference !Int
+data MNodeChild = MNodeChildReference (IORef MNodeT) | MLeafChildReference (IORef MLeafT)
 
 data ModelExtra = AliasModelExtra DMdlT | SpriteModelExtra DSpriteT
 
@@ -243,7 +238,7 @@ data Globals =
           , _scrVRect           :: VRectT
           , _sysFrameTime       :: !Int
           , _gunFrame           :: Int
-          , _gunModel           :: Maybe ModelReference
+          , _gunModel           :: Maybe (IORef ModelT)
           , _netFrom            :: NetAdrT
 
           , _vec3Origin         :: V3 Float
@@ -825,10 +820,10 @@ data ClientStateT =
                , _csGameDir                :: B.ByteString
                , _csPlayerNum              :: !Int
                , _csConfigStrings          :: V.Vector B.ByteString
-               , _csModelDraw              :: V.Vector (Maybe ModelReference)
+               , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
                , _csModelClip              :: V.Vector (Maybe CModelReference)
                , _csSoundPrecache          :: V.Vector SfxT
-               , _csImagePrecache          :: V.Vector (Maybe ImageReference)
+               , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
                , _csClientInfo             :: V.Vector ClientInfoT
                , _csBaseClientInfo         :: ClientInfoT
                }
@@ -846,7 +841,7 @@ data MTexInfoT =
             , _mtiFlags     :: !Int
             , _mtiNumFrames :: !Int
             , _mtiNext      :: Maybe Int
-            , _mtiImage     :: Maybe ImageReference
+            , _mtiImage     :: Maybe (IORef ImageT)
             }
 
 data ImageT =
@@ -858,7 +853,7 @@ data ImageT =
          , _iUploadWidth          :: !Int
          , _iUploadHeight         :: !Int
          , _iRegistrationSequence :: !Int
-         , _iTextureChain         :: Maybe MSurfaceT
+         , _iTextureChain         :: Maybe (IORef MSurfaceT)
          , _iTexNum               :: !Int
          , _iSL                   :: !Float
          , _iTL                   :: !Float
@@ -891,7 +886,7 @@ data RefDefT =
           }
 
 data EntityT =
-  EntityT { _eModel      :: Maybe ModelReference -- index to some modelT vector
+  EntityT { _eModel      :: Maybe (IORef ModelT)
           , _eAngles     :: V3 Float
           , _eOrigin     :: V3 Float
           , _eFrame      :: !Int
@@ -901,7 +896,7 @@ data EntityT =
           , _eSkinNum    :: !Int
           , _eLightStyle :: !Int
           , _eAlpha      :: !Float
-          , _eSkin       :: Maybe ImageReference
+          , _eSkin       :: Maybe (IORef ImageT)
           , _enFlags     :: !Int -- name clash with EdictT._eFlags
           }
 
@@ -921,36 +916,36 @@ data ModelT =
          , _mNumModelSurfaces     :: !Int
          , _mLightmap             :: !Int
          , _mNumSubModels         :: !Int
-         , _mSubModels            :: V.Vector MModelT
+         , _mSubModels            :: V.Vector (IORef MModelT)
          , _mNumPlanes            :: !Int
-         , _mPlanes               :: V.Vector CPlaneT
+         , _mPlanes               :: V.Vector (IORef CPlaneT)
          , _mNumLeafs             :: !Int
-         , _mLeafs                :: V.Vector MLeafT
+         , _mLeafs                :: V.Vector (IORef MLeafT)
          , _mNumVertexes          :: !Int
-         , _mVertexes             :: V.Vector MVertexT
+         , _mVertexes             :: V.Vector (IORef MVertexT)
          , _mNumEdges             :: !Int
-         , _mEdges                :: V.Vector MEdgeT
+         , _mEdges                :: V.Vector (IORef MEdgeT)
          , _mNumNodes             :: !Int
          , _mFirstNode            :: !Int
-         , _mNodes                :: V.Vector MNodeT
+         , _mNodes                :: V.Vector (IORef MNodeT)
          , _mNumTexInfo           :: !Int
-         , _mTexInfo              :: V.Vector MTexInfoT
+         , _mTexInfo              :: V.Vector (IORef MTexInfoT)
          , _mNumSurfaces          :: !Int
-         , _mSurfaces             :: V.Vector MSurfaceT
+         , _mSurfaces             :: V.Vector (IORef MSurfaceT)
          , _mNumSurfEdges         :: !Int
          , _mSurfEdges            :: V.Vector Int
          , _mNumMarkSurfaces      :: !Int
-         , _mMarkSurfaces         :: V.Vector MSurfaceT
+         , _mMarkSurfaces         :: V.Vector (IORef MSurfaceT)
          , _mVis                  :: Maybe DVisT
          , _mLightdata            :: Maybe B.ByteString
-         , _mSkins                :: V.Vector (Maybe ImageReference)
+         , _mSkins                :: V.Vector (Maybe (IORef ImageT))
          , _mExtraDataSize        :: !Int
          , _mExtraData            :: Maybe ModelExtra
          }
 
 data MSurfaceT =
   MSurfaceT { _msVisFrame           :: !Int
-            , _msPlane              :: Maybe CPlaneT
+            , _msPlane              :: Maybe (IORef CPlaneT)
             , _msFlags              :: !Int
             , _msFirstEdge          :: !Int
             , _msNumEdges           :: !Int
@@ -961,9 +956,9 @@ data MSurfaceT =
             , _msDLightS            :: !Int
             , _msDLightT            :: !Int
             , _msPolys              :: Maybe GLPolyReference
-            , _msTextureChain       :: Maybe MSurfaceReference
-            , _msLightmapChain      :: Maybe MSurfaceReference
-            , _msTexInfo            :: MTexInfoT -- !(Maybe (ModelReference, MTexInfoReference))
+            , _msTextureChain       :: Maybe (IORef MSurfaceT)
+            , _msLightmapChain      :: Maybe (IORef MSurfaceT)
+            , _msTexInfo            :: MTexInfoT
             , _msDLightFrame        :: !Int
             , _msDLightBits         :: !Int
             , _msLightmapTextureNum :: !Int
@@ -988,11 +983,11 @@ data MLeafT =
 data ClientInfoT =
   ClientInfoT { _ciName        :: B.ByteString
               , _ciCInfo       :: B.ByteString
-              , _ciSkin        :: Maybe ImageReference -- index to some imageT vector
-              , _ciIcon        :: Maybe ImageReference -- index to some imageT vector
+              , _ciSkin        :: Maybe (IORef ImageT)
+              , _ciIcon        :: Maybe (IORef ImageT)
               , _ciIconName    :: B.ByteString
-              , _ciModel       :: Maybe ModelReference -- index to some modelT vector
-              , _ciWeaponModel :: V.Vector (Maybe ModelReference) -- index to some modelT vector
+              , _ciModel       :: Maybe (IORef ModelT)
+              , _ciWeaponModel :: V.Vector (Maybe (IORef ModelT))
               }
 
 data SCRGlobals =
@@ -1016,9 +1011,9 @@ data RefExportT =
   RefExportT { _reInit                :: Int -> Int -> Quake Bool
              , _reShutDown            :: Quake ()
              , _reBeginRegistration   :: B.ByteString -> Quake ()
-             , _reRegisterModel       :: B.ByteString -> Quake (Maybe ModelReference)
-             , _reRegisterSkin        :: B.ByteString -> Quake (Maybe ImageReference)
-             , _reRegisterPic         :: B.ByteString -> Quake (Maybe ImageReference)
+             , _reRegisterModel       :: B.ByteString -> Quake (Maybe (IORef ModelT))
+             , _reRegisterSkin        :: B.ByteString -> Quake (Maybe (IORef ImageT))
+             , _reRegisterPic         :: B.ByteString -> Quake (Maybe (IORef ImageT))
              , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
              , _reEndRegistration     :: Quake ()
              , _reRenderFrame         :: RefDefT -> Quake ()
@@ -1038,7 +1033,6 @@ data RefExportT =
              , _reApiVersion          :: Int
              , _reGetModeList         :: Quake (V.Vector VideoMode)
              , _reGetKeyboardHandler  :: KBD
-             , _reGetImage            :: ImageReference -> Quake (Maybe ImageT)
              }
 
 data NETGlobals =
@@ -1500,9 +1494,9 @@ data RenderAPI =
             , _rInit2             :: GLDriver -> Quake Bool
             , _rShutdown          :: GLDriver -> Quake ()
             , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
-            , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe ModelReference)
-            , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe ImageReference)
-            , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe ImageReference)
+            , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ModelT))
+            , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
+            , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
             , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
             , _rEndRegistration   :: GLDriver -> Quake ()
             , _rRenderFrame       :: GLDriver -> RefDefT -> Quake ()
@@ -1517,7 +1511,6 @@ data RenderAPI =
             , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
             , _rBeginFrame        :: GLDriver -> Float -> Quake ()
             , _glScreenShotF      :: GLDriver -> XCommandT
-            , _rGetImage          :: GLDriver -> ImageReference -> Quake (Maybe ImageT)
             }
 
 data INGlobals =
@@ -1559,83 +1552,7 @@ data BasicRenderAPIGlobals =
   BasicRenderAPIGlobals
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frGLDepthMin           :: !Float
-                       , _frGLDepthMax           :: !Float
-                       , _frGLConfig             :: GLConfigT
-                       , _frGLState              :: GLStateT
-                       , _frd8to24table          :: UV.Vector Int
-                       , _frVid                  :: VidDefT
-                       , _frColorTableEXT        :: !Bool
-                       , _frActiveTextureARB     :: !Bool
-                       , _frPointParameterEXT    :: !Bool
-                       , _frLockArraysEXT        :: !Bool
-                       , _frSwapIntervalEXT      :: !Bool
-                       , _frTexture0             :: !Int
-                       , _frTexture1             :: !Int
-                       , _frGLTexSolidFormat     :: !Int
-                       , _frGLTexAlphaFormat     :: !Int
-                       , _frGLFilterMin          :: !Int
-                       , _frGLFilterMax          :: !Int
-                       , _frNumGLTextures        :: !Int
-                       , _frGLTextures           :: V.Vector ImageT
-                       , _frLastModes            :: (Int, Int)
-                       , _frRegistrationSequence :: !Int
-                       , _frGammaTable           :: B.ByteString
-                       , _frIntensityTable       :: B.ByteString
-                       , _frModKnown             :: V.Vector ModelT
-                       , _frModNumKnown          :: !Int
-                       , _frLoadModel            :: ModelReference
-                       , _frCurrentModel         :: ModelReference
-                       , _frModInline            :: V.Vector ModelT
-                       , _frModNoVis             :: B.ByteString
-                       , _frNoTexture            :: ImageReference
-                       , _frParticleTexture      :: ImageReference
-                       , _frUploadWidth          :: !Int
-                       , _frUploadHeight         :: !Int
-                       , _frUploadedPaletted     :: !Bool
-                       , _frDrawChars            :: Maybe ImageReference
-                       , _frTrickFrame           :: !Int
-                       , _frScrapDirty           :: !Bool
-                       , _frViewCluster          :: !Int
-                       , _frViewCluster2         :: !Int
-                       , _frOldViewCluster       :: !Int
-                       , _frOldViewCluster2      :: !Int
-                       , _frWorldModel           :: Maybe ModelReference
-                       , _frModelTextureCoordBuf :: MSV.IOVector Float
-                       , _frModelVertexIndexBuf  :: MSV.IOVector Int32
-                       , _frModelTextureCoordIdx :: !Int
-                       , _frModelVertexIndexIdx  :: !Int
-                       , _frPolygonS1Old         :: UV.Vector Float
-                       , _frPolygonBuffer        :: MSV.IOVector Float
-                       , _frPolygonCache         :: MV.IOVector GLPolyT
-                       , _frPolygonBufferIndex   :: !Int
-                       , _frPolygonCount         :: !Int
-                       , _frGLLms                :: GLLightMapStateT
-                       , _frNewRefDef            :: RefDefT
-                       , _frFrameCount           :: !Int
-                       , _frWarpFace             :: Maybe MSurfaceT
-                       , _frModelVisibility      :: Maybe B.ByteString
-                       , _frSkyName              :: B.ByteString
-                       , _frSkyRotate            :: !Float
-                       , _frSkyAxis              :: V3 Float
-                       , _frSkyImages            :: V.Vector (Maybe ImageReference)
-                       , _frSkyMin               :: !Float
-                       , _frSkyMax               :: !Float
-                       , _frCBrushPolys          :: !Int
-                       , _frCAliasPolys          :: !Int
-                       , _frFrustum              :: V.Vector CPlaneT
-                       , _frDLightFrameCount     :: !Int
-                       , _frOrigin               :: V3 Float
-                       , _frVUp                  :: V3 Float
-                       , _frVPn                  :: V3 Float
-                       , _frVRight               :: V3 Float
-                       , _frVBlend               :: V4 Float
-                       , _frWorldMatrix          :: [GL.GLfloat]
-                       , _frVisFrameCount        :: !Int
-                       , _frModelOrg             :: V3 Float
-                       , _frCurrentEntity        :: EntityT
-                       , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
-                       , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
+  FastRenderAPIGlobals { _frVid :: VidDefT
                        }
 
 data ParticleTGlobals =
@@ -1810,7 +1727,7 @@ data MNodeT =
          , _mnVisFrame     :: !Int
          , _mnMins         :: V3 Float
          , _mnMaxs         :: V3 Float
-         , _mnParent       :: Maybe MNodeReference
+         , _mnParent       :: Maybe (IORef MNodeT)
          , _mnPlane        :: CPlaneT
          , _mnChildren     :: (MNodeChild, MNodeChild)
          , _mnFirstSurface :: !Int
@@ -1820,7 +1737,7 @@ data MNodeT =
 data BeamT =
   BeamT { _bEntity     :: !Int
         , _bDestEntity :: !Int
-        , _bModel      :: Maybe ModelReference
+        , _bModel      :: Maybe (IORef ModelT)
         , _bEndTime    :: !Int
         , _bOffset     :: V3 Float
         , _bStart      :: V3 Float
@@ -1862,35 +1779,35 @@ data CLTEntGlobals =
                 , _cltePlayerBeams        :: V.Vector BeamT
                 , _clteLasers             :: V.Vector LaserT
                 , _clteSustains           :: V.Vector CLSustainT
-                , _clteSfxRic1            :: Maybe SfxReference
-                , _clteSfxRic2            :: Maybe SfxReference
-                , _clteSfxRic3            :: Maybe SfxReference
-                , _clteSfxLashIt          :: Maybe SfxReference
-                , _clteSfxSpark5          :: Maybe SfxReference
-                , _clteSfxSpark6          :: Maybe SfxReference
-                , _clteSfxSpark7          :: Maybe SfxReference
-                , _clteSfxRailg           :: Maybe SfxReference
-                , _clteSfxRockExp         :: Maybe SfxReference
-                , _clteSfxGrenExp         :: Maybe SfxReference
-                , _clteSfxWatrExp         :: Maybe SfxReference
-                , _clteSfxPlasExp         :: Maybe SfxReference
+                , _clteSfxRic1            :: Maybe (IORef SfxT)
+                , _clteSfxRic2            :: Maybe (IORef SfxT)
+                , _clteSfxRic3            :: Maybe (IORef SfxT)
+                , _clteSfxLashIt          :: Maybe (IORef SfxT)
+                , _clteSfxSpark5          :: Maybe (IORef SfxT)
+                , _clteSfxSpark6          :: Maybe (IORef SfxT)
+                , _clteSfxSpark7          :: Maybe (IORef SfxT)
+                , _clteSfxRailg           :: Maybe (IORef SfxT)
+                , _clteSfxRockExp         :: Maybe (IORef SfxT)
+                , _clteSfxGrenExp         :: Maybe (IORef SfxT)
+                , _clteSfxWatrExp         :: Maybe (IORef SfxT)
+                , _clteSfxPlasExp         :: Maybe (IORef SfxT)
                 , _clteSfxFootsteps       :: V.Vector SfxT
-                , _clteModExplode         :: Maybe ModelReference
-                , _clteModSmoke           :: Maybe ModelReference
-                , _clteModFlash           :: Maybe ModelReference
-                , _clteModParasiteSegment :: Maybe ModelReference
-                , _clteModGrappleCable    :: Maybe ModelReference
-                , _clteModParasiteTip     :: Maybe ModelReference
-                , _clteModExplo4          :: Maybe ModelReference
-                , _clteModBfgExplo        :: Maybe ModelReference
-                , _clteModPowerScreen     :: Maybe ModelReference
-                , _clteModPlasmaExplo     :: Maybe ModelReference
-                , _clteSfxLightning       :: Maybe SfxReference
-                , _clteSfxDisrExp         :: Maybe SfxReference
-                , _clteModLightning       :: Maybe ModelReference
-                , _clteModHeatBeam        :: Maybe ModelReference
-                , _clteModMonsterHeatBeam :: Maybe ModelReference
-                , _clteModExplo4Big       :: Maybe ModelReference
+                , _clteModExplode         :: Maybe (IORef ModelT)
+                , _clteModSmoke           :: Maybe (IORef ModelT)
+                , _clteModFlash           :: Maybe (IORef ModelT)
+                , _clteModParasiteSegment :: Maybe (IORef ModelT)
+                , _clteModGrappleCable    :: Maybe (IORef ModelT)
+                , _clteModParasiteTip     :: Maybe (IORef ModelT)
+                , _clteModExplo4          :: Maybe (IORef ModelT)
+                , _clteModBfgExplo        :: Maybe (IORef ModelT)
+                , _clteModPowerScreen     :: Maybe (IORef ModelT)
+                , _clteModPlasmaExplo     :: Maybe (IORef ModelT)
+                , _clteSfxLightning       :: Maybe (IORef SfxT)
+                , _clteSfxDisrExp         :: Maybe (IORef SfxT)
+                , _clteModLightning       :: Maybe (IORef ModelT)
+                , _clteModHeatBeam        :: Maybe (IORef ModelT)
+                , _clteModMonsterHeatBeam :: Maybe (IORef ModelT)
+                , _clteModExplo4Big       :: Maybe (IORef ModelT)
                 }
 
 data MBoss31Globals =

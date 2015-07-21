@@ -8,6 +8,7 @@ import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Int (Int16)
+import Data.IORef (IORef, readIORef)
 import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
@@ -989,7 +990,7 @@ addPacketEntities frame = do
                     + (fmap (* lerpFrac) ((cent^.ceCurrent.esOrigin) - (cent^.cePrev.esOrigin)))
               in (v, v)
 
-        tweakBeamsColor :: ClientStateT -> EntityStateT -> EntityT -> Int -> Quake (Float, Int, Maybe ImageReference, Maybe ModelReference)
+        tweakBeamsColor :: ClientStateT -> EntityStateT -> EntityT -> Int -> Quake (Float, Int, Maybe (IORef ImageT), Maybe (IORef ModelT))
         tweakBeamsColor cl' s1 ent renderfx = do
           if renderfx .&. Constants.rfBeam /= 0 -- the four beam colors are encoded in 32 bits of skinnum (hack)
             then do
@@ -1011,7 +1012,7 @@ addPacketEntities frame = do
                                          let registerSkin = renderer^.rRefExport.reRegisterSkin
                                              registerModel = renderer^.rRefExport.reRegisterModel
 
-                                         Just image <- (renderer^.rRefExport.reGetImage) (fromJust skin)
+                                         image <- io $ readIORef (fromJust skin)
 
                                          if | "players/male" `BC.isPrefixOf` (image^.iName) -> do
                                                 s <- registerSkin "players/male/disguise.pcx"

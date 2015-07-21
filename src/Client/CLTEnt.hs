@@ -5,6 +5,7 @@ module Client.CLTEnt where
 import Control.Lens (zoom, (.=), use, (^.), ix)
 import Control.Monad (void, when)
 import Data.Bits (shiftR, (.|.), (.&.))
+import Data.IORef (IORef)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
@@ -174,7 +175,7 @@ addBeams = do
                       constructBeams b org len modLightning pitch yaw d' dist' modelLength
                       addBeam beams cl' (idx + 1) maxIdx
 
-        constructBeams :: BeamT -> V3 Float -> Float -> Maybe ModelReference -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
+        constructBeams :: BeamT -> V3 Float -> Float -> Maybe (IORef ModelT) -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
         constructBeams b org len modLightning pitch yaw d dist modelLength
           | d <= 0 = return ()
           | otherwise = do
@@ -347,7 +348,7 @@ addPlayerBeams = do
                       constructBeams b org'' len modHeatBeam modLightning pitch yaw d' dist'' modelLength frameNum
                       addPlayerBeam beams cl' handMultiplier (idx + 1) maxIdx
 
-        constructBeams :: BeamT -> V3 Float -> Float -> Maybe ModelReference -> Maybe ModelReference -> Float -> Float -> Float -> V3 Float -> Float -> Int -> Quake ()
+        constructBeams :: BeamT -> V3 Float -> Float -> Maybe (IORef ModelT) -> Maybe (IORef ModelT) -> Float -> Float -> Float -> V3 Float -> Float -> Int -> Quake ()
         constructBeams b org len modHeatBeam modLightning pitch yaw d dist modelLength frameNum
           | d <= 0 = return ()
           | otherwise = do

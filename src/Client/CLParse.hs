@@ -9,6 +9,7 @@ import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=), Traversal')
 import Control.Monad (when, liftM, void)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
+import Data.IORef (IORef)
 import Data.Maybe (isNothing)
 import System.IO (IOMode(ReadWriteMode), hFileSize)
 import qualified Data.ByteString as B
@@ -354,7 +355,7 @@ loadClientInfo clientInfoLens str = do
                                          , _ciWeaponModel = weaponModels
                                          }
 
-  where loadWeapons :: V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe ModelReference)] -> Quake [(Int, Maybe ModelReference)]
+  where loadWeapons :: V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe (IORef ModelT))] -> Quake [(Int, Maybe (IORef ModelT))]
         loadWeapons clWeaponModels modelName idx maxIdx acc
           | idx >= maxIdx = return acc
           | otherwise = do
