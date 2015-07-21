@@ -1552,7 +1552,83 @@ data BasicRenderAPIGlobals =
   BasicRenderAPIGlobals
 
 data FastRenderAPIGlobals =
-  FastRenderAPIGlobals { _frVid :: VidDefT
+  FastRenderAPIGlobals { _frGLDepthMin           :: !Float
+                       , _frGLDepthMax           :: !Float
+                       , _frGLConfig             :: GLConfigT
+                       , _frGLState              :: GLStateT
+                       , _frd8to24table          :: UV.Vector Int
+                       , _frVid                  :: VidDefT
+                       , _frColorTableEXT        :: !Bool
+                       , _frActiveTextureARB     :: !Bool
+                       , _frPointParameterEXT    :: !Bool
+                       , _frLockArraysEXT        :: !Bool
+                       , _frSwapIntervalEXT      :: !Bool
+                       , _frTexture0             :: !Int
+                       , _frTexture1             :: !Int
+                       , _frGLTexSolidFormat     :: !Int
+                       , _frGLTexAlphaFormat     :: !Int
+                       , _frGLFilterMin          :: !Int
+                       , _frGLFilterMax          :: !Int
+                       , _frNumGLTextures        :: !Int
+                       , _frGLTextures           :: V.Vector (IORef ImageT)
+                       , _frLastModes            :: (Int, Int)
+                       , _frRegistrationSequence :: !Int
+                       , _frGammaTable           :: B.ByteString
+                       , _frIntensityTable       :: B.ByteString
+                       , _frModKnown             :: V.Vector (IORef ModelT)
+                       , _frModNumKnown          :: !Int
+                       , _frLoadModel            :: IORef ModelT
+                       , _frCurrentModel         :: IORef ModelT
+                       , _frModInline            :: V.Vector (IORef ModelT)
+                       , _frModNoVis             :: B.ByteString
+                       , _frNoTexture            :: IORef ImageT
+                       , _frParticleTexture      :: IORef ImageT
+                       , _frUploadWidth          :: !Int
+                       , _frUploadHeight         :: !Int
+                       , _frUploadedPaletted     :: !Bool
+                       , _frDrawChars            :: Maybe (IORef ImageT)
+                       , _frTrickFrame           :: !Int
+                       , _frScrapDirty           :: !Bool
+                       , _frViewCluster          :: !Int
+                       , _frViewCluster2         :: !Int
+                       , _frOldViewCluster       :: !Int
+                       , _frOldViewCluster2      :: !Int
+                       , _frWorldModel           :: Maybe (IORef ModelT)
+                       , _frModelTextureCoordBuf :: MSV.IOVector Float
+                       , _frModelVertexIndexBuf  :: MSV.IOVector Int32
+                       , _frModelTextureCoordIdx :: !Int
+                       , _frModelVertexIndexIdx  :: !Int
+                       , _frPolygonS1Old         :: UV.Vector Float
+                       , _frPolygonBuffer        :: MSV.IOVector Float
+                       , _frPolygonCache         :: MV.IOVector GLPolyT
+                       , _frPolygonBufferIndex   :: !Int
+                       , _frPolygonCount         :: !Int
+                       , _frGLLms                :: GLLightMapStateT
+                       , _frNewRefDef            :: RefDefT
+                       , _frFrameCount           :: !Int
+                       , _frWarpFace             :: Maybe (IORef MSurfaceT)
+                       , _frModelVisibility      :: Maybe B.ByteString
+                       , _frSkyName              :: B.ByteString
+                       , _frSkyRotate            :: !Float
+                       , _frSkyAxis              :: V3 Float
+                       , _frSkyImages            :: V.Vector (Maybe (IORef ImageT))
+                       , _frSkyMin               :: !Float
+                       , _frSkyMax               :: !Float
+                       , _frCBrushPolys          :: !Int
+                       , _frCAliasPolys          :: !Int
+                       , _frFrustum              :: V.Vector (IORef CPlaneT)
+                       , _frDLightFrameCount     :: !Int
+                       , _frOrigin               :: V3 Float
+                       , _frVUp                  :: V3 Float
+                       , _frVPn                  :: V3 Float
+                       , _frVRight               :: V3 Float
+                       , _frVBlend               :: V4 Float
+                       , _frWorldMatrix          :: [GL.GLfloat]
+                       , _frVisFrameCount        :: !Int
+                       , _frModelOrg             :: V3 Float
+                       , _frCurrentEntity        :: EntityT
+                       , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
+                       , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
                        }
 
 data ParticleTGlobals =
@@ -1717,7 +1793,7 @@ data CParticleT =
 data GLLightMapStateT =
   GLLightMapStateT { _lmsInternalFormat         :: !Int
                    , _lmsCurrentLightmapTexture :: !Int
-                   , _lmsLightmapSurfaces       :: V.Vector Int -- TODO: reference ?
+                   , _lmsLightmapSurfaces       :: V.Vector (IORef MSurfaceT)
                    , _lmsAllocated              :: UV.Vector Int
                    , _lmsLightmapBuffer         :: MSV.IOVector Word8
                    }
