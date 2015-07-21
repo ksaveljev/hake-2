@@ -113,3 +113,33 @@ drawChar x y num = do
       GL.glTexCoord2f fcol (frow + size)
       GL.glVertex2f x' (y' + 8)
       GL.glEnd
+
+fill :: Int -> Int -> Int -> Int -> Int -> Quake ()
+fill x y w h colorIndex = do
+    when (colorIndex > 255) $
+      Com.comError Constants.errFatal "Draw_Fill: bad color"
+
+    GL.glDisable GL.gl_TEXTURE_2D
+
+    d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+    let color = d8to24table UV.! colorIndex
+
+    GL.glColor3ub (fromIntegral $ (color `shiftR`  0) .&. 0xFF) -- r
+                  (fromIntegral $ (color `shiftR`  8) .&. 0xFF) -- g
+                  (fromIntegral $ (color `shiftR` 16) .&. 0xFF) -- b
+
+    let x' = fromIntegral x
+        y' = fromIntegral y
+        w' = fromIntegral w
+        h' = fromIntegral h
+
+    GL.glBegin GL.gl_QUADS
+
+    GL.glVertex2f x' y'
+    GL.glVertex2f (x' + w') y'
+    GL.glVertex2f (x' + w') (y' + h')
+    GL.glVertex2f x' (y' + h')
+
+    GL.glEnd
+    GL.glColor3f 1 1 1
+    GL.glEnable GL.gl_TEXTURE_2D
