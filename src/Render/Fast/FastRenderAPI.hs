@@ -44,10 +44,10 @@ import qualified Util.Math3D as Math3D
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
-    RenderAPI { _rInit              = fastInit
-              , _rInit2             = fastInit2
+    RenderAPI { _rInit              = DT.trace "rInit" undefined -- fastInit
+              , _rInit2             = DT.trace "rInit2" undefined -- fastInit2
               , _rShutdown          = DT.trace "FastRenderAPI.rShutdown" undefined -- TODO
-              , _rBeginRegistration = \_ -> Model.rBeginRegistration
+              , _rBeginRegistration = DT.trace "rBeginRegistration" undefined -- \_ -> Model.rBeginRegistration
               , _rRegisterModel     = DT.trace "rRegisterModel" undefined -- \_ -> Model.rRegisterModel
               , _rRegisterSkin      = DT.trace "rRegisterSkin" undefined -- \_ -> Image.rRegisterSkin
               , _rDrawFindPic       = DT.trace "rDrawFindPic" undefined -- \_ -> Draw.findPic
@@ -56,14 +56,14 @@ fastRenderAPI =
               , _rRenderFrame       = DT.trace "rRenderFrame" undefined -- \_ -> fastRenderFrame
               , _rDrawGetPicSize    = DT.trace "rDrawGetPicSize" undefined -- \_ -> Draw.getPicSize
               , _rDrawPic           = DT.trace "rDrawPic" undefined -- \_ -> Draw.drawPic
-              , _rDrawStretchPic    = \_ -> Draw.stretchPic
-              , _rDrawChar          = \_ -> Draw.drawChar
+              , _rDrawStretchPic    = DT.trace "rDrawStretchPic" undefined -- \_ -> Draw.stretchPic
+              , _rDrawChar          = DT.trace "rDrawChar" undefined -- \_ -> Draw.drawChar
               , _rDrawTileClear     = DT.trace "FastRenderAPI.rDrawTileClear" undefined -- TODO
-              , _rDrawFill          = \_ -> Draw.fill
+              , _rDrawFill          = DT.trace "rDrawFill" undefined -- \_ -> Draw.fill
               , _rDrawFadeScreen    = DT.trace "FastRenderAPI.rDrawFadeScreen" undefined -- TODO
               , _rDrawStretchRaw    = DT.trace "FastRenderAPI.rDrawStretchRaw" undefined -- TODO
               , _rSetPalette        = DT.trace "FastRenderAPI.rSetPalette" undefined -- TODO
-              , _rBeginFrame        = fastBeginFrame
+              , _rBeginFrame        = DT.trace "rBeginFrame" undefined -- fastBeginFrame
               , _glScreenShotF      = DT.trace "FastRenderAPI.glScreenShotF" undefined -- TODO
               }
 
