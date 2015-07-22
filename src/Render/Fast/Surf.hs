@@ -394,5 +394,121 @@ drawTriangleOutlines = do
       io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
 
 recursiveWorldNode :: IORef MNodeT -> Quake ()
-recursiveWorldNode _ = do
-    io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
+recursiveWorldNode nodeRef = do
+    node <- io $ readIORef nodeRef
+    nothingToDo <- checkIfNothingToDo (node^.mnContents) (node^.mnVisFrame) (node^.mnMins) (node^.mnMaxs)
+
+    unless nothingToDo $ do
+      -- node is just a decision point, so go down the appropriate sides
+      modelOrg <- use $ fastRenderAPIGlobals.frModelOrg
+      plane <- io $ readIORef (node^.mnPlane)
+
+      let dot' = if | (plane^.cpType) == Constants.planeX -> (modelOrg^._x) - (plane^.cpDist)
+                    | (plane^.cpType) == Constants.planeY -> (modelOrg^._y) - (plane^.cpDist)
+                    | (plane^.cpType) == Constants.planeZ -> (modelOrg^._z) - (plane^.cpDist)
+                    | otherwise -> modelOrg `dot` (plane^.cpNormal) - (plane^.cpDist)
+
+          (side, sidebit) = if dot' > 0
+                              then (0, 0)
+                              else (1, Constants.surfPlaneBack)
+
+      Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      worldModel <- io $ readIORef worldModelRef
+
+      let child = if side == 0 then node^.mnChildren._1 else node^.mnChildren._2
+
+      case child of
+        MNodeChildReference nodeRef -> recursiveWorldNode nodeRef
+        MLeafChildReference leafRef -> drawLeafStuff worldModel leafRef
+
+      frameCount <- use $ fastRenderAPIGlobals.frFrameCount
+      drawNodeStuff worldModel node sidebit frameCount 0 (node^.mnNumSurfaces)
+
+      -- recurse down the back side
+      let child' = if side == 0 then node^.mnChildren._2 else node^.mnChildren._1
+
+      case child' of
+        MNodeChildReference nodeRef -> recursiveWorldNode nodeRef
+        MLeafChildReference leafRef -> drawLeafStuff worldModel leafRef
+
+  where checkIfNothingToDo :: Int -> Int -> V3 Float -> V3 Float -> Quake Bool
+        checkIfNothingToDo contents visFrame mins maxs = do
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+
+          if | contents == Constants.contentsSolid -> return True
+             | visFrame /= visFrameCount -> return True
+             | otherwise -> rCullBox mins maxs
+
+        drawLeafStuff :: ModelT -> IORef MLeafT -> Quake ()
+        drawLeafStuff worldModel leafRef = do
+          leaf <- io $ readIORef leafRef
+          nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) (leaf^.mlMins) (leaf^.mlMaxs)
+
+          unless nothingToDo $ do
+            newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+            let notVisible = ((newRefDef^.rdAreaBits) UV.! ((leaf^.mlArea) `shiftR` 3)) .&. (1 `shiftL` ((leaf^.mlArea) .&. 7)) == 0
+
+            unless notVisible $ do
+              let c = leaf^.mlNumMarkSurfaces
+                  idx = leaf^.mlMarkIndex
+
+              frameCount <- use $ fastRenderAPIGlobals.frFrameCount
+              io $ V.imapM_ (\i s -> if i >= idx && i < idx + c then modifyIORef' s (\v -> v { _msVisFrame = frameCount }) else return ()) (worldModel^.mMarkSurfaces)
+
+        drawNodeStuff :: ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()
+        drawNodeStuff worldModel node sidebit frameCount idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let surfRef = (worldModel^.mSurfaces) V.! ((node^.mnFirstSurface) + idx)
+              surf <- io $ readIORef surfRef
+
+              if (surf^.msVisFrame) /= frameCount || ((surf^.msFlags) .&. Constants.surfPlaneBack /= sidebit)
+                then
+                  drawNodeStuff worldModel node sidebit frameCount (idx + 1) maxIdx
+                else do
+                  let texInfo = surf^.msTexInfo
+
+                  if | (texInfo^.mtiFlags) .&. Constants.surfSky /= 0 ->
+                         Warp.rAddSkySurface surfRef
+                     | (texInfo^.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 -> do
+                         alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
+                         io $ modifyIORef' surfRef (\v -> v { _msTextureChain = alphaSurfaces })
+                         fastRenderAPIGlobals.frAlphaSurfaces .= Just surfRef
+                     | otherwise -> do
+                         if (surf^.msFlags) .&. Constants.surfDrawTurb == 0
+                           then
+                             glRenderLightmappedPoly surfRef
+                           else do
+                             -- the polygon is visible, so add it to the
+                             -- texture sorted chain
+                             -- FIXME: this is a hack for animation
+                             imageRef <- rTextureAnimation (surf^.msTexInfo)
+                             image <- io $ readIORef imageRef
+                             io $ modifyIORef' surfRef (\v -> v { _msTextureChain = image^.iTextureChain })
+                             io $ modifyIORef' imageRef (\v -> v { _iTextureChain = Just surfRef })
+
+                  drawNodeStuff worldModel node sidebit frameCount (idx + 1) maxIdx
+
+rCullBox :: V3 Float -> V3 Float -> Quake Bool
+rCullBox mins maxs = do
+    noCullValue <- liftM (^.cvValue) noCullCVar
+
+    if noCullValue /= 0
+      then return False
+      else do
+        frustum <- use $ fastRenderAPIGlobals.frFrustum
+        frustum' <- io $ V.mapM readIORef frustum
+        if | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 0) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 1) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 2) == 2 -> return True
+           | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 3) == 2 -> return True
+           | otherwise -> return False
+
+rTextureAnimation :: MTexInfoT -> Quake (IORef ImageT)
+rTextureAnimation _ = do
+    io (putStrLn "Surf.rTextureAnimation") >> undefined -- TODO
+
+glRenderLightmappedPoly :: IORef MSurfaceT -> Quake ()
+glRenderLightmappedPoly _ = do
+    io (putStrLn "Surf.glRenderLightmappedPoly") >> undefined -- TODO

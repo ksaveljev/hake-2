@@ -6,7 +6,7 @@ module Render.Fast.Warp where
 import Control.Applicative (Const)
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), _1, _2)
 import Control.Monad (when, unless, liftM)
-import Data.IORef (readIORef)
+import Data.IORef (IORef, readIORef)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
 import qualified Data.ByteString as B
@@ -382,3 +382,7 @@ makeSkyVec s t axis = do
 
     GL.glTexCoord2f (realToFrac s'') (realToFrac t''')
     GL.glVertex3f (v1^._x) (v1^._y) (v1^._z)
+
+rAddSkySurface :: IORef MSurfaceT -> Quake ()
+rAddSkySurface _ = do
+    io (putStrLn "Warp.rAddSkySurface") >> undefined -- TODO

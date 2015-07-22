@@ -122,4 +122,5 @@ initialFastRenderAPIGlobals =
                        , _frCurrentEntity        = newEntityT
                        , _frSkyMins              = (UV.empty, UV.empty)
                        , _frSkyMaxs              = (UV.empty, UV.empty)
+                       , _frAlphaSurfaces        = Nothing
                        }
