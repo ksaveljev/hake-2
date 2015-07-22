@@ -235,3 +235,43 @@ glSubdivideSurface surface = do
               let vecRef = (loadModel^.mVertexes) V.! (fromIntegral $ edge^.meV._2)
               vec <- io $ readIORef vecRef
               return (vec^.mvPosition)
+
+rSetSky :: B.ByteString -> Float -> V3 Float -> Quake ()
+rSetSky name rotate axis = do
+    zoom fastRenderAPIGlobals $ do
+      frSkyName .= name
+      frSkyRotate .= rotate
+      frSkyAxis .= axis
+
+    glSkyMipValue <- liftM (^.cvValue) glSkyMipCVar
+    glExtPalettedTextureValue <- liftM (^.cvValue) glExtPalettedTextureCVar
+    colorTableEXT <- use $ fastRenderAPIGlobals.frColorTableEXT
+
+    (skyMin, skyMax) <- setSky glSkyMipValue glExtPalettedTextureValue colorTableEXT 0 6 0 0
+    fastRenderAPIGlobals.frSkyMin .= skyMin
+    fastRenderAPIGlobals.frSkyMax .= skyMax
+
+  where setSky :: Float -> Float -> Bool -> Int -> Int -> Float -> Float -> Quake (Float, Float)
+        setSky skyMipValue extPalettedTexture colorTableEXT idx maxIdx skyMin skyMax
+          | idx >= maxIdx = return (skyMin, skyMax)
+          | otherwise = do
+              when (skyMipValue /= 0 || rotate /= 0) $
+                glPicMipCVar >>= \picMip -> CVar.update picMip { _cvValue = (picMip^.cvValue) + 1 }
+
+              let pathname = if colorTableEXT && extPalettedTexture /= 0
+                               then "env/" `B.append` name `B.append` (suf V.! idx) `B.append` ".pcx"
+                               else "env/" `B.append` name `B.append` (suf V.! idx) `B.append` ".tga"
+
+              imageRef <- Image.glFindImage pathname RenderAPIConstants.itSky
+              imageRef' <- if isNothing imageRef
+                                then (use $ fastRenderAPIGlobals.frNoTexture) >>= \ref -> return (Just ref)
+                                else return imageRef
+
+              fastRenderAPIGlobals.frSkyImages.ix idx .= imageRef'
+
+              if skyMipValue /= 0 || rotate /= 0
+                then do
+                  glPicMipCVar >>= \picMip -> CVar.update picMip { _cvValue = (picMip^.cvValue) - 1 }
+                  setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx (1 / 256) (255 / 256)
+                else
+                  setSky skyMipValue extPalettedTexture colorTableEXT (idx + 1) maxIdx (1 / 512) (511 / 512)
