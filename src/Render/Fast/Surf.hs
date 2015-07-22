@@ -6,7 +6,7 @@ import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=), _1, _2)
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Char (toUpper)
-import Data.IORef (IORef, readIORef)
+import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
 import qualified Data.ByteString as B
@@ -226,9 +226,107 @@ lmUploadBlock dynamic = do
           when (clt == Constants.maxLightMaps) $
             Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
 
+{-
+- R_MarkLeaves
+- Mark the leaves and nodes that are in the PVS for
+- the current cluster
+-}
 rMarkLeaves :: Quake ()
 rMarkLeaves = do
-    io (putStrLn "Surf.rMarkLeaves") >> undefined -- TODO
+    oldViewCluster <- use $ fastRenderAPIGlobals.frOldViewCluster
+    oldViewCluster2 <- use $ fastRenderAPIGlobals.frOldViewCluster2
+    viewCluster <- use $ fastRenderAPIGlobals.frViewCluster
+    viewCluster2 <- use $ fastRenderAPIGlobals.frViewCluster2
+    noVisValue <- liftM (^.cvValue) noVisCVar
+
+    unless (oldViewCluster == viewCluster && oldViewCluster2 == viewCluster2 && noVisValue == 0 && viewCluster /= -1) $ do
+      -- TODO: implement this development stuff
+      -- if (gl_lockpvs.value != 0)
+      --     return;
+      
+      zoom fastRenderAPIGlobals $ do
+        frVisFrameCount += 1
+        frOldViewCluster .= viewCluster
+        frOldViewCluster2 .= viewCluster2
+
+      Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      worldModel <- io $ readIORef worldModelRef
+
+      if noVisValue /= 0 || viewCluster == -1 || isNothing (worldModel^.mVis)
+        then do
+          -- mark everything
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+
+          io $ markLeafs (worldModel^.mLeafs) visFrameCount 0 (worldModel^.mNumLeafs)
+          io $ markNodes (worldModel^.mNodes) visFrameCount 0 (worldModel^.mNumNodes)
+
+        else do
+          vis <- Model.clusterPVS viewCluster worldModel
+
+          -- may have to combine two clusters because of solid water boundaries
+          vis' <- if viewCluster2 /= viewCluster
+                    then combineClusters worldModel vis viewCluster2
+                    else return vis
+
+          visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
+          markLeaf worldModelRef vis' visFrameCount 0 (worldModel^.mNumLeafs)
+
+  where markLeafs :: V.Vector (IORef MLeafT) -> Int -> Int -> Int -> IO ()
+        markLeafs leafs visFrameCount idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              modifyIORef' (leafs V.! idx) (\v -> v { _mlVisFrame = visFrameCount })
+              markLeafs leafs visFrameCount (idx + 1) maxIdx
+
+        markNodes :: V.Vector (IORef MNodeT) -> Int -> Int -> Int -> IO ()
+        markNodes nodes visFrameCount idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              modifyIORef' (nodes V.! idx) (\v -> v { _mnVisFrame = visFrameCount })
+              markNodes nodes visFrameCount (idx + 1) maxIdx
+
+        combineClusters :: ModelT -> B.ByteString -> Int -> Quake B.ByteString
+        combineClusters worldModel vis viewCluster2 = do
+          let len = ((worldModel^.mNumLeafs) + 7) `shiftR` 3
+              fatvis = B.take len vis `B.append` B.replicate ((Constants.maxMapLeafs `div` 8) - len) 0
+              c = (((worldModel^.mNumLeafs) + 31) `shiftR` 5) `shiftL` 2
+
+          vis' <- Model.clusterPVS viewCluster2 worldModel
+
+          let fatvis' = B.pack (B.zipWith (\a b -> a .|. b) (B.take c fatvis) (B.take c vis')) `B.append` (B.drop c fatvis)
+          return fatvis'
+
+        markLeaf :: IORef ModelT -> B.ByteString -> Int -> Int -> Int -> Quake ()
+        markLeaf worldModelRef vis visFrameCount idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              worldModel <- io $ readIORef worldModelRef
+              let leafRef = (worldModel^.mLeafs) V.! idx
+              leaf <- io $ readIORef leafRef
+              let cluster = leaf^.mlCluster
+
+              if cluster == -1
+                then
+                  markLeaf worldModelRef vis visFrameCount (idx + 1) maxIdx
+                else do
+                  when ((vis `B.index` (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) /= 0) $ do
+                    when ((leaf^.mlVisFrame) /= visFrameCount) $ do
+                      io $ modifyIORef' leafRef (\v -> v { _mlVisFrame = visFrameCount })
+                      markNode (leaf^.mlParent) visFrameCount
+
+                  markLeaf worldModelRef vis visFrameCount (idx + 1) maxIdx
+
+        markNode :: Maybe (IORef MNodeT) -> Int -> Quake ()
+        markNode Nothing _ = return ()
+        makrNode (Just nodeRef) visFrameCount = do
+          node <- io $ readIORef nodeRef
+
+          if (node^.mnVisFrame) == visFrameCount
+            then
+              return ()
+            else do
+              io $ modifyIORef' nodeRef (\v -> v { _mnVisFrame = visFrameCount })
+              makrNode (node^.mnParent) visFrameCount
 
 rDrawWorld :: Quake ()
 rDrawWorld = do
