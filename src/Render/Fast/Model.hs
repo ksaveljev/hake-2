@@ -837,3 +837,44 @@ precompileGLCmds model = do
         collectIndexElements (x:xs) idx pos acc =
           let count = fromIntegral $ if x < 0 then -x else x
           in collectIndexElements xs idx (pos + count) ((idx + pos, count) : acc)
+
+rRegisterModel :: B.ByteString -> Quake (Maybe (IORef ModelT))
+rRegisterModel name = do
+    modelRef <- modForName name False
+
+    when (isJust modelRef) $
+      registerModelImages (fromJust modelRef)
+
+    return modelRef
+
+  where registerModelImages :: IORef ModelT -> Quake ()
+        registerModelImages modelRef = do
+          model <- io $ readIORef modelRef
+
+          regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+          io $ modifyIORef' modelRef (\v -> v { _mRegistrationSequence = regSeq })
+
+          if | model^.mType == RenderAPIConstants.modSprite -> do
+                 let Just (SpriteModelExtra sprOut) = model^.mExtraData
+                 skins <- V.mapM (\frame -> Image.glFindImage (frame^.dsfName) RenderAPIConstants.itSprite) (sprOut^.dsFrames)
+                 io $ modifyIORef' modelRef (\v -> v { _mSkins = skins })
+
+             | model^.mType == RenderAPIConstants.modAlias -> do
+                 let Just (AliasModelExtra pheader) = model^.mExtraData
+                 skins <- V.mapM (\skinName -> Image.glFindImage skinName RenderAPIConstants.itSkin) (fromJust $ pheader^.dmSkinNames)
+                 io $ modifyIORef' modelRef (\v -> v { _mSkins = skins
+                                                     , _mNumFrames = pheader^.dmNumFrames
+                                                     })
+
+             | model^.mType == RenderAPIConstants.modBrush -> do
+                 updateImageRegistrationSequence model regSeq 0 (model^.mNumTexInfo)
+
+             | otherwise -> return ()
+
+        updateImageRegistrationSequence :: ModelT -> Int -> Int -> Int -> Quake ()
+        updateImageRegistrationSequence model regSeq idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              texInfo <- io $ readIORef ((model^.mTexInfo) V.! idx)
+              io $ modifyIORef' (fromJust $ texInfo^.mtiImage) (\v -> v { _iRegistrationSequence = regSeq })
+              updateImageRegistrationSequence model regSeq (idx + 1) maxIdx
