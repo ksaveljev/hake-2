@@ -143,3 +143,13 @@ fill x y w h colorIndex = do
     GL.glEnd
     GL.glColor3f 1 1 1
     GL.glEnable GL.gl_TEXTURE_2D
+
+getPicSize :: B.ByteString -> Quake (Maybe (Int, Int))
+getPicSize pic = do
+    maybeImage <- findPic pic
+
+    case maybeImage of
+      Nothing -> return Nothing
+      Just imageRef -> do
+        image <- io $ readIORef imageRef
+        return $ Just (image^.iWidth, image^.iHeight)
