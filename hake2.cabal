@@ -21,10 +21,10 @@ executable hake2
                      , bytestring
                      , mtl >= 2.2.1
                      , containers
-                     , vector
+                     , vector >= 0.11
                      , linear
                      , cryptohash
-                     , lens
+                     , lens >= 4.12
                      , time
                      , directory
                      , binary

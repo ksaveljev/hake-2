@@ -972,12 +972,11 @@ data MLeafT =
          , _mlVisFrame        :: !Int
          , _mlMins            :: V3 Float
          , _mlMaxs            :: V3 Float
-         , _mlParent          :: Maybe MNodeReference
+         , _mlParent          :: Maybe (IORef MNodeT)
          , _mlCluster         :: !Int
          , _mlArea            :: !Int
          , _mlNumMarkSurfaces :: !Int
          , _mlMarkIndex       :: !Int
-         , _mlMarkSurfaces    :: V.Vector MSurfaceT -- TODO: remove this
          }
 
 data ClientInfoT =
@@ -1606,7 +1605,7 @@ data FastRenderAPIGlobals =
                        , _frGLLms                :: GLLightMapStateT
                        , _frNewRefDef            :: RefDefT
                        , _frFrameCount           :: !Int
-                       , _frWarpFace             :: Maybe (IORef MSurfaceT)
+                       , _frWarpFace             :: Maybe MSurfaceT
                        , _frModelVisibility      :: Maybe B.ByteString
                        , _frSkyName              :: B.ByteString
                        , _frSkyRotate            :: !Float
@@ -1804,7 +1803,7 @@ data MNodeT =
          , _mnMins         :: V3 Float
          , _mnMaxs         :: V3 Float
          , _mnParent       :: Maybe (IORef MNodeT)
-         , _mnPlane        :: CPlaneT
+         , _mnPlane        :: IORef CPlaneT
          , _mnChildren     :: (MNodeChild, MNodeChild)
          , _mnFirstSurface :: !Int
          , _mnNumSurfaces  :: !Int
