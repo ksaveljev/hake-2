@@ -9,7 +9,7 @@ import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Char (toLower, toUpper)
 import Data.Int (Int8)
-import Data.IORef (readIORef)
+import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromMaybe, isNothing, fromJust)
 import Foreign.Marshal.Array (withArray, allocaArray, peekArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
@@ -872,3 +872,41 @@ rSetupFrame = do
       GL.glClear (GL.gl_COLOR_BUFFER_BIT .|. GL.gl_DEPTH_BUFFER_BIT)
       GL.glClearColor 1.0 0.0 0.5 0.5
       GL.glDisable GL.gl_SCISSOR_TEST
+
+rSetFrustum :: Quake ()
+rSetFrustum = do
+    vup <- use $ fastRenderAPIGlobals.frVUp
+    vright <- use $ fastRenderAPIGlobals.frVRight
+    vpn <- use $ fastRenderAPIGlobals.frVPn
+
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    frustum <- use $ fastRenderAPIGlobals.frFrustum
+
+                               -- rotate VPN right by FOV_X/2 degrees
+    let normals = V.fromList [ Math3D.rotatePointAroundVector vup vpn (0 - (90 - (newRefDef^.rdFovX) / 2))
+                               -- rotate VPN left by FOV_x/2 degrees
+                             , Math3D.rotatePointAroundVector vup vpn (90 - (newRefDef^.rdFovX) / 2)
+                               -- rotate VPN up by FOV_Y/2 degrees
+                             , Math3D.rotatePointAroundVector vright vpn (90 - (newRefDef^.rdFovY) / 2)
+                               -- rotate VPN down by FOV_Y/2 degrees
+                             , Math3D.rotatePointAroundVector vright vpn (0 - (90 - (newRefDef^.rdFovY) / 2))
+                             ]
+
+    origin <- use $ fastRenderAPIGlobals.frOrigin
+    io $ V.imapM_ (updateFrustum normals origin) frustum
+
+  where updateFrustum :: V.Vector (V3 Float) -> V3 Float -> Int -> IORef CPlaneT -> IO ()
+        updateFrustum normals origin idx planeRef = do
+          plane <- readIORef planeRef
+          modifyIORef' planeRef (\v -> v { _cpNormal = normals V.! idx
+                                         , _cpType = Constants.planeAnyZ
+                                         , _cpDist = origin `dot` (normals V.! idx)
+                                         , _cpSignBits = signbitsForPlane plane
+                                         })
+
+signbitsForPlane :: CPlaneT -> Int8
+signbitsForPlane out =
+    let a = if (out^.cpNormal._x) < 0 then 1 else 0
+        b = if (out^.cpNormal._y) < 0 then 2 else 0
+        c = if (out^.cpNormal._z) < 0 then 4 else 0
+    in a .|. b .|. c
