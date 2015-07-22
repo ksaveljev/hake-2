@@ -903,3 +903,22 @@ rEndRegistration = do
                                   io $ modifyIORef' (modKnown V.! idx) (\v -> v { _mExtraData = Just (AliasModelExtra pheader') })
 
               checkModels modKnown regSeq (idx + 1) maxIdx
+
+pointInLeaf :: V3 Float -> ModelT -> Quake MLeafT
+pointInLeaf p model = do
+    let rootNode = MNodeChildReference ((model^.mNodes) V.! 0)
+    findLeaf rootNode
+
+  where findLeaf :: MNodeChild -> Quake MLeafT
+        findLeaf (MNodeChildReference nodeRef) = do
+          node <- io $ readIORef nodeRef
+          plane <- io $ readIORef (node^.mnPlane)
+
+          let d = p `dot` (plane^.cpNormal) - (plane^.cpDist)
+              childRef = if d > 0
+                           then node^.mnChildren._1
+                           else node^.mnChildren._2
+
+          case childRef of
+            MLeafChildReference leafRef -> io $ readIORef leafRef
+            nodeChild -> findLeaf nodeChild
