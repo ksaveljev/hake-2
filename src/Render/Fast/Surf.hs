@@ -318,7 +318,7 @@ rMarkLeaves = do
 
         markNode :: Maybe (IORef MNodeT) -> Int -> Quake ()
         markNode Nothing _ = return ()
-        makrNode (Just nodeRef) visFrameCount = do
+        markNode (Just nodeRef) visFrameCount = do
           node <- io $ readIORef nodeRef
 
           if (node^.mnVisFrame) == visFrameCount
@@ -326,12 +326,73 @@ rMarkLeaves = do
               return ()
             else do
               io $ modifyIORef' nodeRef (\v -> v { _mnVisFrame = visFrameCount })
-              makrNode (node^.mnParent) visFrameCount
+              markNode (node^.mnParent) visFrameCount
 
 rDrawWorld :: Quake ()
 rDrawWorld = do
-    io (putStrLn "Surf.rDrawWorld") >> undefined -- TODO
+    drawWorldValue <- liftM (^.cvValue) drawWorldCVar
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+    unless (drawWorldValue == 0 || (newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel /= 0) $ do
+      Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+      fastRenderAPIGlobals.frCurrentModel .= worldModelRef
+
+      fastRenderAPIGlobals.frModelOrg .= (newRefDef^.rdViewOrg)
+      fastRenderAPIGlobals.frCurrentEntity .= newEntityT { _eFrame = truncate ((newRefDef^.rdTime) * 2) }
+
+      fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
+
+      GL.glColor3f 1 1 1
+
+      Warp.clearSkyBox
+
+      Image.glEnableMultiTexture True
+
+      Image.glSelectTexture QGLConstants.glTexture0
+      Image.glTexEnv GL.gl_REPLACE
+
+      polygonBuffer <- use $ fastRenderAPIGlobals.frPolygonBuffer
+      io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+        GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
+
+      Image.glSelectTexture QGLConstants.glTexture1
+
+      io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
+        GL.glTexCoordPointer 2 GL.gl_FLOAT (fromIntegral byteStride) ptr
+
+      lightmapValue <- liftM (^.cvValue) glLightMapCVar
+      if lightmapValue /= 0
+        then Image.glTexEnv GL.gl_REPLACE
+        else Image.glTexEnv GL.gl_MODULATE
+
+      worldModel <- io $ readIORef worldModelRef
+
+      recursiveWorldNode ((worldModel^.mNodes) V.! 0) -- root node
+
+      GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture1)
+      GL.glDisableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+      Image.glEnableMultiTexture False
+
+      drawTextureChains
+      Warp.drawSkyBox
+      drawTriangleOutlines
 
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
     io (putStrLn "Surf.rDrawAlphaSurfaces") >> undefined -- TODO
+
+drawTextureChains :: Quake ()
+drawTextureChains = do
+    io (putStrLn "Surf.drawTextureChains") >> undefined -- TODO
+
+drawTriangleOutlines :: Quake ()
+drawTriangleOutlines = do
+    showTrisValue <- liftM (^.cvValue) glShowTrisCVar
+
+    when (showTrisValue /= 0) $ do
+      io (putStrLn "Surf.drawTriangleOutlines") >> undefined -- TODO
+
+recursiveWorldNode :: IORef MNodeT -> Quake ()
+recursiveWorldNode _ = do
+    io (putStrLn "Surf.recursiveWorldNode") >> undefined -- TODO
