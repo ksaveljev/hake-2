@@ -505,10 +505,64 @@ rCullBox mins maxs = do
            | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 3) == 2 -> return True
            | otherwise -> return False
 
+{-
+- R_TextureAnimation
+- Returns the proper texture for a given time and base texture
+-}
 rTextureAnimation :: MTexInfoT -> Quake (IORef ImageT)
-rTextureAnimation _ = do
-    io (putStrLn "Surf.rTextureAnimation") >> undefined -- TODO
+rTextureAnimation tex = do
+    case (tex^.mtiNext) of
+      Nothing -> return (fromJust $ tex^.mtiImage)
+      Just _ -> do
+        currentEntity <- use $ fastRenderAPIGlobals.frCurrentEntity
+        let c = (currentEntity^.eFrame) `mod` (tex^.mtiNumFrames)
+        findFrame tex c
+
+  where findFrame :: MTexInfoT -> Int -> Quake (IORef ImageT)
+        findFrame tex 0 = return (fromJust $ tex^.mtiImage)
+        findFrame tex c = do
+          nextTex <- io $ readIORef (fromJust $ tex^.mtiNext)
+          findFrame nextTex (c - 1)
 
 glRenderLightmappedPoly :: IORef MSurfaceT -> Quake ()
-glRenderLightmappedPoly _ = do
+glRenderLightmappedPoly surfRef = do
+    surf <- io $ readIORef surfRef
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    frameCount <- use $ fastRenderAPIGlobals.frFrameCount
+
+    let (gotoDynamic, mapIdx) = calcGotoDynamic surf newRefDef 0 Constants.maxLightMaps
+        mapIdx' = if mapIdx == 4 then 3 else mapIdx -- this is a hack from cwei
+
+    isDynamic <- checkIfDynamic surf gotoDynamic frameCount
+    imageRef <- rTextureAnimation (surf^.msTexInfo)
+
+    image <- io $ readIORef imageRef
+    let lmtex = surf^.msLightmapTextureNum
+
     io (putStrLn "Surf.glRenderLightmappedPoly") >> undefined -- TODO
+
+  where calcGotoDynamic :: MSurfaceT -> RefDefT -> Int -> Int -> (Bool, Int)
+        calcGotoDynamic surf newRefDef idx maxIdx
+          | idx >= maxIdx = (False, maxIdx)
+          | otherwise =
+              let f = (surf^.msStyles) `B.index` idx
+                  white = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
+              in if white /= (surf^.msCachedLight) UV.! idx
+                   then (True, idx)
+                   else calcGotoDynamic surf newRefDef (idx + 1) maxIdx
+
+        checkIfDynamic :: MSurfaceT -> Bool -> Int -> Quake Bool
+        checkIfDynamic surf gotoDynamic frameCount =
+          if gotoDynamic || (surf^.msDLightFrame) == frameCount
+            then do
+              dynamicValue <- liftM (^.cvValue) glDynamicCVar
+
+              if dynamicValue /= 0
+                then
+                  return $ if (surf^.msTexInfo.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0
+                             then True
+                             else False
+                else
+                  return False
+            else
+              return False

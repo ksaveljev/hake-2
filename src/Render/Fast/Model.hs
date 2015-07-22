@@ -460,19 +460,20 @@ loadTexInfo buffer lump = do
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
         texInfoT = runGet (getTexInfo count) buf
 
-    mTexInfoT <- V.mapM toMTexInfoT texInfoT
-    let mTexInfoT' = V.imap (countFrames mTexInfoT) mTexInfoT
-    mTexInfoT'' <- io $ V.mapM newIORef mTexInfoT'
-
+    mti <- io $ V.replicateM count (newIORef undefined)
     io $ modifyIORef' loadModelRef (\v -> v { _mNumTexInfo = count
-                                            , _mTexInfo = mTexInfoT''
+                                            , _mTexInfo = mti
                                             })
+
+    model <- io $ readIORef loadModelRef
+    V.imapM_ (toMTexInfoT model) texInfoT
+    countAnimationFrames model 0 count
 
   where getTexInfo :: Int -> Get (V.Vector TexInfoT)
         getTexInfo count = V.replicateM count getTexInfoT
 
-        toMTexInfoT :: TexInfoT -> Quake MTexInfoT
-        toMTexInfoT texInfoT = do
+        toMTexInfoT :: ModelT -> Int -> TexInfoT -> Quake ()
+        toMTexInfoT model idx texInfoT = do
           let name = "textures/" `B.append` (texInfoT^.tiTexture) `B.append` ".wal"
           foundImage <- Image.glFindImage name RenderAPIConstants.itWall
           imgRef <- case foundImage of
@@ -481,23 +482,32 @@ loadTexInfo buffer lump = do
                         VID.printf Constants.printAll ("Couldn't load " `B.append` name `B.append` "\n")
                         use $ fastRenderAPIGlobals.frNoTexture
 
-          return MTexInfoT { _mtiVecs = texInfoT^.tiVecs
-                           , _mtiFlags = texInfoT^.tiFlags
-                           , _mtiNumFrames = 1
-                           , _mtiNext = if (texInfoT^.tiNextTexInfo) > 0 then Just (texInfoT^.tiNextTexInfo) else Nothing
-                           , _mtiImage = Just imgRef
-                           }
+          let mTexInfoRef = (model^.mTexInfo) V.! idx
+          io $ writeIORef mTexInfoRef MTexInfoT { _mtiVecs = texInfoT^.tiVecs
+                                                , _mtiFlags = texInfoT^.tiFlags
+                                                , _mtiNumFrames = 1
+                                                , _mtiNext = if (texInfoT^.tiNextTexInfo) > 0 then Just ((model^.mTexInfo) V.! (texInfoT^.tiNextTexInfo)) else Nothing
+                                                , _mtiImage = Just imgRef
+                                                }
 
-        countFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
-        countFrames allTexInfo idx current = current { _mtiNumFrames = countNumFrames allTexInfo idx current 1 }
+        countAnimationFrames :: ModelT -> Int -> Int -> Quake ()
+        countAnimationFrames model idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let mTexInfoRef = (model^.mTexInfo) V.! idx
+              texInfo <- io $ readIORef mTexInfoRef
+              num <- countFrames mTexInfoRef (texInfo^.mtiNext) 1
+              io $ modifyIORef' mTexInfoRef (\v -> v { _mtiNumFrames = num })
+              countAnimationFrames model (idx + 1) maxIdx
 
-        countNumFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> Int -> Int
-        countNumFrames allTexInfo idx current count =
-          case current^.mtiNext of
-            Nothing -> count
-            Just nextIdx -> if nextIdx == idx
-                              then count
-                              else countNumFrames allTexInfo idx (allTexInfo V.! nextIdx) (count + 1)
+        countFrames :: IORef MTexInfoT -> Maybe (IORef MTexInfoT) -> Int -> Quake Int
+        countFrames _ Nothing n = return n
+        countFrames initial (Just current) n = do
+          if current == initial
+            then return n
+            else do
+              texInfo <- io $ readIORef current
+              countFrames initial (texInfo^.mtiNext) (n + 1)
 
 loadFaces :: B.ByteString -> LumpT -> Quake ()
 loadFaces buffer lump = do

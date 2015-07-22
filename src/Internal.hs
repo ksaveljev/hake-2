@@ -840,7 +840,7 @@ data MTexInfoT =
   MTexInfoT { _mtiVecs      :: (V4 Float, V4 Float)
             , _mtiFlags     :: !Int
             , _mtiNumFrames :: !Int
-            , _mtiNext      :: Maybe Int
+            , _mtiNext      :: Maybe (IORef MTexInfoT)
             , _mtiImage     :: Maybe (IORef ImageT)
             }
 
