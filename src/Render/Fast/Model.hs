@@ -878,3 +878,28 @@ rRegisterModel name = do
               texInfo <- io $ readIORef ((model^.mTexInfo) V.! idx)
               io $ modifyIORef' (fromJust $ texInfo^.mtiImage) (\v -> v { _iRegistrationSequence = regSeq })
               updateImageRegistrationSequence model regSeq (idx + 1) maxIdx
+
+rEndRegistration :: Quake ()
+rEndRegistration = do
+    modNumKnown <- use $ fastRenderAPIGlobals.frModNumKnown
+    modKnown <- use $ fastRenderAPIGlobals.frModKnown
+    regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+
+    checkModels modKnown regSeq 0 modNumKnown
+
+    Image.glFreeUnusedImages
+
+  where checkModels :: V.Vector (IORef ModelT) -> Int -> Int -> Int -> Quake ()
+        checkModels modKnown regSeq idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              model <- io $ readIORef (modKnown V.! idx)
+
+              if | B.null (model^.mName) -> return ()
+                 | (model^.mRegistrationSequence) /= regSeq -> modFree (modKnown V.! idx)
+                 | otherwise -> when ((model^.mType) == RenderAPIConstants.modAlias) $ do
+                                  let Just (AliasModelExtra pheader) = model^.mExtraData
+                                  pheader' <- precompileGLCmds pheader
+                                  io $ modifyIORef' (modKnown V.! idx) (\v -> v { _mExtraData = Just (AliasModelExtra pheader') })
+
+              checkModels modKnown regSeq (idx + 1) maxIdx

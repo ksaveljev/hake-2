@@ -9,7 +9,7 @@ import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (toUpper)
 import Data.Int (Int32)
-import Data.IORef (IORef, readIORef, modifyIORef')
+import Data.IORef (IORef, readIORef, modifyIORef', writeIORef)
 import Data.Maybe (isNothing, isJust, fromJust, fromMaybe)
 import Data.Monoid (mappend, mempty, mconcat)
 import Data.Word (Word8)
@@ -973,3 +973,43 @@ glSelectTexture texture = do
 
 rRegisterSkin :: B.ByteString -> Quake (Maybe (IORef ImageT))
 rRegisterSkin name = glFindImage name RenderAPIConstants.itSkin
+
+{-
+================
+GL_FreeUnusedImages
+Any image that was not touched on this registration sequence
+will be freed.
+================
+-}
+glFreeUnusedImages :: Quake ()
+glFreeUnusedImages = do
+    -- never free r_notexture or particle texture
+    regSeq <- use $ fastRenderAPIGlobals.frRegistrationSequence
+    noTextureRef <- use $ fastRenderAPIGlobals.frNoTexture
+    particleTextureRef <- use $ fastRenderAPIGlobals.frParticleTexture
+
+    io $ do
+      modifyIORef' noTextureRef (\v -> v { _iRegistrationSequence = regSeq })
+      modifyIORef' particleTextureRef (\v -> v { _iRegistrationSequence = regSeq })
+
+    numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+    glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+
+    checkImages glTextures regSeq 0 numGLTextures
+
+  where checkImages :: V.Vector (IORef ImageT) -> Int -> Int -> Int -> Quake ()
+        checkImages glTextures regSeq idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              image <- io $ readIORef (glTextures V.! idx)
+
+              if (image^.iRegistrationSequence) == regSeq ||
+                 (image^.iRegistrationSequence) == 0 ||
+                 (image^.iType) == RenderAPIConstants.itPic
+                then
+                  checkImages glTextures regSeq (idx + 1) maxIdx
+                else do
+                  io $ with (fromIntegral $ image^.iTexNum) $ \ptr -> do
+                    GL.glDeleteTextures 1 ptr
+                    writeIORef (glTextures V.! idx) (newImageT idx)
+                  checkImages glTextures regSeq (idx + 1) maxIdx
