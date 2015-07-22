@@ -53,7 +53,7 @@ fastRenderAPI =
               , _rDrawFindPic       = \_ -> Draw.findPic
               , _rSetSky            = \_ -> Warp.rSetSky
               , _rEndRegistration   = \_ -> Model.rEndRegistration
-              , _rRenderFrame       = DT.trace "rRenderFrame" undefined -- \_ -> fastRenderFrame
+              , _rRenderFrame       = \_ -> fastRenderFrame
               , _rDrawGetPicSize    = \_ -> Draw.getPicSize
               , _rDrawPic           = DT.trace "rDrawPic" undefined -- \_ -> Draw.drawPic
               , _rDrawStretchPic    = \_ -> Draw.stretchPic
@@ -718,3 +718,86 @@ setGL2D = do
     GL.glDisable GL.gl_BLEND
     GL.glEnable GL.gl_ALPHA_TEST
     GL.glColor4f 1 1 1 1
+
+fastRenderFrame :: RefDefT -> Quake ()
+fastRenderFrame fd = do
+    renderView fd
+    setLightLevel
+    setGL2D
+
+{-
+- R_RenderView
+- r_newrefdef must be set before the first call
+-}
+renderView :: RefDefT -> Quake ()
+renderView fd = do
+    noRefreshValue <- liftM (^.cvValue) noRefreshCVar
+
+    when (noRefreshValue == 0) $ do
+      fastRenderAPIGlobals.frNewRefDef .= fd
+
+      {-
+      when (isNothing fd) $
+        Com.comError Constants.errDrop "R_RenderView: refdef_t fd is null"
+        -}
+
+      worldModel <- use $ fastRenderAPIGlobals.frWorldModel
+
+      when (isNothing worldModel && ((fd^.rdRdFlags) .&. Constants.rdfNoWorldModel) == 0) $
+        Com.comError Constants.errDrop "R_RenderView: NULL worldmodel"
+
+      speedsValue <- liftM (^.cvValue) speedsCVar
+      when (speedsValue /= 0) $ do
+        fastRenderAPIGlobals.frCBrushPolys .= 0
+        fastRenderAPIGlobals.frCAliasPolys .= 0
+
+      Light.rPushDLights
+
+      glFinishValue <- liftM (^.cvValue) glFinishCVar
+      when (glFinishValue /= 0) $
+        GL.glFinish
+
+      rSetupFrame
+
+      rSetFrustum
+
+      rSetupGL
+
+      Surf.rMarkLeaves -- done here so we know if we're in water
+
+      Surf.rDrawWorld
+
+      rDrawEntitiesOnList
+
+      Light.rRenderDLights
+
+      rDrawParticles
+
+      Surf.rDrawAlphaSurfaces
+
+      rFlash
+
+      -- TODO: add VID.printf like in jake2 to print some info
+
+setLightLevel :: Quake ()
+setLightLevel = do
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0) $ do
+      -- save off light value for server to look at (BIG HACK!)
+      light <- Light.rLightPoint (newRefDef^.rdViewOrg)
+
+      -- pick the greatest component, which should be the same
+      -- as the mono value returned by software
+      let v = if (light^._x) > (light^._y)
+                then do
+                  if (light^._x) > (light^._z)
+                    then 150 * (light^._x)
+                    else 150 * (light^._z)
+                else do
+                  if (light^._y) > (light^._z)
+                    then 150 * (light^._y)
+                    else 150 * (light^._z)
+
+      lightLevel <- clLightLevelCVar
+      CVar.update lightLevel { _cvValue = v }
