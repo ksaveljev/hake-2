@@ -1013,3 +1013,16 @@ glFreeUnusedImages = do
                     GL.glDeleteTextures 1 ptr
                     writeIORef (glTextures V.! idx) (newImageT idx)
                   checkImages glTextures regSeq (idx + 1) maxIdx
+
+glMBind :: Int -> Int -> Quake ()
+glMBind target texNum = do
+    glSelectTexture target
+    texture0 <- use $ fastRenderAPIGlobals.frTexture0
+    glState <- use $ fastRenderAPIGlobals.frGLState
+
+    let done = if target == texture0
+              then (glState^.glsCurrentTextures._1) == texNum
+              else (glState^.glsCurrentTextures._2) == texNum
+
+    unless done $
+      glBind texNum
