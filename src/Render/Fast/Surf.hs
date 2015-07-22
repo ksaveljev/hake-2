@@ -539,7 +539,29 @@ glRenderLightmappedPoly surfRef = do
     image <- io $ readIORef imageRef
     let lmtex = surf^.msLightmapTextureNum
 
-    io (putStrLn "Surf.glRenderLightmappedPoly") >> undefined -- TODO
+    if isDynamic
+      then do
+        io (putStrLn "Surf.glRenderLightmappedPoly") >> undefined -- TODO
+      else do
+        fastRenderAPIGlobals.frCBrushPolys += 1
+
+        texture0 <- use $ fastRenderAPIGlobals.frTexture0
+        texture1 <- use $ fastRenderAPIGlobals.frTexture1
+        glState <- use $ fastRenderAPIGlobals.frGLState
+
+        Image.glMBind texture0 (image^.iTexNum)
+        Image.glMBind texture1 ((glState^.glsLightmapTextures) + lmtex)
+
+        if (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0
+          then do
+            let v = truncate ((newRefDef^.rdTime) / 40) :: Int
+                scroll = (-64) * ( ((newRefDef^.rdTime) / 40) - fromIntegral v)
+                scroll' = if scroll == 0 then -64 else scroll
+
+            drawScrollingArrays (surf^.msPolys) scroll
+
+          else
+            drawArrays (surf^.msPolys)
 
   where calcGotoDynamic :: MSurfaceT -> RefDefT -> Int -> Int -> (Bool, Int)
         calcGotoDynamic surf newRefDef idx maxIdx
@@ -566,3 +588,24 @@ glRenderLightmappedPoly surfRef = do
                   return False
             else
               return False
+
+        drawArrays :: Maybe GLPolyReference -> Quake ()
+        drawArrays Nothing = return ()
+        drawArrays (Just (GLPolyReference polyIdx)) = do
+          polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+          poly <- io $ MV.read polygonCache polyIdx
+          GL.glDrawArrays (fromIntegral $ QGLConstants.glPolygon)
+                          (fromIntegral $ poly^.glpPos)
+                          (fromIntegral $ poly^.glpNumVerts)
+          drawArrays (poly^.glpChain)
+
+        drawScrollingArrays :: Maybe GLPolyReference -> Float -> Quake ()
+        drawScrollingArrays Nothing _ = return ()
+        drawScrollingArrays (Just (GLPolyReference polyIdx)) scroll = do
+          polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+          poly <- io $ MV.read polygonCache polyIdx
+          Polygon.beginScrolling poly scroll
+          GL.glDrawArrays (fromIntegral $ QGLConstants.glPolygon)
+                          (fromIntegral $ poly^.glpPos)
+                          (fromIntegral $ poly^.glpNumVerts)
+          Polygon.endScrolling poly
