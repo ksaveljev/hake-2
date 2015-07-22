@@ -981,3 +981,15 @@ myGLUPerspective fovY aspect zNear zFar = do
                  (realToFrac ymax)
                  (realToFrac zNear)
                  (realToFrac zFar)
+
+rDrawEntitiesOnList :: Quake ()
+rDrawEntitiesOnList = do
+    io (putStrLn "FastRenderAPI.rDrawEntitiesOnList") >> undefined -- TODO
+
+rDrawParticles :: Quake ()
+rDrawParticles = do
+    io (putStrLn "FastRenderAPI.rDrawParticles") >> undefined -- TODO
+
+rFlash :: Quake ()
+rFlash = do
+    io (putStrLn "FastRenderAPI.rFlash") >> undefined -- TODO

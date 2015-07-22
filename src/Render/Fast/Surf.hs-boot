@@ -12,3 +12,9 @@ glEndBuildingLightmaps :: Quake ()
 glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
 
 glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
+
+rMarkLeaves :: Quake ()
+
+rDrawWorld :: Quake ()
+
+rDrawAlphaSurfaces :: Quake ()

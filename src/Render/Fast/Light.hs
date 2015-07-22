@@ -82,3 +82,11 @@ rMarkLights light bit (MNodeChildReference nodeRef) = do
                   io $ modifyIORef' surfRef (\v -> v { _msDLightBits = (v^.msDLightBits) .|. bit })
 
                   markPolygons worldModel node (idx + 1) maxIdx
+
+rRenderDLights :: Quake ()
+rRenderDLights = do
+    io (putStrLn "Light.rRenderDLights") >> undefined -- TODO
+
+rLightPoint :: V3 Float -> Quake (V3 Float)
+rLightPoint _ = do
+    io (putStrLn "Light.rLightPoint") >> undefined -- TODO
