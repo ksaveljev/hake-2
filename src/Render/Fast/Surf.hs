@@ -25,6 +25,7 @@ import Client.LightStyleT
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
+import qualified Render.Fast.Light as Light
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.Fast.Warp as Warp
@@ -548,7 +549,7 @@ glRenderLightmappedPoly surfRef = do
                           tmax = ((surf^.msExtents._2) `shiftR` 4) + 1
 
                       temp <- rBuildLightMap surf smax
-                      rSetCacheState surfRef
+                      Light.rSetCacheState surfRef
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
                       glState <- use $ fastRenderAPIGlobals.frGLState

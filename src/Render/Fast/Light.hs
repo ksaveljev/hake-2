@@ -4,10 +4,12 @@ module Render.Fast.Light where
 import Control.Lens ((^.), preuse, use, (.=), ix, _1, _2)
 import Control.Monad (when, liftM)
 import Data.Bits (shiftL, (.&.), (.|.))
-import Data.IORef (readIORef, modifyIORef')
+import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust)
 import Linear (V3, dot)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -90,3 +92,20 @@ rRenderDLights = do
 rLightPoint :: V3 Float -> Quake (V3 Float)
 rLightPoint _ = do
     io (putStrLn "Light.rLightPoint") >> undefined -- TODO
+
+rSetCacheState :: IORef MSurfaceT -> Quake ()
+rSetCacheState surfRef = do
+    surf <- io $ readIORef surfRef
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    let updates = updateCachedLight surf newRefDef 0 Constants.maxLightMaps []
+    io $ modifyIORef' surfRef (\v -> v { _msCachedLight = (surf^.msCachedLight) UV.// updates })
+
+  where updateCachedLight :: MSurfaceT -> RefDefT -> Int -> Int -> [(Int, Float)] -> [(Int, Float)]
+        updateCachedLight surf newRefDef idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise =
+              let f = (surf^.msStyles) `B.index` idx
+              in if f == 255
+                   then acc
+                   else let w = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
+                        in updateCachedLight surf newRefDef (idx + 1) maxIdx ((idx, w) : acc)
