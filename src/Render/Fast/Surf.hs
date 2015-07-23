@@ -541,7 +541,74 @@ glRenderLightmappedPoly surfRef = do
 
     if isDynamic
       then do
-        io (putStrLn "Surf.glRenderLightmappedPoly") >> undefined -- TODO
+        let f = (surf^.msStyles) `B.index` mapIdx'
+        lmtex' <- if (f >= 32 || f == 0) && (surf^.msDLightFrame) /= frameCount
+                    then do
+                      let smax = ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = ((surf^.msExtents._2) `shiftR` 4) + 1
+
+                      temp <- rBuildLightMap surf smax
+                      rSetCacheState surfRef
+
+                      texture1 <- use $ fastRenderAPIGlobals.frTexture1
+                      glState <- use $ fastRenderAPIGlobals.frGLState
+                      Image.glMBind texture1 ((glState^.glsLightmapTextures) + (surf^.msLightmapTextureNum))
+
+                      -- TODO: decide what this 'temp' is
+                      GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                         0
+                                         (surf^.msLightS)
+                                         (surf^.msLightT)
+                                         smax
+                                         tmax
+                                         glLightmapFormat
+                                         GL.gl_UNSIGNED_BYTE
+                                         temp
+
+                      return (surf^.msLightmapTextureNum)
+                    else do
+                      let smax = ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = ((surf^.msExtents._2) `shiftR` 4) + 1
+
+                      temp <- rBuildLightMap surf smax
+
+                      texture1 <- use $ fastRenderAPIGlobals.frTexture1
+                      glState <- use $ fastRenderAPIGlobals.frGLState
+                      Image.glMBind texture1 ((glState^.glsLightmapTextures) + 0)
+
+                      -- TODO: decide what this 'temp' is
+                      GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                         0
+                                         (surf^.msLightS)
+                                         (surf^.msLightT)
+                                         smax
+                                         tmax
+                                         glLightmapFormat
+                                         GL.gl_UNSIGNED_BYTE
+                                         temp
+          
+                      return 0
+
+        fastRenderAPIGlobals.frCBrushPolys += 1
+
+        texture0 <- use $ fastRenderAPIGlobals.frTexture0
+        texture1 <- use $ fastRenderAPIGlobals.frTexture1
+        glState <- use $ fastRenderAPIGlobals.frGLState
+
+        Image.glMBind texture0 (image^.iTexNum)
+        Image.glMBind texture1 ((glState^.glsLightmapTextures) + lmtex')
+
+        if (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0
+          then do
+            let v = truncate ((newRefDef^.rdTime) / 40) :: Int
+                scroll = (-64) * ( ((newRefDef^.rdTime) / 40) - fromIntegral v)
+                scroll' = if scroll == 0 then -64 else scroll
+
+            drawScrollingArrays (surf^.msPolys) scroll
+
+          else
+            drawArrays (surf^.msPolys)
+
       else do
         fastRenderAPIGlobals.frCBrushPolys += 1
 
