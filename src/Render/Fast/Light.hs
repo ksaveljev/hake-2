@@ -109,3 +109,7 @@ rSetCacheState surfRef = do
                    then acc
                    else let w = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
                         in updateCachedLight surf newRefDef (idx + 1) maxIdx ((idx, w) : acc)
+
+rBuildLightMap :: MSurfaceT -> Int -> Quake B.ByteString
+rBuildLightMap surf stride = do
+    io (print "implement me!") >> return undefined -- TODO

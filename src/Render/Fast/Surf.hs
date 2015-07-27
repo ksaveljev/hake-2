@@ -545,48 +545,48 @@ glRenderLightmappedPoly surfRef = do
         let f = (surf^.msStyles) `B.index` mapIdx'
         lmtex' <- if (f >= 32 || f == 0) && (surf^.msDLightFrame) /= frameCount
                     then do
-                      let smax = ((surf^.msExtents._1) `shiftR` 4) + 1
-                          tmax = ((surf^.msExtents._2) `shiftR` 4) + 1
+                      let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- rBuildLightMap surf smax
+                      temp <- Light.rBuildLightMap surf smax
                       Light.rSetCacheState surfRef
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
                       glState <- use $ fastRenderAPIGlobals.frGLState
                       Image.glMBind texture1 ((glState^.glsLightmapTextures) + (surf^.msLightmapTextureNum))
 
-                      -- TODO: decide what this 'temp' is
-                      GL.glTexSubImage2D GL.gl_TEXTURE_2D
-                                         0
-                                         (surf^.msLightS)
-                                         (surf^.msLightT)
-                                         smax
-                                         tmax
-                                         glLightmapFormat
-                                         GL.gl_UNSIGNED_BYTE
-                                         temp
+                      io $ B.useAsCString temp $ \ptr -> do
+                        GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                           0
+                                           (fromIntegral $ surf^.msLightS)
+                                           (fromIntegral $ surf^.msLightT)
+                                           (fromIntegral smax)
+                                           (fromIntegral tmax)
+                                           glLightmapFormat
+                                           GL.gl_UNSIGNED_BYTE
+                                           ptr
 
                       return (surf^.msLightmapTextureNum)
                     else do
-                      let smax = ((surf^.msExtents._1) `shiftR` 4) + 1
-                          tmax = ((surf^.msExtents._2) `shiftR` 4) + 1
+                      let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- rBuildLightMap surf smax
+                      temp <- Light.rBuildLightMap surf smax
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
                       glState <- use $ fastRenderAPIGlobals.frGLState
                       Image.glMBind texture1 ((glState^.glsLightmapTextures) + 0)
 
-                      -- TODO: decide what this 'temp' is
-                      GL.glTexSubImage2D GL.gl_TEXTURE_2D
-                                         0
-                                         (surf^.msLightS)
-                                         (surf^.msLightT)
-                                         smax
-                                         tmax
-                                         glLightmapFormat
-                                         GL.gl_UNSIGNED_BYTE
-                                         temp
+                      io $ B.useAsCString temp $ \ptr -> do
+                        GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                           0
+                                           (fromIntegral $ surf^.msLightS)
+                                           (fromIntegral $ surf^.msLightT)
+                                           (fromIntegral $ smax)
+                                           (fromIntegral $ tmax)
+                                           glLightmapFormat
+                                           GL.gl_UNSIGNED_BYTE
+                                           ptr
           
                       return 0
 
