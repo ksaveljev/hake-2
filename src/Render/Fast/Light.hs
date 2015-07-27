@@ -1,9 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Light where
 
 import Control.Lens ((^.), preuse, use, (.=), ix, _1, _2)
 import Control.Monad (when, liftM)
-import Data.Bits (shiftL, (.&.), (.|.))
+import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust)
 import Linear (V3, dot)
@@ -15,6 +16,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import qualified QCommon.Com as Com
 
 dLightCutoff :: Float
 dLightCutoff = 64
@@ -110,6 +112,17 @@ rSetCacheState surfRef = do
                    else let w = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
                         in updateCachedLight surf newRefDef (idx + 1) maxIdx ((idx, w) : acc)
 
+{-
+- R_BuildLightMap
+- 
+- Combine and scale multiple lightmaps into the floating format in blocklights
+-}
 rBuildLightMap :: MSurfaceT -> Int -> Quake B.ByteString
 rBuildLightMap surf stride = do
+    when ((surf^.msTexInfo.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) /= 0) $
+      Com.comError Constants.errDrop "R_BuildLightMap called for non-lit surface"
+
+    let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+        tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+        size = smax * tmax
     io (print "implement me!") >> return undefined -- TODO

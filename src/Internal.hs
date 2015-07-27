@@ -1629,6 +1629,7 @@ data FastRenderAPIGlobals =
                        , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
                        , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
                        , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
+                       , _frBlockLights          :: UV.Vector Float
                        }
 
 data ParticleTGlobals =
