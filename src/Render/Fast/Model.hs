@@ -970,7 +970,7 @@ decompressVis maybeModelVisibility offset model =
             else let c = modelVisibility `B.index` (inp + 1)
                      builder' = buildEmpty builder c
                  in if outp + fromIntegral c < row
-                      then buildVis modelVisibility row (inp + 1) (outp + fromIntegral c) builder'
+                      then buildVis modelVisibility row (inp + 2) (outp + fromIntegral c) builder'
                       else let result = BL.toStrict (BB.toLazyByteString builder')
                                diff = Constants.maxMapLeafs `div` 8 - (B.length result)
                            in if diff > 0
