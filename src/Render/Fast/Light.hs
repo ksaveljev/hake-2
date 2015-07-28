@@ -7,8 +7,13 @@ import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
+import Data.Monoid ((<>), mempty)
+import Data.Word (Word8)
 import Linear (V3, dot, _x, _y, _z)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -163,7 +168,14 @@ rBuildLightMap surf stride = do
       when ((surf^.msDLightFrame) == frameCount) $
         rAddDynamicLights surf
 
-    io (print "implement me!") >> return undefined -- TODO
+    -- put into texture format
+    let stride' = stride - (smax `shiftL` 2)
+    monoLightMap <- liftM (^.cvString) glMonoLightMapCVar
+    blockLights' <- use $ fastRenderAPIGlobals.frBlockLights
+
+    return $ if monoLightMap `BC.index` 0 == '0'
+               then buildLightMap blockLights' 0 stride' 0 tmax 0 smax mempty
+               else buildLightMapAlpha monoLightMap blockLights' 0 stride' 0 tmax 0 smax mempty
 
   where addLightMaps :: UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
         addLightMaps blockLights lightmap lightmapIndex newRefDef glModulateValue size idx maxIdx
@@ -228,6 +240,81 @@ rBuildLightMap surf stride = do
                   b = (blockLights UV.! (idx * 3 + 1)) + scale1 * (fromIntegral $ lightmap `B.index` (lightmapIndex + 1))
                   c = (blockLights UV.! (idx * 3 + 2)) + scale2 * (fromIntegral $ lightmap `B.index` (lightmapIndex + 2))
               in updateLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
+
+        buildLightMap :: UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
+        buildLightMap blockLights blp stride i tmax j smax builder
+          | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
+          | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
+          | otherwise =
+              let r = (truncate $ blockLights UV.! blp) :: Int
+                  g = (truncate $ blockLights UV.! blp) :: Int
+                  b = (truncate $ blockLights UV.! blp) :: Int
+                  -- catch negative lights
+                  r' = if r < 0 then 0 else r
+                  g' = if g < 0 then 0 else g
+                  b' = if b < 0 then 0 else b
+                  -- determine the brightest of the three color components
+                  brightest = maximum [r', g', b']
+                  -- alpha is ONLY used for the mono lightmap case. For
+                  -- this reason we set it to the brightest of the color
+                  -- components so that thigs don't get too dim
+                  a = brightest
+                  -- rescale all the color components if the intensity of
+                  -- the greatest channel exceeds 1.0
+                  t = (255 / (fromIntegral brightest)) :: Float
+                  r'' = if brightest > 255 then truncate (fromIntegral r' * t) else fromIntegral r'
+                  g'' = if brightest > 255 then truncate (fromIntegral g' * t) else fromIntegral g'
+                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else fromIntegral g'
+                  a' = if brightest > 255 then truncate (fromIntegral a * t) else fromIntegral a
+              in buildLightMap blockLights (blp + 3) stride i tmax (j + 1) smax (builder <> BB.word8 r'' <> BB.word8 g'' <> BB.word8 b'' <> BB.word8 a')
+
+        buildLightMapAlpha :: B.ByteString -> UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
+        buildLightMapAlpha monoLightMap blockLights blp stride i tmax j smax builder
+          | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
+          | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
+          | otherwise =
+              let r = (truncate $ blockLights UV.! blp) :: Int
+                  g = (truncate $ blockLights UV.! blp) :: Int
+                  b = (truncate $ blockLights UV.! blp) :: Int
+                  -- catch negative lights
+                  r' = if r < 0 then 0 else r
+                  g' = if g < 0 then 0 else g
+                  b' = if b < 0 then 0 else b
+                  -- determine the brightest of the three color components
+                  brightest = maximum [r', g', b']
+                  -- alpha is ONLY used for the mono lightmap case. For
+                  -- this reason we set it to the brightest of the color
+                  -- components so that thigs don't get too dim
+                  a = brightest
+                  -- rescale all the color components if the intensity of
+                  -- the greatest channel exceeds 1.0
+                  t = (255 / (fromIntegral brightest)) :: Float
+                  r'' = if brightest > 255 then truncate (fromIntegral r' * t) else r'
+                  g'' = if brightest > 255 then truncate (fromIntegral g' * t) else g'
+                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else g'
+                  a' = if brightest > 255 then truncate (fromIntegral a * t) else a
+                  -- So if we are doing alpha lightmaps we need to set the
+                  -- R, G, and B components to 0 and we need to set alpha to 1-alpha
+                  (r''', g''', b''', a'') = updateRGBA monoLightMap r'' g'' b'' a'
+              in buildLightMapAlpha monoLightMap blockLights (blp + 3) stride i tmax (j + 1) smax (builder <> BB.word8 r''' <> BB.word8 g''' <> BB.word8 b''' <> BB.word8 a'')
+
+        fillStride :: BB.Builder -> Int -> Int -> BB.Builder
+        fillStride builder idx maxIdx
+          | idx >= maxIdx = builder
+          | otherwise = fillStride (builder <> (BB.word8 0)) (idx + 1) maxIdx
+
+        updateRGBA :: B.ByteString -> Int -> Int -> Int -> Int -> (Word8, Word8, Word8, Word8)
+        updateRGBA monoLightMap r g b a =
+          let c = monoLightMap `BC.index` 0
+          in if | c == 'L' || c == 'I' -> (fromIntegral a, 0, 0, fromIntegral a)
+                | c == 'C' ->
+                    let a' = 255 - ((fromIntegral $ r + g + b) / 3)
+                        af = a' / 255
+                        r' = fromIntegral r * af
+                        g' = fromIntegral g * af
+                        b' = fromIntegral b * af
+                    in (truncate r', truncate g', truncate b', truncate a')
+                | otherwise -> (fromIntegral r, fromIntegral g, fromIntegral b, fromIntegral (255 - a))
 
 rAddDynamicLights :: MSurfaceT -> Quake ()
 rAddDynamicLights _ = do
