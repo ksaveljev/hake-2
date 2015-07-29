@@ -431,7 +431,61 @@ rDrawAlphaSurfaces = do
 
 drawTextureChains :: Quake ()
 drawTextureChains = do
-    io (putStrLn "Surf.drawTextureChains") >> undefined -- TODO
+    -- TODO: c_visible_textures -- useless for us?
+    numGLTextures <- use $ fastRenderAPIGlobals.frNumGLTextures
+    glTextures <- use $ fastRenderAPIGlobals.frGLTextures
+    renderTextureChain glTextures 0 numGLTextures
+
+    Image.glEnableMultiTexture False
+
+    renderTextureChain2 glTextures 0 numGLTextures
+
+    Image.glTexEnv GL.gl_REPLACE
+
+  where renderTextureChain :: V.Vector (IORef ImageT) -> Int -> Int -> Quake ()
+        renderTextureChain glTextures idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let imageRef = glTextures V.! idx
+              image <- io $ readIORef imageRef
+
+              if (image^.iRegistrationSequence) == 0 || isNothing (image^.iTextureChain)
+                then
+                  renderTextureChain glTextures (idx + 1) maxIdx
+                else do
+                  drawTextureChain (image^.iTextureChain)
+                  renderTextureChain glTextures (idx + 1) maxIdx
+
+        drawTextureChain :: Maybe (IORef MSurfaceT) -> Quake ()
+        drawTextureChain Nothing = return ()
+        drawTextureChain (Just surfRef) = do
+          surf <- io $ readIORef surfRef
+          when ((surf^.msFlags) .&. Constants.surfDrawTurb == 0) $
+            rRenderBrushPoly surfRef
+          drawTextureChain (surf^.msTextureChain)
+
+        renderTextureChain2 :: V.Vector (IORef ImageT) -> Int -> Int -> Quake ()
+        renderTextureChain2 glTextures idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let imageRef = glTextures V.! idx
+              image <- io $ readIORef imageRef
+
+              if (image^.iRegistrationSequence) == 0 || isNothing (image^.iTextureChain)
+                then
+                  renderTextureChain2 glTextures (idx + 1) maxIdx
+                else do
+                  drawTextureChain2 (image^.iTextureChain)
+                  io $ modifyIORef' imageRef (\v -> v { _iTextureChain = Nothing })
+                  renderTextureChain2 glTextures (idx + 1) maxIdx
+
+        drawTextureChain2 :: Maybe (IORef MSurfaceT) -> Quake ()
+        drawTextureChain2 Nothing = return ()
+        drawTextureChain2 (Just surfRef) = do
+          surf <- io $ readIORef surfRef
+          when ((surf^.msFlags) .&. Constants.surfDrawTurb /= 0) $
+            rRenderBrushPoly surfRef
+          drawTextureChain2 (surf^.msTextureChain)
 
 drawTriangleOutlines :: Quake ()
 drawTriangleOutlines = do
@@ -810,3 +864,7 @@ lmAllocBlock w h pos = do
 
 lmInitBlock :: Quake ()
 lmInitBlock = fastRenderAPIGlobals.frGLLms.lmsAllocated .= UV.replicate blockWidth 0
+
+rRenderBrushPoly :: IORef MSurfaceT -> Quake ()
+rRenderBrushPoly _ = do
+    io (putStrLn "Surf.rRenderBrushPoly") >> undefined -- TODO
