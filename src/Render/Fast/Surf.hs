@@ -8,6 +8,7 @@ import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Char (toUpper)
 import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
+import Data.Word (Word8)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -17,6 +18,9 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
+
+import Numeric (showHex)
+import Text.Printf (printf)
 
 import Quake
 import QuakeState
@@ -105,21 +109,54 @@ glEndBuildingLightmaps = do
     lmUploadBlock False
     Image.glEnableMultiTexture False
 
-glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
-glCreateSurfaceLightmap surface = do
-    if (surface^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) /= 0
-      then do
-        io (putStrLn "Surf.glBuildPolygonFromSurface") >> undefined -- TODO
-      else
-        return surface
+glCreateSurfaceLightmap :: IORef MSurfaceT -> Quake ()
+glCreateSurfaceLightmap surfRef = do
+    surf <- io $ readIORef surfRef
 
-glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
-glBuildPolygonFromSurface surface = do
+    when ((surf^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) == 0) $ do
+      let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+          tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+
+      (ok, pos) <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
+
+      pos' <- if ok
+                then return pos
+                else do
+                  lmUploadBlock False
+                  lmInitBlock
+                  (ok', pos') <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
+                  unless ok' $
+                    Com.comError Constants.errFatal ("Consecutive calls to LM_AllocBlock(" `B.append` BC.pack (show smax) `B.append` "," `B.append` BC.pack (show tmax) `B.append` ") failed\n") -- IMPROVE?
+                  return pos'
+
+      currentLightmapTexture <- use $ fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture
+      io $ modifyIORef' surfRef (\v -> v { _msLightS = pos'^._1
+                                         , _msLightT = pos'^._2
+                                         , _msLightmapTextureNum = currentLightmapTexture
+                                         })
+
+      Light.rSetCacheState surfRef
+      surf' <- io $ readIORef surfRef
+      lightmap <- Light.rBuildLightMap surf' blockWidth
+
+      buffer <- use $ fastRenderAPIGlobals.frGLLms.lmsLightmapBuffer
+      io $ saveLightmap buffer lightmap ((surf'^.msLightT) * blockWidth + (surf'^.msLightS)) 0 (B.length lightmap)
+
+  where saveLightmap :: MSV.IOVector Word8 -> B.ByteString -> Int -> Int -> Int -> IO ()
+        saveLightmap buffer lightmap offset idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              MSV.write buffer offset (lightmap `B.index` idx)
+              saveLightmap buffer lightmap (offset + 1) (idx + 1) maxIdx
+
+glBuildPolygonFromSurface :: IORef MSurfaceT -> Quake ()
+glBuildPolygonFromSurface surfRef = do
+    surf <- io $ readIORef surfRef
     currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
     model <- io $ readIORef currentModelRef
 
-    let Just imageRef = surface^.msTexInfo.mtiImage
-        lNumVerts = surface^.msNumEdges
+    let Just imageRef = surf^.msTexInfo.mtiImage
+        lNumVerts = surf^.msNumEdges
 
     image <- io $ readIORef imageRef
     polyRef@(GLPolyReference polyIdx) <- Polygon.create lNumVerts
@@ -127,19 +164,17 @@ glBuildPolygonFromSurface surface = do
     use (fastRenderAPIGlobals.frPolygonCache) >>= \polygonCache ->
       io $ do
         poly <- MV.read polygonCache polyIdx
-        MV.write polygonCache polyIdx poly { _glpNext = surface^.msPolys, _glpFlags = surface^.msFlags }
+        MV.write polygonCache polyIdx poly { _glpNext = surf^.msPolys, _glpFlags = surf^.msFlags }
 
-    let surface' = surface { _msPolys = Just polyRef }
+    io $ modifyIORef' surfRef (\v -> v { _msPolys = Just polyRef })
 
-    doStuffWithVerts model image polyRef 0 lNumVerts
+    doStuffWithVerts surf model image polyRef 0 lNumVerts
 
-    return surface'
-
-  where doStuffWithVerts :: ModelT -> ImageT -> GLPolyReference -> Int -> Int -> Quake ()
-        doStuffWithVerts model image polyRef idx maxIdx
+  where doStuffWithVerts :: MSurfaceT -> ModelT -> ImageT -> GLPolyReference -> Int -> Int -> Quake ()
+        doStuffWithVerts surf model image polyRef idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let li = (model^.mSurfEdges) V.! (surface^.msFirstEdge + idx)
+              let li = (model^.mSurfEdges) V.! (surf^.msFirstEdge + idx)
               vec <- if li > 0
                        then do
                          let edgeRef = (model^.mEdges) V.! li
@@ -154,10 +189,10 @@ glBuildPolygonFromSurface surface = do
                          vertex <- io $ readIORef vertexRef
                          return (vertex^.mvPosition)
 
-              let s = vec `dot` ((fst $ surface^.msTexInfo.mtiVecs)^._xyz) + ((fst $ surface^.msTexInfo.mtiVecs)^._w)
+              let s = vec `dot` ((fst $ surf^.msTexInfo.mtiVecs)^._xyz) + ((fst $ surf^.msTexInfo.mtiVecs)^._w)
                   s' = s / (fromIntegral $ image^.iWidth)
 
-                  t = vec `dot` ((snd $ surface^.msTexInfo.mtiVecs)^._xyz) + ((snd $ surface^.msTexInfo.mtiVecs)^._w)
+                  t = vec `dot` ((snd $ surf^.msTexInfo.mtiVecs)^._xyz) + ((snd $ surf^.msTexInfo.mtiVecs)^._w)
                   t' = t / (fromIntegral $ image^.iHeight)
 
               Polygon.setPolyX polyRef idx (vec^._x)
@@ -168,13 +203,13 @@ glBuildPolygonFromSurface surface = do
               Polygon.setPolyT1 polyRef idx t'
 
               -- lightmap texture coordinates
-              let a = s - fromIntegral (fst $ surface^.msTextureMins)
-                  b = a + fromIntegral (surface^.msLightS) * 16
+              let a = s - fromIntegral (fst $ surf^.msTextureMins)
+                  b = a + fromIntegral (surf^.msLightS) * 16
                   c = b + 8
                   d = c / fromIntegral (blockWidth * 16)
 
-                  a' = t - fromIntegral (snd $ surface^.msTextureMins)
-                  b' = a' + fromIntegral (surface^.msLightT) * 16
+                  a' = t - fromIntegral (snd $ surf^.msTextureMins)
+                  b' = a' + fromIntegral (surf^.msLightT) * 16
                   c' = b' + 8
                   d' = c' / fromIntegral (blockHeight * 16)
 
@@ -397,6 +432,13 @@ drawTriangleOutlines = do
 recursiveWorldNode :: IORef MNodeT -> Quake ()
 recursiveWorldNode nodeRef = do
     node <- io $ readIORef nodeRef
+
+    io $ print "INITIALINITIAL"
+    io $ print ("num surfaces = " ++ show (node^.mnNumSurfaces))
+    io $ print ("first surface = " ++ show (node^.mnFirstSurface))
+    io $ print ("contents = " ++ show (node^.mnContents))
+    io $ print ("visframe = " ++ show (node^.mnVisFrame))
+
     nothingToDo <- checkIfNothingToDo (node^.mnContents) (node^.mnVisFrame) (node^.mnMins) (node^.mnMaxs)
 
     unless nothingToDo $ do
@@ -531,11 +573,21 @@ glRenderLightmappedPoly surfRef = do
     newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
     frameCount <- use $ fastRenderAPIGlobals.frFrameCount
 
+    io $ print "SURF STYLES"
+    io $ putStrLn $ concatMap (printf "0x%02X ") $ B.unpack (surf^.msStyles)
+    io $ print "SURF CACHED LIGHT"
+    io $ UV.mapM_ (\v -> print v) (surf^.msCachedLight)
+
     let (gotoDynamic, mapIdx) = calcGotoDynamic surf newRefDef 0 Constants.maxLightMaps
         mapIdx' = if mapIdx == 4 then 3 else mapIdx -- this is a hack from cwei
 
+    io $ print ("gotoDynamic = " ++ show gotoDynamic)
+    io $ print ("map = " ++ show mapIdx')
+
     isDynamic <- checkIfDynamic surf gotoDynamic frameCount
     imageRef <- rTextureAnimation (surf^.msTexInfo)
+
+    io $ print ("isDynamic = " ++ show isDynamic)
 
     image <- io $ readIORef imageRef
     let lmtex = surf^.msLightmapTextureNum
@@ -549,6 +601,13 @@ glRenderLightmappedPoly surfRef = do
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
                       temp <- Light.rBuildLightMap surf smax
+                      io $ print "TEMPTEMPTEMP DYNAMIC"
+                      io $ print ("flags = " ++ show (surf^.msFlags) ++
+                                  " fe = " ++ show (surf^.msFirstEdge) ++
+                                  " nume = " ++ show (surf^.msNumEdges) ++
+                                  " tex num = " ++ show (surf^.msLightmapTextureNum))
+                      io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      io $ print $ (concat . map (flip showHex "") . B.unpack) temp
                       Light.rSetCacheState surfRef
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
@@ -572,6 +631,9 @@ glRenderLightmappedPoly surfRef = do
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
                       temp <- Light.rBuildLightMap surf smax
+                      io $ print "TEMPTEMPTEMP"
+                      io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      io $ print $ (concat . map (flip showHex "") . B.unpack) temp
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
                       glState <- use $ fastRenderAPIGlobals.frGLState
@@ -634,6 +696,7 @@ glRenderLightmappedPoly surfRef = do
   where calcGotoDynamic :: MSurfaceT -> RefDefT -> Int -> Int -> (Bool, Int)
         calcGotoDynamic surf newRefDef idx maxIdx
           | idx >= maxIdx = (False, maxIdx)
+          | (surf^.msStyles) `B.index` idx == 0xFF = (False, idx)
           | otherwise =
               let f = (surf^.msStyles) `B.index` idx
                   white = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
@@ -677,3 +740,40 @@ glRenderLightmappedPoly surfRef = do
                           (fromIntegral $ poly^.glpPos)
                           (fromIntegral $ poly^.glpNumVerts)
           Polygon.endScrolling poly
+
+lmAllocBlock :: Int -> Int -> (Int, Int) -> Quake (Bool, (Int, Int))
+lmAllocBlock w h pos = do
+    allocated <- use $ fastRenderAPIGlobals.frGLLms.lmsAllocated
+    let (pos', best) = findSpot allocated blockHeight 0 (blockWidth - w) pos
+    if best + h > blockHeight
+      then return (False, pos')
+      else do
+        let updates = collectUpdates (pos^._1) best 0 w []
+        fastRenderAPIGlobals.frGLLms.lmsAllocated %= (UV.// updates)
+        return (True, pos')
+
+  where findSpot :: UV.Vector Int -> Int -> Int -> Int -> (Int, Int) -> ((Int, Int), Int)
+        findSpot allocated best i maxI pos
+          | i >= maxI = (pos, best)
+          | otherwise =
+              let (best2, j) = findBest2 allocated best 0 i 0 w
+              in if j == w -- this is a valid spot
+                   then findSpot allocated best2 (i + 1) maxI (i, best2)
+                   else findSpot allocated best (i + 1) maxI pos
+
+        findBest2 :: UV.Vector Int -> Int -> Int -> Int -> Int -> Int -> (Int, Int)
+        findBest2 allocated best best2 i j maxJ
+          | j >= maxJ = (best2, j)
+          | otherwise =
+              let v = allocated UV.! (i + j)
+              in if | v >= best -> (best2, j)
+                    | v > best2 -> findBest2 allocated best v i (j + 1) maxJ
+                    | otherwise -> findBest2 allocated best best2 i (j + 1) maxJ
+
+        collectUpdates :: Int -> Int -> Int -> Int -> [(Int, Int)] -> [(Int, Int)]
+        collectUpdates x best idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise = collectUpdates x best (idx + 1) maxIdx ((x + idx, best + h) : acc)
+
+lmInitBlock :: Quake ()
+lmInitBlock = fastRenderAPIGlobals.frGLLms.lmsAllocated .= UV.replicate blockWidth 0

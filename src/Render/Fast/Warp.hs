@@ -6,7 +6,7 @@ module Render.Fast.Warp where
 import Control.Applicative (Const)
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), _1, _2)
 import Control.Monad (when, unless, liftM)
-import Data.IORef (IORef, readIORef)
+import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
 import qualified Data.ByteString as B
@@ -202,25 +202,26 @@ boundPoly numVerts verts = findMinMax 0 (V3 9999 9999 9999) (V3 (-9999) (-9999) 
 - boundaries so that turbulent and sky warps
 - can be done reasonably.
 -}
-glSubdivideSurface :: MSurfaceT -> Quake MSurfaceT
-glSubdivideSurface surface = do
+glSubdivideSurface :: IORef MSurfaceT -> Quake ()
+glSubdivideSurface surfRef = do
+    surf <- io $ readIORef surfRef
     loadModelRef <- use $ fastRenderAPIGlobals.frLoadModel
     model <- io $ readIORef loadModelRef
 
     -- convert edges back to a normal polygon
     -- let verts = V.generate (surface^.msNumEdges) (collectVerts model)
-    verts <- V.generateM (surface^.msNumEdges) (collectVerts model)
+    verts <- V.generateM (surf^.msNumEdges) (collectVerts surf model)
 
-    fastRenderAPIGlobals.frWarpFace .= Just surface
+    fastRenderAPIGlobals.frWarpFace .= Just surf
 
-    subdividePolygon (surface^.msNumEdges) verts
+    subdividePolygon (surf^.msNumEdges) verts
 
     use (fastRenderAPIGlobals.frWarpFace) >>= \(Just warpFace) ->
-      return warpFace
+      io $ writeIORef surfRef warpFace
 
-  where collectVerts :: ModelT -> Int -> Quake (V3 Float)
-        collectVerts loadModel idx = do
-          let lindex = (loadModel^.mSurfEdges) V.! ((surface^.msFirstEdge) + idx)
+  where collectVerts :: MSurfaceT -> ModelT -> Int -> Quake (V3 Float)
+        collectVerts surf loadModel idx = do
+          let lindex = (loadModel^.mSurfEdges) V.! ((surf^.msFirstEdge) + idx)
 
           if lindex > 0
             then do
@@ -385,4 +386,4 @@ makeSkyVec s t axis = do
 
 rAddSkySurface :: IORef MSurfaceT -> Quake ()
 rAddSkySurface _ = do
-    io (putStrLn "Warp.rAddSkySurface") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! Warp.rAddSkySurface") >> return () -- TODO

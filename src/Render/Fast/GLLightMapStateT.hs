@@ -6,7 +6,7 @@ import Data.IORef (newIORef)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 
 import Internal
 import Render.MSurfaceT
@@ -35,5 +35,5 @@ newGLLightMapStateT =
                    , _lmsCurrentLightmapTexture = 0
                    , _lmsLightmapSurfaces       = V.replicate Constants.maxLightMaps (unsafePerformIO $ newIORef newMSurfaceT)
                    , _lmsAllocated              = UV.replicate blockWidth 0
-                   , _lmsLightmapBuffer         = unsafePerformIO $ MV.new (4 * blockWidth * blockHeight)
+                   , _lmsLightmapBuffer         = unsafePerformIO $ MSV.new (4 * blockWidth * blockHeight)
                    }

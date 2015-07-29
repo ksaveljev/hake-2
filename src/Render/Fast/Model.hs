@@ -525,10 +525,9 @@ loadFaces buffer lump = do
     Surf.glBeginBuildingLightmaps loadModelRef
 
     surfaces <- V.mapM toMSurfaceT dFaces
-    surfaces' <- io $ V.mapM newIORef surfaces
 
     io $ modifyIORef' loadModelRef (\v -> v { _mNumSurfaces = count
-                                            , _mSurfaces = surfaces'
+                                            , _mSurfaces = surfaces
                                             })
 
     Surf.glEndBuildingLightmaps
@@ -536,7 +535,7 @@ loadFaces buffer lump = do
   where getDFaces :: Int -> Get (V.Vector DFaceT)
         getDFaces count = V.replicateM count getDFaceT
 
-        toMSurfaceT :: DFaceT -> Quake MSurfaceT
+        toMSurfaceT :: DFaceT -> Quake (IORef MSurfaceT)
         toMSurfaceT dface = do
           loadModelRef <- use $ fastRenderAPIGlobals.frLoadModel
           model <- io $ readIORef loadModelRef
@@ -555,43 +554,48 @@ loadFaces buffer lump = do
           texInfo <- io $ readIORef texInfoRef
 
           let texInfoFlags = texInfo^.mtiFlags
-              initialMSurfaceT = newMSurfaceT { _msFirstEdge = dface^.dfFirstEdge
-                                              , _msNumEdges = fromIntegral (dface^.dfNumEdges)
-                                              , _msFlags = flags
-                                              , _msPolys = Nothing
-                                              , _msPlane = Just ((model^.mPlanes) V.! planeNum)
-                                              , _msTexInfo = texInfo
-                                              , _msStyles = dface^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
-                                              , _msSamples = if i == -1 then Nothing else Just (B.drop i (fromJust (model^.mLightdata)))
-                                              }
-          mSurfaceT <- calcSurfaceExtents model texInfo initialMSurfaceT
+          surfRef <- io $ newIORef newMSurfaceT { _msFirstEdge = dface^.dfFirstEdge
+                                                , _msNumEdges = fromIntegral (dface^.dfNumEdges)
+                                                , _msFlags = flags
+                                                , _msPolys = Nothing
+                                                , _msPlane = Just ((model^.mPlanes) V.! planeNum)
+                                                , _msTexInfo = texInfo
+                                                , _msStyles = dface^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
+                                                , _msSamples = if i == -1 then Nothing else Just (B.drop i (fromJust (model^.mLightdata)))
+                                                                          }
+          calcSurfaceExtents model texInfo surfRef
 
-          mSurfaceT' <- if texInfoFlags .&. Constants.surfWarp /= 0
-                          then Warp.glSubdivideSurface mSurfaceT { _msFlags = flags .|. Constants.surfWarp, _msExtents = (16384, 16384), _msTextureMins = (-8192, -8192) }
-                          else return mSurfaceT
+          when (texInfoFlags .&. Constants.surfWarp /= 0) $ do
+            io $ modifyIORef' surfRef (\v -> v { _msFlags = flags .|. Constants.surfWarp
+                                               , _msExtents = (16384, 16384)
+                                               , _msTextureMins = (-8192, -8192)
+                                               })
+            Warp.glSubdivideSurface surfRef
 
-          mSurfaceT'' <- if texInfoFlags .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0
-                           then Surf.glCreateSurfaceLightmap mSurfaceT'
-                           else return mSurfaceT'
+          when (texInfoFlags .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0) $
+            Surf.glCreateSurfaceLightmap surfRef
 
-          if texInfoFlags .&. Constants.surfWarp == 0
-            then Surf.glBuildPolygonFromSurface mSurfaceT''
-            else return mSurfaceT''
+          when (texInfoFlags .&. Constants.surfWarp == 0) $
+            Surf.glBuildPolygonFromSurface surfRef
 
-calcSurfaceExtents :: ModelT -> MTexInfoT -> MSurfaceT -> Quake MSurfaceT
-calcSurfaceExtents model texInfo surface = do
-    (mins, maxs) <- io $ calcMinsMaxs 0 (surface^.msNumEdges) (999999, 999999) (-99999, -99999)
+          return surfRef
+
+calcSurfaceExtents :: ModelT -> MTexInfoT -> IORef MSurfaceT -> Quake ()
+calcSurfaceExtents model texInfo surfRef = do
+    surf <- io $ readIORef surfRef
+    (mins, maxs) <- io $ calcMinsMaxs surf 0 (surf^.msNumEdges) (999999, 999999) (-99999, -99999)
     let bmins = mapTuple (floor . (/ 16)) mins
         bmaxs = mapTuple (ceiling . (/ 16)) maxs
-    return surface { _msTextureMins = mapTuple (* 16) bmins
-                   , _msExtents = mapTuple (* 16) (fst bmaxs - fst bmins, snd bmaxs - snd bmins)
-                   }
 
-  where calcMinsMaxs :: Int -> Int -> (Float, Float) -> (Float, Float) -> IO ((Float, Float), (Float, Float))
-        calcMinsMaxs idx maxIdx mins maxs
+    io $ modifyIORef' surfRef (\v -> v { _msTextureMins = mapTuple (* 16) bmins
+                                       , _msExtents = mapTuple (* 16) (fst bmaxs - fst bmins, snd bmaxs - snd bmins)
+                                       })
+
+  where calcMinsMaxs :: MSurfaceT -> Int -> Int -> (Float, Float) -> (Float, Float) -> IO ((Float, Float), (Float, Float))
+        calcMinsMaxs surf idx maxIdx mins maxs
           | idx >= maxIdx = return (mins, maxs)
           | otherwise = do
-              let e = (model^.mSurfEdges) V.! ((surface^.msFirstEdge) + idx)
+              let e = (model^.mSurfEdges) V.! ((surf^.msFirstEdge) + idx)
               v <- if e >= 0
                      then do
                        let edgeRef = (model^.mEdges) V.! e
@@ -610,7 +614,7 @@ calcSurfaceExtents model texInfo surface = do
                   mins' = (if val1 < fst mins then val1 else fst mins, if val2 < snd mins then val2 else snd mins)
                   maxs' = (if val1 > fst maxs then val1 else fst maxs, if val2 > snd maxs then val2 else snd maxs)
 
-              calcMinsMaxs (idx + 1) maxIdx mins' maxs'
+              calcMinsMaxs surf (idx + 1) maxIdx mins' maxs'
 
         mapTuple :: (a -> b) -> (a, a) -> (b, b)
         mapTuple f (a1, a2) = (f a1, f a2)

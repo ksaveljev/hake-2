@@ -9,9 +9,9 @@ glBeginBuildingLightmaps :: IORef ModelT -> Quake ()
 
 glEndBuildingLightmaps :: Quake ()
 
-glCreateSurfaceLightmap :: MSurfaceT -> Quake MSurfaceT
+glCreateSurfaceLightmap :: IORef MSurfaceT -> Quake ()
 
-glBuildPolygonFromSurface :: MSurfaceT -> Quake MSurfaceT
+glBuildPolygonFromSurface :: IORef MSurfaceT -> Quake ()
 
 rMarkLeaves :: Quake ()
 
