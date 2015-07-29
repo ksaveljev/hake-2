@@ -997,7 +997,50 @@ myGLUPerspective fovY aspect zNear zFar = do
 
 rDrawEntitiesOnList :: Quake ()
 rDrawEntitiesOnList = do
-    io (putStrLn "FastRenderAPI.rDrawEntitiesOnList") >> undefined -- TODO
+    drawEntitiesValue <- liftM (^.cvValue) drawEntitiesCVar
+
+    unless (drawEntitiesValue == 0) $ do
+      newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+      -- draw non-transparent first
+      drawNonTransparentEntities newRefDef 0 (newRefDef^.rdNumEntities)
+
+      -- draw transparent entities
+      -- we could sort these if it ever becomes a problem
+      GL.glDepthMask (fromIntegral GL.gl_FALSE) -- no z writes
+
+      drawTransparentEntities newRefDef 0 (newRefDef^.rdNumEntities)
+
+      GL.glDepthMask (fromIntegral GL.gl_FALSE) -- back to writing
+
+  where drawNonTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
+        drawNonTransparentEntities newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let currentEntity = (newRefDef^.rdEntities) V.! idx
+              fastRenderAPIGlobals.frCurrentEntity .= currentEntity
+
+              if | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 ->
+                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
+
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 ->
+                     rDrawBeam currentEntity
+
+                 | otherwise -> do
+                     let currentModel = currentEntity^.eModel
+                     fastRenderAPIGlobals.frCurrentModel .= currentModel
+
+                     case currentModel of
+                       Nothing -> do
+                         rDrawNullModel
+                         drawNonTransparentEntities newRefDef (idx + 1) maxIdx
+                       Just modelRef -> do
+                         undefined -- TODO
+
+        drawTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
+        drawTransparentEntities newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              undefined -- TODO
 
 rDrawParticles :: Quake ()
 rDrawParticles = do
@@ -1006,3 +1049,7 @@ rDrawParticles = do
 rFlash :: Quake ()
 rFlash = do
     io (putStrLn "FastRenderAPI.rFlash") >> undefined -- TODO
+
+rDrawBeam :: EntityT -> Quake ()
+rDrawBeam _ = do
+    io (putStrLn "FastRenderAPI.rDrawBeam") >> undefined -- TODO
