@@ -151,7 +151,7 @@ rotatePointAroundVector :: V3 Float -> V3 Float -> Float -> V3 Float
 rotatePointAroundVector dir point degrees =
     let vf = dir
         vr = perpendicularVector dir
-        vup = vf `cross` vr
+        vup = vr `cross` vf
         m = UV.fromList [ (vr^._x), (vup^._x), (vf^._x)
                         , (vr^._y), (vup^._y), (vf^._y)
                         , (vr^._z), (vup^._z), (vf^._z)

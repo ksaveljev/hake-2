@@ -28,12 +28,14 @@ predictMovement = do
     pausedValue <- liftM (^.cvValue) clPausedCVar
 
     unless (state /= Constants.caActive || pausedValue /= 0) $ do
+      io $ print "PREDICT MOVEMENT"
       predictValue <- liftM (^.cvValue) clPredictCVar
       flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
 
       if predictValue == 0 || (flags .&. PMoveT.pmfNoPrediction) /= 0
         then do
           -- just set angles
+          io $ print "JUST SET ANGLES"
           viewAngles <- use $ globals.cl.csViewAngles
           deltaAngles <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles
           globals.cl.csPredictedAngles .= viewAngles + (fmap (Math3D.shortToAngle. fromIntegral) deltaAngles)
@@ -48,6 +50,7 @@ predictMovement = do
               when (showMiss /= 0) $
                 Com.printf "exceeded CMD_BACKUP\n"
             else do
+              io $ print "CALC ANGLES"
               -- copy current state to pmove
               playerPMove <- use $ globals.cl.csFrame.fPlayerState.psPMoveState
               
@@ -56,11 +59,15 @@ predictMovement = do
                                  , _pmState = playerPMove
                                  }
 
+              io $ print ("viewangles1 = " ++ show (pm^.pmViewAngles))
+
               Just airAccel <- preuse $ globals.cl.csConfigStrings.ix Constants.csAirAccel
               pMoveGlobals.pmAirAccelerate .= Lib.atof airAccel
               
               -- run frames
               pm' <- runFrames pm (ack + 1) current
+
+              io $ print ("viewangles2 = " ++ show (pm'^.pmViewAngles))
 
               let oldFrame = (current - 2) .&. (Constants.cmdBackup - 1)
               Just oldZ <- preuse $ globals.cl.csPredictedOrigins.ix oldFrame._z

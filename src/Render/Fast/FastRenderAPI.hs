@@ -809,6 +809,8 @@ rSetupFrame = do
 
     -- build the transformation matrix for the given view angles
     newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    io $ print "SETUP FRAME"
+    io $ print ("viewAngles = " ++ show (newRefDef^.rdViewAngles))
     let (Just vpn, Just vright, Just vup) = Math3D.angleVectors (newRefDef^.rdViewAngles) True True True
 
     zoom fastRenderAPIGlobals $ do
@@ -892,6 +894,17 @@ rSetFrustum = do
                              , Math3D.rotatePointAroundVector vright vpn (0 - (90 - (newRefDef^.rdFovY) / 2))
                              ]
 
+    io $ print "SET FRUSTUM"
+    io $ print ("fovX = " ++ show (newRefDef^.rdFovX))
+    io $ print ("fovY = " ++ show (newRefDef^.rdFovY))
+    io $ print ("vup = " ++ show vup)
+    io $ print ("vright = " ++ show vright)
+    io $ print ("vpn = " ++ show vpn)
+    io $ print ("normals0 = " ++ show (normals V.! 0))
+    io $ print ("normals1 = " ++ show (normals V.! 1))
+    io $ print ("normals2 = " ++ show (normals V.! 2))
+    io $ print ("normals3 = " ++ show (normals V.! 3))
+
     origin <- use $ fastRenderAPIGlobals.frOrigin
     io $ V.imapM_ (updateFrustum normals origin) frustum
 
@@ -901,14 +914,14 @@ rSetFrustum = do
           modifyIORef' planeRef (\v -> v { _cpNormal = normals V.! idx
                                          , _cpType = Constants.planeAnyZ
                                          , _cpDist = origin `dot` (normals V.! idx)
-                                         , _cpSignBits = signbitsForPlane plane
+                                         , _cpSignBits = signbitsForPlane (normals V.! idx)
                                          })
 
-signbitsForPlane :: CPlaneT -> Int8
-signbitsForPlane out =
-    let a = if (out^.cpNormal._x) < 0 then 1 else 0
-        b = if (out^.cpNormal._y) < 0 then 2 else 0
-        c = if (out^.cpNormal._z) < 0 then 4 else 0
+signbitsForPlane :: V3 Float -> Int8
+signbitsForPlane normal =
+    let a = if (normal^._x) < 0 then 1 else 0
+        b = if (normal^._y) < 0 then 2 else 0
+        c = if (normal^._z) < 0 then 4 else 0
     in a .|. b .|. c
 
 rSetupGL :: Quake ()

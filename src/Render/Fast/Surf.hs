@@ -114,14 +114,22 @@ glCreateSurfaceLightmap surfRef = do
     surf <- io $ readIORef surfRef
 
     when ((surf^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) == 0) $ do
+      io $ print "CREATE SURFACE LIGHTMAP OK"
+
       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+
+      io $ print ("smax = " ++ show smax)
+      io $ print ("tmax = " ++ show tmax)
+      io $ print ("light_s = " ++ show (surf^.msLightS))
+      io $ print ("light_t = " ++ show (surf^.msLightT))
 
       (ok, pos) <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
 
       pos' <- if ok
                 then return pos
                 else do
+                  io $ print "NOT OK"
                   lmUploadBlock False
                   lmInitBlock
                   (ok', pos') <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
@@ -220,6 +228,9 @@ lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock dynamic = do
     lms <- use $ fastRenderAPIGlobals.frGLLms
 
+    io $ print "LM_UPLOADBLOCK"
+    io $ print (lms^.lmsCurrentLightmapTexture)
+
     let texture = if dynamic
                     then 0
                     else lms^.lmsCurrentLightmapTexture
@@ -259,7 +270,7 @@ lmUploadBlock dynamic = do
 
         fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture += 1
         use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture) >>= \clt ->
-          when (clt == Constants.maxLightMaps) $
+          when (clt == 128) $ -- TODO: 128 should be a constant here but there is some name clashing
             Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
 
 {-
@@ -433,7 +444,7 @@ recursiveWorldNode :: IORef MNodeT -> Quake ()
 recursiveWorldNode nodeRef = do
     node <- io $ readIORef nodeRef
 
-    io $ print "INITIALINITIAL"
+    io $ print "recursiveWorldNode"
     io $ print ("num surfaces = " ++ show (node^.mnNumSurfaces))
     io $ print ("first surface = " ++ show (node^.mnFirstSurface))
     io $ print ("contents = " ++ show (node^.mnContents))
@@ -478,9 +489,12 @@ recursiveWorldNode nodeRef = do
         checkIfNothingToDo contents visFrame mins maxs = do
           visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
 
-          if | contents == Constants.contentsSolid -> return True
-             | visFrame /= visFrameCount -> return True
-             | otherwise -> rCullBox mins maxs
+          if | contents == Constants.contentsSolid -> io (print "SOLID. RETURN") >> return True
+             | visFrame /= visFrameCount -> io (print "VISFRAME /= VISFRAMECOUNT. RETURN") >> return True
+             | otherwise -> do
+                 ok <- rCullBox mins maxs
+                 when ok $ io (print "CULL BOX. RETURN")
+                 return ok
 
         drawLeafStuff :: ModelT -> IORef MLeafT -> Quake ()
         drawLeafStuff worldModel leafRef = do
@@ -488,6 +502,8 @@ recursiveWorldNode nodeRef = do
           nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) (leaf^.mlMins) (leaf^.mlMaxs)
 
           unless nothingToDo $ do
+            io $ print "drawLeafStuff"
+
             newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
 
             let notVisible = ((newRefDef^.rdAreaBits) UV.! ((leaf^.mlArea) `shiftR` 3)) .&. (1 `shiftL` ((leaf^.mlArea) .&. 7)) == 0
@@ -503,6 +519,7 @@ recursiveWorldNode nodeRef = do
         drawNodeStuff worldModel node sidebit frameCount idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
+              io $ print "drawNodeStuff"
               let surfRef = (worldModel^.mSurfaces) V.! ((node^.mnFirstSurface) + idx)
               surf <- io $ readIORef surfRef
 
@@ -542,6 +559,18 @@ rCullBox mins maxs = do
       else do
         frustum <- use $ fastRenderAPIGlobals.frFrustum
         frustum' <- io $ V.mapM readIORef frustum
+
+        io $ print "CULL BOX!"
+        io $ print mins
+        io $ print maxs
+        io $ V.mapM_ (\f -> do
+                       print (f^.cpNormal)
+                       print (f^.cpDist)
+                       print (f^.cpType)
+                       print (f^.cpSignBits)
+                       print (f^.cpPad)
+                     ) frustum'
+
         if | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 0) == 2 -> return True
            | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 1) == 2 -> return True
            | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 2) == 2 -> return True
@@ -745,10 +774,14 @@ lmAllocBlock :: Int -> Int -> (Int, Int) -> Quake (Bool, (Int, Int))
 lmAllocBlock w h pos = do
     allocated <- use $ fastRenderAPIGlobals.frGLLms.lmsAllocated
     let (pos', best) = findSpot allocated blockHeight 0 (blockWidth - w) pos
+    io $ print "ALLOC BLOCK"
+    io $ print ("best = " ++ show best)
+    io $ print ("pos = " ++ show pos')
+    io $ print ("allocated = " ++ show (UV.take 10 allocated))
     if best + h > blockHeight
       then return (False, pos')
       else do
-        let updates = collectUpdates (pos^._1) best 0 w []
+        let updates = collectUpdates (pos'^._1) best 0 w []
         fastRenderAPIGlobals.frGLLms.lmsAllocated %= (UV.// updates)
         return (True, pos')
 

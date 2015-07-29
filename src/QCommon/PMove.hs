@@ -141,6 +141,10 @@ clampAngles :: Quake ()
 clampAngles = do
     pm <- use $ pMoveGlobals.pmPM
 
+    io $ print "CLAMP ANGLES"
+    io $ print (pm^.pmCmd.ucAngles)
+    io $ print (pm^.pmState.pmsDeltaAngles)
+
     let pm' = if (pm^.pmState.pmsPMFlags) .&. pmfTimeTeleport /= 0
                 then
                   -- TODO: think how to update it using Constants.yaw,
@@ -153,6 +157,8 @@ clampAngles = do
                               | a < 271 && a >= 180 -> 271
                               | otherwise -> a
                   in pm { _pmViewAngles = V3 a' b c }
+
+    pMoveGlobals.pmPM .= pm'
 
     let (Just forward, Just right, Just up) = Math3D.angleVectors (pm'^.pmViewAngles) True True True
     

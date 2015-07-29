@@ -357,6 +357,9 @@ parseFrame = do
         globals.cls.csState .= Constants.caActive
         globals.cl.csForceRefDef .= True
 
+        io $ print "PARSE FRAME"
+        io $ print (frame^.fPlayerState.psViewAngles)
+
         globals.cl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (frame^.fPlayerState.psPMoveState.pmsOrigin)
         globals.cl.csPredictedAngles .= (frame^.fPlayerState.psViewAngles)
 
@@ -782,8 +785,18 @@ calcViewValues = do
     -- if not running a demo or on a locked frame, add the local angle
     -- movement
     if (cl'^.csFrame.fPlayerState.psPMoveState.pmsPMType) < Constants.pmDead
-      then globals.cl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
-      else globals.cl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
+      then do
+        io $ print "USE PREDICTED VALUES"
+        io $ print (cl'^.csPredictedAngles)
+
+        globals.cl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
+      else do
+        io $ print "USE INTERPOLATED VALUES"
+        io $ print ("ops.viewangles = " ++ show (ops'^.psViewAngles))
+        io $ print ("ps.viewangles = " ++ show (ps^.psViewAngles))
+        io $ print ("lerp = " ++ show lerp)
+
+        globals.cl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
 
     globals.cl.csRefDef.rdViewAngles += Math3D.lerpAngles (ops'^.psKickAngles) (ps^.psKickAngles) lerp
 
