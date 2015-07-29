@@ -255,9 +255,9 @@ rBuildLightMap surf stride = do
           | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
           | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
           | otherwise =
-              let r = (truncate $ blockLights UV.! blp) :: Int
-                  g = (truncate $ blockLights UV.! blp) :: Int
-                  b = (truncate $ blockLights UV.! blp) :: Int
+              let r = (truncate $ blockLights UV.! (blp + 0)) :: Int
+                  g = (truncate $ blockLights UV.! (blp + 1)) :: Int
+                  b = (truncate $ blockLights UV.! (blp + 2)) :: Int
                   -- catch negative lights
                   r' = if r < 0 then 0 else r
                   g' = if g < 0 then 0 else g
@@ -273,7 +273,7 @@ rBuildLightMap surf stride = do
                   t = (255 / (fromIntegral brightest)) :: Float
                   r'' = if brightest > 255 then truncate (fromIntegral r' * t) else fromIntegral r'
                   g'' = if brightest > 255 then truncate (fromIntegral g' * t) else fromIntegral g'
-                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else fromIntegral g'
+                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else fromIntegral b'
                   a' = if brightest > 255 then truncate (fromIntegral a * t) else fromIntegral a
               in buildLightMap blockLights (blp + 3) stride i tmax (j + 1) smax (builder <> BB.word8 r'' <> BB.word8 g'' <> BB.word8 b'' <> BB.word8 a')
 
@@ -282,9 +282,9 @@ rBuildLightMap surf stride = do
           | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
           | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
           | otherwise =
-              let r = (truncate $ blockLights UV.! blp) :: Int
-                  g = (truncate $ blockLights UV.! blp) :: Int
-                  b = (truncate $ blockLights UV.! blp) :: Int
+              let r = (truncate $ blockLights UV.! (blp + 0)) :: Int
+                  g = (truncate $ blockLights UV.! (blp + 1)) :: Int
+                  b = (truncate $ blockLights UV.! (blp + 2)) :: Int
                   -- catch negative lights
                   r' = if r < 0 then 0 else r
                   g' = if g < 0 then 0 else g
@@ -300,7 +300,7 @@ rBuildLightMap surf stride = do
                   t = (255 / (fromIntegral brightest)) :: Float
                   r'' = if brightest > 255 then truncate (fromIntegral r' * t) else r'
                   g'' = if brightest > 255 then truncate (fromIntegral g' * t) else g'
-                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else g'
+                  b'' = if brightest > 255 then truncate (fromIntegral b' * t) else b'
                   a' = if brightest > 255 then truncate (fromIntegral a * t) else a
                   -- So if we are doing alpha lightmaps we need to set the
                   -- R, G, and B components to 0 and we need to set alpha to 1-alpha
