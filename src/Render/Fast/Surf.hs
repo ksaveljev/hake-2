@@ -160,7 +160,7 @@ glCreateSurfaceLightmap surfRef = do
 glBuildPolygonFromSurface :: IORef MSurfaceT -> Quake ()
 glBuildPolygonFromSurface surfRef = do
     surf <- io $ readIORef surfRef
-    currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
+    Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
     model <- io $ readIORef currentModelRef
 
     let Just imageRef = surf^.msTexInfo.mtiImage
@@ -382,7 +382,7 @@ rDrawWorld = do
 
     unless (drawWorldValue == 0 || (newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel /= 0) $ do
       Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
-      fastRenderAPIGlobals.frCurrentModel .= worldModelRef
+      fastRenderAPIGlobals.frCurrentModel .= Just worldModelRef
 
       fastRenderAPIGlobals.frModelOrg .= (newRefDef^.rdViewOrg)
       fastRenderAPIGlobals.frCurrentEntity .= newEntityT { _eFrame = truncate ((newRefDef^.rdTime) * 2) }

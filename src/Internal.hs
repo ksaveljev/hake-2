@@ -1577,7 +1577,7 @@ data FastRenderAPIGlobals =
                        , _frModKnown             :: V.Vector (IORef ModelT)
                        , _frModNumKnown          :: !Int
                        , _frLoadModel            :: IORef ModelT
-                       , _frCurrentModel         :: IORef ModelT
+                       , _frCurrentModel         :: Maybe (IORef ModelT)
                        , _frModInline            :: V.Vector (IORef ModelT)
                        , _frModNoVis             :: B.ByteString
                        , _frNoTexture            :: IORef ImageT

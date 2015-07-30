@@ -1053,3 +1053,44 @@ rFlash = do
 rDrawBeam :: EntityT -> Quake ()
 rDrawBeam _ = do
     io (putStrLn "FastRenderAPI.rDrawBeam") >> undefined -- TODO
+
+rDrawNullModel :: Quake ()
+rDrawNullModel = do
+    currentEntity <- use $ fastRenderAPIGlobals.frCurrentEntity
+
+    shadeLight <- if (currentEntity^.enFlags) .&. Constants.rfFullBright /= 0
+                    then return (V3 0 0 0.8)
+                    else Light.rLightPoint (currentEntity^.eOrigin)
+
+    let shadeLight' = fmap realToFrac shadeLight
+
+    GL.glPushMatrix
+    rRotateForEntity currentEntity
+
+    GL.glDisable GL.gl_TEXTURE_2D
+    GL.glColor3f (shadeLight'^._x) (shadeLight'^._y) (shadeLight'^._z)
+
+    GL.glBegin GL.gl_TRIANGLE_FAN
+    GL.glVertex3f 0 0 (-16)
+    mapM_ (\i -> GL.glVertex3f (16 * cos(i * pi / 2)) (16 * sin(i * pi / 2)) 0) [0..4]
+    GL.glEnd
+
+    GL.glBegin GL.gl_TRIANGLE_FAN
+    GL.glVertex3f 0 0 16
+    mapM_ (\i -> GL.glVertex3f (16 * cos(i * pi / 2)) (16 * sin(i * pi / 2)) 0) [4,3..0]
+    GL.glEnd
+
+    GL.glColor3f 1 1 1
+    GL.glPopMatrix
+    GL.glEnable GL.gl_TEXTURE_2D
+
+rRotateForEntity :: EntityT -> Quake ()
+rRotateForEntity e = do
+    let origin = fmap realToFrac (e^.eOrigin)
+        angles = fmap realToFrac (e^.eAngles)
+
+    GL.glTranslatef (origin^._x) (origin^._y) (origin^._z)
+
+    GL.glRotatef          (angles^._y) 0 0 1
+    GL.glRotatef (negate $ angles^._x) 0 1 0
+    GL.glRotatef (negate $ angles^._z) 1 0 0

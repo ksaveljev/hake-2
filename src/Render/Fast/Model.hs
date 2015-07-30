@@ -521,7 +521,7 @@ loadFaces buffer lump = do
         buf = BL.fromStrict $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) buffer)
         dFaces = runGet (getDFaces count) buf
 
-    fastRenderAPIGlobals.frCurrentModel .= loadModelRef
+    fastRenderAPIGlobals.frCurrentModel .= Just loadModelRef
     Surf.glBeginBuildingLightmaps loadModelRef
 
     surfaces <- V.mapM toMSurfaceT dFaces
