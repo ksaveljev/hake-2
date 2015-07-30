@@ -124,4 +124,5 @@ initialFastRenderAPIGlobals =
                        , _frSkyMaxs              = (UV.empty, UV.empty)
                        , _frAlphaSurfaces        = Nothing
                        , _frBlockLights          = UV.replicate (34 * 34 * 3) 0
+                       , _frPointColor           = V3 0 0 0
                        }

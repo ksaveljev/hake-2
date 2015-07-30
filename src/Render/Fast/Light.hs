@@ -9,7 +9,7 @@ import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
 import Data.Monoid ((<>), mempty)
 import Data.Word (Word8)
-import Linear (V3, dot, _x, _y, _z)
+import Linear (V3(..), dot, _x, _y, _z, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
@@ -97,8 +97,41 @@ rRenderDLights = do
     io (putStrLn "Light.rRenderDLights") >> undefined -- TODO
 
 rLightPoint :: V3 Float -> Quake (V3 Float)
-rLightPoint _ = do
-    io (putStrLn "Light.rLightPoint") >> undefined -- TODO
+rLightPoint p@(V3 a b c) = do
+    Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+    worldModel <- io $ readIORef worldModelRef
+
+    case (worldModel^.mLightdata) of
+      Nothing -> return (V3 1 1 1)
+      Just lightData -> do
+        let end = V3 a b (c - 2048)
+
+        r <- recursiveLightPoint (MNodeChildReference $ (worldModel^.mNodes) V.! 0) p end
+
+        color <- if r == -1
+                   then use $ globals.vec3Origin
+                   else use $ fastRenderAPIGlobals.frPointColor
+
+        -- add dynamic lights
+        newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+        Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+        currentEntity <- io $ readIORef currentEntityRef
+        let color' = addDynamicLights currentEntity newRefDef color 0 (newRefDef^.rdNumDLights)
+
+        modulateValue <- liftM (^.cvValue) glModulateCVar
+        return $ fmap (* modulateValue) color'
+
+  where addDynamicLights :: EntityT -> RefDefT -> V3 Float -> Int -> Int -> V3 Float
+        addDynamicLights currentEntity newRefDef color idx maxIdx
+          | idx >= maxIdx = color
+          | otherwise =
+              let dlight = (newRefDef^.rdDLights) V.! idx
+                  end = (currentEntity^.eOrigin) - (dlight^.dlOrigin)
+                  add = ((dlight^.dlIntensity) - norm end) * (1 / 256)
+                  color' = if add > 0
+                             then color + fmap (* add) (dlight^.dlColor)
+                             else color
+              in addDynamicLights currentEntity newRefDef color' (idx + 1) maxIdx
 
 rSetCacheState :: IORef MSurfaceT -> Quake ()
 rSetCacheState surfRef = do
@@ -328,3 +361,7 @@ rBuildLightMap surf stride = do
 rAddDynamicLights :: MSurfaceT -> Quake ()
 rAddDynamicLights _ = do
     io (putStrLn "Light.rAddDynamicLights") >> undefined -- TODO
+
+recursiveLightPoint :: MNodeChild -> V3 Float -> V3 Float -> Quake Int
+recursiveLightPoint _ _ _ = do
+    io (putStrLn "Light.recursiveLightPoint") >> undefined -- TODO
