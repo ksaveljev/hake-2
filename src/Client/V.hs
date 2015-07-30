@@ -3,6 +3,7 @@ module Client.V where
 
 import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse)
 import Control.Monad (void, unless, liftM, when)
+import Data.IORef (IORef)
 import Data.Maybe (isJust)
 import Linear (V3(..), V4(..))
 import qualified Data.ByteString as B
@@ -219,11 +220,11 @@ addParticle :: V3 Float -> Int -> Float -> Quake ()
 addParticle _ _ _ = do
     io (putStrLn "V.addParticle") >> undefined -- TODO
 
-addEntity :: EntityT -> Quake ()
-addEntity ent = do
+addEntity :: IORef EntityT -> Quake ()
+addEntity entRef = do
     numEntities <- use $ vGlobals.vgRNumEntities
     when (numEntities < Constants.maxEntities) $ do
-      vGlobals.vgREntities.ix numEntities .= ent
+      vGlobals.vgREntities.ix numEntities .= entRef
       vGlobals.vgRNumEntities += 1
 
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()

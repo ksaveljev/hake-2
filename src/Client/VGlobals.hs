@@ -6,6 +6,8 @@ module Client.VGlobals ( module Client.VGlobals
                        ) where
 
 import Control.Lens (makeLenses)
+import Data.IORef (newIORef)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
 import Internal
@@ -22,6 +24,6 @@ initialVGlobals =
            , _vgRNumEntities  = 0
            , _vgRNumParticles = 0
            , _vgRLightStyles  = V.replicate Constants.maxLightStyles newLightStyleT
-           , _vgREntities     = V.replicate Constants.maxEntities newEntityT
+           , _vgREntities     = unsafePerformIO $ V.replicateM Constants.maxEntities (newIORef newEntityT)
            , _vgRDLights      = V.replicate Constants.maxDLights newDLightT
            }

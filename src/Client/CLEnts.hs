@@ -8,7 +8,7 @@ import Control.Monad (when, liftM, unless)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Int (Int16)
-import Data.IORef (IORef, readIORef)
+import Data.IORef (IORef, newIORef, readIORef)
 import Data.Maybe (fromJust, isNothing)
 import Linear (V3(..), V4(..), _x, _y, _z, _w)
 import qualified Data.ByteString as B
@@ -847,17 +847,17 @@ addViewWeapon ps ops = do
                                            then (0, 0) -- just changed weapons, don't lerp from old
                                            else (ps^.psGunFrame, ops^.psGunFrame)
 
-              gun = newEntityT { _eModel = model
-                               , _eAngles = angles
-                               , _eOrigin = origin
-                               , _eFrame = frame
-                               , _eOldOrigin = origin
-                               , _eOldFrame = oldFrame
-                               , _eBackLerp = 1 - (cl'^.csLerpFrac)
-                               , _enFlags = Constants.rfMinLight .|. Constants.rfDepthHack .|. Constants.rfWeaponModel
-                               }
+          gunRef <- io $ newIORef newEntityT { _eModel = model
+                                             , _eAngles = angles
+                                             , _eOrigin = origin
+                                             , _eFrame = frame
+                                             , _eOldOrigin = origin
+                                             , _eOldFrame = oldFrame
+                                             , _eBackLerp = 1 - (cl'^.csLerpFrac)
+                                             , _enFlags = Constants.rfMinLight .|. Constants.rfDepthHack .|. Constants.rfWeaponModel
+                                             }
 
-          ClientV.addEntity gun
+          ClientV.addEntity gunRef
 
 addPacketEntities :: FrameT -> Quake ()
 addPacketEntities frame = do
@@ -940,7 +940,7 @@ addPacketEntities frame = do
 
                  | otherwise -> do
                      let (entFlags', entAlpha'') = updateFlagsAndAlpha entFlags entAlpha' effects
-                         ent' = ent { _eFrame     = entFrame
+                     let ent' = ent { _eFrame     = entFrame
                                     , _eOldFrame  = entOldFrame
                                     , _eBackLerp  = entBackLerp
                                     , _eOrigin    = entOrigin
@@ -954,7 +954,8 @@ addPacketEntities frame = do
                                     }
 
                      -- add to refresh list
-                     ClientV.addEntity ent'
+                     entRef <- io $ newIORef ent'
+                     ClientV.addEntity entRef
 
                      -- color shells generate a separate entity for the main model
                      checkColorShells ent' effects renderfx
@@ -1130,9 +1131,10 @@ addPacketEntities frame = do
                             else
                               return renderfx'
 
-            ClientV.addEntity ent { _enFlags = renderfx'' .|. Constants.rfTranslucent
-                                  , _eAlpha  = 0.3
-                                  }
+            entRef <- io $ newIORef ent { _enFlags = renderfx'' .|. Constants.rfTranslucent
+                                        , _eAlpha  = 0.3
+                                        }
+            ClientV.addEntity entRef
 
           return ent { _eSkin    = Nothing -- never use a custom skin on others
                      , _eSkinNum = 0
@@ -1174,12 +1176,13 @@ addPacketEntities frame = do
               -- replaces the previous version which used the high bit on
               -- modelindex2 to determine transparency
               Just configString <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + (s1^.esModelIndex2))
-              if BC.map toLower configString == "models/items/shell/tris.md2"
-                then ClientV.addEntity ent { _eModel  = model
-                                           , _eAlpha  = 0.32
-                                           , _enFlags = Constants.rfTranslucent
-                                           }
-                else ClientV.addEntity ent { _eModel = model }
+              entRef <- io $ if BC.map toLower configString == "models/items/shell/tris.md2"
+                               then newIORef ent { _eModel  = model
+                                                 , _eAlpha  = 0.32
+                                                 , _enFlags = Constants.rfTranslucent
+                                                 }
+                               else newIORef ent { _eModel = model }
+              ClientV.addEntity entRef
 
               -- PGM - make sure these get reset
               return ent { _eModel  = model
@@ -1195,7 +1198,8 @@ addPacketEntities frame = do
             then do
               Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex3)
               let ent' = ent { _eModel = model }
-              ClientV.addEntity ent'
+              entRef <- io $ newIORef ent'
+              ClientV.addEntity entRef
               return ent'
             else
               return ent
@@ -1206,7 +1210,8 @@ addPacketEntities frame = do
             then do
               Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex4)
               let ent' = ent { _eModel = model }
-              ClientV.addEntity ent'
+              entRef <- io $ newIORef ent'
+              ClientV.addEntity entRef
               return ent'
             else
               return ent
@@ -1222,7 +1227,8 @@ addPacketEntities frame = do
                              , _enFlags   = (ent^.enFlags) .|. Constants.rfTranslucent .|. Constants.rfShellGreen
                              , _eAlpha    = 0.3
                              }
-              ClientV.addEntity ent'
+              entRef <- io $ newIORef ent'
+              ClientV.addEntity entRef
               return ent'
 
             else

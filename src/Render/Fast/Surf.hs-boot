@@ -18,3 +18,5 @@ rMarkLeaves :: Quake ()
 rDrawWorld :: Quake ()
 
 rDrawAlphaSurfaces :: Quake ()
+
+rDrawBrushModel :: IORef EntityT -> Quake ()

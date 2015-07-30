@@ -6,7 +6,7 @@ import Control.Lens ((.=), (^.), zoom, use, preuse, ix, (+=), (%=), _1, _2)
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Char (toUpper)
-import Data.IORef (IORef, readIORef, modifyIORef')
+import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
 import Data.Word (Word8)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
@@ -385,7 +385,8 @@ rDrawWorld = do
       fastRenderAPIGlobals.frCurrentModel .= Just worldModelRef
 
       fastRenderAPIGlobals.frModelOrg .= (newRefDef^.rdViewOrg)
-      fastRenderAPIGlobals.frCurrentEntity .= newEntityT { _eFrame = truncate ((newRefDef^.rdTime) * 2) }
+      currentEntity <- io $ newIORef newEntityT { _eFrame = truncate ((newRefDef^.rdTime) * 2) }
+      fastRenderAPIGlobals.frCurrentEntity .= Just currentEntity
 
       fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
 
@@ -640,7 +641,8 @@ rTextureAnimation tex = do
     case (tex^.mtiNext) of
       Nothing -> return (fromJust $ tex^.mtiImage)
       Just _ -> do
-        currentEntity <- use $ fastRenderAPIGlobals.frCurrentEntity
+        Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+        currentEntity <- io $ readIORef currentEntityRef
         let c = (currentEntity^.eFrame) `mod` (tex^.mtiNumFrames)
         findFrame tex c
 
@@ -868,3 +870,7 @@ lmInitBlock = fastRenderAPIGlobals.frGLLms.lmsAllocated .= UV.replicate blockWid
 rRenderBrushPoly :: IORef MSurfaceT -> Quake ()
 rRenderBrushPoly _ = do
     io (putStrLn "Surf.rRenderBrushPoly") >> undefined -- TODO
+
+rDrawBrushModel :: IORef EntityT -> Quake ()
+rDrawBrushModel _ = do
+    io (putStrLn "Surf.rDrawBrushModel") >> undefined -- TODO

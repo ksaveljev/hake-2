@@ -4,6 +4,7 @@ module Render.ModelT ( ModelT(..)
                      , module Render.ModelT
                      , module Game.CPlaneT
                      , module QCommon.QFiles.BSP.DVisT
+                     , module QCommon.QFiles.MD2.DMdlT
                      , module Render.MEdgeT
                      , module Render.MLeafT
                      , module Render.MModelT
@@ -20,6 +21,7 @@ import qualified Data.Vector as V
 import Internal
 import Game.CPlaneT
 import QCommon.QFiles.BSP.DVisT
+import QCommon.QFiles.MD2.DMdlT
 import Render.MEdgeT
 import Render.MLeafT
 import Render.MModelT

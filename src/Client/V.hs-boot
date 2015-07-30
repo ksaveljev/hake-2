@@ -1,5 +1,6 @@
 module Client.V where
 
+import Data.IORef (IORef)
 import Linear (V3)
 
 import Quake
@@ -28,7 +29,7 @@ testLights :: Quake ()
 
 addParticle :: V3 Float -> Int -> Float -> Quake ()
 
-addEntity :: EntityT -> Quake ()
+addEntity :: IORef EntityT -> Quake ()
 
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
 

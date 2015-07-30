@@ -5,7 +5,7 @@ module Client.CLTEnt where
 import Control.Lens (zoom, (.=), use, (^.), ix)
 import Control.Monad (void, when)
 import Data.Bits (shiftR, (.|.), (.&.))
-import Data.IORef (IORef)
+import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
@@ -164,11 +164,11 @@ addBeams = do
                   if (b^.bModel) == modLightning && d' <= modelLength
                     then do
                       r <- Lib.rand
-                      let ent = newEntityT { _eOrigin = b^.bEnd
-                                           , _eModel = b^.bModel
-                                           , _enFlags = Constants.rfFullBright
-                                           , _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
-                                           }
+                      ent <- io $ newIORef newEntityT { _eOrigin = b^.bEnd
+                                                      , _eModel = b^.bModel
+                                                      , _enFlags = Constants.rfFullBright
+                                                      , _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
+                                                      }
 
                       ClientV.addEntity ent
                     else do
@@ -186,13 +186,14 @@ addBeams = do
               r <- Lib.rand
 
               if (b^.bModel) == modLightning
-                then
-                  ClientV.addEntity ent { _enFlags = Constants.rfFullBright
-                                        , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
-                                        }
-                else
-                  ClientV.addEntity ent { _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
-                                        }
+                then do
+                  entRef <- io $ newIORef ent { _enFlags = Constants.rfFullBright
+                                              , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
+                                              }
+                  ClientV.addEntity entRef
+                else do
+                  entRef <- io $ newIORef ent { _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360) }
+                  ClientV.addEntity entRef
 
               let org' = org + fmap (* len) dist
               constructBeams b org' len modLightning pitch yaw (d - modelLength) dist modelLength
@@ -337,13 +338,13 @@ addPlayerBeams = do
                   if (b^.bModel) == modLightning && d' <= modelLength
                     then do
                       r <- Lib.rand
-                      let ent = newEntityT { _eOrigin = b^.bEnd
-                                           , _eModel = b^.bModel
-                                           , _enFlags = Constants.rfFullBright
-                                           , _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
-                                           }
+                      entRef <- io $ newIORef newEntityT { _eOrigin = b^.bEnd
+                                                         , _eModel = b^.bModel
+                                                         , _enFlags = Constants.rfFullBright
+                                                         , _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
+                                                         }
 
-                      ClientV.addEntity ent
+                      ClientV.addEntity entRef
                     else do
                       constructBeams b org'' len modHeatBeam modLightning pitch yaw d' dist'' modelLength frameNum
                       addPlayerBeam beams cl' handMultiplier (idx + 1) maxIdx
@@ -358,19 +359,20 @@ addPlayerBeams = do
 
               r <- Lib.rand
 
-              if | isJust modHeatBeam && (b^.bModel) == modHeatBeam ->
-                     ClientV.addEntity ent { _enFlags = Constants.rfFullBright
-                                           , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
-                                           , _eFrame = frameNum
-                                           }
-                 | (b^.bModel) == modLightning ->
-                     ClientV.addEntity ent { _enFlags = Constants.rfFullBright
-                                           , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
-                                           }
+              entRef <- io $ if | isJust modHeatBeam && (b^.bModel) == modHeatBeam ->
+                                    newIORef ent { _enFlags = Constants.rfFullBright
+                                                 , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
+                                                 , _eFrame = frameNum
+                                                 }
+                                | (b^.bModel) == modLightning ->
+                                    newIORef ent { _enFlags = Constants.rfFullBright
+                                                 , _eAngles = V3 (-pitch) (yaw + 180) (fromIntegral $ r `mod` 360)
+                                                 }
 
-                 | otherwise ->
-                     ClientV.addEntity ent { _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360)
-                                           }
+                                | otherwise ->
+                                    newIORef ent { _eAngles = V3 pitch yaw (fromIntegral $ r `mod` 360) }
+
+              ClientV.addEntity entRef
 
               let org' = org + fmap (* len) dist
               constructBeams b org' len modHeatBeam modLightning pitch yaw (d - modelLength) dist modelLength frameNum
@@ -394,58 +396,65 @@ addExplosions = do
                   let frac = (fromIntegral (cl'^.csTime) - (ex^.eStart)) / 100
                       f = truncate frac :: Int
 
-                  maybeEnt <- if | (ex^.eType) == exMFlash -> do
-                                     return $ if f >= (ex^.eFrames) - 1
-                                                then Nothing
-                                                else Just (ex^.eEnt)
-                 
-                                 | (ex^.eType) == exMisc -> do
-                                     return $ if f >= (ex^.eFrames) - 1
-                                                then Nothing
-                                                else Just $ (ex^.eEnt) { _eAlpha = 1 - frac / fromIntegral ((ex^.eFrames) - 1) }
-                 
-                                 | (ex^.eType) == exFlash -> do
-                                     return $ if f >= 1
-                                                then Nothing
-                                                else Just $ (ex^.eEnt) { _eAlpha = 1 }
-                 
-                                 | (ex^.eType) == exPoly -> do
-                                     return $ if f >= (ex^.eFrames) - 1
-                                                then Nothing
-                                                else let alpha = (16.0 - fromIntegral f) / 16
-                                                         skinNum = if f < 10
-                                                                     then if (f `shiftR` 1) < 0
-                                                                            then 0
-                                                                            else f `shiftR` 1
-                                                                     else if f < 13
-                                                                            then 5
-                                                                            else 6
-                                                         flags = if f < 10
-                                                                   then (ex^.eEnt.enFlags)
-                                                                   else (ex^.eEnt.enFlags) .|. Constants.rfTranslucent
-                                                     in Just $ (ex^.eEnt) { _eAlpha = alpha
-                                                                          , _eSkinNum = skinNum
-                                                                          , _enFlags = flags
-                                                                          }
-                 
-                                 | (ex^.eType) == exPoly2 -> do
-                                     return $ if f >= (ex^.eFrames) - 1
-                                                then Nothing
-                                                else let alpha = (5.0 - fromIntegral f) / 5.0
-                                                         flags = (ex^.eEnt.enFlags) .|. Constants.rfTranslucent
-                                                     in Just $ (ex^.eEnt) { _eAlpha = alpha
-                                                                          , _eSkinNum = 0
-                                                                          , _enFlags = flags
-                                                                          }
+                  maybeEntRef <- if | (ex^.eType) == exMFlash -> do
+                                        return $ if f >= (ex^.eFrames) - 1
+                                                   then Nothing
+                                                   else Just (ex^.eEnt)
 
-                                 | otherwise -> return Nothing -- shouldn't happend tbh
+                                    | (ex^.eType) == exMisc -> do
+                                        if f >= (ex^.eFrames) - 1
+                                          then return Nothing
+                                          else do
+                                            io $ modifyIORef' (ex^.eEnt) (\v -> v { _eAlpha = 1 - frac / fromIntegral ((ex^.eFrames) - 1) })
+                                            return (Just (ex^.eEnt))
 
-                         
-                  case maybeEnt of
+                                    | (ex^.eType) == exFlash -> do
+                                        if f >= 1
+                                          then return Nothing
+                                          else do
+                                            io $ modifyIORef' (ex^.eEnt) (\v -> v { _eAlpha = 1 })
+                                            return (Just (ex^.eEnt))
+
+                                    | (ex^.eType) == exPoly -> do
+                                        if f >= (ex^.eFrames) - 1
+                                          then return Nothing
+                                          else do
+                                            let alpha = (16.0 - fromIntegral f) / 16
+                                                skinNum = if f < 10
+                                                            then if (f `shiftR` 1) < 0
+                                                                   then 0
+                                                                   else f `shiftR` 1
+                                                            else if f < 13
+                                                                   then 5
+                                                                   else 6
+                                                flagUpdate = if f < 10
+                                                               then 0
+                                                               else Constants.rfTranslucent
+                                            io $ modifyIORef' (ex^.eEnt) (\v -> v { _eAlpha = alpha
+                                                                                  , _eSkinNum = skinNum
+                                                                                  , _enFlags = (v^.enFlags) .|. flagUpdate
+                                                                                  })
+                                            return (Just (ex^.eEnt))
+
+                                    | (ex^.eType) == exPoly2 -> do
+                                        if f >= (ex^.eFrames) - 1
+                                          then return Nothing
+                                          else do
+                                            io $ modifyIORef' (ex^.eEnt) (\v -> v { _eAlpha = (5.0 - fromIntegral f) / 5.0
+                                                                                  , _eSkinNum = 0
+                                                                                  , _enFlags = (v^.enFlags) .|. Constants.rfTranslucent
+                                                                                  })
+                                            return (Just (ex^.eEnt))
+
+                                    | otherwise -> return Nothing -- shouldn't happend tbh
+
+                  case maybeEntRef of
                     Nothing -> do
                       clTEntGlobals.clteExplosions.ix idx.eType .= exFree
                       addExplosion explosions cl' (idx + 1) maxIdx
-                    Just ent -> do
+                    Just entRef -> do
+                      ent <- io $ readIORef entRef
+
                       when ((ex^.eLight) /= 0) $
                         ClientV.addLight (ent^.eOrigin)
                                          ((ex^.eLight) * (ent^.eAlpha))
@@ -455,11 +464,13 @@ addExplosions = do
 
                       let f' = if f < 0 then 0 else f
 
-                      ClientV.addEntity ent { _eOldOrigin = ent^.eOrigin
-                                            , _eFrame = (ex^.eBaseFrame) + f' + 1
-                                            , _eOldFrame = (ex^.eBaseFrame) + f'
-                                            , _eBackLerp = 1 - (cl'^.csLerpFrac)
-                                            }
+                      io $ modifyIORef' entRef (\v -> v { _eOldOrigin = ent^.eOrigin
+                                                        , _eFrame = (ex^.eBaseFrame) + f' + 1
+                                                        , _eOldFrame = (ex^.eBaseFrame) + f'
+                                                        , _eBackLerp = 1 - (cl'^.csLerpFrac)
+                                                        })
+
+                      ClientV.addEntity entRef
 
                       addExplosion explosions cl' (idx + 1) maxIdx
 

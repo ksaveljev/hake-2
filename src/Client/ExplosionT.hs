@@ -4,7 +4,9 @@ module Client.ExplosionT ( ExplosionT(..)
                          ) where
 
 import Control.Lens (makeLenses)
+import Data.IORef (newIORef)
 import Linear (V3(..))
+import System.IO.Unsafe (unsafePerformIO)
 
 import Internal
 import Client.EntityT
@@ -14,7 +16,7 @@ makeLenses ''ExplosionT
 newExplosionT :: ExplosionT
 newExplosionT =
   ExplosionT { _eType       = 0
-             , _eEnt        = newEntityT
+             , _eEnt        = unsafePerformIO $ newIORef newEntityT
              , _eFrames     = 0
              , _eLight      = 0
              , _eLightColor = V3 0 0 0

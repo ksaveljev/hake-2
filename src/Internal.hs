@@ -879,7 +879,7 @@ data RefDefT =
           , _rdAreaBits     :: UV.Vector Word8
           , _rdLightStyles  :: V.Vector LightStyleT
           , _rdNumEntities  :: !Int
-          , _rdEntities     :: V.Vector EntityT
+          , _rdEntities     :: V.Vector (IORef EntityT)
           , _rdNumDLights   :: !Int
           , _rdDLights      :: V.Vector DLightT
           , _rdNumParticles :: !Int
@@ -1625,7 +1625,7 @@ data FastRenderAPIGlobals =
                        , _frWorldMatrix          :: [GL.GLfloat]
                        , _frVisFrameCount        :: !Int
                        , _frModelOrg             :: V3 Float
-                       , _frCurrentEntity        :: EntityT
+                       , _frCurrentEntity        :: Maybe (IORef EntityT)
                        , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
                        , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
                        , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
@@ -1741,7 +1741,7 @@ data VGlobals =
            , _vgRNumEntities  :: !Int
            , _vgRNumParticles :: !Int
            , _vgRLightStyles  :: V.Vector LightStyleT
-           , _vgREntities     :: V.Vector EntityT
+           , _vgREntities     :: V.Vector (IORef EntityT)
            , _vgRDLights      :: V.Vector DLightT
            }
 
@@ -1836,13 +1836,13 @@ data CLSustainT =
              }
 
 data LaserT =
-  LaserT { _lEnt     :: EntityT
+  LaserT { _lEnt     :: IORef EntityT
          , _lEndTime :: !Int
          }
 
 data ExplosionT =
   ExplosionT { _eType       :: !Int
-             , _eEnt        :: EntityT
+             , _eEnt        :: IORef EntityT
              , _eFrames     :: !Int
              , _eLight      :: Float
              , _eLightColor :: V3 Float

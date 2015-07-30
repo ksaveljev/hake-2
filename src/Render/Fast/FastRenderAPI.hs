@@ -36,6 +36,7 @@ import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Light as Light
+import qualified Render.Fast.Mesh as Mesh
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Surf as Surf
 import qualified Render.Fast.Warp as Warp
@@ -1016,8 +1017,9 @@ rDrawEntitiesOnList = do
         drawNonTransparentEntities newRefDef idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let currentEntity = (newRefDef^.rdEntities) V.! idx
-              fastRenderAPIGlobals.frCurrentEntity .= currentEntity
+              let currentEntityRef = (newRefDef^.rdEntities) V.! idx
+              currentEntity <- io $ readIORef currentEntityRef
+              fastRenderAPIGlobals.frCurrentEntity .= Just currentEntityRef
 
               if | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 ->
                      drawNonTransparentEntities newRefDef (idx + 1) maxIdx
@@ -1032,9 +1034,21 @@ rDrawEntitiesOnList = do
                      case currentModel of
                        Nothing -> do
                          rDrawNullModel
-                         drawNonTransparentEntities newRefDef (idx + 1) maxIdx
                        Just modelRef -> do
-                         undefined -- TODO
+                         model <- io $ readIORef modelRef
+                         if | (model^.mType) == RenderAPIConstants.modAlias ->
+                                Mesh.rDrawAliasModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modBrush ->
+                                Surf.rDrawBrushModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modSprite ->
+                                rDrawSpriteModel currentEntityRef
+
+                            | otherwise ->
+                                Com.comError Constants.errDrop "Bad modeltype"
+
+                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
 
         drawTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
         drawTransparentEntities newRefDef idx maxIdx
@@ -1056,7 +1070,8 @@ rDrawBeam _ = do
 
 rDrawNullModel :: Quake ()
 rDrawNullModel = do
-    currentEntity <- use $ fastRenderAPIGlobals.frCurrentEntity
+    Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+    currentEntity <- io $ readIORef currentEntityRef
 
     shadeLight <- if (currentEntity^.enFlags) .&. Constants.rfFullBright /= 0
                     then return (V3 0 0 0.8)
@@ -1094,3 +1109,7 @@ rRotateForEntity e = do
     GL.glRotatef          (angles^._y) 0 0 1
     GL.glRotatef (negate $ angles^._x) 0 1 0
     GL.glRotatef (negate $ angles^._z) 1 0 0
+
+rDrawSpriteModel :: IORef EntityT -> Quake ()
+rDrawSpriteModel _ = do
+    io (putStrLn "FastRenderAPI.rDrawSpriteModel") >> undefined -- TODO

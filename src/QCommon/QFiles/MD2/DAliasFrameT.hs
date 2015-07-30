@@ -16,7 +16,7 @@ data DAliasFrameT =
                , _dafTranslate :: V3 Float
                , _dafName      :: B.ByteString
                , _dafVerts     :: UV.Vector Int
-               }
+               } deriving Eq
 
 makeLenses ''DAliasFrameT
 

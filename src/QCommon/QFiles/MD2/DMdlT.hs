@@ -1,6 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module QCommon.QFiles.MD2.DMdlT where
+module QCommon.QFiles.MD2.DMdlT ( module QCommon.QFiles.MD2.DMdlT
+                                , module QCommon.QFiles.MD2.DAliasFrameT
+                                , module QCommon.QFiles.MD2.DSTVertT
+                                , module QCommon.QFiles.MD2.DTriangleT
+                                ) where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)

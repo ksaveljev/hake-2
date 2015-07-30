@@ -5,6 +5,8 @@ module Client.LaserT ( LaserT(..)
                      ) where
 
 import Control.Lens (makeLenses)
+import Data.IORef (newIORef)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Internal
 import Client.EntityT
@@ -13,6 +15,6 @@ makeLenses ''LaserT
 
 newLaserT :: LaserT
 newLaserT =
-  LaserT { _lEnt     = newEntityT
+  LaserT { _lEnt     = unsafePerformIO $ newIORef newEntityT
          , _lEndTime = 0
          }
