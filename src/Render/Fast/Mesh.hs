@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.Fast.Mesh where
 
 import Control.Lens ((^.), use)
-import Control.Monad (when)
+import Control.Monad (when, liftM, unless)
 import Data.Bits ((.&.), (.|.), complement, shiftL)
 import Data.Int (Int32)
 import Data.IORef (IORef, readIORef, modifyIORef')
@@ -14,19 +15,129 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import qualified Client.VID as VID
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import qualified Render.Fast.Light as Light
 import qualified Util.Math3D as Math3D
 
 rDrawAliasModel :: IORef EntityT -> Quake ()
-rDrawAliasModel e = do
-    io (putStrLn "Mesh.rDrawAliasModel") >> undefined -- TODO
+rDrawAliasModel entRef = do
+    e <- io $ readIORef entRef
+    done <- checkIfDone e
+
+    unless done $ do
+      Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
+      currentModel <- io $ readIORef currentModelRef
+
+      let Just (AliasModelExtra pAliasHdr) = currentModel^.mExtraData
+
+      -- get lighting information
+      --
+      -- PMM - rewrote, reordered to handle new shells & mixing
+      -- PMM - 3.20 code .. replaced with original way of doing it to keep mod
+      -- authors happy
+      shadeLight <- buildShadeLight
+
+      io $ print "SHADE LIGHT"
+      io $ print shadeLight
+
+      io (putStrLn "Mesh.rDrawAliasModel") >> undefined -- TODO
+
+  where checkIfDone :: EntityT -> Quake Bool
+        checkIfDone e = do
+          if (e^.enFlags) .&. Constants.rfWeaponModel == 0
+            then
+              rCullAliasModel entRef
+            else do
+              handValue <- liftM (^.cvValue) handCVar
+              return $ if handValue == 2 then True else False
+
+        buildShadeLight :: Quake (V3 Float)
+        buildShadeLight = do
+          Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+          currentEntity <- io $ readIORef currentEntityRef
+
+          shadeLight <- if | (currentEntity^.enFlags) .&. (Constants.rfShellHalfDam .|. Constants.rfShellGreen .|. Constants.rfShellRed .|. Constants.rfShellBlue .|. Constants.rfShellDouble) /= 0 -> do
+                               let (a, b, c) = if (currentEntity^.enFlags) .&. Constants.rfShellHalfDam /= 0
+                                                   then (0.56, 0.59, 0.45)
+                                                   else (0, 0, 0)
+                                   (a', b') = if (currentEntity^.enFlags) .&. Constants.rfShellDouble /= 0
+                                                then (0.9, 0.7)
+                                                else (a, b)
+                                   a'' = if (currentEntity^.enFlags) .&. Constants.rfShellRed /= 0 then 1 else a'
+                                   b'' = if (currentEntity^.enFlags) .&. Constants.rfShellGreen /= 0 then 1 else b'
+                                   c' = if (currentEntity^.enFlags) .&. Constants.rfShellBlue /= 0 then 1 else c
+                               return (V3 a'' b'' c')
+
+                           | (currentEntity^.enFlags) .&. Constants.rfFullBright /= 0 ->
+                               return (V3 1 1 1)
+
+                           | otherwise -> do
+                               shadeLight <- Light.rLightPoint (currentEntity^.eOrigin)
+
+                               -- player lighting hack for communication back to server
+                               -- big hack!
+                               when ((currentEntity^.enFlags) .&. Constants.rfWeaponModel /= 0) $ do
+                                 let v = if (shadeLight^._x) > (shadeLight^._y)
+                                           then
+                                             if (shadeLight^._x) > (shadeLight^._z)
+                                               then shadeLight^._x
+                                               else shadeLight^._z
+                                           else
+                                             if (shadeLight^._y) > (shadeLight^._z)
+                                               then shadeLight^._y
+                                               else shadeLight^._z
+
+                                 clLightLevelCVar >>= \lightLevel -> CVar.update lightLevel { _cvValue = 150 * v }
+
+                               monoLightmap <- liftM (^.cvString) glMonoLightMapCVar
+
+                               return $ if monoLightmap `BC.index` 0 /= '0'
+                                          then let s = shadeLight^._x
+                                                   s' = if s < (shadeLight^._y) then shadeLight^._y else s
+                                                   s'' = if s' < (shadeLight^._z) then shadeLight^._z else s'
+                                               in V3 s'' s'' s''
+                                          else shadeLight
+
+          let shadeLight' = if (currentEntity^.enFlags) .&. Constants.rfMinLight /= 0
+                              then let v = (shadeLight^._x) > 0.1 || (shadeLight^._y) > 0.1 || (shadeLight^._z) > 0.1
+                                   in if v
+                                        then shadeLight
+                                        else V3 0.1 0.1 0.1
+                              else
+                                shadeLight
+
+          newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
+          let shadeLight'' = if (currentEntity^.enFlags) .&. Constants.rfGlow /= 0 -- bonus items will pulse with time
+                               then
+                                 let scale = 0.1 * sin (7 * (newRefDef^.rdTime))
+                                     smin = fmap (* 0.8) shadeLight'
+                                     a = if (shadeLight'^._x) + scale < (smin^._x)
+                                           then (smin^._x)
+                                           else (shadeLight'^._x) + scale
+                                     b = if (shadeLight'^._y) + scale < (smin^._y)
+                                           then (smin^._y)
+                                           else (shadeLight'^._y) + scale
+                                     c = if (shadeLight'^._z) + scale < (smin^._z)
+                                           then (smin^._z)
+                                           else (shadeLight'^._z) + scale
+                                 in V3 a b c
+                               else
+                                 shadeLight'
+
+          let shadeLight''' = if ((newRefDef^.rdRdFlags) .&. Constants.rdfIrGoggles /= 0) && ((currentEntity^.enFlags) .&. Constants.rfIrVisible /= 0)
+                                then V3 1 0 0
+                                else shadeLight''
+
+          return shadeLight'''
 
 rCullAliasModel :: IORef EntityT -> Quake Bool
 rCullAliasModel entRef = do
     e <- io $ readIORef entRef
 
-    -- data ModelExtra = AliasModelExtra DMdlT | SpriteModelExtra DSpriteT
     Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
     currentModel <- io $ readIORef currentModelRef
 
