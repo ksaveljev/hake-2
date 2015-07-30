@@ -8,19 +8,25 @@ import Data.Bits ((.&.), (.|.), complement, shiftL)
 import Data.Int (Int32)
 import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust)
-import Linear (V3(..), _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import CVarVariables
+import Render.Anorms
 import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Render.Fast.Light as Light
 import qualified Util.Math3D as Math3D
+
+-- precalculated dot products for quantized angles
+shadeDotQuant :: Int
+shadeDotQuant = 16
 
 rDrawAliasModel :: IORef EntityT -> Quake ()
 rDrawAliasModel entRef = do
@@ -42,6 +48,14 @@ rDrawAliasModel entRef = do
 
       io $ print "SHADE LIGHT"
       io $ print shadeLight
+
+      Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+      currentEntity <- io $ readIORef currentEntityRef
+
+      let idx = truncate ((currentEntity^.eAngles._y) * (fromIntegral shadeDotQuant / 360)) .&. (shadeDotQuant - 1)
+          shadeDots = vertexNormalDots V.! idx
+          an = (currentEntity^.eAngles._y) / 180 * pi
+          shadeVector = normalize (V3 (cos (-an)) (sin (-an)) 1)
 
       io (putStrLn "Mesh.rDrawAliasModel") >> undefined -- TODO
 
