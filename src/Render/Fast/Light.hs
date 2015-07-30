@@ -9,7 +9,7 @@ import Data.IORef (IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
 import Data.Monoid ((<>), mempty)
 import Data.Word (Word8)
-import Linear (V3(..), dot, _x, _y, _z, norm)
+import Linear (V3(..), dot, _x, _y, _z, _w, _xyz, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
@@ -363,5 +363,94 @@ rAddDynamicLights _ = do
     io (putStrLn "Light.rAddDynamicLights") >> undefined -- TODO
 
 recursiveLightPoint :: MNodeChild -> V3 Float -> V3 Float -> Quake Int
-recursiveLightPoint _ _ _ = do
-    io (putStrLn "Light.recursiveLightPoint") >> undefined -- TODO
+recursiveLightPoint (MLeafChildReference _) _ _ = return (-1) -- didn't hit anything
+recursiveLightPoint (MNodeChildReference nodeRef) start end = do
+    -- calculate mid point
+    node <- io $ readIORef nodeRef
+    plane <- io $ readIORef (node^.mnPlane)
+
+    let front = start `dot` (plane^.cpNormal) - (plane^.cpDist)
+        back = end `dot` (plane^.cpNormal) - (plane^.cpDist)
+        side = front < 0
+        sideIndex = if side then _2 else _1
+        sideIndex2 = if side then _1 else _2
+
+    if (back < 0) == side
+      then
+        recursiveLightPoint (node^.mnChildren.sideIndex) start end
+      else do
+        let frac = front / (front - back)
+            mid = start + fmap (* frac) (end - start)
+
+        -- go down front side
+        r <- recursiveLightPoint (node^.mnChildren.sideIndex) start mid
+
+        if | r >= 0 -> return r
+           | (back < 0) == side -> return (-1)
+           | otherwise -> do
+               -- check for impact on this node
+               fastRenderAPIGlobals.frLightSpot .= mid
+
+               Just worldModelRef <- use $ fastRenderAPIGlobals.frWorldModel
+               worldModel <- io $ readIORef worldModelRef
+
+               r' <- calcPointColor worldModel mid (node^.mnFirstSurface) 0 (node^.mnNumSurfaces)
+
+               case r' of
+                 Just result -> return result
+                 -- go down back side
+                 Nothing -> recursiveLightPoint (node^.mnChildren.sideIndex2) mid end
+
+  where calcPointColor :: ModelT -> V3 Float -> Int -> Int -> Int -> Quake (Maybe Int)
+        calcPointColor worldModel mid surfIndex idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              let surfRef = (worldModel^.mSurfaces) V.! surfIndex
+              surf <- io $ readIORef surfRef
+
+              if (surf^.msFlags) .&. (Constants.surfDrawTurb .|. Constants.surfDrawSky) /= 0
+                then
+                  -- no lightmaps
+                  calcPointColor worldModel mid (surfIndex + 1) (idx + 1) maxIdx
+                else do
+                  let tex = surf^.msTexInfo
+                      s = truncate (mid `dot` (tex^.mtiVecs._1._xyz) + (tex^.mtiVecs._1._w)) :: Int
+                      t = truncate (mid `dot` (tex^.mtiVecs._2._xyz) + (tex^.mtiVecs._2._w)) :: Int
+
+                  if s < fromIntegral (surf^.msTextureMins._1) || t < fromIntegral (surf^.msTextureMins._2)
+                    then
+                      calcPointColor worldModel mid (surfIndex + 1) (idx + 1) maxIdx
+                    else do
+                      let ds = s - fromIntegral (surf^.msTextureMins._1)
+                          dt = t - fromIntegral (surf^.msTextureMins._2)
+
+                      if | ds > fromIntegral (surf^.msExtents._1) || dt > fromIntegral (surf^.msExtents._2) ->
+                             calcPointColor worldModel mid (surfIndex + 1) (idx + 1) maxIdx
+                         | isNothing (surf^.msSamples) ->
+                             return (Just 0)
+                         | otherwise -> do
+                             let ds' = ds `shiftR` 4
+                                 dt' = dt `shiftR` 4
+                                 lightmap = fromJust (surf^.msSamples)
+
+                             v3o <- use $ globals.vec3Origin
+                             newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+                             modulateValue <- liftM (^.cvValue) glModulateCVar
+                             let lightmapIndex = 3 * (dt' * ((fromIntegral (surf^.msExtents._1) `shiftR` 4) + 1) + ds')
+                                 pointColor = calculate surf lightmap newRefDef modulateValue lightmapIndex v3o 0 Constants.maxLightMaps
+
+                             fastRenderAPIGlobals.frPointColor .= pointColor
+                             return (Just 1)
+
+        calculate :: MSurfaceT -> B.ByteString -> RefDefT -> Float -> Int -> V3 Float -> Int -> Int -> V3 Float
+        calculate surf lightmap newRefDef modulateValue lightmapIndex pointColor idx maxIdx
+          | idx >= maxIdx = pointColor
+          | (surf^.msStyles) `B.index` idx == 0xFF = pointColor
+          | otherwise =
+              let rgb = ((newRefDef^.rdLightStyles) V.! (fromIntegral $ (surf^.msStyles) `B.index` idx))^.lsRGB
+                  scale = fmap (* modulateValue) rgb
+                  a = (pointColor^._x) + (fromIntegral $ lightmap `B.index` (lightmapIndex + 0)) * (scale^._x) * (1 / 255)
+                  b = (pointColor^._y) + (fromIntegral $ lightmap `B.index` (lightmapIndex + 1)) * (scale^._y) * (1 / 255)
+                  c = (pointColor^._z) + (fromIntegral $ lightmap `B.index` (lightmapIndex + 2)) * (scale^._z) * (1 / 255)
+                  lightmapIndex' = lightmapIndex + 3 * ((fromIntegral (surf^.msExtents._1) `shiftR` 4) + 1) * ((fromIntegral (surf^.msExtents._2) `shiftR` 4) + 1)
+              in calculate surf lightmap newRefDef modulateValue lightmapIndex' (V3 a b c) (idx + 1) maxIdx

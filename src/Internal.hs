@@ -1631,6 +1631,7 @@ data FastRenderAPIGlobals =
                        , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
                        , _frBlockLights          :: UV.Vector Float
                        , _frPointColor           :: V3 Float
+                       , _frLightSpot            :: V3 Float
                        }
 
 data ParticleTGlobals =
