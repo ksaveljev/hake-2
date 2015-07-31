@@ -5,7 +5,7 @@ module Client.Console where
 
 import Control.Lens ((.=), use, zoom, (^.), ix, preuse, (-=), (+=))
 import Control.Monad (void, unless, when)
-import Data.Bits (shiftR, shiftL, (.&.), (.|.))
+import Data.Bits (shiftR, shiftL, (.&.), (.|.), xor)
 import Data.Char (ord, chr)
 import Data.Maybe (isJust)
 import Data.Word (Word8)
@@ -131,8 +131,16 @@ clearNotify :: Quake ()
 clearNotify = globals.con.cTimes .= UV.replicate Constants.numConTimes 0
 
 drawAltString :: Int -> Int -> B.ByteString -> Quake ()
-drawAltString _ _ _ = do
-    io (putStrLn "Console.drawAltString") >> undefined -- TODO
+drawAltString x y s = do
+    draw x 0 (B.length s)
+
+  where draw :: Int -> Int -> Int -> Quake ()
+        draw x' idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) x' y ((ord $ s `BC.index` idx) `xor` 0x80)
+              draw (x' + 8) (idx + 1) maxIdx
 
 drawString :: Int -> Int -> B.ByteString -> Quake ()
 drawString x y s =
