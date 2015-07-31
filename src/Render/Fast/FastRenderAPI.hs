@@ -1014,7 +1014,7 @@ rDrawEntitiesOnList = do
                      fastRenderAPIGlobals.frCurrentModel .= currentModel
 
                      case currentModel of
-                       Nothing -> do
+                       Nothing ->
                          rDrawNullModel
                        Just modelRef -> do
                          model <- io $ readIORef modelRef
@@ -1036,7 +1036,39 @@ rDrawEntitiesOnList = do
         drawTransparentEntities newRefDef idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              undefined -- TODO
+              let currentEntityRef = (newRefDef^.rdEntities) V.! idx
+              currentEntity <- io $ readIORef currentEntityRef
+              fastRenderAPIGlobals.frCurrentEntity .= Just currentEntityRef
+
+              if | (currentEntity^.enFlags) .&. Constants.rfTranslucent == 0 ->
+                     drawTransparentEntities newRefDef (idx + 1) maxIdx
+
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 ->
+                     rDrawBeam currentEntity
+
+                 | otherwise -> do
+                     let currentModel = currentEntity^.eModel
+                     fastRenderAPIGlobals.frCurrentModel .= currentModel
+
+                     case currentModel of
+                       Nothing ->
+                         rDrawNullModel
+                       Just modelRef -> do
+                         model <- io $ readIORef modelRef
+
+                         if | (model^.mType) == RenderAPIConstants.modAlias ->
+                                Mesh.rDrawAliasModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modBrush ->
+                                Surf.rDrawBrushModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modSprite ->
+                                rDrawSpriteModel currentEntityRef
+
+                            | otherwise ->
+                                Com.comError Constants.errDrop "Bad modeltype"
+
+                     drawTransparentEntities newRefDef (idx + 1) maxIdx
 
 rDrawParticles :: Quake ()
 rDrawParticles = do
