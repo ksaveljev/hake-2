@@ -722,7 +722,24 @@ addDirtyPoint x y = do
 
 drawCrosshair :: Quake ()
 drawCrosshair = do
-    io (putStrLn "SCR.drawCrosshair") >> undefined -- TODO
+    crosshair <- crosshairCVar
+
+    unless ((crosshair^.cvValue) == 0) $ do
+      when (crosshair^.cvModified) $ do
+        CVar.update crosshair { _cvModified = False }
+        touchPics
+
+      crosshairPic <- use $ scrGlobals.scrCrosshairPic
+
+      unless (B.null crosshairPic) $ do
+        vrect <- use $ globals.scrVRect
+        Just renderer <- use $ globals.re
+        crosshairWidth <- use $ scrGlobals.scrCrosshairWidth
+        crosshairHeight <- use $ scrGlobals.scrCrosshairHeight
+
+        (renderer^.rRefExport.reDrawPic) ((vrect^.vrX) + ((vrect^.vrWidth) - crosshairWidth) `shiftR` 1)
+                                         ((vrect^.vrY) + ((vrect^.vrHeight) - crosshairHeight) `shiftR` 1)
+                                         crosshairPic
 
 executeLayoutString :: B.ByteString -> Quake ()
 executeLayoutString str = do
