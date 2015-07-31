@@ -135,8 +135,16 @@ drawAltString _ _ _ = do
     io (putStrLn "Console.drawAltString") >> undefined -- TODO
 
 drawString :: Int -> Int -> B.ByteString -> Quake ()
-drawString _ _ _ = do
-    io (putStrLn "Console.drawString") >> undefined -- TODO
+drawString x y s =
+    draw x 0 (B.length s)
+
+  where draw :: Int -> Int -> Int -> Quake ()
+        draw x' idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) x' y (ord $ s `BC.index` idx)
+              draw (x' + 8) (idx + 1) maxIdx
 
 {-
 - ================ Con_DrawConsole
@@ -227,6 +235,11 @@ drawConsole frac = do
               drawChar ((idx + 1) `shiftL` 3) y $! (ord ch)
               drawLine drawChar text first y (idx + 1) maxIdx
 
+{-
+- ================ Con_DrawNotify ================
+- 
+- Draws the last few lines of output transparently over the game top
+-}
 drawNotify :: Quake ()
 drawNotify = do
     io (putStrLn "Console.drawNotify") >> undefined -- TODO
