@@ -1632,6 +1632,7 @@ data FastRenderAPIGlobals =
                        , _frBlockLights          :: UV.Vector Float
                        , _frPointColor           :: V3 Float
                        , _frLightSpot            :: V3 Float
+                       , _frVertexArrayBuf       :: MSV.IOVector Float
                        }
 
 data ParticleTGlobals =

@@ -32,6 +32,7 @@ import Render.GLPolyT
 import Render.GLStateT
 import Render.ImageT
 import Render.ModelT
+import qualified Constants
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Render.OpenGL.QGLConstants as QGLConstants
 
@@ -126,4 +127,5 @@ initialFastRenderAPIGlobals =
                        , _frBlockLights          = UV.replicate (34 * 34 * 3) 0
                        , _frPointColor           = V3 0 0 0
                        , _frLightSpot            = V3 0 0 0
+                       , _frVertexArrayBuf       = unsafePerformIO $ MSV.new (Constants.maxVerts * 3)
                        }

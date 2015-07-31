@@ -946,7 +946,7 @@ rSetupGL = do
     GL.glMatrixMode GL.gl_PROJECTION
     GL.glLoadIdentity
 
-    myGLUPerspective (float2Double $ newRefDef^.rdFovY) (float2Double screenAspect) 4 4096
+    Mesh.myGLUPerspective (float2Double $ newRefDef^.rdFovY) (float2Double screenAspect) 4 4096
 
     GL.glCullFace GL.gl_FRONT
 
@@ -977,24 +977,6 @@ rSetupGL = do
     GL.glDisable GL.gl_BLEND
     GL.glDisable GL.gl_ALPHA_TEST
     GL.glEnable GL.gl_DEPTH_TEST
-
-myGLUPerspective :: Double -> Double -> Double -> Double -> Quake ()
-myGLUPerspective fovY aspect zNear zFar = do
-    glState <- use $ fastRenderAPIGlobals.frGLState
-
-    let ymax = zNear * tan (fovY * pi / 360)
-        ymin = negate ymax
-        xmin = ymin * aspect
-        xmax = ymax * aspect
-        xmin' = xmin - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
-        xmax' = xmax - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
-
-    GL.glFrustum (realToFrac xmin)
-                 (realToFrac xmax)
-                 (realToFrac ymin)
-                 (realToFrac ymax)
-                 (realToFrac zNear)
-                 (realToFrac zFar)
 
 rDrawEntitiesOnList :: Quake ()
 rDrawEntitiesOnList = do
@@ -1080,7 +1062,7 @@ rDrawNullModel = do
     let shadeLight' = fmap realToFrac shadeLight
 
     GL.glPushMatrix
-    rRotateForEntity currentEntity
+    Mesh.rRotateForEntity currentEntity
 
     GL.glDisable GL.gl_TEXTURE_2D
     GL.glColor3f (shadeLight'^._x) (shadeLight'^._y) (shadeLight'^._z)
@@ -1098,17 +1080,6 @@ rDrawNullModel = do
     GL.glColor3f 1 1 1
     GL.glPopMatrix
     GL.glEnable GL.gl_TEXTURE_2D
-
-rRotateForEntity :: EntityT -> Quake ()
-rRotateForEntity e = do
-    let origin = fmap realToFrac (e^.eOrigin)
-        angles = fmap realToFrac (e^.eAngles)
-
-    GL.glTranslatef (origin^._x) (origin^._y) (origin^._z)
-
-    GL.glRotatef          (angles^._y) 0 0 1
-    GL.glRotatef (negate $ angles^._x) 0 1 0
-    GL.glRotatef (negate $ angles^._z) 1 0 0
 
 rDrawSpriteModel :: IORef EntityT -> Quake ()
 rDrawSpriteModel _ = do
