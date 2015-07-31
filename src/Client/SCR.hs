@@ -35,6 +35,21 @@ import qualified Util.Lib as Lib
 statLayouts :: Int
 statLayouts = 13
 
+statMinus :: Int
+statMinus = 10 -- num frame for '-' stats digit
+
+iconWidth :: Int
+iconWidth = 24
+
+iconHeight :: Int
+iconHeight = 24
+
+charWidth :: Int
+charWidth = 16
+
+iconSpace :: Int
+iconSpace = 8
+
 sbNums1 :: V.Vector B.ByteString
 sbNums1 =
     V.fromList [ "num_0" , "num_1" , "num_2"
@@ -1052,8 +1067,34 @@ executeLayoutString str = do
                                 else skipToEndIf newIdx
 
 drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
-drawField _ _ _ _ _ = do
-    io (putStrLn "SCR.drawField") >> undefined -- TODO
+drawField x y color width value = do
+    unless (width < 1) $ do
+      let width' = if width > 5 then 5 else width
+
+      addDirtyPoint x y
+      addDirtyPoint (x + width' * charWidth + 2) (y + 23)
+
+      let num = BC.pack (show value)
+          len = B.length num
+          len' = if len > width' then width' else len
+          x' = x + 2 + charWidth * (width' - len')
+
+      draw num x' 0 len'
+
+  where draw :: B.ByteString -> Int -> Int -> Int -> Quake ()
+        draw num x' idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ptr = num `BC.index` idx
+                  frame = if ptr == '-'
+                            then statMinus
+                            else ord ptr - ord '0'
+                  pic = if color == 0
+                          then sbNums1 V.! frame
+                          else sbNums2 V.! frame
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawPic) x' y pic
+              draw num (x' + charWidth) (idx + 1) maxIdx
 
 drawHUDString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
 drawHUDString _ _ _ _ _ = do
