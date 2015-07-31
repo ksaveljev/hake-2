@@ -4,13 +4,13 @@ module Client.ConsoleT where
 import Control.Lens (makeLenses)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 
 import qualified Constants
 
 data ConsoleT =
   ConsoleT { _cInitialized :: Bool
-           , _cText        :: MV.IOVector Char
+           , _cText        :: MSV.IOVector Char
            , _cCurrent     :: Int
            , _cX           :: Int
            , _cDisplay     :: Int
@@ -27,7 +27,7 @@ makeLenses ''ConsoleT
 newConsoleT :: ConsoleT
 newConsoleT =
   ConsoleT { _cInitialized = False
-           , _cText        = unsafePerformIO $ MV.replicate Constants.conTextSize ' '
+           , _cText        = unsafePerformIO $ MSV.replicate Constants.conTextSize ' '
            , _cCurrent     = 0
            , _cX           = 0
            , _cDisplay     = 0

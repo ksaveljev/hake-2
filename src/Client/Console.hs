@@ -4,7 +4,7 @@
 module Client.Console where
 
 import Control.Lens ((.=), use, zoom, (^.), ix, preuse, (-=), (+=))
-import Control.Monad (void, unless, when)
+import Control.Monad (void, unless, when, liftM)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.), xor)
 import Data.Char (ord, chr)
 import Data.Maybe (isJust)
@@ -13,10 +13,11 @@ import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector.Storable.Mutable as MV
+import qualified Data.Vector.Storable.Mutable as MSV
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import {-# SOURCE #-} qualified Client.SCR as SCR
@@ -64,7 +65,7 @@ checkResize = do
             cTotalLines .= Constants.conTextSize `div` 38
 
           use (globals.con.cText) >>= \text ->
-            io $ text `MV.set` ' '
+            io $ text `MSV.set` ' '
 
         else do
           oldWidth <- use $ globals.con.cLineWidth
@@ -84,7 +85,7 @@ checkResize = do
 
           currentLine <- use $ globals.con.cCurrent
           use (globals.con.cText) >>= \text -> do
-            tbuf <- io $ MV.clone text
+            tbuf <- io $ MSV.clone text
             fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines width 0 0 numLines numChars
 
           clearNotify
@@ -93,14 +94,14 @@ checkResize = do
       globals.con.cCurrent .= totalLines - 1
       globals.con.cDisplay .= totalLines - 1
 
-  where fillInBuf :: MV.IOVector Char -> MV.IOVector Char -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+  where fillInBuf :: MSV.IOVector Char -> MSV.IOVector Char -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
         fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i j maxI maxJ
           | i >= maxI = return ()
           | j >= maxJ = fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth (i + 1) 0 maxI maxJ
           | otherwise = do
               let idx = (totalLines - 1 - i) * lineWidth + j
                   idx2 = ((currentLine - i + oldTotalLines) `mod` oldTotalLines) * oldWidth + j
-              io $ tbuf `MV.read` idx2 >>= MV.write text idx
+              io $ tbuf `MSV.read` idx2 >>= MSV.write text idx
               fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i (j + 1) maxI maxJ
 
 toggleConsoleF :: XCommandT
@@ -121,7 +122,7 @@ messageMode2F = do
 
 clearF :: XCommandT
 clearF = do
-    text <- io $ MV.replicate Constants.conTextSize ' '
+    text <- io $ MSV.replicate Constants.conTextSize ' '
     globals.con.cText .= text
 
 dumpF :: XCommandT
@@ -235,11 +236,11 @@ drawConsole frac = do
               drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
               drawText console (row - 1) (y - 8) (idx + 1) maxIdx
 
-        drawLine :: (Int -> Int -> Int -> Quake ()) -> MV.IOVector Char -> Int -> Int -> Int -> Int -> Quake ()
+        drawLine :: (Int -> Int -> Int -> Quake ()) -> MSV.IOVector Char -> Int -> Int -> Int -> Int -> Quake ()
         drawLine drawChar text first y idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              ch <- io $ text `MV.read` (idx + first)
+              ch <- io $ text `MSV.read` (idx + first)
               drawChar ((idx + 1) `shiftL` 3) y $! (ord ch)
               drawLine drawChar text first y (idx + 1) maxIdx
 
@@ -250,7 +251,38 @@ drawConsole frac = do
 -}
 drawNotify :: Quake ()
 drawNotify = do
+    console <- use $ globals.con
+    cls' <- use $ globals.cls
+    v <- draw cls' console 0 ((console^.cCurrent) - Constants.numConTimes + 1) (console^.cCurrent)
     io (putStrLn "Console.drawNotify") >> undefined -- TODO
+
+  where draw :: ClientStaticT -> ConsoleT -> Int -> Int -> Int -> Quake Int
+        draw cls' console v idx maxIdx
+          | idx > maxIdx = return v
+          | idx < 0 = draw cls' console v (idx + 1) maxIdx
+          | otherwise = do
+              let time = truncate ((console^.cTimes) UV.! (idx `mod` Constants.numConTimes)) :: Int
+
+              if time == 0
+                then draw cls' console v (idx + 1) maxIdx
+                else do
+                  let time' = (cls'^.csRealTime) - time
+                  conNotifyTimeValue <- liftM (^.cvValue) conNotifyTimeCVar
+                  if time' > truncate (conNotifyTimeValue * 1000)
+                    then draw cls' console v (idx + 1) maxIdx
+                    else do
+                      let text = (idx `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+                      drawText console v text 0 (console^.cLineWidth)
+                      draw cls' console (v + 8) (idx + 1) maxIdx
+
+        drawText :: ConsoleT -> Int -> Int -> Int -> Int -> Quake ()
+        drawText console v text idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              c <- io $ MSV.read (console^.cText) (text + idx)
+              (renderer^.rRefExport.reDrawChar) ((idx + 1) `shiftL` 3) v (ord c)
+              drawText console v text (idx + 1) maxIdx
 
 {-
 - ================ Con_DrawInput
@@ -355,7 +387,7 @@ print txt = do
                     let y = (console'^.cCurrent) `mod` (console'^.cTotalLines)
                         idx = y * (console'^.cLineWidth) + (console'^.cX)
                         b = (ord c) .|. mask .|. (console'^.cOrMask)
-                    io $ MV.write (console'^.cText) idx (chr b)
+                    io $ MSV.write (console'^.cText) idx (chr b)
                     globals.con.cX += 1
                     when ((console'^.cX) + 1 >= (console'^.cLineWidth)) $
                       globals.con.cX .= 0
@@ -384,9 +416,9 @@ lineFeed = do
           e = i + (console^.cLineWidth)
       fillSpaces (console^.cText) i e
 
-  where fillSpaces :: MV.IOVector Char -> Int -> Int -> Quake ()
+  where fillSpaces :: MSV.IOVector Char -> Int -> Int -> Quake ()
         fillSpaces text i e
           | i >= e = return ()
           | otherwise = do
-              io $ MV.write text i ' '
+              io $ MSV.write text i ' '
               fillSpaces text (i + 1) e
