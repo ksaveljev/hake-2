@@ -14,7 +14,7 @@ import Data.Maybe (fromMaybe, isNothing, fromJust)
 import Foreign.Marshal.Array (withArray, allocaArray, peekArray)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import GHC.Float (float2Double)
-import Linear (V3(..), _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, _w, dot)
 import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -1075,8 +1075,7 @@ rDrawParticles = do
     io (putStrLn "FastRenderAPI.rDrawParticles") >> undefined -- TODO
 
 rFlash :: Quake ()
-rFlash = do
-    io (putStrLn "FastRenderAPI.rFlash") >> undefined -- TODO
+rFlash = rPolyBlend
 
 rDrawBeam :: EntityT -> Quake ()
 rDrawBeam _ = do
@@ -1116,3 +1115,36 @@ rDrawNullModel = do
 rDrawSpriteModel :: IORef EntityT -> Quake ()
 rDrawSpriteModel _ = do
     io (putStrLn "FastRenderAPI.rDrawSpriteModel") >> undefined -- TODO
+
+rPolyBlend :: Quake ()
+rPolyBlend = do
+    polyBlendValue <- liftM (^.cvValue) glPolyBlendCVar
+    vblend <- use $ fastRenderAPIGlobals.frVBlend
+    
+    unless (polyBlendValue == 0 || (vblend^._w) == 0) $ do
+      GL.glDisable GL.gl_ALPHA_TEST
+      GL.glEnable GL.gl_BLEND
+      GL.glDisable GL.gl_DEPTH_TEST
+      GL.glDisable GL.gl_TEXTURE_2D
+
+      GL.glLoadIdentity
+
+      -- FIXME: get rid of these
+      GL.glRotatef (-90) 1 0 0 -- put Z going up
+      GL.glRotatef 90 0 0 1 -- put Z going up
+
+      GL.glColor4f (realToFrac $ vblend^._x) (realToFrac $ vblend^._y) (realToFrac $ vblend^._z) (realToFrac $ vblend^._w)
+
+      GL.glBegin GL.gl_QUADS
+
+      GL.glVertex3f 10 100 100
+      GL.glVertex3f 10 (-100) 100
+      GL.glVertex3f 10 (-100) (-100)
+      GL.glVertex3f 10 100 (-100)
+      GL.glEnd
+
+      GL.glDisable GL.gl_BLEND
+      GL.glEnable GL.gl_TEXTURE_2D
+      GL.glEnable GL.gl_ALPHA_TEST
+
+      GL.glColor4f 1 1 1 1
