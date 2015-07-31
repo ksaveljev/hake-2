@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import qualified Graphics.Rendering.OpenGL.Raw as GL
 
 import Quake
 import QuakeState
@@ -94,7 +95,66 @@ rMarkLights light bit (MNodeChildReference nodeRef) = do
 
 rRenderDLights :: Quake ()
 rRenderDLights = do
-    io (putStrLn "Light.rRenderDLights") >> undefined -- TODO
+    flashBlendValue <- liftM (^.cvValue) glFlashBlendCVar
+
+    unless (flashBlendValue == 0) $ do
+      frameCount <- use $ fastRenderAPIGlobals.frFrameCount
+
+      fastRenderAPIGlobals.frDLightFrameCount .= frameCount + 1 -- because the count hasn't advanced yet for this frame
+
+      GL.glDepthMask (fromIntegral GL.gl_FALSE)
+      GL.glDisable GL.gl_TEXTURE_2D
+      GL.glShadeModel GL.gl_SMOOTH
+      GL.glEnable GL.gl_BLEND
+      GL.glBlendFunc GL.gl_ONE GL.gl_ONE
+
+      newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+      renderLights newRefDef 0 (newRefDef^.rdNumDLights)
+
+      GL.glColor3f 1 1 1
+      GL.glDisable GL.gl_BLEND
+      GL.glEnable GL.gl_TEXTURE_2D
+      GL.glBlendFunc GL.gl_SRC_ALPHA GL.gl_ONE_MINUS_SRC_ALPHA
+      GL.glDepthMask (fromIntegral GL.gl_FALSE)
+
+  where renderLights :: RefDefT -> Int -> Int -> Quake ()
+        renderLights newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              rRenderDLight ((newRefDef^.rdDLights) V.! idx)
+              renderLights newRefDef (idx + 1) maxIdx
+
+rRenderDLight :: DLightT -> Quake ()
+rRenderDLight light = do
+    origin <- use $ fastRenderAPIGlobals.frOrigin
+    vpn <- use $ fastRenderAPIGlobals.frVPn
+    vup <- use $ fastRenderAPIGlobals.frVUp
+    vright <- use $ fastRenderAPIGlobals.frVRight
+
+    let rad = (light^.dlIntensity) * 0.35
+        v = (light^.dlOrigin) - origin
+
+    GL.glBegin GL.gl_TRIANGLE_FAN
+    GL.glColor3f (realToFrac $ (light^.dlColor._x) * 0.2) (realToFrac $ (light^.dlColor._y) * 0.2) (realToFrac $ (light^.dlColor._z) * 0.2)
+
+    let v' = (light^.dlOrigin) - fmap (* rad) vpn
+
+    GL.glVertex3f (realToFrac $ v'^._x) (realToFrac $ v'^._y) (realToFrac $ v'^._z)
+    GL.glColor3f 0 0 0
+
+    addVertex vright vup rad 16 0
+
+    GL.glEnd
+
+  where addVertex :: V3 Float -> V3 Float -> Float -> Int -> Int -> Quake ()
+        addVertex vright vup rad idx minIdx
+          | idx < minIdx = return ()
+          | otherwise = do
+              let a = fromIntegral idx / 16 * pi * 2
+                  v = (light^.dlOrigin) + fmap (* ((cos a) * rad)) vright + fmap (* ((sin a) * rad)) vup
+
+              GL.glVertex3f (realToFrac $ v^._x) (realToFrac $ v^._y) (realToFrac $ v^._z)
+              addVertex vright vup rad (idx - 1) minIdx
 
 rLightPoint :: V3 Float -> Quake (V3 Float)
 rLightPoint p@(V3 a b c) = do

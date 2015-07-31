@@ -993,7 +993,7 @@ rDrawEntitiesOnList = do
 
       drawTransparentEntities newRefDef 0 (newRefDef^.rdNumEntities)
 
-      GL.glDepthMask (fromIntegral GL.gl_FALSE) -- back to writing
+      GL.glDepthMask (fromIntegral GL.gl_TRUE) -- back to writing
 
   where drawNonTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
         drawNonTransparentEntities newRefDef idx maxIdx
