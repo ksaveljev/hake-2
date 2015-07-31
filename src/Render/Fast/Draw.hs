@@ -153,3 +153,46 @@ getPicSize pic = do
       Just imageRef -> do
         image <- io $ readIORef imageRef
         return $ Just (image^.iWidth, image^.iHeight)
+
+drawPic :: Int -> Int -> B.ByteString -> Quake ()
+drawPic x y pic = do
+    foundImage <- findPic pic
+
+    case foundImage of
+      Nothing ->
+        VID.printf Constants.printAll ("Can't find pic: " `B.append` pic `B.append` "\n")
+      Just imageRef -> do
+        scrapDirty <- use $ fastRenderAPIGlobals.frScrapDirty
+        image <- io $ readIORef imageRef
+        glConfig <- use $ fastRenderAPIGlobals.frGLConfig
+
+        when scrapDirty $
+          Image.scrapUpload
+
+        when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
+          GL.glDisable GL.gl_ALPHA_TEST
+
+        let isl = realToFrac $ image^.iSL
+            itl = realToFrac $ image^.iTL
+            ith = realToFrac $ image^.iTH
+            ish = realToFrac $ image^.iSH
+            x' = fromIntegral x
+            y' = fromIntegral y
+            w' = fromIntegral (image^.iWidth)
+            h' = fromIntegral (image^.iHeight)
+
+        Image.glBind (image^.iTexNum)
+
+        GL.glBegin GL.gl_QUADS
+        GL.glTexCoord2f isl itl
+        GL.glVertex2f x' y'
+        GL.glTexCoord2f ish itl
+        GL.glVertex2f (x' + w') y'
+        GL.glTexCoord2f ish ith
+        GL.glVertex2f (x' + w') (y' + h')
+        GL.glTexCoord2f isl ith
+        GL.glVertex2f x' (y' + h')
+        GL.glEnd
+
+        when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
+          GL.glEnable GL.gl_ALPHA_TEST
