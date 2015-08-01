@@ -669,6 +669,25 @@ respawn :: EdictReference -> Quake ()
 respawn _ = do
     io (putStrLn "PlayerClient.respawn") >> undefined -- TODO
 
+{-
+- This will be called once for each client frame, which will usually be a
+- couple times for each server frame.
+-}
 clientThink :: EdictReference -> UserCmdT -> Quake ()
-clientThink _ _ = do
-    io (putStrLn "PlayerClient.clientThink") >> undefined -- TODO
+clientThink edictRef@(EdictReference edictIdx) ucmd = do
+    gameBaseGlobals.gbLevel.llCurrentEntity .= Just edictRef
+
+    Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+
+    if intermissionTime /= 0
+      then do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsPMType .= Constants.pmFreeze
+        -- can exit intermission after five seconds
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        when (levelTime > intermissionTime + 5 && (fromIntegral (ucmd^.ucButtons) .&. Constants.buttonAny /= 0)) $
+          gameBaseGlobals.gbLevel.llExitIntermission .= True
+      else do
+        io (putStrLn "PlayerClient.clientThink") >> undefined -- TODO
