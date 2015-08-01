@@ -79,6 +79,7 @@ initialGlobals =
 
           , _scrVRect           = newVRectT
           , _sysFrameTime       = 0
+          , _chatBufferLen      = 0
           , _gunFrame           = 0
           , _gunModel           = Nothing
           , _netFrom            = newNetAdrT

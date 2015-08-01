@@ -237,7 +237,8 @@ data Globals =
 
           , _scrVRect           :: VRectT
           , _sysFrameTime       :: !Int
-          , _gunFrame           :: Int
+          , _chatBufferLen      :: !Int
+          , _gunFrame           :: !Int
           , _gunModel           :: Maybe (IORef ModelT)
           , _netFrom            :: NetAdrT
 

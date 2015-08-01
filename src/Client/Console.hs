@@ -252,9 +252,35 @@ drawConsole frac = do
 drawNotify :: Quake ()
 drawNotify = do
     console <- use $ globals.con
+    vidDefWidth <- use $ globals.vidDef.vdWidth
     cls' <- use $ globals.cls
+
     v <- draw cls' console 0 ((console^.cCurrent) - Constants.numConTimes + 1) (console^.cCurrent)
-    io (putStrLn "Console.drawNotify") >> undefined -- TODO
+
+    v' <- if (cls'^.csKeyDest) == Constants.keyMessage
+            then do
+              chatTeam' <- use $ globals.chatTeam
+              skip <- if chatTeam'
+                        then do
+                          drawString 8 v "say_team:"
+                          return 11
+                        else do
+                          drawString 8 v "say:"
+                          return 5
+
+              s <- use $ globals.chatBuffer
+              chatLen <- use $ globals.chatBufferLen
+              let s' = if chatLen > (vidDefWidth `shiftR` 3) - (skip + 1)
+                         then B.drop (chatLen - ((vidDefWidth `shiftR` 3) - (skip + 1))) s 
+                         else s
+              drawChat s' skip v 0 (B.length s')
+              return (v + 8)
+            else
+              return v
+
+    when (v' /= 0) $ do
+      SCR.addDirtyPoint 0 0
+      SCR.addDirtyPoint (vidDefWidth - 1) v'
 
   where draw :: ClientStaticT -> ConsoleT -> Int -> Int -> Int -> Quake Int
         draw cls' console v idx maxIdx
@@ -283,6 +309,18 @@ drawNotify = do
               c <- io $ MSV.read (console^.cText) (text + idx)
               (renderer^.rRefExport.reDrawChar) ((idx + 1) `shiftL` 3) v (ord c)
               drawText console v text (idx + 1) maxIdx
+
+        drawChat :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+        drawChat s skip v idx maxIdx
+          | idx >= maxIdx = do
+              realTime <- use $ globals.cls.csRealTime
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) ((idx + skip) `shiftL` 3) v (10 + ((realTime `shiftR` 8) .&. 1))
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) ((idx + skip) `shiftL` 3) v (ord $ s `BC.index` idx)
+              drawChat s skip v (idx + 1) maxIdx
+              
 
 {-
 - ================ Con_DrawInput
