@@ -4,9 +4,10 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVUser where
 
-import Control.Lens ((.=), preuse, ix, use, (^.), zoom)
+import Control.Lens ((.=), preuse, ix, use, (^.), zoom, (-=))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
+import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -168,7 +169,15 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
           | otherwise = return netDrop
 
 clientThink :: ClientReference -> UserCmdT -> Quake ()
-clientThink _ _ = io (putStrLn "SVUser.clientThink") >> undefined -- TODO
+clientThink (ClientReference clientIdx) cmd = do
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cCommandMsec -= (fromIntegral (cmd^.ucMsec) .&. 0xFF)
+
+    Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+    enforceTimeValue <- liftM (^.cvValue) svEnforceTimeCVar
+    
+    if (client^.cCommandMsec) < 0 && enforceTimeValue /= 0
+      then Com.dprintf ("commandMsec underflow from " `B.append` (client^.cName) `B.append` "\n")
+      else PlayerClient.clientThink (fromJust $ client^.cEdict) cmd
 
 executeUserCommand :: B.ByteString -> Quake ()
 executeUserCommand str = do

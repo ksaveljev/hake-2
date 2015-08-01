@@ -668,3 +668,7 @@ spectatorRespawn _ = do
 respawn :: EdictReference -> Quake ()
 respawn _ = do
     io (putStrLn "PlayerClient.respawn") >> undefined -- TODO
+
+clientThink :: EdictReference -> UserCmdT -> Quake ()
+clientThink _ _ = do
+    io (putStrLn "PlayerClient.clientThink") >> undefined -- TODO
