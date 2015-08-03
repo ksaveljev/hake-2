@@ -37,3 +37,5 @@ pickTarget :: Maybe B.ByteString -> Quake (Maybe EdictReference)
 addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
 
 clipVelocity :: V3 Float -> V3 Float -> Float -> (Int, V3 Float)
+
+touchTriggers :: EdictReference -> Quake ()

@@ -8,7 +8,7 @@ import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
-import Data.Maybe (isNothing, fromJust)
+import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _y)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -21,6 +21,7 @@ import Game.Adapters
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.Info as Info
+import qualified Game.GameChase  as GameChase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
@@ -690,4 +691,178 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
         when (levelTime > intermissionTime + 5 && (fromIntegral (ucmd^.ucButtons) .&. Constants.buttonAny /= 0)) $
           gameBaseGlobals.gbLevel.llExitIntermission .= True
       else do
-        io (putStrLn "PlayerClient.clientThink") >> undefined -- TODO
+        clientGlobals.cgPMPassEnt .= Just edictRef
+
+        case gClient^.gcChaseTarget of
+          Just (EdictReference chaseTargetIdx) ->
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crCmdAngles .= fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles)
+
+          Nothing -> do
+            preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
+              let pmtype = if | (edict^.eMoveType) == Constants.moveTypeNoClip -> Constants.pmSpectator
+                              | (edict^.eEntityState.esModelIndex) /= 255 -> Constants.pmGib
+                              | (edict^.eEdictStatus.eDeadFlag) /= 0 -> Constants.pmDead
+                              | otherwise -> Constants.pmNormal
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsPMType .= pmtype
+              
+            gravityValue <- liftM (^.cvValue) svGravityCVar
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsGravity .= truncate gravityValue
+
+            Just pmoveState <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState
+            Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            gameImport <- use $ gameBaseGlobals.gbGameImport
+
+            let pointContents = gameImport^.giPointContents
+                pMove = gameImport^.giPMove
+                sound = gameImport^.giSound
+                soundIndex = gameImport^.giSoundIndex
+                linkEntity = gameImport^.giLinkEntity
+
+                pmoveState' = pmoveState { _pmsOrigin = fmap (truncate . (* 8)) (edict^.eEntityState.esOrigin)
+                                         , _pmsVelocity = fmap (truncate . (* 8)) (edict^.eEdictPhysics.eVelocity)
+                                         }
+
+                snapInitial = if (gClient^.gcOldPMove) == pmoveState'
+                                then True
+                                else False
+
+                pm = newPMoveT { _pmState = pmoveState'
+                               , _pmCmd = ucmd
+                               , _pmTrace = defaultTrace
+                               , _pmPointContents = pointContents
+                               , _pmSnapInitial = snapInitial
+                               }
+
+            -- perform a pmove
+            pm' <- pMove pm
+
+            -- save results of pmove
+            zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+              gcPlayerState.psPMoveState .= (pm'^.pmState)
+              gcOldPMove .= (pm'^.pmState)
+              gcResp.crCmdAngles .= fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles)
+
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eEntityState.esOrigin .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
+              eEdictPhysics.eVelocity .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsVelocity)
+              eEdictMinMax.eMins .= (pm'^.pmMins)
+              eEdictMinMax.eMaxs .= (pm'^.pmMaxs)
+
+            preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
+              when (isJust (edict'^.eEdictOther.eoGroundEntity) && isNothing (pm'^.pmGroundEntity) && (pm'^.pmCmd.ucUpMove) >= 10 && (pm'^.pmWaterLevel) == 0) $ do
+                sIdx <- soundIndex (Just "*jump1.wav")
+                sound (Just edictRef) Constants.chanVoice sIdx 1 Constants.attnNorm 0
+                PlayerWeapon.playerNoise edictRef (edict'^.eEntityState.esOrigin) Constants.pNoiseSelf
+
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eEdictStatus.eViewHeight .= truncate (pm'^.pmViewHeight)
+              eWaterLevel .= (pm'^.pmWaterLevel)
+              eWaterType .= (pm'^.pmWaterType)
+              eEdictOther.eoGroundEntity .= (pm'^.pmGroundEntity)
+
+            when (isJust (pm'^.pmGroundEntity)) $ do
+              let Just (EdictReference groundEntityIdx) = pm'^.pmGroundEntity
+              Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix groundEntityIdx
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= (groundEntity^.eLinkCount)
+
+            preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
+              if (edict'^.eEdictStatus.eDeadFlag) /= 0
+                then
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewAngles .= V3 (-15) (gClient^.gcKillerYaw) 40 -- TODO: use ROLL PITCH YAW? -- TODO: we use gcKillerYaw hasn't changed?
+                else
+                  zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+                    gcVAngle .= (pm'^.pmViewAngles)
+                    gcPlayerState.psViewAngles .= (pm'^.pmViewAngles)
+
+            linkEntity edictRef
+
+            preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
+              when ((edict'^.eMoveType) /= Constants.moveTypeNoClip) $
+                GameBase.touchTriggers edictRef
+
+            -- touch other objects
+            touchOtherObjects pm' 0 (pm'^.pmNumTouch)
+
+        preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gClient') ->
+          zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+            gcOldButtons .= (gClient'^.gcButtons)
+            gcButtons .= fromIntegral (ucmd^.ucButtons)
+            gcLatchedButtons .= (gClient'^.gcLatchedButtons) .|. (fromIntegral (ucmd^.ucButtons) .&. (complement (gClient'^.gcButtons)))
+
+        -- save light level the player is standing on for
+        -- monster sighting AI
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eLightLevel .= fromIntegral (ucmd^.ucLightLevel)
+
+        -- fire weapon from final position if needed
+        preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gClient') ->
+          when ((gClient'^.gcLatchedButtons) .&. Constants.buttonAttack /= 0) $ do
+            if gClient'^.gcResp.crSpectator
+              then do
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcLatchedButtons .= 0
+
+                case gClient^.gcChaseTarget of
+                  Just (EdictReference targetIdx) -> do
+                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcChaseTarget .= Nothing
+                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsPMFlags %= (.&. (complement pmfNoPrediction))
+                  Nothing -> GameChase.getChaseTarget edictRef
+              else
+                unless (gClient'^.gcWeaponThunk) $ do
+                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponThunk .= True
+                  PlayerWeapon.thinkWeapon edictRef
+
+        preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gClient') ->
+          when (gClient'^.gcResp.crSpectator) $ do
+            io (putStrLn "PlayerClient.clientThink") >> undefined -- TODO
+
+        -- update chase cam if being followed
+        maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+        updateChaseCamera 1 maxClientsValue
+
+  where touchOtherObjects :: PMoveT -> Int -> Int -> Quake ()
+        touchOtherObjects pm idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let otherRef = (pm^.pmTouchEnts) V.! idx
+                  duplicated = checkIfDuplicated pm otherRef 0 idx
+
+              unless duplicated $ do
+                let (EdictReference otherIdx) = otherRef
+                Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+                when (isJust (other^.eEdictAction.eaTouch)) $ do
+                  dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
+                  touch (fromJust $ other^.eEdictAction.eaTouch) otherRef edictRef dummyPlane Nothing
+
+              touchOtherObjects pm (idx + 1) maxIdx
+
+        checkIfDuplicated :: PMoveT -> EdictReference -> Int -> Int -> Bool
+        checkIfDuplicated pm ref idx maxIdx
+          | idx >= maxIdx = False
+          | otherwise = let otherRef = (pm^.pmTouchEnts) V.! idx
+                        in if ref == otherRef
+                             then True
+                             else checkIfDuplicated pm ref (idx + 1) maxIdx
+        
+        updateChaseCamera :: Int -> Int -> Quake ()
+        updateChaseCamera idx maxIdx
+          | idx > maxIdx = return ()
+          | otherwise = do
+              Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              when (other^.eInUse) $ do
+                let (Just (GClientReference gClientIdx)) = other^.eClient
+                Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                when ((client^.gcChaseTarget) == Just edictRef) $
+                  GameChase.updateChaseCam (EdictReference idx)
+
+              updateChaseCamera (idx + 1) maxIdx
+
+defaultTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
+defaultTrace start mins maxs end = do
+    Just edictRef@(EdictReference edictIdx) <- use $ clientGlobals.cgPMPassEnt
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+
+    if (edict^.eEdictStatus.eHealth) > 0
+      then liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskPlayerSolid
+      else liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskDeadSolid

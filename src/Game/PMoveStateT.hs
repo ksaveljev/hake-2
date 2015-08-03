@@ -13,7 +13,7 @@ data PMoveStateT =
               , _pmsPMTime      :: Int8
               , _pmsGravity     :: Int16
               , _pmsDeltaAngles :: V3 Int16
-              }
+              } deriving Eq
 
 makeLenses ''PMoveStateT
 

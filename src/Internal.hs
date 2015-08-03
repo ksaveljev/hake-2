@@ -1731,6 +1731,7 @@ data ClientGlobals =
                 , _cgPrecacheModel      :: Maybe B.ByteString
                 , _cgNumCLWeaponModels  :: !Int
                 , _cgWeaponModels       :: V.Vector B.ByteString
+                , _cgPMPassEnt          :: Maybe EdictReference
                 }
 
 data VRectT =
