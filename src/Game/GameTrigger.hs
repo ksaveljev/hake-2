@@ -176,4 +176,21 @@ useMulti =
 -- ent.activator should be set to the activator so it can be held through a
 -- delay so wait for the delay time before firing
 multiTrigger :: EdictReference -> Quake ()
-multiTrigger _ = io (putStrLn "GameTrigger.multiTrigger") >> undefined -- TODO
+multiTrigger selfRef@(EdictReference selfIdx) = do
+    undefined -- TODO
+
+initTrigger :: EdictReference -> Quake ()
+initTrigger selfRef@(EdictReference selfIdx) = do
+    v3o <- use $ globals.vec3Origin
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    unless ((self^.eEntityState.esAngles) == v3o) $
+      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eMoveDir)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSolid .= Constants.solidTrigger
+      eMoveType .= Constants.moveTypeNone
+      eSvFlags .= Constants.svfNoClient
+
+    setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
+    setModel selfRef (self^.eEdictInfo.eiModel)
