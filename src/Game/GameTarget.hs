@@ -2,7 +2,7 @@
 module Game.GameTarget where
 
 import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (+=))
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, void)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -190,8 +190,20 @@ spTargetEarthquake _ = io (putStrLn "GameTarget.spTargetEarthquake") >> undefine
 
 useTargetExplosion :: EntUse
 useTargetExplosion =
-  GenericEntUse "use_target_explosion" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetExplosion") >> undefined -- TODO
+  GenericEntUse "use_target_explosion" $ \selfRef@(EdictReference selfIdx) _ activator -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoActivator .= activator
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eDelay) == 0
+      then
+        void $ think targetExplosionExplode selfRef
+      else do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
+          eaThink .= Just targetExplosionExplode
+          eaNextThink .= levelTime + (self^.eDelay)
 
 useTargetGoal :: EntUse
 useTargetGoal =
@@ -283,3 +295,29 @@ useTargetChangeLevel :: EntUse
 useTargetChangeLevel =
   GenericEntUse "use_target_changelevel" $ \_ _ _ -> do
     io (putStrLn "GameTarget.useTargetChangeLevel") >> undefined -- TODO
+
+targetExplosionExplode :: EntThink
+targetExplosionExplode =
+  GenericEntThink "target_explosion_explode" $ \selfRef@(EdictReference selfIdx) -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writePosition = gameImport^.giWritePosition
+        multicast = gameImport^.giMulticast
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    writeByte Constants.svcTempEntity
+    writeByte Constants.teExplosion1
+    writePosition (self^.eEntityState.esOrigin)
+    multicast (self^.eEntityState.esOrigin) Constants.multicastPhs
+
+    GameCombat.radiusDamage selfRef (fromJust $ self^.eEdictOther.eoActivator) (fromIntegral $ self^.eEdictStatus.eDmg) Nothing (fromIntegral (self^.eEdictStatus.eDmg) + 40) Constants.modExplosive
+
+    let save = self^.eDelay
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eDelay .= 0
+
+    GameUtil.useTargets selfRef (self^.eEdictOther.eoActivator)
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eDelay .= save
+    return True
