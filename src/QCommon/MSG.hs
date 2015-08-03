@@ -474,3 +474,12 @@ readData sizeBufLens bufLens len = do
           | otherwise = do
               w <- readByte sizeBufLens
               collectUpdates (idx + 1) ((idx, fromIntegral w) : acc)
+
+readDir :: Lens' QuakeState SizeBufT -> Quake (V3 Float)
+readDir sizeBufLens = do
+    b <- readByte sizeBufLens
+
+    when (b >= Constants.numVertexNormals) $
+      Com.comError Constants.errDrop "MSG_ReadDir: out of range"
+
+    return (Constants.byteDirs V.! b)
