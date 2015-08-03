@@ -176,8 +176,28 @@ useMulti =
 -- ent.activator should be set to the activator so it can be held through a
 -- delay so wait for the delay time before firing
 multiTrigger :: EdictReference -> Quake ()
-multiTrigger selfRef@(EdictReference selfIdx) = do
-    undefined -- TODO
+multiTrigger edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    when ((edict^.eEdictAction.eaNextThink) == 0) $ do
+      GameUtil.useTargets edictRef (edict^.eEdictOther.eoActivator)
+
+      Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+      
+      if (edict'^.eWait) > 0
+        then
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+            eaThink .= Just multiWait
+            eaNextThink .= levelTime + (edict'^.eWait)
+        else
+          -- we can't just remove (self) here, because this is a touch
+          -- function
+          -- called while looping through area links...
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
+            eaTouch .= Nothing
+            eaNextThink .= levelTime + (Constants.frameTime)
+            eaThink .= Just GameUtil.freeEdictA
 
 initTrigger :: EdictReference -> Quake ()
 initTrigger selfRef@(EdictReference selfIdx) = do
@@ -194,3 +214,9 @@ initTrigger selfRef@(EdictReference selfIdx) = do
 
     setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
     setModel selfRef (self^.eEdictInfo.eiModel)
+
+multiWait :: EntThink
+multiWait =
+  GenericEntThink "multi_wait" $ \(EdictReference edictIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= 0
+    return True
