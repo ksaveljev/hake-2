@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.PMove where
 
@@ -13,13 +14,14 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import qualified Constants
+import qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
 -- try all single bits first
 jitterBits :: UV.Vector Int
 jitterBits = UV.fromList [ 0, 4, 1, 2, 3, 5, 6, 7 ]
 
-offset :: V3 Int
+offset :: V3 Int16
 offset = V3 0 (-1) 1
 
 -- Can be called by either the server or the client
@@ -273,9 +275,30 @@ checkDuck = do
                                      , _pmViewHeight = 22
                                      }
 
+-- Snaps the origin of the player move to 0.125 grid.
 initialSnapPosition :: Quake ()
 initialSnapPosition = do
-    io (putStrLn "PMove.initialSnapPosition") >> undefined -- TODO
+    pm <- use $ pMoveGlobals.pmPM
+    let base = pm^.pmState.pmsOrigin
+    checkPosition base 0 3 0 3 0 3
+
+  where checkPosition :: V3 Int16 -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+        checkPosition base z maxZ y maxY x maxX
+          | z >= maxZ = Com.dprintf "Bad InitialSnapPosition\n"
+          | y >= maxY = checkPosition base (z + 1) maxZ 0 maxY x maxX
+          | x >= maxX = checkPosition base z maxZ (y + 1) maxY 0 maxX
+          | otherwise = do
+              let a = (base^._x) + (offset^.(Math3D.v3Access z))
+                  b = (base^._y) + (offset^.(Math3D.v3Access y))
+                  c = (base^._z) + (offset^.(Math3D.v3Access x))
+              pMoveGlobals.pmPM.pmState.pmsOrigin .= V3 a b c
+              ok <- goodPosition
+              if ok
+                then do
+                  pMoveGlobals.pmPML.pmlOrigin .= fmap ((* 0.125) . fromIntegral) (V3 a b c)
+                  pMoveGlobals.pmPML.pmlPreviousOrigin .= fmap fromIntegral (V3 a b c)
+                else
+                  checkPosition base z maxZ y maxY (x + 1) maxX
 
 catagorizePosition :: Quake ()
 catagorizePosition = do
