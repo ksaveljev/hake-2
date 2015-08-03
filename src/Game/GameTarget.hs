@@ -238,8 +238,14 @@ useTargetSecret =
 
 useTargetHelp :: EntUse
 useTargetHelp =
-  GenericEntUse "Use_Target_Help" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetHelp") >> undefined -- TODO
+  GenericEntUse "Use_Target_Help" $ \(EdictReference edictIdx) _ _ -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if (edict^.eSpawnFlags) .&. 1 /= 0
+      then gameBaseGlobals.gbGame.glHelpMessage1 .= fromJust (edict^.eEdictInfo.eiMessage) -- TODO: are we sure about fromJust?
+      else gameBaseGlobals.gbGame.glHelpMessage2 .= fromJust (edict^.eEdictInfo.eiMessage) -- TODO: are we sure about fromJust?
+
+    gameBaseGlobals.gbGame.glHelpChanged += 1
 
 {-
 - QUAKED target_splash (1 0 0) (-8 -8 -8) (8 8 8) Creates a particle splash
