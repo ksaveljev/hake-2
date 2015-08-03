@@ -197,17 +197,17 @@ rSetCacheState :: IORef MSurfaceT -> Quake ()
 rSetCacheState surfRef = do
     surf <- io $ readIORef surfRef
 
-    io $ print "SET CACHE STATE"
-    io $ print "BEFORE"
-    io $ UV.mapM_ print (surf^.msCachedLight)
+    -- io $ print "SET CACHE STATE"
+    -- io $ print "BEFORE"
+    -- io $ UV.mapM_ print (surf^.msCachedLight)
 
     newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
     let updates = updateCachedLight surf newRefDef 0 Constants.maxLightMaps []
     io $ modifyIORef' surfRef (\v -> v { _msCachedLight = (surf^.msCachedLight) UV.// updates })
 
-    io $ print "AFTER"
-    surf' <- io $ readIORef surfRef
-    io $ UV.mapM_ print (surf'^.msCachedLight)
+    -- io $ print "AFTER"
+    -- surf' <- io $ readIORef surfRef
+    -- io $ UV.mapM_ print (surf'^.msCachedLight)
 
   where updateCachedLight :: MSurfaceT -> RefDefT -> Int -> Int -> [(Int, Float)] -> [(Int, Float)]
         updateCachedLight surf newRefDef idx maxIdx acc

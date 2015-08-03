@@ -114,9 +114,9 @@ parseEntityBits bits = do
                 then MSG.readShort (globals.netMessage)
                 else MSG.readByte (globals.netMessage)
 
-    io (print "YEYEYE")
-    io (print total''')
-    io (print number)
+    -- io (print "YEYEYE")
+    -- io (print total''')
+    -- io (print number)
 
     return (number, total''' : tail bits)
 
@@ -234,26 +234,26 @@ parseDelta from to number bits = do
                , _esSolid       = solid
                }
 
-    io (print "ENTITYENTITY")
-    io (print number)
-    io (print modelIndex)
-    io (print modelIndex2)
-    io (print modelIndex3)
-    io (print modelIndex4)
-    io (print frame')
-    io (print skinNum)
-    io (print effects)
-    io (print renderFx)
-    io (print originX)
-    io (print originY)
-    io (print originZ)
-    io (print anglesX)
-    io (print anglesY)
-    io (print anglesZ)
-    io (print oldOrigin)
-    io (print sound)
-    io (print event)
-    io (print solid)
+    -- io (print "ENTITYENTITY")
+    -- io (print number)
+    -- io (print modelIndex)
+    -- io (print modelIndex2)
+    -- io (print modelIndex3)
+    -- io (print modelIndex4)
+    -- io (print frame')
+    -- io (print skinNum)
+    -- io (print effects)
+    -- io (print renderFx)
+    -- io (print originX)
+    -- io (print originY)
+    -- io (print originZ)
+    -- io (print anglesX)
+    -- io (print anglesY)
+    -- io (print anglesZ)
+    -- io (print oldOrigin)
+    -- io (print sound)
+    -- io (print event)
+    -- io (print solid)
 
 parseFrame :: Quake ()
 parseFrame = do
@@ -268,10 +268,10 @@ parseFrame = do
     let serverTime = serverFrame * 100
     globals.cl.csFrame.fServerTime .= serverTime
 
-    io (print "SERVER FRAME")
-    io (print serverFrame)
-    io (print "DELTA FRAME")
-    io (print deltaFrame)
+    -- io (print "SERVER FRAME")
+    -- io (print serverFrame)
+    -- io (print "DELTA FRAME")
+    -- io (print deltaFrame)
 
     -- BIG HACK to let old demos continue to work
     serverProtocol <- use $ globals.cls.csServerProtocol
@@ -357,8 +357,8 @@ parseFrame = do
         globals.cls.csState .= Constants.caActive
         globals.cl.csForceRefDef .= True
 
-        io $ print "PARSE FRAME"
-        io $ print (frame^.fPlayerState.psViewAngles)
+        -- io $ print "PARSE FRAME"
+        -- io $ print (frame^.fPlayerState.psViewAngles)
 
         globals.cl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (frame^.fPlayerState.psPMoveState.pmsOrigin)
         globals.cl.csPredictedAngles .= (frame^.fPlayerState.psViewAngles)
@@ -568,8 +568,8 @@ parsePacketEntities oldFrame newFrameLens = do
 
           showNetValue <- liftM (^.cvValue) clShowNetCVar
 
-          io (print $ "BITS = " ++ show bits')
-          io (print $ "NEW NUM = " ++ show newNum)
+          -- io (print $ "BITS = " ++ show bits')
+          -- io (print $ "NEW NUM = " ++ show newNum)
 
           if newNum == 0
             then
@@ -786,15 +786,15 @@ calcViewValues = do
     -- movement
     if (cl'^.csFrame.fPlayerState.psPMoveState.pmsPMType) < Constants.pmDead
       then do
-        io $ print "USE PREDICTED VALUES"
-        io $ print (cl'^.csPredictedAngles)
+        -- io $ print "USE PREDICTED VALUES"
+        -- io $ print (cl'^.csPredictedAngles)
 
         globals.cl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
       else do
-        io $ print "USE INTERPOLATED VALUES"
-        io $ print ("ops.viewangles = " ++ show (ops'^.psViewAngles))
-        io $ print ("ps.viewangles = " ++ show (ps^.psViewAngles))
-        io $ print ("lerp = " ++ show lerp)
+        -- io $ print "USE INTERPOLATED VALUES"
+        -- io $ print ("ops.viewangles = " ++ show (ops'^.psViewAngles))
+        -- io $ print ("ps.viewangles = " ++ show (ps^.psViewAngles))
+        -- io $ print ("lerp = " ++ show lerp)
 
         globals.cl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
 

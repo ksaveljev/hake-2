@@ -143,9 +143,9 @@ clampAngles :: Quake ()
 clampAngles = do
     pm <- use $ pMoveGlobals.pmPM
 
-    io $ print "CLAMP ANGLES"
-    io $ print (pm^.pmCmd.ucAngles)
-    io $ print (pm^.pmState.pmsDeltaAngles)
+    -- io $ print "CLAMP ANGLES"
+    -- io $ print (pm^.pmCmd.ucAngles)
+    -- io $ print (pm^.pmState.pmsDeltaAngles)
 
     let pm' = if (pm^.pmState.pmsPMFlags) .&. pmfTimeTeleport /= 0
                 then

@@ -42,7 +42,7 @@ writeFrameToClient clientRef@(ClientReference clientIdx) sizeBufLens = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     frameNum <- use $ svGlobals.svServer.sFrameNum
 
-    io (print $ "frameNum = " ++ show frameNum)
+    -- io (print $ "frameNum = " ++ show frameNum)
 
     let frameIdx = frameNum .&. Constants.updateMask
         frame = svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix frameIdx :: Traversal' QuakeState ClientFrameT
@@ -122,64 +122,64 @@ writePlayerStateToClient from to sizeBufLens = do
 
     -- write the pmove_state_t
     when (pflags .&. Constants.psMType /= 0) $ do
-      io (print "PS_M_TYPE")
+      --io (print "PS_M_TYPE")
       MSG.writeByteI sizeBufLens (ps^.psPMoveState.pmsPMType)
 
     when (pflags .&. Constants.psMOrigin /= 0) $ do
-      io (print "PS_M_ORIGIN")
+      --io (print "PS_M_ORIGIN")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsOrigin._z)
 
     when (pflags .&. Constants.psMVelocity /= 0) $ do
-      io (print "PS_M_VELOCITY")
+      --io (print "PS_M_VELOCITY")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsVelocity._z)
 
     when (pflags .&. Constants.psMTime /= 0) $ do
-      io (print "PS_M_TIME")
+      --io (print "PS_M_TIME")
       MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMTime)
 
     when (pflags .&. Constants.psMFlags /= 0) $ do
-      io (print "PS_M_FLAGS")
+      --io (print "PS_M_FLAGS")
       MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMFlags)
 
     when (pflags .&. Constants.psMGravity /= 0) $ do
-      io (print "PS_M_GRAVITY")
+      --io (print "PS_M_GRAVITY")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsGravity)
 
     when (pflags .&. Constants.psMDeltaAngles /= 0) $ do
-      io (print "PS_M_DELTA_ANGLES")
+      --io (print "PS_M_DELTA_ANGLES")
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._x)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._y)
       MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._z)
 
     -- write the rest of the player_state_t
     when (pflags .&. Constants.psViewOffset /= 0) $ do
-      io (print "PS_VIEWOFFSET")
+      --io (print "PS_VIEWOFFSET")
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._y) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psViewOffset._z) * 4)
 
     when (pflags .&. Constants.psViewAngles /= 0) $ do
-      io (print "PS_VIEWANGLES")
+      --io (print "PS_VIEWANGLES")
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._x)
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._y)
       MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._z)
 
     when (pflags .&. Constants.psKickAngles /= 0) $ do
-      io (print "PS_KICKANGLES")
+      --io (print "PS_KICKANGLES")
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._y) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psKickAngles._z) * 4)
 
     when (pflags .&. Constants.psWeaponIndex /= 0) $ do
-      io (print "PS_WEAPONINDEX")
+      --io (print "PS_WEAPONINDEX")
       MSG.writeByteI sizeBufLens (ps^.psGunIndex)
 
     when (pflags .&. Constants.psWeaponFrame /= 0) $ do
-      io (print "PS_WEAPONFRAME")
+      --io (print "PS_WEAPONFRAME")
       MSG.writeByteI sizeBufLens (ps^.psGunFrame)
       MSG.writeCharF sizeBufLens ((ps^.psGunOffset._x) * 4)
       MSG.writeCharF sizeBufLens ((ps^.psGunOffset._y) * 4)
@@ -189,24 +189,24 @@ writePlayerStateToClient from to sizeBufLens = do
       MSG.writeCharF sizeBufLens ((ps^.psGunAngles._z) * 4)
 
     when (pflags .&. Constants.psBlend /= 0) $ do
-      io (print "PS_BLEND")
+      --io (print "PS_BLEND")
       MSG.writeByteF sizeBufLens ((ps^.psBlend._x) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._y) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._z) * 255)
       MSG.writeByteF sizeBufLens ((ps^.psBlend._w) * 255)
 
     when (pflags .&. Constants.psFov /= 0) $ do
-      io (print "PS_FOV")
+      --io (print "PS_FOV")
       MSG.writeByteF sizeBufLens (ps^.psFOV)
 
     when (pflags .&. Constants.psRdFlags /= 0) $ do
-      io (print "PS_RDFLAGS")
+      --io (print "PS_RDFLAGS")
       MSG.writeByteI sizeBufLens (ps^.psRDFlags)
 
     -- send stats
     let statbits = calcStatBits ps ops 0 0 Constants.maxStats
 
-    io (print "statbits")
+    --io (print "statbits")
     MSG.writeLong sizeBufLens statbits
 
     writeStats ps statbits 0 Constants.maxStats
@@ -246,12 +246,12 @@ emitPacketEntities from to sizeBufLens = do
         sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt newEnt oldIndex newIndex
           | newIndex >= (to^.cfNumEntities) && oldIndex >= fromNumEntites = return ()
           | otherwise = do
-              io (print $ "maxClientsValue = " ++ show maxClientsValue)
-              io (print $ "numClientEntities = " ++ show numClientEntities)
-              io (print $ "fromNumEntites = " ++ show fromNumEntites)
-              io (print $ "cfNumEntities = " ++ show (to^.cfNumEntities))
-              io (print $ "newIndex = " ++ show newIndex)
-              io (print $ "oldIndex = " ++ show oldIndex)
+              -- io (print $ "maxClientsValue = " ++ show maxClientsValue)
+              -- io (print $ "numClientEntities = " ++ show numClientEntities)
+              -- io (print $ "fromNumEntites = " ++ show fromNumEntites)
+              -- io (print $ "cfNumEntities = " ++ show (to^.cfNumEntities))
+              -- io (print $ "newIndex = " ++ show newIndex)
+              -- io (print $ "oldIndex = " ++ show oldIndex)
               (newEnt', newNum) <- if newIndex >= (to^.cfNumEntities)
                                      then return (fromJust newEnt, 9999)
                                      else do
@@ -266,10 +266,10 @@ emitPacketEntities from to sizeBufLens = do
                                        Just oldEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
                                        return (oldEnt', oldEnt'^.esNumber)
 
-              io (print $ "oldNum = " ++ show oldNum ++ " newNum = " ++ show newNum)
+              -- io (print $ "oldNum = " ++ show oldNum ++ " newNum = " ++ show newNum)
 
               if | newNum == oldNum -> do
-                     io (print "newNum == oldNum")
+                     -- io (print "newNum == oldNum")
                      -- delta update from old position
                      -- because the force parm is false, this will not result
                      -- in any bytes being emited if the entity has not changed at
@@ -280,14 +280,14 @@ emitPacketEntities from to sizeBufLens = do
                      sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) (newIndex + 1)
 
                  | newNum < oldNum -> do
-                     io (print "newNum < oldNum")
+                     -- io (print "newNum < oldNum")
                      -- this is a new entity, send it from the baseline
                      Just baseline <- preuse $ svGlobals.svServer.sBaselines.ix newNum
                      MSG.writeDeltaEntity baseline newEnt' sizeBufLens True True
                      sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') oldIndex (newIndex + 1)
 
                  | newNum > oldNum -> do
-                     io (print "newNum > oldNum")
+                     -- io (print "newNum > oldNum")
                      -- the old entity isn't present in the new message
                      let bits = if oldNum >= 256
                                   then Constants.uRemove .|. Constants.uNumber16 .|. Constants.uMoreBits1
@@ -309,7 +309,7 @@ emitPacketEntities from to sizeBufLens = do
 -}
 buildClientFrame :: ClientReference -> Quake ()
 buildClientFrame (ClientReference clientIdx) = do
-    io (print "buildClientFrame")
+    -- io (print "buildClientFrame")
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     let Just clEntRef@(EdictReference clEntIdx) = client^.cEdict
     Just clEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix clEntIdx
@@ -326,8 +326,8 @@ buildClientFrame (ClientReference clientIdx) = do
 
         -- find the client's PVS
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-        io (print (gClient^.gcPlayerState.psViewOffset))
-        io (print (gClient^.gcPlayerState.psPMoveState.pmsOrigin))
+        -- io (print (gClient^.gcPlayerState.psViewOffset))
+        -- io (print (gClient^.gcPlayerState.psPMoveState.pmsOrigin))
         let org = (gClient^.gcPlayerState.psViewOffset) + fmap ((* 0.125) . fromIntegral) (gClient^.gcPlayerState.psPMoveState.pmsOrigin)
 
         leafNum <- CM.pointLeafNum org
@@ -351,7 +351,7 @@ buildClientFrame (ClientReference clientIdx) = do
 
         numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
-        io (print "collecting edicts")
+        -- io (print "collecting edicts")
         collectEdicts org clientPHS clientArea clEntRef frame 1 numEdicts
 
   where --collectEdicts :: V3Float -> B.ByteString -> Int -> EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
@@ -360,15 +360,15 @@ buildClientFrame (ClientReference clientIdx) = do
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
-              io (print $ "working through edict " ++ show idx)
+              -- io (print $ "working through edict " ++ show idx)
 
                    -- ignore ents without visible models
               if | (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 -> do
-                     io (print "skip svFlags")
+                     -- io (print "skip svFlags")
                      collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                    -- ignore ents without visible models unless they have an effect
                  | (edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esEffects) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEvent) == 0 -> do
-                     io (print "skip modelIndex or effects or ...")
+                     -- io (print "skip modelIndex or effects or ...")
                      collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
@@ -379,7 +379,7 @@ buildClientFrame (ClientReference clientIdx) = do
 
                                  if blocked
                                    then do
-                                     io (print "skip door blocked")
+                                     -- io (print "skip door blocked")
                                      return True
                                    else
                                      -- beams just check one point for PHS
@@ -388,7 +388,7 @@ buildClientFrame (ClientReference clientIdx) = do
                                          let l = (edict^.eClusterNums) UV.! 0
                                          if (clientPHS `B.index` (l `shiftR` 3)) .&. (1 `shiftL` (l .&. 7)) == 0
                                            then do
-                                             io (print "skip beam PHS")
+                                             -- io (print "skip beam PHS")
                                              return True
                                            else return False
 
@@ -402,16 +402,16 @@ buildClientFrame (ClientReference clientIdx) = do
                                          done <- if (edict^.eNumClusters) == -1 -- too many leafs for individual check, go by headnode
                                                    then do
                                                      visible <- CM.headNodeVisible (edict^.eHeadNode) bitVector
-                                                     io (print $ "headnode visible = " ++ show visible)
+                                                     -- io (print $ "headnode visible = " ++ show visible)
                                                      return (not visible)
                                                    else do -- check individual leafs
                                                      let visible = checkBitVector edict bitVector 0 (edict^.eNumClusters)
-                                                     io (print $ "bitvector visible = " ++ show visible)
+                                                     -- io (print $ "bitvector visible = " ++ show visible)
                                                      return (not visible)
 
                                          if done
                                            then do
-                                             io (print "skip headnode visible")
+                                             -- io (print "skip headnode visible")
                                              return True
                                            else
                                              if (edict^.eEntityState.esModelIndex) == 0 -- don't send sounds if they will be attenuated away
@@ -421,7 +421,7 @@ buildClientFrame (ClientReference clientIdx) = do
 
                                                  if len > 400
                                                    then do
-                                                     io (print "skip len")
+                                                     -- io (print "skip len")
                                                      return True
                                                    else return False
                                                else
@@ -431,10 +431,10 @@ buildClientFrame (ClientReference clientIdx) = do
 
                      if skip
                        then do
-                         io (print "skip because SKIP")
+                         -- io (print "skip because SKIP")
                          collectEdicts org clientPHS clientArea clEntRef frame (idx + 1) maxIdx
                        else do
-                         io (print "not skipped")
+                         -- io (print "not skipped")
                          serverStatic <- use $ svGlobals.svServerStatic
                          let index = (serverStatic^.ssNextClientEntities) `mod` (serverStatic^.ssNumClientEntities)
                              -- state = (serverStatic^.ssClientEntities) V.! index
@@ -458,9 +458,9 @@ buildClientFrame (ClientReference clientIdx) = do
 
         isBlockedByDoor :: Int -> EdictT -> Quake Bool
         isBlockedByDoor clientArea edict = do
-          io (print $ "clientArea = " ++ show clientArea)
-          io (print $ "areanum = " ++ show (edict^.eAreaNum))
-          io (print $ "areanum2 = " ++ show (edict^.eAreaNum2))
+          -- io (print $ "clientArea = " ++ show clientArea)
+          -- io (print $ "areanum = " ++ show (edict^.eAreaNum))
+          -- io (print $ "areanum2 = " ++ show (edict^.eAreaNum2))
           connected <- CM.areasConnected clientArea (edict^.eAreaNum)
           if not connected
             then
@@ -489,19 +489,19 @@ buildClientFrame (ClientReference clientIdx) = do
 -}
 fatPVS :: V3 Float -> Quake ()
 fatPVS org = do
-    io (print org)
+    -- io (print org)
     let mins = fmap (subtract 8) org
         maxs = fmap (+ 8) org
 
     (count, _) <- CM.boxLeafNums mins maxs (svGlobals.svLeafsTmp) 64 Nothing
-    io (print $ "count = " ++ show count)
+    -- io (print $ "count = " ++ show count)
 
     when (count < 1) $
       Com.comError Constants.errFatal "SV_FatPVS: count < 1"
 
     numClusters <- use $ cmGlobals.cmNumClusters
     let longs = (numClusters + 31) `shiftR` 5
-    io (print $ "longs = " ++ show longs)
+    -- io (print $ "longs = " ++ show longs)
 
     -- convert leafs to clusters
     leafs <- use $ svGlobals.svLeafsTmp

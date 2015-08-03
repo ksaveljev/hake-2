@@ -324,8 +324,8 @@ touchTriggers er@(EdictReference edictIdx) = do
       boxEdicts <- use $ gameBaseGlobals.gbGameImport.giBoxEdicts
       num <- boxEdicts (edict^.eEdictMinMax.eAbsMin) (edict^.eEdictMinMax.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
 
-      io (print "NUM")
-      io (print num)
+      -- io (print "NUM")
+      -- io (print num)
 
       -- be careful, it is possible to have an entity in this
       -- list removed before we got to it (killtriggered)

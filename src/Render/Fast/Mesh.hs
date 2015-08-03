@@ -58,8 +58,8 @@ rDrawAliasModel entRef = do
       -- authors happy
       shadeLight <- buildShadeLight
 
-      io $ print "SHADE LIGHT"
-      io $ print shadeLight
+      -- io $ print "SHADE LIGHT"
+      -- io $ print shadeLight
 
       Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
       currentEntity <- io $ readIORef currentEntityRef

@@ -35,11 +35,11 @@ writeCharF = writeByteF
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = do
-    io (print "WRITE BYTE")
+    --io (print "WRITE BYTE")
     let -- c' :: Word32 = fromIntegral c
         c' :: Word8 = fromIntegral (c .&. 0xFF)
         c'' :: Int8 = fromIntegral c'
-    io (print c'')
+    -- io (print c'')
     SZ.write sizeBufLens (B.pack [c']) 1
 
 writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
@@ -53,9 +53,9 @@ writeShort sizeBufLens c = do
         b :: Word8 = fromIntegral ((c' `shiftR` 8) .&. 0xFF)
         a' :: Int8 = fromIntegral a
         b' :: Int8 = fromIntegral b
-    io (print "WRITE SHORT")
-    io (print a')
-    io (print b')
+    -- io (print "WRITE SHORT")
+    -- io (print a')
+    -- io (print b')
     SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
@@ -168,8 +168,8 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
     when ((to^.esNumber) >= Constants.maxEdicts) $
       Com.comError Constants.errFatal "Entity number >= MAX_EDICTS"
 
-    io (print $ "from origin = " ++ show (from^.esOrigin))
-    io (print $ "to origin = " ++ show (to^.esOrigin))
+    -- io (print $ "from origin = " ++ show (from^.esOrigin))
+    -- io (print $ "to origin = " ++ show (to^.esOrigin))
 
     -- send an update
     let a = if (to^.esNumber) >= 256 then Constants.uNumber16 else 0 -- number8 is implicit otherwise
@@ -211,7 +211,7 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
 
         bits = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h .|. i .|. j .|. k .|. l .|. m .|. n .|. o .|. p .|. q .|. r .|. s
 
-    io (print $ "bits = " ++ show bits)
+    -- io (print $ "bits = " ++ show bits)
 
     -- write the message
     unless (bits == 0 && not force) $ do
@@ -220,7 +220,7 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
                          | bits .&. 0x0000FF00 /= 0 -> bits .|. Constants.uMoreBits1
                          | otherwise -> bits
 
-      io (print $ "finalBits = " ++ show finalBits)
+      -- io (print $ "finalBits = " ++ show finalBits)
       writeByteI sizeBufLens (finalBits .&. 255)
 
       if | finalBits .&. 0xFF000000 /= 0 -> do
@@ -341,8 +341,8 @@ readByte sizeBufLens = do
 
     sizeBufLens.sbReadCount += 1
 
-    io (print "READ BYTE")
-    io (print c)
+    -- io (print "READ BYTE")
+    -- io (print c)
 
     return c
 
@@ -362,8 +362,8 @@ readShort sizeBufLens = do
             b' :: Word16 = (fromIntegral b) `shiftL` 8
             result :: Int16 = fromIntegral $ (fromIntegral a) .|. b'
 
-        io (print "READ SHORT")
-        io (print result)
+        -- io (print "READ SHORT")
+        -- io (print result)
         sizeBufLens.sbReadCount += 2
         return (fromIntegral result)
 

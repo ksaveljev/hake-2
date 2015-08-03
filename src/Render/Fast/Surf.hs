@@ -114,22 +114,22 @@ glCreateSurfaceLightmap surfRef = do
     surf <- io $ readIORef surfRef
 
     when ((surf^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) == 0) $ do
-      io $ print "CREATE SURFACE LIGHTMAP OK"
+      -- io $ print "CREATE SURFACE LIGHTMAP OK"
 
       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-      io $ print ("smax = " ++ show smax)
-      io $ print ("tmax = " ++ show tmax)
-      io $ print ("light_s = " ++ show (surf^.msLightS))
-      io $ print ("light_t = " ++ show (surf^.msLightT))
+--      io $ print ("smax = " ++ show smax)
+--      io $ print ("tmax = " ++ show tmax)
+--      io $ print ("light_s = " ++ show (surf^.msLightS))
+--      io $ print ("light_t = " ++ show (surf^.msLightT))
 
       (ok, pos) <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
 
       pos' <- if ok
                 then return pos
                 else do
-                  io $ print "NOT OK"
+                  -- io $ print "NOT OK"
                   lmUploadBlock False
                   lmInitBlock
                   (ok', pos') <- lmAllocBlock smax tmax (surf^.msLightS, surf^.msLightT)
@@ -228,8 +228,8 @@ lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock dynamic = do
     lms <- use $ fastRenderAPIGlobals.frGLLms
 
-    io $ print "LM_UPLOADBLOCK"
-    io $ print (lms^.lmsCurrentLightmapTexture)
+    -- io $ print "LM_UPLOADBLOCK"
+    -- io $ print (lms^.lmsCurrentLightmapTexture)
 
     let texture = if dynamic
                     then 0
@@ -428,7 +428,7 @@ rDrawWorld = do
 
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
-    io (putStrLn "Surf.rDrawAlphaSurfaces") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! Surf.rDrawAlphaSurfaces") >> return () -- TODO
 
 drawTextureChains :: Quake ()
 drawTextureChains = do
@@ -499,11 +499,11 @@ recursiveWorldNode :: IORef MNodeT -> Quake ()
 recursiveWorldNode nodeRef = do
     node <- io $ readIORef nodeRef
 
-    io $ print "recursiveWorldNode"
-    io $ print ("num surfaces = " ++ show (node^.mnNumSurfaces))
-    io $ print ("first surface = " ++ show (node^.mnFirstSurface))
-    io $ print ("contents = " ++ show (node^.mnContents))
-    io $ print ("visframe = " ++ show (node^.mnVisFrame))
+    -- io $ print "recursiveWorldNode"
+    -- io $ print ("num surfaces = " ++ show (node^.mnNumSurfaces))
+    -- io $ print ("first surface = " ++ show (node^.mnFirstSurface))
+    -- io $ print ("contents = " ++ show (node^.mnContents))
+    -- io $ print ("visframe = " ++ show (node^.mnVisFrame))
 
     nothingToDo <- checkIfNothingToDo (node^.mnContents) (node^.mnVisFrame) (node^.mnMins) (node^.mnMaxs)
 
@@ -544,11 +544,10 @@ recursiveWorldNode nodeRef = do
         checkIfNothingToDo contents visFrame mins maxs = do
           visFrameCount <- use $ fastRenderAPIGlobals.frVisFrameCount
 
-          if | contents == Constants.contentsSolid -> io (print "SOLID. RETURN") >> return True
-             | visFrame /= visFrameCount -> io (print "VISFRAME /= VISFRAMECOUNT. RETURN") >> return True
+          if | contents == Constants.contentsSolid -> return True
+             | visFrame /= visFrameCount -> return True
              | otherwise -> do
                  ok <- rCullBox mins maxs
-                 when ok $ io (print "CULL BOX. RETURN")
                  return ok
 
         drawLeafStuff :: ModelT -> IORef MLeafT -> Quake ()
@@ -557,7 +556,7 @@ recursiveWorldNode nodeRef = do
           nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) (leaf^.mlMins) (leaf^.mlMaxs)
 
           unless nothingToDo $ do
-            io $ print "drawLeafStuff"
+            --io $ print "drawLeafStuff"
 
             newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
 
@@ -574,7 +573,7 @@ recursiveWorldNode nodeRef = do
         drawNodeStuff worldModel node sidebit frameCount idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              io $ print "drawNodeStuff"
+              -- io $ print "drawNodeStuff"
               let surfRef = (worldModel^.mSurfaces) V.! ((node^.mnFirstSurface) + idx)
               surf <- io $ readIORef surfRef
 
@@ -615,16 +614,16 @@ rCullBox mins maxs = do
         frustum <- use $ fastRenderAPIGlobals.frFrustum
         frustum' <- io $ V.mapM readIORef frustum
 
-        io $ print "CULL BOX!"
-        io $ print mins
-        io $ print maxs
-        io $ V.mapM_ (\f -> do
-                       print (f^.cpNormal)
-                       print (f^.cpDist)
-                       print (f^.cpType)
-                       print (f^.cpSignBits)
-                       print (f^.cpPad)
-                     ) frustum'
+        -- io $ print "CULL BOX!"
+        -- io $ print mins
+        -- io $ print maxs
+        -- io $ V.mapM_ (\f -> do
+        --                print (f^.cpNormal)
+        --                print (f^.cpDist)
+        --                print (f^.cpType)
+        --                print (f^.cpSignBits)
+        --                print (f^.cpPad)
+        --              ) frustum'
 
         if | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 0) == 2 -> return True
            | Math3D.boxOnPlaneSide mins maxs (frustum' V.! 1) == 2 -> return True
@@ -658,21 +657,21 @@ glRenderLightmappedPoly surfRef = do
     newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
     frameCount <- use $ fastRenderAPIGlobals.frFrameCount
 
-    io $ print "SURF STYLES"
-    io $ putStrLn $ concatMap (printf "0x%02X ") $ B.unpack (surf^.msStyles)
-    io $ print "SURF CACHED LIGHT"
-    io $ UV.mapM_ (\v -> print v) (surf^.msCachedLight)
+    -- io $ print "SURF STYLES"
+    -- io $ putStrLn $ concatMap (printf "0x%02X ") $ B.unpack (surf^.msStyles)
+    -- io $ print "SURF CACHED LIGHT"
+    -- io $ UV.mapM_ (\v -> print v) (surf^.msCachedLight)
 
     let (gotoDynamic, mapIdx) = calcGotoDynamic surf newRefDef 0 Constants.maxLightMaps
         mapIdx' = if mapIdx == 4 then 3 else mapIdx -- this is a hack from cwei
 
-    io $ print ("gotoDynamic = " ++ show gotoDynamic)
-    io $ print ("map = " ++ show mapIdx')
+    -- io $ print ("gotoDynamic = " ++ show gotoDynamic)
+    -- io $ print ("map = " ++ show mapIdx')
 
     isDynamic <- checkIfDynamic surf gotoDynamic frameCount
     imageRef <- rTextureAnimation (surf^.msTexInfo)
 
-    io $ print ("isDynamic = " ++ show isDynamic)
+    -- io $ print ("isDynamic = " ++ show isDynamic)
 
     image <- io $ readIORef imageRef
     let lmtex = surf^.msLightmapTextureNum
@@ -686,13 +685,13 @@ glRenderLightmappedPoly surfRef = do
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
                       temp <- Light.rBuildLightMap surf smax
-                      io $ print "TEMPTEMPTEMP DYNAMIC"
-                      io $ print ("flags = " ++ show (surf^.msFlags) ++
-                                  " fe = " ++ show (surf^.msFirstEdge) ++
-                                  " nume = " ++ show (surf^.msNumEdges) ++
-                                  " tex num = " ++ show (surf^.msLightmapTextureNum))
-                      io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
-                      io $ print $ (concat . map (flip showHex "") . B.unpack) temp
+                      -- io $ print "TEMPTEMPTEMP DYNAMIC"
+                      -- io $ print ("flags = " ++ show (surf^.msFlags) ++
+                      --             " fe = " ++ show (surf^.msFirstEdge) ++
+                      --             " nume = " ++ show (surf^.msNumEdges) ++
+                      --             " tex num = " ++ show (surf^.msLightmapTextureNum))
+                      -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      -- io $ print $ (concat . map (flip showHex "") . B.unpack) temp
                       Light.rSetCacheState surfRef
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
@@ -716,9 +715,9 @@ glRenderLightmappedPoly surfRef = do
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
                       temp <- Light.rBuildLightMap surf smax
-                      io $ print "TEMPTEMPTEMP"
-                      io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
-                      io $ print $ (concat . map (flip showHex "") . B.unpack) temp
+                      -- io $ print "TEMPTEMPTEMP"
+                      -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      -- io $ print $ (concat . map (flip showHex "") . B.unpack) temp
 
                       texture1 <- use $ fastRenderAPIGlobals.frTexture1
                       glState <- use $ fastRenderAPIGlobals.frGLState
@@ -830,10 +829,10 @@ lmAllocBlock :: Int -> Int -> (Int, Int) -> Quake (Bool, (Int, Int))
 lmAllocBlock w h pos = do
     allocated <- use $ fastRenderAPIGlobals.frGLLms.lmsAllocated
     let (pos', best) = findSpot allocated blockHeight 0 (blockWidth - w) pos
-    io $ print "ALLOC BLOCK"
-    io $ print ("best = " ++ show best)
-    io $ print ("pos = " ++ show pos')
-    io $ print ("allocated = " ++ show (UV.take 10 allocated))
+    -- io $ print "ALLOC BLOCK"
+    -- io $ print ("best = " ++ show best)
+    -- io $ print ("pos = " ++ show pos')
+    --io $ print ("allocated = " ++ show (UV.take 10 allocated))
     if best + h > blockHeight
       then return (False, pos')
       else do

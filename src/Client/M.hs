@@ -266,9 +266,9 @@ moveFrame selfRef@(EdictReference selfIdx) = do
 
     let Just move = self^.eMonsterInfo.miCurrentMove
 
-    io (print "BEFORE")
-    io (print $ "self.frame = " ++ show (self^.eEntityState.esFrame))
-    io (print $ "move.firstframe = " ++ show (move^.mmFirstFrame))
+    -- io (print "BEFORE")
+    -- io (print $ "self.frame = " ++ show (self^.eEntityState.esFrame))
+    -- io (print $ "move.firstframe = " ++ show (move^.mmFirstFrame))
 
     done <- if (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame)
               then do
@@ -324,13 +324,13 @@ moveFrame selfRef@(EdictReference selfIdx) = do
           index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
           frame = (move'^.mmFrame) V.! index
 
-      io (print "AFTER")
-      io (print $ "self.frame = " ++ show (self'^.eEntityState.esFrame))
-      io (print $ "move.firstframe = " ++ show (move'^.mmFirstFrame))
-      io (print $ "INDEX = " ++ show index)
+      -- io (print "AFTER")
+      -- io (print $ "self.frame = " ++ show (self'^.eEntityState.esFrame))
+      -- io (print $ "move.firstframe = " ++ show (move'^.mmFirstFrame))
+      -- io (print $ "INDEX = " ++ show index)
 
       when (isJust (frame^.mfAI)) $ do
-        io (print "YUP, calling AI")
+        -- io (print "YUP, calling AI")
         if (self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0
           then
             ai (fromJust $ frame^.mfAI) selfRef ((frame^.mfDist) * (self'^.eMonsterInfo.miScale))
@@ -513,8 +513,8 @@ moveToGoal edictRef@(EdictReference edictIdx) dist = do
                then SV.closeEnough edictRef (fromJust $ edict^.eEdictOther.eoEnemy) dist
                else return False
 
-    io (print "M.moveToGoal")
-    io (print $ "skip = " ++ show skip ++ " skip' = " ++ show skip')
+    -- io (print "M.moveToGoal")
+    -- io (print $ "skip = " ++ show skip ++ " skip' = " ++ show skip')
 
     unless (skip || skip') $ do
       Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx

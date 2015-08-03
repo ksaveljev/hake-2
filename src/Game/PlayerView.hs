@@ -107,8 +107,8 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
         unicast <- use $ gameBaseGlobals.gbGameImport.giUnicast
         unicast edictRef False
 
-      preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just ed) ->
-        io (print "PEWPEWPEW") >> io (print (ed^.eEntityState.esOrigin))
+      -- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just ed) ->
+        -- io (print "PEWPEWPEW") >> io (print (ed^.eEntityState.esOrigin))
 
   where setCurrentPlayerAndClient :: Quake ()
         setCurrentPlayerAndClient = do
@@ -124,10 +124,10 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
             pmsOrigin .= fmap (truncate . (* 8.0)) (edict^.eEntityState.esOrigin)
             pmsVelocity .= fmap (truncate . (* 8.0)) (edict^.eEdictPhysics.eVelocity)
 
-          io (print "updatePMoveValues")
-          io (print (edict^.eEntityState.esOrigin))
-          preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gc) ->
-            io (print (gc^.gcPlayerState.psPMoveState.pmsOrigin))
+          -- io (print "updatePMoveValues")
+          -- io (print (edict^.eEntityState.esOrigin))
+          -- preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gc) ->
+            -- io (print (gc^.gcPlayerState.psPMoveState.pmsOrigin))
 
         checkIntermissionTime :: Quake Bool
         checkIntermissionTime = do

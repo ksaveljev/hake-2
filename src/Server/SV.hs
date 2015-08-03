@@ -124,8 +124,8 @@ physicsNoClip _ = io (putStrLn "SV.physicsNoClip") >> undefined -- TODO
 -}
 physicsStep :: EdictReference -> Quake ()
 physicsStep edictRef@(EdictReference edictIdx) = do
-    io (print "PHYSICS STEP")
-    io (print edictIdx)
+    -- io (print "PHYSICS STEP")
+    -- io (print edictIdx)
 
     -- airborn monsters should always check for ground
     wasOnGround <- checkGroundEntity
@@ -148,7 +148,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     let V3 a b c = edict^.eEdictPhysics.eVelocity
 
-    io (print $ "VELOCITY = " ++ show a ++ " " ++ show b ++ " " ++ show c)
+    -- io (print $ "VELOCITY = " ++ show a ++ " " ++ show b ++ " " ++ show c)
 
     if a /= 0 || b /= 0 || c /= 0
       then do
@@ -681,7 +681,7 @@ runThink er@(EdictReference edictIdx) = do
           Com.comError Constants.errFatal "NULL ent.think"
 
         let GenericEntThink sdf _ = fromJust $ edict^.eEdictAction.eaThink
-        io (print $ "THINK FUNCTION = " `B.append` sdf)
+        -- io (print $ "THINK FUNCTION = " `B.append` sdf)
         void $ think (fromJust $ edict^.eEdictAction.eaThink) er
 
         return False
@@ -818,8 +818,8 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
     let planes = V.replicate 6 (V3 0 0 0)
 
     v <- doFlyMove velocity velocity planes time 0 0 0 4
-    io (putStrLn "HIHIHI")
-    io (print v)
+    -- io (putStrLn "HIHIHI")
+    -- io (print v)
     return v
 
   where doFlyMove :: V3 Float -> V3 Float -> V.Vector (V3 Float) -> Float -> Int -> Int -> Int -> Int -> Quake Int
@@ -1218,8 +1218,8 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 -}
 stepDirection :: EdictReference -> Float -> Float -> Quake Bool
 stepDirection edictRef@(EdictReference edictIdx) yaw dist = do
-    io (print "SV.stepDirection")
-    io (print $ "yaw = " ++ show yaw ++ " dist = " ++ show dist)
+    -- io (print "SV.stepDirection")
+    -- io (print $ "yaw = " ++ show yaw ++ " dist = " ++ show dist)
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eIdealYaw .= yaw
     M.changeYaw edictRef
 

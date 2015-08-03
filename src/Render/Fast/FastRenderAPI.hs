@@ -57,7 +57,7 @@ fastRenderAPI =
               , _rEndRegistration   = \_ -> Model.rEndRegistration
               , _rRenderFrame       = \_ -> fastRenderFrame
               , _rDrawGetPicSize    = \_ -> Draw.getPicSize
-              , _rDrawPic           = DT.trace "rDrawPic" undefined -- \_ -> Draw.drawPic
+              , _rDrawPic           = \_ -> Draw.drawPic
               , _rDrawStretchPic    = \_ -> Draw.stretchPic
               , _rDrawChar          = \_ -> Draw.drawChar
               , _rDrawTileClear     = DT.trace "FastRenderAPI.rDrawTileClear" undefined -- TODO
@@ -810,8 +810,8 @@ rSetupFrame = do
 
     -- build the transformation matrix for the given view angles
     newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
-    io $ print "SETUP FRAME"
-    io $ print ("viewAngles = " ++ show (newRefDef^.rdViewAngles))
+    -- io $ print "SETUP FRAME"
+    -- io $ print ("viewAngles = " ++ show (newRefDef^.rdViewAngles))
     let (Just vpn, Just vright, Just vup) = Math3D.angleVectors (newRefDef^.rdViewAngles) True True True
 
     zoom fastRenderAPIGlobals $ do
@@ -895,16 +895,16 @@ rSetFrustum = do
                              , Math3D.rotatePointAroundVector vright vpn (0 - (90 - (newRefDef^.rdFovY) / 2))
                              ]
 
-    io $ print "SET FRUSTUM"
-    io $ print ("fovX = " ++ show (newRefDef^.rdFovX))
-    io $ print ("fovY = " ++ show (newRefDef^.rdFovY))
-    io $ print ("vup = " ++ show vup)
-    io $ print ("vright = " ++ show vright)
-    io $ print ("vpn = " ++ show vpn)
-    io $ print ("normals0 = " ++ show (normals V.! 0))
-    io $ print ("normals1 = " ++ show (normals V.! 1))
-    io $ print ("normals2 = " ++ show (normals V.! 2))
-    io $ print ("normals3 = " ++ show (normals V.! 3))
+    -- io $ print "SET FRUSTUM"
+    -- io $ print ("fovX = " ++ show (newRefDef^.rdFovX))
+    -- io $ print ("fovY = " ++ show (newRefDef^.rdFovY))
+    -- io $ print ("vup = " ++ show vup)
+    -- io $ print ("vright = " ++ show vright)
+    -- io $ print ("vpn = " ++ show vpn)
+    -- io $ print ("normals0 = " ++ show (normals V.! 0))
+    -- io $ print ("normals1 = " ++ show (normals V.! 1))
+    -- io $ print ("normals2 = " ++ show (normals V.! 2))
+    -- io $ print ("normals3 = " ++ show (normals V.! 3))
 
     origin <- use $ fastRenderAPIGlobals.frOrigin
     io $ V.imapM_ (updateFrustum normals origin) frustum
@@ -1072,7 +1072,7 @@ rDrawEntitiesOnList = do
 
 rDrawParticles :: Quake ()
 rDrawParticles = do
-    io (putStrLn "FastRenderAPI.rDrawParticles") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! FastRenderAPI.rDrawParticles") >> return () -- TODO
 
 rFlash :: Quake ()
 rFlash = rPolyBlend
