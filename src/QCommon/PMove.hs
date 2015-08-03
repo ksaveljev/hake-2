@@ -6,7 +6,7 @@ import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement, shiftL)
 import Data.Int (Int16)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z, normalize, norm, dot)
+import Linear (V3(..), _x, _y, _z, normalize, norm, dot, cross)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -519,7 +519,71 @@ stepSlideMove_ = do
                               numPlanes'' = numPlanes' + 1
 
                           -- modify original_velocity so it parallels all of the clip planes
-                          io (putStrLn "PMove.slideMove") >> undefined -- TODO
+                          i <- modifyOriginalVelocity planes' 0 numPlanes''
+
+                          done <- if i /= numPlanes''
+                            then
+                              return False -- go along this plane
+                            else do
+                              -- go along the crease
+                              if numPlanes'' /= 2
+                                then do
+                                  v3o <- use $ globals.vec3Origin
+                                  pMoveGlobals.pmPML.pmlVelocity .= v3o
+                                  return True
+                                else do
+                                  velocity <- use $ pMoveGlobals.pmPML.pmlVelocity
+                                  let dir = (planes' V.! 0) `cross` (planes' V.! 1)
+                                      d = dir `dot` velocity
+                                  pMoveGlobals.pmPML.pmlVelocity .= fmap (* d) dir
+                                  return False
+
+                          if done
+                            then
+                              return False -- break out of loop
+                            else do
+                              -- if velocity is against the original velocity, stop dead
+                              -- to avoid tiny occilations in sloping corners
+                              velocity <- use $ pMoveGlobals.pmPML.pmlVelocity
+                              if velocity `dot` primalVelocity <= 0
+                                then do
+                                  v3o <- use $ globals.vec3Origin
+                                  pMoveGlobals.pmPML.pmlVelocity .= v3o
+                                  return False
+                                else
+                                  slideMove planes' timeLeft' primalVelocity numPlanes'' (idx + 1) maxIdx
+
+        modifyOriginalVelocity :: V.Vector (V3 Float) -> Int -> Int -> Quake Int
+        modifyOriginalVelocity planes idx maxIdx
+          | idx >= maxIdx = return idx
+          | otherwise = do
+              velocity <- use $ pMoveGlobals.pmPML.pmlVelocity
+              let velocity' = clipVelocity velocity (planes V.! idx) 1.01
+              pMoveGlobals.pmPML.pmlVelocity .= velocity'
+              let j = checkVelocity planes velocity' idx 0 maxIdx
+              if j == maxIdx
+                then return idx
+                else modifyOriginalVelocity planes (idx + 1) maxIdx
+
+        checkVelocity :: V.Vector (V3 Float) -> V3 Float -> Int -> Int -> Int -> Int
+        checkVelocity planes velocity i idx maxIdx
+          | idx >= maxIdx = idx
+          | i == idx = checkVelocity planes velocity i (idx + 1) maxIdx
+          | otherwise = let result = velocity `dot` (planes V.! idx)
+                        in if result < 0
+                             then idx
+                             else checkVelocity planes velocity i (idx + 1) maxIdx
+
+-- Slide off of the impacting object returns the blocked flags (1 = floor, 2 = step / wall)
+clipVelocity :: V3 Float -> V3 Float -> Float -> V3 Float
+clipVelocity v normal overbounce =
+    let backoff = (v `dot` normal) * overbounce
+        change = fmap (* backoff) normal
+        V3 a b c = v - change
+        a' = if a > negate Constants.moveStopEpsilon && a < Constants.moveStopEpsilon then 0 else a
+        b' = if b > negate Constants.moveStopEpsilon && b < Constants.moveStopEpsilon then 0 else b
+        c' = if c > negate Constants.moveStopEpsilon && c < Constants.moveStopEpsilon then 0 else c
+    in V3 a' b' c'
 
 checkJump :: Quake ()
 checkJump = do
