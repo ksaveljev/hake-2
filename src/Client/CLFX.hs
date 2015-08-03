@@ -6,7 +6,8 @@ module Client.CLFX where
 -- Client Graphics Effects
 
 import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
-import Control.Monad (unless, when)
+import Control.Monad (unless, when, liftM)
+import Data.Bits ((.&.))
 import Data.Char (ord)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
@@ -16,9 +17,12 @@ import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import qualified Constants
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
+import qualified Sound.S as S
+import qualified Util.Lib as Lib
 
 instantParticle :: Float
 instantParticle = -10000.0
@@ -121,9 +125,44 @@ teleporterParticles :: EntityStateT -> Quake ()
 teleporterParticles _ = do
     io (putStrLn "CLFX.teleporterParticles") >> undefined -- TODO
 
+{-
+- ============== CL_EntityEvent ==============
+- 
+- An entity has just been parsed that has an event value
+- 
+- the female events are there for backwards compatability
+-}
 entityEvent :: EntityStateT -> Quake ()
-entityEvent _ = do
-    io (putStrLn "CLFX.entityEvent") >> undefined -- TODO
+entityEvent entityState = do
+    if | (entityState^.esEvent) == Constants.evItemRespawn -> do
+           sfx <- S.registerSound "items/respawn1.wav"
+           S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+           itemRespawnParticles (entityState^.esOrigin)
+
+       | (entityState^.esEvent) == Constants.evPlayerTeleport -> do
+           sfx <- S.registerSound "misc/tele1.wav"
+           S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+           teleportParticles (entityState^.esOrigin)
+
+       | (entityState^.esEvent) == Constants.evFootstep -> do
+           footstepsValue <- liftM (^.cvValue) clFootstepsCVar
+           when (footstepsValue /= 0) $ do
+             r <- Lib.rand
+             let idx = fromIntegral (r .&. 3)
+             Just sfx <- preuse $ clTEntGlobals.clteSfxFootsteps.ix idx
+             S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanBody sfx 1 Constants.attnNorm 0
+
+       | (entityState^.esEvent) == Constants.evFallShort -> do
+           sfx <- S.registerSound "player/land1.wav"
+           S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+
+       | (entityState^.esEvent) == Constants.evFall -> do
+           sfx <- S.registerSound "*fall2.wav"
+           S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+
+       | (entityState^.esEvent) == Constants.evFallFar -> do
+           sfx <- S.registerSound "*fall1.wav"
+           S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
 
 addParticles :: Quake ()
 addParticles = do
@@ -212,3 +251,11 @@ addLightStyles = do
               let ls = lightStyles V.! idx
               ClientV.addLightStyle idx (ls^.clsValue._x) (ls^.clsValue._y) (ls^.clsValue._z)
               addLightStyle lightStyles (idx + 1) maxIdx
+
+itemRespawnParticles :: V3 Float -> Quake ()
+itemRespawnParticles _ = do
+    io (putStrLn "CLFX.itemRespawnParticles") >> undefined -- TODO
+
+teleportParticles :: V3 Float -> Quake ()
+teleportParticles _ = do
+    io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO

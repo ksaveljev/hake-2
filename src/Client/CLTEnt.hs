@@ -523,136 +523,136 @@ parseTEnt = do
 
          -- bullet hitting flesh
     if | entType == Constants.teBlood -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 1") >> undefined -- TODO
 
          -- bullet hitting wall
        | any (== entType) [Constants.teGunshot, Constants.teSparks, Constants.teBulletSparks] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 2") >> undefined -- TODO
 
        | any (== entType) [Constants.teScreenSparks, Constants.teShieldSparks] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 3") >> undefined -- TODO
 
          -- bullet hitting wall
        | entType == Constants.teShotgun -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 4") >> undefined -- TODO
 
          -- bullet hitting water
        | entType == Constants.teSplash -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 5") >> undefined -- TODO
 
        | entType == Constants.teLaserSparks -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 6") >> undefined -- TODO
 
        | entType == Constants.teBlueHyperblaster -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 7") >> undefined -- TODO
 
          -- blaster hitting wall
        | entType == Constants.teBlaster -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 8") >> undefined -- TODO
 
          -- railgun effect
        | entType == Constants.teRailTrail -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 9") >> undefined -- TODO
 
        | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 10") >> undefined -- TODO
 
        | entType == Constants.tePlasmaExplosion -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 11") >> undefined -- TODO
 
        | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 12") >> undefined -- TODO
 
        | entType == Constants.teBfgExplosion -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 13") >> undefined -- TODO
 
        | entType == Constants.teBfgBigExplosion -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 14") >> undefined -- TODO
 
        | entType == Constants.teBfgLaser -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 15") >> undefined -- TODO
 
        | entType == Constants.teBubbleTrail -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 16") >> undefined -- TODO
 
        | any (== entType) [Constants.teParasiteAttack, Constants.teMedicCableAttack] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 17") >> undefined -- TODO
 
          -- boss teleporting to station
        | entType == Constants.teBossTPort -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 18") >> undefined -- TODO
 
        | entType == Constants.teGrappleCable -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 19") >> undefined -- TODO
 
        | entType == Constants.teWeldingSparks -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 20") >> undefined -- TODO
 
        | entType == Constants.teGreenBlood -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 21") >> undefined -- TODO
 
        | entType == Constants.teTunnelSparks -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 22") >> undefined -- TODO
 
        | any (== entType) [Constants.teBlaster2, Constants.teFlechette] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 23") >> undefined -- TODO
 
        | entType == Constants.teLightning -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 24") >> undefined -- TODO
 
        | entType == Constants.teDebugTrail -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 25") >> undefined -- TODO
 
        | entType == Constants.tePlainExplosion -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 26") >> undefined -- TODO
 
        | entType == Constants.teFlashlight -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 27") >> undefined -- TODO
 
        | entType == Constants.teForceWall -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 28") >> undefined -- TODO
 
        | entType == Constants.teHeatBeam -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 29") >> undefined -- TODO
 
        | entType == Constants.teMonsterHeatBeam -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 30") >> undefined -- TODO
 
        | entType == Constants.teHeatBeamSparks -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 31") >> undefined -- TODO
 
        | entType == Constants.teHeatBeamSteam -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 32") >> undefined -- TODO
 
        | entType == Constants.teSteam -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 33") >> undefined -- TODO
 
        | entType == Constants.teBubbleTrail2 -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 34") >> undefined -- TODO
 
        | entType == Constants.teMoreBlood -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 35") >> undefined -- TODO
 
        | entType == Constants.teChainFistSmoke -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 36") >> undefined -- TODO
 
        | entType == Constants.teElectricSparks -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 37") >> undefined -- TODO
 
        | entType == Constants.teTrackerExplosion -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 38") >> undefined -- TODO
 
        | any (== entType) [Constants.teTeleportEffect, Constants.teDBallGoal] -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 39") >> undefined -- TODO
 
        | entType == Constants.teWidowBeamOut -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 40") >> undefined -- TODO
 
        | entType == Constants.teNukeBlast -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 41") >> undefined -- TODO
 
        | entType == Constants.teWidowSplash -> do
-           undefined -- TODO
+           io (print "CLTEnt.parseTEnt 42") >> undefined -- TODO
 
        | otherwise -> do
            Com.comError Constants.errDrop "CL_ParseTEnt: bad type"
