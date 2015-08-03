@@ -259,3 +259,7 @@ itemRespawnParticles _ = do
 teleportParticles :: V3 Float -> Quake ()
 teleportParticles _ = do
     io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO
+    
+particleEffect :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+particleEffect _ _ _ _ = do
+    io (putStrLn "CLFX.particleEffect") >> undefined -- TODO

@@ -14,6 +14,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Client.CLFX as CLFX
 import qualified Client.CLNewFX as CLNewFX
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
@@ -523,7 +524,9 @@ parseTEnt = do
 
          -- bullet hitting flesh
     if | entType == Constants.teBlood -> do
-           io (print "CLTEnt.parseTEnt 1") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           CLFX.particleEffect pos dir 0xE8 60
 
          -- bullet hitting wall
        | any (== entType) [Constants.teGunshot, Constants.teSparks, Constants.teBulletSparks] -> do
