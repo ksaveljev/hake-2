@@ -9,13 +9,16 @@ import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import qualified Constants
 import qualified Client.CLNewFX as CLNewFX
 import {-# SOURCE #-} qualified Client.V as ClientV
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import qualified QCommon.MSG as MSG
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -39,6 +42,9 @@ exPoly = 5
 
 exPoly2 :: Int
 exPoly2 = 6
+
+splashColor :: UV.Vector Int
+splashColor = UV.fromList [ 0x00, 0xe0, 0xb0, 0x50, 0xd0, 0xe0, 0xe8 ]
 
 clearTEnts :: Quake ()
 clearTEnts = do
@@ -510,3 +516,143 @@ processSustain = do
                  | otherwise -> return ()
 
               process sustains time (idx + 1) maxIdx
+
+parseTEnt :: Quake ()
+parseTEnt = do
+    entType <- MSG.readByte (globals.netMessage)
+
+         -- bullet hitting flesh
+    if | entType == Constants.teBlood -> do
+           undefined -- TODO
+
+         -- bullet hitting wall
+       | any (== entType) [Constants.teGunshot, Constants.teSparks, Constants.teBulletSparks] -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teScreenSparks, Constants.teShieldSparks] -> do
+           undefined -- TODO
+
+         -- bullet hitting wall
+       | entType == Constants.teShotgun -> do
+           undefined -- TODO
+
+         -- bullet hitting water
+       | entType == Constants.teSplash -> do
+           undefined -- TODO
+
+       | entType == Constants.teLaserSparks -> do
+           undefined -- TODO
+
+       | entType == Constants.teBlueHyperblaster -> do
+           undefined -- TODO
+
+         -- blaster hitting wall
+       | entType == Constants.teBlaster -> do
+           undefined -- TODO
+
+         -- railgun effect
+       | entType == Constants.teRailTrail -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
+           undefined -- TODO
+
+       | entType == Constants.tePlasmaExplosion -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
+           undefined -- TODO
+
+       | entType == Constants.teBfgExplosion -> do
+           undefined -- TODO
+
+       | entType == Constants.teBfgBigExplosion -> do
+           undefined -- TODO
+
+       | entType == Constants.teBfgLaser -> do
+           undefined -- TODO
+
+       | entType == Constants.teBubbleTrail -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teParasiteAttack, Constants.teMedicCableAttack] -> do
+           undefined -- TODO
+
+         -- boss teleporting to station
+       | entType == Constants.teBossTPort -> do
+           undefined -- TODO
+
+       | entType == Constants.teGrappleCable -> do
+           undefined -- TODO
+
+       | entType == Constants.teWeldingSparks -> do
+           undefined -- TODO
+
+       | entType == Constants.teGreenBlood -> do
+           undefined -- TODO
+
+       | entType == Constants.teTunnelSparks -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teBlaster2, Constants.teFlechette] -> do
+           undefined -- TODO
+
+       | entType == Constants.teLightning -> do
+           undefined -- TODO
+
+       | entType == Constants.teDebugTrail -> do
+           undefined -- TODO
+
+       | entType == Constants.tePlainExplosion -> do
+           undefined -- TODO
+
+       | entType == Constants.teFlashlight -> do
+           undefined -- TODO
+
+       | entType == Constants.teForceWall -> do
+           undefined -- TODO
+
+       | entType == Constants.teHeatBeam -> do
+           undefined -- TODO
+
+       | entType == Constants.teMonsterHeatBeam -> do
+           undefined -- TODO
+
+       | entType == Constants.teHeatBeamSparks -> do
+           undefined -- TODO
+
+       | entType == Constants.teHeatBeamSteam -> do
+           undefined -- TODO
+
+       | entType == Constants.teSteam -> do
+           undefined -- TODO
+
+       | entType == Constants.teBubbleTrail2 -> do
+           undefined -- TODO
+
+       | entType == Constants.teMoreBlood -> do
+           undefined -- TODO
+
+       | entType == Constants.teChainFistSmoke -> do
+           undefined -- TODO
+
+       | entType == Constants.teElectricSparks -> do
+           undefined -- TODO
+
+       | entType == Constants.teTrackerExplosion -> do
+           undefined -- TODO
+
+       | any (== entType) [Constants.teTeleportEffect, Constants.teDBallGoal] -> do
+           undefined -- TODO
+
+       | entType == Constants.teWidowBeamOut -> do
+           undefined -- TODO
+
+       | entType == Constants.teNukeBlast -> do
+           undefined -- TODO
+
+       | entType == Constants.teWidowSplash -> do
+           undefined -- TODO
+
+       | otherwise -> do
+           Com.comError Constants.errDrop "CL_ParseTEnt: bad type"

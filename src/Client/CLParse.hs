@@ -24,6 +24,7 @@ import qualified Constants
 import qualified Client.CL as CL
 import qualified Client.CLEnts as CLEnts
 import qualified Client.CLFX as CLFX
+import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import qualified QCommon.CBuf as CBuf
@@ -111,7 +112,7 @@ parseServerMessage = do
 
                      | cmd == Constants.svcSpawnBaseline -> parseBaseline
 
-                     | cmd == Constants.svcTempEntity -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcTempEntity") >> undefined -- TODO
+                     | cmd == Constants.svcTempEntity -> CLTEnt.parseTEnt
 
                      | cmd == Constants.svcMuzzleFlash -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcMuzzleFlash") >> undefined -- TODO
 
