@@ -391,3 +391,7 @@ rAddSkySurface surfRef = do
 
     -- calculate vertex values for sky box
     io (putStrLn "IMPLEMENT ME! Warp.rAddSkySurface") >> return () -- TODO
+
+emitWaterPolys :: IORef MSurfaceT -> Quake ()
+emitWaterPolys _ = do
+    io (putStrLn "Warp.emitWaterPolys") >> undefined -- TODO

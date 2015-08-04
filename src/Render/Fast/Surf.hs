@@ -9,6 +9,7 @@ import Data.Char (toUpper)
 import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
 import Data.Maybe (fromJust, isNothing)
 import Data.Word (Word8)
+import Foreign.Marshal.Array (withArray)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -427,9 +428,61 @@ rDrawWorld = do
       Warp.drawSkyBox
       drawTriangleOutlines
 
+{-
+- R_DrawAlphaSurfaces
+- Draw water surfaces and windows.
+- The BSP tree is waled front to back, so unwinding the chain
+- of alpha_surfaces will draw back to front, giving proper ordering.
+-}
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
-    io (putStrLn "IMPLEMENT ME! Surf.rDrawAlphaSurfaces") >> return () -- TODO
+    worldMatrix <- use $ fastRenderAPIGlobals.frWorldMatrix
+
+    io $ withArray worldMatrix $ \ptr -> GL.glLoadMatrixf ptr
+
+    GL.glEnable GL.gl_BLEND
+    Image.glTexEnv GL.gl_MODULATE
+
+    glState <- use $ fastRenderAPIGlobals.frGLState
+    let intens = glState^.glsInverseIntensity
+
+    polygonBuffer <- use $ fastRenderAPIGlobals.frPolygonBuffer
+    io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+      GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
+
+    alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
+    drawSurfaces (realToFrac intens) alphaSurfaces
+
+    Image.glTexEnv GL.gl_REPLACE
+    GL.glColor4f 1 1 1 1
+    GL.glDisable GL.gl_BLEND
+
+    fastRenderAPIGlobals.frAlphaSurfaces .= Nothing
+
+  where drawSurfaces :: GL.GLfloat -> Maybe (IORef MSurfaceT) -> Quake ()
+        drawSurfaces _ Nothing = return ()
+        drawSurfaces intens (Just surfRef) = do
+          surf <- io $ readIORef surfRef
+          image <- io $ readIORef (fromJust $ surf^.msTexInfo.mtiImage)
+          Image.glBind (image^.iTexNum)
+
+          fastRenderAPIGlobals.frCBrushPolys += 1
+
+          if | (surf^.msTexInfo.mtiFlags) .&. Constants.surfTrans33 /= 0 ->
+                 GL.glColor4f intens intens intens 0.33
+             | (surf^.msTexInfo.mtiFlags) .&. Constants.surfTrans66 /= 0 ->
+                 GL.glColor4f intens intens intens 0.66
+             | otherwise ->
+                 GL.glColor4f intens intens intens 1
+
+          if | (surf^.msFlags) .&. Constants.surfDrawTurb /= 0 ->
+                 Warp.emitWaterPolys surfRef
+             | (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0 ->
+                 drawGLFlowingPoly (fromJust $ surf^.msPolys)
+             | otherwise ->
+                 drawGLPoly (fromJust $ surf^.msPolys)
+
+          drawSurfaces intens (surf^.msTextureChain)
 
 drawTextureChains :: Quake ()
 drawTextureChains = do
@@ -877,6 +930,7 @@ rDrawBrushModel entRef = do
     currentModel <- io $ readIORef currentModelRef
 
     unless ((currentModel^.mNumModelSurfaces) == 0) $ do
+      io (print "rDrawBrushModel")
       fastRenderAPIGlobals.frCurrentEntity .= Just entRef
       fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
 
@@ -980,14 +1034,16 @@ rDrawInlineBModel = do
               let dot' = modelOrg `dot` (pplane^.cpNormal) - (pplane^.cpDist)
 
               -- draw the polygon
-              when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate RenderAPIConstants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > RenderAPIConstants.backfaceEpsilon) $
+              when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate RenderAPIConstants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > RenderAPIConstants.backfaceEpsilon) $ do
+                io (print "DRAW MAIN")
+
                 if | (psurf^.msTexInfo.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 -> do
                        -- add to the translucent chain
                        alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
                        io $ modifyIORef' psurfRef (\v -> v { _msTextureChain = alphaSurfaces })
                        fastRenderAPIGlobals.frAlphaSurfaces .= Just psurfRef
 
-                   | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 ->
+                   | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 -> do
                        glRenderLightmappedPoly psurfRef
 
                    | otherwise -> do
@@ -996,3 +1052,13 @@ rDrawInlineBModel = do
                        Image.glEnableMultiTexture True
 
               drawTexture currentModel (idx + 1) maxIdx
+
+drawGLFlowingPoly :: GLPolyReference -> Quake ()
+drawGLFlowingPoly _ = do
+    io (putStrLn "Surf.drawGLFlowingPoly") >> undefined -- TODO
+
+drawGLPoly :: GLPolyReference -> Quake ()
+drawGLPoly (GLPolyReference polyIdx) = do
+    polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+    poly <- io $ MV.read polygonCache polyIdx
+    GL.glDrawArrays GL.gl_POLYGON (fromIntegral $ poly^.glpPos) (fromIntegral $ poly^.glpNumVerts)
