@@ -30,6 +30,7 @@ import qualified Constants
 import qualified QCommon.Com as Com
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Light as Light
+import qualified Render.Fast.Mesh as Mesh
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.Fast.Warp as Warp
@@ -871,5 +872,127 @@ rRenderBrushPoly _ = do
     io (putStrLn "Surf.rRenderBrushPoly") >> undefined -- TODO
 
 rDrawBrushModel :: IORef EntityT -> Quake ()
-rDrawBrushModel _ = do
-    io (putStrLn "Surf.rDrawBrushModel") >> undefined -- TODO
+rDrawBrushModel entRef = do
+    Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
+    currentModel <- io $ readIORef currentModelRef
+
+    unless ((currentModel^.mNumModelSurfaces) == 0) $ do
+      fastRenderAPIGlobals.frCurrentEntity .= Just entRef
+      fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
+
+      e <- io $ readIORef entRef
+
+      let (rotated, mins, maxs) = if (e^.eAngles._x) /= 0 || (e^.eAngles._y) /= 0 || (e^.eAngles._z) /= 0
+                                    then (True, fmap (subtract (currentModel^.mRadius)) (e^.eOrigin), fmap (+ (currentModel^.mRadius)) (e^.eOrigin))
+                                    else (False, (e^.eOrigin) + (currentModel^.mMins), (e^.eOrigin) + (currentModel^.mMaxs))
+
+      ok <- rCullBox mins maxs
+
+      unless ok $ do
+        GL.glColor3f 1 1 1
+
+        newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+        let modelOrg = (newRefDef^.rdViewOrg) - (e^.eOrigin)
+            modelOrg' = if rotated
+                          then let org = modelOrg
+                                   (Just forward, Just right, Just up) = Math3D.angleVectors (e^.eAngles) True True True
+                               in V3 (org `dot` forward) (negate $ org `dot` right) (org `dot` up)
+                          else modelOrg
+
+        fastRenderAPIGlobals.frModelOrg .= modelOrg'
+
+        GL.glPushMatrix
+
+        Mesh.rRotateForEntity e { _eAngles = let V3 a b c = (e^.eAngles) in V3 (-a) b (-c) }
+
+        Image.glEnableMultiTexture True
+        use (fastRenderAPIGlobals.frTexture0) >>= Image.glSelectTexture
+        Image.glTexEnv GL.gl_REPLACE
+
+        polygonBuffer <- use $ fastRenderAPIGlobals.frPolygonBuffer
+        io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+          GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
+
+        use (fastRenderAPIGlobals.frTexture1) >>= Image.glSelectTexture
+        Image.glTexEnv GL.gl_MODULATE
+
+        io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
+          GL.glTexCoordPointer 2 GL.gl_FLOAT (fromIntegral byteStride) ptr
+
+        GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+        rDrawInlineBModel
+
+        use (fastRenderAPIGlobals.frTexture1) >>= \v -> GL.glClientActiveTextureARB (fromIntegral v)
+        GL.glDisableClientState GL.gl_TEXTURE_COORD_ARRAY
+
+        Image.glEnableMultiTexture False
+
+        GL.glPopMatrix
+
+rDrawInlineBModel :: Quake ()
+rDrawInlineBModel = do
+    Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
+    currentModel <- io $ readIORef currentModelRef
+
+    -- calculate dynamic lighting for bmodel
+    flashBlendValue <- liftM (^.cvValue) glFlashBlendCVar
+
+    when (flashBlendValue == 0) $ do
+      newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+      let firstNodeRef = (currentModel^.mNodes) V.! (currentModel^.mFirstNode)
+      markLights (MNodeChildReference firstNodeRef) newRefDef 0 (newRefDef^.rdNumDLights)
+
+    Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
+    currentEntity <- io $ readIORef currentEntityRef
+      
+    when ((currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0) $ do
+      GL.glEnable GL.gl_BLEND
+      GL.glColor4f 1 1 1 0.25
+      Image.glTexEnv GL.gl_MODULATE
+
+    -- draw texture
+    drawTexture currentModel 0 (currentModel^.mNumModelSurfaces)
+
+    when ((currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0) $ do
+      GL.glDisable GL.gl_BLEND
+      GL.glColor4f 1 1 1 1
+      Image.glTexEnv GL.gl_REPLACE
+
+  where markLights :: MNodeChild -> RefDefT -> Int -> Int -> Quake ()
+        markLights nodeChild newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Light.rMarkLights ((newRefDef^.rdDLights) V.! idx) (1 `shiftL` idx) nodeChild
+              markLights nodeChild newRefDef (idx + 1) maxIdx
+
+        drawTexture :: ModelT -> Int -> Int -> Quake ()
+        drawTexture currentModel idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let psurfRef = (currentModel^.mSurfaces) V.! ((currentModel^.mFirstModelSurface) + idx)
+              psurf <- io $ readIORef psurfRef
+
+              let Just pplaneRef = psurf^.msPlane
+              pplane <- io $ readIORef pplaneRef
+
+              modelOrg <- use $ fastRenderAPIGlobals.frModelOrg
+              let dot' = modelOrg `dot` (pplane^.cpNormal) - (pplane^.cpDist)
+
+              -- draw the polygon
+              when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate RenderAPIConstants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > RenderAPIConstants.backfaceEpsilon) $
+                if | (psurf^.msTexInfo.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 -> do
+                       -- add to the translucent chain
+                       alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
+                       io $ modifyIORef' psurfRef (\v -> v { _msTextureChain = alphaSurfaces })
+                       fastRenderAPIGlobals.frAlphaSurfaces .= Just psurfRef
+
+                   | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 ->
+                       glRenderLightmappedPoly psurfRef
+
+                   | otherwise -> do
+                       Image.glEnableMultiTexture False
+                       rRenderBrushPoly psurfRef
+                       Image.glEnableMultiTexture True
+
+              drawTexture currentModel (idx + 1) maxIdx
