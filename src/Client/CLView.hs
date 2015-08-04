@@ -98,8 +98,9 @@ prepRefresh = do
         registerModels configStrings idx maxIdx
           | idx >= maxIdx || B.length (configStrings V.! (Constants.csModels + idx)) == 0 = return ()
           | otherwise = do
-              let name = if B.length (configStrings V.! (Constants.csModels + idx)) > 37
-                           then B.take 36 (configStrings V.! (Constants.csModels + idx))
+              let fullName = configStrings V.! (Constants.csModels + idx)
+                  name = if B.length fullName > 37
+                           then B.take 36 fullName
                            else configStrings V.! (Constants.csModels + idx)
 
               when (name `BC.index` 0 /= '*') $
@@ -112,16 +113,16 @@ prepRefresh = do
                 then do -- special player weapon model
                   numWeaponModels <- use $ clientGlobals.cgNumCLWeaponModels
                   when (numWeaponModels < Constants.maxClientWeaponModels) $ do
-                    clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 name
+                    clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 fullName
                     clientGlobals.cgNumCLWeaponModels += 1
                 else do
                   Just renderer <- use $ globals.re
-                  modelRef <- (renderer^.rRefExport.reRegisterModel) name
+                  modelRef <- (renderer^.rRefExport.reRegisterModel) fullName
                   globals.cl.csModelDraw.ix idx .= modelRef
 
                   if name `BC.index` 0 == '*'
                     then do
-                      inlineModelRef <- CM.inlineModel name
+                      inlineModelRef <- CM.inlineModel fullName
                       globals.cl.csModelClip.ix idx .= Just inlineModelRef
                     else
                       globals.cl.csModelClip.ix idx .= Nothing

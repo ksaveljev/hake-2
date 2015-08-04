@@ -385,5 +385,9 @@ makeSkyVec s t axis = do
     GL.glVertex3f (v1^._x) (v1^._y) (v1^._z)
 
 rAddSkySurface :: IORef MSurfaceT -> Quake ()
-rAddSkySurface _ = do
+rAddSkySurface surfRef = do
+    surf <- io $ readIORef surfRef
+    origin <- use $ fastRenderAPIGlobals.frOrigin
+
+    -- calculate vertex values for sky box
     io (putStrLn "IMPLEMENT ME! Warp.rAddSkySurface") >> return () -- TODO

@@ -984,6 +984,7 @@ rDrawEntitiesOnList = do
 
     unless (drawEntitiesValue == 0) $ do
       newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+
       -- draw non-transparent first
       drawNonTransparentEntities newRefDef 0 (newRefDef^.rdNumEntities)
 
@@ -1006,7 +1007,7 @@ rDrawEntitiesOnList = do
               if | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 ->
                      drawNonTransparentEntities newRefDef (idx + 1) maxIdx
 
-                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 ->
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 -> do
                      rDrawBeam currentEntity
 
                  | otherwise -> do
@@ -1043,7 +1044,7 @@ rDrawEntitiesOnList = do
               if | (currentEntity^.enFlags) .&. Constants.rfTranslucent == 0 ->
                      drawTransparentEntities newRefDef (idx + 1) maxIdx
 
-                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 ->
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 -> do
                      rDrawBeam currentEntity
 
                  | otherwise -> do

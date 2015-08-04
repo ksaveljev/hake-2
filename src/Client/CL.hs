@@ -873,7 +873,7 @@ requestNextDownload = do
               (done, continue) <- checkWildcard str
                                     >>= checkPrecacheModelSkin str
                                     >>= checkPrecacheModel str
-                
+
               if | done -> return True
                  | continue -> downloadModels configStrings
                  | otherwise -> do
@@ -889,7 +889,7 @@ requestNextDownload = do
                          clientGlobals.cgPrecacheModel .= Nothing
                          clientGlobals.cgPrecacheModelSkin .= 0
                          clientGlobals.cgPrecacheCheck += 1
-                         return False
+                         downloadModels configStrings
 
             else
               return False

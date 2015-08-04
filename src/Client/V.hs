@@ -3,8 +3,8 @@ module Client.V where
 
 import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse)
 import Control.Monad (void, unless, liftM, when)
-import Data.IORef (IORef)
-import Data.Maybe (isJust)
+import Data.IORef (IORef, readIORef)
+import Data.Maybe (isJust, fromJust)
 import Linear (V3(..), V4(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC

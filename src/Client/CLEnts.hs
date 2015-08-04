@@ -965,6 +965,7 @@ addPacketEntities frame = do
                        >>= checkPowerScreen effects
                        >>= addAutomaticParticleTrails effects s1 cent
                        >>= copyOrigin s1
+                       >>= \v -> addEntity autoRotate autoAnim v (pNum + 1) maxPNum
 
         setFrame :: Int -> EntityStateT -> Int -> Int
         setFrame autoAnim s1 time =
@@ -1046,7 +1047,7 @@ addPacketEntities frame = do
                                          return (skin, model)
 
                   return (ent^.eAlpha, skinNum, skin', model')
-                else
+                else do
                   return (ent^.eAlpha, s1^.esSkinNum, Nothing, (cl'^.csModelDraw) V.! (s1^.esModelIndex))
 
         calcAngles :: ClientStateT -> EntityStateT -> V3 Float -> CEntityT -> Float -> Int -> Quake (V3 Float)
@@ -1242,6 +1243,7 @@ addPacketEntities frame = do
             else
               return ent
 
-        copyOrigin :: EntityStateT -> EntityT -> Quake ()
-        copyOrigin s1 ent =
+        copyOrigin :: EntityStateT -> EntityT -> Quake EntityT
+        copyOrigin s1 ent = do
           globals.clEntities.ix (s1^.esNumber).ceLerpOrigin .= (ent^.eOrigin)
+          return ent
