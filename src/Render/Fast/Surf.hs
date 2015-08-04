@@ -232,9 +232,6 @@ lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock dynamic = do
     lms <- use $ fastRenderAPIGlobals.frGLLms
 
-    -- io $ print "LM_UPLOADBLOCK"
-    -- io $ print (lms^.lmsCurrentLightmapTexture)
-
     let texture = if dynamic
                     then 0
                     else lms^.lmsCurrentLightmapTexture
@@ -400,17 +397,19 @@ rDrawWorld = do
 
       Image.glEnableMultiTexture True
 
-      Image.glSelectTexture QGLConstants.glTexture0
+      use (fastRenderAPIGlobals.frTexture0) >>= Image.glSelectTexture
       Image.glTexEnv GL.gl_REPLACE
 
       polygonBuffer <- use $ fastRenderAPIGlobals.frPolygonBuffer
       io $ MSV.unsafeWith polygonBuffer $ \ptr ->
         GL.glInterleavedArrays GL.gl_T2F_V3F (fromIntegral byteStride) ptr
 
-      Image.glSelectTexture QGLConstants.glTexture1
+      use (fastRenderAPIGlobals.frTexture1) >>= Image.glSelectTexture
 
       io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
         GL.glTexCoordPointer 2 GL.gl_FLOAT (fromIntegral byteStride) ptr
+
+      GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY
 
       lightmapValue <- liftM (^.cvValue) glLightMapCVar
       if lightmapValue /= 0
@@ -421,7 +420,7 @@ rDrawWorld = do
 
       recursiveWorldNode ((worldModel^.mNodes) V.! 0) -- root node
 
-      GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture1)
+      use (fastRenderAPIGlobals.frTexture1) >>= GL.glClientActiveTextureARB . fromIntegral
       GL.glDisableClientState GL.gl_TEXTURE_COORD_ARRAY
 
       Image.glEnableMultiTexture False
@@ -438,7 +437,6 @@ rDrawWorld = do
 -}
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
-    io (print "rDrawAlphaSurfaces")
     worldMatrix <- use $ fastRenderAPIGlobals.frWorldMatrix
 
     io $ withArray worldMatrix $ \ptr -> GL.glLoadMatrixf ptr
@@ -648,7 +646,7 @@ recursiveWorldNode nodeRef = do
                          fastRenderAPIGlobals.frAlphaSurfaces .= Just surfRef
                      | otherwise -> do
                          if (surf^.msFlags) .&. Constants.surfDrawTurb == 0
-                           then
+                           then do
                              glRenderLightmappedPoly surfRef
                            else do
                              -- the polygon is visible, so add it to the
@@ -933,7 +931,6 @@ rDrawBrushModel entRef = do
     currentModel <- io $ readIORef currentModelRef
 
     unless ((currentModel^.mNumModelSurfaces) == 0) $ do
-      io (print "rDrawBrushModel")
       fastRenderAPIGlobals.frCurrentEntity .= Just entRef
       fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
 
@@ -1043,17 +1040,14 @@ rDrawInlineBModel = do
                        alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
                        io $ modifyIORef' psurfRef (\v -> v { _msTextureChain = alphaSurfaces })
                        fastRenderAPIGlobals.frAlphaSurfaces .= Just psurfRef
-                       io (print "added alpha surfaces")
 
                    | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 -> do
                        glRenderLightmappedPoly psurfRef
-                       io (print "drew lightmapped poly")
 
                    | otherwise -> do
                        Image.glEnableMultiTexture False
                        rRenderBrushPoly psurfRef
                        Image.glEnableMultiTexture True
-                       io (print "rendered brush poly")
 
               drawTexture currentModel (idx + 1) maxIdx
 
