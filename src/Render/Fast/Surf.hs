@@ -226,6 +226,8 @@ glBuildPolygonFromSurface surfRef = do
               Polygon.setPolyS2 polyRef idx d
               Polygon.setPolyT2 polyRef idx d'
 
+              doStuffWithVerts surf model image polyRef (idx + 1) maxIdx
+
 lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock dynamic = do
     lms <- use $ fastRenderAPIGlobals.frGLLms
@@ -436,6 +438,7 @@ rDrawWorld = do
 -}
 rDrawAlphaSurfaces :: Quake ()
 rDrawAlphaSurfaces = do
+    io (print "rDrawAlphaSurfaces")
     worldMatrix <- use $ fastRenderAPIGlobals.frWorldMatrix
 
     io $ withArray worldMatrix $ \ptr -> GL.glLoadMatrixf ptr
@@ -1035,21 +1038,22 @@ rDrawInlineBModel = do
 
               -- draw the polygon
               when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate RenderAPIConstants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > RenderAPIConstants.backfaceEpsilon) $ do
-                io (print "DRAW MAIN")
-
                 if | (psurf^.msTexInfo.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 -> do
                        -- add to the translucent chain
                        alphaSurfaces <- use $ fastRenderAPIGlobals.frAlphaSurfaces
                        io $ modifyIORef' psurfRef (\v -> v { _msTextureChain = alphaSurfaces })
                        fastRenderAPIGlobals.frAlphaSurfaces .= Just psurfRef
+                       io (print "added alpha surfaces")
 
                    | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 -> do
                        glRenderLightmappedPoly psurfRef
+                       io (print "drew lightmapped poly")
 
                    | otherwise -> do
                        Image.glEnableMultiTexture False
                        rRenderBrushPoly psurfRef
                        Image.glEnableMultiTexture True
+                       io (print "rendered brush poly")
 
               drawTexture currentModel (idx + 1) maxIdx
 
