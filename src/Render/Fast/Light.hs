@@ -15,6 +15,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
@@ -224,8 +225,8 @@ rSetCacheState surfRef = do
 - 
 - Combine and scale multiple lightmaps into the floating format in blocklights
 -}
-rBuildLightMap :: MSurfaceT -> Int -> Quake B.ByteString
-rBuildLightMap surf stride = do
+rBuildLightMap :: MSurfaceT -> MSV.IOVector Word8 -> Int -> Int -> Quake ()
+rBuildLightMap surf buffer offset stride = do
     when ((surf^.msTexInfo.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) /= 0) $
       Com.comError Constants.errDrop "R_BuildLightMap called for non-lit surface"
 
@@ -275,9 +276,9 @@ rBuildLightMap surf stride = do
     monoLightMap <- liftM (^.cvString) glMonoLightMapCVar
     blockLights' <- use $ fastRenderAPIGlobals.frBlockLights
 
-    return $ if monoLightMap `BC.index` 0 == '0'
-               then buildLightMap blockLights' 0 stride' 0 tmax 0 smax mempty
-               else buildLightMapAlpha monoLightMap blockLights' 0 stride' 0 tmax 0 smax mempty
+    if monoLightMap `BC.index` 0 == '0'
+      then io $ buildLightMap blockLights' 0 stride' offset 0 tmax 0 smax
+      else io $ buildLightMapAlpha monoLightMap blockLights' 0 stride' offset 0 tmax 0 smax
 
   where addLightMaps :: UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
         addLightMaps blockLights lightmap lightmapIndex newRefDef glModulateValue size idx maxIdx
@@ -343,11 +344,11 @@ rBuildLightMap surf stride = do
                   c = (blockLights UV.! (idx * 3 + 2)) + scale2 * (fromIntegral $ lightmap `B.index` (lightmapIndex + 2))
               in updateLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
 
-        buildLightMap :: UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-        buildLightMap blockLights blp stride i tmax j smax builder
-          | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
-          | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
-          | otherwise =
+        buildLightMap :: UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+        buildLightMap blockLights blp stride currentOffset i tmax j smax
+          | i >= tmax = return ()
+          | j >= smax = buildLightMap blockLights blp stride (currentOffset + stride) (i + 1) tmax 0 smax
+          | otherwise = do
               let r = (truncate $ blockLights UV.! (blp + 0)) :: Int
                   g = (truncate $ blockLights UV.! (blp + 1)) :: Int
                   b = (truncate $ blockLights UV.! (blp + 2)) :: Int
@@ -368,13 +369,19 @@ rBuildLightMap surf stride = do
                   g'' = if brightest > 255 then truncate (fromIntegral g' * t) else fromIntegral g'
                   b'' = if brightest > 255 then truncate (fromIntegral b' * t) else fromIntegral b'
                   a' = if brightest > 255 then truncate (fromIntegral a * t) else fromIntegral a
-              in buildLightMap blockLights (blp + 3) stride i tmax (j + 1) smax (builder <> BB.word8 r'' <> BB.word8 g'' <> BB.word8 b'' <> BB.word8 a')
 
-        buildLightMapAlpha :: B.ByteString -> UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-        buildLightMapAlpha monoLightMap blockLights blp stride i tmax j smax builder
-          | i >= tmax = BL.toStrict (BB.toLazyByteString builder)
-          | j >= smax = buildLightMap blockLights blp stride (i + 1) tmax 0 smax (fillStride builder 0 stride)
-          | otherwise =
+              MSV.write buffer (currentOffset + 0) r''
+              MSV.write buffer (currentOffset + 1) g''
+              MSV.write buffer (currentOffset + 2) b''
+              MSV.write buffer (currentOffset + 3) a'
+
+              buildLightMap blockLights (blp + 3) stride (currentOffset + 4) i tmax (j + 1) smax
+
+        buildLightMapAlpha :: B.ByteString -> UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+        buildLightMapAlpha monoLightMap blockLights blp stride currentOffset i tmax j smax
+          | i >= tmax = return ()
+          | j >= smax = buildLightMap blockLights blp stride (currentOffset + stride) (i + 1) tmax 0 smax
+          | otherwise = do
               let r = (truncate $ blockLights UV.! (blp + 0)) :: Int
                   g = (truncate $ blockLights UV.! (blp + 1)) :: Int
                   b = (truncate $ blockLights UV.! (blp + 2)) :: Int
@@ -398,7 +405,13 @@ rBuildLightMap surf stride = do
                   -- So if we are doing alpha lightmaps we need to set the
                   -- R, G, and B components to 0 and we need to set alpha to 1-alpha
                   (r''', g''', b''', a'') = updateRGBA monoLightMap r'' g'' b'' a'
-              in buildLightMapAlpha monoLightMap blockLights (blp + 3) stride i tmax (j + 1) smax (builder <> BB.word8 r''' <> BB.word8 g''' <> BB.word8 b''' <> BB.word8 a'')
+
+              MSV.write buffer (currentOffset + 0) r'''
+              MSV.write buffer (currentOffset + 1) g'''
+              MSV.write buffer (currentOffset + 2) b'''
+              MSV.write buffer (currentOffset + 3) a''
+
+              buildLightMapAlpha monoLightMap blockLights (blp + 3) stride (currentOffset + stride) i tmax (j + 1) smax
 
         fillStride :: BB.Builder -> Int -> Int -> BB.Builder
         fillStride builder idx maxIdx

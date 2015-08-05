@@ -147,17 +147,8 @@ glCreateSurfaceLightmap surfRef = do
 
       Light.rSetCacheState surfRef
       surf' <- io $ readIORef surfRef
-      lightmap <- Light.rBuildLightMap surf' blockWidth
-
       buffer <- use $ fastRenderAPIGlobals.frGLLms.lmsLightmapBuffer
-      io $ saveLightmap buffer lightmap ((surf'^.msLightT) * blockWidth + (surf'^.msLightS)) 0 (B.length lightmap)
-
-  where saveLightmap :: MSV.IOVector Word8 -> B.ByteString -> Int -> Int -> Int -> IO ()
-        saveLightmap buffer lightmap offset idx maxIdx
-          | idx >= maxIdx = return ()
-          | otherwise = do
-              MSV.write buffer offset (lightmap `B.index` idx)
-              saveLightmap buffer lightmap (offset + 1) (idx + 1) maxIdx
+      Light.rBuildLightMap surf' buffer (((surf'^.msLightT) * blockWidth + (surf'^.msLightS)) * lightmapBytes) (blockWidth * lightmapBytes)
 
 glBuildPolygonFromSurface :: IORef MSurfaceT -> Quake ()
 glBuildPolygonFromSurface surfRef = do
@@ -739,7 +730,8 @@ glRenderLightmappedPoly surfRef = do
                       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- Light.rBuildLightMap surf smax
+                      temp <- io $ MSV.new (4 * 128 * 128)
+                      Light.rBuildLightMap surf temp 0 (smax * 4)
                       -- io $ print "TEMPTEMPTEMP DYNAMIC"
                       -- io $ print ("flags = " ++ show (surf^.msFlags) ++
                       --             " fe = " ++ show (surf^.msFirstEdge) ++
@@ -753,7 +745,7 @@ glRenderLightmappedPoly surfRef = do
                       glState <- use $ fastRenderAPIGlobals.frGLState
                       Image.glMBind texture1 ((glState^.glsLightmapTextures) + (surf^.msLightmapTextureNum))
 
-                      io $ B.useAsCString temp $ \ptr -> do
+                      io $ MSV.unsafeWith temp $ \ptr -> do
                         GL.glTexSubImage2D GL.gl_TEXTURE_2D
                                            0
                                            (fromIntegral $ surf^.msLightS)
@@ -769,7 +761,8 @@ glRenderLightmappedPoly surfRef = do
                       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- Light.rBuildLightMap surf smax
+                      temp <- io $ MSV.new (4 * 128 * 128)
+                      Light.rBuildLightMap surf temp 0 (smax * 4)
                       -- io $ print "TEMPTEMPTEMP"
                       -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
                       -- io $ print $ (concat . map (flip showHex "") . B.unpack) temp
@@ -778,7 +771,7 @@ glRenderLightmappedPoly surfRef = do
                       glState <- use $ fastRenderAPIGlobals.frGLState
                       Image.glMBind texture1 ((glState^.glsLightmapTextures) + 0)
 
-                      io $ B.useAsCString temp $ \ptr -> do
+                      io $ MSV.unsafeWith temp $ \ptr -> do
                         GL.glTexSubImage2D GL.gl_TEXTURE_2D
                                            0
                                            (fromIntegral $ surf^.msLightS)
