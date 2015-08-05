@@ -42,10 +42,12 @@ textureArrayBuf = unsafePerformIO $ MSV.new (Constants.maxVerts * 2)
 
 rDrawAliasModel :: IORef EntityT -> Quake ()
 rDrawAliasModel entRef = do
+    io (print "rDrawAliasModel")
     e <- io $ readIORef entRef
     done <- checkIfDone e
 
     unless done $ do
+      io (print "doing something")
       Just currentModelRef <- use $ fastRenderAPIGlobals.frCurrentModel
       currentModel <- io $ readIORef currentModelRef
 
@@ -58,8 +60,8 @@ rDrawAliasModel entRef = do
       -- authors happy
       shadeLight <- buildShadeLight
 
-      -- io $ print "SHADE LIGHT"
-      -- io $ print shadeLight
+      io $ print "FINAL SHADE LIGHT"
+      io $ print shadeLight
 
       Just currentEntityRef <- use $ fastRenderAPIGlobals.frCurrentEntity
       currentEntity <- io $ readIORef currentEntityRef
@@ -89,7 +91,7 @@ rDrawAliasModel entRef = do
         GL.glPushMatrix
         GL.glLoadIdentity
         GL.glScalef (-1) 1 1 
-        myGLUPerspective (float2Double $ newRefDef^.rdFovY) (fromIntegral (newRefDef^.rdWidth) / fromIntegral (newRefDef^.rdWidth)) 4 4096
+        myGLUPerspective (float2Double $ newRefDef^.rdFovY) (fromIntegral (newRefDef^.rdWidth) / fromIntegral (newRefDef^.rdHeight)) 4 4096
         GL.glMatrixMode GL.gl_MODELVIEW
         GL.glCullFace GL.gl_BACK
 
@@ -123,6 +125,8 @@ rDrawAliasModel entRef = do
 
       currentEntity' <- io $ readIORef currentEntityRef
 
+      io (putStrLn ("backlerp = " ++ show (currentEntity^.eBackLerp)))
+      io (putStrLn ("shadeDots = " ++ show shadeDots))
       glDrawAliasFrameLerp pAliasHdr (currentEntity'^.eBackLerp) shadeLight shadeDots
 
       Image.glTexEnv GL.gl_REPLACE
@@ -189,6 +193,8 @@ rDrawAliasModel entRef = do
 
                            | otherwise -> do
                                shadeLight <- Light.rLightPoint (currentEntity^.eOrigin)
+                               io (putStrLn ("origin = " ++ show (currentEntity^.eOrigin)))
+                               io (putStrLn ("shadeLight = " ++ show shadeLight))
 
                                -- player lighting hack for communication back to server
                                -- big hack!
@@ -214,6 +220,9 @@ rDrawAliasModel entRef = do
                                                in V3 s'' s'' s''
                                           else shadeLight
 
+          io (print "SHADE LIGHT 1")
+          io (print shadeLight)
+
           let shadeLight' = if (currentEntity^.enFlags) .&. Constants.rfMinLight /= 0
                               then let v = (shadeLight^._x) > 0.1 || (shadeLight^._y) > 0.1 || (shadeLight^._z) > 0.1
                                    in if v
@@ -221,6 +230,9 @@ rDrawAliasModel entRef = do
                                         else V3 0.1 0.1 0.1
                               else
                                 shadeLight
+
+          io (print "SHADE LIGHT 2")
+          io (print shadeLight')
 
           newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
 
@@ -240,6 +252,9 @@ rDrawAliasModel entRef = do
                                  in V3 a b c
                                else
                                  shadeLight'
+
+          io (print "SHADE LIGHT 3")
+          io (print shadeLight'')
 
           let shadeLight''' = if ((newRefDef^.rdRdFlags) .&. Constants.rdfIrGoggles /= 0) && ((currentEntity^.enFlags) .&. Constants.rfIrVisible /= 0)
                                 then V3 1 0 0
@@ -492,9 +507,11 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
     GL.glClientActiveTextureARB (fromIntegral texture0)
     io $ MSV.unsafeWith textureArrayBuf $ \ptr ->
       GL.glTexCoordPointer 2 GL.gl_FLOAT 0 ptr
+    GL.glEnableClientState GL.gl_TEXTURE_COORD_ARRAY -- TODO? jake2 has this commented out?
 
     srcTextureCoords <- use $ fastRenderAPIGlobals.frModelTextureCoordBuf
     vertexIndexBuf <- use $ fastRenderAPIGlobals.frModelVertexIndexBuf
+
     io $ drawElements vertexIndexBuf srcTextureCoords 0 0 (UV.length $ pAliasHdr^.dmCounts)
 
     -- PMM - added double shell
@@ -521,6 +538,7 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
           | idx >= maxIdx = return ()
           | otherwise = do
               let count = (pAliasHdr^.dmCounts) UV.! idx
+              io (putStrLn ("count = " ++ show count))
 
               unless (count == 0) $ do
                 let (indexStartIdx, indexLength) = (pAliasHdr^.dmIndexElements) V.! idx
@@ -528,6 +546,10 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
                                        then (GL.gl_TRIANGLE_FAN, negate count)
                                        else (GL.gl_TRIANGLE_STRIP, count)
                     srcIndex = (pos `shiftL` 1) - 1
+
+                io (putStrLn ("mode = " ++ show mode))
+                io (putStrLn ("count' = " ++ show count'))
+                io (putStrLn ("srcIndex = " ++ show srcIndex))
 
                 let buf = MSV.slice indexStartIdx indexLength vertexIndexBuf
                 addTextureCoords buf srcTextureCoords srcIndex 0 (fromIntegral count')
@@ -543,10 +565,11 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
           | otherwise = do
               dstIndex <- MSV.read srcIndexBuf idx
               let dstIndex' = dstIndex `shiftL` 1
+              io (putStrLn ("dstIndex = " ++ show dstIndex'))
               a <- MSV.read srcTextureCoords (srcIndex + 1)
               b <- MSV.read srcTextureCoords (srcIndex + 2)
-              MSV.write textureArrayBuf (fromIntegral dstIndex + 0) a
-              MSV.write textureArrayBuf (fromIntegral dstIndex + 1) b
+              MSV.write textureArrayBuf (fromIntegral dstIndex' + 0) a
+              MSV.write textureArrayBuf (fromIntegral dstIndex' + 1) b
               addTextureCoords srcIndexBuf srcTextureCoords (srcIndex + 2) (idx + 1) maxIdx
 
 glLerpVerts :: Int -> UV.Vector Int -> UV.Vector Int -> V3 Float -> V3 Float -> V3 Float -> Quake ()

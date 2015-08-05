@@ -22,6 +22,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
+import Text.Printf (printf)
+
 import Quake
 import QuakeState
 import QCommon.QFiles.BSP.DFaceT
@@ -829,10 +831,10 @@ precompileGLCmds model = do
         setTextureAndVertex textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex tmp = do
           let count :: Int32 = fromIntegral (order UV.! orderIndex)
 
-          if (count == 0)
+          if count /= 0
             then do
               let count' = if count < 0 then -count else count
-              (textureCoordIdx', vertexIndexIdx', orderIndex') <- setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex count'
+              (textureCoordIdx', vertexIndexIdx', orderIndex') <- setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx (orderIndex + 1) count'
               setTextureAndVertex textureBuf vertexBuf order textureCoordIdx' vertexIndexIdx' orderIndex' (count : tmp)
             else
               return (tmp, textureCoordIdx, vertexIndexIdx)
