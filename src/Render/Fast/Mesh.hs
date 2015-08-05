@@ -488,6 +488,7 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
     glLerpVerts (pAliasHdr^.dmNumXYZ) (oldFrame^.dafVerts) (frame^.dafVerts) move' frontV' backV'
 
     vertexArrayBuf <- use $ fastRenderAPIGlobals.frVertexArrayBuf
+    GL.glEnableClientState GL.gl_VERTEX_ARRAY
     io $ MSV.unsafeWith vertexArrayBuf $ \ptr ->
       GL.glVertexPointer 3 GL.gl_FLOAT 0 ptr
 
@@ -504,6 +505,7 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
         io $ prelight (frame^.dafVerts) alpha 0 0 (pAliasHdr^.dmNumXYZ)
 
     texture0 <- use $ fastRenderAPIGlobals.frTexture0
+    io (putStrLn ("texture0 = " ++ show texture0))
     GL.glClientActiveTextureARB (fromIntegral texture0)
     io $ MSV.unsafeWith textureArrayBuf $ \ptr ->
       GL.glTexCoordPointer 2 GL.gl_FLOAT 0 ptr
@@ -566,8 +568,10 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
               dstIndex <- MSV.read srcIndexBuf idx
               let dstIndex' = dstIndex `shiftL` 1
               io (putStrLn ("dstIndex = " ++ show dstIndex'))
-              a <- MSV.read srcTextureCoords (srcIndex + 1)
-              b <- MSV.read srcTextureCoords (srcIndex + 2)
+              a <- MSV.read srcTextureCoords ((pAliasHdr^.dmTextureCoordBufIdx) + (srcIndex + 1))
+              b <- MSV.read srcTextureCoords ((pAliasHdr^.dmTextureCoordBufIdx) + (srcIndex + 2))
+              io (putStrLn ("a = " ++ show a))
+              io (putStrLn ("b = " ++ show b))
               MSV.write textureArrayBuf (fromIntegral dstIndex' + 0) a
               MSV.write textureArrayBuf (fromIntegral dstIndex' + 1) b
               addTextureCoords srcIndexBuf srcTextureCoords (srcIndex + 2) (idx + 1) maxIdx

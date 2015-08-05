@@ -814,8 +814,9 @@ precompileGLCmds model = do
     -- next calculations and assignments
     (tmp, modelTextureCoordIdx', modelVertexIndexIdx') <- setTextureAndVertex textureBuf vertexBuf (fromJust $ model^.dmGlCmds) modelTextureCoordIdx modelVertexIndexIdx 0 []
 
-    let counts = UV.fromList (reverse tmp)
-        indexElements = collectIndexElements tmp modelVertexIndexIdx 0 []
+    let rtmp = reverse tmp
+        counts = UV.fromList rtmp
+        indexElements = collectIndexElements rtmp modelVertexIndexIdx 0 []
 
     zoom fastRenderAPIGlobals $ do
       frModelTextureCoordIdx .= modelTextureCoordIdx'
@@ -834,6 +835,7 @@ precompileGLCmds model = do
           if count /= 0
             then do
               let count' = if count < 0 then -count else count
+              io (print "TEXTURE COORD BUF")
               (textureCoordIdx', vertexIndexIdx', orderIndex') <- setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx (orderIndex + 1) count'
               setTextureAndVertex textureBuf vertexBuf order textureCoordIdx' vertexIndexIdx' orderIndex' (count : tmp)
             else
@@ -843,15 +845,18 @@ precompileGLCmds model = do
         setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex count
           | count <= 0 = return (textureCoordIdx, vertexIndexIdx, orderIndex)
           | otherwise = do
+              io (print (wordToFloat $ order UV.! orderIndex))
+              io (print (wordToFloat $ order UV.! (orderIndex + 1)))
+              io (print (order UV.! (orderIndex + 2)))
               io $ MSV.write textureBuf textureCoordIdx (wordToFloat $ order UV.! orderIndex)
               io $ MSV.write textureBuf (textureCoordIdx + 1) (wordToFloat $ order UV.! (orderIndex + 1))
               io $ MSV.write vertexBuf vertexIndexIdx (fromIntegral $ order UV.! (orderIndex + 2))
               setCoords textureBuf vertexBuf order (textureCoordIdx + 2) (vertexIndexIdx + 1) (orderIndex + 3) (count - 1)
               
         collectIndexElements :: [Int32] -> Int -> Int -> [(Int, Int)] -> V.Vector (Int, Int)
-        collectIndexElements [] _ _ acc = V.fromList acc
+        collectIndexElements [] _ _ acc = V.fromList (reverse acc)
         collectIndexElements (x:xs) idx pos acc =
-          let count = fromIntegral $ if x < 0 then -x else x
+          let count = fromIntegral $ if x < 0 then negate x else x
           in collectIndexElements xs idx (pos + count) ((idx + pos, count) : acc)
 
 rRegisterModel :: B.ByteString -> Quake (Maybe (IORef ModelT))
