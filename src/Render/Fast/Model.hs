@@ -835,7 +835,6 @@ precompileGLCmds model = do
           if count /= 0
             then do
               let count' = if count < 0 then -count else count
-              io (print "TEXTURE COORD BUF")
               (textureCoordIdx', vertexIndexIdx', orderIndex') <- setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx (orderIndex + 1) count'
               setTextureAndVertex textureBuf vertexBuf order textureCoordIdx' vertexIndexIdx' orderIndex' (count : tmp)
             else
@@ -845,9 +844,6 @@ precompileGLCmds model = do
         setCoords textureBuf vertexBuf order textureCoordIdx vertexIndexIdx orderIndex count
           | count <= 0 = return (textureCoordIdx, vertexIndexIdx, orderIndex)
           | otherwise = do
-              io (print (wordToFloat $ order UV.! orderIndex))
-              io (print (wordToFloat $ order UV.! (orderIndex + 1)))
-              io (print (order UV.! (orderIndex + 2)))
               io $ MSV.write textureBuf textureCoordIdx (wordToFloat $ order UV.! orderIndex)
               io $ MSV.write textureBuf (textureCoordIdx + 1) (wordToFloat $ order UV.! (orderIndex + 1))
               io $ MSV.write vertexBuf vertexIndexIdx (fromIntegral $ order UV.! (orderIndex + 2))
