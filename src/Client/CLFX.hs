@@ -27,6 +27,9 @@ import qualified Util.Lib as Lib
 instantParticle :: Float
 instantParticle = -10000.0
 
+particleGravity :: Int
+particleGravity = 40
+
 runDLights :: Quake ()
 runDLights = do
     time <- use $ globals.cl.csTime
@@ -81,7 +84,7 @@ clearEffects = do
 
 clearParticles :: Quake ()
 clearParticles = do
-    clientGlobals.cgFreeParticles .= CParticleReference 0
+    clientGlobals.cgFreeParticles .= Just (CParticleReference 0)
     clientGlobals.cgActiveParticles .= Nothing
 
     particles <- use $ clientGlobals.cgParticles
@@ -185,8 +188,8 @@ addParticles = do
                                       if alpha <= 0 -- faded out
                                         then do
                                           freeParticles <- use $ clientGlobals.cgFreeParticles
-                                          clientGlobals.cgParticles.ix particleIdx.cpNext .= Just freeParticles
-                                          clientGlobals.cgFreeParticles .= pRef
+                                          clientGlobals.cgParticles.ix particleIdx.cpNext .= freeParticles
+                                          clientGlobals.cgFreeParticles .= Just pRef
                                           return (True, time', alpha)
                                         else
                                           return (False, time', alpha)
@@ -260,6 +263,57 @@ teleportParticles :: V3 Float -> Quake ()
 teleportParticles _ = do
     io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO
     
+{-
+- =============== CL_ParticleEffect ===============
+- 
+- Wall impact puffs
+-}
 particleEffect :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
-particleEffect _ _ _ _ = do
-    io (putStrLn "CLFX.particleEffect") >> undefined -- TODO
+particleEffect org dir color count = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addEffects freeParticles 0
+
+  where addEffects :: Maybe CParticleReference -> Int -> Quake ()
+        addEffects Nothing _ = return ()
+        addEffects (Just pRef@(CParticleReference particleIdx)) idx
+          | idx >= count = return ()
+          | otherwise = do
+              preuse (clientGlobals.cgParticles.ix particleIdx) >>= \(Just p) ->
+                clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              pTime <- use $ globals.cl.csTime
+              r <- Lib.rand
+              let pColor = color + fromIntegral (r .&. 7)
+              d <- liftM (fromIntegral . (.&. 31)) Lib.rand
+
+              o1 <- Lib.rand
+              v1 <- Lib.crandom
+              o2 <- Lib.rand
+              v2 <- Lib.crandom
+              o3 <- Lib.rand
+              v3 <- Lib.crandom
+
+              let oRand = V3 o1 o2 o3
+                  vRand = V3 v1 v2 v3
+                  pOrg = org + fmap (fromIntegral . (subtract 4) . (.&. 7)) oRand + fmap (* d) dir
+                  pVel = fmap (* 20) vRand
+                  pAccel = fmap fromIntegral (V3 0 0 (negate particleGravity))
+                  pAlpha = 1.0
+
+              r' <- Lib.randomF
+              let pAlphaVel = -1 / (0.5 + r' * 0.3)
+
+              clientGlobals.cgParticles.ix particleIdx .= CParticleT { _cpNext = activeParticles
+                                                                     , _cpTime = fromIntegral pTime
+                                                                     , _cpColor = fromIntegral pColor
+                                                                     , _cpOrg = pOrg
+                                                                     , _cpVel = pVel
+                                                                     , _cpAccel = pAccel
+                                                                     , _cpAlpha = pAlpha
+                                                                     , _cpAlphaVel = pAlphaVel
+                                                                     }
+
+              freeParticles <- use $ clientGlobals.cgFreeParticles
+              addEffects freeParticles (idx + 1)

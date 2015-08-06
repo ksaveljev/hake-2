@@ -1723,7 +1723,7 @@ data ClientGlobals =
                 , _cgCR                 :: !Int -- from Console.hs
                 , _cgParticles          :: V.Vector CParticleT
                 , _cgActiveParticles    :: Maybe CParticleReference
-                , _cgFreeParticles      :: CParticleReference
+                , _cgFreeParticles      :: Maybe CParticleReference
                 , _cgPrecacheCheck      :: !Int
                 , _cgPrecacheSpawnCount :: !Int
                 , _cgPrecacheTex        :: !Int
