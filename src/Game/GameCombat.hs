@@ -6,7 +6,7 @@ import Quake
 import QuakeState
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()
-radiusDamage _ _ _ _ _ _ = do
+radiusDamage inflictorRef attackerRef damage ignoreRef radius mod' = do
     io (putStrLn "GameCombat.radiusDamage") >> undefined -- TODO
 
 damage :: EdictReference -> EdictReference -> EdictReference -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()

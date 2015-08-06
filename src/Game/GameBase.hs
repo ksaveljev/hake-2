@@ -9,7 +9,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z, dot)
+import Linear (V3(..), _x, _y, _z, dot, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -145,7 +145,7 @@ gFind ref findBy str = do
 
   where findEdict :: Int -> Int -> Quake (Maybe EdictReference)
         findEdict idx maxIdx
-          | idx == maxIdx = return Nothing
+          | idx >= maxIdx = return Nothing
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
@@ -357,3 +357,28 @@ addPointToBound v mins maxs =
 -- The timelimit or fraglimit has been exceeded.
 endDMLevel :: Quake ()
 endDMLevel = io (putStrLn "GameBase.endDMLevel") >> undefined -- TODO
+
+findRadius :: Maybe EdictReference -> V3 Float -> Float -> Quake (Maybe EdictReference)
+findRadius fromRef org rad = do
+    let (EdictReference edictIdx) = case fromRef of
+                                      Nothing -> EdictReference 0
+                                      Just (EdictReference refIdx) -> EdictReference (refIdx + 1)
+
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+
+    findEdict edictIdx numEdicts
+
+  where findEdict :: Int -> Int -> Quake (Maybe EdictReference)
+        findEdict idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+
+              if | not (edict^.eInUse) -> findEdict (idx + 1) maxIdx
+                 | (edict^.eSolid) == Constants.solidNot -> findEdict (idx + 1) maxIdx
+                 | otherwise -> do
+                     let eorg = org - ((edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eEdictMinMax.eMins) + (edict^.eEdictMinMax.eMaxs)))
+
+                     if norm eorg > rad
+                       then findEdict (idx + 1) maxIdx
+                       else return $ Just (EdictReference idx)
