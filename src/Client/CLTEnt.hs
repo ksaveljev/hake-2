@@ -3,7 +3,7 @@
 module Client.CLTEnt where
 
 import Control.Lens (zoom, (.=), use, (^.), ix)
-import Control.Monad (void, when)
+import Control.Monad (void, when, liftM)
 import Data.Bits (shiftR, (.|.), (.&.))
 import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
 import Data.Maybe (isNothing, fromJust, isJust)
@@ -20,6 +20,7 @@ import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
+import qualified Sound.S as S
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -541,7 +542,21 @@ parseTEnt = do
 
          -- bullet hitting water
        | entType == Constants.teSplash -> do
-           io (print "CLTEnt.parseTEnt 5") >> undefined -- TODO
+           cnt <- MSG.readByte (globals.netMessage)
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           r <- MSG.readByte (globals.netMessage)
+           let color = if r > 6 then 0x00 else splashColor UV.! r
+
+           CLFX.particleEffect pos dir color cnt
+
+           when (r == Constants.splashSparks) $ do
+             r' <- liftM (.&. 3) Lib.rand
+             Just sfxRef <- if | r' == 0 -> use $ clTEntGlobals.clteSfxSpark5
+                               | r' == 1 -> use $ clTEntGlobals.clteSfxSpark6
+                               | otherwise -> use $ clTEntGlobals.clteSfxSpark7
+             sfx <- io $ readIORef sfxRef
+             S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnStatic 0
 
        | entType == Constants.teLaserSparks -> do
            io (print "CLTEnt.parseTEnt 6") >> undefined -- TODO
