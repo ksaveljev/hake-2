@@ -823,7 +823,7 @@ data ClientStateT =
                , _csConfigStrings          :: V.Vector B.ByteString
                , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
                , _csModelClip              :: V.Vector (Maybe CModelReference)
-               , _csSoundPrecache          :: V.Vector SfxT
+               , _csSoundPrecache          :: V.Vector (Maybe (IORef SfxT))
                , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
                , _csClientInfo             :: V.Vector ClientInfoT
                , _csBaseClientInfo         :: ClientInfoT
@@ -1873,7 +1873,7 @@ data CLTEntGlobals =
                 , _clteSfxGrenExp         :: Maybe (IORef SfxT)
                 , _clteSfxWatrExp         :: Maybe (IORef SfxT)
                 , _clteSfxPlasExp         :: Maybe (IORef SfxT)
-                , _clteSfxFootsteps       :: V.Vector SfxT
+                , _clteSfxFootsteps       :: V.Vector (Maybe (IORef SfxT))
                 , _clteModExplode         :: Maybe (IORef ModelT)
                 , _clteModSmoke           :: Maybe (IORef ModelT)
                 , _clteModFlash           :: Maybe (IORef ModelT)

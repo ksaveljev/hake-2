@@ -57,6 +57,46 @@ clearTEnts = do
       clteLasers      .= V.replicate Constants.maxLasers newLaserT
       clteSustains    .= V.replicate Constants.maxSustains newCLSustainT
 
+registerTEntSounds :: Quake ()
+registerTEntSounds = do
+    sfxRic1      <- S.registerSound "world/ric1.wav"
+    sfxRic2      <- S.registerSound "world/ric2.wav"
+    sfxRic3      <- S.registerSound "world/ric3.wav"
+    sfxLashIt    <- S.registerSound "weapons/lashit.wav"
+    sfxSpark5    <- S.registerSound "world/spark5.wav"
+    sfxSpark6    <- S.registerSound "world/spark6.wav"
+    sfxSpark7    <- S.registerSound "world/spark7.wav"
+    sfxRailg     <- S.registerSound "weapons/railgf1a.wav"
+    sfxRockExp   <- S.registerSound "weapons/rocklx1a.wav"
+    sfxGrenExp   <- S.registerSound "weapons/grenlx1a.wav"
+    sfxWatrExp   <- S.registerSound "weapons/xpld_wat.wav"
+    sfxFootStep1 <- S.registerSound "player/step1.wav"
+    sfxFootStep2 <- S.registerSound "player/step2.wav"
+    sfxFootStep3 <- S.registerSound "player/step3.wav"
+    sfxFootStep4 <- S.registerSound "player/step4.wav"
+    sfxLightning <- S.registerSound "weapons/tesla.wav"
+    sfxDisrExp   <- S.registerSound "weapons/disrupthit.wav"
+
+    void $ S.registerSound "player/land1.wav"
+    void $ S.registerSound "player/fall2.wav"
+    void $ S.registerSound "player/fall1.wav"
+
+    zoom clTEntGlobals $ do
+      clteSfxRic1      .= sfxRic1
+      clteSfxRic2      .= sfxRic2
+      clteSfxRic3      .= sfxRic3
+      clteSfxLashIt    .= sfxLashIt
+      clteSfxSpark5    .= sfxSpark5
+      clteSfxSpark6    .= sfxSpark6
+      clteSfxSpark7    .= sfxSpark7
+      clteSfxRailg     .= sfxRailg
+      clteSfxRockExp   .= sfxRockExp
+      clteSfxGrenExp   .= sfxGrenExp
+      clteSfxWatrExp   .= sfxWatrExp
+      clteSfxFootsteps .= V.fromList [sfxFootStep1, sfxFootStep2, sfxFootStep3, sfxFootStep4]
+      clteSfxLightning .= sfxLightning
+      clteSfxDisrExp   .= sfxDisrExp
+
 registerTEntModels :: Quake ()
 registerTEntModels = do
     Just renderer <- use $ globals.re
@@ -552,11 +592,10 @@ parseTEnt = do
 
            when (r == Constants.splashSparks) $ do
              r' <- liftM (.&. 3) Lib.rand
-             Just sfxRef <- if | r' == 0 -> use $ clTEntGlobals.clteSfxSpark5
-                               | r' == 1 -> use $ clTEntGlobals.clteSfxSpark6
-                               | otherwise -> use $ clTEntGlobals.clteSfxSpark7
-             sfx <- io $ readIORef sfxRef
-             S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnStatic 0
+             sfxRef <- if | r' == 0 -> use $ clTEntGlobals.clteSfxSpark5
+                          | r' == 1 -> use $ clTEntGlobals.clteSfxSpark6
+                          | otherwise -> use $ clTEntGlobals.clteSfxSpark7
+             S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnStatic 0
 
        | entType == Constants.teLaserSparks -> do
            io (print "CLTEnt.parseTEnt 6") >> undefined -- TODO
