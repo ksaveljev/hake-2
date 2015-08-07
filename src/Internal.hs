@@ -1637,7 +1637,9 @@ data FastRenderAPIGlobals =
                        }
 
 data ParticleTGlobals =
-  ParticleTGlobals { _pColorTable :: UV.Vector Int
+  ParticleTGlobals { _pColorTable  :: UV.Vector Int
+                   , _pVertexArray :: MSV.IOVector Float
+                   , _pColorArray  :: MSV.IOVector Int
                    }
 
 data MenuFrameworkS =
@@ -1742,12 +1744,12 @@ data VRectT =
          }
 
 data VGlobals =
-  VGlobals { _vgRNumDLights   :: !Int
-           , _vgRNumEntities  :: !Int
-           , _vgRNumParticles :: !Int
-           , _vgRLightStyles  :: V.Vector LightStyleT
-           , _vgREntities     :: V.Vector (IORef EntityT)
-           , _vgRDLights      :: V.Vector DLightT
+  VGlobals { _vgNumDLights   :: !Int
+           , _vgNumEntities  :: !Int
+           , _vgNumParticles :: !Int
+           , _vgLightStyles  :: V.Vector LightStyleT
+           , _vgEntities     :: V.Vector (IORef EntityT)
+           , _vgDLights      :: V.Vector DLightT
            }
 
 data CDLightT =

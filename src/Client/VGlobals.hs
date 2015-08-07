@@ -20,10 +20,10 @@ makeLenses ''VGlobals
 
 initialVGlobals :: VGlobals
 initialVGlobals =
-  VGlobals { _vgRNumDLights   = 0
-           , _vgRNumEntities  = 0
-           , _vgRNumParticles = 0
-           , _vgRLightStyles  = V.replicate Constants.maxLightStyles newLightStyleT
-           , _vgREntities     = unsafePerformIO $ V.replicateM Constants.maxEntities (newIORef newEntityT)
-           , _vgRDLights      = V.replicate Constants.maxDLights newDLightT
+  VGlobals { _vgNumDLights   = 0
+           , _vgNumEntities  = 0
+           , _vgNumParticles = 0
+           , _vgLightStyles  = V.replicate Constants.maxLightStyles newLightStyleT
+           , _vgEntities     = unsafePerformIO $ V.replicateM Constants.maxEntities (newIORef newEntityT)
+           , _vgDLights      = V.replicate Constants.maxDLights newDLightT
            }

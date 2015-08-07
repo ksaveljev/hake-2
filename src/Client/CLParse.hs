@@ -6,7 +6,7 @@ module Client.CLParse where
 
 import Control.Exception (handle, IOException)
 import Control.Lens (use, (^.), (.=), preuse, ix, zoom, (+=), Traversal')
-import Control.Monad (when, liftM, void)
+import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.IORef (IORef)
@@ -34,6 +34,7 @@ import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
+import qualified Sys.Sys as Sys
 import {-# SOURCE #-} qualified Util.Lib as Lib
 
 svcStrings :: V.Vector B.ByteString
@@ -438,8 +439,25 @@ downloadFileName fileName = do
 
 registerSounds :: Quake ()
 registerSounds = do
-    io (putStrLn "IMPLEMENT ME!!! CLParse.registerSounds") >> return ()
-    --io (putStrLn "CLParse.registerSounds") >> undefined -- TODO
+    S.beginRegistration
+    CLTEnt.registerTEntSounds
+
+    configStrings <- use $ globals.cl.csConfigStrings
+    precacheSounds configStrings 1 Constants.maxSounds
+
+    S.endRegistration
+
+  where precacheSounds :: V.Vector B.ByteString -> Int -> Int -> Quake ()
+        precacheSounds configSrings idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let cs = configSrings V.! (Constants.csSounds + idx)
+
+              unless (cs == "" || cs == "\0") $ do
+                  sfxRef <- S.registerSound cs
+                  globals.cl.csSoundPrecache.ix idx .= sfxRef
+                  Sys.sendKeyEvents -- pump message loop
+                  precacheSounds configSrings (idx + 1) maxIdx
 
 parseBaseline :: Quake ()
 parseBaseline = do

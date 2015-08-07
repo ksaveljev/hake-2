@@ -3,11 +3,14 @@ module Client.V where
 
 import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse)
 import Control.Monad (void, unless, liftM, when)
+import Data.Bits ((.|.), shiftL)
 import Data.IORef (IORef, readIORef)
 import Data.Maybe (isJust, fromJust)
-import Linear (V3(..), V4(..))
+import Linear (V3(..), V4(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector.Storable.Mutable as MSV
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -117,36 +120,36 @@ renderView stereoSeparation = do
 
         clAddEntitiesCVar >>= \c ->
           when ((c^.cvValue) == 0) $
-            vGlobals.vgRNumEntities .= 0
+            vGlobals.vgNumEntities .= 0
 
         clAddParticlesCVar >>= \c ->
           when ((c^.cvValue) == 0) $
-            vGlobals.vgRNumParticles .= 0
+            vGlobals.vgNumParticles .= 0
 
         clAddLightsCVar >>= \c ->
           when ((c^.cvValue) == 0) $
-            vGlobals.vgRNumDLights .= 0
+            vGlobals.vgNumDLights .= 0
 
         clAddBlendCVar >>= \c ->
           when ((c^.cvValue) == 0) $
             globals.cl.csRefDef.rdBlend .= V4 0 0 0 0
 
-        use (vGlobals.vgRNumEntities) >>= \v ->
+        use (vGlobals.vgNumEntities) >>= \v ->
           globals.cl.csRefDef.rdNumEntities .= v
 
-        use (vGlobals.vgRNumParticles) >>= \v ->
+        use (vGlobals.vgNumParticles) >>= \v ->
           globals.cl.csRefDef.rdNumParticles .= v
 
-        use (vGlobals.vgRNumDLights) >>= \v ->
+        use (vGlobals.vgNumDLights) >>= \v ->
           globals.cl.csRefDef.rdNumDLights .= v
 
-        use (vGlobals.vgREntities) >>= \v ->
+        use (vGlobals.vgEntities) >>= \v ->
           globals.cl.csRefDef.rdEntities .= v
 
-        use (vGlobals.vgRDLights) >>= \v ->
+        use (vGlobals.vgDLights) >>= \v ->
           globals.cl.csRefDef.rdDLights .= v
 
-        use (vGlobals.vgRLightStyles) >>= \v ->
+        use (vGlobals.vgLightStyles) >>= \v ->
           globals.cl.csRefDef.rdLightStyles .= v
 
         globals.cl.csRefDef.rdRdFlags .= (cl'^.csFrame.fPlayerState.psRDFlags)
@@ -200,9 +203,9 @@ renderView stereoSeparation = do
 -}
 clearScene :: Quake ()
 clearScene = do
-    vGlobals.vgRNumDLights .= 0
-    vGlobals.vgRNumEntities .= 0
-    vGlobals.vgRNumParticles .= 0
+    vGlobals.vgNumDLights .= 0
+    vGlobals.vgNumEntities .= 0
+    vGlobals.vgNumParticles .= 0
 
 testParticles :: Quake ()
 testParticles = do
@@ -217,27 +220,42 @@ testLights = do
     io (putStrLn "V.testLights") >> undefined -- TODO
 
 addParticle :: V3 Float -> Int -> Float -> Quake ()
-addParticle _ _ _ = do
-    io (putStrLn "V.addParticle") >> undefined -- TODO
+addParticle org color alpha = do
+    numParticles <- use $ vGlobals.vgNumParticles
+
+    unless (numParticles >= Constants.maxParticles) $ do
+      vGlobals.vgNumParticles += 1
+      colorTable <- use $ particleTGlobals.pColorTable
+      colorArray <- use $ particleTGlobals.pColorArray
+      vertexArray <- use $ particleTGlobals.pVertexArray
+
+      let c = (colorTable UV.! color) .|. (truncate (alpha * 255) `shiftL` 24)
+          i = numParticles * 3
+
+      io $ do
+        MSV.write colorArray numParticles c
+        MSV.write vertexArray (i + 0) (org^._x)
+        MSV.write vertexArray (i + 1) (org^._y)
+        MSV.write vertexArray (i + 2) (org^._z)
 
 addEntity :: IORef EntityT -> Quake ()
 addEntity entRef = do
-    numEntities <- use $ vGlobals.vgRNumEntities
+    numEntities <- use $ vGlobals.vgNumEntities
     when (numEntities < Constants.maxEntities) $ do
-      vGlobals.vgREntities.ix numEntities .= entRef
-      vGlobals.vgRNumEntities += 1
+      vGlobals.vgEntities.ix numEntities .= entRef
+      vGlobals.vgNumEntities += 1
 
 addLight :: V3 Float -> Float -> Float -> Float -> Float -> Quake ()
 addLight org intensity r g b = do
-    numDLights <- use $ vGlobals.vgRNumDLights
+    numDLights <- use $ vGlobals.vgNumDLights
 
     unless (numDLights >= Constants.maxDLights) $ do
-      vGlobals.vgRDLights.ix numDLights .= DLightT org (V3 r g b) intensity
-      vGlobals.vgRNumDLights += 1
+      vGlobals.vgDLights.ix numDLights .= DLightT org (V3 r g b) intensity
+      vGlobals.vgNumDLights += 1
 
 addLightStyle :: Int -> Float -> Float -> Float -> Quake ()
 addLightStyle style r g b = do
     when (style < 0 || style > Constants.maxLightStyles) $
       Com.comError Constants.errDrop ("Bad light style " `B.append` BC.pack (show style)) -- IMPROVE?
 
-    vGlobals.vgRLightStyles.ix style .= LightStyleT (V3 r g b) (r + g + b)
+    vGlobals.vgLightStyles.ix style .= LightStyleT (V3 r g b) (r + g + b)

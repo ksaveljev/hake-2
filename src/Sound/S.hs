@@ -1,6 +1,6 @@
 module Sound.S where
 
-import Data.IORef (IORef)
+import Data.IORef (IORef, newIORef)
 import Linear (V3)
 import qualified Data.ByteString as B
 
@@ -30,9 +30,17 @@ disableStreaming = io (putStrLn "S.disableStreaming") >> undefined -- TODO
 
 registerSound :: B.ByteString -> Quake (Maybe (IORef SfxT))
 registerSound _ = do
-    io (putStrLn "S.registerSound") >> undefined -- TODO
+    sfx <- io $ newIORef newSfxT
+    io (putStrLn "IMPLEMENT ME! S.registerSound") >> return (Just sfx) -- TODO
 
 startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Maybe (IORef SfxT) -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = do
-    return () -- TODO: don't want to get involved with sound system yet
-    --io (putStrLn "S.startSound") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! S.startSound") >> return () -- TODO: don't want to get involved with sound system yet
+
+beginRegistration :: Quake ()
+beginRegistration = do
+    io (putStrLn "IMPLEMENT ME! S.beginRegistration") >> return () -- TODO
+
+endRegistration :: Quake ()
+endRegistration = do
+    io (putStrLn "IMPLEMENT ME! S.endRegistration") >> return () -- TODO
