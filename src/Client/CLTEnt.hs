@@ -633,6 +633,7 @@ parseTEnt = do
            let ent = newEntityT { _enFlags = Constants.rfFullBright
                                 , _eAngles = V3 0 r 0
                                 , _eModel  = model
+                                , _eOrigin = pos
                                 }
 
            entRef <- io $ newIORef ent

@@ -424,4 +424,4 @@ emitWaterPolys _ = do
 
 clipSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Int -> Quake ()
 clipSkyPolygon nump vecs stage = do
-    io (putStrLn "Warp.clipSkyPolygon") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! Warp.clipSkyPolygon") >> return () -- TODO
