@@ -1637,9 +1637,9 @@ data FastRenderAPIGlobals =
                        }
 
 data ParticleTGlobals =
-  ParticleTGlobals { _pColorTable  :: UV.Vector Int
+  ParticleTGlobals { _pColorTable  :: UV.Vector Int32
                    , _pVertexArray :: MSV.IOVector Float
-                   , _pColorArray  :: MSV.IOVector Int
+                   , _pColorArray  :: MSV.IOVector Int32
                    }
 
 data MenuFrameworkS =

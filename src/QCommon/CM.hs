@@ -1190,7 +1190,11 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
                 Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ clipPlane)
                 Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
                 let Just surfaceIdx = brushSide^.cbsSurface
-                Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
+                surface <- case brushSide^.cbsSurface of
+                             Nothing -> return nullSurface
+                             Just surfaceIdx -> do
+                               Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
+                               return surface
 
                 traceLens.tFraction .= if enterFrac < 0 then 0 else enterFrac
                 traceLens.tPlane .= plane

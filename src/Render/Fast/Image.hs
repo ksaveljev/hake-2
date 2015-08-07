@@ -110,7 +110,7 @@ getPalette = do
 
         fastRenderAPIGlobals.frd8to24table .= d8to24table
 
-        particleTGlobals.pColorTable .= UV.map (.&. 0x00FFFFFF) d8to24table
+        particleTGlobals.pColorTable .= UV.map ((.&. 0x00FFFFFF) . fromIntegral) d8to24table
 
   where constructPalette :: B.ByteString -> Int -> Int
         constructPalette bs i =
@@ -794,7 +794,7 @@ glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
 glMipMap img width height =
     let height' = height `shiftR` 1
     in if width == 1 || height == 1
-         then B.replicate (width * height) 0 -- TODO: UGLY HACK!!!!!! FIXME!! mipmap generation fails when w or h is 1 (in jake2 and quake2 it uses the fact that input array is huge and can overflow, but we cannot)
+         then B.replicate (width * height) 255 -- TODO: UGLY HACK!!!!!! FIXME!! mipmap generation fails when w or h is 1 (in jake2 and quake2 it uses the fact that input array is huge and can overflow, but we cannot)
          else forI 0 0 height' mempty
 
   where forI :: Int -> Int -> Int -> BB.Builder -> B.ByteString

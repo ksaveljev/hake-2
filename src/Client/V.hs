@@ -229,6 +229,12 @@ addParticle org color alpha = do
       colorArray <- use $ particleTGlobals.pColorArray
       vertexArray <- use $ particleTGlobals.pVertexArray
 
+      io (putStrLn "ADD PARTICLE")
+      io (putStrLn ("i = " ++ show numParticles))
+      io (putStrLn ("color = " ++ show color))
+      io (putStrLn ("alpha = " ++ show alpha))
+      io (putStrLn ("org = " ++ show org))
+
       let c = (colorTable UV.! color) .|. (truncate (alpha * 255) `shiftL` 24)
           i = numParticles * 3
 

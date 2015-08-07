@@ -270,6 +270,11 @@ teleportParticles _ = do
 -}
 particleEffect :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect org dir color count = do
+    io (print "PARTICLE EFFECT")
+    io (putStrLn ("org = " ++ show org))
+    io (putStrLn ("dir = " ++ show dir))
+    io (putStrLn ("color = " ++ show color))
+    io (putStrLn ("count = " ++ show count))
     freeParticles <- use $ clientGlobals.cgFreeParticles
     addEffects freeParticles 0
 
