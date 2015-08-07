@@ -5,7 +5,7 @@ module Client.CLTEnt where
 import Control.Lens (zoom, (.=), use, (^.), ix)
 import Control.Monad (void, when, liftM)
 import Data.Bits (shiftR, (.|.), (.&.))
-import Data.IORef (newIORef, IORef, readIORef, modifyIORef')
+import Data.IORef (newIORef, IORef, readIORef, modifyIORef', writeIORef)
 import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
@@ -50,8 +50,10 @@ splashColor = UV.fromList [ 0x00, 0xe0, 0xb0, 0x50, 0xd0, 0xe0, 0xe8 ]
 
 clearTEnts :: Quake ()
 clearTEnts = do
+    explosions <- use $ clTEntGlobals.clteExplosions
+    io $ V.mapM_ (\exRef -> writeIORef exRef newExplosionT) explosions
+
     zoom clTEntGlobals $ do
-      clteExplosions  .= V.replicate Constants.maxExplosions newExplosionT
       clteBeams       .= V.replicate Constants.maxBeams newBeamT
       cltePlayerBeams .= V.replicate Constants.maxBeams newBeamT
       clteLasers      .= V.replicate Constants.maxLasers newLaserT
@@ -431,11 +433,12 @@ addExplosions = do
     cl' <- use $ globals.cl
     addExplosion explosions cl' 0 Constants.maxExplosions
 
-  where addExplosion :: V.Vector ExplosionT -> ClientStateT -> Int -> Int -> Quake ()
+  where addExplosion :: V.Vector (IORef ExplosionT) -> ClientStateT -> Int -> Int -> Quake ()
         addExplosion explosions cl' idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let ex = explosions V.! idx
+              let exRef = explosions V.! idx
+              ex <- io $ readIORef exRef
 
               if (ex^.eType) == exFree
                 then
@@ -498,7 +501,7 @@ addExplosions = do
 
                   case maybeEntRef of
                     Nothing -> do
-                      clTEntGlobals.clteExplosions.ix idx.eType .= exFree
+                      io $ modifyIORef' exRef (\v -> v { _eType = exFree })
                       addExplosion explosions cl' (idx + 1) maxIdx
                     Just entRef -> do
                       ent <- io $ readIORef entRef
@@ -618,7 +621,44 @@ parseTEnt = do
            io (print "CLTEnt.parseTEnt 11") >> undefined -- TODO
 
        | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
-           io (print "CLTEnt.parseTEnt 12") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           exRef <- allocExplosion
+
+           r <- liftM (fromIntegral . (`mod` 360)) Lib.rand
+           model <- if entType /= Constants.teExplosion1Big
+                      then use $ clTEntGlobals.clteModExplo4
+                      else use $ clTEntGlobals.clteModExplo4Big
+
+           let ent = newEntityT { _enFlags = Constants.rfFullBright
+                                , _eAngles = V3 0 r 0
+                                , _eModel  = model
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+           f <- Lib.randomF
+           let baseFrame = if f < 0.5 then 15 else 0
+
+           let ex = ExplosionT { _eType       = exPoly
+                               , _eEnt        = entRef
+                               , _eFrames     = 15
+                               , _eLight      = 350
+                               , _eLightColor = V3 1.0 0.5 0.5
+                               , _eStart      = fromIntegral (serverTime  - 100)
+                               , _eBaseFrame  = baseFrame
+                               }
+
+           io $ writeIORef exRef ex
+
+           when (entType /= Constants.teExplosion1Big && entType /= Constants.teExplosion1Np) $
+             CLFX.explosionParticles pos
+
+           sfxRef <- if entType == Constants.teRocketExplosionWater
+                       then use $ clTEntGlobals.clteSfxWatrExp
+                       else use $ clTEntGlobals.clteSfxRockExp
+
+           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.teBfgExplosion -> do
            io (print "CLTEnt.parseTEnt 13") >> undefined -- TODO
@@ -713,3 +753,7 @@ parseTEnt = do
 
        | otherwise -> do
            Com.comError Constants.errDrop "CL_ParseTEnt: bad type"
+
+allocExplosion :: Quake (IORef ExplosionT)
+allocExplosion = do
+    io (putStrLn "CLTEnt.allocExplosion") >> undefined -- TODO

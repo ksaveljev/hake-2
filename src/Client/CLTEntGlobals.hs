@@ -9,6 +9,8 @@ module Client.CLTEntGlobals ( module Client.CLTEntGlobals
                             ) where
 
 import Control.Lens (makeLenses)
+import Data.IORef (newIORef)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
 import Internal
@@ -24,7 +26,7 @@ makeLenses ''CLTEntGlobals
 
 initialCLTEntGlobals :: CLTEntGlobals
 initialCLTEntGlobals =
-  CLTEntGlobals { _clteExplosions         = V.replicate Constants.maxExplosions newExplosionT
+  CLTEntGlobals { _clteExplosions         = unsafePerformIO $ V.replicateM Constants.maxExplosions (newIORef newExplosionT)
                 , _clteBeams              = V.replicate Constants.maxBeams newBeamT
                 , _cltePlayerBeams        = V.replicate Constants.maxBeams newBeamT
                 , _clteLasers             = V.replicate Constants.maxLasers newLaserT

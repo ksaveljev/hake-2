@@ -317,3 +317,7 @@ particleEffect org dir color count = do
 
               freeParticles <- use $ clientGlobals.cgFreeParticles
               addEffects freeParticles (idx + 1)
+
+explosionParticles :: V3 Float -> Quake ()
+explosionParticles _ = do
+    io (putStrLn "CLFX.explosionParticles") >> undefined -- TODO

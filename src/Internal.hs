@@ -1858,7 +1858,7 @@ data ExplosionT =
              }
 
 data CLTEntGlobals =
-  CLTEntGlobals { _clteExplosions         :: V.Vector ExplosionT
+  CLTEntGlobals { _clteExplosions         :: V.Vector (IORef ExplosionT)
                 , _clteBeams              :: V.Vector BeamT
                 , _cltePlayerBeams        :: V.Vector BeamT
                 , _clteLasers             :: V.Vector LaserT
