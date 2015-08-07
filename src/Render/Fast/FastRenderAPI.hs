@@ -6,7 +6,7 @@ module Render.Fast.FastRenderAPI where
 import Control.Exception (handle, IOException)
 import Control.Lens ((.=), (^.), use, zoom, (+=), preuse, ix)
 import Control.Monad (void, when, liftM, unless)
-import Data.Bits ((.|.), (.&.))
+import Data.Bits ((.|.), (.&.), shiftR)
 import Data.Char (toLower, toUpper)
 import Data.Int (Int8)
 import Data.IORef (IORef, readIORef, modifyIORef')
@@ -19,6 +19,7 @@ import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
 
@@ -1073,7 +1074,15 @@ rDrawEntitiesOnList = do
 
 rDrawParticles :: Quake ()
 rDrawParticles = do
-    io (putStrLn "IMPLEMENT ME! FastRenderAPI.rDrawParticles") >> return () -- TODO
+    extPointParametersValue <- liftM (^.cvValue) glExtPointParametersCVar
+    pointParameterEXT <- use $ fastRenderAPIGlobals.frPointParameterEXT
+
+    if extPointParametersValue /= 0 && pointParameterEXT
+      then do
+        io (putStrLn "IMPLEMENT ME! FastRenderAPI.rDrawParticles") >> return () -- TODO
+      else do
+        newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+        glDrawParticles (newRefDef^.rdNumParticles)
 
 rFlash :: Quake ()
 rFlash = rPolyBlend
@@ -1149,3 +1158,69 @@ rPolyBlend = do
       GL.glEnable GL.gl_ALPHA_TEST
 
       GL.glColor4f 1 1 1 1
+
+glDrawParticles :: Int -> Quake ()
+glDrawParticles numParticles = do
+    vup <- use $ fastRenderAPIGlobals.frVUp
+    vright <- use $ fastRenderAPIGlobals.frVRight
+    vpn <- use $ fastRenderAPIGlobals.frVPn
+    origin <- use $ fastRenderAPIGlobals.frOrigin
+
+    let up = fmap (* 1.5) vup
+        right = fmap (* 1.5) vright
+
+    particleTextureRef <- use $ fastRenderAPIGlobals.frParticleTexture
+    particleTexture <- io $ readIORef particleTextureRef
+
+    Image.glBind (particleTexture^.iTexNum)
+    GL.glDepthMask (fromIntegral GL.gl_FALSE) -- no z buffering
+    GL.glEnable GL.gl_BLEND
+    Image.glTexEnv GL.gl_MODULATE
+
+    GL.glBegin GL.gl_TRIANGLES
+
+    sourceVertices <- use $ particleTGlobals.pVertexArray
+    sourceColors <- use $ particleTGlobals.pColorArray
+
+    io $ drawParticles sourceVertices sourceColors up right vpn origin 0 0 numParticles
+
+    GL.glEnd
+
+    GL.glDisable GL.gl_BLEND
+    GL.glColor4f 1 1 1 1
+    GL.glDepthMask (fromIntegral GL.gl_TRUE) -- back to normal z buffering
+    Image.glTexEnv GL.gl_REPLACE
+
+  where drawParticles :: MSV.IOVector Float -> MSV.IOVector Int -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> IO ()
+        drawParticles sourceVertices sourceColors up right vpn origin j idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              originX <- MSV.read sourceVertices (j + 0)
+              originY <- MSV.read sourceVertices (j + 1)
+              originZ <- MSV.read sourceVertices (j + 2)
+
+              -- hack a scale up to keep particles from disappearing
+              let scale = (originX - (origin^._x)) * (vpn^._x)
+                        + (originY - (origin^._y)) * (vpn^._y)
+                        + (originZ - (origin^._z)) * (vpn^._z)
+
+                  scale' = if scale < 20 then 1 else 1 + scale * 0.004
+
+              color <- MSV.read sourceColors idx
+
+              GL.glColor4ub (fromIntegral $ color .&. 0xFF)
+                            (fromIntegral $ (color `shiftR` 8) .&. 0xFF)
+                            (fromIntegral $ (color `shiftR` 16) .&. 0xFF)
+                            (fromIntegral $ (color `shiftR` 24) .&. 0xFF)
+
+              -- first vertex
+              GL.glTexCoord2f 0.0625 0.0625
+              GL.glVertex3f (realToFrac originX) (realToFrac originY) (realToFrac originZ)
+              -- second vertex
+              GL.glTexCoord2f 1.0625 0.0625
+              GL.glVertex3f (realToFrac $ originX + (up^._x) * scale') (realToFrac $ originY + (up^._y) * scale') (realToFrac $ originZ + (up^._z) * scale')
+              -- third vertex
+              GL.glTexCoord2f 0.0625 1.0625
+              GL.glVertex3f (realToFrac $ originX + (right^._x) * scale') (realToFrac $ originY + (right^._y) * scale') (realToFrac $ originZ + (right^._z) * scale')
+
+              drawParticles sourceVertices sourceColors up right vpn origin (j + 3) (idx + 1) maxIdx
