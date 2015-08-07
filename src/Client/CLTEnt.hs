@@ -756,4 +756,34 @@ parseTEnt = do
 
 allocExplosion :: Quake (IORef ExplosionT)
 allocExplosion = do
-    io (putStrLn "CLTEnt.allocExplosion") >> undefined -- TODO
+    explosions <- use $ clTEntGlobals.clteExplosions
+    freeExRef <- findFreeSlot explosions 0 Constants.maxExplosions
+
+    case freeExRef of
+      Just ref -> do
+        io $ writeIORef ref newExplosionT
+        return ref
+      Nothing -> do
+        -- find the oldest explosion
+        time <- use $ globals.cl.csTime
+        exRef <- findOldestExplosion explosions (fromIntegral time) 0 0 Constants.maxExplosions
+        io $ writeIORef exRef newExplosionT
+        return exRef
+
+  where findFreeSlot :: V.Vector (IORef ExplosionT) -> Int -> Int -> Quake (Maybe (IORef ExplosionT))
+        findFreeSlot explosions idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              ex <- io $ readIORef (explosions V.! idx)
+              if (ex^.eType) == exFree
+                then return (Just (explosions V.! idx))
+                else findFreeSlot explosions (idx + 1) maxIdx
+
+        findOldestExplosion :: V.Vector (IORef ExplosionT) -> Float -> Int -> Int -> Int -> Quake (IORef ExplosionT)
+        findOldestExplosion explosions time oldestIdx idx maxIdx
+          | idx >= maxIdx = return (explosions V.! oldestIdx)
+          | otherwise = do
+              ex <- io $ readIORef (explosions V.! idx)
+              if (ex^.eStart) < time
+                then findOldestExplosion explosions (ex^.eStart) idx (idx + 1) maxIdx
+                else findOldestExplosion explosions time oldestIdx (idx + 1) maxIdx
