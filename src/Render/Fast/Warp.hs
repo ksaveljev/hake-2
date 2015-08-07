@@ -9,6 +9,7 @@ import Control.Monad (when, unless, liftM)
 import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -34,6 +35,12 @@ skyTexOrder = UV.fromList [0, 2, 1, 3, 4, 5]
 
 suf :: V.Vector B.ByteString
 suf = V.fromList ["rt", "bk", "lf", "ft", "up", "dn"]
+
+maxClipVerts :: Int
+maxClipVerts = 64
+
+warpVerts :: MV.IOVector (V3 Float)
+warpVerts = unsafePerformIO $ MV.new maxClipVerts
 
 sinV :: UV.Vector Float
 sinV =
@@ -388,10 +395,33 @@ rAddSkySurface :: IORef MSurfaceT -> Quake ()
 rAddSkySurface surfRef = do
     surf <- io $ readIORef surfRef
     origin <- use $ fastRenderAPIGlobals.frOrigin
+    polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
 
     -- calculate vertex values for sky box
-    io (putStrLn "IMPLEMENT ME! Warp.rAddSkySurface") >> return () -- TODO
+    calculate polygonCache origin (surf^.msPolys)
+
+  where calculate :: MV.IOVector GLPolyT -> V3 Float -> Maybe GLPolyReference -> Quake ()
+        calculate _ _ Nothing = return ()
+        calculate polygonCache origin (Just polyRef@(GLPolyReference polyIdx)) = do
+          poly <- io $ MV.read polygonCache polyIdx
+          constructVerts polyRef origin 0 (poly^.glpNumVerts)
+          clipSkyPolygon (poly^.glpNumVerts) warpVerts 0
+          calculate polygonCache origin (poly^.glpNext)
+
+        constructVerts :: GLPolyReference -> V3 Float -> Int -> Int -> Quake ()
+        constructVerts polyRef origin idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              x <- Polygon.getPolyX polyRef idx
+              y <- Polygon.getPolyY polyRef idx
+              z <- Polygon.getPolyZ polyRef idx
+              io $ MV.write warpVerts idx (V3 (x - (origin^._x)) (y - (origin^._y)) (z - (origin^._z)))
+              constructVerts polyRef origin (idx + 1) maxIdx
 
 emitWaterPolys :: IORef MSurfaceT -> Quake ()
 emitWaterPolys _ = do
     io (putStrLn "Warp.emitWaterPolys") >> undefined -- TODO
+
+clipSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Int -> Quake ()
+clipSkyPolygon nump vecs stage = do
+    io (putStrLn "Warp.clipSkyPolygon") >> undefined -- TODO
