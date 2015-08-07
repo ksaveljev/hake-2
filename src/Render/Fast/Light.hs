@@ -433,7 +433,7 @@ rBuildLightMap surf buffer offset stride = do
 
 rAddDynamicLights :: MSurfaceT -> Quake ()
 rAddDynamicLights _ = do
-    io (putStrLn "Light.rAddDynamicLights") >> undefined -- TODO
+    io (putStrLn "IMPLEMENT ME! Light.rAddDynamicLights") >> return () -- TODO
 
 recursiveLightPoint :: MNodeChild -> V3 Float -> V3 Float -> Quake Int
 recursiveLightPoint (MLeafChildReference _) _ _ = return (-1) -- didn't hit anything

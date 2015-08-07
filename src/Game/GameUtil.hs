@@ -7,7 +7,7 @@ import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (norm)
+import Linear (V3(..), norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -285,9 +285,20 @@ killBox edictRef@(EdictReference edictIdx) = do
           then return False
           else killBox edictRef
 
+-- Returns 1 if the entity is visible to self, even if not infront()
 visible :: EdictReference -> EdictReference -> Quake Bool
-visible _ _ = do
-    io (putStrLn "GameUtil.visible") >> undefined -- TODO
+visible selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+    let spot1 = let V3 a b c = (self^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (self^.eEdictStatus.eViewHeight))
+        spot2 = let V3 a b c = (other^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (other^.eEdictStatus.eViewHeight))
+
+    v3o <- use $ globals.vec3Origin
+    trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+    traceT <- trace spot1 (Just v3o) (Just v3o) spot2 (Just selfRef) Constants.maskOpaque
+
+    return $ (traceT^.tFraction) == 1
 
 {-
 - Finds a target.
