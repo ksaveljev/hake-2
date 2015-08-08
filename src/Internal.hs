@@ -126,11 +126,6 @@ newtype MenuItemReference = MenuItemReference Int
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
 
--- reference to clientGlobals.cgParticles
-newtype CParticleReference = CParticleReference Int
-
-newtype MSurfaceReference = MSurfaceReference Int
-
 newtype MTexInfoReference = MTexInfoReference Int
 
 newtype GLPolyReference = GLPolyReference Int
@@ -1723,9 +1718,9 @@ data ClientGlobals =
                 , _cgLightStyle         :: V.Vector CLightStyleT
                 , _cgLastOfs            :: !Int
                 , _cgCR                 :: !Int -- from Console.hs
-                , _cgParticles          :: V.Vector CParticleT
-                , _cgActiveParticles    :: Maybe CParticleReference
-                , _cgFreeParticles      :: Maybe CParticleReference
+                , _cgParticles          :: V.Vector (IORef CParticleT)
+                , _cgActiveParticles    :: Maybe (IORef CParticleT)
+                , _cgFreeParticles      :: Maybe (IORef CParticleT)
                 , _cgPrecacheCheck      :: !Int
                 , _cgPrecacheSpawnCount :: !Int
                 , _cgPrecacheTex        :: !Int
@@ -1795,7 +1790,7 @@ data CParticleT =
              , _cpColor    :: !Float
              , _cpAlpha    :: !Float
              , _cpAlphaVel :: !Float
-             , _cpNext     :: Maybe CParticleReference
+             , _cpNext     :: Maybe (IORef CParticleT)
              }
 
 data GLLightMapStateT =

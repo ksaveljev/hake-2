@@ -9,6 +9,7 @@ import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
 import Data.Char (ord)
+import Data.IORef (IORef, modifyIORef', writeIORef, readIORef)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -84,14 +85,22 @@ clearEffects = do
 
 clearParticles :: Quake ()
 clearParticles = do
-    clientGlobals.cgFreeParticles .= Just (CParticleReference 0)
+    particles <- use $ clientGlobals.cgParticles
+
+    clientGlobals.cgFreeParticles .= Just (particles V.! 0)
     clientGlobals.cgActiveParticles .= Nothing
 
-    particles <- use $ clientGlobals.cgParticles
-    let particles' = V.imap (\idx p -> p { _cpNext = Just (CParticleReference (idx + 1))}) particles
-        lastone = particles' V.! (Constants.maxParticles - 1)
-        particles'' = particles' V.// [(Constants.maxParticles - 1, lastone { _cpNext = Nothing })]
-    clientGlobals.cgParticles .= particles''
+    io $ do
+      let len = V.length particles - 1
+      setParticleChain particles 0 (len - 1)
+      modifyIORef' (particles V.! (len - 1)) (\v -> v { _cpNext = Nothing })
+
+  where setParticleChain :: V.Vector (IORef CParticleT) -> Int -> Int -> IO ()
+        setParticleChain particles idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              modifyIORef' (particles V.! idx) (\v -> v { _cpNext = Just $ particles V.! (idx + 1) })
+              setParticleChain particles (idx + 1) maxIdx
 
 clearDLights :: Quake ()
 clearDLights = clientGlobals.cgDLights .= V.replicate Constants.maxDLights newCDLightT
@@ -173,11 +182,11 @@ addParticles = do
     cl' <- use $ globals.cl
     addParticle cl' activeParticles Nothing Nothing 0
 
-  where addParticle :: ClientStateT -> Maybe CParticleReference -> Maybe CParticleReference -> Maybe CParticleReference -> Float -> Quake ()
+  where addParticle :: ClientStateT -> Maybe (IORef CParticleT) -> Maybe (IORef CParticleT) -> Maybe (IORef CParticleT) -> Float -> Quake ()
         addParticle _ Nothing active _ _ =
           clientGlobals.cgActiveParticles .= active
-        addParticle cl' (Just pRef@(CParticleReference particleIdx)) active tail time = do
-          Just p <- preuse $ clientGlobals.cgParticles.ix particleIdx
+        addParticle cl' (Just pRef) activeRef tailRef time = do
+          p <- io $ readIORef pRef
           let next = p^.cpNext
 
           (done, time', alpha) <- if (p^.cpAlphaVel) /= instantParticle
@@ -188,7 +197,7 @@ addParticles = do
                                       if alpha <= 0 -- faded out
                                         then do
                                           freeParticles <- use $ clientGlobals.cgFreeParticles
-                                          clientGlobals.cgParticles.ix particleIdx.cpNext .= freeParticles
+                                          io $ modifyIORef' pRef (\v -> v { _cpNext = freeParticles })
                                           clientGlobals.cgFreeParticles .= Just pRef
                                           return (True, time', alpha)
                                         else
@@ -198,15 +207,15 @@ addParticles = do
 
           if done
             then
-              addParticle cl' next active tail time'
+              addParticle cl' next activeRef tailRef time'
             else do
-              clientGlobals.cgParticles.ix particleIdx.cpNext .= Nothing
-              (active', tail') <- case tail of
-                                    Nothing ->
-                                      return (Just pRef, Just pRef)
-                                    Just (CParticleReference idx) -> do
-                                      clientGlobals.cgParticles.ix idx.cpNext .= Just pRef
-                                      return (active, Just pRef)
+              io $ modifyIORef' pRef (\v -> v { _cpNext = Nothing })
+              (activeRef', tailRef') <- case tailRef of
+                                          Nothing ->
+                                            return (Just pRef, Just pRef)
+                                          Just ref -> do
+                                            io $ modifyIORef' ref (\v -> v { _cpNext = Just pRef })
+                                            return (activeRef, Just pRef)
 
               let alpha' = if alpha > 1 then 1 else alpha
                   color = truncate (p^.cpColor) :: Int
@@ -216,11 +225,11 @@ addParticles = do
               ClientV.addParticle org color alpha'
 
               when ((p^.cpAlphaVel) == instantParticle) $
-                zoom (clientGlobals.cgParticles.ix particleIdx) $ do
-                  cpAlphaVel .= 0
-                  cpAlpha .= 0
+                io $ modifyIORef' pRef (\v -> v { _cpAlpha = 0
+                                                , _cpAlphaVel = 0
+                                                })
 
-              addParticle cl' next active' tail' time'
+              addParticle cl' next activeRef' tailRef' time'
 
 addDLights :: Quake ()
 addDLights = do
@@ -270,21 +279,16 @@ teleportParticles _ = do
 -}
 particleEffect :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect org dir color count = do
-    io (print "PARTICLE EFFECT")
-    io (putStrLn ("org = " ++ show org))
-    io (putStrLn ("dir = " ++ show dir))
-    io (putStrLn ("color = " ++ show color))
-    io (putStrLn ("count = " ++ show count))
     freeParticles <- use $ clientGlobals.cgFreeParticles
     addEffects freeParticles 0
 
-  where addEffects :: Maybe CParticleReference -> Int -> Quake ()
+  where addEffects :: Maybe (IORef CParticleT) -> Int -> Quake ()
         addEffects Nothing _ = return ()
-        addEffects (Just pRef@(CParticleReference particleIdx)) idx
+        addEffects (Just pRef) idx
           | idx >= count = return ()
           | otherwise = do
-              preuse (clientGlobals.cgParticles.ix particleIdx) >>= \(Just p) ->
-                clientGlobals.cgFreeParticles .= (p^.cpNext)
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
@@ -310,31 +314,30 @@ particleEffect org dir color count = do
               r' <- Lib.randomF
               let pAlphaVel = -1 / (0.5 + r' * 0.3)
 
-              clientGlobals.cgParticles.ix particleIdx .= CParticleT { _cpNext = activeParticles
-                                                                     , _cpTime = fromIntegral pTime
-                                                                     , _cpColor = fromIntegral pColor
-                                                                     , _cpOrg = pOrg
-                                                                     , _cpVel = pVel
-                                                                     , _cpAccel = pAccel
-                                                                     , _cpAlpha = pAlpha
-                                                                     , _cpAlphaVel = pAlphaVel
-                                                                     }
+              io $ writeIORef pRef CParticleT { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral pTime
+                                              , _cpColor = fromIntegral pColor
+                                              , _cpOrg = pOrg
+                                              , _cpVel = pVel
+                                              , _cpAccel = pAccel
+                                              , _cpAlpha = pAlpha
+                                              , _cpAlphaVel = pAlphaVel
+                                              }
 
-              freeParticles <- use $ clientGlobals.cgFreeParticles
-              addEffects freeParticles (idx + 1)
+              addEffects (p^.cpNext) (idx + 1)
 
 explosionParticles :: V3 Float -> Quake ()
 explosionParticles org = do
     freeParticles <- use $ clientGlobals.cgFreeParticles
     addEffects freeParticles 0 256
 
-  where addEffects :: Maybe CParticleReference -> Int -> Int -> Quake ()
+  where addEffects :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
         addEffects Nothing _ _ = return ()
-        addEffects (Just pRef@(CParticleReference particleIdx)) idx maxIdx
+        addEffects (Just pRef) idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              preuse (clientGlobals.cgParticles.ix particleIdx) >>= \(Just p) ->
-                clientGlobals.cgFreeParticles .= (p^.cpNext)
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
@@ -359,15 +362,14 @@ explosionParticles org = do
               r' <- Lib.randomF
               let pAlphaVel = -0.8 / (0.5 + r' * 0.3)
 
-              clientGlobals.cgParticles.ix particleIdx .= CParticleT { _cpNext = activeParticles
-                                                                     , _cpTime = fromIntegral pTime
-                                                                     , _cpColor = fromIntegral pColor
-                                                                     , _cpOrg = pOrg
-                                                                     , _cpVel = pVel
-                                                                     , _cpAccel = pAccel
-                                                                     , _cpAlpha = pAlpha
-                                                                     , _cpAlphaVel = pAlphaVel
-                                                                     }
+              io $ writeIORef pRef CParticleT { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral pTime
+                                              , _cpColor = fromIntegral pColor
+                                              , _cpOrg = pOrg
+                                              , _cpVel = pVel
+                                              , _cpAccel = pAccel
+                                              , _cpAlpha = pAlpha
+                                              , _cpAlphaVel = pAlphaVel
+                                              }
 
-              freeParticles <- use $ clientGlobals.cgFreeParticles
-              addEffects freeParticles (idx + 1) maxIdx
+              addEffects (p^.cpNext) (idx + 1) maxIdx

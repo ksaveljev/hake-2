@@ -798,15 +798,15 @@ itemList =
                         40
   
                , GItemT "" (Just GameItems.pickupHealth) Nothing Nothing Nothing
-  	        (Just "items/pkup.wav") Nothing 0 Nothing
-  	        -- icon
-  	        (Just "i_health")
-  	        -- pickup
-  	        (Just "Health")
-  	        -- width
-  	        3 0 Nothing 0 0 Nothing 0
-  	        -- precache
-  	        "items/s_health.wav items/n_health.wav items/l_health.wav items/m_health.wav"
-                  -- index
-                  41
+                        (Just "items/pkup.wav") Nothing 0 Nothing
+                        -- icon
+                        (Just "i_health")
+                        -- pickup
+                        (Just "Health")
+                        -- width
+                        3 0 Nothing 0 0 Nothing 0
+                        -- precache
+                        "items/s_health.wav items/n_health.wav items/l_health.wav items/m_health.wav"
+                        -- index
+                        41
                ]

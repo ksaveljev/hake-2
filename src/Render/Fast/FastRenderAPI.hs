@@ -1166,12 +1166,6 @@ glDrawParticles numParticles = do
     vpn <- use $ fastRenderAPIGlobals.frVPn
     origin <- use $ fastRenderAPIGlobals.frOrigin
 
-    io (putStrLn ("GONNA DRAW PARTICLES: " ++ show numParticles))
-    io (putStrLn ("vup = " ++ show vup))
-    io (putStrLn ("vright = " ++ show vright))
-    io (putStrLn ("vpn = " ++ show vpn))
-    io (putStrLn ("origin = " ++ show origin))
-
     let up = fmap (* 1.5) vup
         right = fmap (* 1.5) vright
 
@@ -1205,10 +1199,6 @@ glDrawParticles numParticles = do
               originY <- MSV.read sourceVertices (j + 1)
               originZ <- MSV.read sourceVertices (j + 2)
 
-              io (putStrLn ("originX = " ++ show originX))
-              io (putStrLn ("originY = " ++ show originY))
-              io (putStrLn ("originZ = " ++ show originZ))
-
               -- hack a scale up to keep particles from disappearing
               let scale = (originX - (origin^._x)) * (vpn^._x)
                         + (originY - (origin^._y)) * (vpn^._y)
@@ -1216,11 +1206,7 @@ glDrawParticles numParticles = do
 
                   scale' = if scale < 20 then 1 else 1 + scale * 0.004
 
-              io (putStrLn ("scale = " ++ show scale'))
-
               color <- MSV.read sourceColors idx
-
-              io (putStrLn ("color = " ++ show color))
 
               GL.glColor4ub (fromIntegral $ color .&. 0xFF)
                             (fromIntegral $ (color `shiftR` 8) .&. 0xFF)

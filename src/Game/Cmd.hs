@@ -56,7 +56,8 @@ addCommand cmdName f = do
        | otherwise ->
            cmdGlobals.cgCmdFunctions %= (CmdFunctionT cmdName f <|)
 
-  where commandExists name = do
+  where commandExists :: B.ByteString -> Quake Bool
+        commandExists name = do
           allCommands <- use $ cmdGlobals.cgCmdFunctions
           case find (\cmd -> cmd^.cfName == name) allCommands of
             Just _ -> return True

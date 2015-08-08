@@ -9,6 +9,8 @@ module Client.ClientGlobals ( module Client.ClientGlobals
                             ) where
 
 import Control.Lens (makeLenses)
+import Data.IORef (newIORef)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
 import Internal
@@ -48,7 +50,7 @@ initialClientGlobals =
                 , _cgLightStyle         = V.replicate Constants.maxLightStyles newCLightStyleT
                 , _cgLastOfs            = 0
                 , _cgCR                 = 0 -- from Console.hs
-                , _cgParticles          = V.replicate Constants.maxParticles newCParticleT
+                , _cgParticles          = unsafePerformIO $ V.replicateM Constants.maxParticles (newIORef newCParticleT)
                 , _cgActiveParticles    = Nothing
                 , _cgFreeParticles      = Nothing
                 , _cgPrecacheCheck      = 0

@@ -1326,7 +1326,7 @@ stepSize = 18 :: Int
 
 
 moveStopEpsilon = 0.1 :: Float
-	
+
 minStepNormal = 0.7 :: Float -- can't step up onto very steep slopes
 
 
