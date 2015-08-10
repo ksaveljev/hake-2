@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Render.GLFWbRenderer ( glfwbRenderer
                             , glfwbRefExport
                             ) where
 
 import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TChan (TChan, newTChanIO, readTChan, isEmptyTChan)
+import Control.Concurrent.STM.TChan (TChan, newTChanIO, readTChan, isEmptyTChan, writeTChan)
 import Control.Lens ((^.), use, (.=))
 import Control.Monad (when, unless, void)
+import Data.Char (ord)
 import Data.IORef (IORef)
 import Linear (V3)
 import qualified Data.ByteString as B
@@ -18,8 +20,11 @@ import QCommon.XCommandT
 import Render.Basic.BasicRenderAPI
 import Render.OpenGL.GLFWbGLDriver
 import qualified Constants
+import qualified Client.Key as Key
+import qualified Client.KeyConstants as KeyConstants
 import qualified Client.VID as VID
 import qualified QCommon.CBuf as CBuf
+import qualified Sys.Timer as Timer
 
 glfwbRefExport :: RenderAPI -> RefExportT
 glfwbRefExport = glfwbRefExportT glfwbKBD
@@ -179,28 +184,38 @@ glfwbKBDUpdate = do
 
           unless emptyChan $ do
             msg <- io $ atomically $ readTChan kbdChan
-            void $ case msg of
-                     KeyPress -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     KeyRelease -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     MotionNotify -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     ButtonPress -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     ButtonRelease -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     ConfigureNotify -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
-                     WheelMoved -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+
+            case msg of
+              KeyPress key -> doKeyEvent (xLateKey key) True
+              KeyRelease key -> doKeyEvent (xLateKey key) False
+              CursorPosition x y -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              MouseButtonPress button -> doKeyEvent (mouseEventToKey button) True
+              MouseButtonRelease button -> doKeyEvent (mouseEventToKey button) False
+              MouseWheelScroll scroll -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              ConfigureNotify -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
 
             handleEvents kbdChan
 
 keyCallback :: TChan GLFWKBDEvent -> GLFW.Window -> GLFW.Key -> Int -> GLFW.KeyState -> GLFW.ModifierKeys -> IO ()
-keyCallback _ _ _ _ _ _ = putStrLn "GLFWbRenderer.keyCallback" >> undefined -- TODO
+keyCallback kbdChan _ key _ action _ =
+    if | action == GLFW.KeyState'Pressed -> atomically $ writeTChan kbdChan (KeyPress key)
+       | action == GLFW.KeyState'Released -> atomically $ writeTChan kbdChan (KeyRelease key)
+       | otherwise -> return ()
 
 mouseButtonCallback :: TChan GLFWKBDEvent -> GLFW.Window -> GLFW.MouseButton -> GLFW.MouseButtonState -> GLFW.ModifierKeys -> IO ()
-mouseButtonCallback _ _ _ _ _ = putStrLn "GLFWbRenderer.mouseButtonCallback" >> undefined -- TODO
+mouseButtonCallback kbdChan _ button action _ =
+    if | action == GLFW.MouseButtonState'Pressed -> atomically $ writeTChan kbdChan (MouseButtonPress button)
+       | action == GLFW.MouseButtonState'Released -> atomically $ writeTChan kbdChan (MouseButtonRelease button)
+       | otherwise -> return ()
 
 cursorPosCallback :: TChan GLFWKBDEvent -> GLFW.Window -> Double -> Double -> IO ()
-cursorPosCallback _ _ _ _ = putStrLn "GLFWbRenderer.cursorPosCallback" >> undefined -- TODO
+cursorPosCallback kbdChan _ xPos yPos =
+    atomically $ writeTChan kbdChan (CursorPosition xPos yPos)
 
 scrollCallback :: TChan GLFWKBDEvent -> GLFW.Window -> Double -> Double -> IO ()
-scrollCallback _ _ _ _ = putStrLn "GLFWbRenderer.scrollCallback" >> undefined -- TODO
+scrollCallback kbdChan _ _ yOffset =
+    -- A simple mouse wheel, being vertical, provides offsets along the Y-axis.
+    atomically$ writeTChan kbdChan (MouseWheelScroll yOffset)
 
 glfwbKBDInstallGrabs :: Quake ()
 glfwbKBDInstallGrabs = do
@@ -211,3 +226,81 @@ glfwbKBDUninstallGrabs :: Quake ()
 glfwbKBDUninstallGrabs = do
     Just window <- use $ glfwbGlobals.glfwbWindow
     io $ GLFW.setCursorInputMode window GLFW.CursorInputMode'Normal
+
+-- TODO: what about keypad left/right/up/down?
+xLateKey :: GLFW.Key -> Int
+xLateKey key =
+    if | key == GLFW.Key'PageUp       -> KeyConstants.kPgUp
+       | key == GLFW.Key'PageDown     -> KeyConstants.kPgDn
+       | key == GLFW.Key'Home         -> KeyConstants.kHome
+       | key == GLFW.Key'End          -> KeyConstants.kEnd
+       | key == GLFW.Key'Left         -> KeyConstants.kLeftArrow
+       | key == GLFW.Key'Right        -> KeyConstants.kRightArrow
+       | key == GLFW.Key'Down         -> KeyConstants.kDownArrow
+       | key == GLFW.Key'Up           -> KeyConstants.kUpArrow
+       | key == GLFW.Key'Escape       -> KeyConstants.kEscape
+       | key == GLFW.Key'Enter        -> KeyConstants.kEnter
+       | key == GLFW.Key'Tab          -> KeyConstants.kTab
+       | key == GLFW.Key'F1           -> KeyConstants.kF1
+       | key == GLFW.Key'F2           -> KeyConstants.kF2 
+       | key == GLFW.Key'F3           -> KeyConstants.kF3
+       | key == GLFW.Key'F4           -> KeyConstants.kF4
+       | key == GLFW.Key'F5           -> KeyConstants.kF5
+       | key == GLFW.Key'F6           -> KeyConstants.kF6
+       | key == GLFW.Key'F7           -> KeyConstants.kF7
+       | key == GLFW.Key'F8           -> KeyConstants.kF8
+       | key == GLFW.Key'F9           -> KeyConstants.kF9
+       | key == GLFW.Key'F10          -> KeyConstants.kF10
+       | key == GLFW.Key'F11          -> KeyConstants.kF11
+       | key == GLFW.Key'F12          -> KeyConstants.kF12
+       | key == GLFW.Key'Backspace    -> KeyConstants.kBackspace
+       | key == GLFW.Key'Delete       -> KeyConstants.kDel
+       | key == GLFW.Key'Pause        -> KeyConstants.kPause
+       | key == GLFW.Key'LeftShift    -> KeyConstants.kShift
+       | key == GLFW.Key'RightShift   -> KeyConstants.kShift
+       | key == GLFW.Key'LeftControl  -> KeyConstants.kCtrl
+       | key == GLFW.Key'RightControl -> KeyConstants.kCtrl
+       | key == GLFW.Key'LeftAlt      -> KeyConstants.kAlt
+       | key == GLFW.Key'RightAlt     -> KeyConstants.kAlt
+       | key == GLFW.Key'Insert       -> KeyConstants.kIns
+       | key == GLFW.Key'GraveAccent  -> ord '`'
+       | key == GLFW.Key'A            -> 97   -- a
+       | key == GLFW.Key'B            -> 98   -- b
+       | key == GLFW.Key'C            -> 99   -- c
+       | key == GLFW.Key'D            -> 100  -- d
+       | key == GLFW.Key'E            -> 101  -- e
+       | key == GLFW.Key'F            -> 102  -- f
+       | key == GLFW.Key'G            -> 103  -- g
+       | key == GLFW.Key'H            -> 104  -- h
+       | key == GLFW.Key'I            -> 105  -- i
+       | key == GLFW.Key'J            -> 106  -- j
+       | key == GLFW.Key'K            -> 107  -- k
+       | key == GLFW.Key'L            -> 108  -- l
+       | key == GLFW.Key'M            -> 109  -- m
+       | key == GLFW.Key'N            -> 110  -- n
+       | key == GLFW.Key'O            -> 111  -- o
+       | key == GLFW.Key'P            -> 112  -- p
+       | key == GLFW.Key'Q            -> 113  -- q
+       | key == GLFW.Key'R            -> 114  -- r
+       | key == GLFW.Key'S            -> 115  -- s
+       | key == GLFW.Key'T            -> 116  -- t
+       | key == GLFW.Key'U            -> 117  -- u
+       | key == GLFW.Key'V            -> 118  -- v
+       | key == GLFW.Key'W            -> 119  -- w
+       | key == GLFW.Key'X            -> 120  -- x
+       | key == GLFW.Key'Y            -> 121  -- y
+       | key == GLFW.Key'Z            -> 122  -- z
+       | otherwise                    -> 0
+
+-- BUTTON1(left) BUTTON2(center) BUTTON3(right)
+-- K_MOUSE1      K_MOUSE3        K_MOUSE2
+mouseEventToKey :: GLFW.MouseButton -> Int
+mouseEventToKey button =
+    if | button == GLFW.MouseButton'3 -> KeyConstants.kMouse3
+       | button == GLFW.MouseButton'2 -> KeyConstants.kMouse2
+       | otherwise -> KeyConstants.kMouse1
+
+doKeyEvent :: Int -> Bool -> Quake ()
+doKeyEvent key down = do
+    ms <- Timer.milliseconds
+    Key.event key down ms

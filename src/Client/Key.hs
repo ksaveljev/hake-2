@@ -2,10 +2,10 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Key where
 
-import Data.Maybe (isJust, fromJust)
-import Data.Char (ord, toUpper, chr)
-import Control.Lens ((.=), (%=), use)
+import Control.Lens ((.=), (%=), use, ix, (+=), (^.))
 import Control.Monad.State (liftM, unless, when, void)
+import Data.Char (ord, toUpper, chr)
+import Data.Maybe (isJust, fromJust, isNothing)
 import System.IO (Handle)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
@@ -14,8 +14,10 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
-import QCommon.XCommandT
 import Client.KeyConstants
+import QCommon.XCommandT
+import qualified Constants
+import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 
@@ -134,3 +136,68 @@ writeBindings h = do
         writeKeyBinding handle i (Just b) = do
           keyStr <- keynumToString i
           io $ B.hPut handle $ "bind " `B.append` keyStr `B.append` " \"" `B.append` b `B.append` "\"\n"
+
+-- Called by the system between frames for both key up and key down events.
+event :: Int -> Bool -> Int -> Quake ()
+event key down time = do
+    -- TODO: do we need this?
+    -- // hack for modal presses
+    -- if (key_waiting == -1) {
+    --     if (down)
+    --         key_waiting = key;
+    --     return;
+    -- }
+    
+    cls' <- use $ globals.cls
+
+    -- update auto-repeat status
+    done <- if down
+              then do
+                keyGlobals.kgKeyRepeats.ix key += 1
+
+                keyRepeats <- use $ keyGlobals.kgKeyRepeats
+                keyBindings' <- use $ globals.keyBindings
+
+                if | keyRepeats UV.! key > 1 && (cls'^.csKeyDest) == Constants.keyGame && not ((cls'^.csState) == Constants.caDisconnected) -> -- ignore most autorepeats
+                       return True
+                   | key >= 200 && isNothing (keyBindings' V.! key) -> do
+                       v <- keynumToString key
+                       Com.printf (v `B.append` " is unbound, hit F4 to set.\n")
+                       return False
+                   | otherwise ->
+                       return False
+
+              else do
+                keyGlobals.kgKeyRepeats.ix key .= 0
+                return False
+
+    unless done $ do
+      when (key == kShift) $
+        keyGlobals.kgShiftDown .= down
+
+      -- TODO: '~' is not working for console so far? need to set it up?
+      -- console key is hardcoded, so the user can never unbind it
+      done' <- if key == ord '`' || key == ord '~'
+                 then do
+                   if not down
+                     then return True
+                     else do
+                       Console.toggleConsoleF
+                       return True
+                 else
+                   return False
+
+      unless done' $ do
+        -- any key during the attract mode will bring up the menu
+        cl' <- use $ globals.cl
+
+        let key' = if (cl'^.csAttractLoop) && (cls'^.csKeyDest) /= Constants.keyMenu && not (key >= kF1 && key <= kF12)
+                     then kEscape
+                     else key
+
+        -- menu key is hardcoded, so the user can never unbind it
+        if key' == kEscape
+          then do
+            undefined -- TODO
+          else do
+            io (print "Key.event") >> undefined -- TODO

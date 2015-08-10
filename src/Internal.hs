@@ -1520,13 +1520,13 @@ data INGlobals =
             }
 
 data GLFWKBDEvent =
-    KeyPress
-  | KeyRelease
-  | MotionNotify
-  | ButtonPress
-  | ButtonRelease
+    KeyPress GLFW.Key
+  | KeyRelease GLFW.Key
+  | CursorPosition Double Double
+  | MouseButtonPress GLFW.MouseButton
+  | MouseButtonRelease GLFW.MouseButton
+  | MouseWheelScroll Double
   | ConfigureNotify
-  | WheelMoved
 
 data GLFWbGlobals =
   GLFWbGlobals { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
