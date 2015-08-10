@@ -26,6 +26,7 @@ import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.RenderAPIConstants as RenderAPIConstants
+import qualified Util.Math3D as Math3D
 
 subdivideSize :: Float
 subdivideSize = 64
@@ -41,6 +42,15 @@ maxClipVerts = 64
 
 warpVerts :: MV.IOVector (V3 Float)
 warpVerts = unsafePerformIO $ MV.new maxClipVerts
+
+vecToSt :: V.Vector (V3 Int)
+vecToSt = V.fromList [ V3 (-2)   3    1
+                     , V3   2    3  (-1)
+                     , V3   1    3    2
+                     , V3 (-1)   3  (-2)
+                     , V3 (-2) (-1)   3
+                     , V3 (-2)   1  (-3)
+                     ]
 
 sinV :: UV.Vector Float
 sinV =
@@ -424,4 +434,61 @@ emitWaterPolys _ = do
 
 clipSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Int -> Quake ()
 clipSkyPolygon nump vecs stage = do
-    io (putStrLn "IMPLEMENT ME! Warp.clipSkyPolygon") >> return () -- TODO
+    when (nump > maxClipVerts - 2) $
+      Com.comError Constants.errDrop "ClipSkyPolygon: MAX_CLIP_VERTS"
+
+    if stage == 6
+      then
+        drawSkyPolygon nump vecs
+      else do
+        io (putStrLn "Warp.clipSkyPolygon") >> undefined -- TODO
+
+drawSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Quake ()
+drawSkyPolygon nump vecs = do
+    v <- use $ globals.vec3Origin
+    v' <- io $ addVecs v 0 nump
+    let av = fmap abs v'
+        axis = if | (av^._x) > (av^._y) && (av^._x) > (av^._z) ->
+                      if (v^._x) < 0 then 1 else 0
+                  | (av^._y) > (av^._z) && (av^._y) > (av^._x) ->
+                      if (v^._y) < 0 then 3 else 2
+                  | otherwise ->
+                      if (v^._z) < 0 then 5 else 4
+
+    -- project new texture coords
+    projectCoords axis 0 nump
+
+  where addVecs :: V3 Float -> Int -> Int -> IO (V3 Float)
+        addVecs v idx maxIdx
+          | idx >= maxIdx = return v
+          | otherwise = do
+              vec <- MV.read vecs idx
+              addVecs (v + vec) (idx + 1) maxIdx
+
+        projectCoords :: Int -> Int -> Int -> Quake ()
+        projectCoords axis idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              vec <- io $ MV.read vecs idx
+
+              let j = vecToSt V.! axis
+                  dv = if (j^._z) > 0
+                         then vec^.(Math3D.v3Access ((j^._z) - 1))
+                         else negate (vec^.(Math3D.v3Access (negate (j^._z) - 1)))
+
+              if dv < 0.001
+                then projectCoords axis (idx + 1) maxIdx -- don't divide by zero
+                else do
+                  let s = if (j^._x) < 0
+                            then (negate (vec^.(Math3D.v3Access (negate (j^._x) - 1)))) / dv
+                            else (vec^.(Math3D.v3Access ((j^._x) - 1))) / dv
+                      t = if (j^._y) < 0
+                            then (negate (vec^.(Math3D.v3Access (negate (j^._y) - 1)))) / dv
+                            else (vec^.(Math3D.v3Access ((j^._y) - 1))) / dv
+
+                  (skyMins0, skyMins1) <- use $ fastRenderAPIGlobals.frSkyMins
+                  (skyMaxs0, skyMaxs1) <- use $ fastRenderAPIGlobals.frSkyMaxs
+                    
+                  ??? -- TODO
+
+                  projectCoords axis (idx + 1) maxIdx
