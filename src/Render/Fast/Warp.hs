@@ -28,6 +28,18 @@ import qualified Render.Fast.Polygon as Polygon
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Math3D as Math3D
 
+sideFront :: Int
+sideFront = 0
+
+sideBack :: Int
+sideBack = 1
+
+sideOn :: Int
+sideOn = 2
+
+onEpsilon :: Float
+onEpsilon = 0.1 -- point on plane side epsilon
+
 subdivideSize :: Float
 subdivideSize = 64
 
@@ -50,6 +62,15 @@ vecToSt = V.fromList [ V3 (-2)   3    1
                      , V3 (-1)   3  (-2)
                      , V3 (-2) (-1)   3
                      , V3 (-2)   1  (-3)
+                     ]
+
+skyClip :: V.Vector (V3 Float)
+skyClip = V.fromList [ V3   1    1    0
+                     , V3   1  (-1)   0
+                     , V3   0  (-1)   1
+                     , V3   0    1    1
+                     , V3   1    0    1
+                     , V3 (-1)   0    1
                      ]
 
 sinV :: UV.Vector Float
@@ -439,9 +460,92 @@ clipSkyPolygon nump vecs stage = do
 
     if stage == 6
       then
+        -- fully clipped, so draw it
         drawSkyPolygon nump vecs
       else do
-        io (putStrLn "Warp.clipSkyPolygon") >> undefined -- TODO
+        sides <- io $ MV.new maxClipVerts :: Quake (MV.IOVector Int)
+        dists <- io $ MV.new maxClipVerts :: Quake (MV.IOVector Float)
+
+        (front, back) <- io $ checkFrontAndBack sides dists (skyClip V.! stage) False False 0 nump
+
+        if not front || not back
+          then
+            -- not clipped
+            clipSkyPolygon nump vecs (stage + 1)
+          else do
+            -- clip it
+            io $ do
+              s <- MV.read sides 0
+              MV.write sides nump s
+              d <- MV.read dists 0
+              MV.write dists nump d
+              v <- MV.read vecs 0
+              MV.write vecs nump v
+
+            newv0 <- io $ MV.new maxClipVerts :: Quake (MV.IOVector (V3 Float))
+            newv1 <- io $ MV.new maxClipVerts :: Quake (MV.IOVector (V3 Float))
+
+            (newc0, newc1) <- io $ clipStuff newv0 newv1 sides dists 0 0 0 nump
+
+            -- continue
+            clipSkyPolygon newc0 newv0 (stage + 1)
+            clipSkyPolygon newc1 newv1 (stage + 1)
+
+  where checkFrontAndBack :: MV.IOVector Int -> MV.IOVector Float -> V3 Float -> Bool -> Bool -> Int -> Int -> IO (Bool, Bool)
+        checkFrontAndBack sides dists norm front back idx maxIdx
+          | idx >= maxIdx = return (front, back)
+          | otherwise = do
+              v <- MV.read vecs idx
+              let d = v `dot` norm
+              MV.write dists idx d
+
+              if | d > onEpsilon -> do
+                     MV.write sides idx sideFront
+                     checkFrontAndBack sides dists norm True back (idx + 1) maxIdx
+                 | d < negate onEpsilon -> do
+                     MV.write sides idx sideBack
+                     checkFrontAndBack sides dists norm front True (idx + 1) maxIdx
+                 | otherwise -> do
+                     MV.write sides idx sideOn
+                     checkFrontAndBack sides dists norm front back (idx + 1) maxIdx
+
+        clipStuff :: MV.IOVector (V3 Float) -> MV.IOVector (V3 Float) -> MV.IOVector Int -> MV.IOVector Float -> Int -> Int -> Int -> Int -> IO (Int, Int)
+        clipStuff newv0 newv1 sides dists newc0 newc1 idx maxIdx
+          | idx >= maxIdx = return (newc0, newc1)
+          | otherwise = do
+              v <- MV.read vecs idx
+              s <- MV.read sides idx
+
+              (newc0', newc1') <- if | s == sideFront -> do
+                                         MV.write newv0 newc0 v
+                                         return (newc0 + 1, newc1)
+                                     | s == sideBack -> do
+                                         MV.write newv1 newc1 v
+                                         return (newc0, newc1 + 1)
+                                     | s == sideOn -> do
+                                         MV.write newv0 newc0 v
+                                         MV.write newv1 newc1 v
+                                         return (newc0 + 1, newc1 + 1)
+                                     | otherwise ->
+                                         return (newc0, newc1) -- shouldn't happen really
+
+              s' <- MV.read sides (idx + 1)
+
+              if s == sideOn || s' == sideOn || s == s'
+                then
+                  clipStuff newv0 newv1 sides dists newc0' newc1' (idx + 1) maxIdx
+                else do
+                  dist <- MV.read dists idx
+                  dist' <- MV.read dists (idx + 1)
+                  v' <- MV.read vecs (idx + 1)
+
+                  let d = dist / (dist - dist')
+                      e = v + fmap (* d) (v' - v)
+
+                  MV.write newv0 newc0' e
+                  MV.write newv1 newc1' e
+                  
+                  clipStuff newv0 newv1 sides dists (newc0' + 1) (newc1' + 1) (idx + 1) maxIdx
 
 drawSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Quake ()
 drawSkyPolygon nump vecs = do
@@ -489,6 +593,23 @@ drawSkyPolygon nump vecs = do
                   (skyMins0, skyMins1) <- use $ fastRenderAPIGlobals.frSkyMins
                   (skyMaxs0, skyMaxs1) <- use $ fastRenderAPIGlobals.frSkyMaxs
                     
-                  ??? -- TODO
+                  let skyMins0' = if s < skyMins0 UV.! axis
+                                    then skyMins0 UV.// [(axis, s)]
+                                    else skyMins0
+
+                      skyMins1' = if t < skyMins1 UV.! axis
+                                    then skyMins1 UV.// [(axis, t)]
+                                    else skyMins1
+
+                      skyMaxs0' = if s > skyMaxs0 UV.! axis
+                                    then skyMaxs0 UV.// [(axis, s)]
+                                    else skyMaxs0
+
+                      skyMaxs1' = if t > skyMaxs1 UV.! axis
+                                    then skyMaxs1 UV.// [(axis, t)]
+                                    else skyMaxs1
+
+                  fastRenderAPIGlobals.frSkyMins .= (skyMins0', skyMins1')
+                  fastRenderAPIGlobals.frSkyMaxs .= (skyMaxs0', skyMaxs1')
 
                   projectCoords axis (idx + 1) maxIdx
