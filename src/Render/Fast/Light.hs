@@ -432,8 +432,67 @@ rBuildLightMap surf buffer offset stride = do
                 | otherwise -> (fromIntegral r, fromIntegral g, fromIntegral b, fromIntegral (255 - a))
 
 rAddDynamicLights :: MSurfaceT -> Quake ()
-rAddDynamicLights _ = do
-    io (putStrLn "IMPLEMENT ME! Light.rAddDynamicLights") >> return () -- TODO
+rAddDynamicLights surf = do
+    let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+        tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    addLights newRefDef smax tmax 0 (newRefDef^.rdNumDLights)
+
+  where addLights :: RefDefT -> Int -> Int -> Int -> Int -> Quake ()
+        addLights newRefDef smax tmax idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              if (surf^.msDLightBits) .&. (1 `shiftL` idx) == 0
+                then
+                  -- not lit by this light
+                  addLights newRefDef smax tmax (idx + 1) maxIdx
+                else do
+                  plane <- io $ readIORef (fromJust $ surf^.msPlane)
+                  let dl = (newRefDef^.rdDLights) V.! idx
+                      fdist = (dl^.dlOrigin) `dot` (plane^.cpNormal) - (plane^.cpDist)
+                      frad = (dl^.dlIntensity) - abs fdist
+                  -- rad is now the highest intensity on the plane
+                  if frad < dLightCutoff
+                    then
+                      addLights newRefDef smax tmax (idx + 1) maxIdx
+                    else do
+                      let fminlight = frad - dLightCutoff
+                          impact = (dl^.dlOrigin) - fmap (* fdist) (plane^.cpNormal)
+                          local0 = impact `dot` (surf^.msTexInfo.mtiVecs._1._xyz) + (surf^.msTexInfo.mtiVecs._1._w) - (fromIntegral $ surf^.msTextureMins._1)
+                          local1 = impact `dot` (surf^.msTexInfo.mtiVecs._2._xyz) + (surf^.msTexInfo.mtiVecs._2._w) - (fromIntegral $ surf^.msTextureMins._2)
+
+                      blockLights <- use $ fastRenderAPIGlobals.frBlockLights
+                      let updates = collectBlockLightsUpdates blockLights smax tmax fminlight dl frad local0 local1 0 0 0 []
+
+                      fastRenderAPIGlobals.frBlockLights .= (blockLights UV.// updates)
+                      addLights newRefDef smax tmax (idx + 1) maxIdx
+
+        collectBlockLightsUpdates :: UV.Vector Float -> Int -> Int -> Float -> DLightT -> Float -> Float -> Float -> Int -> Int -> Float -> [(Int, Float)] -> [(Int, Float)]
+        collectBlockLightsUpdates blockLights smax tmax fminlight dl frad local0 local1 blIndex t ftacc acc
+          | t >= tmax = acc
+          | otherwise =
+              let td = truncate (local1 - ftacc) :: Int
+                  td' = if td < 0 then negate td else td
+                  (blIndex', acc') = collectUpdates blockLights smax fminlight dl frad td' local0 blIndex 0 0 acc
+              in collectBlockLightsUpdates blockLights smax tmax fminlight dl frad local0 local1 blIndex' (t + 1) (ftacc + 16) acc'
+
+        collectUpdates :: UV.Vector Float -> Int -> Float -> DLightT -> Float -> Int -> Float -> Int -> Int -> Float -> [(Int, Float)] -> (Int, [(Int, Float)])
+        collectUpdates blockLights smax fminlight dl frad td local0 blIndex s fsacc acc
+          | s >= smax = (blIndex, acc)
+          | otherwise =
+              let sd = truncate (local0 - fsacc) :: Int
+                  sd' = if sd < 0 then negate sd else sd
+                  fdist = fromIntegral $ if sd' > td
+                                           then sd' + (td `shiftR` 1)
+                                           else td + (sd' `shiftR` 1)
+              in if fdist < fminlight
+                   then let a = (frad - fdist) * (dl^.dlColor._x)
+                            b = (frad - fdist) * (dl^.dlColor._y)
+                            c = (frad - fdist) * (dl^.dlColor._z)
+                        in collectUpdates blockLights smax fminlight dl frad td local0 (blIndex + 3) (s + 1) (fsacc + 16) ((blIndex, (blockLights UV.! blIndex) + a) : (blIndex + 1, (blockLights UV.! (blIndex + 1)) + b) : (blIndex + 2, (blockLights UV.! (blIndex + 2)) + c) : acc)
+                   else
+                     collectUpdates blockLights smax fminlight dl frad td local0 (blIndex + 3) (s + 1) (fsacc + 16) acc
 
 recursiveLightPoint :: MNodeChild -> V3 Float -> V3 Float -> Quake Int
 recursiveLightPoint (MLeafChildReference _) _ _ = return (-1) -- didn't hit anything
