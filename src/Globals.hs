@@ -70,7 +70,7 @@ initialGlobals =
           , _re                 = Just dummyRenderer
 
           , _keyBindings        = V.replicate 256 Nothing
-          , _keyDown            = UV.empty
+          , _keyDown            = UV.replicate 256 False
           , _chatTeam           = False
           , _chatBuffer         = ""
           , _keyLines           = V.replicate 32 ""

@@ -29,7 +29,7 @@ menuOutSound = "misc/menu3.wav"
 
 init :: Quake ()
 init = do
-    Cmd.addCommand "menu_main" (Just menuMain)
+    Cmd.addCommand "menu_main" (Just menuMainF)
     Cmd.addCommand "menu_game" (Just menuGame)
     Cmd.addCommand "menu_loadgame" (Just menuLoadGame)
     Cmd.addCommand "menu_savegame" (Just menuSaveGame)
@@ -96,8 +96,8 @@ tallySlots menuIdx = do
             MenuSliderS _ _ _ _ _ -> return 1
             MenuActionS _ -> return 1
 
-menuMain :: XCommandT
-menuMain = io (putStrLn "Menu.menuMain") >> undefined -- TODO
+menuMainF :: XCommandT
+menuMainF = io (putStrLn "Menu.menuMainF") >> undefined -- TODO
 
 menuGame :: XCommandT
 menuGame = io (putStrLn "Menu.menuGame") >> undefined -- TODO
@@ -170,3 +170,7 @@ draw = do
       when enterSound $ do
         S.startLocalSound menuInSound
         menuGlobals.mgEnterSound .= False
+
+menuKeyDown :: Int -> Quake ()
+menuKeyDown key = do
+    io (putStrLn "Menu.menuKeyDown") >> undefined -- TODO

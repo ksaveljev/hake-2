@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Key where
 
-import Control.Lens ((.=), (%=), use, ix, (+=), (^.))
+import Control.Lens ((.=), (%=), use, ix, (+=), (^.), (-=), preuse)
 import Control.Monad.State (liftM, unless, when, void)
 import Data.Char (ord, toUpper, chr)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -17,8 +17,10 @@ import QuakeState
 import Client.KeyConstants
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Game.Cmd as Cmd
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 
 init :: Quake ()
@@ -198,6 +200,84 @@ event key down time = do
         -- menu key is hardcoded, so the user can never unbind it
         if key' == kEscape
           then do
-            undefined -- TODO
+            when down $ do
+              if (cl'^.csFrame.fPlayerState.psStats) UV.! Constants.statLayouts /= 0 && (cls'^.csKeyDest) == Constants.keyGame
+                then
+                  CBuf.addText "cmd putaway\n"
+                else
+                  if | (cls'^.csKeyDest) == Constants.keyMessage ->
+                         message key'
+
+                     | (cls'^.csKeyDest) == Constants.keyMenu ->
+                         Menu.menuKeyDown key'
+
+                     | (cls'^.csKeyDest) == Constants.keyGame || (cls'^.csKeyDest) == Constants.keyConsole ->
+                         Menu.menuMainF
+
+                     | otherwise ->
+                         Com.comError Constants.errFatal "Bad cls.key_dest"
           else do
-            io (print "Key.event") >> undefined -- TODO
+            -- track if any key is down for BUTTON_ANY
+            globals.keyDown.ix key' .= down
+
+            if down
+              then do
+                keyRepeats <- use $ keyGlobals.kgKeyRepeats
+                when (keyRepeats UV.! key' == 1) $
+                  keyGlobals.kgAnyKeyDown += 1
+              else do
+                anyKeyDown <- use $ keyGlobals.kgAnyKeyDown
+                when (anyKeyDown > 0) $
+                  keyGlobals.kgAnyKeyDown -= 1
+
+            -- key up events only generate commands if the game key binding is
+            -- a button command (leading + sign).  These will occur even in console mode,
+            -- to keep the character from continuing an action started before a console
+            -- switch.  Button commands include the kenum as a parameter, so multiple
+            -- downs can be matched with ups
+            if not down
+              then do
+                Just kb <- preuse $ globals.keyBindings.ix key'
+                case kb of
+                  Nothing -> return ()
+                  Just binding ->
+                    when (B.length binding > 0 && binding `BC.index` 0 == '+') $
+                      CBuf.addText ("-" `B.append` (B.drop 1 binding) `B.append` " " `B.append` BC.pack (show key') `B.append` " " `B.append` BC.pack (show time) `B.append` "\n") -- IMPROVE?
+              else do
+                -- if not a consolekey, send to the interpreter no matter what mode is
+                Just menuBound <- preuse $ keyGlobals.kgMenuBound.ix key'
+                Just consoleKey <- preuse $ keyGlobals.kgConsoleKeys.ix key'
+
+                if ((cls'^.csKeyDest) == Constants.keyMenu && menuBound) ||
+                   ((cls'^.csKeyDest) == Constants.keyConsole && not consoleKey) ||
+                   ((cls'^.csKeyDest) == Constants.keyGame && ((cls'^.csState) == Constants.caActive || not consoleKey))
+                   then do
+                     Just kb <- preuse $ globals.keyBindings.ix key'
+                     case kb of
+                       Nothing -> return ()
+                       Just binding ->
+                         if B.length binding > 0 && binding `BC.index` 0 == '+'
+                           then CBuf.addText (binding `B.append` " " `B.append` BC.pack (show key') `B.append` " " `B.append` BC.pack (show time) `B.append` "\n") -- IMPROVE?
+                           else CBuf.addText (binding `B.append` "\n")
+                   else
+                     -- other systems only care about key down events
+                     when down $ do
+                       if | (cls'^.csKeyDest) == Constants.keyMessage ->
+                              message key'
+
+                          | (cls'^.csKeyDest) == Constants.keyMenu ->
+                              Menu.menuKeyDown key'
+
+                          | (cls'^.csKeyDest) == Constants.keyGame || (cls'^.csKeyDest) == Constants.keyConsole ->
+                              console key'
+
+                          | otherwise ->
+                              Com.comError Constants.errFatal "Bad cls.key_dest"
+
+message :: Int -> Quake ()
+message key = do
+    io (putStrLn "Key.message") >> undefined -- TODO
+
+console :: Int -> Quake ()
+console key = do
+    io (putStrLn "Key.console") >> undefined -- TODO
