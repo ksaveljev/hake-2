@@ -19,7 +19,8 @@ stopAllSounds = return () -- TODO: don't want to get involved with sound system 
     -- io (putStrLn "S.stopAllSounds") >> undefined -- TODO
 
 update :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake ()
-update _ _ _ _ = io (putStrLn "S.update IMPLEMENT ME!") >> return () -- io (putStrLn "S.update") >> undefined -- TODO
+update _ _ _ _ = return () -- IMPLEMENT ME!
+-- io (putStrLn "S.update") >> undefined -- TODO
 
 startLocalSound :: B.ByteString -> Quake ()
 startLocalSound _ = do
@@ -35,7 +36,8 @@ registerSound _ = do
 
 startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Maybe (IORef SfxT) -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = do
-    io (putStrLn "IMPLEMENT ME! S.startSound") >> return () -- TODO: don't want to get involved with sound system yet
+    return () -- IMPLEMENT ME!
+    -- io (putStrLn "IMPLEMENT ME! S.startSound") >> return () -- TODO: don't want to get involved with sound system yet
 
 beginRegistration :: Quake ()
 beginRegistration = do

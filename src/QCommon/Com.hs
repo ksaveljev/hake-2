@@ -265,7 +265,7 @@ chktbl = UV.fromList [ 0x84, 0x47, 0x51, 0xc1, 0x93, 0x22, 0x21, 0x24
 
 blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
 blockSequenceCRCByte _ _ _ _ = do
-    io (putStrLn "IMPLEMENT ME!! Com.blockSequenceCRCByte") >> return 0
+    return 0 -- IMPLEMENT ME!
     -- io (putStrLn "Com.blockSequenceCRCByte") >> undefined -- TODO
 
 stripExtension :: B.ByteString -> B.ByteString
