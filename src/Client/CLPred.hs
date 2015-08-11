@@ -210,8 +210,8 @@ checkPredictionError = do
 
     unless (predictValue == 0 || (flags .&. pmfNoPrediction) /= 0) $ do
       -- calculate the last usercmd_t we sent that the server has processed
-      globals.cls.csNetChan.ncIncomingAcknowledged %= (.&. (Constants.cmdBackup - 1))
-      frame <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
+      incomingAcknowledged <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
+      let frame = incomingAcknowledged .&. (Constants.cmdBackup - 1)
 
       -- compare what the server returned with what we had predicted it to be
       origin <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsOrigin
