@@ -328,6 +328,9 @@ catagorizePosition = do
               pmGroundEntity .= Nothing
               pmState.pmsPMFlags %= (.&. (complement pmfOnGround))
           else do
+            pMoveGlobals.pmPM.pmGroundEntity .= (traceT^.tEnt)
+
+            -- hitting solid ground will end a waterjump
             when ((pm^.pmState.pmsPMFlags) .&. pmfTimeWaterJump /= 0) $
               zoom (pMoveGlobals.pmPM.pmState) $ do
                 pmsPMFlags %= (.&. (complement (pmfTimeWaterJump .|. pmfTimeLand .|. pmfTimeTeleport)))
@@ -715,10 +718,36 @@ airMove = do
                                     else (wishVel', wishSpeed)
 
     if | pml^.pmlLadder -> do
-           io (putStrLn "PMove.airMove#ladder") >> undefined -- TODO
+           accel <- use $ pMoveGlobals.pmAccelerate
+           accelerate wishDir wishSpeed' accel
+
+           when ((wishVel''^._z) == 0) $
+             if (pml^.pmlVelocity._z) > 0
+               then do
+                 pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
+                 velocityZ <- use $ pMoveGlobals.pmPML.pmlVelocity._z
+                 when (velocityZ < 0) $
+                   pMoveGlobals.pmPML.pmlVelocity._z .= 0
+               else do
+                 pMoveGlobals.pmPML.pmlVelocity._z += (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
+                 velocityZ <- use $ pMoveGlobals.pmPML.pmlVelocity._z
+                 when (velocityZ > 0) $
+                   pMoveGlobals.pmPML.pmlVelocity._z .= 0
+
+           stepSlideMove
 
        | isJust (pm^.pmGroundEntity) -> do -- walking on ground
-           io (putStrLn "PMove.airMove#ground") >> undefined -- TODO
+           pMoveGlobals.pmPML.pmlVelocity._z .= 0 -- !!! this is before the accel
+           accel <- use $ pMoveGlobals.pmAccelerate
+           accelerate wishDir wishSpeed' accel
+
+           if (pm^.pmState.pmsGravity) > 0
+             then pMoveGlobals.pmPML.pmlVelocity._z .= 0 -- !!! this is before the accel
+             else pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
+
+           velocity <- use $ pMoveGlobals.pmPML.pmlVelocity
+           unless ((velocity^._x) == 0 && (velocity^._y) == 0) $
+             stepSlideMove
 
        | otherwise -> do -- not on ground, so little effect on velocity
            airAccel <- use $ pMoveGlobals.pmAirAccelerate
@@ -727,7 +756,7 @@ airMove = do
                accel <- use $ pMoveGlobals.pmAccelerate
                airAccelerate wishDir wishSpeed' accel
              else
-               airAccelerate wishDir wishSpeed' 1
+               accelerate wishDir wishSpeed' 1
 
            -- add gravity
            pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
@@ -797,6 +826,22 @@ addCurrents pm pml (V3 a b c) waterSpeed =
         wishVel'' = wishVel' + fmap (* 100) v'
 
     in wishVel''
+
+-- Handles user intended acceleration
+accelerate :: V3 Float -> Float -> Float -> Quake ()
+accelerate wishDir wishSpeed accel = do
+    pml <- use $ pMoveGlobals.pmPML
+
+    let currentSpeed = (pml^.pmlVelocity) `dot` wishDir
+        addSpeed = wishSpeed - currentSpeed
+
+    unless (addSpeed <= 0) $ do
+      let accelSpeed = accel * (pml^.pmlFrameTime) * wishSpeed
+          accelSpeed' = if accelSpeed > addSpeed
+                          then addSpeed
+                          else accelSpeed
+
+      pMoveGlobals.pmPML.pmlVelocity += (fmap (* accelSpeed') wishDir)
 
 airAccelerate :: V3 Float -> Float -> Float -> Quake ()
 airAccelerate wishDir wishSpeed accel = do
