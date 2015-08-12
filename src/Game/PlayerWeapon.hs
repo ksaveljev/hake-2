@@ -7,7 +7,7 @@ import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, fromJust)
-import Linear (V3)
+import Linear (V3(..))
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -16,8 +16,10 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
+import qualified Game.GameWeapon as GameWeapon
 import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 useWeapon :: ItemUse
 useWeapon =
@@ -492,8 +494,38 @@ weaponGrenadeFire _ _ = do
     io (putStrLn "PlayerWeapon.weaponGrenadeFire") >> undefined -- TODO
 
 blasterFire :: EdictReference -> V3 Float -> Int -> Bool -> Int -> Quake ()
-blasterFire _ _ _ _ _ = do
-    io (putStrLn "PlayerWeapon.blasterFire") >> undefined -- TODO
+blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    let damage = if isQuad then dmg * 4 else dmg
+        (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+        offset = (V3 24 8 (fromIntegral (edict^.eEdictStatus.eViewHeight) - 8)) + gOffset
+        start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+        V3 _ b c = fmap (* (-2)) forward
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcKickOrigin .= V3 (-1) b c
+
+    GameWeapon.fireBlaster edictRef start forward damage 1000 effect hyper
+
+    -- send muzzle flash
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcMuzzleFlash
+    writeShort edictIdx
+    if hyper
+      then writeByte (Constants.mzHyperblaster .|. isSilenced)
+      else writeByte (Constants.mzBlaster .|. isSilenced)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    playerNoise edictRef start Constants.pNoiseWeapon
 
 playerNoise :: EdictReference -> V3 Float -> Int -> Quake ()
 playerNoise _ _ _ = do
@@ -502,3 +534,11 @@ playerNoise _ _ _ = do
 noAmmoWeaponChange :: EdictReference -> Quake ()
 noAmmoWeaponChange _ = do
     io (putStrLn "PlayerWeapon.noAmmoWeaponChange") >> undefined -- TODO
+
+projectSource :: GClientT -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> V3 Float
+projectSource client point distance forward right =
+    let V3 a b c = distance
+        distance' = if | (client^.gcPers.cpHand) == Constants.leftHanded -> V3 a (negate b) c
+                       | (client^.gcPers.cpHand) == Constants.centerHanded -> V3 a 0 c
+                       | otherwise -> distance
+    in Math3D.projectSource point distance' forward right

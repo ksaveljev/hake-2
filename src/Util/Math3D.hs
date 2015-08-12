@@ -220,3 +220,10 @@ concatRotations in1 in2 =
                 , (in1 UV.! 6) * (in2 UV.! 1) + (in1 UV.! 7) * (in2 UV.! 4) + (in1 UV.! 8) * (in2 UV.! 7)
                 , (in1 UV.! 6) * (in2 UV.! 2) + (in1 UV.! 7) * (in2 UV.! 5) + (in1 UV.! 8) * (in2 UV.! 8)
                 ]
+
+projectSource :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> V3 Float
+projectSource point distance forward right =
+    let a = (point^._x) + (forward^._x) * (distance^._x) + (right^._x) * (distance^._y)
+        b = (point^._y) + (forward^._y) * (distance^._x) + (right^._y) * (distance^._y)
+        c = (point^._z) + (forward^._z) * (distance^._x) + (right^._z) * (distance^._y) + (distance^._z)
+    in V3 a b c
