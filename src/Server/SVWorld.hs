@@ -205,8 +205,6 @@ linkEdict er@(EdictReference edictIdx) = do
           area <- CM.leafArea (leafs UV.! idx)
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-          -- io (print $ "idx = " ++ show edictIdx ++ " area = " ++ show area)
-
           when (area /= 0) $
             -- doors may legally straggle two areas,
             -- but nothing should ever need more than that
@@ -217,10 +215,8 @@ linkEdict er@(EdictReference edictIdx) = do
                 when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
                   Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eEdictMinMax.eAbsMin)) `B.append` "\n"
 
-                -- io (print $ "setting areanum2 = " ++ show area)
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
               else do
-                -- io (print $ "setting areanum = " ++ show area)
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum .= area
 
         setHeadNode :: Int -> Int -> Int -> Quake ()
@@ -366,17 +362,17 @@ areaEdicts mins maxs listLens maxCount areaType = do
 -}
 trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictReference -> Int -> Quake TraceT
 trace start maybeMins maybeMaxs end passEdict contentMask = do
-    vec3origin <- use $ globals.vec3Origin
+    v3o <- use $ globals.vec3Origin
 
     let clip = newMoveClipT
 
-        mins = if isNothing maybeMins
-                 then vec3origin
-                 else fromJust maybeMins
+        mins = case maybeMins of
+                 Nothing -> v3o
+                 Just m -> m
 
-        maxs = if isNothing maybeMaxs
-                 then vec3origin
-                 else fromJust maybeMaxs
+        maxs = case maybeMaxs of
+                 Nothing -> v3o
+                 Just m -> m
 
     -- clip to world
     boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
@@ -402,7 +398,6 @@ trace start maybeMins maybeMaxs end passEdict contentMask = do
         finalClip <- clipMoveToEntities $ updatedClip { _mcBoxMins = boxMins, _mcBoxMaxs = boxMaxs }
 
         return (finalClip^.mcTrace)
-
 
 clearWorld :: Quake ()
 clearWorld = do

@@ -4,7 +4,7 @@
 module Util.Math3D where
 
 import Control.Lens (preuse, ix, (^.), Const)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), (.|.))
 import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z, dot, normalize, cross)
 import qualified Data.Vector as V
@@ -72,12 +72,11 @@ boxOnPlaneSide emins emaxs p =
                                        in (d1, d2)
                                   _ -> undefined -- TODO: throw error
 
-               sides = if | dist1 >= (p^.cpDist) -> 1
-                          | dist2 < (p^.cpDist) -> 2
-                          | otherwise -> 0
+               sides = if dist1 >= (p^.cpDist) then 1 else 0
+               sides' = if dist2 < (p^.cpDist) then sides .|. 2 else sides
            -- TODO: 
            -- assert(sides != 0) : "BoxOnPlaneSide(): sides == 0 bug";
-           in sides
+           in sides'
 
 angleVectors :: V3 Float -> Bool -> Bool -> Bool -> (Maybe (V3 Float), Maybe (V3 Float), Maybe (V3 Float))
 angleVectors angles setForward setRight setUp =

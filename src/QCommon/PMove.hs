@@ -201,14 +201,14 @@ snapPosition = do
   where tryFindingGoodPosition :: V3 Int16 -> V3 Int -> Int -> Int -> Quake ()
         tryFindingGoodPosition base sign idx maxIdx
           | idx >= maxIdx = do
+              -- go back to the last position
               previousOrigin <- use $ pMoveGlobals.pmPML.pmlPreviousOrigin
               pMoveGlobals.pmPM.pmState.pmsOrigin .= fmap truncate previousOrigin
           | otherwise = do
-              origin <- use $ pMoveGlobals.pmPM.pmState.pmsOrigin
               let bits = jitterBits UV.! idx
-                  a = if (bits .&. (1 `shiftL` 0)) /= 0 then (origin^._x) + fromIntegral (sign^._x) else origin^._x
-                  b = if (bits .&. (1 `shiftL` 1)) /= 0 then (origin^._y) + fromIntegral (sign^._y) else origin^._y
-                  c = if (bits .&. (1 `shiftL` 2)) /= 0 then (origin^._z) + fromIntegral (sign^._z) else origin^._z
+                  a = if (bits .&. (1 `shiftL` 0)) /= 0 then (base^._x) + fromIntegral (sign^._x) else base^._x
+                  b = if (bits .&. (1 `shiftL` 1)) /= 0 then (base^._y) + fromIntegral (sign^._y) else base^._y
+                  c = if (bits .&. (1 `shiftL` 2)) /= 0 then (base^._z) + fromIntegral (sign^._z) else base^._z
                   
               pMoveGlobals.pmPM.pmState.pmsOrigin .= V3 a b c
               ok <- goodPosition
@@ -225,6 +225,7 @@ goodPosition = do
         return True
       else do
         let origin = fmap ((* 0.125) . fromIntegral) (pm^.pmState.pmsOrigin)
+
         Just traceT <- (pm^.pmTrace) origin (pm^.pmMins) (pm^.pmMaxs) origin
 
         return $ not (traceT^.tAllSolid)

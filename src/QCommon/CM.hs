@@ -946,10 +946,9 @@ boxTrace start end mins maxs headNode brushMask = do
     numNodes <- use $ cmGlobals.cmNumNodes
 
     if numNodes == 0
-      -- map no loaded
-      then do
-        traceTrace <- use $ cmGlobals.cmTraceTrace
-        return traceTrace
+      -- map not loaded
+      then
+        use $ cmGlobals.cmTraceTrace
       else do
         zoom (cmGlobals) $ do
           cmTraceContents .= brushMask
@@ -970,8 +969,7 @@ boxTrace start end mins maxs headNode brushMask = do
 
             cmGlobals.cmTraceTrace.tEndPos .= start
 
-            traceTrace <- use $ cmGlobals.cmTraceTrace
-            return traceTrace
+            use $ cmGlobals.cmTraceTrace
           else do
             -- check for point special case
             let nullV3 :: V3 Float = V3 0 0 0
@@ -1030,13 +1028,15 @@ testInLeaf leafNum = do
               checkCount <- use $ cmGlobals.cmCheckCount
               if (brush^.cbCheckCount) == checkCount
                      -- already checked this brush in another leaf
-                then traceLine firstLeafBrush (idx + 1) maxIdx
+                then
+                  traceLine firstLeafBrush (idx + 1) maxIdx
                 else do
                   cmGlobals.cmMapBrushes.ix brushNum.cbCheckCount .= checkCount
 
                   traceContents <- use $ cmGlobals.cmTraceContents
                   if (brush^.cbContents) .&. traceContents == 0
-                    then traceLine firstLeafBrush (idx + 1) maxIdx
+                    then
+                      traceLine firstLeafBrush (idx + 1) maxIdx
                     else do
                       traceMins <- use $ cmGlobals.cmTraceMins
                       traceMaxs <- use $ cmGlobals.cmTraceMaxs
@@ -1045,6 +1045,7 @@ testInLeaf leafNum = do
                       testBoxInBrush traceMins traceMaxs traceStart (cmGlobals.cmTraceTrace) brush
 
                       fraction <- use $ cmGlobals.cmTraceTrace.tFraction
+
                       unless (fraction == 0) $
                         traceLine firstLeafBrush (idx + 1) maxIdx
 
@@ -1057,7 +1058,8 @@ recursiveHullCheck num p1f p2f p1 p2 = do
 
       -- if < 0, we are in a leaf node
       if num < 0
-        then traceToLeaf ((-1) - num)
+        then
+          traceToLeaf ((-1) - num)
         else do
           -- find the point distances to the separating plane
           -- and the offset for the size of the box
@@ -1253,36 +1255,37 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
 -- BSP trees instead of being compared directly
 headnodeForBox :: V3 Float -> V3 Float -> Quake Int
 headnodeForBox mins maxs = do
+    numPlanes <- use $ cmGlobals.cmNumPlanes
     boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
 
     mapPlanes <- use $ cmGlobals.cmMapPlanes
     -- this version is much better from the point of view of memory
     -- consumption than two versions below
-    let !a = mapPlanes V.! (boxHeadNode +  0)
-        !b = mapPlanes V.! (boxHeadNode +  1)
-        !c = mapPlanes V.! (boxHeadNode +  2)
-        !d = mapPlanes V.! (boxHeadNode +  3)
-        !e = mapPlanes V.! (boxHeadNode +  4)
-        !f = mapPlanes V.! (boxHeadNode +  5)
-        !g = mapPlanes V.! (boxHeadNode +  6)
-        !h = mapPlanes V.! (boxHeadNode +  7)
-        !i = mapPlanes V.! (boxHeadNode +  8)
-        !j = mapPlanes V.! (boxHeadNode +  9)
-        !k = mapPlanes V.! (boxHeadNode + 10)
-        !l = mapPlanes V.! (boxHeadNode + 11)
+    let !a = mapPlanes V.! (numPlanes +  0)
+        !b = mapPlanes V.! (numPlanes +  1)
+        !c = mapPlanes V.! (numPlanes +  2)
+        !d = mapPlanes V.! (numPlanes +  3)
+        !e = mapPlanes V.! (numPlanes +  4)
+        !f = mapPlanes V.! (numPlanes +  5)
+        !g = mapPlanes V.! (numPlanes +  6)
+        !h = mapPlanes V.! (numPlanes +  7)
+        !i = mapPlanes V.! (numPlanes +  8)
+        !j = mapPlanes V.! (numPlanes +  9)
+        !k = mapPlanes V.! (numPlanes + 10)
+        !l = mapPlanes V.! (numPlanes + 11)
 
-    cmGlobals.cmMapPlanes %= (V.// [ (boxHeadNode +  0, a { _cpDist = maxs^._x })
-                                   , (boxHeadNode +  1, b { _cpDist = - (maxs^._x) })
-                                   , (boxHeadNode +  2, c { _cpDist = mins^._x })
-                                   , (boxHeadNode +  3, d { _cpDist = - (mins^._x) })
-                                   , (boxHeadNode +  4, e { _cpDist = maxs^._y })
-                                   , (boxHeadNode +  5, f { _cpDist = - (maxs^._y) })
-                                   , (boxHeadNode +  6, g { _cpDist = mins^._y })
-                                   , (boxHeadNode +  7, h { _cpDist = - (mins^._y) })
-                                   , (boxHeadNode +  8, i { _cpDist = maxs^._z })
-                                   , (boxHeadNode +  9, j { _cpDist = - (maxs^._z) })
-                                   , (boxHeadNode + 10, k { _cpDist = mins^._z })
-                                   , (boxHeadNode + 11, l { _cpDist = - (mins^._z) })
+    cmGlobals.cmMapPlanes %= (V.// [ (numPlanes +  0, a { _cpDist = maxs^._x })
+                                   , (numPlanes +  1, b { _cpDist = - (maxs^._x) })
+                                   , (numPlanes +  2, c { _cpDist = mins^._x })
+                                   , (numPlanes +  3, d { _cpDist = - (mins^._x) })
+                                   , (numPlanes +  4, e { _cpDist = maxs^._y })
+                                   , (numPlanes +  5, f { _cpDist = - (maxs^._y) })
+                                   , (numPlanes +  6, g { _cpDist = mins^._y })
+                                   , (numPlanes +  7, h { _cpDist = - (mins^._y) })
+                                   , (numPlanes +  8, i { _cpDist = maxs^._z })
+                                   , (numPlanes +  9, j { _cpDist = - (maxs^._z) })
+                                   , (numPlanes + 10, k { _cpDist = mins^._z })
+                                   , (numPlanes + 11, l { _cpDist = - (mins^._z) })
                                    ])
     {-
     - this version builds a lot of thunks which reside in memory
@@ -1300,7 +1303,7 @@ headnodeForBox mins maxs = do
                                   , mins^._z
                                   , - (mins^._z)
                                   ]
-        updates = map (updateDist mapPlanes newDistances boxHeadNode) [0..11]
+        updates = map (updateDist mapPlanes newDistances numPlanes) [0..11]
 
     cmGlobals.cmMapPlanes %= (V.// updates)
     -}
@@ -1309,18 +1312,18 @@ headnodeForBox mins maxs = do
 -   this version is simply crazy from the allocation rate point of view
 -
     zoom (cmGlobals.cmMapPlanes) $ do
-      ix (boxHeadNode +  0).cpDist .= (maxs^._x)
-      ix (boxHeadNode +  1).cpDist .= (- (maxs^._x))
-      ix (boxHeadNode +  2).cpDist .= (mins^._x)
-      ix (boxHeadNode +  3).cpDist .= (- (mins^._x))
-      ix (boxHeadNode +  4).cpDist .= (maxs^._y)
-      ix (boxHeadNode +  5).cpDist .= (- (maxs^._y))
-      ix (boxHeadNode +  6).cpDist .= (mins^._y)
-      ix (boxHeadNode +  7).cpDist .= (- (mins^._y))
-      ix (boxHeadNode +  8).cpDist .= (maxs^._z)
-      ix (boxHeadNode +  9).cpDist .= (- (maxs^._z))
-      ix (boxHeadNode + 10).cpDist .= (mins^._z)
-      ix (boxHeadNode + 11).cpDist .= (- (mins^._z))
+      ix (numPlanes +  0).cpDist .= (maxs^._x)
+      ix (numPlanes +  1).cpDist .= (- (maxs^._x))
+      ix (numPlanes +  2).cpDist .= (mins^._x)
+      ix (numPlanes +  3).cpDist .= (- (mins^._x))
+      ix (numPlanes +  4).cpDist .= (maxs^._y)
+      ix (numPlanes +  5).cpDist .= (- (maxs^._y))
+      ix (numPlanes +  6).cpDist .= (mins^._y)
+      ix (numPlanes +  7).cpDist .= (- (mins^._y))
+      ix (numPlanes +  8).cpDist .= (maxs^._z)
+      ix (numPlanes +  9).cpDist .= (- (maxs^._z))
+      ix (numPlanes + 10).cpDist .= (mins^._z)
+      ix (numPlanes + 11).cpDist .= (- (mins^._z))
       -}
 
     return boxHeadNode
@@ -1458,7 +1461,10 @@ testBoxInBrush mins maxs p1 traceLens brush = do
                   dist = (plane^.cpDist) - dot ofs (plane^.cpNormal)
                   d1 = dot p1 (plane^.cpNormal) - dist
 
-              return (d1 > 0)
+              -- if completely in front of face, no intersection
+              if d1 > 0
+                then return True
+                else checkIntersection firstBrushSide (idx + 1) maxIdx
 
 -- Returns a tag that describes the content of the point
 pointContents :: V3 Float -> Int -> Quake Int

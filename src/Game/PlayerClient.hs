@@ -429,9 +429,6 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
     -- do it before setting health back up, so farthest
     -- ranging doesn't count this client
     (spawnOrigin, spawnAngles) <- selectSpawnPoint edictRef
-    io (print "putClientInServer")
-    io (print spawnOrigin)
-    io (print spawnAngles)
     let gClientIdx = edictIdx - 1
 
     -- deathmatch wipes most client data every spawn
@@ -522,7 +519,7 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
     gunIndex <- modelIndex (weaponModel^.giViewModel)
 
     -- clear entity state values
-    let spawnOrigin' = let V3 a b c = spawnOrigin in V3 a (b + 1) c -- make sure off ground
+    let spawnOrigin' = let V3 a b c = spawnOrigin in V3 a b (c + 1) -- make sure off ground
         {- TODO: decide how to better setup Angles using pitch/yaw/roll
         ent.s.angles[Defines.PITCH] = 0;
         ent.s.angles[Defines.YAW] = spawn_angles[Defines.YAW];
