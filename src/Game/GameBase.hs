@@ -98,12 +98,12 @@ runFrame = do
                  gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
 
                  -- if the ground entity moved, make sure we are still on it
-                 when (isJust (edict^.eEdictOther.eoGroundEntity)) $ do
-                   let Just (EdictReference groundIdx) = edict^.eEdictOther.eoGroundEntity
+                 when (isJust (edict^.eGroundEntity)) $ do
+                   let Just (EdictReference groundIdx) = edict^.eGroundEntity
                    Just groundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix groundIdx
 
                    when (groundEdict^.eLinkCount /= (edict^.eGroundEntityLinkCount)) $ do
-                     gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity .= Nothing
+                     gameBaseGlobals.gbGEdicts.ix idx.eGroundEntity .= Nothing
                      when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
                        M.checkGround er
 
@@ -250,8 +250,8 @@ runEntity :: EdictReference -> Quake ()
 runEntity er@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    when (isJust (edict^.eEdictAction.eaPrethink)) $
-      void (think (fromJust $ edict^.eEdictAction.eaPrethink) er)
+    when (isJust (edict^.ePrethink)) $
+      void (think (fromJust $ edict^.ePrethink) er)
 
     let moveType = edict^.eMoveType
 
@@ -320,7 +320,7 @@ touchTriggers er@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     -- dead things don't activate triggers!
-    unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eEdictStatus.eHealth <= 0)) $ do
+    unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eHealth <= 0)) $ do
       boxEdicts <- use $ gameBaseGlobals.gbGameImport.giBoxEdicts
       num <- boxEdicts (edict^.eEdictMinMax.eAbsMin) (edict^.eEdictMinMax.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
 
@@ -338,11 +338,11 @@ touchTriggers er@(EdictReference edictIdx) = do
               Just hitRef@(EdictReference hitIdx) <- preuse $ gameBaseGlobals.gbTouch.ix idx
               Just hit <- preuse $ gameBaseGlobals.gbGEdicts.ix hitIdx
 
-              if not (hit^.eInUse) || isNothing (hit^.eEdictAction.eaTouch)
+              if not (hit^.eInUse) || isNothing (hit^.eTouch)
                 then touchEdicts (idx + 1) maxIdx
                 else do
                   dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
-                  touch (fromJust $ hit^.eEdictAction.eaTouch) hitRef er dummyPlane Nothing
+                  touch (fromJust $ hit^.eTouch) hitRef er dummyPlane Nothing
 
 addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
 addPointToBound v mins maxs =

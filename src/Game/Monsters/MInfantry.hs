@@ -268,7 +268,7 @@ infantryPain =
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     time <- use $ gameBaseGlobals.gbLevel.llTime
 
-    when ((edict^.eEdictStatus.eHealth) < (edict^.eEdictStatus.eMaxHealth) `div` 2) $
+    when ((edict^.eHealth) < (edict^.eMaxHealth) `div` 2) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= 1
 
     unless (time < (edict^.eEdictTiming.etPainDebounceTime)) $ do
@@ -419,7 +419,7 @@ infantryDie =
         soundIndex = gameImport^.giSoundIndex
 
     -- check for gib
-    if (self^.eEdictStatus.eHealth) <= (self^.eEdictStatus.eGibHealth)
+    if (self^.eHealth) <= (self^.eGibHealth)
       then do
         udeath <- soundIndex (Just "misc/udeath.wav")
         sound (Just er) Constants.chanVoice udeath 1 Constants.attnNorm 0
@@ -436,12 +436,12 @@ infantryDie =
 
         GameMisc.throwHead er "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus.eDeadFlag .= Constants.deadDead
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
 
       else
-        unless ((self^.eEdictStatus.eDeadFlag) == Constants.deadDead) $ do
+        unless ((self^.eDeadFlag) == Constants.deadDead) $ do
           -- regular death
-          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
             eDeadFlag .= Constants.deadDead
             eTakeDamage .= Constants.damageYes
 
@@ -505,12 +505,12 @@ spMonsterInfantry er@(EdictReference edictIdx) = do
           eEdictMinMax.eMins        .= V3 (-16) (-16) (-24)
           eEdictMinMax.eMaxs        .= V3 16 16 32
 
-          eEdictStatus.eHealth    .= 100
-          eEdictStatus.eGibHealth .= -40
-          eEdictPhysics.eMass     .= 200
+          eHealth             .= 100
+          eGibHealth          .= -40
+          eEdictPhysics.eMass .= 200
 
-          eEdictAction.eaPain .= Just infantryPain
-          eEdictAction.eaDie  .= Just infantryDie
+          ePain .= Just infantryPain
+          eDie  .= Just infantryDie
 
           eMonsterInfo.miStand  .= Just infantryStand
           eMonsterInfo.miWalk   .= Just infantryWalk

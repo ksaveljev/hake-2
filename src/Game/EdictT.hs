@@ -2,13 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.EdictT ( EdictT(..)
                    , module Game.EdictT
-                   , module Game.EdictActionT
-                   , module Game.EdictOtherT
+                   --, module Game.EdictActionT
+                   --, module Game.EdictOtherT
                    , module Game.EdictTimingT
                    , module Game.EdictMinMaxT
                    , module Game.EdictInfoT
                    , module Game.EdictPhysicsT
-                   , module Game.EdictStatusT
+                   --, module Game.EdictStatusT
                    , module Game.GClientT
                    , module Game.EntityStateT
                    , module Game.MonsterInfoT
@@ -20,13 +20,13 @@ import Linear (V3(..))
 import qualified Data.Vector.Unboxed as UV
 
 import Internal
-import Game.EdictActionT
-import Game.EdictOtherT
+-- import Game.EdictActionT
+-- import Game.EdictOtherT
 import Game.EdictTimingT
 import Game.EdictMinMaxT
 import Game.EdictInfoT
 import Game.EdictPhysicsT
-import Game.EdictStatusT
+-- import Game.EdictStatusT
 import Game.EntityStateT
 import Game.GClientT
 import Game.MonsterInfoT
@@ -59,13 +59,41 @@ newEdictT idx =
          , _eTargetEnt             = Nothing
          , _eGoalEntity            = Nothing
          , _eMoveTarget            = Nothing
-         , _eEdictAction           = newEdictActionT
+         -- , _eEdictAction           = newEdictActionT
+         , _eNextThink             = 0
+         , _ePrethink              = Nothing
+         , _eThink                 = Nothing
+         , _eBlocked               = Nothing
+         , _eTouch                 = Nothing
+         , _eUse                   = Nothing
+         , _ePain                  = Nothing
+         , _eDie                   = Nothing
          , _eEdictTiming           = newEdictTimingT
-         , _eEdictStatus           = newEdictStatusT
+         -- , _eEdictStatus           = newEdictStatusT
+         , _eHealth                = 0
+         , _eMaxHealth             = 0
+         , _eGibHealth             = 0
+         , _eDeadFlag              = 0
+         , _eShowHostile           = 0
+         , _ePowerArmorTime        = 0
+         , _eViewHeight            = 0
+         , _eTakeDamage            = 0
+         , _eDmg                   = 0
+         , _eRadiusDmg             = 0
+         , _eDmgRadius             = 0
          , _eSounds                = 0
          , _eCount                 = 0
          , _eGroundEntityLinkCount = 0
-         , _eEdictOther            = newEdictOtherT
+         -- , _eEdictOther            = newEdictOtherT
+         , _eChain                 = Nothing
+         , _eEnemy                 = Nothing
+         , _eOldEnemy              = Nothing
+         , _eActivator             = Nothing
+         , _eGroundEntity          = Nothing
+         , _eTeamChain             = Nothing
+         , _eTeamMaster            = Nothing
+         , _eMyNoise               = Nothing
+         , _eMyNoise2              = Nothing
          , _eNoiseIndex            = 0
          , _eNoiseIndex2           = 0
          , _eVolume                = 0

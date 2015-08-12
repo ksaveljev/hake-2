@@ -273,7 +273,7 @@ superTankDead =
       eEdictMinMax.eMaxs .= V3 60 60 72
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -567,8 +567,8 @@ superTankDie =
     sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictStatus.eDeadFlag .= Constants.deadDead
-      eEdictStatus.eTakeDamage .= Constants.damageNo
+      eDeadFlag .= Constants.deadDead
+      eTakeDamage .= Constants.damageNo
       eCount .= 0
       eMonsterInfo.miCurrentMove .= Just superTankMoveDeath
 

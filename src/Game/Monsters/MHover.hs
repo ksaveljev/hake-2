@@ -159,8 +159,8 @@ hoverDead =
       eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
       eEdictMinMax.eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
-      eEdictAction.eaThink .= Just hoverDeadThink
-      eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+      eThink .= Just hoverDeadThink
+      eNextThink .= levelTime + Constants.frameTime
       eTimeStamp .= levelTime + 15
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity

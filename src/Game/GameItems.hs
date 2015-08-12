@@ -107,9 +107,9 @@ spawnItem er@(EdictReference edictIdx) gir@(GItemReference itemIdx) = do
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eItem .= Just gir
-          eEdictAction.eaNextThink .= time + 2 * Constants.frameTime
+          eNextThink .= time + 2 * Constants.frameTime
           -- items start after other solids
-          eEdictAction.eaThink .= Just dropToFloor
+          eThink .= Just dropToFloor
           eEntityState.esEffects .= (item^.giWorldModelFlags)
           eEntityState.esRenderFx .= Constants.rfGlow
 
@@ -429,7 +429,7 @@ dropToFloor =
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eSolid .= Constants.solidTrigger
       eMoveType .= Constants.moveTypeToss
-      eEdictAction.eaTouch .= Just touchItem
+      eTouch .= Just touchItem
 
     let dest = (V3 0 0 (-128)) + (edict^.eEntityState.esOrigin)
 
@@ -445,22 +445,22 @@ dropToFloor =
         when (isJust $ edict^.eEdictInfo.eiTeam) $ do
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
             eFlags %= (.&. (complement Constants.flTeamSlave))
-            eEdictOther.eoChain .= (edict^.eEdictOther.eoTeamChain)
-            eEdictOther.eoTeamChain .= Nothing
+            eChain .= (edict^.eTeamChain)
+            eTeamChain .= Nothing
             eSvFlags %= (.|. Constants.svfNoClient)
             eSolid .= Constants.solidNot
 
-          when ((Just er) == (edict^.eEdictOther.eoTeamMaster)) $ do
+          when ((Just er) == (edict^.eTeamMaster)) $ do
             time <- use $ gameBaseGlobals.gbLevel.llTime
 
-            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-              eaNextThink .= time + Constants.frameTime
-              eaThink .= Just doRespawn
+            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+              eNextThink .= time + Constants.frameTime
+              eThink .= Just doRespawn
             
         when ((edict^.eSpawnFlags) .&. Constants.itemNoTouch /= 0) $ do
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
             eSolid .= Constants.solidBbox
-            eEdictAction.eaTouch .= Nothing
+            eTouch .= Nothing
             eEntityState.esEffects %= (.&. (complement Constants.efRotate))
             eEntityState.esRenderFx %= (.&. (complement Constants.rfGlow))
 
@@ -468,7 +468,7 @@ dropToFloor =
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
             eSvFlags %= (.|. Constants.svfNoClient)
             eSolid .= Constants.solidNot
-            eEdictAction.eaUse .= Just useItem
+            eUse .= Just useItem
 
         linkEntity er
 
@@ -553,7 +553,7 @@ touchItem =
           let Just (GItemReference itemIdx) = itemRef
           Just pickup <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giPickup
                                            -- dead people can't pickup          -- not a grabbable item?
-          if isNothing (other^.eClient) || (other^.eEdictStatus.eHealth) < 1 || isNothing pickup
+          if isNothing (other^.eClient) || (other^.eHealth) < 1 || isNothing pickup
             then return True
             else return False
 

@@ -310,6 +310,7 @@ data CmdFunctionT =
                , _cfFunction :: Maybe XCommandT
                }
 
+{-
 data EdictActionT =
   EdictActionT { _eaNextThink :: !Float
                , _eaPrethink  :: Maybe EntThink
@@ -320,7 +321,9 @@ data EdictActionT =
                , _eaPain      :: Maybe EntPain
                , _eaDie       :: Maybe EntDie
                }
+               -}
 
+{-
 data EdictOtherT =
   EdictOtherT { _eoChain        :: Maybe EdictReference
               , _eoEnemy        :: Maybe EdictReference
@@ -332,6 +335,7 @@ data EdictOtherT =
               , _eoMyNoise      :: Maybe EdictReference
               , _eoMyNoise2     :: Maybe EdictReference
               }
+              -}
 
 data EdictTimingT =
   EdictTimingT { _etTouchDebounceTime    :: !Float
@@ -379,6 +383,7 @@ data EdictPhysicsT =
                 , _eIdealYaw    :: !Float
                 }
 
+{-
 data EdictStatusT =
   EdictStatusT { _eHealth         :: !Int
                , _eMaxHealth      :: !Int
@@ -392,6 +397,7 @@ data EdictStatusT =
                , _eRadiusDmg      :: !Int
                , _eDmgRadius      :: !Float
                }
+               -}
 
 -- had to split EdictT into smaller EdictXXX types in order
 -- for makeLenses not to generate A LOT of code which eats up
@@ -419,13 +425,41 @@ data EdictT =
          , _eTargetEnt             :: Maybe EdictReference
          , _eGoalEntity            :: Maybe EdictReference
          , _eMoveTarget            :: Maybe EdictReference
-         , _eEdictAction           :: EdictActionT
+         -- , _eEdictAction           :: EdictActionT
+         , _eNextThink             :: !Float
+         , _ePrethink              :: Maybe EntThink
+         , _eThink                 :: Maybe EntThink
+         , _eBlocked               :: Maybe EntBlocked
+         , _eTouch                 :: Maybe EntTouch
+         , _eUse                   :: Maybe EntUse
+         , _ePain                  :: Maybe EntPain
+         , _eDie                   :: Maybe EntDie
          , _eEdictTiming           :: EdictTimingT
-         , _eEdictStatus           :: EdictStatusT
+         -- , _eEdictStatus           :: EdictStatusT
+         , _eHealth                :: !Int
+         , _eMaxHealth             :: !Int
+         , _eGibHealth             :: !Int
+         , _eDeadFlag              :: !Int
+         , _eShowHostile           :: !Int
+         , _ePowerArmorTime        :: !Float
+         , _eViewHeight            :: !Int
+         , _eTakeDamage            :: !Int
+         , _eDmg                   :: !Int
+         , _eRadiusDmg             :: !Int
+         , _eDmgRadius             :: !Float
          , _eSounds                :: !Int
          , _eCount                 :: !Int
          , _eGroundEntityLinkCount :: !Int
-         , _eEdictOther            :: EdictOtherT
+         -- , _eEdictOther            :: EdictOtherT
+         , _eChain                 :: Maybe EdictReference
+         , _eEnemy                 :: Maybe EdictReference
+         , _eOldEnemy              :: Maybe EdictReference
+         , _eActivator             :: Maybe EdictReference
+         , _eGroundEntity          :: Maybe EdictReference
+         , _eTeamChain             :: Maybe EdictReference
+         , _eTeamMaster            :: Maybe EdictReference
+         , _eMyNoise               :: Maybe EdictReference
+         , _eMyNoise2              :: Maybe EdictReference
          , _eNoiseIndex            :: !Int
          , _eNoiseIndex2           :: !Int
          , _eVolume                :: !Float

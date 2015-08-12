@@ -312,7 +312,7 @@ thinkWeapon edictRef@(EdictReference edictIdx) = do
     let Just (GClientReference gClientIdx) = edict^.eClient
 
     -- if just died, put the weapon away
-    when ((edict^.eEdictStatus.eHealth) < 1) $ do
+    when ((edict^.eHealth) < 1) $ do
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Nothing
       changeWeapon edictRef
 
@@ -342,7 +342,7 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
         frameIdleFirst = frameFireLast + 1
         frameDeactivateFirst = frameIdleLast + 1
 
-    if | (edict^.eEdictStatus.eDeadFlag) /= 0 || (edict^.eEntityState.esModelIndex) /= 255 ->
+    if | (edict^.eDeadFlag) /= 0 || (edict^.eEntityState.esModelIndex) /= 255 ->
            return () -- VWep animations screw up corpses
 
        | (gClient^.gcWeaponState) == Constants.weaponDropping -> do
@@ -504,7 +504,7 @@ blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
 
     let damage = if isQuad then dmg * 4 else dmg
         (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
-        offset = (V3 24 8 (fromIntegral (edict^.eEdictStatus.eViewHeight) - 8)) + gOffset
+        offset = (V3 24 8 (fromIntegral (edict^.eViewHeight) - 8)) + gOffset
         start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
         V3 _ b c = fmap (* (-2)) forward
 

@@ -56,7 +56,7 @@ spTargetSpeaker er@(EdictReference edictIdx) = do
         when ((edict^.eSpawnFlags) .&. 1 /= 0) $
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= noiseIndex
 
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetSpeaker
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just useTargetSpeaker
 
         -- must link the entity so we get areas and clusters so
         -- the server can determine who to send updates to
@@ -81,7 +81,7 @@ spTargetHelp er@(EdictReference edictIdx) = do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ (edict^.eClassName) `B.append` " with no message at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
             GameUtil.freeEdict er
-          else gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetHelp
+          else gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just useTargetHelp
 
 spTargetSecret :: EdictReference -> Quake ()
 spTargetSecret er@(EdictReference edictIdx) = do
@@ -101,7 +101,7 @@ spTargetSecret er@(EdictReference edictIdx) = do
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eNoiseIndex .= noiseIndex
-          eEdictAction.eaUse .= Just useTargetSecret
+          eUse .= Just useTargetSecret
           eSvFlags .= Constants.svfNoClient
 
         gameBaseGlobals.gbLevel.llTotalSecrets += 1
@@ -122,7 +122,7 @@ spTargetGoal er@(EdictReference edictIdx) = do
       else do
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
 
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetGoal
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just useTargetGoal
 
         noise <- (use $ gameBaseGlobals.gbSpawnTemp.stNoise) >>= \n -> if isJust n then return n else return (Just "misc/secret.wav")
 
@@ -133,7 +133,7 @@ spTargetGoal er@(EdictReference edictIdx) = do
 spTargetExplosion :: EdictReference -> Quake ()
 spTargetExplosion (EdictReference edictIdx) = do
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictAction.eaUse .= Just useTargetExplosion
+      eUse .= Just useTargetExplosion
       eSvFlags .= Constants.svfNoClient
 
 spTargetChangeLevel :: EdictReference -> Quake ()
@@ -152,12 +152,12 @@ spTargetChangeLevel er@(EdictReference edictIdx) = do
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMap .= Just "fact3$secret1"
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eEdictAction.eaUse .= Just useTargetChangeLevel
+          eUse .= Just useTargetChangeLevel
           eSvFlags .= Constants.svfNoClient
 
 spTargetSplash :: EdictReference -> Quake ()
 spTargetSplash (EdictReference edictIdx) = do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just useTargetSplash
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just useTargetSplash
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
@@ -191,7 +191,7 @@ spTargetEarthquake _ = io (putStrLn "GameTarget.spTargetEarthquake") >> undefine
 useTargetExplosion :: EntUse
 useTargetExplosion =
   GenericEntUse "use_target_explosion" $ \selfRef@(EdictReference selfIdx) _ activator -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoActivator .= activator
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eActivator .= activator
 
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
@@ -201,9 +201,9 @@ useTargetExplosion =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
-          eaThink .= Just targetExplosionExplode
-          eaNextThink .= levelTime + (self^.eDelay)
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eThink .= Just targetExplosionExplode
+          eNextThink .= levelTime + (self^.eDelay)
 
 useTargetGoal :: EntUse
 useTargetGoal =
@@ -288,8 +288,8 @@ useTargetSplash =
     writeByte (fromIntegral $ self^.eSounds)
     multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
 
-    when ((self^.eEdictStatus.eDmg) /= 0) $
-      GameCombat.radiusDamage selfRef (fromJust activatorRef) (fromIntegral $ self^.eEdictStatus.eDmg) Nothing (fromIntegral (self^.eEdictStatus.eDmg) + 40) Constants.modSplash
+    when ((self^.eDmg) /= 0) $
+      GameCombat.radiusDamage selfRef (fromJust activatorRef) (fromIntegral $ self^.eDmg) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modSplash
 
 useTargetChangeLevel :: EntUse
 useTargetChangeLevel =
@@ -311,13 +311,13 @@ targetExplosionExplode =
     writePosition (self^.eEntityState.esOrigin)
     multicast (self^.eEntityState.esOrigin) Constants.multicastPhs
 
-    GameCombat.radiusDamage selfRef (fromJust $ self^.eEdictOther.eoActivator) (fromIntegral $ self^.eEdictStatus.eDmg) Nothing (fromIntegral (self^.eEdictStatus.eDmg) + 40) Constants.modExplosive
+    GameCombat.radiusDamage selfRef (fromJust $ self^.eActivator) (fromIntegral $ self^.eDmg) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modExplosive
 
     let save = self^.eDelay
 
     gameBaseGlobals.gbGEdicts.ix selfIdx.eDelay .= 0
 
-    GameUtil.useTargets selfRef (self^.eEdictOther.eoActivator)
+    GameUtil.useTargets selfRef (self^.eActivator)
 
     gameBaseGlobals.gbGEdicts.ix selfIdx.eDelay .= save
     return True

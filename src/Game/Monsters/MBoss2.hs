@@ -101,7 +101,7 @@ boss2Attack :: EntThink
 boss2Attack =
   GenericEntThink "boss2_attack" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
@@ -128,7 +128,7 @@ boss2ReAttackMg :: EntThink
 boss2ReAttackMg =
   GenericEntThink "boss2_reattack_mg" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
     action <- if GameUtil.inFront self enemy
@@ -156,7 +156,7 @@ boss2Dead =
       eEdictMinMax.eMaxs .= V3 56 56 80
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -172,8 +172,8 @@ boss2Die =
     sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNone 0
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictStatus.eDeadFlag .= Constants.deadDead
-      eEdictStatus.eTakeDamage .= Constants.damageNo
+      eDeadFlag .= Constants.deadDead
+      eTakeDamage .= Constants.damageNo
       eCount .= 0
       eMonsterInfo.miCurrentMove .= Just boss2MoveDeath
 

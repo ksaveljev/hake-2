@@ -56,17 +56,17 @@ monsterStart edictRef@(EdictReference edictIdx) = do
           time <- use $ gameBaseGlobals.gbLevel.llTime
 
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eEdictAction.eaNextThink .= time + Constants.frameTime
+            eNextThink .= time + Constants.frameTime
             eSvFlags %= (.|. Constants.svfMonster)
             eEntityState.esRenderFx %= (.|. Constants.rfFrameLerp)
-            eEdictStatus.eTakeDamage .= Constants.damageAim
+            eTakeDamage .= Constants.damageAim
             eEdictPhysics.eAirFinished .= time + 12
-            eEdictAction.eaUse .= Just (GameUtil.monsterUse)
-            eEdictStatus.eMaxHealth .= (edict^.eEdictStatus.eHealth)
+            eUse .= Just (GameUtil.monsterUse)
+            eMaxHealth .= (edict^.eHealth)
             eClipMask .= Constants.maskMonsterSolid
 
             eEntityState.esSkinNum .= 0
-            eEdictStatus.eDeadFlag .= Constants.deadNo
+            eDeadFlag .= Constants.deadNo
             eSvFlags %= (.&. (complement Constants.svfDeadMonster))
 
             eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
@@ -102,7 +102,7 @@ monsterStartGo :: EdictReference -> Quake ()
 monsterStartGo selfRef@(EdictReference selfIdx) = do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-    unless ((self^.eEdictStatus.eHealth) <= 0) $ do
+    unless ((self^.eHealth) <= 0) $ do
       -- check for target to combat_point and change to combattarget
       when (isJust (self^.eEdictInfo.eiTarget)) $
         checkTarget (fromJust $ self^.eEdictInfo.eiTarget)
@@ -162,9 +162,9 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
           void $ think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
 
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction) $ do
-        eaThink .= Just monsterThink
-        eaNextThink .= levelTime + Constants.frameTime
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+        eThink .= Just monsterThink
+        eNextThink .= levelTime + Constants.frameTime
 
   where checkTarget :: B.ByteString -> Quake ()
         checkTarget targetName = do
@@ -220,8 +220,8 @@ monsterTriggeredStart =
       eSolid .= Constants.solidNot
       eMoveType .= Constants.moveTypeNone
       eSvFlags %= (.|. Constants.svfNoClient)
-      eEdictAction.eaNextThink .= 0
-      eEdictAction.eaUse .= Just monsterTriggeredSpawnUse
+      eNextThink .= 0
+      eUse .= Just monsterTriggeredSpawnUse
 
     return True
 

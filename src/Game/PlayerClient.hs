@@ -125,8 +125,8 @@ saveClientData = do
             Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix idx
             let pers = client^.gcPers
 
-            let updatedPers = pers { _cpHealth     = edict^.eEdictStatus.eHealth
-                                   , _cpMaxHealth  = edict^.eEdictStatus.eMaxHealth
+            let updatedPers = pers { _cpHealth     = edict^.eHealth
+                                   , _cpMaxHealth  = edict^.eMaxHealth
                                    , _cpSavedFlags = (edict^.eFlags) .&. (Constants.flGodMode .|. Constants.flNoTarget .|. Constants.flPowerArmor)
                                    }
 
@@ -157,9 +157,9 @@ spInfoPlayerStart (EdictReference edictIdx) = do
       when (mapName == "security") $ do
         time <- use $ gameBaseGlobals.gbLevel.llTime
         -- invoke one of our gross, ugly, disgusting hacks
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-          eaThink .= Just spCreateCoopSpots
-          eaNextThink .= time + Constants.frameTime
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eThink .= Just spCreateCoopSpots
+          eNextThink .= time + Constants.frameTime
 
 {-
 - QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) potential
@@ -193,8 +193,8 @@ spInfoPlayerCoop er@(EdictReference edictIdx) = do
           -- invoke one of our gross, ugly, disgusting hacks
           time <- use $ gameBaseGlobals.gbLevel.llTime
 
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaThink .= Just spFixCoopSpots
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= time + Constants.frameTime
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eThink .= Just spFixCoopSpots
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= time + Constants.frameTime
 
 spInfoPlayerIntermission :: Quake ()
 spInfoPlayerIntermission = return ()
@@ -233,7 +233,7 @@ clientBeginServerFrame edictRef@(EdictReference edictIdx) = do
             else gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponThunk .= False
 
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-          if (edict^.eEdictStatus.eDeadFlag) /= 0
+          if (edict^.eDeadFlag) /= 0
             then
               -- wait for any butotn just going down
               when (levelTime > (gClient^.gcRespawnTime)) $ do
@@ -476,21 +476,21 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictOther.eoGroundEntity .= Nothing
+      eGroundEntity              .= Nothing
       eClient                    .= Just (GClientReference gClientIdx)
-      eEdictStatus.eTakeDamage   .= Constants.damageAim
+      eTakeDamage                .= Constants.damageAim
       eMoveType                  .= Constants.moveTypeWalk
-      eEdictStatus.eViewHeight   .= 22
+      eViewHeight                .= 22
       eInUse                     .= True
       eClassName                 .= "player"
       eEdictPhysics.eMass        .= 200
       eSolid                     .= Constants.solidBbox
-      eEdictStatus.eDeadFlag     .= Constants.deadNo
+      eDeadFlag                  .= Constants.deadNo
       eEdictPhysics.eAirFinished .= levelTime + 12
       eClipMask                  .= Constants.maskPlayerSolid
       eEdictInfo.eiModel         .= Just "players/male/tris.md2"
-      eEdictAction.eaPain        .= Just playerPain
-      eEdictAction.eaDie         .= Just playerDie
+      ePain                      .= Just playerPain
+      eDie                       .= Just playerDie
       eWaterLevel                .= 0
       eWaterType                 .= 0
       eFlags                     %= (.&. (complement Constants.flNoKnockback))
@@ -643,8 +643,8 @@ fetchClientEntData (EdictReference edictIdx) = do
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictStatus.eHealth .= gClient^.gcPers.cpHealth
-      eEdictStatus.eMaxHealth .= gClient^.gcPers.cpMaxHealth
+      eHealth .= gClient^.gcPers.cpHealth
+      eMaxHealth .= gClient^.gcPers.cpMaxHealth
       eFlags %= (.|. (gClient^.gcPers.cpSavedFlags))
 
     when (coopValue /= 0) $
@@ -698,7 +698,7 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
             preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
               let pmtype = if | (edict^.eMoveType) == Constants.moveTypeNoClip -> Constants.pmSpectator
                               | (edict^.eEntityState.esModelIndex) /= 255 -> Constants.pmGib
-                              | (edict^.eEdictStatus.eDeadFlag) /= 0 -> Constants.pmDead
+                              | (edict^.eDeadFlag) /= 0 -> Constants.pmDead
                               | otherwise -> Constants.pmNormal
               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsPMType .= pmtype
               
@@ -746,16 +746,16 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
               eEdictMinMax.eMaxs .= (pm'^.pmMaxs)
 
             preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
-              when (isJust (edict'^.eEdictOther.eoGroundEntity) && isNothing (pm'^.pmGroundEntity) && (pm'^.pmCmd.ucUpMove) >= 10 && (pm'^.pmWaterLevel) == 0) $ do
+              when (isJust (edict'^.eGroundEntity) && isNothing (pm'^.pmGroundEntity) && (pm'^.pmCmd.ucUpMove) >= 10 && (pm'^.pmWaterLevel) == 0) $ do
                 sIdx <- soundIndex (Just "*jump1.wav")
                 sound (Just edictRef) Constants.chanVoice sIdx 1 Constants.attnNorm 0
                 PlayerWeapon.playerNoise edictRef (edict'^.eEntityState.esOrigin) Constants.pNoiseSelf
 
             zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-              eEdictStatus.eViewHeight .= truncate (pm'^.pmViewHeight)
+              eViewHeight .= truncate (pm'^.pmViewHeight)
               eWaterLevel .= (pm'^.pmWaterLevel)
               eWaterType .= (pm'^.pmWaterType)
-              eEdictOther.eoGroundEntity .= (pm'^.pmGroundEntity)
+              eGroundEntity .= (pm'^.pmGroundEntity)
 
             when (isJust (pm'^.pmGroundEntity)) $ do
               let Just (EdictReference groundEntityIdx) = pm'^.pmGroundEntity
@@ -763,7 +763,7 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
               gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= (groundEntity^.eLinkCount)
 
             preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
-              if (edict'^.eEdictStatus.eDeadFlag) /= 0
+              if (edict'^.eDeadFlag) /= 0
                 then
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewAngles .= V3 (-15) (gClient^.gcKillerYaw) 40 -- TODO: use ROLL PITCH YAW? -- TODO: we use gcKillerYaw hasn't changed?
                 else
@@ -826,9 +826,9 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
                 let (EdictReference otherIdx) = otherRef
                 Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
 
-                when (isJust (other^.eEdictAction.eaTouch)) $ do
+                when (isJust (other^.eTouch)) $ do
                   dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
-                  touch (fromJust $ other^.eEdictAction.eaTouch) otherRef edictRef dummyPlane Nothing
+                  touch (fromJust $ other^.eTouch) otherRef edictRef dummyPlane Nothing
 
               touchOtherObjects pm (idx + 1) maxIdx
 
@@ -860,6 +860,6 @@ defaultTrace start mins maxs end = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
 
-    if (edict^.eEdictStatus.eHealth) > 0
+    if (edict^.eHealth) > 0
       then liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskPlayerSolid
       else liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskDeadSolid

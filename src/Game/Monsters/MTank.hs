@@ -424,7 +424,7 @@ tankMoveAttackPostBlast = MMoveT "tankMoveAttackPostBlast" frameAttack117 frameA
 tankPostStrike :: EntThink
 tankPostStrike =
   GenericEntThink "tank_poststrike" $ \selfRef@(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Nothing
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Nothing
     void $ think tankRun selfRef
     return True
 
@@ -607,7 +607,7 @@ tankDead =
       eEdictMinMax.eMaxs .= V3 16 16 0
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef

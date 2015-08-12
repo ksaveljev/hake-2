@@ -148,9 +148,9 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
 
         zoom (gameBaseGlobals.gbGEdicts.ix tmpIdx) $ do
           eClassName .= "DelayedUse"
-          eEdictAction.eaNextThink .= time + (edict^.eDelay)
-          eEdictAction.eaThink .= Just thinkDelay
-          eEdictOther.eoActivator .= activatorReference
+          eNextThink .= time + (edict^.eDelay)
+          eThink .= Just thinkDelay
+          eActivator .= activatorReference
           eEdictInfo.eiMessage .= (edict^.eEdictInfo.eiMessage)
           eEdictInfo.eiTarget .= (edict^.eEdictInfo.eiTarget)
           eEdictInfo.eiKillTarget .= (edict^.eEdictInfo.eiKillTarget)
@@ -212,8 +212,8 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
                 if foundEdictIdx == edictIdx
                   then dprintf "WARNING: Entity used iteself.\n"
                   else
-                    when (isJust $ foundEdict^.eEdictAction.eaUse) $
-                      entUse (fromJust $ foundEdict^.eEdictAction.eaUse) fr (Just er) activatorReference
+                    when (isJust $ foundEdict^.eUse) $
+                      entUse (fromJust $ foundEdict^.eUse) fr (Just er) activatorReference
 
                 Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
 
@@ -225,7 +225,7 @@ thinkDelay :: EntThink
 thinkDelay =
   GenericEntThink "Think_Delay" $ \er@(EdictReference edictIdx) -> do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    useTargets er (edict^.eEdictOther.eoActivator)
+    useTargets er (edict^.eActivator)
     freeEdict er
     return True
 
@@ -291,8 +291,8 @@ visible selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) = do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
     Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
 
-    let spot1 = let V3 a b c = (self^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (self^.eEdictStatus.eViewHeight))
-        spot2 = let V3 a b c = (other^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (other^.eEdictStatus.eViewHeight))
+    let spot1 = let V3 a b c = (self^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (self^.eViewHeight))
+        spot2 = let V3 a b c = (other^.eEntityState.esOrigin) in V3 a b (c + fromIntegral (other^.eViewHeight))
 
     v3o <- use $ globals.vec3Origin
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
@@ -354,14 +354,14 @@ findTarget selfRef@(EdictReference selfIdx) = do
           if | (level^.llSightEntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 == 0 -> do
                  let Just clientRef@(EdictReference clientIdx) = level^.llSightEntity
                  Just client <- preuse $ gameBaseGlobals.gbGEdicts.ix clientIdx
-                 if (client^.eEdictOther.eoEnemy) == (self^.eEdictOther.eoEnemy)
+                 if (client^.eEnemy) == (self^.eEnemy)
                    then return False
                    else checkClientInUse clientRef False
 
              | (level^.llSoundEntityFrameNum) >= ((level^.llFrameNum) - 1) ->
                  checkClientInUse (fromJust $ level^.llSoundEntity) True
 
-             | isJust (self^.eEdictOther.eoEnemy) && (level^.llSound2EntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 /= 0 ->
+             | isJust (self^.eEnemy) && (level^.llSound2EntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 /= 0 ->
                  checkClientInUse (fromJust $ level^.llSound2Entity) True
 
              | otherwise -> do
@@ -385,7 +385,7 @@ findTarget selfRef@(EdictReference selfIdx) = do
                    else actBasedOnHeardIt clientRef heardIt
 
              | (client^.eSvFlags) .&. Constants.svfMonster /= 0 ->
-                 case client^.eEdictOther.eoEnemy of
+                 case client^.eEnemy of
                    Nothing -> return False
                    Just (EdictReference enemyIdx) -> do
                      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
@@ -424,17 +424,17 @@ findTarget selfRef@(EdictReference selfIdx) = do
                      if | not vis ->
                             return False
 
-                        | r == Constants.rangeNear && fromIntegral (client^.eEdictStatus.eShowHostile) < levelTime && not (inFront self client) ->
+                        | r == Constants.rangeNear && fromIntegral (client^.eShowHostile) < levelTime && not (inFront self client) ->
                             return False
 
                         | r == Constants.rangeMid && not (inFront self client) ->
                             return False
 
-                        | Just clientRef == (self^.eEdictOther.eoEnemy) ->
+                        | Just clientRef == (self^.eEnemy) ->
                             return True -- JDC false
 
                         | otherwise -> do
-                            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just clientRef
+                            gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just clientRef
 
                             if (client^.eClassName) /= "player_noise"
                               then do
@@ -442,13 +442,13 @@ findTarget selfRef@(EdictReference selfIdx) = do
 
                                 case client^.eClient of
                                   Nothing -> do
-                                    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= client^.eEdictOther.eoEnemy
-                                    let Just (EdictReference enemyIdx) = client^.eEdictOther.eoEnemy
+                                    gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= client^.eEnemy
+                                    let Just (EdictReference enemyIdx) = client^.eEnemy
                                     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
                                     case enemy^.eClient of
                                       Nothing -> do
-                                        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Nothing
+                                        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Nothing
                                         return False
 
                                       _ -> finishFindTarget
@@ -496,10 +496,10 @@ findTarget selfRef@(EdictReference selfIdx) = do
                               -- the real player
                               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiSoundTarget)
 
-                              if Just clientRef == (self^.eEdictOther.eoEnemy)
+                              if Just clientRef == (self^.eEnemy)
                                 then return True
                                 else do
-                                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just clientRef
+                                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just clientRef
                                   finishFindTarget
 
         finishFindTarget :: Quake Bool
@@ -509,7 +509,7 @@ findTarget selfRef@(EdictReference selfIdx) = do
 
           Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
           when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget == 0 && isJust (self^.eMonsterInfo.miSight)) $
-            void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEdictOther.eoEnemy) -- TODO: are we sure eoEnemy is Just ?
+            void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEnemy) -- TODO: are we sure eEnemy is Just ?
 
           return True
 

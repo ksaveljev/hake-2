@@ -62,7 +62,7 @@ setStats edictRef@(EdictReference edictIdx) = do
 
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats) $ do
             ix Constants.statHealthIcon .= fromIntegral picHealth
-            ix Constants.statHealth .= fromIntegral (edict^.eEdictStatus.eHealth)
+            ix Constants.statHealth .= fromIntegral (edict^.eHealth)
 
         setAmmo :: GClientReference -> Quake ()
         setAmmo (GClientReference gClientIdx) = do

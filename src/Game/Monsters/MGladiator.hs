@@ -268,7 +268,7 @@ gladiatorDead =
       eEdictMinMax.eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef

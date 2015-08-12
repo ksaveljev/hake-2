@@ -286,10 +286,10 @@ setEdictField e key value =
       "move_angles"  -> (e { _eMoveAngles = Lib.atov value }, True)
       "style"        -> (e { _eStyle = Lib.atoi value }, True)
       "count"        -> (e { _eCount = Lib.atoi value }, True)
-      "health"       -> (e { _eEdictStatus = (e^.eEdictStatus) { _eHealth = Lib.atoi value } }, True)
+      "health"       -> (e { _eHealth = Lib.atoi value }, True)
       "sounds"       -> (e { _eSounds = Lib.atoi value }, True)
       "light"        -> (e, True)
-      "dmg"          -> (e { _eEdictStatus = (e^.eEdictStatus) { _eDmg = Lib.atoi value } }, True)
+      "dmg"          -> (e { _eDmg = Lib.atoi value }, True)
       "mass"         -> (e { _eEdictPhysics = (e^.eEdictPhysics) { _eMass = Lib.atoi value } }, True)
       "volume"       -> (e { _eVolume = Lib.atof value }, True)
       "attenuation"  -> (e { _eAttenuation = Lib.atof value }, True)
@@ -383,7 +383,7 @@ findTeams = do
               if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
                 then findNextTeam maxIdx (idx + 1) c c2
                 else do
-                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoTeamMaster .= Just (EdictReference idx)
+                  gameBaseGlobals.gbGEdicts.ix idx.eTeamMaster .= Just (EdictReference idx)
                   c2' <- findTeamMembers (fromJust $ edict^.eEdictInfo.eiTeam) (EdictReference idx) (EdictReference idx) maxIdx (idx + 1) c2
                   findNextTeam maxIdx (idx + 1) (c + 1) c2'
 
@@ -396,8 +396,8 @@ findTeams = do
               if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eEdictInfo.eiTeam)
                 then findTeamMembers teamName master chain maxIdx (idx + 1) c2
                 else do
-                  gameBaseGlobals.gbGEdicts.ix chainIdx.eEdictOther.eoTeamChain .= Just (EdictReference idx)
-                  gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoTeamMaster .= Just master
+                  gameBaseGlobals.gbGEdicts.ix chainIdx.eTeamChain .= Just (EdictReference idx)
+                  gameBaseGlobals.gbGEdicts.ix idx.eTeamMaster .= Just master
                   gameBaseGlobals.gbGEdicts.ix idx.eFlags %= (.|. Constants.flTeamSlave)
                   findTeamMembers teamName master (EdictReference idx) maxIdx (idx + 1) (c2 + 1)
 

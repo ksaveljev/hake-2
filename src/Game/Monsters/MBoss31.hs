@@ -149,7 +149,7 @@ jorgReAttack1 :: EntThink
 jorgReAttack1 =
   GenericEntThink "jorg_reattack1" $ \selfRef@(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just enemyRef = self^.eEdictOther.eoEnemy
+    let Just enemyRef = self^.eEnemy
     -- Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
     vis <- GameUtil.visible selfRef enemyRef
 

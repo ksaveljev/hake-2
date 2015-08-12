@@ -39,7 +39,7 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
       gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 0.2
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictAction.eaTouch .= Just touchMulti
+      eTouch .= Just touchMulti
       eMoveType .= Constants.moveTypeNone
       eSvFlags %= (.|. Constants.svfNoClient)
     
@@ -47,11 +47,11 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
       then
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eSolid .= Constants.solidNot
-          eEdictAction.eaUse .= Just triggerEnable
+          eUse .= Just triggerEnable
       else
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eSolid .= Constants.solidTrigger
-          eEdictAction.eaUse .= Just useMulti
+          eUse .= Just useMulti
 
     origin <- use $ globals.vec3Origin
 
@@ -92,7 +92,7 @@ spTriggerOnce er@(EdictReference edictIdx) = do
 
 spTriggerRelay :: EdictReference -> Quake ()
 spTriggerRelay (EdictReference edictIdx) =
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just triggerRelayUse
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just triggerRelayUse
 
 spTriggerKey :: EdictReference -> Quake ()
 spTriggerKey _ = io (putStrLn "GameTrigger.spTriggerKey") >> undefined -- TODO
@@ -150,7 +150,7 @@ touchMulti =
                    return False
 
       unless done' $ do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoActivator .= Just otherRef
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eActivator .= Just otherRef
         multiTrigger edictRef
 
   where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
@@ -179,25 +179,25 @@ multiTrigger :: EdictReference -> Quake ()
 multiTrigger edictRef@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    when ((edict^.eEdictAction.eaNextThink) == 0) $ do
-      GameUtil.useTargets edictRef (edict^.eEdictOther.eoActivator)
+    when ((edict^.eNextThink) == 0) $ do
+      GameUtil.useTargets edictRef (edict^.eActivator)
 
       Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       
       if (edict'^.eWait) > 0
         then
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-            eaThink .= Just multiWait
-            eaNextThink .= levelTime + (edict'^.eWait)
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eThink .= Just multiWait
+            eNextThink .= levelTime + (edict'^.eWait)
         else
           -- we can't just remove (self) here, because this is a touch
           -- function
           -- called while looping through area links...
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-            eaTouch .= Nothing
-            eaNextThink .= levelTime + (Constants.frameTime)
-            eaThink .= Just GameUtil.freeEdictA
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eTouch .= Nothing
+            eNextThink .= levelTime + (Constants.frameTime)
+            eThink .= Just GameUtil.freeEdictA
 
 initTrigger :: EdictReference -> Quake ()
 initTrigger selfRef@(EdictReference selfIdx) = do
@@ -218,5 +218,5 @@ initTrigger selfRef@(EdictReference selfIdx) = do
 multiWait :: EntThink
 multiWait =
   GenericEntThink "multi_wait" $ \(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= 0
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= 0
     return True

@@ -39,7 +39,7 @@ thinkBoss3Stand =
       else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame += 1
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= levelTime + Constants.frameTime
     return True
 
 {-
@@ -71,9 +71,9 @@ spMonsterBoss3Stand selfRef@(EdictReference selfIdx) = do
           eEntityState.esFrame      .= MBoss32.frameStand201
           eEdictMinMax.eMins        .= V3 (-32) (-32) 0
           eEdictMinMax.eMaxs        .= V3 32 32 90
-          eEdictAction.eaUse        .= Just useBoss3
-          eEdictAction.eaThink      .= Just thinkBoss3Stand
-          eEdictAction.eaNextThink  .= levelTime + Constants.frameTime
+          eUse                      .= Just useBoss3
+          eThink                    .= Just thinkBoss3Stand
+          eNextThink                .= levelTime + Constants.frameTime
 
         void $ soundIndex (Just "misc/bigtele.wav")
 

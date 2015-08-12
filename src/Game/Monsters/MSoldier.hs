@@ -151,7 +151,7 @@ soldierDead =
       eEdictMinMax.eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity self
 
@@ -242,7 +242,7 @@ soldierPain =
   GenericEntPain "soldier_pain" $ \self@(EdictReference selfIdx) _ _ _ -> do
     Just selfEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-    when ((selfEdict^.eEdictStatus.eHealth) < ((selfEdict^.eEdictStatus.eMaxHealth) `div` 2)) $
+    when ((selfEdict^.eHealth) < ((selfEdict^.eMaxHealth) `div` 2)) $
       gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum %= (.|. 1)
 
     time <- use $ gameBaseGlobals.gbLevel.llTime
@@ -515,10 +515,10 @@ soldierDodge =
     r <- Lib.randomF
 
     when (r > 0.25) $ do
-      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy
+      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy
 
       when (isNothing enemy) $
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just attacker
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attacker
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -604,10 +604,10 @@ soldierAttack1Refire1 :: EntThink
 soldierAttack1Refire1 =
   GenericEntThink "soldier_attack1_refire1" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
@@ -623,10 +623,10 @@ soldierAttack1Refire2 :: EntThink
 soldierAttack1Refire2 =
   GenericEntThink "soldier_attack1_refire2" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eEdictStatus.eHealth <= 0) $ do
+    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
@@ -639,10 +639,10 @@ soldierAttack2Refire1 :: EntThink
 soldierAttack2Refire1 =
   GenericEntThink "soldier_attack2_refire1" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eEdictStatus.eHealth <= 0) $ do
+    unless (self^.eEntityState.esSkinNum > 1 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
@@ -658,10 +658,10 @@ soldierAttack2Refire2 :: EntThink
 soldierAttack2Refire2 =
   GenericEntThink "soldier_attack2_refire2" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eEdictStatus.eHealth <= 0) $ do
+    unless (self^.eEntityState.esSkinNum < 2 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
@@ -685,10 +685,10 @@ soldierAttack6Refire :: EntThink
 soldierAttack6Refire =
   GenericEntThink "soldier_attack6_refire" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-    unless (enemy^.eEdictStatus.eHealth <= 0 || GameUtil.range self enemy < Constants.rangeMid) $ do
+    unless (enemy^.eHealth <= 0 || GameUtil.range self enemy < Constants.rangeMid) $ do
       skillValue <- liftM (^.cvValue) skillCVar
 
       when (skillValue == 3) $
@@ -704,7 +704,7 @@ soldierDuckUp =
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
       eEdictMinMax.eMaxs._z += 32
-      eEdictStatus.eTakeDamage .= Constants.damageAim
+      eTakeDamage .= Constants.damageAim
 
     linkEntity self
 
@@ -722,7 +722,7 @@ soldierDuckDown =
       zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
         eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
         eEdictMinMax.eMaxs._z -= 32
-        eEdictStatus.eTakeDamage .= Constants.damageYes
+        eTakeDamage .= Constants.damageYes
         eMonsterInfo.miPauseTime .= time + 1
 
       linkEntity self
@@ -880,7 +880,7 @@ soldierSight :: EntInteract
 soldierSight =
   GenericEntInteract "soldier_sight" $ \self@(EdictReference selfIdx) _ -> do
     Just selfEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = selfEdict^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = selfEdict^.eEnemy
     Just enemyEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     r <- Lib.randomF
@@ -924,8 +924,8 @@ spMonsterSoldierX =
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eEdictPhysics.eMass .= 100
 
-      eEdictAction.eaPain .= Just soldierPain
-      eEdictAction.eaDie  .= Just soldierDie
+      ePain .= Just soldierPain
+      eDie  .= Just soldierDie
 
       eMonsterInfo.miStand  .= Just soldierStand
       eMonsterInfo.miWalk   .= Just soldierWalk
@@ -968,8 +968,8 @@ spMonsterSoldier =
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 2
-          eEdictStatus.eHealth .= 30
-          eEdictStatus.eGibHealth .= (-30)
+          eHealth .= 30
+          eGibHealth .= (-30)
 
     return True
 
@@ -995,8 +995,8 @@ spMonsterSoldierSS =
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 4
-          eEdictStatus.eHealth .= 40
-          eEdictStatus.eGibHealth .= (-30)
+          eHealth .= 40
+          eGibHealth .= (-30)
 
     return True
 
@@ -1026,7 +1026,7 @@ spMonsterSoldierLight =
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eEntityState.esSkinNum .= 0
-          eEdictStatus.eHealth .= 20
-          eEdictStatus.eGibHealth .= (-30)
+          eHealth .= 20
+          eGibHealth .= (-30)
 
     return True

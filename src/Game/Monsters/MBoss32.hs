@@ -268,7 +268,7 @@ makronDead =
       eEdictMinMax.eMaxs .= V3 60 60 72
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -518,13 +518,13 @@ makronSaveLoc :: EntThink
 makronSaveLoc =
   GenericEntThink "MakronSaveloc" $ \(EdictReference selfIdx) -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
     let V3 a b c = (enemy^.eEntityState.esOrigin)
 
     -- save for aiming the shot
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.ePos1 .= V3 a b (c + fromIntegral (enemy^.eEdictStatus.eViewHeight))
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.ePos1 .= V3 a b (c + fromIntegral (enemy^.eViewHeight))
     return True
 
 -- FIXME: He's not firing from the proper Z
@@ -556,7 +556,7 @@ makronAttack =
     r <- Lib.randomF
 
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEdictOther.eoEnemy
+    let Just (EdictReference enemyIdx) = self^.eEnemy
     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
@@ -580,7 +580,7 @@ makronTorsoThink =
       else gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame .= 346
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
 
     return True
 
@@ -603,8 +603,8 @@ makronTorso =
       eEdictMinMax.eMaxs .= V3 8 8 8
       eEntityState.esFrame .= 346
       eEntityState.esModelIndex .= modelIdx
-      eEdictAction.eaThink .= Just makronTorsoThink
-      eEdictAction.eaNextThink .= levelTime + 2 * Constants.frameTime
+      eThink .= Just makronTorsoThink
+      eNextThink .= levelTime + 2 * Constants.frameTime
       eEntityState.esSound .= soundIdx
 
     linkEntity edictRef

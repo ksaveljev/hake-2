@@ -26,7 +26,7 @@ radiusDamage inflictorRef@(EdictReference inflictorIdx) attackerRef dmg ignoreRe
               Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
 
               if | edictit == ignoreRef -> radiusDamage' edictit
-                 | (ent^.eEdictStatus.eTakeDamage) == 0 -> radiusDamage' edictit
+                 | (ent^.eTakeDamage) == 0 -> radiusDamage' edictit
                  | otherwise -> do
                      let v = (ent^.eEdictMinMax.eMins) + (ent^.eEdictMinMax.eMaxs)
                          v' = (ent^.eEntityState.esOrigin) + fmap (* 0.5) v

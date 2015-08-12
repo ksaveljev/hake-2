@@ -103,7 +103,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
 
       -- if the scoreboard is up, update it
       when ((gClient^.gcShowScores) && frameNum .&. 31 == 0) $ do
-        PlayerHud.deathmatchScoreboardMessage edictRef (edict^.eEdictOther.eoEnemy)
+        PlayerHud.deathmatchScoreboardMessage edictRef (edict^.eEnemy)
         unicast <- use $ gameBaseGlobals.gbGameImport.giUnicast
         unicast edictRef False
 
@@ -186,7 +186,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
                  gameBaseGlobals.gbBobMove .= 0
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcBobTime .= 0 -- start at beginning of cycle again
 
-             | isJust (edict^.eEdictOther.eoGroundEntity) -> do
+             | isJust (edict^.eGroundEntity) -> do
                  gameBaseGlobals.gbBobMove .= if | xyspeed > 210 -> 0.25
                                                  | xyspeed > 100 -> 0.125
                                                  | otherwise -> 0.0625
@@ -364,11 +364,11 @@ worldEffects = do
                 let Just (GClientReference clientIdx) = edict^.eClient
                 Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
 
-                when ((client^.gcNextDrownTime) < levelTime && (edict^.eEdictStatus.eHealth) > 0) $ do
+                when ((client^.gcNextDrownTime) < levelTime && (edict^.eHealth) > 0) $ do
                   gameBaseGlobals.gbGame.glClients.ix clientIdx.gcNextDrownTime .= levelTime + 1
 
                   -- take more damage the longer underwater
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg %= (\v -> if v + 2 > 15 then 15 else v + 2)
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg %= (\v -> if v + 2 > 15 then 15 else v + 2)
 
                   -- play a gurp sound instead of a normal pain sound
                   playDrowningSound edictRef
@@ -383,7 +383,7 @@ worldEffects = do
                                       v3o
                                       (ent^.eEntityState.esOrigin)
                                       v3o
-                                      (ent^.eEdictStatus.eDmg)
+                                      (ent^.eDmg)
                                       0
                                       Constants.damageNoArmor
                                       Constants.modWater
@@ -392,7 +392,7 @@ worldEffects = do
 
               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
                 eEdictPhysics.eAirFinished .= levelTime + 12
-                eEdictStatus.eDmg .= 2
+                eDmg .= 2
 
         playDrowningSound :: EdictReference -> Quake ()
         playDrowningSound edictRef@(EdictReference edictIdx) = do
@@ -403,7 +403,7 @@ worldEffects = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
           r <- Lib.rand
 
-          idx <- if | (edict^.eEdictStatus.eHealth) <= (edict^.eEdictStatus.eDmg) ->
+          idx <- if | (edict^.eHealth) <= (edict^.eDmg) ->
                         soundIndex (Just "player/drown1.wav")
                     | r .&. 1 /= 0 ->
                         soundIndex (Just "*gurp1.wav")
@@ -422,7 +422,7 @@ worldEffects = do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
               frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
-              when ((edict^.eEdictStatus.eHealth) > 0 && (edict^.eEdictTiming.etPainDebounceTime) <= levelTime && truncate (gClient^.gcInvincibleFrameNum) < frameNum) $ do
+              when ((edict^.eHealth) > 0 && (edict^.eEdictTiming.etPainDebounceTime) <= levelTime && truncate (gClient^.gcInvincibleFrameNum) < frameNum) $ do
                 r <- Lib.rand
 
                 gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -499,9 +499,9 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
     unless ((edict^.eEntityState.esModelIndex) /= 255 || (edict^.eMoveType) == Constants.moveTypeNoClip) $ do
       let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-      let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eEdictPhysics.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eEdictOther.eoGroundEntity)
+      let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eEdictPhysics.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eGroundEntity)
                          then Just (gClient^.gcOldVelocity._z)
-                         else if isNothing (edict^.eEdictOther.eoGroundEntity)
+                         else if isNothing (edict^.eGroundEntity)
                                 then Nothing
                                 else Just ((edict^.eEdictPhysics.eVelocity._z) - (gClient^.gcOldVelocity._z))
 
@@ -519,8 +519,8 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
 
               if delta' > 30
                 then do
-                  when ((edict^.eEdictStatus.eHealth) > 0) $
-                    if (edict^.eEdictStatus.eHealth) >= 55
+                  when ((edict^.eHealth) > 0) $
+                    if (edict^.eHealth) >= 55
                       then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFallFar
                       else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFall
 
@@ -626,9 +626,9 @@ damageFeedback playerRef@(EdictReference playerIdx) = do
 
         gameBaseGlobals.gbGEdicts.ix playerIdx.eEdictTiming.etPainDebounceTime .= levelTime + 0.7
 
-        let l = if | (player^.eEdictStatus.eHealth) < 25 -> 25
-                   | (player^.eEdictStatus.eHealth) < 50 -> 50
-                   | (player^.eEdictStatus.eHealth) < 75 -> 75
+        let l = if | (player^.eHealth) < 25 -> 25
+                   | (player^.eHealth) < 50 -> 50
+                   | (player^.eHealth) < 75 -> 75
                    | otherwise -> 100
 
 
@@ -673,11 +673,11 @@ damageFeedback playerRef@(EdictReference playerIdx) = do
       -- calculate view angle kicks
       let kick = abs (gClient^.gcDamageKnockback)
 
-      when (kick /= 0 && (player^.eEdictStatus.eHealth) > 0) $ do -- kick of 0 means no view adjust at all
+      when (kick /= 0 && (player^.eHealth) > 0) $ do -- kick of 0 means no view adjust at all
         right <- use $ gameBaseGlobals.gbRight
         forward <- use $ gameBaseGlobals.gbForward
 
-        let kick' :: Float = (fromIntegral kick) * 100 / (fromIntegral $ player^.eEdictStatus.eHealth)
+        let kick' :: Float = (fromIntegral kick) * 100 / (fromIntegral $ player^.eHealth)
             kick'' = if kick' < fromIntegral count' * 0.5
                        then fromIntegral count' * 0.5
                        else kick'
@@ -719,7 +719,7 @@ calcViewOffset (EdictReference edictIdx) = do
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     -- if dead, fix the angle and don't add any kick
-    angles <- if (edict^.eEdictStatus.eDeadFlag) /= 0
+    angles <- if (edict^.eDeadFlag) /= 0
                 then do
                   zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewAngles) $ do
                     access Constants.roll .= 40
@@ -750,7 +750,7 @@ calcViewOffset (EdictReference edictIdx) = do
     bobUpValue <- liftM (^.cvValue) bobUpCVar
     let bob :: Float = bobFracSin * xyspeed * bobUpValue
         bob' = if bob > 6 then 6 else bob
-        V3 a b c = (V3 0 0 (fromIntegral (edict^.eEdictStatus.eViewHeight) + bob')) + (gClient^.gcKickOrigin)
+        V3 a b c = (V3 0 0 (fromIntegral (edict^.eViewHeight) + bob')) + (gClient^.gcKickOrigin)
         a' = if | a < -14 -> -14
                 | a > 14 -> 14
                 | otherwise -> a
@@ -917,7 +917,7 @@ setClientEvent (EdictReference edictIdx) = do
     unless ((edict^.eEntityState.esEvent) /= 0) $ do
       xyspeed <- use $ gameBaseGlobals.gbXYSpeed
 
-      when (isJust (edict^.eEdictOther.eoGroundEntity) && xyspeed > 225) $ do
+      when (isJust (edict^.eGroundEntity) && xyspeed > 225) $ do
         Just (GClientReference currentClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
         Just bobTime <- preuse $ gameBaseGlobals.gbGame.glClients.ix currentClientIdx.gcBobTime
         bobMove <- use $ gameBaseGlobals.gbBobMove
@@ -934,10 +934,10 @@ setClientEffects edictRef@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
 
-    unless ((edict^.eEdictStatus.eHealth) <= 0 || intermissionTime /= 0) $ do
+    unless ((edict^.eHealth) <= 0 || intermissionTime /= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-      when ((edict^.eEdictStatus.ePowerArmorTime) > levelTime) $ do
+      when ((edict^.ePowerArmorTime) > levelTime) $ do
         paType <- GameItems.powerArmorType edictRef
 
         if | paType == Constants.powerArmorScreen ->
@@ -1059,7 +1059,7 @@ setClientFrame (EdictReference edictIdx) = do
           gcAnimDuck .= duck
           gcAnimRun .= run
 
-        if | isNothing (edict^.eEdictOther.eoGroundEntity) -> do
+        if | isNothing (edict^.eGroundEntity) -> do
                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animJump
                when ((edict^.eEntityState.esFrame) /= MPlayer.frameJump2) $
                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameJump1
@@ -1091,7 +1091,7 @@ setClientFrame (EdictReference edictIdx) = do
               b = if run /= (gClient^.gcAnimRun) && (gClient^.gcAnimPriority) == Constants.animBasic
                     then True
                     else False
-              c = if isNothing (edict^.eEdictOther.eoGroundEntity) && (gClient^.gcAnimPriority) <= Constants.animWave
+              c = if isNothing (edict^.eGroundEntity) && (gClient^.gcAnimPriority) <= Constants.animWave
                     then True
                     else False
           in a || b || c
@@ -1123,7 +1123,7 @@ setClientFrame (EdictReference edictIdx) = do
         checkJump edict gClient = do
           if (gClient^.gcAnimPriority) == Constants.animJump
             then do
-              if isNothing (edict^.eEdictOther.eoGroundEntity)
+              if isNothing (edict^.eGroundEntity)
                 then return True -- stay there
                 else do
                   let Just (GClientReference gClientIdx) = edict^.eClient

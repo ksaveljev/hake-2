@@ -59,9 +59,9 @@ physicsPusher er@(EdictReference edictIdx) = do
           let Just (EdictReference blockedIdx) = finalEdict
           Just blockedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix blockedIdx
 
-          when (isJust (blockedEdict^.eEdictAction.eaBlocked)) $ do
+          when (isJust (blockedEdict^.eBlocked)) $ do
             obstacle <- use $ gameBaseGlobals.gbObstacle
-            blocked (fromJust $ blockedEdict^.eEdictAction.eaBlocked) (fromJust finalEdict) (fromJust obstacle)
+            blocked (fromJust $ blockedEdict^.eBlocked) (fromJust finalEdict) (fromJust obstacle)
 
         else
           -- the move succeeded, so call all think functions
@@ -83,10 +83,10 @@ physicsPusher er@(EdictReference edictIdx) = do
 
               pushed <- push chain move amove
               if pushed
-                then pushTeamChain (edict^.eEdictOther.eoTeamChain)
+                then pushTeamChain (edict^.eTeamChain)
                 else return (Just chain)
 
-            else pushTeamChain (edict^.eEdictOther.eoTeamChain)
+            else pushTeamChain (edict^.eTeamChain)
 
         thinkTeamChain :: Maybe EdictReference -> Quake ()
         thinkTeamChain Nothing = return ()
@@ -95,17 +95,17 @@ physicsPusher er@(EdictReference edictIdx) = do
 
           void $ runThink chain
 
-          thinkTeamChain (edict^.eEdictOther.eoTeamChain)
+          thinkTeamChain (edict^.eTeamChain)
 
         backOutTeamChain :: Maybe EdictReference -> Quake ()
         backOutTeamChain Nothing = return ()
         backOutTeamChain (Just (EdictReference chainIdx)) = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix chainIdx
 
-          when ((edict^.eEdictAction.eaNextThink) > 0) $
-            gameBaseGlobals.gbGEdicts.ix chainIdx.eEdictAction.eaNextThink += Constants.frameTime
+          when ((edict^.eNextThink) > 0) $
+            gameBaseGlobals.gbGEdicts.ix chainIdx.eNextThink += Constants.frameTime
 
-          backOutTeamChain (edict^.eEdictOther.eoTeamChain)
+          backOutTeamChain (edict^.eTeamChain)
 
 -- Non moving objects can only think
 physicsNone :: EdictReference -> Quake ()
@@ -156,7 +156,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
         -- let dead monsters who aren't completely onground slide
         when (wasOnGround || (edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
           ok <- M.checkBottom edictRef
-          when (not ((edict^.eEdictStatus.eHealth) <= 0 && not ok)) $ do
+          when (not ((edict^.eHealth) <= 0 && not ok)) $ do
             let vel = edict^.eEdictPhysics.eVelocity
                 speed = sqrt $ (vel^._x) * (vel^._x) + (vel^._y) * (vel^._y)
 
@@ -188,7 +188,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
         Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
         when (edict'^.eInUse) $ do
-          when (isJust (edict'^.eEdictOther.eoGroundEntity) && not wasOnGround && hitSound) $ do
+          when (isJust (edict'^.eGroundEntity) && not wasOnGround && hitSound) $ do
             wavIdx <- soundIndex (Just "world/land.wav")
             sound (Just edictRef) 0 wavIdx 1 1 0
 
@@ -199,11 +199,11 @@ physicsStep edictRef@(EdictReference edictIdx) = do
 
   where checkGroundEntity :: Quake Bool
         checkGroundEntity = do
-          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity) >>= \(Just groundEntity) ->
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity) >>= \(Just groundEntity) ->
             when (isNothing groundEntity) $
               M.checkGround edictRef
 
-          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity) >>= \(Just groundEntity) ->
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity) >>= \(Just groundEntity) ->
             case groundEntity of
               Nothing -> return False
               Just _ -> return True
@@ -314,7 +314,7 @@ physicsToss er@(EdictReference edictIdx) = do
           playWaterSound oldOrigin wasInWater isInWater
 
           -- move teamslaves
-          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoTeamChain
+          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eTeamChain
           Just origin <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin
           moveTeamSlaves origin teamChain
 
@@ -328,9 +328,9 @@ physicsToss er@(EdictReference edictIdx) = do
           Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
 
           when ((velocity^._z) > 0 ) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
 
-          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity
+          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity
 
           -- check for the groundentity going away
           if isJust groundEntity
@@ -339,7 +339,7 @@ physicsToss er@(EdictReference edictIdx) = do
               Just groundEntityInUse <- preuse $ gameBaseGlobals.gbGEdicts.ix groundEntityIdx.eInUse
               if not groundEntityInUse
                 then do
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
                   return False
                 else return True
             else return False
@@ -370,7 +370,7 @@ physicsToss er@(EdictReference edictIdx) = do
               origin <- use $ globals.vec3Origin
 
               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                eEdictOther.eoGroundEntity .= (trace^.tEnt)
+                eGroundEntity .= (trace^.tEnt)
                 eGroundEntityLinkCount .= linkCount
                 eEdictPhysics.eVelocity .= origin
                 eEdictPhysics.eAVelocity .= origin
@@ -414,7 +414,7 @@ physicsToss er@(EdictReference edictIdx) = do
           linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
           linkEntity sr
 
-          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix slaveIdx.eEdictOther.eoTeamChain
+          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix slaveIdx.eTeamChain
           moveTeamSlaves origin teamChain
 
 {-
@@ -506,7 +506,7 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
               if not skip
                 then do
                   Just pusherMovetype <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eMoveType
-                  Just edictGroundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix idx.eEdictOther.eoGroundEntity
+                  Just edictGroundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix idx.eGroundEntity
 
                   nextEntity <- if pusherMovetype == Constants.moveTypePush || edictGroundEntity == Just pusherRef
                                   then do
@@ -587,9 +587,9 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
 
         nullifyGroundEntity :: EdictReference -> Quake ()
         nullifyGroundEntity (EdictReference edictIdx) = do
-          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity
+          Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity
           when (groundEntity /= Just pusherRef) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
 
         figureMovement :: V3 Float -> V3 Float -> V3 Float -> EdictReference -> Quake ()
         figureMovement forward right up (EdictReference edictIdx) = do
@@ -637,7 +637,7 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
                -- not linked in anywhere
              | not linked -> return True
                -- if the entity is standing on the pusher, it will definetly be moved
-             | (edict^.eEdictOther.eoGroundEntity) /= Just (EdictReference edictIdx) -> do
+             | (edict^.eGroundEntity) /= Just (EdictReference edictIdx) -> do
                  -- see if the ent needs to be tested
                  let absmin = edict^.eEdictMinMax.eAbsMin
                      absmax = edict^.eEdictMinMax.eAbsMax
@@ -669,20 +669,20 @@ runThink :: EdictReference -> Quake Bool
 runThink er@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    let thinktime = edict^.eEdictAction.eaNextThink
+    let thinktime = edict^.eNextThink
     time <- use $ gameBaseGlobals.gbLevel.llTime
 
     if thinktime <= 0 || thinktime > time + 0.001
       then return True
       else do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= 0
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= 0
 
-        when (isNothing (edict^.eEdictAction.eaThink)) $
+        when (isNothing (edict^.eThink)) $
           Com.comError Constants.errFatal "NULL ent.think"
 
-        let GenericEntThink sdf _ = fromJust $ edict^.eEdictAction.eaThink
+        let GenericEntThink sdf _ = fromJust $ edict^.eThink
         -- io (print $ "THINK FUNCTION = " `B.append` sdf)
-        void $ think (fromJust $ edict^.eEdictAction.eaThink) er
+        void $ think (fromJust $ edict^.eThink) er
 
         return False
 
@@ -773,13 +773,13 @@ impact er@(EdictReference edictIdx) traceT = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     Just traceEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx
 
-    when (isJust (edict^.eEdictAction.eaTouch) && (edict^.eSolid) /= Constants.solidNot) $
-      touch (fromJust $ edict^.eEdictAction.eaTouch) er tr (traceT^.tPlane) (traceT^.tSurface)
+    when (isJust (edict^.eTouch) && (edict^.eSolid) /= Constants.solidNot) $
+      touch (fromJust $ edict^.eTouch) er tr (traceT^.tPlane) (traceT^.tSurface)
 
     dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
 
-    when (isJust (traceEdict^.eEdictAction.eaTouch) && (traceEdict^.eSolid) /= Constants.solidNot) $
-      touch (fromJust $ traceEdict^.eEdictAction.eaTouch) tr er dummyPlane Nothing
+    when (isJust (traceEdict^.eTouch) && (traceEdict^.eSolid) /= Constants.solidNot) $
+      touch (fromJust $ traceEdict^.eTouch) tr er dummyPlane Nothing
 
 testEntityPosition :: EdictReference -> Quake Bool
 testEntityPosition (EdictReference edictIdx) = do
@@ -814,7 +814,7 @@ addRotationalFriction _ = do
 flyMove :: EdictReference -> Float -> Int -> Quake Int
 flyMove edictRef@(EdictReference edictIdx) time mask = do
     Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
     let planes = V.replicate 6 (V3 0 0 0)
 
     v <- doFlyMove velocity velocity planes time 0 0 0 4
@@ -859,7 +859,7 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
                                         then do
                                           preuse (gameBaseGlobals.gbGEdicts.ix hitIdx) >>= \(Just hit) -> do
                                             when ((hit^.eSolid) == Constants.solidBsp) $ do
-                                              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT^.tEnt
+                                              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= traceT^.tEnt
                                               gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= hit^.eLinkCount
 
                                             return (blockedMask .|. 1) -- floor
@@ -1003,7 +1003,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
             when ((edict'^.eFlags) .&. Constants.flPartialGround /= 0) $
               gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flPartialGround))
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= traceT'^.tEnt
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= traceT'^.tEnt
             let Just (EdictReference traceEntIdx) = traceT'^.tEnt
             Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
             gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntityLinkCount .= traceEnt^.eLinkCount
@@ -1042,18 +1042,18 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
               case done of
                 Just _ -> return done
                 Nothing -> do
-                  if isNothing (edict^.eEdictOther.eoEnemy)
+                  if isNothing (edict^.eEnemy)
                     then return Nothing
                     else doFlyingStep (idx + 1) maxIdx
 
         updateNewOrg :: Int -> EdictT -> V3 Float -> Quake (V3 Float)
         updateNewOrg idx edict newOrg = do
-          if idx == 0 && isJust (edict^.eEdictOther.eoEnemy)
+          if idx == 0 && isJust (edict^.eEnemy)
             then do
               goalEntity <- if isNothing (edict^.eGoalEntity)
                               then do
-                                gameBaseGlobals.gbGEdicts.ix edictIdx.eGoalEntity .= (edict^.eEdictOther.eoEnemy)
-                                let Just (EdictReference goalEntityIdx) = edict^.eEdictOther.eoEnemy
+                                gameBaseGlobals.gbGEdicts.ix edictIdx.eGoalEntity .= (edict^.eEnemy)
+                                let Just (EdictReference goalEntityIdx) = edict^.eEnemy
                                 Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
                                 return goalEntity
                               else do
@@ -1179,7 +1179,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
                     linkEntity edictRef
                     GameBase.touchTriggers edictRef
                   
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
                   return (Just True, traceT, newOrg)
                 else
                   return (Just False, traceT, newOrg) -- walked off an edge

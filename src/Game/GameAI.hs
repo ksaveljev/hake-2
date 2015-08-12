@@ -56,7 +56,7 @@ aiStand =
 
           if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
             then do
-              case self^.eEdictOther.eoEnemy of
+              case self^.eEnemy of
                 Just (EdictReference enemyIdx) -> do
                   Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
                   let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
@@ -154,7 +154,7 @@ aiRun =
 walkMonsterStart :: EntThink
 walkMonsterStart =
   GenericEntThink "walkmonster_start" $ \edictRef@(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaThink .= Just walkMonsterStartGo
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eThink .= Just walkMonsterStartGo
     void $ Monster.monsterStart edictRef
     return True
 
@@ -188,7 +188,7 @@ aiSetSightClient = do
 
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix check'
 
-          if | (edict^.eInUse) && (edict^.eEdictStatus.eHealth) > 0 && (edict^.eFlags) .&. Constants.flNoTarget == 0 ->
+          if | (edict^.eInUse) && (edict^.eHealth) > 0 && (edict^.eFlags) .&. Constants.flNoTarget == 0 ->
                  gameBaseGlobals.gbLevel.llSightClient .= Just (EdictReference check') -- got one
              | check' == start ->
                  gameBaseGlobals.gbLevel.llSightClient .= Nothing
@@ -207,7 +207,7 @@ walkMonsterStartGo =
 
     when (spawnFlags .&. 2 == 0 && levelTime < 1) $ do
       void $ think M.dropToFloor selfRef
-      Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoGroundEntity
+      Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eGroundEntity
       when (isJust groundEntity) $ do
         ok <- M.walkMove selfRef 0 0
         when (not ok) $ do
@@ -219,7 +219,7 @@ walkMonsterStartGo =
     when (yawSpeed == 0) $
       gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eYawSpeed .= 40
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictStatus.eViewHeight .= 25
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eViewHeight .= 25
 
     Monster.monsterStartGo selfRef
 

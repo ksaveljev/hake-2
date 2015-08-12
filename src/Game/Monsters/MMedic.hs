@@ -296,7 +296,7 @@ medicDead =
       eEdictMinMax.eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -358,7 +358,7 @@ medicDuckDown =
         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
           eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
           eEdictMinMax.eMaxs._z -= 32
-          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eTakeDamage .= Constants.damageYes
           eMonsterInfo.miPauseTime .= levelTime + 1
 
         linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
@@ -384,7 +384,7 @@ medicDuckUp =
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
       eEdictMinMax.eMaxs._z += 32
-      eEdictStatus.eTakeDamage .= Constants.damageAim
+      eTakeDamage .= Constants.damageAim
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef

@@ -26,7 +26,7 @@ checkGround edictRef@(EdictReference edictIdx) = do
     unless ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
       if (edict^.eEdictPhysics.eVelocity._z) > 100
         then
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
         else do
           -- if the hull point one-quarter unit down is solid the entity is
           -- on ground
@@ -43,7 +43,7 @@ checkGround edictRef@(EdictReference edictIdx) = do
           -- check steepness
           if (traceT^.tPlane.cpNormal._z) < 0.7 && not (traceT^.tStartSolid)
             then
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictOther.eoGroundEntity .= Nothing
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
             else do
               when (not (traceT^.tStartSolid) && not (traceT^.tAllSolid)) $ do
                 let Just (EdictReference traceIdx) = traceT^.tEnt
@@ -51,7 +51,7 @@ checkGround edictRef@(EdictReference edictIdx) = do
 
                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
                   eEntityState.esOrigin .= traceT^.tEndPos
-                  eEdictOther.eoGroundEntity .= traceT^.tEnt
+                  eGroundEntity .= traceT^.tEnt
                   eGroundEntityLinkCount .= linkCount
                   eEdictPhysics.eVelocity._z .= 0
 
@@ -79,8 +79,8 @@ fliesOn =
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
         eEntityState.esEffects %= (.|. Constants.efFlies)
         eEntityState.esSound .= inflies
-        eEdictAction.eaThink .= Just fliesOff
-        eEdictAction.eaNextThink .= time + 60
+        eThink .= Just fliesOff
+        eNextThink .= time + 60
 
     return True
 
@@ -96,9 +96,9 @@ flyCheck =
       time <- use $ gameBaseGlobals.gbLevel.llTime
       nf <- Lib.randomF
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-        eaThink .= Just fliesOn
-        eaNextThink .= time + 5 + 10 * nf
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+        eThink .= Just fliesOn
+        eNextThink .= time + 5 + 10 * nf
 
     return True
 
@@ -222,7 +222,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
 walkMove :: EdictReference -> Float -> Float -> Quake Bool
 walkMove edictRef@(EdictReference edictIdx) yaw dist = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    if isNothing (edict^.eEdictOther.eoGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
+    if isNothing (edict^.eGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
       then
         return False
       else do
@@ -262,7 +262,7 @@ moveFrame selfRef@(EdictReference selfIdx) = do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
 
     let Just move = self^.eMonsterInfo.miCurrentMove
 
@@ -364,7 +364,7 @@ worldEffects edictRef@(EdictReference edictIdx) = do
         checkWaterDamage = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-          when ((edict^.eEdictStatus.eHealth) > 0) $ do
+          when ((edict^.eHealth) > 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
             -- TODO: refactor, too much same stuff here
@@ -464,10 +464,10 @@ setEffects (EdictReference edictIdx) = do
         esEffects %= (.|. Constants.efColorShell)
         esRenderFx %= (.|. Constants.rfShellRed)
 
-    unless ((edict^.eEdictStatus.eHealth) <= 0) $ do
+    unless ((edict^.eHealth) <= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-      when ((edict^.eEdictStatus.ePowerArmorTime) > levelTime) $
+      when ((edict^.ePowerArmorTime) > levelTime) $
         if | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorScreen ->
                gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPowerScreen)
 
@@ -507,10 +507,10 @@ moveToGoal :: EdictReference -> Float -> Quake ()
 moveToGoal edictRef@(EdictReference edictIdx) dist = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    let skip = isNothing (edict^.eEdictOther.eoGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
+    let skip = isNothing (edict^.eGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
     -- if the next step hits the enemy, return immediately
-    skip' <- if isJust (edict^.eEdictOther.eoEnemy)
-               then SV.closeEnough edictRef (fromJust $ edict^.eEdictOther.eoEnemy) dist
+    skip' <- if isJust (edict^.eEnemy)
+               then SV.closeEnough edictRef (fromJust $ edict^.eEnemy) dist
                else return False
 
     -- io (print "M.moveToGoal")

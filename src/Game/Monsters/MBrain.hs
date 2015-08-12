@@ -261,7 +261,7 @@ brainDuckDown =
         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
           eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
           eEdictMinMax.eMaxs._z -= 32
-          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eTakeDamage .= Constants.damageYes
 
         linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
         linkEntity selfRef
@@ -286,7 +286,7 @@ brainDuckUp =
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
       eEdictMinMax.eMaxs._z += 32
-      eEdictStatus.eTakeDamage .= Constants.damageAim
+      eTakeDamage .= Constants.damageAim
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -301,8 +301,8 @@ brainDodge =
     unless (r > 0.25) $ do
       Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-      when (isNothing (self^.eEdictOther.eoEnemy)) $
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictOther.eoEnemy .= Just attackerRef
+      when (isNothing (self^.eEnemy)) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
 
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -327,7 +327,7 @@ brainDead =
       eEdictMinMax.eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
-      eEdictAction.eaNextThink .= 0
+      eNextThink .= 0
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef

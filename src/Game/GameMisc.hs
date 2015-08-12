@@ -60,7 +60,7 @@ spPathCorner er@(EdictReference edictIdx) = do
       else do
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eSolid .= Constants.solidTrigger
-          eEdictAction.eaTouch .= Just pathCornerTouch
+          eTouch .= Just pathCornerTouch
           eEdictMinMax.eMins .= V3 (-8) (-8) (-8)
           eEdictMinMax.eMaxs .= V3 8 8 8
           eSvFlags %= (.|. Constants.svfNoClient)
@@ -113,7 +113,7 @@ pathCornerTouch =
   where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
         shouldReturn selfRef (EdictReference otherIdx) = do
           Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eMoveTarget
-          Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eEdictOther.eoEnemy
+          Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx.eEnemy
 
           if moveTarget /= (Just selfRef) || isJust enemy
             then return True
@@ -161,7 +161,7 @@ spPointCombat er@(EdictReference edictIdx) = do
       else do
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eSolid .= Constants.solidTrigger
-          eEdictAction.eaTouch .= Just pointCombatTouch
+          eTouch .= Just pointCombatTouch
           eEdictMinMax.eMins .= V3 (-8) (-8) (-16)
           eEdictMinMax.eMaxs .= V3 8 8 16
           eSvFlags .= Constants.svfNoClient
@@ -190,9 +190,9 @@ spViewThing edictRef@(EdictReference edictIdx) = do
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-      eaNextThink .= levelTime + 0.5
-      eaThink .= Just thViewThing
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eNextThink .= levelTime + 0.5
+      eThink .= Just thViewThing
 
 {-
 - QUAKED viewthing (0 .5 .8) (-8 -8 -8) (8 8 8) Just for the debugging
@@ -206,7 +206,7 @@ thViewThing =
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eEntityState.esFrame .= ((edict^.eEntityState.esFrame) + 1) `mod` 7
-      eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+      eNextThink .= levelTime + Constants.frameTime
 
     return True
 
@@ -239,7 +239,7 @@ spLight er@(EdictReference edictIdx) = do
       then GameUtil.freeEdict er
       else 
         when ((edict^.eStyle) >= 32) $ do
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just lightUse
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just lightUse
 
           configString <- use $ gameBaseGlobals.gbGameImport.giConfigString
 
@@ -274,7 +274,7 @@ spFuncWall edictRef@(EdictReference edictIdx) = do
         -- yell if the spawnflags are odd
         checkOddSpawnFlags
 
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just funcWallUse
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just funcWallUse
 
         preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags) >>= \(Just v) ->
           if v .&. 4 /= 0
@@ -347,11 +347,11 @@ spFuncExplosive er@(EdictReference edictIdx) = do
             zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
               eSvFlags %= (.|. Constants.svfNoClient)
               eSolid .= Constants.solidNot
-              eEdictAction.eaUse .= Just funcExplosiveSpawn
+              eUse .= Just funcExplosiveSpawn
           else do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
             when (isJust (edict^.eEdictInfo.eiTargetName)) $
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse .= Just funcExplosiveUse
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just funcExplosiveUse
 
         when ((edict^.eSpawnFlags) .&. 2 /= 0) $
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
@@ -359,16 +359,16 @@ spFuncExplosive er@(EdictReference edictIdx) = do
         when ((edict^.eSpawnFlags) .&. 4 /= 0) $
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
 
-        Just edictUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaUse
+        Just edictUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eUse
         case edictUse of
           Just (FuncExplosiveUse _ _) -> return ()
           _ -> do
-            when ((edict^.eEdictStatus.eHealth) == 0) $
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eHealth .= 100
+            when ((edict^.eHealth) == 0) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eHealth .= 100
 
             zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-              eEdictAction.eaDie .= Just funcExplosiveExplode
-              eEdictStatus.eTakeDamage .= Constants.damageYes
+              eDie .= Just funcExplosiveExplode
+              eTakeDamage .= Constants.damageYes
 
         linkEntity er
 
@@ -399,23 +399,23 @@ spMiscExploBox er@(EdictReference edictIdx) = do
           eEntityState.esModelIndex .= tris
           eEdictMinMax.eMins .= V3 (-16) (-16) 0
           eEdictMinMax.eMaxs .= V3 16 16 40
-          eEdictAction.eaDie .= Just barrelDelay
-          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eDie .= Just barrelDelay
+          eTakeDamage .= Constants.damageYes
           eMonsterInfo.miAIFlags .= Constants.aiNoStep
-          eEdictAction.eaTouch .= Just barrelTouch
-          eEdictAction.eaThink .= Just M.dropToFloor
-          eEdictAction.eaNextThink .= time + 2 * Constants.frameTime
+          eTouch .= Just barrelTouch
+          eThink .= Just M.dropToFloor
+          eNextThink .= time + 2 * Constants.frameTime
 
         Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
         when ((edict^.eEdictPhysics.eMass) == 0) $
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMass .= 400
 
-        when ((edict^.eEdictStatus.eHealth) == 0) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eHealth .= 10
+        when ((edict^.eHealth) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eHealth .= 10
 
-        when ((edict^.eEdictStatus.eDmg) == 0) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictStatus.eDmg .= 150
+        when ((edict^.eDmg) == 0) $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg .= 150
 
         linkEntity er
 
@@ -452,9 +452,9 @@ spMiscBanner edictRef@(EdictReference edictIdx) = do
 
     linkEntity edictRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction) $ do
-      eaThink .= Just miscBannerThink
-      eaNextThink .= time + Constants.frameTime
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eThink .= Just miscBannerThink
+      eNextThink .= time + Constants.frameTime
 
 spMiscDeadSoldier :: EdictReference -> Quake ()
 spMiscDeadSoldier er@(EdictReference edictIdx) = do
@@ -489,10 +489,10 @@ spMiscDeadSoldier er@(EdictReference edictIdx) = do
           eEntityState.esFrame .= frame
           eEdictMinMax.eMins .= V3 (-16) (-16) 0
           eEdictMinMax.eMaxs .= V3 16 16 16
-          eEdictStatus.eDeadFlag .= Constants.deadDead
-          eEdictStatus.eTakeDamage .= Constants.damageYes
+          eDeadFlag .= Constants.deadDead
+          eTakeDamage .= Constants.damageYes
           eSvFlags %= (.|. (Constants.svfMonster .|. Constants.svfDeadMonster))
-          eEdictAction.eaDie .= Just miscDeadSoldierDie
+          eDie .= Just miscDeadSoldierDie
           eMonsterInfo.miAIFlags %= (.|. Constants.aiGoodGuy)
 
         linkEntity er
@@ -531,9 +531,9 @@ spMiscStroggShip edictRef@(EdictReference edictIdx) = do
           eEdictMinMax.eMins .= V3 (-16) (-16) 0
           eEdictMinMax.eMaxs .= V3 16 16 32
 
-          eEdictAction.eaThink .= Just (GameFunc.funcTrainFind)
-          eEdictAction.eaNextThink .= time + Constants.frameTime
-          eEdictAction.eaUse .= Just (miscStroggShipUse)
+          eThink .= Just (GameFunc.funcTrainFind)
+          eNextThink .= time + Constants.frameTime
+          eUse .= Just (miscStroggShipUse)
           eSvFlags %= (.|. Constants.svfNoClient)
           eMoveInfo.miAccel .= (edict^.eEdictPhysics.eSpeed)
           eMoveInfo.miDecel .= (edict^.eEdictPhysics.eSpeed)
@@ -578,14 +578,14 @@ spMiscGibHead er@(EdictReference edictIdx) = do
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eSolid .= Constants.solidNot
       eEntityState.esEffects %= (.|. Constants.efGib)
-      eEdictStatus.eTakeDamage .= Constants.damageYes
-      eEdictAction.eaDie .= Just gibDie
+      eTakeDamage .= Constants.damageYes
+      eDie .= Just gibDie
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfMonster)
-      eEdictStatus.eDeadFlag .= Constants.deadDead
+      eDeadFlag .= Constants.deadDead
       eEdictPhysics.eAVelocity .= V3 (r1 * 200) (r2 * 200) (r3 * 200)
-      eEdictAction.eaThink .= Just GameUtil.freeEdictA
-      eEdictAction.eaNextThink .= time + 30
+      eThink .= Just GameUtil.freeEdictA
+      eNextThink .= time + 30
 
     linkEntity er
 
@@ -612,7 +612,7 @@ spFuncAreaPortal :: EntThink
 spFuncAreaPortal =
   GenericEntThink "sp_func_areaportal" $ \(EdictReference edictIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictAction.eaUse .= Just useAreaPortal
+      eUse .= Just useAreaPortal
       eCount .= 0 -- always start closed
 
     return True
@@ -703,7 +703,7 @@ miscStroggShipUse =
   GenericEntUse "misc_strogg_ship_use" $ \selfRef@(EdictReference selfIdx) otherRef activatorRef -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eSvFlags %= (.&. (complement Constants.svfNoClient))
-      eEdictAction.eaUse .= Just GameFunc.trainUse
+      eUse .= Just GameFunc.trainUse
 
     entUse GameFunc.trainUse selfRef otherRef activatorRef
 
@@ -721,5 +721,5 @@ miscBannerThink =
   GenericEntThink "misc_banner_think" $ \(EdictReference edictIdx) -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame %= (`mod` 16) . (+ 1)
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictAction.eaNextThink .= levelTime + Constants.frameTime
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= levelTime + Constants.frameTime
     return True
