@@ -419,12 +419,12 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
 
                              else do
                                levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                               when (levelTime >= (edict^.eEdictTiming.etPainDebounceTime)) $ do
+                               when (levelTime >= (edict^.ePainDebounceTime)) $ do
                                  soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
                                  sound <- use $ gameBaseGlobals.gbGameImport.giSound
                                  soundIdx <- soundIndex (Just "weapons/noammo.wav")
                                  sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
-                                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime + 1
+                                 gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime + 1
 
                                noAmmoWeaponChange edictRef
                                return False

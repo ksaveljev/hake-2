@@ -4,10 +4,10 @@ module Game.EdictT ( EdictT(..)
                    , module Game.EdictT
                    --, module Game.EdictActionT
                    --, module Game.EdictOtherT
-                   , module Game.EdictTimingT
-                   , module Game.EdictMinMaxT
-                   , module Game.EdictInfoT
-                   , module Game.EdictPhysicsT
+                   --, module Game.EdictTimingT
+                   --, module Game.EdictMinMaxT
+                   --, module Game.EdictInfoT
+                   --, module Game.EdictPhysicsT
                    --, module Game.EdictStatusT
                    , module Game.GClientT
                    , module Game.EntityStateT
@@ -22,10 +22,10 @@ import qualified Data.Vector.Unboxed as UV
 import Internal
 -- import Game.EdictActionT
 -- import Game.EdictOtherT
-import Game.EdictTimingT
-import Game.EdictMinMaxT
-import Game.EdictInfoT
-import Game.EdictPhysicsT
+-- import Game.EdictTimingT
+-- import Game.EdictMinMaxT
+-- import Game.EdictInfoT
+-- import Game.EdictPhysicsT
 -- import Game.EdictStatusT
 import Game.EntityStateT
 import Game.GClientT
@@ -55,7 +55,21 @@ newEdictT idx =
          , _eFreeTime              = 0
          , _eSpawnFlags            = 0
          , _eTimeStamp             = 0
-         , _eEdictPhysics          = newEdictPhysicsT
+         -- , _eEdictPhysics          = newEdictPhysicsT
+         , _eAngle                 = 0
+         , _eSpeed                 = 0
+         , _eAccel                 = 0
+         , _eDecel                 = 0
+         , _eMoveDir               = V3 0 0 0
+         , _ePos1                  = V3 0 0 0
+         , _ePos2                  = V3 0 0 0
+         , _eVelocity              = V3 0 0 0
+         , _eAVelocity             = V3 0 0 0
+         , _eMass                  = 0
+         , _eAirFinished           = 0
+         , _eGravity               = 0
+         , _eYawSpeed              = 0
+         , _eIdealYaw              = 0
          , _eTargetEnt             = Nothing
          , _eGoalEntity            = Nothing
          , _eMoveTarget            = Nothing
@@ -68,7 +82,12 @@ newEdictT idx =
          , _eUse                   = Nothing
          , _ePain                  = Nothing
          , _eDie                   = Nothing
-         , _eEdictTiming           = newEdictTimingT
+         -- , _eEdictTiming           = newEdictTimingT
+         , _eTouchDebounceTime     = 0
+         , _ePainDebounceTime      = 0
+         , _eDamageDebounceTime    = 0
+         , _eFlySoundDebounceTime  = 0
+         , _eLastMoveTime          = 0
          -- , _eEdictStatus           = newEdictStatusT
          , _eHealth                = 0
          , _eMaxHealth             = 0
@@ -114,6 +133,21 @@ newEdictT idx =
          , _eClient                = Nothing
          , _eOwner                 = Nothing
          , _eIndex                 = if idx == Constants.maxEdicts then -1 else idx
-         , _eEdictInfo             = newEdictInfoT
-         , _eEdictMinMax           = newEdictMinMaxT
+         -- , _eEdictInfo             = newEdictInfoT
+         , _eiModel                = Nothing
+         , _eMessage               = Nothing
+         , _eTarget                = Nothing
+         , _eTargetName            = Nothing
+         , _eKillTarget            = Nothing
+         , _eTeam                  = Nothing
+         , _ePathTarget            = Nothing
+         , _eDeathTarget           = Nothing
+         , _eCombatTarget          = Nothing
+         , _eMap                   = Nothing
+         -- , _eEdictMinMax           = newEdictMinMaxT
+         , _eMins                  = V3 0 0 0
+         , _eMaxs                  = V3 0 0 0
+         , _eAbsMin                = V3 0 0 0
+         , _eAbsMax                = V3 0 0 0
+         , _eSize                  = V3 0 0 0
          }

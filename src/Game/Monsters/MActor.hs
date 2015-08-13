@@ -197,7 +197,7 @@ actorRun =
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    if levelTime < (self^.eEdictTiming.etPainDebounceTime) && isNothing (self^.eEnemy)
+    if levelTime < (self^.ePainDebounceTime) && isNothing (self^.eEnemy)
       then
         case self^.eMoveTarget of
           Nothing -> void $ think actorStand selfRef
@@ -297,8 +297,8 @@ actorDead :: EntThink
 actorDead =
   GenericEntThink "actor_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0

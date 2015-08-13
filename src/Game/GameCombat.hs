@@ -28,7 +28,7 @@ radiusDamage inflictorRef@(EdictReference inflictorIdx) attackerRef dmg ignoreRe
               if | edictit == ignoreRef -> radiusDamage' edictit
                  | (ent^.eTakeDamage) == 0 -> radiusDamage' edictit
                  | otherwise -> do
-                     let v = (ent^.eEdictMinMax.eMins) + (ent^.eEdictMinMax.eMaxs)
+                     let v = (ent^.eMins) + (ent^.eMaxs)
                          v' = (ent^.eEntityState.esOrigin) + fmap (* 0.5) v
                          v'' = (inflictor^.eEntityState.esOrigin) - v'
                          points = dmg - 0.5 * (norm v'')

@@ -147,8 +147,8 @@ soldierDead =
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0
@@ -247,9 +247,9 @@ soldierPain =
 
     time <- use $ gameBaseGlobals.gbLevel.llTime
 
-    if time < (selfEdict^.eEdictTiming.etPainDebounceTime)
+    if time < (selfEdict^.ePainDebounceTime)
       then
-        when ((selfEdict^.eEdictPhysics.eVelocity._z) > 100 && isJust (selfEdict^.eMonsterInfo.miCurrentMove)) $ do
+        when ((selfEdict^.eVelocity._z) > 100 && isJust (selfEdict^.eMonsterInfo.miCurrentMove)) $ do
           let Just move = selfEdict^.eMonsterInfo.miCurrentMove
               moveId = move^.mmId
 
@@ -258,7 +258,7 @@ soldierPain =
 
       else do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictTiming.etPainDebounceTime .= time + 3
+        gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= time + 3
 
         let n = (selfEdict^.eEntityState.esSkinNum) .|. 1
 
@@ -272,7 +272,7 @@ soldierPain =
 
         sound (Just self) Constants.chanVoice s 1 Constants.attnNorm 0
 
-        if (selfEdict^.eEdictPhysics.eVelocity._z) > 100
+        if (selfEdict^.eVelocity._z) > 100
           then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMovePain4
           else do
             skillValue <- liftM (^.cvValue) skillCVar
@@ -703,7 +703,7 @@ soldierDuckUp =
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
-      eEdictMinMax.eMaxs._z += 32
+      eMaxs._z += 32
       eTakeDamage .= Constants.damageAim
 
     linkEntity self
@@ -721,7 +721,7 @@ soldierDuckDown =
 
       zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
         eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
-        eEdictMinMax.eMaxs._z -= 32
+        eMaxs._z -= 32
         eTakeDamage .= Constants.damageYes
         eMonsterInfo.miPauseTime .= time + 1
 
@@ -911,8 +911,8 @@ spMonsterSoldierX =
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eEntityState.esModelIndex .= tris
       eMonsterInfo.miScale .= modelScale
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 32
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 32
       eMoveType .= Constants.moveTypeStep
       eSolid .= Constants.solidBbox
 
@@ -922,7 +922,7 @@ spMonsterSoldierX =
     soundIndex (Just "infantry/infatck3.wav") >>= (mSoldierGlobals.msSoundCock .=)
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictPhysics.eMass .= 100
+      eMass .= 100
 
       ePain .= Just soldierPain
       eDie  .= Just soldierDie

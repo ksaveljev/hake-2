@@ -94,7 +94,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
-        gcOldVelocity .= (edict^.eEdictPhysics.eVelocity)
+        gcOldVelocity .= (edict^.eVelocity)
         gcOldViewAngles .= (gClient^.gcPlayerState.psViewAngles)
         gcKickOrigin .= V3 0 0 0
         gcKickAngles .= V3 0 0 0
@@ -122,7 +122,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
           Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState) $ do
             pmsOrigin .= fmap (truncate . (* 8.0)) (edict^.eEntityState.esOrigin)
-            pmsVelocity .= fmap (truncate . (* 8.0)) (edict^.eEdictPhysics.eVelocity)
+            pmsVelocity .= fmap (truncate . (* 8.0)) (edict^.eVelocity)
 
           -- io (print "updatePMoveValues")
           -- io (print (edict^.eEntityState.esOrigin))
@@ -165,7 +165,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.roll) .= 0
 
           preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
-            roll <- calcRoll (edict^.eEntityState.esAngles) (edict^.eEdictPhysics.eVelocity)
+            roll <- calcRoll (edict^.eEntityState.esAngles) (edict^.eVelocity)
             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.(v3setter Constants.roll) .= roll * 4
 
         v3setter x = case x of
@@ -179,7 +179,7 @@ clientEndServerFrame edictRef@(EdictReference edictIdx) = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
           Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
 
-          let velocity = edict^.eEdictPhysics.eVelocity
+          let velocity = edict^.eVelocity
               xyspeed = sqrt ((velocity^._x) * (velocity^._x) + (velocity^._y) * (velocity^._y))
 
           if | xyspeed < 5 -> do
@@ -225,7 +225,7 @@ worldEffects = do
       then do
         -- don't need air
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAirFinished .= levelTime + 12
+        gameBaseGlobals.gbGEdicts.ix edictIdx.eAirFinished .= levelTime + 12
       else do
         Just gClientRef@(GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
@@ -285,7 +285,7 @@ worldEffects = do
 
             -- clear damage_debounce, so the pain sound will play immediately
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etDamageDebounceTime .= levelTime - 1
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eDamageDebounceTime .= levelTime - 1
 
         waterExitPlaySound :: EdictReference -> Int -> Int -> Quake ()
         waterExitPlaySound edictRef@(EdictReference edictIdx) waterLevel oldWaterLevel =
@@ -321,12 +321,12 @@ worldEffects = do
             let sound = gameImport^.giSound
                 soundIndex = gameImport^.giSoundIndex
 
-            if | (edict^.eEdictPhysics.eAirFinished) < levelTime -> do -- gasp for air
+            if | (edict^.eAirFinished) < levelTime -> do -- gasp for air
                    idx <- soundIndex (Just "player/gasp1.wav")
                    sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
                    PlayerWeapon.playerNoise edictRef (edict^.eEntityState.esOrigin) Constants.pNoiseSelf
 
-               | (edict^.eEdictPhysics.eAirFinished) < levelTime + 11 -> do -- just break surface
+               | (edict^.eAirFinished) < levelTime + 11 -> do -- just break surface
                    idx <- soundIndex (Just "player/gasp2.wav")
                    sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
 
@@ -343,7 +343,7 @@ worldEffects = do
 
               -- breather or envirosuit give air
               when (breather || enviroSuit) $ do
-                gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAirFinished .= levelTime + 10
+                gameBaseGlobals.gbGEdicts.ix edictIdx.eAirFinished .= levelTime + 10
                 Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
                 Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
                 frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
@@ -360,7 +360,7 @@ worldEffects = do
               -- if out of air, start drowning
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
               
-              when ((edict^.eEdictPhysics.eAirFinished) < levelTime) $ do -- drown!
+              when ((edict^.eAirFinished) < levelTime) $ do -- drown!
                 let Just (GClientReference clientIdx) = edict^.eClient
                 Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
 
@@ -373,7 +373,7 @@ worldEffects = do
                   -- play a gurp sound instead of a normal pain sound
                   playDrowningSound edictRef
 
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime
 
                   v3o <- use $ globals.vec3Origin
                   preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just ent) ->
@@ -391,7 +391,7 @@ worldEffects = do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                eEdictPhysics.eAirFinished .= levelTime + 12
+                eAirFinished .= levelTime + 12
                 eDmg .= 2
 
         playDrowningSound :: EdictReference -> Quake ()
@@ -422,7 +422,7 @@ worldEffects = do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
               frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
-              when ((edict^.eHealth) > 0 && (edict^.eEdictTiming.etPainDebounceTime) <= levelTime && truncate (gClient^.gcInvincibleFrameNum) < frameNum) $ do
+              when ((edict^.eHealth) > 0 && (edict^.ePainDebounceTime) <= levelTime && truncate (gClient^.gcInvincibleFrameNum) < frameNum) $ do
                 r <- Lib.rand
 
                 gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -435,7 +435,7 @@ worldEffects = do
 
                 sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
 
-                gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime + 1
+                gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime + 1
 
               v3o <- use $ globals.vec3Origin
               if enviroSuit -- take 1/3 damage with envirosuit
@@ -499,11 +499,11 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
     unless ((edict^.eEntityState.esModelIndex) /= 255 || (edict^.eMoveType) == Constants.moveTypeNoClip) $ do
       let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-      let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eEdictPhysics.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eGroundEntity)
+      let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eGroundEntity)
                          then Just (gClient^.gcOldVelocity._z)
                          else if isNothing (edict^.eGroundEntity)
                                 then Nothing
-                                else Just ((edict^.eEdictPhysics.eVelocity._z) - (gClient^.gcOldVelocity._z))
+                                else Just ((edict^.eVelocity._z) - (gClient^.gcOldVelocity._z))
 
       case maybeDelta of
         Nothing -> return () -- we are done
@@ -524,7 +524,7 @@ fallingDamage edictRef@(EdictReference edictIdx) = do
                       then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFallFar
                       else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEvent .= Constants.evFall
 
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= levelTime -- no normal pain sound
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime -- no normal pain sound
 
                   let damage :: Int = truncate ((delta' - 30) / 2)
                       damage' = if damage < 1 then 1 else damage
@@ -620,11 +620,11 @@ damageFeedback playerRef@(EdictReference playerIdx) = do
           count' = if count < 10 then 10 else count -- always make a visible effect
 
       -- play an apropriate pain sound
-      when (levelTime > (player^.eEdictTiming.etPainDebounceTime) && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $ do
+      when (levelTime > (player^.ePainDebounceTime) && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $ do
         r <- Lib.rand
         let r' = 1 + (r .&. 1)
 
-        gameBaseGlobals.gbGEdicts.ix playerIdx.eEdictTiming.etPainDebounceTime .= levelTime + 0.7
+        gameBaseGlobals.gbGEdicts.ix playerIdx.ePainDebounceTime .= levelTime + 0.7
 
         let l = if | (player^.eHealth) < 25 -> 25
                    | (player^.eHealth) < 50 -> 50
@@ -799,8 +799,8 @@ calcViewOffset (EdictReference edictIdx) = do
           forward <- use $ gameBaseGlobals.gbForward
           right <- use $ gameBaseGlobals.gbRight
 
-          let delta = (edict^.eEdictPhysics.eVelocity) `dot` forward
-              delta' = (edict^.eEdictPhysics.eVelocity) `dot` right
+          let delta = (edict^.eVelocity) `dot` forward
+              delta' = (edict^.eVelocity) `dot` right
               angles' = (access Constants.pitch) %~ (+ (delta * runPitchValue)) $ angles
               angles'' = (access Constants.roll) %~ (+ (delta' * runRollValue)) $ angles'
 

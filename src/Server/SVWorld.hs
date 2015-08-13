@@ -98,16 +98,16 @@ linkEdict er@(EdictReference edictIdx) = do
     -- don't add the world and the one not in use
     unless (edictIdx == 0 || not (edict^.eInUse)) $ do
       -- set the size
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax.eSize .= (edict^.eEdictMinMax.eMaxs) - (edict^.eEdictMinMax.eMins)
+      gameBaseGlobals.gbGEdicts.ix edictIdx.eSize .= (edict^.eMaxs) - (edict^.eMins)
 
       -- encode the size into the entity_state for client prediction
       solid <- if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
                           -- assume that x/y are equal and symetric
-                      let i :: Int = truncate ((edict^.eEdictMinMax.eMaxs._x) / 8)
+                      let i :: Int = truncate ((edict^.eMaxs._x) / 8)
                           -- z is not symetric
-                          j :: Int = truncate ((edict^.eEdictMinMax.eMins._z) / (-8))
+                          j :: Int = truncate ((edict^.eMins._z) / (-8))
                           -- and z maxs can be negative
-                          k :: Int= truncate ((32 + (edict^.eEdictMinMax.eMaxs._z)) / 8)
+                          k :: Int= truncate ((32 + (edict^.eMaxs._z)) / 8)
 
                           i' = if | i < 1 -> 1
                                   | i > 31 -> 31
@@ -134,35 +134,35 @@ linkEdict er@(EdictReference edictIdx) = do
       if solid == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
         then do
           -- expand for rotation
-          let aMins = fmap abs (edict^.eEdictMinMax.eMins)
-              aMaxs = fmap abs (edict^.eEdictMinMax.eMaxs)
+          let aMins = fmap abs (edict^.eMins)
+              aMaxs = fmap abs (edict^.eMaxs)
               minMax = F.maximum aMins
               maxMax = F.maximum aMaxs
               m = F.maximum [minMax, maxMax]
 
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
             eAbsMin .= fmap (m `subtract`) (edict^.eEntityState.esOrigin)
             eAbsMax .= fmap (+ m) (edict^.eEntityState.esOrigin)
 
         else
           -- normal
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
-            eAbsMin .= (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMins)
-            eAbsMax .= (edict^.eEntityState.esOrigin) + (edict^.eEdictMinMax.eMaxs)
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eAbsMin .= (edict^.eEntityState.esOrigin) + (edict^.eMins)
+            eAbsMax .= (edict^.eEntityState.esOrigin) + (edict^.eMaxs)
 
       -- because movement is clipped an epsilon away from an actual edge,
       -- we must fully check even when bouding boxes don't quite touch
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eEdictMinMax.eAbsMin -= 1
-        eEdictMinMax.eAbsMax += 1
+        eAbsMin -= 1
+        eAbsMax += 1
         -- link to PVS leafs
         eNumClusters .= 0
         eAreaNum .= 0
         eAreaNum2 .= 0
 
       Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-      (numLeafs, Just iw) <- CM.boxLeafNums (updatedEdict^.eEdictMinMax.eAbsMin)
-                                           (updatedEdict^.eEdictMinMax.eAbsMax)
+      (numLeafs, Just iw) <- CM.boxLeafNums (updatedEdict^.eAbsMin)
+                                           (updatedEdict^.eAbsMax)
                                            (svGlobals.svLeafs)
                                            128
                                            (Just [0])
@@ -213,7 +213,7 @@ linkEdict er@(EdictReference edictIdx) = do
                 state <- use $ svGlobals.svServer.sState
 
                 when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
-                  Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eEdictMinMax.eAbsMin)) `B.append` "\n"
+                  Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eAbsMin)) `B.append` "\n"
 
                 gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
               else do
@@ -261,9 +261,9 @@ linkEdict er@(EdictReference edictIdx) = do
                       _ -> DT.trace "HOLYMOLY" $ undefined -- should never be here
 
           if | (node^.anAxis) == -1 -> return node
-             | (edict^.eEdictMinMax.eAbsMin.v3f) > (node^.anDist) ->
+             | (edict^.eAbsMin.v3f) > (node^.anDist) ->
                  findCrossingNode edict (fromJust (node^.anChildren._1))
-             | (edict^.eEdictMinMax.eAbsMax.v3f) < (node^.anDist) ->
+             | (edict^.eAbsMax.v3f) < (node^.anDist) ->
                  findCrossingNode edict (fromJust (node^.anChildren._2))
              | otherwise -> return node -- crosses the node
 
@@ -320,8 +320,8 @@ areaEdictsR nodeIdx = do
 
         notTouching :: EdictT -> V3 Float -> V3 Float -> Bool
         notTouching edict mins maxs =
-          let absmin = edict^.eEdictMinMax.eAbsMin
-              absmax = edict^.eEdictMinMax.eAbsMax
+          let absmin = edict^.eAbsMin
+              absmax = edict^.eAbsMax
           in if (absmin^._x) > (maxs^._x) ||
                 (absmin^._y) > (maxs^._y) ||
                 (absmin^._z) > (maxs^._z) ||
@@ -526,7 +526,7 @@ hullForEntity edict = do
         Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
         return (model^.cmHeadNode)
       -- create a temp hull from bounding box sizes
-      else CM.headnodeForBox (edict^.eEdictMinMax.eMins) (edict^.eEdictMinMax.eMaxs)
+      else CM.headnodeForBox (edict^.eMins) (edict^.eMaxs)
 
 pointContents :: V3 Float -> Quake Int
 pointContents p = do

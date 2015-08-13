@@ -125,9 +125,9 @@ getGameApi imp =
 
 findByTarget :: EdictT -> B.ByteString -> Bool
 findByTarget e s =
-    if isNothing (e^.eEdictInfo.eiTargetName)
+    if isNothing (e^.eTargetName)
       then False
-      else let Just targetName = e^.eEdictInfo.eiTargetName
+      else let Just targetName = e^.eTargetName
            in BC.map toLower targetName == BC.map toLower s
 
 findByClass :: EdictT -> B.ByteString -> Bool
@@ -322,7 +322,7 @@ touchTriggers er@(EdictReference edictIdx) = do
     -- dead things don't activate triggers!
     unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eHealth <= 0)) $ do
       boxEdicts <- use $ gameBaseGlobals.gbGameImport.giBoxEdicts
-      num <- boxEdicts (edict^.eEdictMinMax.eAbsMin) (edict^.eEdictMinMax.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
+      num <- boxEdicts (edict^.eAbsMin) (edict^.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
 
       -- io (print "NUM")
       -- io (print num)
@@ -377,7 +377,7 @@ findRadius fromRef org rad = do
               if | not (edict^.eInUse) -> findEdict (idx + 1) maxIdx
                  | (edict^.eSolid) == Constants.solidNot -> findEdict (idx + 1) maxIdx
                  | otherwise -> do
-                     let eorg = org - ((edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eEdictMinMax.eMins) + (edict^.eEdictMinMax.eMaxs)))
+                     let eorg = org - ((edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs)))
 
                      if norm eorg > rad
                        then findEdict (idx + 1) maxIdx

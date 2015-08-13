@@ -62,7 +62,7 @@ aiStand =
                   let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
                       idealYaw = Math3D.vectorYaw v
 
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= idealYaw
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= idealYaw
 
                   when ((self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) /= idealYaw && (self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $ do
                     gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround)))
@@ -215,9 +215,9 @@ walkMonsterStartGo =
           dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
           dprintf ((self^.eClassName) `B.append` " in solid at " `B.append` (Lib.vtos (self^.eEntityState.esOrigin)) `B.append` "\n")
           
-    Just yawSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eYawSpeed
+    Just yawSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eYawSpeed
     when (yawSpeed == 0) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eYawSpeed .= 40
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eYawSpeed .= 40
 
     gameBaseGlobals.gbGEdicts.ix selfIdx.eViewHeight .= 25
 

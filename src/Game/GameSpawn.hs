@@ -125,8 +125,8 @@ spawnEntities mapName entities spawnPoint = do
                   -- yet another map hack
                   when (BC.map toLower mapName == "command" &&
                         BC.map toLower (edict^.eClassName) == "trigger_once" &&
-                        isJust (edict^.eEdictInfo.eiModel) &&
-                        BC.map toLower (fromJust (edict^.eEdictInfo.eiModel)) == "*27") $
+                        isJust (edict^.eiModel) &&
+                        BC.map toLower (fromJust (edict^.eiModel)) == "*27") $
                     gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.&. (complement Constants.spawnFlagNotHard))
 
                   -- remove things (except the world) from different skill levels or deathmatch
@@ -266,19 +266,19 @@ setEdictField :: EdictT -> B.ByteString -> B.ByteString -> (EdictT, Bool)
 setEdictField e key value =
     case key of
       "classname"    -> (e { _eClassName = newString value }, True)
-      "model"        -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiModel = Just (newString value) } }, True)
+      "model"        -> (e { _eiModel = Just (newString value) }, True)
       "spawnflags"   -> (e { _eSpawnFlags = Lib.atoi value }, True)
-      "speed"        -> (e { _eEdictPhysics = (e^.eEdictPhysics) { _eSpeed = Lib.atof value } }, True )
-      "accel"        -> (e { _eEdictPhysics = (e^.eEdictPhysics) { _eAccel = Lib.atof value } }, True )
-      "decel"        -> (e { _eEdictPhysics = (e^.eEdictPhysics) { _eDecel = Lib.atof value } }, True )
-      "target"       -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiTarget = Just (newString value) } }, True)
-      "targetname"   -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiTargetName = Just (newString value) } }, True)
-      "pathtarget"   -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiPathTarget = Just (newString value) } }, True)
-      "deathtarget"  -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiDeathTarget = Just (newString value) } }, True)
-      "killtarget"   -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiKillTarget = Just (newString value) } }, True)
-      "combattarget" -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiCombatTarget = Just (newString value) } }, True)
-      "message"      -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiMessage = Just (newString value) } }, True)
-      "team"         -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiTeam = Just (newString value) } }, True) -- TODO: we need to call Com.dprintf here
+      "speed"        -> (e { _eSpeed = Lib.atof value }, True )
+      "accel"        -> (e { _eAccel = Lib.atof value }, True )
+      "decel"        -> (e { _eDecel = Lib.atof value }, True )
+      "target"       -> (e { _eTarget = Just (newString value) }, True)
+      "targetname"   -> (e { _eTargetName = Just (newString value) }, True)
+      "pathtarget"   -> (e { _ePathTarget = Just (newString value) }, True)
+      "deathtarget"  -> (e { _eDeathTarget = Just (newString value) }, True)
+      "killtarget"   -> (e { _eKillTarget = Just (newString value) }, True)
+      "combattarget" -> (e { _eCombatTarget = Just (newString value) }, True)
+      "message"      -> (e { _eMessage = Just (newString value) }, True)
+      "team"         -> (e { _eTeam = Just (newString value) }, True) -- TODO: we need to call Com.dprintf here
       "wait"         -> (e { _eWait = Lib.atof value }, True)
       "delay"        -> (e { _eDelay = Lib.atof value }, True)
       "random"       -> (e { _eRandom = Lib.atof value }, True)
@@ -290,10 +290,10 @@ setEdictField e key value =
       "sounds"       -> (e { _eSounds = Lib.atoi value }, True)
       "light"        -> (e, True)
       "dmg"          -> (e { _eDmg = Lib.atoi value }, True)
-      "mass"         -> (e { _eEdictPhysics = (e^.eEdictPhysics) { _eMass = Lib.atoi value } }, True)
+      "mass"         -> (e { _eMass = Lib.atoi value }, True)
       "volume"       -> (e { _eVolume = Lib.atof value }, True)
       "attenuation"  -> (e { _eAttenuation = Lib.atof value }, True)
-      "map"          -> (e { _eEdictInfo = (e^.eEdictInfo) { _eiMap = Just (newString value) } }, True)
+      "map"          -> (e { _eMap = Just (newString value) }, True)
       "origin"       -> (e { _eEntityState = (e^.eEntityState) { _esOrigin = Lib.atov value } }, True)
       "angles"       -> (e { _eEntityState = (e^.eEntityState) { _esAngles = Lib.atov value } }, True)
       "angle"        -> (e { _eEntityState = (e^.eEntityState) { _esAngles = V3 0 (Lib.atof value) 0 } }, True)
@@ -380,11 +380,11 @@ findTeams = do
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
-              if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
+              if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
                 then findNextTeam maxIdx (idx + 1) c c2
                 else do
                   gameBaseGlobals.gbGEdicts.ix idx.eTeamMaster .= Just (EdictReference idx)
-                  c2' <- findTeamMembers (fromJust $ edict^.eEdictInfo.eiTeam) (EdictReference idx) (EdictReference idx) maxIdx (idx + 1) c2
+                  c2' <- findTeamMembers (fromJust $ edict^.eTeam) (EdictReference idx) (EdictReference idx) maxIdx (idx + 1) c2
                   findNextTeam maxIdx (idx + 1) (c + 1) c2'
 
         findTeamMembers :: B.ByteString -> EdictReference -> EdictReference -> Int -> Int -> Int -> Quake Int
@@ -393,7 +393,7 @@ findTeams = do
           | otherwise = do
               Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
 
-              if not (edict^.eInUse) || isNothing (edict^.eEdictInfo.eiTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eEdictInfo.eiTeam)
+              if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eTeam)
                 then findTeamMembers teamName master chain maxIdx (idx + 1) c2
                 else do
                   gameBaseGlobals.gbGEdicts.ix chainIdx.eTeamChain .= Just (EdictReference idx)
@@ -621,7 +621,7 @@ spWorldSpawn =
         modelIndex = gameImport^.giModelIndex
         cvarSet = gameImport^.giCVarSet
 
-    let msg = edict^.eEdictInfo.eiMessage
+    let msg = edict^.eMessage
     if isJust msg && B.length (fromJust msg) > 0
       then do
         configString Constants.csName (fromJust msg)

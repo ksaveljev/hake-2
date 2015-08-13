@@ -337,6 +337,7 @@ data EdictOtherT =
               }
               -}
 
+{-
 data EdictTimingT =
   EdictTimingT { _etTouchDebounceTime    :: !Float
                , _etPainDebounceTime     :: !Float
@@ -344,7 +345,9 @@ data EdictTimingT =
                , _etFlySoundDebounceTime :: !Float
                , _etLastMoveTime         :: !Float
                }
+               -}
 
+{-
 data EdictMinMaxT =
   EdictMinMaxT { _eMins   :: V3 Float
                , _eMaxs   :: V3 Float
@@ -352,7 +355,9 @@ data EdictMinMaxT =
                , _eAbsMax :: V3 Float
                , _eSize   :: V3 Float
                }
+               -}
 
+{-
 data EdictInfoT =
   EdictInfoT { _eiModel        :: Maybe B.ByteString
              , _eiMessage      :: Maybe B.ByteString
@@ -365,7 +370,9 @@ data EdictInfoT =
              , _eiCombatTarget :: Maybe B.ByteString
              , _eiMap          :: Maybe B.ByteString
              }
+             -}
 
+{-
 data EdictPhysicsT =
   EdictPhysicsT { _eAngle       :: !Float
                 , _eSpeed       :: !Float
@@ -382,6 +389,7 @@ data EdictPhysicsT =
                 , _eYawSpeed    :: !Float
                 , _eIdealYaw    :: !Float
                 }
+                -}
 
 {-
 data EdictStatusT =
@@ -421,7 +429,21 @@ data EdictT =
          , _eFreeTime              :: !Float
          , _eSpawnFlags            :: !Int
          , _eTimeStamp             :: !Float
-         , _eEdictPhysics          :: EdictPhysicsT
+         -- , _eEdictPhysics          :: EdictPhysicsT
+         , _eAngle                 :: !Float
+         , _eSpeed                 :: !Float
+         , _eAccel                 :: !Float
+         , _eDecel                 :: !Float
+         , _eMoveDir               :: V3 Float
+         , _ePos1                  :: V3 Float
+         , _ePos2                  :: V3 Float
+         , _eVelocity              :: V3 Float
+         , _eAVelocity             :: V3 Float
+         , _eMass                  :: !Int
+         , _eAirFinished           :: !Float
+         , _eGravity               :: !Float
+         , _eYawSpeed              :: !Float
+         , _eIdealYaw              :: !Float
          , _eTargetEnt             :: Maybe EdictReference
          , _eGoalEntity            :: Maybe EdictReference
          , _eMoveTarget            :: Maybe EdictReference
@@ -434,7 +456,12 @@ data EdictT =
          , _eUse                   :: Maybe EntUse
          , _ePain                  :: Maybe EntPain
          , _eDie                   :: Maybe EntDie
-         , _eEdictTiming           :: EdictTimingT
+         -- , _eEdictTiming           :: EdictTimingT
+         , _eTouchDebounceTime     :: !Float
+         , _ePainDebounceTime      :: !Float
+         , _eDamageDebounceTime    :: !Float
+         , _eFlySoundDebounceTime  :: !Float
+         , _eLastMoveTime          :: !Float
          -- , _eEdictStatus           :: EdictStatusT
          , _eHealth                :: !Int
          , _eMaxHealth             :: !Int
@@ -480,8 +507,23 @@ data EdictT =
          , _eClient                :: Maybe GClientReference
          , _eOwner                 :: Maybe EdictReference
          , _eIndex                 :: !Int
-         , _eEdictInfo             :: EdictInfoT
-         , _eEdictMinMax           :: EdictMinMaxT
+         -- , _eEdictInfo             :: EdictInfoT
+         , _eiModel                :: Maybe B.ByteString
+         , _eMessage               :: Maybe B.ByteString
+         , _eTarget                :: Maybe B.ByteString
+         , _eTargetName            :: Maybe B.ByteString
+         , _eKillTarget            :: Maybe B.ByteString
+         , _eTeam                  :: Maybe B.ByteString
+         , _ePathTarget            :: Maybe B.ByteString
+         , _eDeathTarget           :: Maybe B.ByteString
+         , _eCombatTarget          :: Maybe B.ByteString
+         , _eMap                   :: Maybe B.ByteString
+         -- , _eEdictMinMax           :: EdictMinMaxT
+         , _eMins                  :: V3 Float
+         , _eMaxs                  :: V3 Float
+         , _eAbsMin                :: V3 Float
+         , _eAbsMax                :: V3 Float
+         , _eSize                  :: V3 Float
          }
 
 data EntityStateT =

@@ -76,7 +76,7 @@ spTargetHelp er@(EdictReference edictIdx) = do
       else do
         Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-        if isNothing (edict^.eEdictInfo.eiMessage)
+        if isNothing (edict^.eMessage)
           then do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ (edict^.eClassName) `B.append` " with no message at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
@@ -111,7 +111,7 @@ spTargetSecret er@(EdictReference edictIdx) = do
         mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
 
         when ("mine3" == mapName && (edict^.eEntityState.esOrigin) == V3 280 (-2048) (-624)) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMessage .= Just "You have found a secret area."
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eMessage .= Just "You have found a secret area."
 
 spTargetGoal :: EdictReference -> Quake ()
 spTargetGoal er@(EdictReference edictIdx) = do
@@ -140,7 +140,7 @@ spTargetChangeLevel :: EdictReference -> Quake ()
 spTargetChangeLevel er@(EdictReference edictIdx) = do
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    if isNothing (edict^.eEdictInfo.eiMap)
+    if isNothing (edict^.eMap)
       then do
         dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
         dprintf $ "target_changelevel with no map at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
@@ -148,8 +148,8 @@ spTargetChangeLevel er@(EdictReference edictIdx) = do
       else do
         -- ugly hack because *SOMEBODY* screwed up their map
         mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
-        when (mapName == "fact1" && BC.map toLower (fromJust $ edict^.eEdictInfo.eiMap) == "fact3") $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiMap .= Just "fact3$secret1"
+        when (mapName == "fact1" && BC.map toLower (fromJust $ edict^.eMap) == "fact3") $
+          gameBaseGlobals.gbGEdicts.ix edictIdx.eMap .= Just "fact3$secret1"
 
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
           eUse .= Just useTargetChangeLevel
@@ -160,7 +160,7 @@ spTargetSplash (EdictReference edictIdx) = do
     gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just useTargetSplash
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir)
 
     when ((edict^.eCount) == 0) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eCount .= 32
@@ -254,8 +254,8 @@ useTargetHelp =
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
     if (edict^.eSpawnFlags) .&. 1 /= 0
-      then gameBaseGlobals.gbGame.glHelpMessage1 .= fromJust (edict^.eEdictInfo.eiMessage) -- TODO: are we sure about fromJust?
-      else gameBaseGlobals.gbGame.glHelpMessage2 .= fromJust (edict^.eEdictInfo.eiMessage) -- TODO: are we sure about fromJust?
+      then gameBaseGlobals.gbGame.glHelpMessage1 .= fromJust (edict^.eMessage) -- TODO: are we sure about fromJust?
+      else gameBaseGlobals.gbGame.glHelpMessage2 .= fromJust (edict^.eMessage) -- TODO: are we sure about fromJust?
 
     gameBaseGlobals.gbGame.glHelpChanged += 1
 
@@ -284,7 +284,7 @@ useTargetSplash =
     writeByte (fromIntegral Constants.teSplash)
     writeByte (fromIntegral $ self^.eCount)
     writePosition (self^.eEntityState.esOrigin)
-    writeDir (self^.eEdictPhysics.eMoveDir)
+    writeDir (self^.eMoveDir)
     writeByte (fromIntegral $ self^.eSounds)
     multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
 

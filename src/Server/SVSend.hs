@@ -228,7 +228,7 @@ startSound maybeOrigin (EdictReference edictIdx) channel soundIndex volume atten
                   Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
                   if (edict^.eSolid) == Constants.solidBsp
                     then
-                      return $ (edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eEdictMinMax.eMins) + (edict^.eEdictMinMax.eMaxs))
+                      return $ (edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs))
                     else
                       return (edict^.eEntityState.esOrigin)
 

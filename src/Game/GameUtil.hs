@@ -71,7 +71,7 @@ initEdict er@(EdictReference idx) = do
 
     let updatedEdict = e { _eInUse        = True
                          , _eClassName    = "noclass"
-                         , _eEdictPhysics = (e^.eEdictPhysics) { _eGravity = 1.0 }
+                         , _eGravity      = 1.0
                          , _eEntityState  = (newEntityStateT (Just er)) { _esNumber = idx }
                          , _eIndex        = idx
                          }
@@ -151,17 +151,17 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
           eNextThink .= time + (edict^.eDelay)
           eThink .= Just thinkDelay
           eActivator .= activatorReference
-          eEdictInfo.eiMessage .= (edict^.eEdictInfo.eiMessage)
-          eEdictInfo.eiTarget .= (edict^.eEdictInfo.eiTarget)
-          eEdictInfo.eiKillTarget .= (edict^.eEdictInfo.eiKillTarget)
+          eMessage .= (edict^.eMessage)
+          eTarget .= (edict^.eTarget)
+          eKillTarget .= (edict^.eKillTarget)
 
       else do
         let ar@(EdictReference activatorIdx) = fromJust activatorReference
         Just activator <- preuse $ gameBaseGlobals.gbGEdicts.ix activatorIdx
 
         -- print the message
-        when (isJust (edict^.eEdictInfo.eiMessage) && ((activator^.eSvFlags) .&. Constants.svfMonster) == 0) $ do
-          centerPrintf ar (fromJust (edict^.eEdictInfo.eiMessage))
+        when (isJust (edict^.eMessage) && ((activator^.eSvFlags) .&. Constants.svfMonster) == 0) $ do
+          centerPrintf ar (fromJust (edict^.eMessage))
           if (edict^.eNoiseIndex) /= 0
             then sound (Just ar) Constants.chanAuto (edict^.eNoiseIndex) 1 Constants.attnNorm 0
             else do
@@ -169,14 +169,14 @@ useTargets er@(EdictReference edictIdx) activatorReference = do
               sound (Just ar) Constants.chanAuto talkIdx 1 Constants.attnNorm 0
 
         -- kill killtargets
-        done <- if (isJust (edict^.eEdictInfo.eiKillTarget))
-                  then killKillTargets Nothing (fromJust $ edict^.eEdictInfo.eiKillTarget)
+        done <- if (isJust (edict^.eKillTarget))
+                  then killKillTargets Nothing (fromJust $ edict^.eKillTarget)
                   else return False
 
         unless done $ do
           -- fire targets
-          when (isJust $ edict^.eEdictInfo.eiTarget) $ do
-            fireTargets (BC.map toLower (edict^.eClassName)) Nothing GameBase.findByTarget (fromJust $ edict^.eEdictInfo.eiTarget)
+          when (isJust $ edict^.eTarget) $ do
+            fireTargets (BC.map toLower (edict^.eClassName)) Nothing GameBase.findByTarget (fromJust $ edict^.eTarget)
 
   where killKillTargets :: Maybe EdictReference -> B.ByteString -> Quake Bool
         killKillTargets edictRef killTarget = do
@@ -255,8 +255,8 @@ killBox edictRef@(EdictReference edictIdx) = do
 
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
     traceT <- trace (edict^.eEntityState.esOrigin)
-                    (Just $ edict^.eEdictMinMax.eMins)
-                    (Just $ edict^.eEdictMinMax.eMaxs)
+                    (Just $ edict^.eMins)
+                    (Just $ edict^.eMaxs)
                     (edict^.eEntityState.esOrigin)
                     Nothing
                     Constants.maskPlayerSolid
@@ -489,7 +489,7 @@ findTarget selfRef@(EdictReference selfIdx) = do
                           if done
                             then return False
                             else do
-                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= Math3D.vectorYaw temp
+                              gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= Math3D.vectorYaw temp
                               M.changeYaw selfRef
 
                               -- hunt the sound for a bit; hopefully find

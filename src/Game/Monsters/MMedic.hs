@@ -292,8 +292,8 @@ medicDead :: EntThink
 medicDead =
   GenericEntThink "medic_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0
@@ -357,7 +357,7 @@ medicDuckDown =
 
         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
           eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
-          eEdictMinMax.eMaxs._z -= 32
+          eMaxs._z -= 32
           eTakeDamage .= Constants.damageYes
           eMonsterInfo.miPauseTime .= levelTime + 1
 
@@ -383,7 +383,7 @@ medicDuckUp =
   GenericEntThink "medic_duck_up" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
-      eEdictMinMax.eMaxs._z += 32
+      eMaxs._z += 32
       eTakeDamage .= Constants.damageAim
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity

@@ -156,8 +156,8 @@ hoverDead =
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eThink .= Just hoverDeadThink
       eNextThink .= levelTime + Constants.frameTime

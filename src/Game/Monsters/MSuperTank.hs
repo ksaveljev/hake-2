@@ -269,8 +269,8 @@ superTankDead :: EntThink
 superTankDead =
   GenericEntThink "supertank_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-60) (-60) 0
-      eEdictMinMax.eMaxs .= V3 60 60 72
+      eMins .= V3 (-60) (-60) 0
+      eMaxs .= V3 60 60 72
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0

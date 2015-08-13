@@ -271,8 +271,8 @@ infantryPain =
     when ((edict^.eHealth) < (edict^.eMaxHealth) `div` 2) $
       gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= 1
 
-    unless (time < (edict^.eEdictTiming.etPainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictTiming.etPainDebounceTime .= time + 3
+    unless (time < (edict^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= time + 3
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -304,8 +304,8 @@ infantryDead =
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
 
@@ -502,12 +502,12 @@ spMonsterInfantry er@(EdictReference edictIdx) = do
           eMoveType                 .= Constants.moveTypeStep
           eSolid                    .= Constants.solidBbox
           eEntityState.esModelIndex .= tris
-          eEdictMinMax.eMins        .= V3 (-16) (-16) (-24)
-          eEdictMinMax.eMaxs        .= V3 16 16 32
+          eMins                     .= V3 (-16) (-16) (-24)
+          eMaxs                     .= V3 16 16 32
 
-          eHealth             .= 100
-          eGibHealth          .= -40
-          eEdictPhysics.eMass .= 200
+          eHealth    .= 100
+          eGibHealth .= -40
+          eMass      .= 200
 
           ePain .= Just infantryPain
           eDie  .= Just infantryDie

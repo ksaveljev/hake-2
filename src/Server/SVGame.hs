@@ -107,7 +107,7 @@ setModel er@(EdictReference edictIdx) name = do
       (CModelReference modelIdx) <- CM.inlineModel modelName
       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
         eMins .= (model^.cmMins)
         eMaxs .= (model^.cmMaxs)
 

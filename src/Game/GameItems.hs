@@ -113,8 +113,8 @@ spawnItem er@(EdictReference edictIdx) gir@(GItemReference itemIdx) = do
           eEntityState.esEffects .= (item^.giWorldModelFlags)
           eEntityState.esRenderFx .= Constants.rfGlow
 
-        when (isJust (edict^.eEdictInfo.eiModel)) $
-          void (modelIndex (edict^.eEdictInfo.eiModel))
+        when (isJust (edict^.eiModel)) $
+          void (modelIndex (edict^.eiModel))
 
 {-
 - =============== PrecacheItem
@@ -355,7 +355,7 @@ spItemHealth er@(EdictReference edictIdx) = do
       then GameUtil.freeEdict er
       else do
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eEdictInfo.eiModel .= Just "models/items/healing/medium/tris.md2"
+          eiModel .= Just "models/items/healing/medium/tris.md2"
           eCount .= 10
 
         findItem "Health" >>= (spawnItem er) . fromJust
@@ -373,7 +373,7 @@ spItemHealthSmall er@(EdictReference edictIdx) = do
       then GameUtil.freeEdict er
       else do
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eEdictInfo.eiModel .= Just "models/items/healing/stimpack/tris.md2"
+          eiModel .= Just "models/items/healing/stimpack/tris.md2"
           eCount .= 2
 
         findItem "Health" >>= (spawnItem er) . fromJust
@@ -393,7 +393,7 @@ spItemHealthLarge er@(EdictReference edictIdx) = do
       then GameUtil.freeEdict er
       else do
         zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eEdictInfo.eiModel .= Just "models/items/healing/large/tris.md2"
+          eiModel .= Just "models/items/healing/large/tris.md2"
           eCount .= 25
 
         findItem "Health" >>= (spawnItem er) . fromJust
@@ -407,7 +407,7 @@ spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- 
 dropToFloor :: EntThink
 dropToFloor =
   GenericEntThink "drop_to_floor" $ \er@(EdictReference edictIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictMinMax) $ do
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eMins .= V3 (-15) (-15) (-15)
       eMaxs .= V3 15 15 15
 
@@ -419,8 +419,8 @@ dropToFloor =
 
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-    if isJust (edict^.eEdictInfo.eiModel)
-      then setModel er (edict^.eEdictInfo.eiModel)
+    if isJust (edict^.eiModel)
+      then setModel er (edict^.eiModel)
       else do
         let GItemReference itemIdx = fromJust $ edict^.eItem
         Just worldModel <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giWorldModel
@@ -433,7 +433,7 @@ dropToFloor =
 
     let dest = (V3 0 0 (-128)) + (edict^.eEntityState.esOrigin)
 
-    tr <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eEdictMinMax.eMins) (Just $ edict^.eEdictMinMax.eMaxs) dest (Just er) Constants.maskSolid
+    tr <- trace (edict^.eEntityState.esOrigin) (Just $ edict^.eMins) (Just $ edict^.eMaxs) dest (Just er) Constants.maskSolid
 
     if tr^.tStartSolid
       then do
@@ -442,7 +442,7 @@ dropToFloor =
       else do
         gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (tr^.tEndPos)
 
-        when (isJust $ edict^.eEdictInfo.eiTeam) $ do
+        when (isJust $ edict^.eTeam) $ do
           zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
             eFlags %= (.&. (complement Constants.flTeamSlave))
             eChain .= (edict^.eTeamChain)

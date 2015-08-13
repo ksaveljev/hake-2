@@ -264,8 +264,8 @@ makronDead :: EntThink
 makronDead =
   GenericEntThink "makron_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-60) (-60) 0
-      eEdictMinMax.eMaxs .= V3 60 60 72
+      eMins .= V3 (-60) (-60) 0
+      eMaxs .= V3 60 60 72
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0
@@ -524,7 +524,7 @@ makronSaveLoc =
     let V3 a b c = (enemy^.eEntityState.esOrigin)
 
     -- save for aiming the shot
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.ePos1 .= V3 a b (c + fromIntegral (enemy^.eViewHeight))
+    gameBaseGlobals.gbGEdicts.ix selfIdx.ePos1 .= V3 a b (c + fromIntegral (enemy^.eViewHeight))
     return True
 
 -- FIXME: He's not firing from the proper Z
@@ -599,8 +599,8 @@ makronTorso =
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eMoveType .= Constants.moveTypeNone
       eSolid .= Constants.solidNot
-      eEdictMinMax.eMins .= V3 (-8) (-8) 0
-      eEdictMinMax.eMaxs .= V3 8 8 8
+      eMins .= V3 (-8) (-8) 0
+      eMaxs .= V3 8 8 8
       eEntityState.esFrame .= 346
       eEntityState.esModelIndex .= modelIdx
       eThink .= Just makronTorsoThink

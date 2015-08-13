@@ -152,8 +152,8 @@ boss2Dead :: EntThink
 boss2Dead =
   GenericEntThink "boss2_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-56) (-56) 0
-      eEdictMinMax.eMaxs .= V3 56 56 80
+      eMins .= V3 (-56) (-56) 0
+      eMaxs .= V3 56 56 80
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0

@@ -66,11 +66,11 @@ spMonsterBoss3Stand selfRef@(EdictReference selfIdx) = do
         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
           eMoveType                 .= Constants.moveTypeStep
           eSolid                    .= Constants.solidBbox
-          eEdictInfo.eiModel        .= Just "models/monsters/boss3/rider/tris.md2"
+          eiModel                   .= Just "models/monsters/boss3/rider/tris.md2"
           eEntityState.esModelIndex .= modelIdx
           eEntityState.esFrame      .= MBoss32.frameStand201
-          eEdictMinMax.eMins        .= V3 (-32) (-32) 0
-          eEdictMinMax.eMaxs        .= V3 32 32 90
+          eMins                     .= V3 (-32) (-32) 0
+          eMaxs                     .= V3 32 32 90
           eUse                      .= Just useBoss3
           eThink                    .= Just thinkBoss3Stand
           eNextThink                .= levelTime + Constants.frameTime

@@ -56,9 +56,9 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
     origin <- use $ globals.vec3Origin
 
     unless ((edict^.eEntityState.esAngles) == origin) $
-      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eMoveDir)
+      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir)
 
-    setModel er (edict^.eEdictInfo.eiModel)
+    setModel er (edict^.eiModel)
     linkEntity er
 
 {-
@@ -79,7 +79,7 @@ spTriggerOnce er@(EdictReference edictIdx) = do
     -- make old maps work because I messed up on flag assignments here
     -- triggered was on bit 1 when it should have been on bit 4
     when ((edict^.eSpawnFlags) .&. 1 /= 0) $ do
-      let v = (edict^.eEdictMinMax.eMins) + fmap (* 0.5) (edict^.eEdictMinMax.eSize)
+      let v = (edict^.eMins) + fmap (* 0.5) (edict^.eSize)
       zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
         eSpawnFlags %= (.&. (complement 1))
         eSpawnFlags %= (.|. 4)
@@ -140,10 +140,10 @@ touchMulti =
       Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
       vec3origin <- use $ globals.vec3Origin
 
-      done' <- if (edict^.eEdictPhysics.eMoveDir) /= vec3origin
+      done' <- if (edict^.eMoveDir) /= vec3origin
                  then do
                    let (Just forward, _, _) = Math3D.angleVectors (other^.eEntityState.esAngles) True False False
-                   if dot forward (edict^.eEdictPhysics.eMoveDir) < 0
+                   if dot forward (edict^.eMoveDir) < 0
                      then return True
                      else return False
                  else
@@ -205,7 +205,7 @@ initTrigger selfRef@(EdictReference selfIdx) = do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
     unless ((self^.eEntityState.esAngles) == v3o) $
-      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eMoveDir)
+      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveDir)
 
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
       eSolid .= Constants.solidTrigger
@@ -213,7 +213,7 @@ initTrigger selfRef@(EdictReference selfIdx) = do
       eSvFlags .= Constants.svfNoClient
 
     setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
-    setModel selfRef (self^.eEdictInfo.eiModel)
+    setModel selfRef (self^.eiModel)
 
 multiWait :: EntThink
 multiWait =

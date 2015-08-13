@@ -273,7 +273,7 @@ berserkAttackClub =
 
     r <- Lib.rand
     let n = r `mod` 6 + 5
-        aim = V3 (fromIntegral Constants.meleeDistance) (self^.eEdictMinMax.eMins._x) (-4)
+        aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) (-4)
 
     void $ GameWeapon.fireHit selfRef aim (fromIntegral n) 400 -- slower attack
     return True
@@ -402,8 +402,8 @@ berserkDead :: EntThink
 berserkDead =
   GenericEntThink "berserk_dead" $ \selfRef@(EdictReference selfIdx) -> do
     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eEdictMinMax.eMins .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs .= V3 16 16 (-8)
+      eMins .= V3 (-16) (-16) (-24)
+      eMaxs .= V3 16 16 (-8)
       eMoveType .= Constants.moveTypeToss
       eSvFlags %= (.|. Constants.svfDeadMonster)
       eNextThink .= 0

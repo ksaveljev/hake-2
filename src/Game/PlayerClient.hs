@@ -476,28 +476,28 @@ putClientInServer edictRef@(EdictReference edictIdx) = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eGroundEntity              .= Nothing
-      eClient                    .= Just (GClientReference gClientIdx)
-      eTakeDamage                .= Constants.damageAim
-      eMoveType                  .= Constants.moveTypeWalk
-      eViewHeight                .= 22
-      eInUse                     .= True
-      eClassName                 .= "player"
-      eEdictPhysics.eMass        .= 200
-      eSolid                     .= Constants.solidBbox
-      eDeadFlag                  .= Constants.deadNo
-      eEdictPhysics.eAirFinished .= levelTime + 12
-      eClipMask                  .= Constants.maskPlayerSolid
-      eEdictInfo.eiModel         .= Just "players/male/tris.md2"
-      ePain                      .= Just playerPain
-      eDie                       .= Just playerDie
-      eWaterLevel                .= 0
-      eWaterType                 .= 0
-      eFlags                     %= (.&. (complement Constants.flNoKnockback))
-      eSvFlags                   %= (.&. (complement Constants.svfDeadMonster))
-      eEdictMinMax.eMins         .= V3 (-16) (-16) (-24)
-      eEdictMinMax.eMaxs         .= V3 16 16 32
-      eEdictPhysics.eVelocity    .= V3 0 0 0
+      eGroundEntity .= Nothing
+      eClient       .= Just (GClientReference gClientIdx)
+      eTakeDamage   .= Constants.damageAim
+      eMoveType     .= Constants.moveTypeWalk
+      eViewHeight   .= 22
+      eInUse        .= True
+      eClassName    .= "player"
+      eMass         .= 200
+      eSolid        .= Constants.solidBbox
+      eDeadFlag     .= Constants.deadNo
+      eAirFinished  .= levelTime + 12
+      eClipMask     .= Constants.maskPlayerSolid
+      eiModel       .= Just "players/male/tris.md2"
+      ePain         .= Just playerPain
+      eDie          .= Just playerDie
+      eWaterLevel   .= 0
+      eWaterType    .= 0
+      eFlags        %= (.&. (complement Constants.flNoKnockback))
+      eSvFlags      %= (.&. (complement Constants.svfDeadMonster))
+      eMins         .= V3 (-16) (-16) (-24)
+      eMaxs         .= V3 16 16 32
+      eVelocity     .= V3 0 0 0
 
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
     fov <- if deathmatchValue /= 0 && (dmFlagsValue .&. Constants.dfFixedFov) /= 0
@@ -617,7 +617,7 @@ selectSpawnPoint edictRef = do
           case es of
             Nothing -> return Nothing
             Just ref@(EdictReference edictIdx) -> do
-              Just targetName <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictInfo.eiTargetName
+              Just targetName <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eTargetName
 
               if | B.length spawnPoint == 0 && isNothing targetName ->
                      return $ Just ref
@@ -716,7 +716,7 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
                 linkEntity = gameImport^.giLinkEntity
 
                 pmoveState' = pmoveState { _pmsOrigin = fmap (truncate . (* 8)) (edict^.eEntityState.esOrigin)
-                                         , _pmsVelocity = fmap (truncate . (* 8)) (edict^.eEdictPhysics.eVelocity)
+                                         , _pmsVelocity = fmap (truncate . (* 8)) (edict^.eVelocity)
                                          }
 
                 snapInitial = if (gClient^.gcOldPMove) == pmoveState'
@@ -741,9 +741,9 @@ clientThink edictRef@(EdictReference edictIdx) ucmd = do
 
             zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
               eEntityState.esOrigin .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
-              eEdictPhysics.eVelocity .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsVelocity)
-              eEdictMinMax.eMins .= (pm'^.pmMins)
-              eEdictMinMax.eMaxs .= (pm'^.pmMaxs)
+              eVelocity .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsVelocity)
+              eMins .= (pm'^.pmMins)
+              eMaxs .= (pm'^.pmMaxs)
 
             preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict') ->
               when (isJust (edict'^.eGroundEntity) && isNothing (pm'^.pmGroundEntity) && (pm'^.pmCmd.ucUpMove) >= 10 && (pm'^.pmWaterLevel) == 0) $ do

@@ -72,8 +72,8 @@ physicsPusher er@(EdictReference edictIdx) = do
         pushTeamChain (Just chain@(EdictReference chainIdx)) = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix chainIdx
           
-          let velocity = edict^.eEdictPhysics.eVelocity
-              avelocity = edict^.eEdictPhysics.eAVelocity
+          let velocity = edict^.eVelocity
+              avelocity = edict^.eAVelocity
 
           if (velocity^._x) /= 0 || (velocity^._y) /= 0 || (velocity^._z) /= 0 || (avelocity^._x) /= 0 || (avelocity^._y) /= 0 || (avelocity^._z) /= 0
             then do
@@ -146,7 +146,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
     checkSwimmingFriction
 
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    let V3 a b c = edict^.eEdictPhysics.eVelocity
+    let V3 a b c = edict^.eVelocity
 
     -- io (print $ "VELOCITY = " ++ show a ++ " " ++ show b ++ " " ++ show c)
 
@@ -157,7 +157,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
         when (wasOnGround || (edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
           ok <- M.checkBottom edictRef
           when (not ((edict^.eHealth) <= 0 && not ok)) $ do
-            let vel = edict^.eEdictPhysics.eVelocity
+            let vel = edict^.eVelocity
                 speed = sqrt $ (vel^._x) * (vel^._x) + (vel^._y) * (vel^._y)
 
             when (speed /= 0) $ do
@@ -168,8 +168,8 @@ physicsStep edictRef@(EdictReference edictIdx) = do
                   newSpeed = speed - Constants.frameTime * control * friction
                   newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
 
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._x %= (* newSpeed')
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._y %= (* newSpeed')
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity._x %= (* newSpeed')
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity._y %= (* newSpeed')
 
         let mask = if (edict^.eSvFlags) .&. Constants.svfMonster /= 0
                      then Constants.maskMonsterSolid
@@ -210,7 +210,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
 
         checkFriction :: Quake ()
         checkFriction = do
-          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eAVelocity) >>= \(Just (V3 a b c)) ->
+          preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eAVelocity) >>= \(Just (V3 a b c)) ->
             when (a /= 0 || b /= 0 || c /= 0) $
               addRotationalFriction edictRef
 
@@ -221,7 +221,7 @@ physicsStep edictRef@(EdictReference edictIdx) = do
           if not wasOnGround && (edict^.eFlags) .&. Constants.flFly == 0 && not ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eWaterLevel) > 2)
             then do
               svGravityValue <- liftM (^.cvValue) svGravityCVar
-              let hitSound = if (edict^.eEdictPhysics.eVelocity._z) < svGravityValue * (-0.1)
+              let hitSound = if (edict^.eVelocity._z) < svGravityValue * (-0.1)
                                then True
                                else False
 
@@ -236,8 +236,8 @@ physicsStep edictRef@(EdictReference edictIdx) = do
         checkFlyingFriction = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-          when ((edict^.eFlags) .&. Constants.flFly /= 0 && (edict^.eEdictPhysics.eVelocity._z) /= 0) $ do
-            let speed = abs (edict^.eEdictPhysics.eVelocity._z)
+          when ((edict^.eFlags) .&. Constants.flFly /= 0 && (edict^.eVelocity._z) /= 0) $ do
+            let speed = abs (edict^.eVelocity._z)
                 control = if speed < Constants.svStopSpeed
                             then Constants.svStopSpeed
                             else speed
@@ -245,21 +245,21 @@ physicsStep edictRef@(EdictReference edictIdx) = do
                 newSpeed = speed - (Constants.frameTime * control * friction)
                 newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z %= (* newSpeed')
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity._z %= (* newSpeed')
 
         checkSwimmingFriction :: Quake ()
         checkSwimmingFriction = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
-          when ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eEdictPhysics.eVelocity._z) /= 0) $ do
-            let speed = abs (edict^.eEdictPhysics.eVelocity._z)
+          when ((edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eVelocity._z) /= 0) $ do
+            let speed = abs (edict^.eVelocity._z)
                 control = if speed < Constants.svStopSpeed
                             then Constants.svStopSpeed
                             else speed
                 newSpeed = speed - (Constants.frameTime * control * Constants.svWaterFriction * (fromIntegral $ edict^.eWaterLevel))
                 newSpeed' = if newSpeed < 0 then 0 else newSpeed / speed
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z %= (* newSpeed')
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity._z %= (* newSpeed')
 
 -- Toss, bounce, and fly movement. When onground, do nothing
 physicsToss :: EdictReference -> Quake ()
@@ -298,9 +298,9 @@ physicsToss er@(EdictReference edictIdx) = do
                             then 1.5
                             else 1
 
-            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
             let (_, out) = GameBase.clipVelocity velocity (trace^.tPlane.cpNormal) backoff
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= out
+            gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= out
 
             -- stop if on ground
             stopIfOnGround moveType trace
@@ -325,7 +325,7 @@ physicsToss er@(EdictReference edictIdx) = do
 
         checkGroundEntity :: Quake Bool
         checkGroundEntity = do
-          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
 
           when ((velocity^._z) > 0 ) $
             gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
@@ -349,20 +349,20 @@ physicsToss er@(EdictReference edictIdx) = do
           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
 
           let angles = edict^.eEntityState.esAngles
-              avelocity = edict^.eEdictPhysics.eAVelocity
+              avelocity = edict^.eAVelocity
               result = angles + fmap (* Constants.frameTime) avelocity
 
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles .= result
 
         moveOrigin :: Quake (V3 Float)
         moveOrigin = do
-          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+          Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
           return $ fmap (* Constants.frameTime) velocity
 
         stopIfOnGround :: Int -> TraceT -> Quake ()
         stopIfOnGround moveType trace = do
           when ((trace^.tPlane.cpNormal._z) > 0.7) $ do
-            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+            Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
 
             when ((velocity^._z) < 60 || moveType /= Constants.moveTypeBounce) $ do
               let Just (EdictReference traceIdx) = trace^.tEnt
@@ -372,8 +372,8 @@ physicsToss er@(EdictReference edictIdx) = do
               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
                 eGroundEntity .= (trace^.tEnt)
                 eGroundEntityLinkCount .= linkCount
-                eEdictPhysics.eVelocity .= origin
-                eEdictPhysics.eAVelocity .= origin
+                eVelocity .= origin
+                eAVelocity .= origin
 
         checkWaterTransition :: Quake (Bool, Bool)
         checkWaterTransition = do
@@ -465,8 +465,8 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
 
         findPusherBoundingBox :: V3 Float -> Quake (V3 Float, V3 Float)
         findPusherBoundingBox updatedMove = do
-          Just eMinMax <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx.eEdictMinMax
-          return ((eMinMax^.eAbsMin) + updatedMove, (eMinMax^.eAbsMax) + updatedMove)
+          Just pusher <- preuse $ gameBaseGlobals.gbGEdicts.ix pusherIdx
+          return ((pusher^.eAbsMin) + updatedMove, (pusher^.eAbsMax) + updatedMove)
 
         savePusherPosition :: Quake ()
         savePusherPosition = do
@@ -639,8 +639,8 @@ push pusherRef@(EdictReference pusherIdx) move amove = do
                -- if the entity is standing on the pusher, it will definetly be moved
              | (edict^.eGroundEntity) /= Just (EdictReference edictIdx) -> do
                  -- see if the ent needs to be tested
-                 let absmin = edict^.eEdictMinMax.eAbsMin
-                     absmax = edict^.eEdictMinMax.eAbsMax
+                 let absmin = edict^.eAbsMin
+                     absmax = edict^.eAbsMax
 
                  if absmin^._x >= maxs^._x || absmin^._y >= maxs^._y || absmin^._z >= maxs^._z ||
                     absmax^._x <= mins^._x || absmax^._y <= mins^._y || absmax^._z <= mins^._z
@@ -689,12 +689,12 @@ runThink er@(EdictReference edictIdx) = do
 checkVelocity :: EdictReference -> Quake ()
 checkVelocity (EdictReference edictIdx) = do
     -- bound velocity
-    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
     maxVelocityValue <- liftM (^.cvValue) svMaxVelocityCVar
 
     let boundedVelocity = fmap (boundVelocity maxVelocityValue) velocity
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= boundedVelocity
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= boundedVelocity
 
   where boundVelocity :: Float -> Float -> Float
         boundVelocity maxV v = if | v > maxV -> maxV
@@ -703,10 +703,10 @@ checkVelocity (EdictReference edictIdx) = do
 
 addGravity :: EdictReference -> Quake ()
 addGravity (EdictReference edictIdx) = do
-    Just edictGravity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eGravity
+    Just edictGravity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eGravity
     gravityValue <- liftM (^.cvValue) svGravityCVar
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity._z -= edictGravity * gravityValue * Constants.frameTime
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity._z -= edictGravity * gravityValue * Constants.frameTime
 
 -- Does not change the entities velocity at all
 pushEntity :: EdictReference -> V3 Float -> Quake TraceT
@@ -739,8 +739,8 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
               linkEntity = gameImport^.giLinkEntity
 
           traceT <- trace start
-                          (Just $ edict^.eEdictMinMax.eMins)
-                          (Just $ edict^.eEdictMinMax.eMaxs)
+                          (Just $ edict^.eMins)
+                          (Just $ edict^.eMaxs)
                           end
                           (Just er)
                           mask
@@ -791,8 +791,8 @@ testEntityPosition (EdictReference edictIdx) = do
 
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
     traceT <- trace (edict^.eEntityState.esOrigin)
-                    (Just $ edict^.eEdictMinMax.eMins)
-                    (Just $ edict^.eEdictMinMax.eMaxs)
+                    (Just $ edict^.eMins)
+                    (Just $ edict^.eMaxs)
                     (edict^.eEntityState.esOrigin)
                     (Just $ EdictReference edictIdx)
                     mask
@@ -813,7 +813,7 @@ addRotationalFriction _ = do
 -}
 flyMove :: EdictReference -> Float -> Int -> Quake Int
 flyMove edictRef@(EdictReference edictIdx) time mask = do
-    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+    Just velocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
     gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
     let planes = V.replicate 6 (V3 0 0 0)
 
@@ -827,11 +827,11 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
           | idx >= maxIdx = return blockedMask
           | otherwise = do
               traceT <- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx) >>= \(Just edict) -> do
-                          let end = (edict^.eEntityState.esOrigin) + fmap (* timeLeft) (edict^.eEdictPhysics.eVelocity)
+                          let end = (edict^.eEntityState.esOrigin) + fmap (* timeLeft) (edict^.eVelocity)
                           trace <- use $ gameBaseGlobals.gbGameImport.giTrace
                           trace (edict^.eEntityState.esOrigin)
-                                (Just $ edict^.eEdictMinMax.eMins)
-                                (Just $ edict^.eEdictMinMax.eMaxs)
+                                (Just $ edict^.eMins)
+                                (Just $ edict^.eMaxs)
                                 end
                                 (Just edictRef)
                                 mask
@@ -839,13 +839,13 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
               if (traceT^.tAllSolid) -- entity is trapped in another solid
                 then do
                   use (globals.vec3Origin) >>= \v3o ->
-                    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                    gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= v3o
                   return 3
                 else do
                   (numPlanes', originalVelocity') <- if (traceT^.tFraction) > 0 -- actually covered some distance
                                                        then do
                                                          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
-                                                         Just v <- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity)
+                                                         Just v <- preuse (gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity)
                                                          return (0, v)
                                                        else
                                                          return (numPlanes, originalVelocity)
@@ -883,7 +883,7 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
                           if numPlanes' >= maxClipPlanes -- this shouldn't really happen
                             then do
                               use (globals.vec3Origin) >>= \v3o ->
-                                gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= v3o
                               return 3
                             else do
                               let planes' = planes V.// [(numPlanes', traceT^.tPlane.cpNormal)]
@@ -894,14 +894,14 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
 
                               if i /= numPlanes'' -- go along this plane
                                 then do
-                                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= newVelocity
+                                  gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= newVelocity
 
                                   -- if original velocity is against the original velocity, stop dead
                                   -- to avoid tiny occilations in sloping corners
                                   if newVelocity `dot` primalVelocity <= 0
                                     then do
                                       use (globals.vec3Origin) >>= \v3o ->
-                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= v3o
                                       return blockedMask'
                                     else
                                       doFlyMove primalVelocity originalVelocity' planes' timeLeft' numPlanes'' blockedMask' (idx + 1) maxIdx
@@ -910,21 +910,21 @@ flyMove edictRef@(EdictReference edictIdx) time mask = do
                                   if numPlanes'' /= 2
                                     then do
                                       use (globals.vec3Origin) >>= \v3o ->
-                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= v3o
                                       return 7
                                     else do
-                                      Just entVelocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity
+                                      Just entVelocity <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity
                                       let dir = (planes' V.! 0) `cross` (planes' V.! 1)
                                           d = dir `dot` entVelocity
 
-                                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= fmap (* d) dir
+                                      gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= fmap (* d) dir
 
                                       -- if original velocity is against the original velocity, stop dead
                                       -- to avoid tiny occilations in sloping corners
                                       if newVelocity `dot` primalVelocity <= 0
                                         then do
                                           use (globals.vec3Origin) >>= \v3o ->
-                                            gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eVelocity .= v3o
+                                            gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= v3o
                                           return blockedMask'
                                         else
                                           doFlyMove primalVelocity originalVelocity' planes' timeLeft' numPlanes'' blockedMask' (idx + 1) maxIdx
@@ -984,8 +984,8 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
 
         trace <- use $ gameBaseGlobals.gbGameImport.giTrace
         traceT <- trace newOrg'
-                        (Just $ edict^.eEdictMinMax.eMins)
-                        (Just $ edict^.eEdictMinMax.eMaxs)
+                        (Just $ edict^.eMins)
+                        (Just $ edict^.eMaxs)
                         end
                         (Just edictRef)
                         Constants.maskMonsterSolid
@@ -1029,8 +1029,8 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
               newOrg' <- updateNewOrg idx edict newOrg
 
               traceT <- trace (edict^.eEntityState.esOrigin)
-                              (Just $ edict^.eEdictMinMax.eMins)
-                              (Just $ edict^.eEdictMinMax.eMaxs)
+                              (Just $ edict^.eMins)
+                              (Just $ edict^.eMaxs)
                               newOrg'
                               (Just edictRef)
                               Constants.maskMonsterSolid
@@ -1083,7 +1083,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
         checkFlyingMonsters edict traceT = do
           if (edict^.eFlags) .&. Constants.flFly /= 0 && (edict^.eWaterLevel) == 0
             then do
-              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              let test = _z %~ (+ ((edict^.eMins._z) + 1)) $ traceT^.tEndPos
               pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
               contents <- pointContents test
               return $ if contents .&. Constants.maskWater /= 0
@@ -1098,7 +1098,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
         checkSwimmingMonsters edict traceT _ = do
           if (edict^.eFlags) .&. Constants.flSwim /= 0 && (edict^.eWaterLevel) < 2
             then do
-              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              let test = _z %~ (+ ((edict^.eMins._z) + 1)) $ traceT^.tEndPos
               pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
               contents <- pointContents test
               return $ if contents .&. Constants.maskWater == 0
@@ -1137,8 +1137,8 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
               let newOrg' = _z %~ (subtract stepSize) $ newOrg
               trace <- use $ gameBaseGlobals.gbGameImport.giTrace
               traceT' <- trace newOrg'
-                               (Just $ edict^.eEdictMinMax.eMins)
-                               (Just $ edict^.eEdictMinMax.eMaxs)
+                               (Just $ edict^.eMins)
+                               (Just $ edict^.eMaxs)
                                end
                                (Just edictRef)
                                Constants.maskMonsterSolid
@@ -1154,7 +1154,7 @@ moveStep edictRef@(EdictReference edictIdx) move relink = do
         checkWaterLevel edict (_, traceT, newOrg) = do
           if (edict^.eWaterLevel) == 0
             then do
-              let test = _z %~ (+ ((edict^.eEdictMinMax.eMins._z) + 1)) $ traceT^.tEndPos
+              let test = _z %~ (+ ((edict^.eMins._z) + 1)) $ traceT^.tEndPos
               pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
               contents <- pointContents test
 
@@ -1220,7 +1220,7 @@ stepDirection :: EdictReference -> Float -> Float -> Quake Bool
 stepDirection edictRef@(EdictReference edictIdx) yaw dist = do
     -- io (print "SV.stepDirection")
     -- io (print $ "yaw = " ++ show yaw ++ " dist = " ++ show dist)
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEdictPhysics.eIdealYaw .= yaw
+    gameBaseGlobals.gbGEdicts.ix edictIdx.eIdealYaw .= yaw
     M.changeYaw edictRef
 
     let yaw' = yaw * pi  * 2 / 360
@@ -1233,7 +1233,7 @@ stepDirection edictRef@(EdictReference edictIdx) yaw dist = do
     if moveDone
       then do
         Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-        let delta = (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) - (edict^.eEdictPhysics.eIdealYaw)
+        let delta = (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) - (edict^.eIdealYaw)
         when (delta > 45 && delta < 315) $ -- not turned far enough, so don't take the step
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= oldOrigin
         linkEntity edictRef
@@ -1258,7 +1258,7 @@ newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
         Just actor <- preuse $ gameBaseGlobals.gbGEdicts.ix actorIdx
         Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
 
-        let tmp :: Int = truncate $ (actor^.eEdictPhysics.eIdealYaw) / 45
+        let tmp :: Int = truncate $ (actor^.eIdealYaw) / 45
             oldDir = Math3D.angleMod (fromIntegral $ tmp * 45)
             turnAround = Math3D.angleMod (oldDir - 180)
 
@@ -1379,7 +1379,7 @@ tryOtherDirections actorRef@(EdictReference actorIdx) dist oldDir turnAround del
 
         cannotMove :: Quake ()
         cannotMove = do
-          gameBaseGlobals.gbGEdicts.ix actorIdx.eEdictPhysics.eIdealYaw .= oldDir -- can't move
+          gameBaseGlobals.gbGEdicts.ix actorIdx.eIdealYaw .= oldDir -- can't move
 
           -- if a bridge was pulled out from underneath a monster, it may
           -- not have a valid standing position at all

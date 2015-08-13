@@ -60,7 +60,7 @@ monsterStart edictRef@(EdictReference edictIdx) = do
             eSvFlags %= (.|. Constants.svfMonster)
             eEntityState.esRenderFx %= (.|. Constants.rfFrameLerp)
             eTakeDamage .= Constants.damageAim
-            eEdictPhysics.eAirFinished .= time + 12
+            eAirFinished .= time + 12
             eUse .= Just (GameUtil.monsterUse)
             eMaxHealth .= (edict^.eHealth)
             eClipMask .= Constants.maskMonsterSolid
@@ -104,16 +104,16 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
 
     unless ((self^.eHealth) <= 0) $ do
       -- check for target to combat_point and change to combattarget
-      when (isJust (self^.eEdictInfo.eiTarget)) $
-        checkTarget (fromJust $ self^.eEdictInfo.eiTarget)
+      when (isJust (self^.eTarget)) $
+        checkTarget (fromJust $ self^.eTarget)
 
       -- validate combattarget
-      Just combatTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiCombatTarget
+      Just combatTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eCombatTarget
       when (isJust combatTarget) $
         validateCombatTarget (fromJust combatTarget) Nothing
 
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-      case self'^.eEdictInfo.eiTarget of
+      case self'^.eTarget of
         Just target -> do
           pickedTargetRef <- GameBase.pickTarget (Just target)
 
@@ -124,7 +124,7 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
             Nothing -> do
               dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
               dprintf "IMPLEMENT ME! can't find target" -- TODO
-              gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+              gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= Nothing
               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= 100000000
 
               void $ think (fromJust $ self'^.eMonsterInfo.miStand) selfRef
@@ -144,11 +144,11 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
                                  _ -> undefined -- shouldn't happen
 
                   gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles.access .= yaw
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictPhysics.eIdealYaw .= yaw
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= yaw
                   
                   void $ think (fromJust $ self'^.eMonsterInfo.miWalk) selfRef
 
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= Nothing
 
                 else do
                   gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= Nothing
@@ -171,12 +171,12 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
           (notCombat, fixup) <- checkTargets targetName False False Nothing
           Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
-          when (notCombat && isJust (self^.eEdictInfo.eiCombatTarget)) $ do
+          when (notCombat && isJust (self^.eCombatTarget)) $ do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ (self^.eClassName) `B.append` " at " `B.append` (Lib.vtos (self^.eEntityState.esOrigin)) `B.append` " has target with mixed types\n"
 
           when fixup $
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiTarget .= Nothing
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= Nothing
 
         checkTargets :: B.ByteString -> Bool -> Bool -> Maybe EdictReference -> Quake (Bool, Bool)
         checkTargets targetName notCombat fixup ref = do
@@ -188,7 +188,7 @@ monsterStartGo selfRef@(EdictReference selfIdx) = do
               Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
               if (target^.eClassName) == "point_combat"
                 then do
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEdictInfo.eiCombatTarget .= Just targetName
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eCombatTarget .= Just targetName
                   checkTargets targetName notCombat True targetRef
                 else
                   checkTargets targetName True fixup targetRef
