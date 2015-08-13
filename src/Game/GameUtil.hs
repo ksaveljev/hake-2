@@ -591,3 +591,8 @@ foundTarget selfRef@(EdictReference selfIdx) = do
 
             -- run for it
             void $ think (fromJust $ self^.eMonsterInfo.miRun) selfRef
+
+attackFinished :: EdictReference -> Float -> Quake ()
+attackFinished (EdictReference selfIdx) time = do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackFinished .= levelTime + time

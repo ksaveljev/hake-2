@@ -238,6 +238,25 @@ aiCheckAttack :: EdictReference -> Float -> Quake Bool
 aiCheckAttack _ _ = do
     io (putStrLn "GameAI.aiCheckAttack") >> undefined -- TODO
 
+-- Decides running or standing according to flag AI_STAND_GROUND
 huntTarget :: EdictReference -> Quake ()
-huntTarget _ = do
-    io (putStrLn "GameAI.huntTarget") >> undefined -- TODO
+huntTarget selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eEnemy)
+
+    void $ if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+             then think (fromJust $ self^.eMonsterInfo.miStand) selfRef
+             else think (fromJust $ self^.eMonsterInfo.miRun) selfRef
+
+    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self'^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let vec = (enemy^.eEntityState.esOrigin) - (self'^.eEntityState.esOrigin)
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= Math3D.vectorYaw vec
+
+    -- wait a while before first attack
+    when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround == 0) $
+      GameUtil.attackFinished selfRef 1
