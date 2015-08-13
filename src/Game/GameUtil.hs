@@ -239,8 +239,15 @@ freeEdictA =
 
 monsterUse :: EntUse
 monsterUse =
-  GenericEntUse "monster_use" $ \_ _ _ -> do
-    io (putStrLn "GameUtil.monsterUse") >> undefined -- TODO
+  GenericEntUse "monster_use" $ \selfRef@(EdictReference selfIdx) _ (Just activatorRef@(EdictReference activatorIdx)) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    Just activator <- preuse $ gameBaseGlobals.gbGEdicts.ix activatorIdx
+
+    let done = isJust (self^.eEnemy) || (self^.eHealth) <= 0 || ((activator^.eFlags) .&. Constants.flNoTarget) /= 0 || (isNothing (activator^.eClient) && ((activator^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy) == 0)
+    
+    unless done $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just activatorRef
+      foundTarget selfRef
 
 mCheckAttack :: EntThink
 mCheckAttack =
