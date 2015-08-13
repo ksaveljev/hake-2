@@ -60,4 +60,8 @@ initialGameBaseGlobals =
                   , _gbBobCycle          = 0
                   , _gbBobFracSin        = 0
                   , _gbXxxi              = 0
+                  , _gbEnemyVis          = False
+                  , _gbEnemyInFront      = False
+                  , _gbEnemyRange        = 0
+                  , _gbEnemyYaw          = 0
                   }

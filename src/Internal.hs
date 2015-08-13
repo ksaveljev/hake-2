@@ -795,18 +795,22 @@ data GameBaseGlobals =
                   , _gbCYes              :: !Int
                   , _gbCNo               :: !Int
                   , _gbTouch             :: V.Vector EdictReference
-                  , _gbIsQuad            :: Bool
-                  , _gbIsSilenced        :: Int
+                  , _gbIsQuad            :: !Bool
+                  , _gbIsSilenced        :: !Int
                   , _gbCurrentPlayer     :: Maybe EdictReference
                   , _gbCurrentClient     :: Maybe GClientReference
                   , _gbForward           :: V3 Float
                   , _gbRight             :: V3 Float
                   , _gbUp                :: V3 Float
-                  , _gbXYSpeed           :: Float
-                  , _gbBobMove           :: Float
-                  , _gbBobCycle          :: Int
-                  , _gbBobFracSin        :: Float
-                  , _gbXxxi              :: Int
+                  , _gbXYSpeed           :: !Float
+                  , _gbBobMove           :: !Float
+                  , _gbBobCycle          :: !Int
+                  , _gbBobFracSin        :: !Float
+                  , _gbXxxi              :: !Int
+                  , _gbEnemyVis          :: !Bool
+                  , _gbEnemyInFront      :: !Bool
+                  , _gbEnemyRange        :: !Int
+                  , _gbEnemyYaw          :: !Float
                   }
 
 data PMoveGlobals =

@@ -51,3 +51,11 @@ lastSpot = do
 add :: V3 Float -> Quake ()
 add _ = do
     io (putStrLn "PlayerTrail.add") >> undefined -- TODO
+
+pickFirst :: EdictReference -> Quake (Maybe EdictReference)
+pickFirst _ = do
+    io (putStrLn "PlayerTrail.pickFirst") >> undefined -- TODO
+
+pickNext :: EdictReference -> Quake (Maybe EdictReference)
+pickNext _ = do
+    io (putStrLn "PlayerTrail.pickNext") >> undefined -- TODO
