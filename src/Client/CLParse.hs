@@ -96,7 +96,9 @@ parseServerMessage = do
 
                      | cmd == Constants.svcPrint -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcPrint") >> undefined -- TODO
 
-                     | cmd == Constants.svcCenterPrint -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcCenterPrint") >> undefined -- TODO
+                     | cmd == Constants.svcCenterPrint -> do
+                         str <- MSG.readString (globals.netMessage)
+                         SCR.centerPrint str
 
                      | cmd == Constants.svcStuffText -> do
                          str <- MSG.readString (globals.netMessage)

@@ -1143,3 +1143,13 @@ touchPics = do
 
         when (width == 0) $
           scrGlobals.scrCrosshairPic .= ""
+
+{-
+- ============== SCR_CenterPrint ==============
+- 
+- Called for important messages that should stay in the center of the
+- screen for a few moments
+-}
+centerPrint :: B.ByteString -> Quake ()
+centerPrint str = do
+    io (putStrLn "SCR.centerPrint") >> undefined -- TODO

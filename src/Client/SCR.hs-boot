@@ -70,3 +70,5 @@ drawHUDString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
 drawCenterString :: Quake ()
 
 playCinematic :: B.ByteString -> Quake ()
+
+centerPrint :: B.ByteString -> Quake ()
