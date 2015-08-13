@@ -238,6 +238,7 @@ xLateKey key =
        | key == GLFW.Key'Right        -> KeyConstants.kRightArrow
        | key == GLFW.Key'Down         -> KeyConstants.kDownArrow
        | key == GLFW.Key'Up           -> KeyConstants.kUpArrow
+       | key == GLFW.Key'Space        -> KeyConstants.kSpace
        | key == GLFW.Key'Escape       -> KeyConstants.kEscape
        | key == GLFW.Key'Enter        -> KeyConstants.kEnter
        | key == GLFW.Key'Tab          -> KeyConstants.kTab

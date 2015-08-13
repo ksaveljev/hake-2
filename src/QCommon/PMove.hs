@@ -338,7 +338,7 @@ catagorizePosition = do
 
             pm' <- use $ pMoveGlobals.pmPM
 
-            when ((pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0) $ do
+            when ((pm'^.pmState.pmsPMFlags) .&. pmfOnGround == 0) $ do
               -- just hit the ground
               pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. pmfOnGround)
 
