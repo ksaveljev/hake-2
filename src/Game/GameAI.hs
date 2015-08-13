@@ -237,3 +237,7 @@ walkMonsterStartGo =
 aiCheckAttack :: EdictReference -> Float -> Quake Bool
 aiCheckAttack _ _ = do
     io (putStrLn "GameAI.aiCheckAttack") >> undefined -- TODO
+
+huntTarget :: EdictReference -> Quake ()
+huntTarget _ = do
+    io (putStrLn "GameAI.huntTarget") >> undefined -- TODO

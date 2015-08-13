@@ -18,8 +18,10 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
+import {-# SOURCE #-} qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameCombat as GameCombat
+import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 {-
@@ -522,5 +524,63 @@ inFront self other =
     in dot' > 0.3
 
 foundTarget :: EdictReference -> Quake ()
-foundTarget _ = do
-    io (putStrLn "GameUtil.foundTarget") >> undefined -- TODO
+foundTarget selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    -- let other monsters see this monster for a while
+    when (isJust (enemy^.eClient)) $ do
+      frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+      zoom (gameBaseGlobals.gbLevel) $ do
+        llSightEntity .= Just selfRef
+        llSightEntityFrameNum .= frameNum
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eLightLevel .= 128
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eShowHostile .= truncate levelTime + 1 -- wake up other monsters
+      eMonsterInfo.miLastSighting .= (enemy^.eEntityState.esOrigin)
+      eMonsterInfo.miTrailTime .= levelTime
+
+    case self^.eCombatTarget of
+      Nothing ->
+        GameAI.huntTarget selfRef
+
+      Just combatTarget -> do
+        target <- GameBase.pickTarget (self^.eCombatTarget)
+
+        case target of
+          Nothing -> do
+            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+              eGoalEntity .= (self^.eEnemy)
+              eMoveTarget .= (self^.eEnemy)
+
+            GameAI.huntTarget selfRef
+
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf ((self^.eClassName) `B.append`
+                     " at " `B.append`
+                     Lib.vtos (self^.eEntityState.esOrigin) `B.append`
+                     ", combattarget " `B.append`
+                     combatTarget `B.append`
+                     " not found\n")
+
+          Just _ -> do
+            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+              eGoalEntity .= target
+              eMoveTarget .= target
+              -- clear out our combattarget, these are a one shot deal
+              eCombatTarget .= Nothing
+              eMonsterInfo.miAIFlags %= (.|. Constants.aiCombatPoint)
+              eMonsterInfo.miPauseTime .= 0
+
+            -- clear the targetname, that point is ours!
+            let Just (EdictReference moveTargetIdx) = target
+            gameBaseGlobals.gbGEdicts.ix moveTargetIdx.eTargetName .= Nothing
+
+            -- run for it
+            void $ think (fromJust $ self^.eMonsterInfo.miRun) selfRef
