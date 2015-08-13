@@ -7,7 +7,7 @@ import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3(..), norm)
+import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -513,8 +513,13 @@ findTarget selfRef@(EdictReference selfIdx) = do
 
           return True
 
+-- Returns true if the entity is in front (in sight) of self
 inFront :: EdictT -> EdictT -> Bool
-inFront self other = undefined -- TODO GameUtil.inFront
+inFront self other =
+    let (Just forward, _, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True False False
+        vec = normalize ((other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
+        dot' = vec `dot` forward
+    in dot' > 0.3
 
 foundTarget :: EdictReference -> Quake ()
 foundTarget _ = do
