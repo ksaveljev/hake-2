@@ -8,10 +8,13 @@ import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
+import Data.Monoid (mempty, (<>))
 import Linear (V3(..))
 import Text.Printf (printf)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
 import Quake
@@ -1152,4 +1155,58 @@ touchPics = do
 -}
 centerPrint :: B.ByteString -> Quake ()
 centerPrint str = do
-    io (putStrLn "SCR.centerPrint") >> undefined -- TODO
+    centerTimeValue <- liftM (^.cvValue) scrCenterTimeCVar
+    time <- use $ globals.cl.csTime
+
+    zoom scrGlobals $ do
+      scrCenterString .= str
+      scrCenterTimeOff .= centerTimeValue
+      scrCenterTimeStart .= fromIntegral time
+      -- count the number of lines for centering
+      scrCenterLines .= 1 + BC.count '\n' str
+
+    -- echo it to the console
+    Com.printf "\n\n\35\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\37\n\n"
+
+    unless (B.null str) $
+      outputLines 0
+
+    Com.printf "\n\n\35\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\36\37\n\n"
+    Console.clearNotify
+
+  where outputLines :: Int -> Quake ()
+        outputLines s = do
+          -- scan the width of the line
+          let len = scanLineWidth s 0 40
+              line = buildSpaces 0 ((40 - len) `div` 2) mempty
+              line' = (appendLine s 0 len line) <> BB.word8 10 -- 10 is '\n'
+
+          Com.printf (BL.toStrict $ BB.toLazyByteString line')
+
+          let s' = findEndOfLine s
+
+          when (s' < B.length str) $
+            outputLines (s' + 1) -- skip the \n
+
+        scanLineWidth :: Int -> Int -> Int -> Int
+        scanLineWidth s idx maxIdx
+          | idx >= maxIdx || (s + idx) >= B.length str = idx
+          | otherwise =
+              if str `BC.index` (s + idx) == '\n' || str `B.index` (s + idx) == 0
+                then idx
+                else scanLineWidth s (idx + 1) maxIdx
+
+        buildSpaces :: Int -> Int -> BB.Builder -> BB.Builder
+        buildSpaces idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise = buildSpaces (idx + 1) maxIdx (acc <> BB.word8 32) -- 32 is SPACE
+
+        appendLine :: Int -> Int -> Int -> BB.Builder -> BB.Builder
+        appendLine s idx maxIdx acc
+          | idx >= maxIdx = acc
+          | otherwise = appendLine s (idx + 1) maxIdx (acc <> BB.word8 (str `B.index` (s + idx)))
+
+        findEndOfLine :: Int -> Int
+        findEndOfLine idx
+          | idx >= B.length str || str `BC.index` idx == '\n' = idx
+          | otherwise = findEndOfLine (idx + 1)

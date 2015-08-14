@@ -1075,11 +1075,15 @@ data SCRGlobals =
              , _scrCrosshairPic    :: B.ByteString
              , _scrCrosshairWidth  :: !Int
              , _scrCrosshairHeight :: !Int
-             , _scrCenterTimeOff   :: !Float
              , _scrLastFrames      :: !Int
              , _scrLastTime        :: !Int
              , _scrFPSValue        :: B.ByteString
              , _scrCin             :: CinematicsT
+             , _scrCenterString    :: B.ByteString
+             , _scrCenterTimeStart :: !Float
+             , _scrCenterTimeOff   :: !Float
+             , _scrCenterLines     :: !Int
+             , _scrEraseCenter     :: !Int
              }
 
 data RefExportT =

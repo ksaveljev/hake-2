@@ -24,9 +24,13 @@ initialSCRGlobals =
              , _scrCrosshairPic    = ""
              , _scrCrosshairWidth  = 0
              , _scrCrosshairHeight = 0
-             , _scrCenterTimeOff   = 0
              , _scrLastFrames      = 0
              , _scrLastTime        = 0
              , _scrFPSValue        = ""
              , _scrCin             = newCinematicsT
+             , _scrCenterString    = ""
+             , _scrCenterTimeStart = 0
+             , _scrCenterTimeOff   = 0
+             , _scrCenterLines     = 0
+             , _scrEraseCenter     = 0
              }
