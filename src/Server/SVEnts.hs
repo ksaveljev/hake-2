@@ -253,18 +253,18 @@ emitPacketEntities from to sizeBufLens = do
               -- io (print $ "newIndex = " ++ show newIndex)
               -- io (print $ "oldIndex = " ++ show oldIndex)
               (newEnt', newNum) <- if newIndex >= (to^.cfNumEntities)
-                                     then return (fromJust newEnt, 9999)
+                                     then return (newEnt, 9999)
                                      else do
                                        let idx = ((to^.cfFirstEntity) + newIndex) `mod` numClientEntities
                                        Just newEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
-                                       return (newEnt', newEnt'^.esNumber)
+                                       return (Just newEnt', newEnt'^.esNumber)
 
               (oldEnt', oldNum) <- if oldIndex >= fromNumEntites
-                                     then return (fromJust oldEnt, 9999)
+                                     then return (oldEnt, 9999)
                                      else do
                                        let idx = ((fromJust from^.cfFirstEntity) + oldIndex) `mod` numClientEntities
                                        Just oldEnt' <- preuse $ svGlobals.svServerStatic.ssClientEntities.ix idx
-                                       return (oldEnt', oldEnt'^.esNumber)
+                                       return (Just oldEnt', oldEnt'^.esNumber)
 
               -- io (print $ "oldNum = " ++ show oldNum ++ " newNum = " ++ show newNum)
 
@@ -276,15 +276,15 @@ emitPacketEntities from to sizeBufLens = do
                      -- all note that players are always 'newentities', this updates
                      -- their oldorigin always
                      -- and prevents warping
-                     MSG.writeDeltaEntity oldEnt' newEnt' sizeBufLens False ((newEnt'^.esNumber) <= maxClientsValue)
-                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) (newIndex + 1)
+                     MSG.writeDeltaEntity (fromJust oldEnt') (fromJust newEnt') sizeBufLens False (((fromJust newEnt')^.esNumber) <= maxClientsValue)
+                     sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt' newEnt' (oldIndex + 1) (newIndex + 1)
 
                  | newNum < oldNum -> do
                      -- io (print "newNum < oldNum")
                      -- this is a new entity, send it from the baseline
                      Just baseline <- preuse $ svGlobals.svServer.sBaselines.ix newNum
-                     MSG.writeDeltaEntity baseline newEnt' sizeBufLens True True
-                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') oldIndex (newIndex + 1)
+                     MSG.writeDeltaEntity baseline (fromJust newEnt') sizeBufLens True True
+                     sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt' newEnt' oldIndex (newIndex + 1)
 
                  | newNum > oldNum -> do
                      -- io (print "newNum > oldNum")
@@ -301,7 +301,7 @@ emitPacketEntities from to sizeBufLens = do
                        then MSG.writeShort sizeBufLens oldNum
                        else MSG.writeByteI sizeBufLens oldNum
 
-                     sendEntities maxClientsValue numClientEntities fromNumEntites (Just oldEnt') (Just newEnt') (oldIndex + 1) newIndex
+                     sendEntities maxClientsValue numClientEntities fromNumEntites oldEnt' newEnt' (oldIndex + 1) newIndex
 
 {-
 - Decides which entities are going to be visible to the client, and copies
