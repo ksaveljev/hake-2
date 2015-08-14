@@ -624,8 +624,21 @@ doRespawn =
 
 useItem :: EntUse
 useItem =
-  GenericEntUse "use_item" $ \_ _ _ -> do
-    io (putStrLn "GameItems.useItem") >> undefined -- TODO
+  GenericEntUse "use_item" $ \edictRef@(EdictReference edictIdx) _ _ -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    let (solid, touch) = if (edict^.eSpawnFlags) .&. Constants.itemNoTouch /= 0
+                           then (Constants.solidBbox, Nothing)
+                           else (Constants.solidTrigger, Just touchItem)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eUse     .= Nothing
+      eSolid   .= solid
+      eTouch   .= touch
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity edictRef
 
 dropItem :: EdictReference -> GItemReference -> Quake EdictReference
 dropItem _ _ = do
