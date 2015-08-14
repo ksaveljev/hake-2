@@ -590,23 +590,37 @@ parseTEnt = do
 
              case cnt of
                1 -> do
-                 sfx <- use $ clTEntGlobals.clteSfxRic1
-                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+                 sfxRef <- use $ clTEntGlobals.clteSfxRic1
+                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
                2 -> do
-                 sfx <- use $ clTEntGlobals.clteSfxRic2
-                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+                 sfxRef <- use $ clTEntGlobals.clteSfxRic2
+                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
                3 -> do
-                 sfx <- use $ clTEntGlobals.clteSfxRic3
-                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+                 sfxRef <- use $ clTEntGlobals.clteSfxRic3
+                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
                _ ->
                  return ()
 
        | any (== entType) [Constants.teScreenSparks, Constants.teShieldSparks] -> do
-           io (print "CLTEnt.parseTEnt 3") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+
+           if entType == Constants.teScreenSparks
+             then CLFX.particleEffect pos dir 0xD0 40
+             else CLFX.particleEffect pos dir 0xB0 40
+
+           -- FIXME: replace or remove this sound
+           sfxRef <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
          -- bullet hitting wall
        | entType == Constants.teShotgun -> do
-           io (print "CLTEnt.parseTEnt 4") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+
+           CLFX.particleEffect pos dir 0 20
+
+           smokeAndFlash pos
 
          -- bullet hitting water
        | entType == Constants.teSplash -> do
@@ -626,10 +640,16 @@ parseTEnt = do
              S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnStatic 0
 
        | entType == Constants.teLaserSparks -> do
-           io (print "CLTEnt.parseTEnt 6") >> undefined -- TODO
+           cnt <- MSG.readByte (globals.netMessage)
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           color <- MSG.readByte (globals.netMessage)
+           CLFX.particleEffect2 pos dir color cnt
 
        | entType == Constants.teBlueHyperblaster -> do
-           io (print "CLTEnt.parseTEnt 7") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readPos (globals.netMessage) -- yes jake2 and original source has readPos here
+           CLFX.blasterParticles pos dir
 
          -- blaster hitting wall
        | entType == Constants.teBlaster -> do

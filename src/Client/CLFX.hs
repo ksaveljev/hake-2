@@ -326,6 +326,10 @@ particleEffect org dir color count = do
 
               addEffects (p^.cpNext) (idx + 1)
 
+particleEffect2 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+particleEffect2 org dir color count = do
+    io (putStrLn "CLFX.particleEffect2") >> undefined -- TODO
+
 explosionParticles :: V3 Float -> Quake ()
 explosionParticles org = do
     freeParticles <- use $ clientGlobals.cgFreeParticles
@@ -373,3 +377,7 @@ explosionParticles org = do
                                               }
 
               addEffects (p^.cpNext) (idx + 1) maxIdx
+
+blasterParticles :: V3 Float -> V3 Float -> Quake ()
+blasterParticles org dir = do
+    io (putStrLn "CLFX.blasterParticles") >> undefined -- TODO
