@@ -580,8 +580,47 @@ touchItem =
 
 doRespawn :: EntThink
 doRespawn =
-  GenericEntThink "do_respawn" $ \_ -> do
-    io (putStrLn "GameItems.doRespawn") >> undefined -- TODO
+  GenericEntThink "do_respawn" $ \edictRef@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    entRef@(EdictReference entIdx) <-
+      if isJust (edict^.eTeam)
+        then do
+          edicts <- use $ gameBaseGlobals.gbGEdicts
+          let master = edict^.eTeamMaster
+              count = countDepth edicts master 0
+
+          choice <- Lib.rand
+          let choice' = (fromIntegral choice) `mod` count :: Int
+
+          return (makeChoice edicts (fromJust master) 0 choice')
+        else
+          return edictRef
+
+    zoom (gameBaseGlobals.gbGEdicts.ix entIdx) $ do
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eSolid .= Constants.solidTrigger
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity entRef
+
+    -- send an effect
+    gameBaseGlobals.gbGEdicts.ix entIdx.eEntityState.esEvent .= Constants.evItemRespawn
+
+    return False
+
+  where countDepth :: V.Vector EdictT -> Maybe EdictReference -> Int -> Int
+        countDepth _ Nothing count = count
+        countDepth edicts (Just (EdictReference entIdx)) count =
+          let ent = edicts V.! entIdx
+          in countDepth edicts (ent^.eChain) (count + 1)
+
+        makeChoice :: V.Vector EdictT -> EdictReference -> Int -> Int -> EdictReference
+        makeChoice edicts entRef@(EdictReference entIdx) idx maxIdx
+          | idx >= maxIdx = entRef
+          | otherwise =
+              let ent = edicts V.! entIdx
+              in makeChoice edicts (fromJust $ ent^.eChain) (idx + 1) maxIdx
 
 useItem :: EntUse
 useItem =
