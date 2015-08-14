@@ -207,26 +207,39 @@ setItemNames = do
           configString (Constants.csItems + idx) (fromJust (item^.giPickupName))
 
 findItemByClassname :: B.ByteString -> Quake (Maybe GItemReference)
-findItemByClassname _ = io (putStrLn "GameItems.findItemByClassname") >> undefined -- TODO
+findItemByClassname className = do
+    numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+    items <- use $ gameBaseGlobals.gbItemList
+    return $ searchByClassName items (BC.map toLower className) 1 numItems
+
+  where searchByClassName :: V.Vector GItemT -> B.ByteString -> Int -> Int -> Maybe GItemReference
+        searchByClassName items classNameLower idx maxIdx
+          | idx >= maxIdx = Nothing
+          | otherwise =
+              let item = items V.! idx
+              in if classNameLower == BC.map toLower (item^.giClassName)
+                   then Just (GItemReference idx)
+                   else searchByClassName items classNameLower (idx + 1) maxIdx
 
 findItem :: B.ByteString -> Quake (Maybe GItemReference)
 findItem pickupName = do
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    searchResult <- searchByName (BC.map toLower pickupName) 1 numItems
+    items <- use $ gameBaseGlobals.gbItemList
+    let searchResult = searchByName items (BC.map toLower pickupName) 1 numItems
 
     when (isNothing searchResult) $
       Com.printf ("Item not found:" `B.append` pickupName `B.append` "\n")
 
     return searchResult
 
-  where searchByName :: B.ByteString -> Int -> Int -> Quake (Maybe GItemReference)
-        searchByName name idx maxIdx
-          | idx == maxIdx = return Nothing
-          | otherwise = do
-              Just item <- preuse $ gameBaseGlobals.gbItemList.ix idx
-              if name == BC.map toLower (fromJust $ item^.giPickupName) -- IMPROVE: this is actually bad, isn't it? what if pickup name is Nothing (in GItemT).. should be taken care of in all occasions
-                then return (Just $ GItemReference idx)
-                else searchByName name (idx + 1) maxIdx
+  where searchByName :: V.Vector GItemT -> B.ByteString -> Int -> Int -> Maybe GItemReference
+        searchByName items name idx maxIdx
+          | idx >= maxIdx = Nothing
+          | otherwise =
+              let item = items V.! idx
+              in if name == BC.map toLower (fromJust $ item^.giPickupName) -- IMPROVE: this is actually bad, isn't it? what if pickup name is Nothing (in GItemT).. should be taken care of in all occasions
+                then Just (GItemReference idx)
+                else searchByName items name (idx + 1) maxIdx
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =
