@@ -32,5 +32,4 @@ initialSCRGlobals =
              , _scrCenterTimeStart = 0
              , _scrCenterTimeOff   = 0
              , _scrCenterLines     = 0
-             , _scrEraseCenter     = 0
              }

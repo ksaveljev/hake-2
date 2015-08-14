@@ -1083,7 +1083,6 @@ data SCRGlobals =
              , _scrCenterTimeStart :: !Float
              , _scrCenterTimeOff   :: !Float
              , _scrCenterLines     :: !Int
-             , _scrEraseCenter     :: !Int
              }
 
 data RefExportT =

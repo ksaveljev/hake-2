@@ -1104,7 +1104,60 @@ drawHUDString _ _ _ _ _ = do
     io (putStrLn "SCR.drawHUDString") >> undefined -- TODO
 
 drawCenterString :: Quake ()
-drawCenterString = io (putStrLn "SCR.drawCenterString") >> undefined -- TODO
+drawCenterString = do
+    str <- use $ scrGlobals.scrCenterString
+
+    unless (B.null str) $ do
+      centerLines <- use $ scrGlobals.scrCenterLines
+      vidDef' <- use $ globals.vidDef
+
+      -- the finale prints the characters one at a time
+      let y = if centerLines <= 4
+                then truncate (fromIntegral (vidDef'^.vdHeight) * 0.35)
+                else 48
+
+      drawLines str vidDef' 9999 y 0
+
+  where drawLines :: B.ByteString -> VidDefT -> Int -> Int -> Int -> Quake ()
+        drawLines str vidDef' remaining y start = do
+          -- scan the width of the line
+          let len = scanLineWidth str start 0 40
+              x = ((vidDef'^.vdWidth) - len * 8) `div` 2
+
+          addDirtyPoint x y
+
+          (remaining', x') <- drawLine str remaining start x y 0 len
+          let y' = y + 8
+
+          addDirtyPoint x' y'
+
+          let start' = findEndOfLine str start
+
+          when (start' < B.length str) $
+            drawLines str vidDef' remaining' y' (start' + 1) -- skip the \n
+
+        scanLineWidth :: B.ByteString -> Int -> Int -> Int -> Int
+        scanLineWidth str s idx maxIdx
+          | idx >= maxIdx || (s + idx) >= B.length str = idx
+          | otherwise =
+              if str `BC.index` (s + idx) == '\n'
+                then idx
+                else scanLineWidth str s (idx + 1) maxIdx
+
+        drawLine :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Int -> Quake (Int, Int)
+        drawLine str remaining start x y idx maxIdx
+          | idx >= maxIdx = return (remaining, x)
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reDrawChar) x y (ord (str `BC.index` (start + idx)))
+              if remaining == 0
+                then return (0, x)
+                else drawLine str (remaining - 1) start (x + 8) y (idx + 1) maxIdx
+
+        findEndOfLine :: B.ByteString -> Int -> Int
+        findEndOfLine str idx
+          | idx >= B.length str || str `BC.index` idx == '\n' = idx
+          | otherwise = findEndOfLine str (idx + 1)
 
 readNextFrame :: Quake (Maybe B.ByteString)
 readNextFrame = do
