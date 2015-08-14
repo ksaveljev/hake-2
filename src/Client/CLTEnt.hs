@@ -574,7 +574,32 @@ parseTEnt = do
 
          -- bullet hitting wall
        | any (== entType) [Constants.teGunshot, Constants.teSparks, Constants.teBulletSparks] -> do
-           io (print "CLTEnt.parseTEnt 2") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+
+           if entType == Constants.teGunshot
+             then CLFX.particleEffect pos dir 0x00 40
+             else CLFX.particleEffect pos dir 0xE0 6
+
+           when (entType /= Constants.teSparks) $ do
+             smokeAndFlash pos
+
+             -- impact sound
+             r <- Lib.rand
+             let cnt = r .&. 15
+
+             case cnt of
+               1 -> do
+                 sfx <- use $ clTEntGlobals.clteSfxRic1
+                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+               2 -> do
+                 sfx <- use $ clTEntGlobals.clteSfxRic2
+                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+               3 -> do
+                 sfx <- use $ clTEntGlobals.clteSfxRic3
+                 S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+               _ ->
+                 return ()
 
        | any (== entType) [Constants.teScreenSparks, Constants.teShieldSparks] -> do
            io (print "CLTEnt.parseTEnt 3") >> undefined -- TODO
@@ -788,3 +813,52 @@ allocExplosion = do
               if (ex^.eStart) < time
                 then findOldestExplosion explosions (ex^.eStart) idx (idx + 1) maxIdx
                 else findOldestExplosion explosions time oldestIdx (idx + 1) maxIdx
+
+smokeAndFlash :: V3 Float -> Quake ()
+smokeAndFlash origin = do
+    setFirstEx
+    setSecondEx
+
+  where setFirstEx :: Quake ()
+        setFirstEx = do
+          exRef <- allocExplosion
+
+          smokeModel <- use $ clTEntGlobals.clteModSmoke
+
+          let ent = newEntityT { _enFlags = Constants.rfTranslucent
+                               , _eModel  = smokeModel
+                               , _eOrigin = origin
+                               }
+
+          entRef <- io $ newIORef ent
+          serverTime <- use $ globals.cl.csFrame.fServerTime
+
+          let ex = newExplosionT { _eType       = exMisc
+                                 , _eEnt        = entRef
+                                 , _eFrames     = 4
+                                 , _eStart      = fromIntegral (serverTime  - 100)
+                                 }
+
+          io $ writeIORef exRef ex
+
+        setSecondEx :: Quake ()
+        setSecondEx = do
+          exRef <- allocExplosion
+
+          flashModel <- use $ clTEntGlobals.clteModFlash
+
+          let ent = newEntityT { _enFlags = Constants.rfFullBright
+                               , _eModel  = flashModel
+                               , _eOrigin = origin
+                               }
+
+          entRef <- io $ newIORef ent
+          serverTime <- use $ globals.cl.csFrame.fServerTime
+
+          let ex = newExplosionT { _eType       = exFlash
+                                 , _eEnt        = entRef
+                                 , _eFrames     = 2
+                                 , _eStart      = fromIntegral (serverTime  - 100)
+                                 }
+
+          io $ writeIORef exRef ex
