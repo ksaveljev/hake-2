@@ -653,11 +653,47 @@ parseTEnt = do
 
          -- blaster hitting wall
        | entType == Constants.teBlaster -> do
-           io (print "CLTEnt.parseTEnt 8") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           CLFX.blasterParticles pos dir
+
+           exRef <- allocExplosion
+           model <- use $ clTEntGlobals.clteModExplode
+
+           let v = if | (dir^._x) /= 0 -> (atan2 (dir^._y) (dir^._x)) / pi * 180
+                      | (dir^._y) > 0 -> 90
+                      | (dir^._y) < 0 -> 270
+                      | otherwise -> 0
+
+               ent = newEntityT { _enFlags = Constants.rfFullBright .|. Constants.rfTranslucent
+                                , _eAngles = V3 ((acos (dir^._z)) / pi * 180) v 0
+                                , _eModel  = model
+                                , _eOrigin = pos
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+
+           let ex = newExplosionT { _eType       = exMisc
+                                  , _eEnt        = entRef
+                                  , _eFrames     = 4
+                                  , _eLight      = 150
+                                  , _eLightColor = V3 1.0 1.0 0.0
+                                  , _eStart      = fromIntegral (serverTime  - 100)
+                                  }
+
+           io $ writeIORef exRef ex
+
+           sfxRef <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
          -- railgun effect
        | entType == Constants.teRailTrail -> do
-           io (print "CLTEnt.parseTEnt 9") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           pos2 <- MSG.readPos (globals.netMessage)
+           CLFX.railTrail pos pos2
+           sfxRef <- use $ clTEntGlobals.clteSfxRailg
+           S.startSound (Just pos2) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
            io (print "CLTEnt.parseTEnt 10") >> undefined -- TODO
