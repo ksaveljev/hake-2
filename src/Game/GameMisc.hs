@@ -460,7 +460,27 @@ spMiscExploBox er@(EdictReference edictIdx) = do
         linkEntity er
 
 spMiscBlackHole :: EdictReference -> Quake ()
-spMiscBlackHole _ = io (putStrLn "GameMisc.spMiscBlackHole") >> undefined -- TODO
+spMiscBlackHole edictRef@(EdictReference edictIdx) = do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    mIdx <- modelIndex (Just "models/objects/black/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidNot
+      eMins .= V3 (-64) (-64) 0
+      eMaxs .= V3 64 64 8
+      eEntityState.esModelIndex .= mIdx
+      eEntityState.esRenderFx .= Constants.rfTranslucent
+      eUse .= Just miscBlackHoleUse
+      eThink .= Just miscBlackHoleThink
+      eNextThink .= levelTime + 2 * Constants.frameTime
+
+    linkEntity edictRef
 
 spMiscEasterTank :: EdictReference -> Quake ()
 spMiscEasterTank _ = io (putStrLn "GameMisc.spMiscEasterTank") >> undefined -- TODO
@@ -788,3 +808,13 @@ funcObjectTouch :: EntTouch
 funcObjectTouch =
   GenericEntTouch "func_object_touch" $ \_ _ _ _ -> do
     io (putStrLn "GameMisc.funcObjectTouch") >> undefined -- TODO
+
+miscBlackHoleUse :: EntUse
+miscBlackHoleUse =
+  GenericEntUse "misc_blackhole_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.miscBlackHoleUse") >> undefined -- TODO
+
+miscBlackHoleThink :: EntThink
+miscBlackHoleThink =
+  GenericEntThink "misc_blackhole_think" $ \_ -> do
+    io (putStrLn "GameMisc.miscBlackHoleThink") >> undefined -- TODO
