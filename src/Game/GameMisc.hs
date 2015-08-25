@@ -483,16 +483,102 @@ spMiscBlackHole edictRef@(EdictReference edictIdx) = do
     linkEntity edictRef
 
 spMiscEasterTank :: EdictReference -> Quake ()
-spMiscEasterTank _ = io (putStrLn "GameMisc.spMiscEasterTank") >> undefined -- TODO
+spMiscEasterTank edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    mIdx <- modelIndex (Just "models/monsters/tank/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eMins .= V3 (-32) (-32) (-16)
+      eMaxs .= V3 32 32 32
+      eEntityState.esModelIndex .= mIdx
+      eEntityState.esFrame .= 254
+      eThink .= Just miscEasterTankThink
+      eNextThink .= levelTime + 2 * Constants.frameTime
+
+    linkEntity edictRef
 
 spMiscEasterChick :: EdictReference -> Quake ()
-spMiscEasterChick _ = io (putStrLn "GameMisc.spMiscEasterChick") >> undefined -- TODO
+spMiscEasterChick edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    mIdx <- modelIndex (Just "models/monsters/bitch/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eMins .= V3 (-32) (-32) 0
+      eMaxs .= V3 32 32 32
+      eEntityState.esModelIndex .= mIdx
+      eEntityState.esFrame .= 208
+      eThink .= Just miscEasterChickThink
+      eNextThink .= levelTime + 2 * Constants.frameTime
+
+    linkEntity edictRef
 
 spMiscEasterChick2 :: EdictReference -> Quake ()
-spMiscEasterChick2 _ = io (putStrLn "GameMisc.spMiscEasterChick2") >> undefined -- TODO
+spMiscEasterChick2 edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    mIdx <- modelIndex (Just "models/monsters/bitch/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eMins .= V3 (-32) (-32) 0
+      eMaxs .= V3 32 32 32
+      eEntityState.esModelIndex .= mIdx
+      eEntityState.esFrame .= 248
+      eThink .= Just miscEasterChick2Think
+      eNextThink .= levelTime + 2 * Constants.frameTime
+
+    linkEntity edictRef
 
 spMonsterCommanderBody :: EdictReference -> Quake ()
-spMonsterCommanderBody _ = io (putStrLn "GameMisc.spMonsterCommanderBody") >> undefined -- TODO
+spMonsterCommanderBody selfRef@(EdictReference selfIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+        soundIndex = gameImport^.giSoundIndex
+
+    mIdx <- modelIndex (Just "models/monsters/commandr/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eiModel .= Just "models/monsters/commandr/tris.md2"
+      eEntityState.esModelIndex .= mIdx
+      eMins .= V3 (-32) (-32) 0
+      eMaxs .= V3 32 32 48
+      eUse .= Just commanderBodyUse
+      eTakeDamage .= Constants.damageYes
+      eFlags .= Constants.flGodMode
+      eEntityState.esRenderFx %= (.|. Constants.rfFrameLerp)
+
+    linkEntity selfRef
+    
+    void $ soundIndex (Just "tank/thud.wav")
+    void $ soundIndex (Just "tank/pain.wav")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eThink .= Just commanderBodyDrop
+      eNextThink .= levelTime + 5 * Constants.frameTime
 
 spMiscBanner :: EdictReference -> Quake ()
 spMiscBanner edictRef@(EdictReference edictIdx) = do
@@ -818,3 +904,28 @@ miscBlackHoleThink :: EntThink
 miscBlackHoleThink =
   GenericEntThink "misc_blackhole_think" $ \_ -> do
     io (putStrLn "GameMisc.miscBlackHoleThink") >> undefined -- TODO
+
+miscEasterTankThink :: EntThink
+miscEasterTankThink =
+  GenericEntThink " misc_eastertank_think" $ \_ -> do
+    io (putStrLn "GameMisc.miscEasterTankThink") >> undefined -- TODO
+
+miscEasterChickThink :: EntThink
+miscEasterChickThink =
+  GenericEntThink "misc_easterchick_think" $ \_ -> do
+    io (putStrLn "GameMisc.miscEasterChickThink") >> undefined -- TODO
+
+miscEasterChick2Think :: EntThink
+miscEasterChick2Think =
+  GenericEntThink "misc_easterchick2_think" $ \_ -> do
+    io (putStrLn "GameMisc.miscEasterChick2Think") >> undefined -- TODO
+
+commanderBodyUse :: EntUse
+commanderBodyUse =
+  GenericEntUse "commander_body_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.commanderBodyUse") >> undefined -- TODO
+
+commanderBodyDrop :: EntThink
+commanderBodyDrop =
+  GenericEntThink "commander_body_drop" $ \_ -> do
+    io (putStrLn "GameMisc.commanderBodyDrop") >> undefined -- TODO
