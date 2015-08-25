@@ -319,7 +319,47 @@ spFuncWall edictRef@(EdictReference edictIdx) = do
             gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. 2)
 
 spFuncObject :: EdictReference -> Quake ()
-spFuncObject _ = io (putStrLn "GameMisc.spFuncObject") >> undefined -- TODO
+spFuncObject selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+        mins = fmap (+ 1) (self^.eMins)
+        maxs = fmap (subtract 1) (self^.eMaxs)
+        dmg = if (self^.eDmg) == 0 then 100 else self^.eDmg
+        effects = if (self^.eSpawnFlags) .&. 2 /= 0 then (self^.eEntityState.esEffects) .|. Constants.efAnimAll else self^.eEntityState.esEffects
+        effects' = if (self^.eSpawnFlags) .&. 4 /= 0 then (self^.eEntityState.esEffects) .|. Constants.efAnimAllFast else effects
+
+    if (self^.eSpawnFlags) == 0
+      then do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMins .= mins
+          eMaxs .= maxs
+          eDmg .= dmg
+          eEntityState.esEffects .= effects'
+          eClipMask .= Constants.maskMonsterSolid
+          eSolid .= Constants.solidBsp
+          eMoveType .= Constants.moveTypePush
+          eThink .= Just funcObjectRelease
+          eNextThink .= levelTime + 2 * Constants.frameTime
+
+      else
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMins .= mins
+          eMaxs .= maxs
+          eDmg .= dmg
+          eEntityState.esEffects .= effects'
+          eClipMask .= Constants.maskMonsterSolid
+          eSolid .= Constants.solidNot
+          eMoveType .= Constants.moveTypePush
+          eUse .= Just funcObjectUse
+          eSvFlags %= (.|. Constants.svfNoClient)
+
+    linkEntity selfRef
 
 spFuncExplosive :: EdictReference -> Quake ()
 spFuncExplosive er@(EdictReference edictIdx) = do
@@ -723,3 +763,28 @@ miscBannerThink =
     gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame %= (`mod` 16) . (+ 1)
     gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= levelTime + Constants.frameTime
     return True
+
+funcObjectRelease :: EntThink
+funcObjectRelease =
+  GenericEntThink "func_object_release" $ \(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMoveType .= Constants.moveTypeToss
+      eTouch .= Just funcObjectTouch
+
+    return True
+
+funcObjectUse :: EntUse
+funcObjectUse =
+  GenericEntUse "func_object_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSolid .= Constants.solidBsp
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eUse .= Nothing
+
+    GameUtil.killBox selfRef
+    void $ think funcObjectRelease selfRef
+
+funcObjectTouch :: EntTouch
+funcObjectTouch =
+  GenericEntTouch "func_object_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameMisc.funcObjectTouch") >> undefined -- TODO
