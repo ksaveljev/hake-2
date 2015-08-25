@@ -385,3 +385,11 @@ blasterParticles org dir = do
 railTrail :: V3 Float -> V3 Float -> Quake ()
 railTrail _ _ = do
     io (putStrLn "CLFX.railTrail") >> undefined -- TODO
+
+bfgExplosionParticles :: V3 Float -> Quake ()
+bfgExplosionParticles _ = do
+    io (putStrLn "CLFX.bfgExplosionParticles") >> undefined -- TODO
+
+bubbleTrail :: V3 Float -> V3 Float -> Quake ()
+bubbleTrail _ _ = do
+    io (putStrLn "CLFX.bubbleTrail") >> undefined -- TODO

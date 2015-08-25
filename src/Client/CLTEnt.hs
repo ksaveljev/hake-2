@@ -696,10 +696,75 @@ parseTEnt = do
            S.startSound (Just pos2) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
-           io (print "CLTEnt.parseTEnt 10") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           exRef <- allocExplosion
+
+           r <- liftM (fromIntegral . (`mod` 360)) Lib.rand
+           model <- use $ clTEntGlobals.clteModExplo4
+
+           let ent = newEntityT { _enFlags = Constants.rfFullBright
+                                , _eAngles = V3 0 r 0
+                                , _eModel  = model
+                                , _eOrigin = pos
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+
+           let ex = ExplosionT { _eType       = exPoly
+                               , _eEnt        = entRef
+                               , _eFrames     = 19
+                               , _eLight      = 350
+                               , _eLightColor = V3 1.0 0.5 0.5
+                               , _eStart      = fromIntegral (serverTime  - 100)
+                               , _eBaseFrame  = 30
+                               }
+
+           io $ writeIORef exRef ex
+
+           CLFX.explosionParticles pos
+
+           sfxRef <- if entType == Constants.teGrenadeExplosionWater
+                       then use $ clTEntGlobals.clteSfxWatrExp
+                       else use $ clTEntGlobals.clteSfxGrenExp
+
+           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.tePlasmaExplosion -> do
-           io (print "CLTEnt.parseTEnt 11") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           exRef <- allocExplosion
+
+           r <- liftM (fromIntegral . (`mod` 360)) Lib.rand
+           model <- use $ clTEntGlobals.clteModExplo4
+
+           let ent = newEntityT { _enFlags = Constants.rfFullBright
+                                , _eAngles = V3 0 r 0
+                                , _eModel  = model
+                                , _eOrigin = pos
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+           f <- Lib.randomF
+           let baseFrame = if f < 0.5 then 15 else 0
+
+           let ex = ExplosionT { _eType       = exPoly
+                               , _eEnt        = entRef
+                               , _eFrames     = 15
+                               , _eLight      = 350
+                               , _eLightColor = V3 1.0 0.5 0.5
+                               , _eStart      = fromIntegral (serverTime  - 100)
+                               , _eBaseFrame  = baseFrame
+                               }
+
+           io $ writeIORef exRef ex
+
+           CLFX.explosionParticles pos
+
+           sfxRef <- use $ clTEntGlobals.clteSfxRockExp
+           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -743,16 +808,42 @@ parseTEnt = do
            S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.teBfgExplosion -> do
-           io (print "CLTEnt.parseTEnt 13") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           exRef <- allocExplosion
+
+           model <- use $ clTEntGlobals.clteModBfgExplo
+
+           let ent = newEntityT { _enFlags = Constants.rfFullBright .|. Constants.rfTranslucent
+                                , _eModel  = model
+                                , _eOrigin = pos
+                                , _eAlpha = 0.3
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+
+           let ex = newExplosionT { _eType       = exPoly
+                                  , _eEnt        = entRef
+                                  , _eFrames     = 4
+                                  , _eLight      = 350
+                                  , _eLightColor = V3 0.0 1.0 0.0
+                                  , _eStart      = fromIntegral (serverTime  - 100)
+                                  }
+
+           io $ writeIORef exRef ex
 
        | entType == Constants.teBfgBigExplosion -> do
-           io (print "CLTEnt.parseTEnt 14") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           CLFX.bfgExplosionParticles pos
 
-       | entType == Constants.teBfgLaser -> do
-           io (print "CLTEnt.parseTEnt 15") >> undefined -- TODO
+       | entType == Constants.teBfgLaser ->
+           parseLaser 0xD0D1D2D3
 
        | entType == Constants.teBubbleTrail -> do
-           io (print "CLTEnt.parseTEnt 16") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           pos2 <- MSG.readPos (globals.netMessage)
+           CLFX.bubbleTrail pos pos2
 
        | any (== entType) [Constants.teParasiteAttack, Constants.teMedicCableAttack] -> do
            io (print "CLTEnt.parseTEnt 17") >> undefined -- TODO
@@ -918,3 +1009,7 @@ smokeAndFlash origin = do
                                  }
 
           io $ writeIORef exRef ex
+
+parseLaser :: Int -> Quake ()
+parseLaser _ = do
+    io (putStrLn "CLTEnt.parseLaser") >> undefined -- TODO
