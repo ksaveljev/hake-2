@@ -269,8 +269,41 @@ bodyArmorInfo =
               }
 
 pickupArmor :: EntInteract
-pickupArmor = PickupArmor "pickup_armor" $ \_ _ -> do
-  io (putStrLn "GameItems.pickupArmor") >> undefined -- TODO
+pickupArmor = PickupArmor "pickup_armor" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) -> do
+  Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  let Just (GItemReference gItemIdx) = edict^.eItem
+
+  -- get info on new armor
+  Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+  let Just newInfo = gItem^.giInfo
+
+  oldArmorIndex <- armorIndex otherRef
+
+  Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+  let Just (GClientReference otherGClientIdx) = other^.eClient
+
+  GItemReference jacketArmorIndex <- use $ gameItemsGlobals.giJacketArmorIndex
+
+       -- handle armor shards specially
+  if | (gItem^.giTag) == Constants.armorShard ->
+         if oldArmorIndex == 0
+           then gameBaseGlobals.gbGame.glClients.ix otherGClientIdx.gcPers.cpInventory.ix jacketArmorIndex .= 2
+           else gameBaseGlobals.gbGame.glClients.ix otherGClientIdx.gcPers.cpInventory.ix oldArmorIndex += 2
+
+       -- if player has no armor, just use it
+     | oldArmorIndex == 0 ->
+         gameBaseGlobals.gbGame.glClients.ix otherGClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) .= (newInfo^.giaBaseCount)
+
+       -- use the better armor
+     | otherwise -> do
+         io (putStrLn "GameItems.pickupArmor") >> undefined -- TODO
+
+  deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+  when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $
+    setRespawn edictRef 20
+
+  return True
 
 pickupPowerArmor :: EntInteract
 pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" $ \_ _ -> do
@@ -695,3 +728,7 @@ getItemByIndex index = do
     if index == 0 || index >= numItems
       then return Nothing
       else preuse $ gameBaseGlobals.gbItemList.ix index
+
+setRespawn :: EdictReference -> Float -> Quake ()
+setRespawn _ _ = do
+    io (putStrLn "GameItems.setRespawn") >> undefined -- TODO
