@@ -1172,7 +1172,7 @@ class EntDieAdapter a where
     die :: a -> EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
 
 class ItemUseAdapter a where
-    itemUse :: a -> EdictReference -> GItemT -> Quake ()
+    itemUse :: a -> EdictReference -> GItemReference -> Quake ()
 
 class ItemDropAdapter a where
     drop :: a -> EdictReference -> GItemReference -> Quake ()
@@ -1228,7 +1228,7 @@ data EntDie =
 
 data ItemUse =
   GenericItemUse { _giuId :: B.ByteString
-                 , _giuUse :: EdictReference -> GItemT -> Quake ()
+                 , _giuUse :: EdictReference -> GItemReference -> Quake ()
                  }
 
 data ItemDrop =

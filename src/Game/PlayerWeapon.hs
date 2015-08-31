@@ -8,6 +8,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3(..))
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -21,10 +22,45 @@ import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+{-
+- ================ 
+- Use_Weapon
+- 
+- Make the weapon ready if there is ammo 
+- ================
+-}
 useWeapon :: ItemUse
 useWeapon =
-  GenericItemUse "Use_Weapon" $ \_ _ -> do
-    io (putStrLn "PlayerWeapon.useWeapon") >> undefined -- TODO
+  GenericItemUse "Use_Weapon" $ \edictRef@(EdictReference edictIdx) gItemRef@(GItemReference gItemIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    -- see if we're already using it
+    unless (Just gItemRef == (gClient^.gcPers.cpWeapon)) $ do
+      Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gSelectEmptyValue <- liftM (^.cvValue) gSelectEmptyCVar
+
+      if isJust (item^.giAmmo) && gSelectEmptyValue == 0 && (item^.giFlags) .&. Constants.itAmmo == 0
+        then do
+          Just (GItemReference ammoItemIdx) <- GameItems.findItem (fromJust (item^.giAmmo))
+          Just ammoItem <- preuse $ gameBaseGlobals.gbItemList.ix ammoItemIdx
+          let ammoIndex = ammoItem^.giIndex
+              quantity = (gClient^.gcPers.cpInventory) UV.! ammoIndex
+
+          cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
+
+          if | quantity == 0 ->
+                 cprintf edictRef Constants.printHigh ("No " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
+
+             | quantity < (item^.giQuantity) -> do
+                 cprintf edictRef Constants.printHigh ("Not enough " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
+
+             | otherwise ->
+                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just gItemRef
+
+        else
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just gItemRef
 
 weaponBlaster :: EntThink
 weaponBlaster =
