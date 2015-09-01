@@ -88,8 +88,55 @@ weaponBlasterFire =
 
 pickupWeapon :: EntInteract
 pickupWeapon =
-  GenericEntInteract "Pickup_Weapon" $ \_ _ -> do
-    io (putStrLn "PlayerWeapon.pickupWeapon") >> undefined -- TODO
+  GenericEntInteract "Pickup_Weapon" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+    let Just (GItemReference itemIdx) = edict^.eItem
+    Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
+    let index = item^.giIndex
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    let Just (GClientReference otherClientIdx) = other^.eClient
+    Just otherClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix otherClientIdx
+
+    let done = (dmFlagsValue .&. Constants.dfWeaponsStay /= 0 || coopValue /= 0) && (otherClient^.gcPers.cpInventory) UV.! index /= 0 && (edict^.eSpawnFlags) .&. (Constants.droppedItem .|. Constants.droppedPlayerItem) == 0
+
+    if done
+      then
+        return False -- leave the weapon for others to pickup
+      else do
+        gameBaseGlobals.gbGame.glClients.ix otherClientIdx.gcPers.cpInventory.ix index += 1
+
+        when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0) $ do
+          -- give them some ammo with it
+          Just ammoRef@(GItemReference ammoIdx) <- GameItems.findItem (fromJust $ item^.giAmmo)
+          Just ammo <- preuse $ gameBaseGlobals.gbItemList.ix ammoIdx
+
+          void $ if dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0
+                   then GameItems.addAmmo otherRef ammoRef 1000
+                   else GameItems.addAmmo otherRef ammoRef (ammo^.giQuantity)
+
+          when ((edict^.eSpawnFlags) .&. Constants.droppedPlayerItem == 0) $ do
+            when (deathmatchValue /= 0) $
+              if dmFlagsValue .&. Constants.dfWeaponsStay /= 0
+                then gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flRespawn)
+                else GameItems.setRespawn edictRef 30
+
+            when (coopValue /= 0) $
+              gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flRespawn)
+
+        Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        Just otherClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix otherClientIdx
+
+        blasterIdx <- GameItems.findItem "blaster"
+
+        when ((otherClient'^.gcPers.cpWeapon) /= (edict'^.eItem) && (otherClient'^.gcPers.cpInventory) UV.! index == 1 && (deathmatchValue == 0 || (otherClient'^.gcPers.cpWeapon) == blasterIdx)) $
+          gameBaseGlobals.gbGame.glClients.ix otherClientIdx.gcNewWeapon .= (edict'^.eItem)
+
+        return True
 
 dropWeapon :: ItemDrop
 dropWeapon =

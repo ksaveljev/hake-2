@@ -732,3 +732,7 @@ getItemByIndex index = do
 setRespawn :: EdictReference -> Float -> Quake ()
 setRespawn _ _ = do
     io (putStrLn "GameItems.setRespawn") >> undefined -- TODO
+
+addAmmo :: EdictReference -> GItemReference -> Int -> Quake Bool
+addAmmo _ _ _ = do
+    io (putStrLn "GameItems.addAmmo") >> undefined -- TODO
