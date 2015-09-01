@@ -7,7 +7,7 @@ import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, fromJust)
-import Linear (V3(..))
+import Linear (V3(..), _x)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -169,8 +169,54 @@ weaponShotgun =
 
 weaponShotgunFire :: EntThink
 weaponShotgunFire =
-  GenericEntThink "weapon_shotgun_fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponShotgunFire") >> undefined -- TODO
+  GenericEntThink "weapon_shotgun_fire" $ \edictRef@(EdictReference edictIdx) -> do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    if (client^.gcPlayerState.psGunFrame) == 9
+      then do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+        return True
+      else do
+        let (Just forward, Just right, _) = Math3D.angleVectors (client^.gcVAngle) True True False
+            kickOrigin = fmap (* (-2)) forward
+            offset = V3 0 8 (fromIntegral (edict^.eViewHeight) - 8)
+
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcKickOrigin .= kickOrigin
+          gcKickAngles._x .= (-2)
+
+        isQuad <- use $ gameBaseGlobals.gbIsQuad
+        isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+        dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+        let start = projectSource client (edict^.eEntityState.esOrigin) offset forward right
+            damage = if isQuad then 4 * 4 else 4
+            kick = if isQuad then 8 * 4 else 8
+            writeByte = gameImport^.giWriteByte
+            writeShort = gameImport^.giWriteShort
+            multicast = gameImport^.giMulticast
+
+        if deathmatchValue /= 0
+          then GameWeapon.fireShotgun edictRef start forward damage kick 500 500 Constants.defaultDeathmatchShotgunCount Constants.modShotgun
+          else GameWeapon.fireShotgun edictRef start forward damage kick 500 500 Constants.defaultShotgunCount Constants.modShotgun
+
+        -- send muzzle flash
+        writeByte Constants.svcMuzzleFlash
+        writeShort (edict^.eIndex)
+        writeByte (Constants.mzShotgun .|. isSilenced)
+        multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+        playerNoise edictRef start Constants.pNoiseWeapon
+
+        when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (client^.gcAmmoIndex) -= 1
+
+        return True
 
 weaponSuperShotgun :: EntThink
 weaponSuperShotgun = 

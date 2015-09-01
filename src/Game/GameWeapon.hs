@@ -55,6 +55,10 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
     when ((traceT^.tFraction) < 1.0) $ do
       io (putStrLn "GameWeapon.fireBlaster") >> undefined -- TODO
 
+fireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireShotgun _ _ _ _ _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireShotgun") >> undefined -- TODO
+
 {-
 - ================= 
 - check_dodge
