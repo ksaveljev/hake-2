@@ -314,12 +314,58 @@ weaponRailgun =
         fireFrames = UV.fromList [4, 0]
 
     weaponGeneric edictRef 3 18 56 61 pauseFrames fireFrames weaponRailgunFire
-    io (putStrLn "PlayerWeapon.weaponRailgun") >> undefined -- TODO
+    return True
 
 weaponRailgunFire :: EntThink
 weaponRailgunFire =
-  GenericEntThink "weapon_railgun_fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponRailgunFire") >> undefined -- TODO
+  GenericEntThink "weapon_railgun_fire" $ \edictRef@(EdictReference edictIdx) -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+
+    let (damage, kick) = if deathmatchValue /= 0 -- normal damage is too extreme in dm
+                           then if isQuad
+                                  then (100 * 4, 200 * 4)
+                                  else (100, 200)
+                           else if isQuad
+                                  then (150 * 4, 250 * 4)
+                                  else (150, 250)
+
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    let (Just forward, Just right, _) = Math3D.angleVectors (client^.gcVAngle) True True False
+        kickOrigin = fmap (* (-3)) forward
+        offset = V3 0 7 (fromIntegral (edict^.eViewHeight) - 8)
+
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcKickOrigin .= kickOrigin
+      gcKickAngles._x .= (-3)
+
+    let start = projectSource client (edict^.eEntityState.esOrigin) offset forward right
+
+    GameWeapon.fireRail edictRef start forward damage kick
+
+    -- send muzzle flash
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcMuzzleFlash
+    writeShort (edict^.eIndex)
+    writeByte (Constants.mzRailgun .|. isSilenced)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+    playerNoise edictRef start Constants.pNoiseWeapon
+
+    when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (client^.gcAmmoIndex) -= 1
+
+    return True
 
 weaponBFG :: EntThink
 weaponBFG =

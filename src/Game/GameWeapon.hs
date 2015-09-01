@@ -59,6 +59,10 @@ fireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> In
 fireShotgun _ _ _ _ _ _ _ _ _ = do
     io (putStrLn "GameWeapon.fireShotgun") >> undefined -- TODO
 
+fireRail :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
+fireRail _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireRail") >> undefined -- TODO
+
 {-
 - ================= 
 - check_dodge
