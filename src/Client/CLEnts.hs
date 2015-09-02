@@ -234,26 +234,26 @@ parseDelta from to number bits = do
                , _esSolid       = solid
                }
 
-    -- io (print "ENTITYENTITY")
-    -- io (print number)
-    -- io (print modelIndex)
-    -- io (print modelIndex2)
-    -- io (print modelIndex3)
-    -- io (print modelIndex4)
-    -- io (print frame')
-    -- io (print skinNum)
-    -- io (print effects)
-    -- io (print renderFx)
-    -- io (print originX)
-    -- io (print originY)
-    -- io (print originZ)
-    -- io (print anglesX)
-    -- io (print anglesY)
-    -- io (print anglesZ)
-    -- io (print oldOrigin)
-    -- io (print sound)
-    -- io (print event)
-    -- io (print solid)
+    --io (print "parseDelta: ENTITYENTITY")
+    --io (print number)
+    --io (print modelIndex)
+    --io (print modelIndex2)
+    --io (print modelIndex3)
+    --io (print modelIndex4)
+    --io (print frame')
+    --io (print skinNum)
+    --io (print effects)
+    --io (print renderFx)
+    --io (print originX)
+    --io (print originY)
+    --io (print originZ)
+    --io (print anglesX)
+    --io (print anglesY)
+    --io (print anglesZ)
+    --io (print oldOrigin)
+    --io (print sound)
+    --io (print event)
+    --io (print solid)
 
 parseFrame :: Quake ()
 parseFrame = do
@@ -568,8 +568,9 @@ parsePacketEntities oldFrame newFrameLens = do
 
           showNetValue <- liftM (^.cvValue) clShowNetCVar
 
-          -- io (print $ "BITS = " ++ show bits')
-          -- io (print $ "NEW NUM = " ++ show newNum)
+          --io (print $ "BITS = " ++ show bits')
+          --io (print $ "NEW NUM = " ++ show newNum)
+          --io (print $ "OLD NUM = " ++ show oldNum)
 
           if newNum == 0
             then
@@ -600,7 +601,7 @@ parsePacketEntities oldFrame newFrameLens = do
                        when (showNetValue == 3) $
                          Com.printf ("   delta: " `B.append` BC.pack (show newNum) `B.append` "\n") -- IMPROVE ?
 
-                       deltaEntity newFrameLens newNum (fromJust oldState) bits'
+                       deltaEntity newFrameLens newNum (fromJust oldState') bits'
 
                        let Just oldFrame' = oldFrame
                        if (oldIndex' + 1) >= oldFrame'^.fNumEntities
@@ -692,6 +693,11 @@ deltaEntity frameLens newNum old bits = do
     let idx = parseEntities .&. (Constants.maxParseEntities - 1)
     globals.cl.csParseEntities += 1
     frameLens.fNumEntities += 1
+
+    --io (print "DELTA ENTITY")
+    --io (print ("number = " ++ show newNum))
+    --io (print ("old number = " ++ show (old^.esNumber)))
+    --io (print ("modelindex = " ++ show (old^.esModelIndex)))
 
     parseDelta old (globals.clParseEntities.ix idx) newNum bits
 

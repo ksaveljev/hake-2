@@ -223,6 +223,14 @@ writeDeltaEntity from to sizeBufLens force newEntity = do
       -- io (print $ "finalBits = " ++ show finalBits)
       writeByteI sizeBufLens (finalBits .&. 255)
 
+      --io (print "writeDelta ENTITYENTITY")
+      --io (print "FROM")
+      --io (print (from^.esNumber))
+      --io (print (from^.esModelIndex))
+      --io (print "TO")
+      --io (print (to^.esNumber))
+      --io (print (to^.esModelIndex))
+
       if | finalBits .&. 0xFF000000 /= 0 -> do
              writeByteI sizeBufLens ((finalBits `shiftR`  8) .&. 0xFF)
              writeByteI sizeBufLens ((finalBits `shiftR` 16) .&. 0xFF)

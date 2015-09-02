@@ -1020,6 +1020,9 @@ rDrawEntitiesOnList = do
                          rDrawNullModel
                        Just modelRef -> do
                          model <- io $ readIORef modelRef
+
+                         --io (print ("nontrans model: = " `B.append` (model^.mName)))
+
                          if | (model^.mType) == RenderAPIConstants.modAlias ->
                                 Mesh.rDrawAliasModel currentEntityRef
 
@@ -1057,6 +1060,8 @@ rDrawEntitiesOnList = do
                          rDrawNullModel
                        Just modelRef -> do
                          model <- io $ readIORef modelRef
+
+                         --io (print ("trans model: = " `B.append` (model^.mName)))
 
                          if | (model^.mType) == RenderAPIConstants.modAlias ->
                                 Mesh.rDrawAliasModel currentEntityRef
