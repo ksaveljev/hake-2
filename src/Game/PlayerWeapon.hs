@@ -6,7 +6,7 @@ module Game.PlayerWeapon where
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3(..), _x)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
@@ -17,6 +17,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
+import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
 import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Util.Lib as Lib
@@ -702,9 +703,87 @@ blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
 
     playerNoise edictRef start Constants.pNoiseWeapon
 
+{-
+- =============== 
+- PlayerNoise
+- 
+- Each player can have two noise objects associated with it: a personal
+- noise (jumping, pain, weapon firing), and a weapon target noise (bullet
+- wall impacts)
+- 
+- Monsters that don't directly see the player can move to a noise in hopes
+- of seeing the player from there. 
+- ===============
+-}
 playerNoise :: EdictReference -> V3 Float -> Int -> Quake ()
-playerNoise _ _ _ = do
-    io (putStrLn "PlayerWeapon.playerNoise") >> undefined -- TODO
+playerNoise whoRef@(EdictReference whoIdx) noiseLocation noiseType = do
+    Just who <- preuse $ gameBaseGlobals.gbGEdicts.ix whoIdx
+    let Just (GClientReference gClientIdx) = who^.eClient
+    Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if | noiseType == Constants.pNoiseWeapon && (client^.gcSilencerShots) > 0 ->
+           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcSilencerShots -= 1
+
+       | deathmatchValue /= 0 || (who^.eFlags) .&. Constants.flNoTarget /= 0 ->
+           return ()
+
+       | otherwise -> do
+           when (isNothing (who^.eMyNoise)) $ do
+             noiseRef@(EdictReference noiseIdx) <- GameUtil.spawn
+
+             zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx) $ do
+               eClassName .= "player_noise"
+               eMins .= V3 (-8) (-8) (-8)
+               eMaxs .= V3 8 8 8
+               eOwner .= Just whoRef
+               eSvFlags .= Constants.svfNoClient
+
+             noiseRef'@(EdictReference noiseIdx') <- GameUtil.spawn
+
+             zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx') $ do
+               eClassName .= "player_noise"
+               eMins .= V3 (-8) (-8) (-8)
+               eMaxs .= V3 8 8 8
+               eOwner .= Just whoRef
+               eSvFlags .= Constants.svfNoClient
+
+             zoom (gameBaseGlobals.gbGEdicts.ix whoIdx) $ do
+               eMyNoise .= Just noiseRef
+               eMyNoise2 .= Just noiseRef'
+
+           Just who' <- preuse $ gameBaseGlobals.gbGEdicts.ix whoIdx
+
+           Just noiseRef@(EdictReference noiseIdx) <-
+             if noiseType == Constants.pNoiseSelf || noiseType == Constants.pNoiseWeapon
+               then do
+                 frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+                 zoom (gameBaseGlobals.gbLevel) $ do
+                   llSoundEntity .= (who'^.eMyNoise)
+                   llSoundEntityFrameNum .= frameNum
+
+                 return (who'^.eMyNoise)
+               else do
+                 frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+                 zoom (gameBaseGlobals.gbLevel) $ do
+                   llSound2Entity .= (who'^.eMyNoise2)
+                   llSound2EntityFrameNum .= frameNum
+
+                 return (who'^.eMyNoise2)
+
+           Just noise <- preuse $ gameBaseGlobals.gbGEdicts.ix noiseIdx
+           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+           zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx) $ do
+             eEntityState.esOrigin .= noiseLocation
+             eAbsMin .= (noiseLocation - (noise^.eMaxs))
+             eAbsMax .= (noiseLocation + (noise^.eMaxs))
+             eTeleportTime .= levelTime
+
+           linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+           linkEntity noiseRef
 
 noAmmoWeaponChange :: EdictReference -> Quake ()
 noAmmoWeaponChange _ = do
