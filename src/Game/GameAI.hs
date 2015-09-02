@@ -273,6 +273,11 @@ aiRun =
 
           pursueNext selfRef dist new1
 
+          M.moveToGoal selfRef dist
+
+          GameUtil.freeEdict tempGoal
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= save -- TODO: jake2 checks for self != null here, do we need it?
+
         calcNew1 :: EdictReference -> Quake Bool
         calcNew1 selfRef@(EdictReference selfIdx) = do
           Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx

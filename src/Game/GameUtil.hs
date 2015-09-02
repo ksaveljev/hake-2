@@ -251,8 +251,106 @@ monsterUse =
 
 mCheckAttack :: EntThink
 mCheckAttack =
-  GenericEntThink "M_CheckAttack" $ \_ -> do
-    io (putStrLn "GameUtil.mCheckAttack") >> undefined -- TODO
+  GenericEntThink "M_CheckAttack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+
+    checkEnemyHealth selfRef enemyRef
+
+  where checkEnemyHealth :: EdictReference -> EdictReference -> Quake Bool
+        checkEnemyHealth selfRef@(EdictReference selfIdx) enemyRef@(EdictReference enemyIdx) = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+          if (enemy^.eHealth) > 0
+            then do
+              let V3 a b c = self^.eEntityState.esOrigin
+                  V3 a' b' c' = enemy^.eEntityState.esOrigin
+                  spot1 = V3 a b (c + fromIntegral (self^.eViewHeight))
+                  spot2 = V3 a' b' (c' + fromIntegral (enemy^.eViewHeight))
+
+              trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+              traceT <- trace spot1 Nothing Nothing spot2 (Just selfRef) (Constants.contentsSolid .|. Constants.contentsMonster .|. Constants.contentsSlime .|. Constants.contentsLava .|. Constants.contentsWindow)
+
+              -- do we have a clear shot?
+              if (traceT^.tEnt) /= (self^.eEnemy)
+                then return False
+                else meleeAttack selfRef
+
+            else
+              meleeAttack selfRef
+
+        meleeAttack :: EdictReference -> Quake Bool
+        meleeAttack selfRef@(EdictReference selfIdx) = do
+          enemyRange <- use $ gameBaseGlobals.gbEnemyRange
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          if enemyRange == Constants.rangeMelee
+            then do
+              -- don't always melee in easy mode
+              skillValue <- liftM (^.cvValue) skillCVar
+              r <- Lib.rand
+
+              if skillValue == 0 && (r .&. 3) /= 0
+                then
+                  return False
+                else do
+                  case self^.eMonsterInfo.miMelee of
+                    Just _ -> gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asMelee
+                    Nothing -> gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asMissile
+
+                  return True
+
+            else
+              missileAttack selfRef
+
+        missileAttack :: EdictReference -> Quake Bool
+        missileAttack selfRef@(EdictReference selfIdx) = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+          enemyRange <- use $ gameBaseGlobals.gbEnemyRange
+
+          if | isNothing (self^.eMonsterInfo.miAttack) -> return False
+             | levelTime < (self^.eMonsterInfo.miAttackFinished) -> return False
+             | enemyRange == Constants.rangeFar -> return False
+             | otherwise -> do
+                 let maybeChance = if | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0 -> Just 0.4
+                                      | enemyRange == Constants.rangeMelee -> Just 0.2
+                                      | enemyRange == Constants.rangeNear -> Just 0.1
+                                      | enemyRange == Constants.rangeMid -> Just 0.02
+                                      | otherwise -> Nothing
+
+                 case maybeChance of
+                   Nothing ->
+                     return False
+
+                   Just chance -> do
+                     skillValue <- liftM (^.cvValue) skillCVar
+                     let chance' = if | skillValue == 0 -> chance * 0.5
+                                      | skillValue >= 2 -> chance * 2
+                                      | otherwise -> chance
+
+                     r <- Lib.randomF
+
+                     if r < chance'
+                       then do
+                         r' <- Lib.randomF
+
+                         zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                           eMonsterInfo.miAttackState .= Constants.asMissile
+                           eMonsterInfo.miAttackFinished .= levelTime + 2 * r'
+
+                         return True
+
+                       else do
+                         when ((self^.eFlags) .&. Constants.flFly /= 0) $ do
+                           r' <- Lib.randomF
+
+                           if r' < 0.3
+                             then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asSliding
+                             else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
+
+                         return False
 
 {-
 - Kills all entities that would touch the proposed new positioning of ent.
