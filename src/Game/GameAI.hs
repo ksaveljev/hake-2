@@ -624,10 +624,6 @@ huntTarget selfRef@(EdictReference selfIdx) = do
     when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround == 0) $
       GameUtil.attackFinished selfRef 1
 
-aiRunSlide :: EdictReference -> Float -> Quake ()
-aiRunSlide _ _ = do
-    io (putStrLn "GameAI.aiRunSlide") >> undefined -- TODO
-
 facingIdeal :: EdictT -> Bool
 facingIdeal self =
     let delta = Math3D.angleMod ((self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) - (self^.eIdealYaw))
@@ -649,6 +645,7 @@ aiRunMelee selfRef@(EdictReference selfIdx) = do
       void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
 
+-- Turn in place until within an angle to launch a missile attack.
 aiRunMissile :: EdictReference -> Quake ()
 aiRunMissile selfRef@(EdictReference selfIdx) = do
     enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
@@ -661,3 +658,24 @@ aiRunMissile selfRef@(EdictReference selfIdx) = do
     when (facingIdeal self) $ do
       void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
+
+-- Strafe sideways, but stay at aproximately the same range.
+aiRunSlide :: EdictReference -> Float -> Quake ()
+aiRunSlide selfRef@(EdictReference selfIdx) distance = do
+    enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    M.changeYaw selfRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let ofs = if (self^.eMonsterInfo.miLefty) /= 0
+                then 90
+                else -90
+
+    ok <- M.walkMove selfRef ((self^.eIdealYaw) + ofs) distance
+
+    unless ok $ do
+      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miLefty .= 1 - (self'^.eMonsterInfo.miLefty)
+      void $ M.walkMove selfRef ((self'^.eIdealYaw) - ofs) distance
