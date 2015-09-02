@@ -415,9 +415,191 @@ walkMonsterStartGo =
 
     return True
 
+{-
+- Decides if we're going to attack or do something else used by ai_run and
+- ai_stand.
+- 
+- .enemy Will be world if not currently angry at anyone.
+- 
+- .movetarget The next path spot to walk toward. If .enemy, ignore
+- .movetarget. When an enemy is killed, the monster will try to return to
+- it's path.
+- 
+- .hunt_time Set to time + something when the player is in sight, but
+- movement straight for him is blocked. This causes the monster to use wall
+- following code for movement direction instead of sighting on the player.
+- 
+- .ideal_yaw A yaw angle of the intended direction, which will be turned
+- towards at up to 45 deg / state. If the enemy is in view and hunt_time is
+- not active, this will be the exact line towards the enemy.
+- 
+- .pausetime A monster will leave it's stand state and head towards it's
+- .movetarget when time > .pausetime.
+- 
+- walkmove(angle, speed) primitive is all or nothing
+-}
 aiCheckAttack :: EdictReference -> Float -> Quake Bool
-aiCheckAttack _ _ = do
-    io (putStrLn "GameAI.aiCheckAttack") >> undefined -- TODO
+aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
+    -- this causes monsters to run blindly to the combat point w/o firing
+    result <- checkBlindRun
+
+    case result of
+      Just b ->
+        return b
+
+      Nothing -> do
+        gameBaseGlobals.gbEnemyVis .= False
+
+        -- see if the enemy is dead
+        hesDeadJim <- checkIfEnemyIsDead
+
+        done <- if hesDeadJim
+                  then lookForOtherTarget
+                  else return False
+
+        if done
+          then
+            return True
+          else do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eShowHostile .= truncate levelTime + 1 -- wake up other
+
+            -- monsters check knowledge of enemy
+            Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+            enemyVis <- GameUtil.visible selfRef (fromJust $ self^.eEnemy)
+            gameBaseGlobals.gbEnemyVis .= enemyVis
+
+            let Just (EdictReference enemyIdx) = self^.eEnemy
+            Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+            when enemyVis $
+              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                eMonsterInfo.miSearchTime .= levelTime + 5
+                eMonsterInfo.miLastSighting .= (enemy^.eEntityState.esOrigin)
+
+            let enemyInFront = GameUtil.inFront self enemy
+                enemyRange = GameUtil.range self enemy
+                temp = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+                enemyYaw = Math3D.vectorYaw temp
+
+            zoom gameBaseGlobals $ do
+              gbEnemyInFront .= enemyInFront
+              gbEnemyRange .= enemyRange
+              gbEnemyYaw .= enemyYaw
+
+            if | (self^.eMonsterInfo.miAttackState) == Constants.asMissile -> do
+                   aiRunMissile selfRef
+                   return True
+               | (self^.eMonsterInfo.miAttackState) == Constants.asMelee -> do
+                   aiRunMelee selfRef
+                   return True
+               | otherwise -> do
+                   enemyVis' <- use $ gameBaseGlobals.gbEnemyVis
+
+                   if not enemyVis'
+                     then return False
+                     else think (fromJust $ self^.eMonsterInfo.miCheckAttack) selfRef
+
+  where checkBlindRun :: Quake (Maybe Bool)
+        checkBlindRun = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          case self^.eGoalEntity of
+            Nothing ->
+              return Nothing
+
+            Just (EdictReference goalEntityIdx) -> do
+              if | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0 ->
+                     return (Just False)
+
+                 | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget /= 0 -> do
+                     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+                     let Just (EdictReference enemyIdx) = self^.eEnemy
+                     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+                     if levelTime - (enemy^.eTeleportTime) > 5.0
+                       then do
+                         when ((self^.eGoalEntity) == (self^.eEnemy)) $ do
+                           case self^.eMoveTarget of
+                             Just _ -> gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eMoveTarget)
+                             Nothing -> gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= Nothing
+
+                         gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiSoundTarget))
+                         when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $
+                           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround)))
+                         return Nothing
+                       else do
+                         gameBaseGlobals.gbGEdicts.ix selfIdx.eShowHostile .= truncate levelTime + 1
+                         return (Just False)
+
+                 | otherwise ->
+                     return Nothing
+
+        checkIfEnemyIsDead :: Quake Bool
+        checkIfEnemyIsDead = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          case self^.eEnemy of
+            Nothing ->
+              return True
+
+            Just (EdictReference enemyIdx) -> do
+              Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+              if | not (enemy^.eInUse) ->
+                     return True
+
+                 | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic /= 0 ->
+                     if (enemy^.eHealth) > 0
+                       then do
+                         gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiMedic))
+                         return True
+                       else
+                         return False
+
+                 | otherwise ->
+                     return $ if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiBrutal /= 0
+                                then if (enemy^.eHealth) <= -80
+                                       then True
+                                       else False
+                                else if (enemy^.eHealth) <= 0
+                                       then True
+                                       else False
+
+        lookForOtherTarget :: Quake Bool
+        lookForOtherTarget = do
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Nothing
+
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          oldEnemy <- case self^.eOldEnemy of
+                        Nothing -> return Nothing
+                        Just (EdictReference oldEnemyIdx) -> preuse $ gameBaseGlobals.gbGEdicts.ix oldEnemyIdx
+
+          if isJust oldEnemy && ((fromJust oldEnemy)^.eHealth) > 0
+            then do
+              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                eEnemy .= (self^.eOldEnemy)
+                eOldEnemy .= Nothing
+
+              huntTarget selfRef
+
+              return False
+            else do
+              case self^.eMoveTarget of
+                Just _ -> do
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eMoveTarget)
+                  void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
+                Nothing -> do
+                  -- we need the pausetime otherwise the stand code
+                  -- will just revert to walking with no target and
+                  -- the monsters will wonder around aimlessly trying
+                  -- to hunt the world entity
+                  levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= levelTime + 100000000
+                  void $ think (fromJust $ self^.eMonsterInfo.miStand) selfRef
+
+              return True
 
 -- Decides running or standing according to flag AI_STAND_GROUND
 huntTarget :: EdictReference -> Quake ()
@@ -445,3 +627,11 @@ huntTarget selfRef@(EdictReference selfIdx) = do
 aiRunSlide :: EdictReference -> Float -> Quake ()
 aiRunSlide _ _ = do
     io (putStrLn "GameAI.aiRunSlide") >> undefined -- TODO
+
+aiRunMelee :: EdictReference -> Quake ()
+aiRunMelee _ = do
+    io (putStrLn "GameAI.aiRunMelee") >> undefined -- TODO
+
+aiRunMissile :: EdictReference -> Quake ()
+aiRunMissile _ = do
+    io (putStrLn "GameAI.aiRunMissile") >> undefined -- TODO
