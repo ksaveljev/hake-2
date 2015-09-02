@@ -114,10 +114,23 @@ aiStand =
               else do
                 gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + rf * 15
 
+-- Turns towards target and advances
+-- Use this call with a distance of 0 to replace ai_face
 aiCharge :: AI
 aiCharge =
-  GenericAI "ai_charge" $ \_ _ -> do
-    io (putStrLn "GameAI.aiCharge") >> undefined -- TODO
+  GenericAI "ai_charge" $ \selfRef@(EdictReference selfIdx) dist -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= Math3D.vectorYaw v
+    M.changeYaw selfRef
+
+    when (dist /= 0) $ do
+      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      void $ M.walkMove selfRef (self'^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
 aiMove :: AI
 aiMove =
