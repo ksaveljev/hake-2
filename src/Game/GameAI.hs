@@ -132,10 +132,13 @@ aiCharge =
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
       void $ M.walkMove selfRef (self'^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
+-- Move the specified distance at current facing. This replaces the QC
+-- functions: ai_forward, ai_back, ai_pain, and ai_painforward
 aiMove :: AI
 aiMove =
-  GenericAI "ai_move" $ \_ _ -> do
-    io (putStrLn "GameAI.aiMove") >> undefined -- TODO
+  GenericAI "ai_move" $ \selfRef@(EdictReference selfIdx) dist -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
 -- The monster is walking it's beat.
 aiWalk :: AI
