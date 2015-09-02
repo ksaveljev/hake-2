@@ -628,10 +628,36 @@ aiRunSlide :: EdictReference -> Float -> Quake ()
 aiRunSlide _ _ = do
     io (putStrLn "GameAI.aiRunSlide") >> undefined -- TODO
 
+facingIdeal :: EdictT -> Bool
+facingIdeal self =
+    let delta = Math3D.angleMod ((self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) - (self^.eIdealYaw))
+    in if delta > 45 && delta < 315
+         then False
+         else True
+
+-- Turn and close until within an angle to launch a melee attack.
 aiRunMelee :: EdictReference -> Quake ()
-aiRunMelee _ = do
-    io (putStrLn "GameAI.aiRunMelee") >> undefined -- TODO
+aiRunMelee selfRef@(EdictReference selfIdx) = do
+    enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    M.changeYaw selfRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when (facingIdeal self) $ do
+      void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
 
 aiRunMissile :: EdictReference -> Quake ()
-aiRunMissile _ = do
-    io (putStrLn "GameAI.aiRunMissile") >> undefined -- TODO
+aiRunMissile selfRef@(EdictReference selfIdx) = do
+    enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    M.changeYaw selfRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when (facingIdeal self) $ do
+      void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
