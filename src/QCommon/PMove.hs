@@ -4,7 +4,7 @@ module QCommon.PMove where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=))
 import Control.Monad (when, unless)
-import Data.Bits ((.&.), (.|.), complement, shiftL)
+import Data.Bits ((.&.), (.|.), complement, shiftL, shiftR)
 import Data.Int (Int16)
 import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _x, _y, _z, normalize, norm, dot, cross)
@@ -94,7 +94,17 @@ pMove pmove = do
           pm <- use $ pMoveGlobals.pmPM
 
           when ((pm^.pmState.pmsPMTime) /= 0) $ do
-            io (putStrLn "PMove.pMove#dropTimingCounter") >> undefined -- TODO
+            let msec = (pm^.pmCmd.ucMsec) `shiftR` 3
+                msec' = if msec == 0 then 1 else fromIntegral msec
+                pmTime = fromIntegral (pm^.pmState.pmsPMTime) .&. 0xFF :: Int
+
+            if msec' >= pmTime
+              then
+                zoom (pMoveGlobals.pmPM.pmState) $ do
+                  pmsPMFlags %= (.&. (complement (pmfTimeWaterJump .|. pmfTimeLand .|. pmfTimeTeleport)))
+                  pmsPMTime .= 0
+              else
+                pMoveGlobals.pmPM.pmState.pmsPMTime .= fromIntegral (pmTime - msec')
 
         checkPMFlags :: Quake ()
         checkPMFlags = do
