@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Server.SVGame where
 
 import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
 import Control.Monad (when, unless, liftM)
+import Data.Bits ((.&.), shiftL, shiftR)
 import Data.Maybe (isNothing, fromJust)
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
@@ -164,7 +166,24 @@ writeAngle f = MSG.writeAngle (svGlobals.svServer.sMulticast) f
 - Also checks portalareas so that doors block sight.
 -}
 inPVS :: V3 Float -> V3 Float -> Quake Bool
-inPVS _ _ = io (putStrLn "SVGame.inPVS") >> undefined -- TODO
+inPVS p1 p2 = do
+    leafNum <- CM.pointLeafNum p1
+    cluster <- CM.leafCluster leafNum
+    area1 <- CM.leafArea leafNum
+    mask <- CM.clusterPVS cluster
+
+    leafNum' <- CM.pointLeafNum p2
+    cluster' <- CM.leafCluster leafNum'
+    area2 <- CM.leafArea leafNum'
+
+    if | cluster' == -1 -> return False
+       | (mask `B.index` (cluster' `shiftR` 3)) .&. (1 `shiftL` (cluster' .&. 7)) == 0 -> return False
+       | otherwise -> do
+           connected <- CM.areasConnected area1 area2
+
+           if not connected
+             then return False -- a door blocks sight
+             else return True
 
 {-
 - PF_inPHS.
@@ -172,7 +191,24 @@ inPVS _ _ = io (putStrLn "SVGame.inPVS") >> undefined -- TODO
 - Also checks portalareas so that doors block sound.
 -}
 inPHS :: V3 Float -> V3 Float -> Quake Bool
-inPHS _ _ = io (putStrLn "SVGame.inPHS") >> undefined -- TODO
+inPHS p1 p2 = do
+    leafNum <- CM.pointLeafNum p1
+    cluster <- CM.leafCluster leafNum
+    area1 <- CM.leafArea leafNum
+    mask <- CM.clusterPHS cluster
+
+    leafNum' <- CM.pointLeafNum p2
+    cluster' <- CM.leafCluster leafNum'
+    area2 <- CM.leafArea leafNum'
+
+    if | cluster' == -1 -> return False
+       | (mask `B.index` (cluster' `shiftR` 3)) .&. (1 `shiftL` (cluster' .&. 7)) == 0 -> return False -- more than one bounce away
+       | otherwise -> do
+           connected <- CM.areasConnected area1 area2
+
+           if not connected
+             then return False -- a door blocks hearing
+             else return True
 
 startSound :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound maybeEdictRef channel soundNum volume attenuation timeOfs = do
