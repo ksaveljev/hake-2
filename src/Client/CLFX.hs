@@ -393,3 +393,11 @@ bfgExplosionParticles _ = do
 bubbleTrail :: V3 Float -> V3 Float -> Quake ()
 bubbleTrail _ _ = do
     io (putStrLn "CLFX.bubbleTrail") >> undefined -- TODO
+
+parseMuzzleFlash :: Quake ()
+parseMuzzleFlash = do
+    io (putStrLn "CLFX.parseMuzzleFlash") >> undefined -- TODO
+
+parseMuzzleFlash2 :: Quake ()
+parseMuzzleFlash2 = do
+    io (putStrLn "CLFX.parseMuzzleFlash2") >> undefined -- TODO

@@ -117,9 +117,9 @@ parseServerMessage = do
 
                      | cmd == Constants.svcTempEntity -> CLTEnt.parseTEnt
 
-                     | cmd == Constants.svcMuzzleFlash -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcMuzzleFlash") >> undefined -- TODO
+                     | cmd == Constants.svcMuzzleFlash -> CLFX.parseMuzzleFlash
 
-                     | cmd == Constants.svcMuzzleFlash2 -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcMuzzleFlash2") >> undefined -- TODO
+                     | cmd == Constants.svcMuzzleFlash2 -> CLFX.parseMuzzleFlash2
 
                      | cmd == Constants.svcDownload -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcDownload") >> undefined -- TODO
 
