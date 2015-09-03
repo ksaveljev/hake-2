@@ -52,8 +52,8 @@ dprintf :: B.ByteString -> Quake ()
 dprintf = Com.printf
 
 -- Centerprintf for critical messages.
-cprintfHigh :: EdictT -> B.ByteString -> Quake ()
-cprintfHigh _ _ = io (putStrLn "SVGame.cprintfHigh") >> undefined -- TODO
+cprintfHigh :: EdictReference -> B.ByteString -> Quake ()
+cprintfHigh edictRef str = cprintf (Just edictRef) Constants.printHigh str
 
 {-
 - PF_cprintf
