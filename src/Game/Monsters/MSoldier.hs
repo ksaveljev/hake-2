@@ -6,10 +6,11 @@ import Control.Lens ((^.), (.=), (%=), (+=), (-=), use, ix, zoom, preuse)
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _z)
+import Linear (V3(..), _z, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -18,8 +19,11 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 modelScale :: Float
 modelScale = 1.20000
@@ -140,6 +144,42 @@ frameWalk209 = 256
 
 frameWalk218 :: Int
 frameWalk218 = 265
+
+blasterFlash :: UV.Vector Int
+blasterFlash =
+    UV.fromList [ Constants.mz2SoldierBlaster1
+                , Constants.mz2SoldierBlaster2
+                , Constants.mz2SoldierBlaster3
+                , Constants.mz2SoldierBlaster4
+                , Constants.mz2SoldierBlaster5
+                , Constants.mz2SoldierBlaster6
+                , Constants.mz2SoldierBlaster7
+                , Constants.mz2SoldierBlaster8
+                ]
+
+shotgunFlash :: UV.Vector Int
+shotgunFlash =
+    UV.fromList [ Constants.mz2SoldierShotgun1
+                , Constants.mz2SoldierShotgun2
+                , Constants.mz2SoldierShotgun3
+                , Constants.mz2SoldierShotgun4
+                , Constants.mz2SoldierShotgun5
+                , Constants.mz2SoldierShotgun6
+                , Constants.mz2SoldierShotgun7
+                , Constants.mz2SoldierShotgun8
+                ]
+
+machinegunFlash :: UV.Vector Int
+machinegunFlash =
+    UV.fromList [ Constants.mz2SoldierMachinegun1
+                , Constants.mz2SoldierMachinegun2
+                , Constants.mz2SoldierMachinegun3
+                , Constants.mz2SoldierMachinegun4
+                , Constants.mz2SoldierMachinegun5
+                , Constants.mz2SoldierMachinegun6
+                , Constants.mz2SoldierMachinegun7
+                , Constants.mz2SoldierMachinegun8
+                ]
 
 soldierDead :: EntThink
 soldierDead =
@@ -598,7 +638,57 @@ soldierFire8 =
     return True
 
 soldierFire :: EdictReference -> Int -> Quake ()
-soldierFire _ _ = io (putStrLn "MSoldier.soldierFire") >> undefined -- TODO
+soldierFire selfRef@(EdictReference selfIdx) flashNumber = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashIndex = if | (self^.eEntityState.esSkinNum) < 2 -> blasterFlash UV.! flashNumber
+                        | (self^.eEntityState.esSkinNum) < 4 -> shotgunFlash UV.! flashNumber
+                        | otherwise -> machinegunFlash UV.! flashNumber
+
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashIndex) forward right
+
+    aim <- if flashNumber == 5 || flashNumber == 6
+             then
+               return forward
+             else do
+               let Just (EdictReference enemyIdx) = self^.eEnemy
+               Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+               let V3 a b c = enemy^.eEntityState.esOrigin
+                   end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+                   aim = end - start
+                   dir = Math3D.vectorAngles aim
+                   (Just forward', Just right', Just up') = Math3D.angleVectors dir True True True
+
+               r <- liftM (* 1000) Lib.crandom
+               u <- liftM (* 500) Lib.crandom
+
+               let end' = start + fmap (* 8192) forward'
+                                + fmap (* r) right'
+                                + fmap (* u) up'
+                   aim' = end' - start
+
+               return (normalize aim')
+
+    if | (self^.eEntityState.esSkinNum) <= 1 ->
+           Monster.monsterFireBlaster selfRef start aim 5 600 flashIndex Constants.efBlaster
+
+       | (self^.eEntityState.esSkinNum) <= 3 ->
+           Monster.monsterFireShotgun selfRef start aim 2 1 Constants.defaultShotgunHspread Constants.defaultShotgunVspread Constants.defaultShotgunCount flashIndex
+
+       | otherwise -> do
+           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+           when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0) $ do
+             r <- Lib.rand
+             gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= levelTime + (3 + fromIntegral (r `mod` 8)) * Constants.frameTime
+
+           Monster.monsterFireBullet selfRef start aim 2 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashIndex
+
+           Just pauseTime <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime
+           if levelTime >= pauseTime
+             then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
+             else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
 
 soldierAttack1Refire1 :: EntThink
 soldierAttack1Refire1 =

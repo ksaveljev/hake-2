@@ -300,8 +300,8 @@ mz2InfantryMachinegun11 = 36 :: Int
 mz2InfantryMachinegun12 = 37 :: Int
 mz2InfantryMachinegun13 = 38 :: Int
 
-mz2SoldierBlater1     = 39 :: Int
-mz2SoldierBlater2     = 40 :: Int
+mz2SoldierBlaster1     = 39 :: Int
+mz2SoldierBlaster2     = 40 :: Int
 mz2SoldierShotgun1    = 41 :: Int
 mz2SoldierShotgun2    = 42 :: Int
 mz2SoldierMachinegun1 = 43 :: Int

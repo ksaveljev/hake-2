@@ -227,3 +227,17 @@ projectSource point distance forward right =
         b = (point^._y) + (forward^._y) * (distance^._x) + (right^._y) * (distance^._y)
         c = (point^._z) + (forward^._z) * (distance^._x) + (right^._z) * (distance^._y) + (distance^._z)
     in V3 a b c
+
+vectorAngles :: V3 Float -> V3 Float
+vectorAngles value1 =
+    if (value1^._y) == 0 && (value1^._x) == 0
+      then let pitch = if (value1^._z) > 0 then 90 else 270
+           in V3 (negate pitch) 0 0
+      else let yaw = if | (value1^._x) /= 0 -> (atan2 (value1^._y) (value1^._x)) * 180 / pi
+                        | (value1^._y) > 0 -> 90
+                        | otherwise -> (-90)
+               yaw' = if yaw < 0 then yaw + 360 else yaw
+               forward = sqrt ((value1^._x) * (value1^._x) + (value1^._y) * (value1^._y))
+               pitch = truncate ((atan2 (value1^._z) forward) * 180 / pi) :: Integer
+               pitch' = fromIntegral $ if pitch < 0 then pitch + 360 else pitch
+           in V3 (negate pitch') yaw' 0

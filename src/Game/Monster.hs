@@ -5,7 +5,7 @@ import Control.Lens ((^.), preuse, (%=), ix, (+=), use, zoom, (.=))
 import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (_x, _y, _z)
+import Linear (V3, _x, _y, _z)
 import qualified Data.ByteString as B
 
 import Quake
@@ -20,6 +20,18 @@ import qualified Game.GameUtil as GameUtil
 import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+monsterFireBullet :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireBullet _ _ _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireBullet") >> undefined -- TODO
+
+monsterFireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireShotgun _ _ _ _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireShotgun") >> undefined -- TODO
+
+monsterFireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireBlaster _ _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireBlaster") >> undefined -- TODO
 
 monsterStart :: EdictReference -> Quake Bool
 monsterStart edictRef@(EdictReference edictIdx) = do
