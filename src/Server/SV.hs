@@ -1244,9 +1244,22 @@ stepDirection edictRef@(EdictReference edictIdx) yaw dist = do
         GameBase.touchTriggers edictRef
         return False
 
+{-
+- SV_CloseEnough - returns true if distance between 2 ents is smaller than
+- given dist.  
+-}
 closeEnough :: EdictReference -> EdictReference -> Float -> Quake Bool
-closeEnough _ _ _ = do
-    io (putStrLn "SV.closeEnough") >> undefined -- TODO
+closeEnough edictRef@(EdictReference edictIdx) goalRef@(EdictReference goalIdx) dist = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    Just goal <- preuse $ gameBaseGlobals.gbGEdicts.ix goalIdx
+
+    if | (goal^.eAbsMin._x) > (edict^.eAbsMax._x) + dist -> return False
+       | (goal^.eAbsMin._y) > (edict^.eAbsMax._y) + dist -> return False
+       | (goal^.eAbsMin._z) > (edict^.eAbsMax._z) + dist -> return False
+       | (goal^.eAbsMax._x) < (edict^.eAbsMin._x) - dist -> return False
+       | (goal^.eAbsMax._y) < (edict^.eAbsMin._y) - dist -> return False
+       | (goal^.eAbsMax._z) < (edict^.eAbsMin._z) - dist -> return False
+       | otherwise -> return True
 
 newChaseDir :: EdictReference -> Maybe EdictReference -> Float -> Quake ()
 newChaseDir actorRef@(EdictReference actorIdx) maybeEnemyRef dist = do
