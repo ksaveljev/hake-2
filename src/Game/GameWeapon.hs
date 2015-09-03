@@ -55,9 +55,19 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
     when ((traceT^.tFraction) < 1.0) $ do
       io (putStrLn "GameWeapon.fireBlaster") >> undefined -- TODO
 
+{-
+- ================= 
+- fire_shotgun
+- 
+- Shoots shotgun pellets. Used by shotgun and super shotgun.
+- =================
+-}
 fireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
-fireShotgun _ _ _ _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireShotgun") >> undefined -- TODO
+fireShotgun selfRef start aimDir damage kick hspread vspread count mod'
+  | count == 0 = return ()
+  | otherwise = do
+      fireLead selfRef start aimDir damage kick Constants.teShotgun hspread vspread mod'
+      fireShotgun selfRef start aimDir damage kick hspread vspread (count - 1) mod'
 
 fireRail :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
 fireRail _ _ _ _ _ = do
@@ -75,3 +85,7 @@ fireRail _ _ _ _ _ = do
 checkDodge :: EdictReference -> V3 Float -> V3 Float -> Int -> Quake ()
 checkDodge _ _ _ _ = do
     io (putStrLn "GameWeapon.checkDodge") >> undefined -- TODO
+
+fireLead :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireLead _ _ _ _ _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireLead") >> undefined -- TODO

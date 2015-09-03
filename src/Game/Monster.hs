@@ -17,6 +17,7 @@ import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
+import qualified Game.GameWeapon as GameWeapon
 import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -26,8 +27,20 @@ monsterFireBullet _ _ _ _ _ _ _ _ = do
     io (putStrLn "Monster.monsterFireBullet") >> undefined -- TODO
 
 monsterFireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
-monsterFireShotgun _ _ _ _ _ _ _ _ _ = do
-    io (putStrLn "Monster.monsterFireShotgun") >> undefined -- TODO
+monsterFireShotgun selfRef@(EdictReference selfIdx) start aimDir damage kick hspread vspread count flashType = do
+    GameWeapon.fireShotgun selfRef start aimDir damage kick hspread vspread count Constants.modUnknown
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    writeByte Constants.svcMuzzleFlash2
+    writeShort (self^.eIndex)
+    writeByte flashType
+    multicast start Constants.multicastPvs
 
 monsterFireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
 monsterFireBlaster _ _ _ _ _ _ _ = do
