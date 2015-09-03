@@ -3,13 +3,14 @@
 module Game.GameWeapon where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
-import Control.Monad (when, liftM)
+import Control.Monad (when, liftM, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, fromJust)
-import Linear (V3(..), normalize)
+import Linear (V3(..), normalize, norm, _x)
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameCombat as GameCombat
@@ -119,8 +120,28 @@ fireRail _ _ _ _ _ = do
 - =================
 -}
 checkDodge :: EdictReference -> V3 Float -> V3 Float -> Int -> Quake ()
-checkDodge _ _ _ _ = do
-    io (putStrLn "GameWeapon.checkDodge") >> undefined -- TODO
+checkDodge selfRef@(EdictReference selfIdx) start dir speed = do
+    skillValue <- liftM (^.cvValue) skillCVar
+
+    -- easy mode only ducks one quarter of the time
+    r <- Lib.randomF
+
+    unless (skillValue == 0 && r > 0.25) $ do
+      let end = start + fmap (* 8192) dir
+
+      trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+      traceT <- trace start Nothing Nothing end (Just selfRef) Constants.maskShot
+
+      when (isJust (traceT^.tEnt)) $ do
+        let Just (EdictReference traceEntIdx) = traceT^.tEnt
+        Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
+        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+        when ((traceEnt^.eSvFlags) .&. Constants.svfMonster /= 0 && (traceEnt^.eHealth) > 0 && isJust (traceEnt^.eMonsterInfo.miDodge) && GameUtil.inFront traceEnt self) $ do
+          let v = (traceT^.tEndPos) - start
+              eta = (norm v - (traceEnt^.eMaxs._x)) / fromIntegral speed
+
+          dodge (fromJust $ traceEnt^.eMonsterInfo.miDodge) (fromJust $ traceT^.tEnt) selfRef eta
 
 fireLead :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireLead selfRef@(EdictReference selfIdx) start aimDir damage kick impact hspread vspread mod' = do
