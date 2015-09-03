@@ -97,10 +97,10 @@ centerPrintf er@(EdictReference edictIdx) str = do
 -  Abort the server with a game error. 
 -}
 pfError :: B.ByteString -> Quake ()
-pfError _ = io (putStrLn "SVGame.pfError") >> undefined -- TODO
+pfError str = Com.comError Constants.errDrop ("Game Error: " `B.append` str)
 
 pfError2 :: Int -> B.ByteString -> Quake ()
-pfError2 _ _ = io (putStrLn "SVGame.pfError2") >> undefined -- TODO
+pfError2 level str = Com.comError level str
 
 {-
 - PF_setmodel
