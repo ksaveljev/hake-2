@@ -52,10 +52,10 @@ useWeapon =
           cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
 
           if | quantity == 0 ->
-                 cprintf edictRef Constants.printHigh ("No " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
+                 cprintf (Just edictRef) Constants.printHigh ("No " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
 
              | quantity < (item^.giQuantity) -> do
-                 cprintf edictRef Constants.printHigh ("Not enough " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
+                 cprintf (Just edictRef) Constants.printHigh ("Not enough " `B.append` (fromJust $ ammoItem^.giPickupName) `B.append` " for " `B.append` (fromJust $ item^.giPickupName) `B.append` ".\n")
 
              | otherwise ->
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just gItemRef
@@ -154,7 +154,7 @@ dropWeapon =
       if ((Just itemRef) == (gClient^.gcPers.cpWeapon) || (Just itemRef) == (gClient^.gcNewWeapon)) && ((gClient^.gcPers.cpInventory) UV.! index) == 1
         then do
           cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
-          cprintf edictRef Constants.printHigh "Can't drop current weapon\n"
+          cprintf (Just edictRef) Constants.printHigh "Can't drop current weapon\n"
         else do
           void $ GameItems.dropItem edictRef itemRef
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix index -= 1

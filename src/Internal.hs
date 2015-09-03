@@ -713,7 +713,7 @@ data LevelLocalsT =
 data GameImportT =
   GameImportT { _giBprintf            :: Int -> B.ByteString -> Quake ()
               , _giDprintf            :: B.ByteString -> Quake ()
-              , _giCprintf            :: EdictReference -> Int -> B.ByteString -> Quake ()
+              , _giCprintf            :: Maybe EdictReference -> Int -> B.ByteString -> Quake ()
               , _giCenterPrintf       :: EdictReference -> B.ByteString -> Quake ()
               , _giSound              :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
               , _giPositionedSound    :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()

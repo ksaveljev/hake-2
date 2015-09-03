@@ -60,8 +60,21 @@ cprintfHigh _ _ = io (putStrLn "SVGame.cprintfHigh") >> undefined -- TODO
 - 
 - Print to a single client.
 -}
-cprintf :: EdictReference -> Int -> B.ByteString -> Quake ()
-cprintf _ _ _ = io (putStrLn "SVGame.cprintf") >>  undefined -- TODO
+cprintf :: Maybe EdictReference -> Int -> B.ByteString -> Quake ()
+cprintf maybeEdict level str = do
+    case maybeEdict of
+      Nothing -> Com.printf str
+      Just (EdictReference edictIdx) -> do
+        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+        maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
+
+        when ((edict^.eIndex) < 1 || (edict^.eIndex) > maxClientsValue) $
+          Com.comError Constants.errDrop "cprintf to a non-client"
+
+        Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix ((edict^.eIndex) - 1)
+
+        SVSend.clientPrintf client level str
 
 {-
 - PF_centerprintf
