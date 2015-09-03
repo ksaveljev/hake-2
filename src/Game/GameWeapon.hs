@@ -1,14 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameWeapon where
 
 import Control.Lens (use, preuse, ix, (.=), (^.))
-import Control.Monad (when)
-import Data.Maybe (isJust)
-import Linear (V3, normalize)
+import Control.Monad (when, liftM)
+import Data.Bits ((.|.), (.&.), complement)
+import Data.Maybe (isJust, fromJust)
+import Linear (V3(..), normalize)
 
 import Quake
 import QuakeState
 import qualified Constants
+import qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
+import qualified Game.PlayerWeapon as PlayerWeapon
+import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool
 fireHit _ _ _ _ = do
@@ -87,5 +94,154 @@ checkDodge _ _ _ _ = do
     io (putStrLn "GameWeapon.checkDodge") >> undefined -- TODO
 
 fireLead :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
-fireLead _ _ _ _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireLead") >> undefined -- TODO
+fireLead selfRef@(EdictReference selfIdx) start aimDir damage kick impact hspread vspread mod' = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let contentMask = Constants.maskShot .|. Constants.maskWater
+        trace = gameImport^.giTrace
+        pointContents = gameImport^.giPointContents
+
+    traceT <- trace (self^.eEntityState.esOrigin) Nothing Nothing start (Just selfRef) Constants.maskShot
+
+    if not ((traceT^.tFraction) < 1.0)
+      then do
+        let dir = Math3D.vectorAngles aimDir
+            (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
+
+        r <- liftM (* fromIntegral hspread) Lib.crandom
+        u <- liftM (* fromIntegral vspread) Lib.crandom
+
+        let end = start + fmap (* 8192) forward
+                        + fmap (* r) right
+                        + fmap (* u) up
+
+        pc <- pointContents start
+        let (water, waterStart, contentMask') = if pc .&. Constants.maskWater /= 0
+                                                  then (True, start, contentMask .&. (complement Constants.maskWater))
+                                                  else (False, V3 0 0 0, contentMask)
+
+        traceT' <- trace start Nothing Nothing end (Just selfRef) contentMask'
+
+        -- see if we hit water
+        if (traceT'^.tContents) .&. Constants.maskWater /= 0
+          then
+            hitWater traceT' start end
+          else do
+            sendGunPuffAndFlash traceT' water
+            waterBubbleTrail traceT' waterStart water
+
+      else do
+        sendGunPuffAndFlash traceT False
+        waterBubbleTrail traceT (V3 0 0 0) False
+
+  where sendGunPuffAndFlash :: TraceT -> Bool -> Quake ()
+        sendGunPuffAndFlash traceT water = do
+          when (not (isJust (traceT^.tSurface) && ((fromJust (traceT^.tSurface))^.csFlags) .&. Constants.surfSky /= 0)) $ do
+            when ((traceT^.tFraction) < 1.0) $ do
+              let Just traceEntRef@(EdictReference traceEntIdx) = traceT^.tEnt
+              Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
+
+              if (traceEnt^.eTakeDamage) /= 0
+                then
+                  GameCombat.damage traceEntRef selfRef selfRef aimDir (traceT^.tEndPos) (traceT^.tPlane.cpNormal) damage kick Constants.damageBullet mod'
+                else do
+                  when (((fromJust (traceT^.tSurface))^.csName) /= "sky") $ do
+                    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+                    let writeByte = gameImport^.giWriteByte
+                        writePosition = gameImport^.giWritePosition
+                        writeDir = gameImport^.giWriteDir
+                        multicast = gameImport^.giMulticast
+
+                    writeByte Constants.svcTempEntity
+                    writeByte impact
+                    writePosition (traceT^.tEndPos)
+                    writeDir (traceT^.tPlane.cpNormal)
+                    multicast (traceT^.tEndPos) Constants.multicastPvs
+
+                    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+                    when (isJust (self^.eClient)) $
+                      PlayerWeapon.playerNoise selfRef (traceT^.tEndPos) Constants.pNoiseImpact
+
+        waterBubbleTrail :: TraceT -> V3 Float -> Bool -> Quake ()
+        waterBubbleTrail _ _ False = return ()
+        waterBubbleTrail traceT waterStart _ = do
+          let dir = normalize ((traceT^.tEndPos) - waterStart)
+              pos = (traceT^.tEndPos) + fmap (* (-2)) dir
+
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+          let pointContents = gameImport^.giPointContents
+              trace = gameImport^.giTrace
+              writeByte = gameImport^.giWriteByte
+              writePosition = gameImport^.giWritePosition
+              multicast = gameImport^.giMulticast
+
+          pc <- pointContents pos
+
+          traceT' <- if pc .&. Constants.maskWater /= 0
+                       then return traceT { _tEndPos = pos }
+                       else trace pos Nothing Nothing waterStart (traceT^.tEnt) Constants.maskWater
+
+          let pos' = fmap (* 0.5) (waterStart + (traceT'^.tEndPos))
+
+          writeByte Constants.svcTempEntity
+          writeByte Constants.teBubbleTrail
+          writePosition waterStart
+          writePosition (traceT'^.tEndPos)
+          multicast pos' Constants.multicastPvs
+
+        hitWater :: TraceT -> V3 Float -> V3 Float -> Quake ()
+        hitWater traceT start end = do
+          let water = True
+              waterStart = traceT^.tEndPos
+
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+          let writeByte = gameImport^.giWriteByte
+              writePosition = gameImport^.giWritePosition
+              writeDir = gameImport^.giWriteDir
+              multicast = gameImport^.giMulticast
+              trace = gameImport^.giTrace
+
+          if start /= waterStart
+            then do
+              let color = if | (traceT^.tContents) .&. Constants.contentsWater /= 0 ->
+                                 if ((fromJust (traceT^.tSurface))^.csName) == "*brwater"
+                                   then Constants.splashBrownWater
+                                   else Constants.splashBlueWater
+                             | (traceT^.tContents) .&. Constants.contentsSlime /= 0 ->
+                                 Constants.splashSlime
+                             | (traceT^.tContents) .&. Constants.contentsLava /= 0 ->
+                                 Constants.splashLava
+                             | otherwise ->
+                                 Constants.splashUnknown
+
+              when (color /= Constants.splashUnknown) $ do
+                writeByte Constants.svcTempEntity
+                writeByte Constants.teSplash
+                writeByte 8
+                writePosition (traceT^.tEndPos)
+                writeDir (traceT^.tPlane.cpNormal)
+                writeByte color
+                multicast (traceT^.tEndPos) Constants.multicastPvs
+
+              -- change bullet's course when it enters water
+              let dir = Math3D.vectorAngles (end - start)
+                  (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
+
+              r <- liftM (* (fromIntegral hspread * 2)) Lib.crandom
+              u <- liftM (* (fromIntegral vspread * 2)) Lib.crandom
+
+              let end' = waterStart + fmap (* 8192) forward
+                                    + fmap (* r) right
+                                    + fmap (* u) up
+
+              -- re-trace ignoring water this time
+              traceT' <- trace waterStart Nothing Nothing end' (Just selfRef) Constants.maskShot
+              sendGunPuffAndFlash traceT' water
+              waterBubbleTrail traceT' waterStart water
+
+            else do
+              traceT' <- trace waterStart Nothing Nothing end (Just selfRef) Constants.maskShot
+              sendGunPuffAndFlash traceT' water
+              waterBubbleTrail traceT' waterStart water

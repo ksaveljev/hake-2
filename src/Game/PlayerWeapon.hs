@@ -18,7 +18,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
-import qualified Game.GameWeapon as GameWeapon
+import {-# SOURCE #-} qualified Game.GameWeapon as GameWeapon
 import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
