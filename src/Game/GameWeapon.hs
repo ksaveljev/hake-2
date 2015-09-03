@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
 import Control.Monad (when, liftM)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, fromJust)
@@ -10,12 +10,18 @@ import Linear (V3(..), normalize)
 
 import Quake
 import QuakeState
+import Game.Adapters
 import qualified Constants
 import qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
 import qualified Game.PlayerWeapon as PlayerWeapon
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+blasterTouch :: EntTouch
+blasterTouch =
+  GenericEntTouch "blaster_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameWeapon.blasterTouch") >> undefined -- TODO
 
 fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool
 fireHit _ _ _ _ = do
@@ -31,10 +37,9 @@ fireHit _ _ _ _ = do
 fireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Bool -> Quake ()
 fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect hyper = do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let dir = normalize dir
+    let dir = normalize direction
 
     boltRef@(EdictReference boltIdx) <- GameUtil.spawn
-    Just bolt <- preuse $ gameBaseGlobals.gbGEdicts.ix boltIdx
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let linkEntity = gameImport^.giLinkEntity
@@ -42,15 +47,37 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
         modelIndex = gameImport^.giModelIndex
         soundIndex = gameImport^.giSoundIndex
 
-    undefined -- TODO
-
     -- yes, I know it looks weird that projectiles are deadmonsters
     -- what this means is that when prediction is used against the object
     -- (blaster/hyperblaster shots), the player won't be solid clipped
     -- against the object. Right now trying to run into a firing hyperblaster
     -- is very jerky since you are predicted 'against' the shots.
-    gameBaseGlobals.gbGEdicts.ix boltIdx .= bolt { _eSvFlags = Constants.svfDeadMonster
-                                                 }
+    modelIdx <- modelIndex (Just "models/objects/laser/tris.md2")
+    soundIdx <- soundIndex (Just "misc/lasfly.wav")
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix boltIdx) $ do
+      eSvFlags .= Constants.svfDeadMonster
+      eEntityState.esOrigin .= start
+      eEntityState.esOldOrigin .= start
+      eEntityState.esAngles .= dir
+      eVelocity .= fmap (* (fromIntegral speed)) dir
+      eMoveType .= Constants.moveTypeFlyMissile
+      eClipMask .= Constants.solidBbox
+      eEntityState.esEffects %= (.|. effect)
+      eMins .= V3 0 0 0
+      eMaxs .= V3 0 0 0
+      eEntityState.esModelIndex .= modelIdx
+      eEntityState.esSound .= soundIdx
+      eOwner .= Just selfRef
+      eTouch .= Just blasterTouch
+      eNextThink .= levelTime + 2
+      eThink .= Just GameUtil.freeEdictA
+      eDmg .= damage
+      eClassName .= "bolt"
+
+    when hyper $
+      gameBaseGlobals.gbGEdicts.ix boltIdx.eSpawnFlags .= 1
 
     linkEntity boltRef
 
@@ -60,7 +87,9 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
     traceT <- trace (self^.eEntityState.esOrigin) Nothing Nothing start (Just boltRef) Constants.maskShot
 
     when ((traceT^.tFraction) < 1.0) $ do
-      io (putStrLn "GameWeapon.fireBlaster") >> undefined -- TODO
+      gameBaseGlobals.gbGEdicts.ix boltIdx.eEntityState.esOrigin .= start + fmap (* (-10)) dir
+      dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
+      touch blasterTouch boltRef (fromJust $ traceT^.tEnt) dummyPlane Nothing
 
 {-
 - ================= 
