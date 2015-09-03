@@ -6,7 +6,7 @@ import Control.Lens (use, (^.), ix, preuse, (.=), (%=), zoom)
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (norm, _y)
+import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
 import Quake
@@ -351,7 +351,70 @@ aiRun =
 
         correctCourse :: EdictReference -> Float -> Bool -> Quake ()
         correctCourse selfRef@(EdictReference selfIdx) dist new1 = do
-          io (putStrLn "GameAI.aiRun#correctCourse") >> undefined -- TODO
+          when new1 $ do
+            Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+            trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+            traceT <- trace (self^.eEntityState.esOrigin) (Just $ self^.eMins) (Just $ self^.eMaxs) (self^.eMonsterInfo.miLastSighting) (Just selfRef) Constants.maskPlayerSolid
+
+            when ((traceT^.tFraction) < 1) $ do
+              let Just (EdictReference goalEntityIdx) = self^.eGoalEntity
+              Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
+
+              let v = (goalEntity^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+                  d1 = norm v
+                  center = traceT^.tFraction
+                  d2 = d1 * ((center + 1) / 2)
+                  yaw = Math3D.vectorYaw v
+
+              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                eEntityState.esAngles._y .= yaw -- use Constants.yaw instead of directly using _y
+                eIdealYaw .= yaw
+
+              Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+              let (Just vForward, Just vRight, _) = Math3D.angleVectors (self'^.eEntityState.esAngles) True True False
+                  v' = V3 d2 (-16) 0
+                  leftTarget = Math3D.projectSource (self'^.eEntityState.esOrigin) v' vForward vRight
+
+              traceT' <- trace (self'^.eEntityState.esOrigin) (Just $ self'^.eMins) (Just $ self'^.eMaxs) leftTarget (Just selfRef) Constants.maskPlayerSolid
+              let left = traceT'^.tFraction
+
+              let v'' = V3 d2 16 0
+                  rightTarget = Math3D.projectSource (self'^.eEntityState.esOrigin) v'' vForward vRight
+
+              traceT'' <- trace (self'^.eEntityState.esOrigin) (Just $ self'^.eMins) (Just $ self'^.eMaxs) rightTarget (Just selfRef) Constants.maskPlayerSolid
+              let right = traceT''^.tFraction
+                  center' = d1 * center / d2
+
+              if | left >= center' && left > right -> do
+                     let leftTarget' = if left < 1
+                                         then Math3D.projectSource (self'^.eEntityState.esOrigin) (V3 (d2 * left * 0.5) (-16) 0) vForward vRight
+                                         else leftTarget
+
+                     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                       eMonsterInfo.miSavedGoal .= (self'^.eMonsterInfo.miLastSighting)
+                       eMonsterInfo.miLastSighting .= leftTarget'
+                       eMonsterInfo.miAIFlags %= (.|. Constants.aiPursueTemp)
+                       eEntityState.esAngles._y .= Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)) -- TODO: use Constants.yaw instead of using _y directly
+                       eIdealYaw .= Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin))
+                       
+                     gameBaseGlobals.gbGEdicts.ix goalEntityIdx.eEntityState.esOrigin .= leftTarget'
+
+                 | right >= center' && right > left -> do
+                     let rightTarget' = if right < 1
+                                          then Math3D.projectSource (self'^.eEntityState.esOrigin) (V3 (d2 * right * 0.5) 16 0) vForward vRight
+                                          else rightTarget
+
+                     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                       eMonsterInfo.miSavedGoal .= (self'^.eMonsterInfo.miLastSighting)
+                       eMonsterInfo.miLastSighting .= rightTarget'
+                       eMonsterInfo.miAIFlags %= (.|. Constants.aiPursueTemp)
+                       eEntityState.esAngles._y .= Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin))
+                       eIdealYaw .= Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin))
+
+                     gameBaseGlobals.gbGEdicts.ix goalEntityIdx.eEntityState.esOrigin .= rightTarget'
+
+                 | otherwise ->
+                     return ()
 
 walkMonsterStart :: EntThink
 walkMonsterStart =
