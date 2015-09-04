@@ -383,8 +383,16 @@ beginF = do
 nextServerF :: XCommandT
 nextServerF = io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
 
+{-
+- ================= SV_Disconnect_f =================
+- 
+- The client is going to disconnect, so remove the connection immediately
+-
+-}
 disconnectF :: XCommandT
-disconnectF = io (putStrLn "SVUser.disconnectF") >> undefined -- TODO
+disconnectF = do
+    Just client <- use $ svGlobals.svClient
+    SVMain.dropClient client
 
 showServerInfoF :: XCommandT
 showServerInfoF = io (putStrLn "SVUser.showServerInfoF") >> undefined -- TODO
