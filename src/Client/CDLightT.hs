@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.CDLightT ( CDLightT
+module Client.CDLightT ( CDLightT(..)
                        , module Client.CDLightT
                        ) where
 

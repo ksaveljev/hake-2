@@ -1797,7 +1797,7 @@ data ClientGlobals =
                 , _cgInUp               :: KButtonT
                 , _cgInDown             :: KButtonT
                 , _cgInImpulse          :: !Int
-                , _cgDLights            :: V.Vector CDLightT
+                , _cgDLights            :: V.Vector (IORef CDLightT)
                 , _cgLightStyle         :: V.Vector CLightStyleT
                 , _cgLastOfs            :: !Int
                 , _cgCR                 :: !Int -- from Console.hs

@@ -9,7 +9,7 @@ import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
 import Data.Char (ord)
-import Data.IORef (IORef, modifyIORef', writeIORef, readIORef)
+import Data.IORef (IORef, newIORef, modifyIORef', writeIORef, readIORef)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -35,16 +35,17 @@ runDLights :: Quake ()
 runDLights = do
     time <- use $ globals.cl.csTime
     dLights <- use $ clientGlobals.cgDLights
-    runDLight dLights (fromIntegral time) 0 Constants.maxDLights
+    io $ runDLight dLights (fromIntegral time) 0 Constants.maxDLights
 
-  where runDLight :: V.Vector CDLightT -> Float -> Int -> Int -> Quake ()
+  where runDLight :: V.Vector (IORef CDLightT) -> Float -> Int -> Int -> IO ()
         runDLight dLights time idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let dl = dLights V.! idx
+              let dlRef = dLights V.! idx
+              dl <- readIORef dlRef
 
               if | dl^.cdlRadius == 0 -> runDLight dLights time (idx + 1) maxIdx
-                 | dl^.cdlDie < time -> clientGlobals.cgDLights.ix idx.cdlRadius .= 0
+                 | dl^.cdlDie < time -> modifyIORef' dlRef (\v -> v { _cdlRadius = 0 })
                  | otherwise -> runDLight dLights time (idx + 1) maxIdx
                  -- TODO: original quake2 code does have something else
                  -- here (jake2 is missing a part of this function)
@@ -103,7 +104,9 @@ clearParticles = do
               setParticleChain particles (idx + 1) maxIdx
 
 clearDLights :: Quake ()
-clearDLights = clientGlobals.cgDLights .= V.replicate Constants.maxDLights newCDLightT
+clearDLights = do
+    dlights <- io $ V.replicateM Constants.maxDLights (newIORef newCDLightT)
+    clientGlobals.cgDLights .= dlights
 
 clearLightStyles :: Quake ()
 clearLightStyles = do
@@ -238,11 +241,12 @@ addDLights = do
     dlights <- use $ clientGlobals.cgDLights
     addDLight dlights 0 Constants.maxDLights
 
-  where addDLight :: V.Vector CDLightT -> Int -> Int -> Quake ()
+  where addDLight :: V.Vector (IORef CDLightT) -> Int -> Int -> Quake ()
         addDLight dlights idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let dl = dlights V.! idx
+              let dlRef = dlights V.! idx
+              dl <- io $ readIORef dlRef
               
               if (dl^.cdlRadius) == 0
                 then
@@ -401,3 +405,52 @@ parseMuzzleFlash = do
 parseMuzzleFlash2 :: Quake ()
 parseMuzzleFlash2 = do
     io (putStrLn "CLFX.parseMuzzleFlash2") >> undefined -- TODO
+
+allocDLight :: Int -> Quake (IORef CDLightT)
+allocDLight key = do
+    dLights <- use $ clientGlobals.cgDLights
+    -- first look for an exact key match
+    exactMatch <- io $ findExactMatch dLights 0 Constants.maxDLights
+
+    case exactMatch of
+      Just em -> return em
+
+      Nothing -> do
+        -- then look for anything else
+        time <- use $ globals.cl.csTime
+        anyMatch <- io $ findAnyDLight (fromIntegral time) dLights 0 Constants.maxDLights
+
+        case anyMatch of
+          Just am -> return am
+
+          Nothing -> do
+            io $ writeIORef (dLights V.! 0) newCDLightT { _cdlKey = key }
+            return (dLights V.! 0)
+
+  where findExactMatch :: V.Vector (IORef CDLightT) -> Int -> Int -> IO (Maybe (IORef CDLightT))
+        findExactMatch dLights idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              let dlRef = dLights V.! idx
+              dl <- readIORef dlRef
+
+              if (dl^.cdlKey) == key
+                then do
+                  writeIORef dlRef newCDLightT { _cdlKey = key }
+                  return (Just dlRef)
+                else
+                  findExactMatch dLights (idx + 1) maxIdx
+
+        findAnyDLight :: Float -> V.Vector (IORef CDLightT) -> Int -> Int -> IO (Maybe (IORef CDLightT))
+        findAnyDLight time dLights idx maxIdx
+          | idx >= maxIdx = return Nothing
+          | otherwise = do
+              let dlRef = dLights V.! idx
+              dl <- readIORef dlRef
+
+              if (dl^.cdlDie) < time
+                then do
+                  writeIORef dlRef newCDLightT { _cdlKey = key }
+                  return (Just dlRef)
+                else
+                  findAnyDLight time dLights (idx + 1) maxIdx
