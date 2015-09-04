@@ -20,7 +20,7 @@ import qualified Constants
 import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
-import qualified Game.GameCombat as GameCombat
+import {-# SOURCE #-} qualified Game.GameCombat as GameCombat
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -694,3 +694,7 @@ attackFinished :: EdictReference -> Float -> Quake ()
 attackFinished (EdictReference selfIdx) time = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackFinished .= levelTime + time
+
+onSameTeam :: EdictReference -> EdictReference -> Quake Bool
+onSameTeam edictRef1@(EdictReference edictIdx1) edictRef2@(EdictReference edictIdx2) = do
+    io (putStrLn "GameUtil.onSameTeam") >> undefined -- TODO

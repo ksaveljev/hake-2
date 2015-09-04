@@ -65,6 +65,7 @@ module QuakeState ( QuakeState(..)
                   , EntDodgeAdapter(..)
                   , EntTouchAdapter(..)
                   , EntUseAdapter(..)
+                  , EntPainAdapter(..)
                   , EntInteractAdapter(..)
                   , AIAdapter(..)
                   , module Globals

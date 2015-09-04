@@ -14,7 +14,7 @@ import Quake
 import QuakeState
 import Game.Adapters
 import qualified Constants
-import qualified Game.GameCombat as GameCombat
+import {-# SOURCE #-} qualified Game.GameCombat as GameCombat
 import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
