@@ -7,7 +7,7 @@ module Client.CLFX where
 
 import Control.Lens ((.=), ix, use, (^.), preuse, zoom)
 import Control.Monad (unless, when, liftM)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), complement)
 import Data.Char (ord)
 import Data.IORef (IORef, newIORef, modifyIORef', writeIORef, readIORef)
 import Linear (V3(..), _x, _y, _z)
@@ -22,6 +22,7 @@ import CVarVariables
 import qualified Constants
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified QCommon.Com as Com
+import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
 import qualified Util.Lib as Lib
 
@@ -400,6 +401,18 @@ bubbleTrail _ _ = do
 
 parseMuzzleFlash :: Quake ()
 parseMuzzleFlash = do
+    i <- MSG.readShort (globals.netMessage)
+
+    when (i < 1 || i >= Constants.maxEdicts) $
+      Com.comError Constants.errDrop "CL_ParseMuzzleFlash: bad entity"
+
+    w <- MSG.readByte (globals.netMessage)
+    let silenced = w .&. Constants.mzSilenced
+        weapon = w .&. (complement Constants.mzSilenced)
+
+    Just pl <- preuse $ globals.clEntities.ix i
+    dlRef <- allocDLight i
+
     io (putStrLn "CLFX.parseMuzzleFlash") >> undefined -- TODO
 
 parseMuzzleFlash2 :: Quake ()
