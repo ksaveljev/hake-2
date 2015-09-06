@@ -235,7 +235,7 @@ mzLogin            =   9 :: Int
 mzLogout           =  10 :: Int
 mzRespawn          =  11 :: Int
 mzBFG              =  12 :: Int
-mzSShotgut         =  13 :: Int
+mzSShotgun         =  13 :: Int
 mzHyperblaster     =  14 :: Int
 mzItemRespawn      =  15 :: Int
 -- RAFAEL

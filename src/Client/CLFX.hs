@@ -25,6 +25,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 instantParticle :: Float
 instantParticle = -10000.0
@@ -412,8 +413,223 @@ parseMuzzleFlash = do
 
     Just pl <- preuse $ globals.clEntities.ix i
     dlRef <- allocDLight i
+    r <- Lib.rand
+    time <- use $ globals.cl.csTime
 
-    io (putStrLn "CLFX.parseMuzzleFlash") >> undefined -- TODO
+    let (Just fv, Just rv, _) = Math3D.angleVectors (pl^.ceCurrent.esAngles) True True False
+        origin = (pl^.ceCurrent.esOrigin)
+               + fmap (* 18) fv
+               + fmap (* 16) rv
+        radius = if silenced /= 0
+                   then 100 + fromIntegral (r .&. 31)
+                   else 200 + fromIntegral (r .&. 31)
+        volume = if silenced /= 0
+                   then 0.2
+                   else 1
+
+    io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = origin
+                                     , _cdlRadius = radius
+                                     , _cdlMinLight = 32
+                                     , _cdlDie = fromIntegral time
+                                     })
+
+    if | weapon == Constants.mzBlaster -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "weapons/blastf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzBlueHyperblaster -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 0 1})
+           soundIdx <- S.registerSound "weapons/hyprbf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzHyperblaster -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0})
+           soundIdx <- S.registerSound "weapons/hyprbf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+           
+       | weapon == Constants.mzMachinegun -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           r <- Lib.rand
+           let soundName = "weapons/machgf" `B.append` BC.pack (show ((r `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE ?
+           soundIdx <- S.registerSound soundName
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzShotgun -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "weapons/shotgf1b.wav"
+           soundIdx' <- S.registerSound "weapons/shotgr1b.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+           S.startSound Nothing (EdictReference i) Constants.chanAuto soundIdx' volume Constants.attnNorm 0.1
+
+       | weapon == Constants.mzSShotgun -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "weapons/sshotf1b.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzChaingun1 -> do
+           r <- Lib.rand
+           io $ modifyIORef' dlRef (\v -> v { _cdlRadius = 200 + fromIntegral (r .&. 31)
+                                            , _cdlColor = V3 1 0.25 0
+                                            })
+           r' <- Lib.rand
+           let soundName = "weapons/machgf" `B.append` BC.pack (show ((r' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx <- S.registerSound soundName
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzChaingun2 -> do
+           r <- Lib.rand
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlRadius = 225 + fromIntegral (r .&. 31)
+                                            , _cdlColor = V3 1 0.5 0
+                                            , _cdlDie = fromIntegral time + 0.1 -- long delay
+                                            })
+           r' <- Lib.rand
+           let soundName = "weapons/machgf" `B.append` BC.pack (show ((r' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx <- S.registerSound soundName
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+           r'' <- Lib.rand
+           let soundName' = "weapons/machgf" `B.append` BC.pack (show ((r'' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx' <- S.registerSound soundName'
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx' volume Constants.attnNorm 0.05
+
+       | weapon == Constants.mzChaingun3 -> do
+           r <- Lib.rand
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlRadius = 250 + fromIntegral (r .&. 31)
+                                            , _cdlColor = V3 1 1 0
+                                            , _cdlDie = fromIntegral time + 0.1 -- long delay
+                                            })
+           r' <- Lib.rand
+           let soundName = "weapons/machgf" `B.append` BC.pack (show ((r' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx <- S.registerSound soundName
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+           r'' <- Lib.rand
+           let soundName' = "weapons/machgf" `B.append` BC.pack (show ((r'' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx' <- S.registerSound soundName'
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx' volume Constants.attnNorm 0.033
+
+           r''' <- Lib.rand
+           let soundName'' = "weapons/machgf" `B.append` BC.pack (show ((r''' `mod` 5) + 1)) `B.append` "b.wav" -- IMPROVE?
+           soundIdx'' <- S.registerSound soundName''
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx'' volume Constants.attnNorm 0.066
+
+       | weapon == Constants.mzRailgun -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0.5 0.5 1 })
+           soundIdx <- S.registerSound "weapons/railgf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzRocket -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.2 })
+           soundIdx <- S.registerSound "weapons/rocklf1a.wav"
+           soundIdx' <- S.registerSound "weapons/rocklr1b.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+           S.startSound Nothing (EdictReference i) Constants.chanAuto soundIdx' volume Constants.attnNorm 0.1
+
+       | weapon == Constants.mzGrenade -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0 })
+           soundIdx <- S.registerSound "weapons/grenlf1a.wav"
+           soundIdx' <- S.registerSound "weapons/grenlr1b.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+           S.startSound Nothing (EdictReference i) Constants.chanAuto soundIdx' volume Constants.attnNorm 0.1
+
+       | weapon == Constants.mzBFG -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 0 })
+           soundIdx <- S.registerSound "weapons/bfg__f1y.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzLogin -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 0
+                                            , _cdlDie = fromIntegral time + 1.0
+                                            })
+           soundIdx <- S.registerSound "weapons/grenlf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+           logoutEffect (pl^.ceCurrent.esOrigin) weapon
+
+       | weapon == Constants.mzLogout -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0 0
+                                            , _cdlDie = fromIntegral time + 1.0
+                                            })
+           soundIdx <- S.registerSound "weapons/grenlf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+           logoutEffect (pl^.ceCurrent.esOrigin) weapon
+
+       | weapon == Constants.mzRespawn -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
+                                            , _cdlDie = fromIntegral time + 1.0
+                                            })
+           soundIdx <- S.registerSound "weapons/grenlf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+           logoutEffect (pl^.ceCurrent.esOrigin) weapon
+
+       | weapon == Constants.mzPhalanx -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.5 })
+           soundIdx <- S.registerSound "weapons/plasshot.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzIonRipper -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.5 })
+           soundIdx <- S.registerSound "weapons/rippfire.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzEtfRifle -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0.9 0.7 0 })
+           soundIdx <- S.registerSound "weapons/nail1.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzShotgun2 -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "weapons/shotg2.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzHeatBeam -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
+                                            , _cdlDie = fromIntegral time + 100
+                                            })
+
+       | weapon == Constants.mzBlaster2 -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 0 })
+           -- FIXME: different sound for blaster2 ??
+           soundIdx <- S.registerSound "weapons/blastf1a.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzTracker -> do
+           -- negative flashes handled the same in gl/soft until CL_AddDLights
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 (-1) (-1) (-1) })
+           soundIdx <- S.registerSound "weapons/disint2.wav"
+           S.startSound Nothing (EdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
+
+       | weapon == Constants.mzNuke1 -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0 0
+                                            , _cdlDie = fromIntegral time + 100
+                                            })
+
+       | weapon == Constants.mzNuke2 -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
+                                            , _cdlDie = fromIntegral time + 100
+                                            })
+
+       | weapon == Constants.mzNuke4 -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 0 1
+                                            , _cdlDie = fromIntegral time + 100
+                                            })
+
+       | weapon == Constants.mzNuke8 -> do
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 1
+                                            , _cdlDie = fromIntegral time + 100
+                                            })
+
+       | otherwise -> return () -- TODO: some error should be thrown?
 
 parseMuzzleFlash2 :: Quake ()
 parseMuzzleFlash2 = do
@@ -467,3 +683,7 @@ allocDLight key = do
                   return (Just dlRef)
                 else
                   findAnyDLight time dLights (idx + 1) maxIdx
+
+logoutEffect :: V3 Float -> Int -> Quake ()
+logoutEffect _ _ = do
+    io (putStrLn "CLFX.logoutEffect") >> undefined -- TODO
