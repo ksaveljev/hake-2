@@ -678,6 +678,18 @@ parseMuzzleFlash = do
 
 parseMuzzleFlash2 :: Quake ()
 parseMuzzleFlash2 = do
+    ent <- MSG.readShort (globals.netMessage)
+
+    when (ent < 1 || ent >= Constants.maxEdicts) $
+      Com.comError Constants.errDrop "CL_ParseMuzzleFlash2: bad entity"
+
+    flashNumber <- MSG.readByte (globals.netMessage)
+
+    -- locate the origin
+    Just cent <- preuse $ globals.clEntities.ix ent
+    let (Just forward, Just right, _) = Math3D.angleVectors (cent^.ceCurrent.esAngles) True True False
+
+    
     io (putStrLn "CLFX.parseMuzzleFlash2") >> undefined -- TODO
 
 allocDLight :: Int -> Quake (IORef CDLightT)
