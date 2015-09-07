@@ -30,7 +30,7 @@ import qualified Util.Math3D as Math3D
 instantParticle :: Float
 instantParticle = -10000.0
 
-particleGravity :: Int
+particleGravity :: Float
 particleGravity = 40
 
 runDLights :: Quake ()
@@ -314,7 +314,7 @@ particleEffect org dir color count = do
                   vRand = V3 v1 v2 v3
                   pOrg = org + fmap (fromIntegral . (subtract 4) . (.&. 7)) oRand + fmap (* d) dir
                   pVel = fmap (* 20) vRand
-                  pAccel = fmap fromIntegral (V3 0 0 (negate particleGravity))
+                  pAccel = V3 0 0 (negate particleGravity)
                   pAlpha = 1.0
 
               r' <- Lib.randomF
@@ -366,7 +366,7 @@ explosionParticles org = do
                   vRand = V3 v1 v2 v3
                   pOrg = org + fmap (fromIntegral . (subtract 16) . (`mod` 32)) oRand
                   pVel = fmap (fromIntegral . (subtract 192) . (`mod` 384)) vRand
-                  pAccel = fmap fromIntegral (V3 0 0 (negate particleGravity))
+                  pAccel = V3 0 0 (negate particleGravity)
                   pAlpha = 1.0
 
               r' <- Lib.randomF
@@ -384,9 +384,54 @@ explosionParticles org = do
 
               addEffects (p^.cpNext) (idx + 1) maxIdx
 
+{-
+- =============== CL_BlasterParticles ===============
+- 
+- Wall impact puffs
+-}
 blasterParticles :: V3 Float -> V3 Float -> Quake ()
 blasterParticles org dir = do
-    io (putStrLn "CLFX.blasterParticles") >> undefined -- TODO
+    drawParticles 0 40
+
+  where drawParticles :: Int -> Int -> Quake ()
+        drawParticles idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              freeParticles <- use $ clientGlobals.cgFreeParticles
+
+              case freeParticles of
+                Nothing ->
+                  return ()
+
+                Just pRef -> do
+                  p <- io $ readIORef pRef
+                  activeParticles <- use $ clientGlobals.cgActiveParticles
+
+                  clientGlobals.cgFreeParticles .= (p^.cpNext)
+                  io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles })
+                  clientGlobals.cgActiveParticles .= Just pRef
+
+                  time <- use $ globals.cl.csTime
+                  r <- Lib.rand
+                  d <- liftM (fromIntegral . (.&. 15)) Lib.rand
+                  o1 <- Lib.rand
+                  o2 <- Lib.rand
+                  o3 <- Lib.rand
+                  v1 <- Lib.crandom
+                  v2 <- Lib.crandom
+                  v3 <- Lib.crandom
+                  f <- Lib.randomF
+
+                  io $ modifyIORef' pRef (\v -> v { _cpTime = fromIntegral time
+                                                  , _cpColor = 0xE0 + fromIntegral (r .&. 7)
+                                                  , _cpOrg = org + (V3 (fromIntegral $ (o1 .&. 7) - 4) (fromIntegral $ (o2 .&. 7) - 4) (fromIntegral $ (o3 .&. 7) - 4)) + fmap (* d) dir
+                                                  , _cpVel = fmap (* 30) dir + fmap (* 40) (V3 v1 v2 v3)
+                                                  , _cpAccel = V3 0 0 (negate particleGravity)
+                                                  , _cpAlpha = 1.0
+                                                  , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
+                                                  })
+
+                  drawParticles (idx + 1) maxIdx
 
 railTrail :: V3 Float -> V3 Float -> Quake ()
 railTrail _ _ = do
