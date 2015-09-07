@@ -7,7 +7,7 @@ data GItemArmorT =
   GItemArmorT { _giaBaseCount        :: Int
               , _giaMaxCount         :: Int
               , _giaNormalProtection :: Float
-              , _giaEnergyProteciton :: Float
+              , _giaEnergyProtection :: Float
               , _giaArmor            :: Int
               }
 

@@ -325,8 +325,43 @@ checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = 
                          return save'
 
 checkArmor :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake Int
-checkArmor _ _ _ _ _ _ = do
-    io (putStrLn "GameCombat.checkArmor") >> undefined -- TODO
+checkArmor edictRef@(EdictReference edictIdx) point normal damage sparks dflags = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+    if | damage == 0 -> return 0
+       | isNothing (edict^.eClient) -> return 0
+       | dflags .&. Constants.damageNoArmor /= 0 -> return 0
+       | otherwise -> do
+           index <- GameItems.armorIndex edictRef
+
+           if index == 0
+             then
+               return 0
+
+             else do
+               Just item <- GameItems.getItemByIndex index
+
+               let Just gArmor = item^.giInfo
+                   save = if dflags .&. Constants.damageEnergy /= 0
+                            then ceiling ((gArmor^.giaEnergyProtection) * (fromIntegral damage))
+                            else ceiling ((gArmor^.giaNormalProtection) * (fromIntegral damage))
+                   Just (GClientReference gClientIdx) = edict^.eClient
+
+               Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+               let save' = if save >= (gClient^.gcPers.cpInventory) UV.! index
+                             then (gClient^.gcPers.cpInventory) UV.! index
+                             else save
+
+               if save' == 0
+                 then
+                   return 0
+
+                 else do
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix index -= save'
+                   spawnDamage sparks point normal save'
+
+                   return save'
 
 checkTeamDamage :: EdictReference -> EdictReference -> Quake Bool
 checkTeamDamage _ _ =

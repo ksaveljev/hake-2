@@ -246,7 +246,7 @@ jacketArmorInfo =
   GItemArmorT { _giaBaseCount        = 25
               , _giaMaxCount         = 50
               , _giaNormalProtection = 0.3
-              , _giaEnergyProteciton = 0
+              , _giaEnergyProtection = 0
               , _giaArmor            = Constants.armorJacket
               }
 
@@ -255,7 +255,7 @@ combatArmorInfo =
   GItemArmorT { _giaBaseCount        = 50
               , _giaMaxCount         = 100
               , _giaNormalProtection = 0.6
-              , _giaEnergyProteciton = 0.3
+              , _giaEnergyProtection = 0.3
               , _giaArmor            = Constants.armorCombat
               }
 
@@ -264,7 +264,7 @@ bodyArmorInfo =
   GItemArmorT { _giaBaseCount        = 100
               , _giaMaxCount         = 200
               , _giaNormalProtection = 0.8
-              , _giaEnergyProteciton = 0.6
+              , _giaEnergyProtection = 0.6
               , _giaArmor            = Constants.armorBody
               }
 
