@@ -21,6 +21,7 @@ import QuakeState
 import CVarVariables
 import qualified Constants
 import qualified Client.CLFX as CLFX
+import qualified Client.CLNewFX as CLNewFX
 import {-# SOURCE #-} qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
 import qualified Client.CLTEnt as CLTEnt
@@ -31,6 +32,10 @@ import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+bfgLightRamp :: UV.Vector Int
+bfgLightRamp =
+    UV.fromList [ 300, 400, 600, 300, 150, 75 ]
 
 {-
 - =============== CL_AddEntities
@@ -969,7 +974,7 @@ addPacketEntities frame = do
                        >>= checkModelIndex3 s1
                        >>= checkModelIndex4 s1
                        >>= checkPowerScreen effects
-                       >>= addAutomaticParticleTrails effects s1 cent
+                       >>= addAutomaticParticleTrails effects s1
                        >>= copyOrigin s1
                        >>= \v -> addEntity autoRotate autoAnim v (pNum + 1) maxPNum
 
@@ -1241,11 +1246,85 @@ addPacketEntities frame = do
             else
               return ent
 
-        addAutomaticParticleTrails :: Int -> EntityStateT -> CEntityT -> EntityT -> Quake EntityT
-        addAutomaticParticleTrails effects s1 cent ent = do
+        addAutomaticParticleTrails :: Int -> EntityStateT -> EntityT -> Quake EntityT
+        addAutomaticParticleTrails effects s1 ent = do
+          Just cent <- preuse $ globals.clEntities.ix (s1^.esNumber)
+
           if effects .&. (complement Constants.efRotate) /= 0
             then do
-              io (putStrLn "CLEnts.addAutomaticParticleTrails") >> undefined -- TODO
+              if | effects .&. Constants.efRocket /= 0 -> do
+                     CLFX.rocketTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber)
+                     ClientV.addLight (ent^.eOrigin) 200 1 1 0
+                     return ent
+
+                 | effects .&. Constants.efBlaster /= 0 -> do
+                     if effects .&. Constants.efTracker /= 0 -- lame... problematic?
+                       then do
+                         CLNewFX.blasterTrail2 (cent^.ceLerpOrigin) (ent^.eOrigin)
+                         ClientV.addLight (ent^.eOrigin) 200 0 1 0
+                       else do
+                         CLFX.blasterTrail (cent^.ceLerpOrigin) (ent^.eOrigin)
+                         ClientV.addLight (ent^.eOrigin) 200 1 1 0
+
+                     return ent
+
+                 | effects .&. Constants.efHyperblaster /= 0 -> do
+                     if effects .&. Constants.efTracker /= 0 -- PGM overloaded for blaster2
+                       then ClientV.addLight (ent^.eOrigin) 200 0 1 0
+                       else ClientV.addLight (ent^.eOrigin) 200 1 1 0
+
+                     return ent
+
+                 | effects .&. Constants.efGib /= 0 -> do
+                     CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+                     return ent
+
+                 | effects .&. Constants.efGrenade /= 0 -> do
+                     CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+                     return ent
+
+                 | effects .&. Constants.efFlies /= 0 -> do
+                     CLFX.flyEffect (s1^.esNumber) (ent^.eOrigin)
+                     return ent
+
+                 | effects .&. Constants.efBFG /= 0 -> do
+                     i <- if effects .&. Constants.efAnimAllFast /= 0
+                            then do
+                              CLFX.bfgParticles ent
+                              return 200
+                            else
+                              return (bfgLightRamp UV.! (s1^.esFrame))
+
+                     ClientV.addLight (ent^.eOrigin) (fromIntegral i) 0 1 0
+                     return ent
+
+                 | effects .&. Constants.efTrap /= 0 -> do
+                     let origin@(V3 a b c) = ent^.eOrigin
+                         ent' = ent { _eOrigin = V3 a b (c + 32) }
+
+                     CLFX.trapParticles ent'
+                     r <- Lib.rand
+                     let i = (fromIntegral (r `mod` 100) + 1) + 100
+                     ClientV.addLight (ent'^.eOrigin) i 1 0.8 0.1
+                     return ent'
+
+                 | effects .&. Constants.efFlag1 /= 0 -> do
+                     CLFX.flagTrail (cent^.ceLerpOrigin) (ent^.eOrigin) 242
+                     ClientV.addLight (ent^.eOrigin) 225 1 0.1 0.1
+                     return ent
+
+                 | effects .&. Constants.efFlag2 /= 0 -> do
+                     CLFX.flagTrail (cent^.ceLerpOrigin) (ent^.eOrigin) 115
+                     ClientV.addLight (ent^.eOrigin) 225 0.1 0.1 1
+                     return ent
+
+                 | effects .&. Constants.efTagTrail /= 0 -> do
+                     CLNewFX.tagTrail (cent^.ceLerpOrigin) (ent^.eOrigin) 220
+                     ClientV.addLight (ent^.eOrigin) 225 1.0 1.0 0.0
+                     return ent
+
+                 | otherwise -> do
+                     io (putStrLn "CLEnts.addAutomaticParticleTrails") >> undefined -- TODO
             else
               return ent
 

@@ -687,3 +687,31 @@ allocDLight key = do
 logoutEffect :: V3 Float -> Int -> Quake ()
 logoutEffect _ _ = do
     io (putStrLn "CLFX.logoutEffect") >> undefined -- TODO
+
+rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
+rocketTrail _ _ _ = do
+    io (putStrLn "CLFX.rocketTrail") >> undefined -- TODO
+
+blasterTrail :: V3 Float -> V3 Float -> Quake ()
+blasterTrail _ _ = do
+    io (putStrLn "CLFX.blasterTrail") >> undefined -- TODO
+
+diminishingTrail :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+diminishingTrail _ _ _ _ = do
+    io (putStrLn "CLFX.diminishingTrail") >> undefined -- TODO
+
+flyEffect :: Int -> V3 Float -> Quake ()
+flyEffect _ _ = do
+    io (putStrLn "CLFX.flyEffect") >> undefined -- TODO
+
+flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
+flagTrail _ _ _ = do
+    io (putStrLn "CLFX.flagTrail") >> undefined -- TODO
+
+bfgParticles :: EntityT -> Quake ()
+bfgParticles _ = do
+    io (putStrLn "CLFX.bfgParticles") >> undefined -- TODO
+
+trapParticles :: EntityT -> Quake ()
+trapParticles _ = do
+    io (putStrLn "CLFX.trapParticles") >> undefined -- TODO

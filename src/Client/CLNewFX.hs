@@ -12,3 +12,11 @@ monsterPlasmaShell _ = do
 heatBeam :: V3 Float -> V3 Float -> Quake ()
 heatBeam _ _ = do
     io (putStrLn "CLNewFX.heatBeam") >> undefined -- TODO
+
+tagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
+tagTrail _ _ _ = do
+    io (putStrLn "CLNewFX.tagTrail") >> undefined -- TODO
+
+blasterTrail2 :: V3 Float -> V3 Float -> Quake ()
+blasterTrail2 _ _ = do
+    io (putStrLn "CLNewFX.blasterTrail2") >> undefined -- TODO
