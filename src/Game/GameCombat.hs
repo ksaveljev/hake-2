@@ -2,18 +2,21 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameCombat where
 
-import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom)
+import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=))
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3, norm, normalize)
+import Linear (V3, norm, normalize, dot)
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
+import qualified Util.Math3D as Math3D
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()
 radiusDamage inflictorRef@(EdictReference inflictorIdx) attackerRef dmg ignoreRef radius mod' = do
@@ -244,8 +247,82 @@ spawnDamage dmgType origin normal damage = do
     multicast origin Constants.multicastPvs
 
 checkPowerArmor :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Quake Int
-checkPowerArmor _ _ _ _ _ = do
-    io (putStrLn "GameCombat.checkPowerArmor") >> undefined -- TODO
+checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = do
+    if | damage == 0 -> return 0
+       | dflags .&. Constants.damageNoArmor /= 0 -> return 0
+       | otherwise -> do
+           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+           if | isJust (edict^.eClient) -> do
+                  powerArmorType <- GameItems.powerArmorType edictRef
+
+                  if powerArmorType /= Constants.powerArmorNone
+                    then do
+                      Just (GItemReference itemIdx) <- GameItems.findItem "Cells"
+                      Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
+
+                      let Just (GClientReference gClientIdx) = edict^.eClient
+                      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+                      let power = (gClient^.gcPers.cpInventory) UV.! (item^.giIndex)
+
+                      continueChecking powerArmorType power
+                    else
+                      continueChecking powerArmorType 0
+
+              | (edict^.eSvFlags) .&. Constants.svfMonster /= 0 ->
+                  continueChecking (edict^.eMonsterInfo.miPowerArmorType) (edict^.eMonsterInfo.miPowerArmorPower)
+
+              | otherwise ->
+                  return 0
+
+  where continueChecking :: Int -> Int -> Quake Int
+        continueChecking powerAmorType power = do
+          if | powerAmorType == Constants.powerArmorNone -> return 0
+             | power == 0 -> return 0
+             | otherwise -> do
+                 Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+                 let maybeDamageInfo = if powerAmorType == Constants.powerArmorScreen
+                                         then let (Just forward, _, _) = Math3D.angleVectors (edict^.eEntityState.esAngles) True False False
+                                                  vec = normalize (point - (edict^.eEntityState.esOrigin))
+                                                  dot' = vec `dot` forward
+                                              in if dot' <= 0.3
+                                                   then Nothing
+                                                   else Just (1, Constants.teScreenSparks, damage `div` 3)
+
+                                         else Just (2, Constants.teShieldSparks, (2 * damage) `div` 3)
+
+                 case maybeDamageInfo of
+                   Nothing ->
+                     return 0
+
+                   Just (damagePerCell, paTeType, damage') -> do
+                     let save = power * damagePerCell
+
+                     if save == 0
+                       then return 0
+                       else do
+                         let save' = if save > damage'
+                                       then damage'
+                                       else save
+
+                         spawnDamage paTeType point normal save'
+
+                         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+                         gameBaseGlobals.gbGEdicts.ix edictIdx.ePowerArmorTime .= levelTime + 0.2
+
+                         let powerUsed = save' `div` damagePerCell
+
+                         case edict^.eClient of
+                           Nothing ->
+                             gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miPowerArmorPower -= powerUsed
+
+                           Just (GClientReference gClientIdx) -> do
+                             Just (GItemReference itemIdx) <- GameItems.findItem "Cells"
+                             Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
+                             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) -= powerUsed
+
+                         return save'
 
 checkArmor :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake Int
 checkArmor _ _ _ _ _ _ = do
