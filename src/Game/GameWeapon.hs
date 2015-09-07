@@ -21,8 +21,47 @@ import qualified Util.Math3D as Math3D
 
 blasterTouch :: EntTouch
 blasterTouch =
-  GenericEntTouch "blaster_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameWeapon.blasterTouch") >> undefined -- TODO
+  GenericEntTouch "blaster_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) plane maybeSurf -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    unless (Just otherRef == (self^.eOwner)) $ do
+      if isJust maybeSurf && ((fromJust maybeSurf)^.csFlags) .&. Constants.surfSky /= 0
+        then
+          GameUtil.freeEdict selfRef
+        else do
+          let Just ownerRef@(EdictReference ownerIdx) = self^.eOwner
+          Just owner <- preuse $ gameBaseGlobals.gbGEdicts.ix ownerIdx
+
+          when (isJust (owner^.eClient)) $
+            PlayerWeapon.playerNoise ownerRef (self^.eEntityState.esOrigin) Constants.pNoiseImpact
+
+          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+          if (other^.eTakeDamage) /= 0
+            then do
+              let mod' = if self^.eSpawnFlags .&. 1 /= 0
+                           then Constants.modHyperblaster
+                           else Constants.modBlaster
+
+                  normal = plane^.cpNormal -- TODO: jake2 has check for NULL here
+
+              GameCombat.damage otherRef selfRef ownerRef (self^.eVelocity) (self^.eEntityState.esOrigin) normal (self^.eDmg) 1 Constants.damageEnergy mod'
+
+            else do
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+
+              let writeByte = gameImport^.giWriteByte
+                  writePosition = gameImport^.giWritePosition
+                  writeDir = gameImport^.giWriteDir
+                  multicast = gameImport^.giMulticast
+
+              writeByte Constants.svcTempEntity
+              writeByte Constants.teBlaster
+              writePosition (self^.eEntityState.esOrigin)
+              writeDir (plane^.cpNormal) -- TODO: jake2 has check for NULL here
+              multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
+
+          GameUtil.freeEdict selfRef
 
 fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool
 fireHit _ _ _ _ = do
