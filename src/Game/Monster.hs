@@ -43,8 +43,18 @@ monsterFireShotgun selfRef@(EdictReference selfIdx) start aimDir damage kick hsp
     multicast start Constants.multicastPvs
 
 monsterFireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
-monsterFireBlaster _ _ _ _ _ _ _ = do
-    io (putStrLn "Monster.monsterFireBlaster") >> undefined -- TODO
+monsterFireBlaster selfRef@(EdictReference selfIdx) start dir damage speed flashType effect = do
+    GameWeapon.fireBlaster selfRef start dir damage speed effect False
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcMuzzleFlash2
+    writeShort selfIdx -- TODO: are we sure it is the same as self^.eIndex?
+    writeByte flashType
+    multicast start Constants.multicastPvs
 
 monsterStart :: EdictReference -> Quake Bool
 monsterStart edictRef@(EdictReference edictIdx) = do
