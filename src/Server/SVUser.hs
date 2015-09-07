@@ -19,11 +19,12 @@ import QCommon.XCommandT
 import Server.UCmdT
 import qualified Constants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified Game.Info as Info
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.CBuf as CBuf
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
-import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Server.SVMain as SVMain
 import qualified Util.Lib as Lib
 
@@ -394,8 +395,13 @@ disconnectF = do
     Just client <- use $ svGlobals.svClient
     SVMain.dropClient client
 
+{-
+- ================== SV_ShowServerinfo_f ==================
+- 
+- Dumps the serverinfo info string
+-}
 showServerInfoF :: XCommandT
-showServerInfoF = io (putStrLn "SVUser.showServerInfoF") >> undefined -- TODO
+showServerInfoF = CVar.serverInfo >>= Info.print
 
 beginDownloadF :: XCommandT
 beginDownloadF = io (putStrLn "SVUser.beginDownloadF") >> undefined -- TODO
