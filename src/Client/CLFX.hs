@@ -10,7 +10,7 @@ import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), complement)
 import Data.Char (ord)
 import Data.IORef (IORef, newIORef, modifyIORef', writeIORef, readIORef)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -693,8 +693,51 @@ rocketTrail _ _ _ = do
     io (putStrLn "CLFX.rocketTrail") >> undefined -- TODO
 
 blasterTrail :: V3 Float -> V3 Float -> Quake ()
-blasterTrail _ _ = do
-    io (putStrLn "CLFX.blasterTrail") >> undefined -- TODO
+blasterTrail start end = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = fmap (* 5) (normalize vec)
+
+    trailParticles move vec' len
+
+  where trailParticles :: V3 Float -> V3 Float -> Float -> Quake ()
+        trailParticles move vec len
+          | len <= 0 = return ()
+          | otherwise = do
+              freeParticles <- use $ clientGlobals.cgFreeParticles
+
+              case freeParticles of
+                Nothing ->
+                  return ()
+
+                Just pRef -> do
+                  activeParticles <- use $ clientGlobals.cgActiveParticles
+                  time <- use $ globals.cl.csTime
+
+                  p <- io $ readIORef pRef
+                  clientGlobals.cgFreeParticles .= (p^.cpNext)
+                  io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles })
+                  clientGlobals.cgActiveParticles .= Just pRef
+
+                  f <- Lib.randomF
+                  o1 <- Lib.crandom
+                  o2 <- Lib.crandom
+                  o3 <- Lib.crandom
+                  v1 <- Lib.crandom
+                  v2 <- Lib.crandom
+                  v3 <- Lib.crandom
+
+                  io $ modifyIORef' pRef (\v -> v { _cpTime = fromIntegral time
+                                                  , _cpAlpha = 1.0
+                                                  , _cpAlphaVel = (-1.0) / (0.3 + f * 0.2)
+                                                  , _cpColor = 0xE0
+                                                  , _cpOrg = move + V3 o1 o2 o3
+                                                  , _cpVel = V3 (5 * v1) (5 * v2) (5 * v3)
+                                                  , _cpAccel = V3 0 0 0
+                                                  })
+
+                  trailParticles (move + vec) vec (len - 5)
 
 diminishingTrail :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 diminishingTrail _ _ _ _ = do
