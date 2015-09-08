@@ -1626,6 +1626,8 @@ data KBDGlobals =
              , _kbdWiny  :: !Int
              , _kbdWinW2 :: !Int
              , _kbdWinH2 :: !Int
+             , _kbdX     :: !Int
+             , _kbdY     :: !Int
              }
 
 data BasicRenderAPIGlobals =

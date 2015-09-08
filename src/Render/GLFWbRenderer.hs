@@ -195,11 +195,16 @@ glfwbKBDUpdate = do
             case msg of
               KeyPress key -> doKeyEvent (xLateKey key) True
               KeyRelease key -> doKeyEvent (xLateKey key) False
-              CursorPosition x y -> do
-                w2 <- use $ kbdGlobals.kbdWinW2
-                h2 <- use $ kbdGlobals.kbdWinH2
-                kbdGlobals.kbdMx .= (x - w2) * 2
-                kbdGlobals.kbdMy .= (y - h2) * 2
+              CursorPosition x' y' -> do
+                x <- use $ kbdGlobals.kbdX
+                y <- use $ kbdGlobals.kbdY
+
+                kbdGlobals.kbdMx .= (truncate x' - x) * 2
+                kbdGlobals.kbdMy .= (truncate y' - y) * 2
+
+                kbdGlobals.kbdX .= truncate x'
+                kbdGlobals.kbdY .= truncate y'
+
               MouseButtonPress button -> doKeyEvent (mouseEventToKey button) True
               MouseButtonRelease button -> doKeyEvent (mouseEventToKey button) False
               MouseWheelScroll scroll -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
@@ -232,6 +237,9 @@ glfwbKBDInstallGrabs :: Quake ()
 glfwbKBDInstallGrabs = do
     Just window <- use $ glfwbGlobals.glfwbWindow
     io $ GLFW.setCursorInputMode window GLFW.CursorInputMode'Disabled
+    (x, y) <- io $ GLFW.getCursorPos window
+    kbdGlobals.kbdX .= truncate x
+    kbdGlobals.kbdY .= truncate y
 
 glfwbKBDUninstallGrabs :: Quake ()
 glfwbKBDUninstallGrabs = do
