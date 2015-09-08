@@ -20,7 +20,9 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
+import {-# SOURCE #-} qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.V as ClientV
+import qualified Game.Monsters.MFlash as MFlash
 import qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
@@ -688,9 +690,379 @@ parseMuzzleFlash2 = do
     -- locate the origin
     Just cent <- preuse $ globals.clEntities.ix ent
     let (Just forward, Just right, _) = Math3D.angleVectors (cent^.ceCurrent.esAngles) True True False
+        a = (cent^.ceCurrent.esOrigin._x) + (forward^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y)
+        b = (cent^.ceCurrent.esOrigin._y) + (forward^._y) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._y) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y)
+        c = (cent^.ceCurrent.esOrigin._z) + (forward^._z) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._z) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y) + ((MFlash.monsterFlashOffset V.! flashNumber)^._z)
+        origin = V3 a b c
 
-    
-    io (putStrLn "CLFX.parseMuzzleFlash2") >> undefined -- TODO
+    dlRef <- allocDLight ent
+    r <- Lib.rand
+    time <- use $ globals.cl.csTime
+
+    io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = origin
+                                     , _cdlRadius = 200 + fromIntegral (r .&. 31)
+                                     , _cdlMinLight = 32
+                                     , _cdlDie = fromIntegral time
+                                     })
+
+    if | flashNumber `elem` [ Constants.mz2InfantryMachinegun1
+                            , Constants.mz2InfantryMachinegun2
+                            , Constants.mz2InfantryMachinegun3
+                            , Constants.mz2InfantryMachinegun4
+                            , Constants.mz2InfantryMachinegun5
+                            , Constants.mz2InfantryMachinegun6
+                            , Constants.mz2InfantryMachinegun7
+                            , Constants.mz2InfantryMachinegun8
+                            , Constants.mz2InfantryMachinegun9
+                            , Constants.mz2InfantryMachinegun10
+                            , Constants.mz2InfantryMachinegun11
+                            , Constants.mz2InfantryMachinegun12
+                            , Constants.mz2InfantryMachinegun13
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "infantry/infatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2SoldierMachinegun1
+                            , Constants.mz2SoldierMachinegun2
+                            , Constants.mz2SoldierMachinegun3
+                            , Constants.mz2SoldierMachinegun4
+                            , Constants.mz2SoldierMachinegun5
+                            , Constants.mz2SoldierMachinegun6
+                            , Constants.mz2SoldierMachinegun7
+                            , Constants.mz2SoldierMachinegun8
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "soldier/solatck3.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2GunnerMachinegun1
+                            , Constants.mz2GunnerMachinegun2
+                            , Constants.mz2GunnerMachinegun3
+                            , Constants.mz2GunnerMachinegun4
+                            , Constants.mz2GunnerMachinegun5
+                            , Constants.mz2GunnerMachinegun6
+                            , Constants.mz2GunnerMachinegun7
+                            , Constants.mz2GunnerMachinegun8
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "gunner/gunatck2.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2ActorMachinegun1
+                            , Constants.mz2SupertankMachinegun1
+                            , Constants.mz2SupertankMachinegun2
+                            , Constants.mz2SupertankMachinegun3
+                            , Constants.mz2SupertankMachinegun4
+                            , Constants.mz2SupertankMachinegun5
+                            , Constants.mz2SupertankMachinegun6
+                            , Constants.mz2TurretMachinegun
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "infantry/infatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2Boss2MachinegunL1
+                            , Constants.mz2Boss2MachinegunL2
+                            , Constants.mz2Boss2MachinegunL3
+                            , Constants.mz2Boss2MachinegunL4
+                            , Constants.mz2Boss2MachinegunL5
+                            , Constants.mz2CarrierMachinegunL1
+                            , Constants.mz2CarrierMachinegunL2
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "infantry/infatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNone 0
+
+       | flashNumber `elem` [ Constants.mz2SoldierBlaster1
+                            , Constants.mz2SoldierBlaster2
+                            , Constants.mz2SoldierBlaster3
+                            , Constants.mz2SoldierBlaster4
+                            , Constants.mz2SoldierBlaster5
+                            , Constants.mz2SoldierBlaster6
+                            , Constants.mz2SoldierBlaster7
+                            , Constants.mz2SoldierBlaster8
+                            , Constants.mz2TurretBlaster
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "soldier/solatck2.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2FlyerBlaster1
+                            , Constants.mz2FlyerBlaster2
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "flyer/flyatck3.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber == Constants.mz2MedicBlaster1 -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "medic/medatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber == Constants.mz2HoverBlaster1 -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "hover/hovatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber == Constants.mz2FloatBlaster1 -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "floater/fltatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2SoldierShotgun1
+                            , Constants.mz2SoldierShotgun2
+                            , Constants.mz2SoldierShotgun3
+                            , Constants.mz2SoldierShotgun4
+                            , Constants.mz2SoldierShotgun5
+                            , Constants.mz2SoldierShotgun6
+                            , Constants.mz2SoldierShotgun7
+                            , Constants.mz2SoldierShotgun8
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "soldier/solatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2TankBlaster1
+                            , Constants.mz2TankBlaster2
+                            , Constants.mz2TankBlaster3
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "tank/tnkatck3.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2TankMachinegun1
+                            , Constants.mz2TankMachinegun2
+                            , Constants.mz2TankMachinegun3
+                            , Constants.mz2TankMachinegun4
+                            , Constants.mz2TankMachinegun5
+                            , Constants.mz2TankMachinegun6
+                            , Constants.mz2TankMachinegun7
+                            , Constants.mz2TankMachinegun8
+                            , Constants.mz2TankMachinegun9
+                            , Constants.mz2TankMachinegun10
+                            , Constants.mz2TankMachinegun11
+                            , Constants.mz2TankMachinegun12
+                            , Constants.mz2TankMachinegun13
+                            , Constants.mz2TankMachinegun14
+                            , Constants.mz2TankMachinegun15
+                            , Constants.mz2TankMachinegun16
+                            , Constants.mz2TankMachinegun17
+                            , Constants.mz2TankMachinegun18
+                            , Constants.mz2TankMachinegun19
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           r <- Lib.rand
+           let soundName = "tank/tnkatk2" `B.append` B.singleton (97 + fromIntegral (r `mod` 5)) `B.append` ".wav"
+           soundIdx <- S.registerSound soundName
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2ChickRocket1
+                            , Constants.mz2TurretRocket
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.2 })
+           soundIdx <- S.registerSound "chick/chkatck2.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2TankRocket1
+                            , Constants.mz2TankRocket2
+                            , Constants.mz2TankRocket3
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.2 })
+           soundIdx <- S.registerSound "tank/tnkatck1.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2SupertankRocket1
+                            , Constants.mz2SupertankRocket2
+                            , Constants.mz2SupertankRocket3
+                            , Constants.mz2Boss2Rocket1
+                            , Constants.mz2Boss2Rocket2
+                            , Constants.mz2Boss2Rocket3
+                            , Constants.mz2Boss2Rocket4
+                            , Constants.mz2CarrierRocket1
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0.2 })
+           soundIdx <- S.registerSound "tank/rocket.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2GunnerGrenade1
+                            , Constants.mz2GunnerGrenade2
+                            , Constants.mz2GunnerGrenade3
+                            , Constants.mz2GunnerGrenade4
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0.5 0 })
+           soundIdx <- S.registerSound "gunner/gunatck3.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2GladiatorRailgun1
+                            , Constants.mz2CarrierRailgun
+                            , Constants.mz2WidowRail
+                            ] ->
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0.5 0.5 1.0 })
+
+       | flashNumber == Constants.mz2MakronBfg ->
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0.5 1 0.5 })
+
+       | flashNumber `elem` [ Constants.mz2MakronBlaster1
+                            , Constants.mz2MakronBlaster2
+                            , Constants.mz2MakronBlaster3
+                            , Constants.mz2MakronBlaster4
+                            , Constants.mz2MakronBlaster5
+                            , Constants.mz2MakronBlaster6
+                            , Constants.mz2MakronBlaster7
+                            , Constants.mz2MakronBlaster8
+                            , Constants.mz2MakronBlaster9
+                            , Constants.mz2MakronBlaster10
+                            , Constants.mz2MakronBlaster11
+                            , Constants.mz2MakronBlaster12
+                            , Constants.mz2MakronBlaster13
+                            , Constants.mz2MakronBlaster14
+                            , Constants.mz2MakronBlaster15
+                            , Constants.mz2MakronBlaster16
+                            , Constants.mz2MakronBlaster17
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           soundIdx <- S.registerSound "makron/blaster.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2JorgMachinegunL1
+                            , Constants.mz2JorgMachinegunL2
+                            , Constants.mz2JorgMachinegunL3
+                            , Constants.mz2JorgMachinegunL4
+                            , Constants.mz2JorgMachinegunL5
+                            , Constants.mz2JorgMachinegunL6
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+           soundIdx <- S.registerSound "boss3/xfire.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2JorgMachinegunR1
+                            , Constants.mz2JorgMachinegunR2
+                            , Constants.mz2JorgMachinegunR3
+                            , Constants.mz2JorgMachinegunR4
+                            , Constants.mz2JorgMachinegunR5
+                            , Constants.mz2JorgMachinegunR6
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+
+       | flashNumber == Constants.mz2JorgBfg1 ->
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0.5 1 0.5 })
+
+       | flashNumber `elem` [ Constants.mz2Boss2MachinegunR1
+                            , Constants.mz2Boss2MachinegunR2
+                            , Constants.mz2Boss2MachinegunR3
+                            , Constants.mz2Boss2MachinegunR4
+                            , Constants.mz2Boss2MachinegunR5
+                            , Constants.mz2CarrierMachinegunR1
+                            , Constants.mz2CarrierMachinegunR2
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
+           v3o <- use $ globals.vec3Origin
+           particleEffect origin v3o 0 40
+           CLTEnt.smokeAndFlash origin
+
+       | flashNumber `elem` [ Constants.mz2StalkerBlaster
+                            , Constants.mz2DaedalusBlaster
+                            , Constants.mz2MedicBlaster2
+                            , Constants.mz2WidowBlaster
+                            , Constants.mz2WidowBlasterSweep1
+                            , Constants.mz2WidowBlasterSweep2
+                            , Constants.mz2WidowBlasterSweep3
+                            , Constants.mz2WidowBlasterSweep4
+                            , Constants.mz2WidowBlasterSweep5
+                            , Constants.mz2WidowBlasterSweep6
+                            , Constants.mz2WidowBlasterSweep7
+                            , Constants.mz2WidowBlasterSweep8
+                            , Constants.mz2WidowBlasterSweep9
+                            , Constants.mz2WidowBlaster100
+                            , Constants.mz2WidowBlaster90
+                            , Constants.mz2WidowBlaster80
+                            , Constants.mz2WidowBlaster70
+                            , Constants.mz2WidowBlaster60
+                            , Constants.mz2WidowBlaster50
+                            , Constants.mz2WidowBlaster40
+                            , Constants.mz2WidowBlaster30
+                            , Constants.mz2WidowBlaster20
+                            , Constants.mz2WidowBlaster10
+                            , Constants.mz2WidowBlaster0
+                            , Constants.mz2WidowBlaster10L
+                            , Constants.mz2WidowBlaster20L
+                            , Constants.mz2WidowBlaster30L
+                            , Constants.mz2WidowBlaster40L
+                            , Constants.mz2WidowBlaster50L
+                            , Constants.mz2WidowBlaster60L
+                            , Constants.mz2WidowBlaster70L
+                            , Constants.mz2WidowRun1
+                            , Constants.mz2WidowRun2
+                            , Constants.mz2WidowRun3
+                            , Constants.mz2WidowRun4
+                            , Constants.mz2WidowRun5
+                            , Constants.mz2WidowRun6
+                            , Constants.mz2WidowRun7
+                            , Constants.mz2WidowRun8
+                            ] -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 0 })
+           soundIdx <- S.registerSound "tank/tnkatck3.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber == Constants.mz2WidowDisruptor -> do
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 (-1) (-1) (-1) })
+           soundIdx <- S.registerSound "weapons/disint2.wav"
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+       | flashNumber `elem` [ Constants.mz2WidowPlasmaBeam
+                            , Constants.mz2Widow2Beamer1
+                            , Constants.mz2Widow2Beamer2
+                            , Constants.mz2Widow2Beamer3
+                            , Constants.mz2Widow2Beamer4
+                            , Constants.mz2Widow2Beamer5
+                            , Constants.mz2Widow2BeamSweep1
+                            , Constants.mz2Widow2BeamSweep2
+                            , Constants.mz2Widow2BeamSweep3
+                            , Constants.mz2Widow2BeamSweep4
+                            , Constants.mz2Widow2BeamSweep5
+                            , Constants.mz2Widow2BeamSweep6
+                            , Constants.mz2Widow2BeamSweep7
+                            , Constants.mz2Widow2BeamSweep8
+                            , Constants.mz2Widow2BeamSweep9
+                            , Constants.mz2Widow2BeamSweep10
+                            , Constants.mz2Widow2BeamSweep11
+                            ] -> do
+           r <- Lib.rand
+           time <- use $ globals.cl.csTime
+           io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
+                                            , _cdlRadius = 300 + fromIntegral (r .&. 100)
+                                            , _cdlDie = fromIntegral time + 200
+                                            })
+
+       | otherwise -> do
+           -- TODO: throw some kind of error ??
+           return ()
 
 allocDLight :: Int -> Quake (IORef CDLightT)
 allocDLight key = do

@@ -331,7 +331,7 @@ mz2GladiatorRailgun1 = 61 :: Int
 
 mz2HoverBlaster1 = 62 :: Int
 
-mz2Actormachinegun1 = 63 :: Int
+mz2ActorMachinegun1 = 63 :: Int
 
 mz2SupertankMachinegun1 = 64 :: Int
 mz2SupertankMachinegun2 = 65 :: Int
@@ -427,7 +427,7 @@ mz2CarrierRailgun      = 147 :: Int
 mz2WidowDisruptor      = 148 :: Int
 mz2WidowBlaster        = 149 :: Int
 mz2WidowRail           = 150 :: Int
-mz2WidowPlasmabeam     = 151 :: Int -- PMM - not used 
+mz2WidowPlasmaBeam     = 151 :: Int -- PMM - not used 
 mz2CarrierMachinegunL2 = 152 :: Int
 mz2CarrierMachinegunR2 = 153 :: Int
 mz2WidowRailLeft       = 154 :: Int
