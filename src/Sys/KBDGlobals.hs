@@ -14,4 +14,6 @@ initialKBDGlobals =
              , _kbdMy    = 0
              , _kbdWinx  = 0
              , _kbdWiny  = 0
+             , _kbdWinW2 = 0
+             , _kbdWinH2 = 0
              }

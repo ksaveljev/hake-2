@@ -157,6 +157,13 @@ glfwbKBDInit :: Quake ()
 glfwbKBDInit = do
     Just window <- use $ glfwbGlobals.glfwbWindow
 
+    (w, h) <- io $ GLFW.getWindowSize window
+
+    -- TODO: make sure this is a correct spot to init these values
+    -- maybe do it in ConfigureNotify section?
+    kbdGlobals.kbdWinW2 .= w `div` 2
+    kbdGlobals.kbdWinH2 .= h `div` 2
+
     kbdChan <- io (newTChanIO :: IO (TChan GLFWKBDEvent))
     glfwbGlobals.glfwbKBDChan .= Just kbdChan
 
@@ -188,7 +195,11 @@ glfwbKBDUpdate = do
             case msg of
               KeyPress key -> doKeyEvent (xLateKey key) True
               KeyRelease key -> doKeyEvent (xLateKey key) False
-              CursorPosition x y -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
+              CursorPosition x y -> do
+                w2 <- use $ kbdGlobals.kbdWinW2
+                h2 <- use $ kbdGlobals.kbdWinH2
+                kbdGlobals.kbdMx .= (x - w2) * 2
+                kbdGlobals.kbdMy .= (y - h2) * 2
               MouseButtonPress button -> doKeyEvent (mouseEventToKey button) True
               MouseButtonRelease button -> doKeyEvent (mouseEventToKey button) False
               MouseWheelScroll scroll -> io (putStrLn "GLFWbRenderer.glfwbKBDUpdate#handleEvents") >> undefined -- TODO
