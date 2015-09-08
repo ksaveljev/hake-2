@@ -183,6 +183,9 @@ entityEvent entityState = do
            sfx <- S.registerSound "*fall1.wav"
            S.startSound Nothing (EdictReference (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
 
+       | otherwise ->
+           return () -- TODO: expected?
+
 addParticles :: Quake ()
 addParticles = do
     activeParticles <- use $ clientGlobals.cgActiveParticles
