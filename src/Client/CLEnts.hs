@@ -1304,7 +1304,7 @@ addPacketEntities frame = do
 
                      CLFX.trapParticles ent'
                      r <- Lib.rand
-                     let i = (fromIntegral (r `mod` 100) + 1) + 100
+                     let i = fromIntegral (r `mod` 100) + 100
                      ClientV.addLight (ent'^.eOrigin) i 1 0.8 0.1
                      return ent'
 

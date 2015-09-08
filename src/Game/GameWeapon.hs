@@ -13,7 +13,7 @@ import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
-import qualified Game.GameCombat as GameCombat
+import {-# SOURCE #-} qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
 import qualified Game.PlayerWeapon as PlayerWeapon
 import qualified Util.Lib as Lib

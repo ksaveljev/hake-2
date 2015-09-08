@@ -17,6 +17,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
 import qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
