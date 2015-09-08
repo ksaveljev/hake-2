@@ -281,3 +281,29 @@ monsterTriggeredSpawnUse :: EntUse
 monsterTriggeredSpawnUse =
   GenericEntUse "monster_trigger_spawn_use" $ \_ _ _ -> do
     io (putStrLn "Monster.monsterTriggeredSpawnUse") >> undefined -- TODO
+
+{-
+- ================ monster_death_use ================
+- 
+- When a monster dies, it fires all of its targets with the current enemy
+- as activator.
+-}
+monsterDeathUse :: EdictReference -> Quake ()
+monsterDeathUse selfRef@(EdictReference selfIdx) = do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eFlags %= (.&. (complement (Constants.flFly .|. Constants.flSwim)))
+      eMonsterInfo.miAIFlags %= (.&. Constants.aiGoodGuy)
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when (isJust (self^.eItem)) $ do
+      GameItems.dropItem selfRef (fromJust $ self^.eItem)
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eItem .= Nothing
+
+    when (isJust (self^.eDeathTarget)) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= (self^.eDeathTarget)
+
+    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when (isJust (self'^.eTarget)) $
+      GameUtil.useTargets selfRef (self'^.eEnemy)

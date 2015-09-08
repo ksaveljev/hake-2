@@ -7,6 +7,7 @@ import Control.Monad (when, unless, liftM)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3, norm, normalize, dot)
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -16,6 +17,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
+import qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()
@@ -371,8 +373,37 @@ checkTeamDamage _ _ =
     return False
 
 killed :: EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
-killed _ _ _ _ _ = do
-    io (putStrLn "GameCombat.killed") >> undefined -- TODO
+killed targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) attackerRef@(EdictReference attackerIdx) damage point = do
+    Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+
+    Com.dprintf ("Killing a " `B.append` (targ^.eClassName) `B.append` "\n")
+
+    when ((targ^.eHealth) < -999) $
+      gameBaseGlobals.gbGEdicts.ix targIdx.eHealth .= (-999)
+
+    gameBaseGlobals.gbGEdicts.ix targIdx.eEnemy .= Just attackerRef
+
+    when ((targ^.eSvFlags) .&. Constants.svfMonster /= 0 && (targ^.eDeadFlag) /= Constants.deadDead) $
+      when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy == 0) $ do
+        gameBaseGlobals.gbLevel.llKilledMonsters += 1
+        coopValue <- liftM (^.cvValue) coopCVar
+        Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+        when (coopValue /= 0 && isJust (attacker^.eClient)) $ do
+          let Just (GClientReference attackerClientIdx) = attacker^.eClient
+          gameBaseGlobals.gbGame.glClients.ix attackerClientIdx.gcResp.crScore += 1
+          -- medics won't heal monsters that they kill themselves
+          when ((attacker^.eClassName) == "monster_medic") $
+            gameBaseGlobals.gbGEdicts.ix targIdx.eOwner .= Just attackerRef
+
+    if (targ^.eMoveType) `elem` [ Constants.moveTypePush, Constants.moveTypeStop, Constants.moveTypeNone ] -- doors, triggers, etc
+      then
+        die (fromJust $ targ^.eDie) targRef inflictorRef attackerRef damage point
+      else do
+        when ((targ^.eSvFlags) .&. Constants.svfMonster /= 0 && (targ^.eDeadFlag) /= Constants.deadDead) $ do
+          gameBaseGlobals.gbGEdicts.ix targIdx.eTouch .= Nothing
+          Monster.monsterDeathUse targRef
+
+        die (fromJust $ targ^.eDie) targRef inflictorRef attackerRef damage point
 
 reactToDamage :: EdictReference -> EdictReference -> Quake ()
 reactToDamage _ _ = do
