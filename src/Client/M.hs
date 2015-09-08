@@ -526,7 +526,7 @@ moveToGoal edictRef@(EdictReference edictIdx) dist = do
             SV.newChaseDir edictRef (edict'^.eGoalEntity) dist
         else do
           v <- SV.stepDirection edictRef (edict'^.eIdealYaw) dist
-          when v $ do
+          unless v $ do
             Just edict'' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
             when (edict''^.eInUse) $
               SV.newChaseDir edictRef (edict''^.eGoalEntity) dist
