@@ -698,3 +698,8 @@ attackFinished (EdictReference selfIdx) time = do
 onSameTeam :: EdictReference -> EdictReference -> Quake Bool
 onSameTeam edictRef1@(EdictReference edictIdx1) edictRef2@(EdictReference edictIdx2) = do
     io (putStrLn "GameUtil.onSameTeam") >> undefined -- TODO
+
+megaHealthThink :: EntThink
+megaHealthThink =
+  GenericEntThink "MegaHealth_think" $ \_ -> do
+    io (putStrLn "GameUtil.megaHealthThink") >> undefined -- TODO

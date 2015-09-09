@@ -388,8 +388,37 @@ pickupKey =
     io (putStrLn "GameItems.pickupKey") >> undefined -- TODO
 
 pickupHealth :: EntInteract
-pickupHealth = PickupHealth "pickup_health" $ \_ _ -> do
-  io (putStrLn "GameItems.pickupHealth") >> undefined -- TODO
+pickupHealth = PickupHealth "pickup_health" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) -> do
+  Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+  if (edict^.eStyle) .&. Constants.healthIgnoreMax == 0 && (other^.eHealth) >= (other^.eMaxHealth)
+    then
+      return False
+    else do
+      gameBaseGlobals.gbGEdicts.ix otherIdx.eHealth += (edict^.eCount)
+      when ((edict^.eStyle) .&. Constants.healthIgnoreMax == 0) $
+        gameBaseGlobals.gbGEdicts.ix otherIdx.eHealth %= (\v -> if v > (other^.eMaxHealth) then other^.eMaxHealth else v)
+
+      if (edict^.eStyle) .&. Constants.healthTimed /= 0
+        then do
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+            eThink .= Just GameUtil.megaHealthThink
+            eNextThink .= levelTime + 5
+            eOwner .= Just otherRef
+            eFlags %= (.|. Constants.flRespawn)
+            eSvFlags %= (.|. Constants.svfNoClient)
+            eSolid .= Constants.solidNot
+
+        else do
+          deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+          when ((edict^.eSpawnFlags) .&. Constants.droppedItem /= 0 && deathmatchValue /= 0) $
+            setRespawn edictRef 30
+
+      return True
 
 -- QUAKED item_health (.3 .3 1) (-16 -16 -16) (16 16 16)
 spItemHealth :: EdictReference -> Quake ()
