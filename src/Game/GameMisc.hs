@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _z)
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -17,6 +17,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameCombat as GameCombat
 import qualified Game.GameFunc as GameFunc
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
@@ -798,8 +799,89 @@ throwHead _ _ _ _ = io (putStrLn "GameMisc.throwHead") >> undefined -- TODO
 
 barrelDelay :: EntDie
 barrelDelay =
-  GenericEntDie "barrel_delay" $ \_ _ _ _ _ -> do
-    io (putStrLn "GameMisc.barrelDelay") >> undefined -- TODO
+  GenericEntDie "barrel_delay" $ \selfRef@(EdictReference selfIdx) attackerRef _ _ _ -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eTakeDamage .= Constants.damageNo
+      eNextThink .= levelTime + 2 * Constants.frameTime
+      eThink .= Just barrelExplode
+      eActivator .= Just attackerRef
+
+barrelExplode :: EntThink
+barrelExplode =
+  GenericEntThink "barrel_explode" $ \selfRef@(EdictReference selfIdx) -> do
+    preuse (gameBaseGlobals.gbGEdicts.ix selfIdx) >>= \(Just self) -> do
+      GameCombat.radiusDamage selfRef (fromJust $ self^.eActivator) (fromIntegral $ self^.eDmg) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modBarrel
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let save = self^.eEntityState.esOrigin
+        origin = (self^.eAbsMin) + fmap (* 0.5) (self^.eSize)
+
+    -- a few big chunks
+    let spd = 1.5 * fromIntegral (self^.eDmg) / 200
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esOrigin .= origin
+    bigChunksDamage selfRef spd origin
+    bigChunksDamage selfRef spd origin
+
+    -- bottom corners
+    let spd' = 1.75 * fromIntegral (self^.eDmg) / 200
+        V3 a b c = self^.eAbsMin
+    throwDebris selfRef "models/objects/debris3/tris.md2" spd' (V3 a b c)
+    throwDebris selfRef "models/objects/debris3/tris.md2" spd' (V3 (a + (self^.eSize._x)) b c)
+    throwDebris selfRef "models/objects/debris3/tris.md2" spd' (V3 a (b + (self^.eSize._y)) c)
+    throwDebris selfRef "models/objects/debris3/tris.md2" spd' (V3 (a + (self^.eSize._x)) (b + (self^.eSize._y)) c)
+
+    -- a bunch of little chunks
+    let spd'' = 2 * fromIntegral (self^.eDmg) / 200
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+    littleChunksDamage selfRef spd'' origin
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esOrigin .= save
+
+    preuse (gameBaseGlobals.gbGEdicts.ix selfIdx) >>= \(Just self) ->
+      case self^.eGroundEntity of
+        Nothing -> becomeExplosion1 selfRef
+        Just _ -> becomeExplosion2 selfRef
+
+    return True
+
+  where bigChunksDamage :: EdictReference -> Float -> V3 Float -> Quake ()
+        bigChunksDamage selfRef@(EdictReference selfIdx) spd origin = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          r1 <- Lib.crandom
+          r2 <- Lib.crandom
+          r3 <- Lib.crandom
+
+          let a = (origin^._x) + r1 * (self^.eSize._x)
+              b = (origin^._y) + r2 * (self^.eSize._y)
+              c = (origin^._z) + r3 * (self^.eSize._z)
+              org = V3 a b c
+
+          throwDebris selfRef "models/objects/debris1/tris.md2" spd org
+
+        littleChunksDamage :: EdictReference -> Float -> V3 Float -> Quake ()
+        littleChunksDamage selfRef@(EdictReference selfIdx) spd origin = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          r1 <- Lib.crandom
+          r2 <- Lib.crandom
+          r3 <- Lib.crandom
+
+          let a = (origin^._x) + r1 * (self^.eSize._x)
+              b = (origin^._y) + r2 * (self^.eSize._y)
+              c = (origin^._z) + r3 * (self^.eSize._z)
+              org = V3 a b c
+
+          throwDebris selfRef "models/objects/debris2/tris.md2" spd org
 
 {-
 - QUAKED misc_explobox (0 .5 .8) (-16 -16 0) (16 16 40) Large exploding
@@ -1010,3 +1092,15 @@ commanderBodyDrop :: EntThink
 commanderBodyDrop =
   GenericEntThink "commander_body_drop" $ \_ -> do
     io (putStrLn "GameMisc.commanderBodyDrop") >> undefined -- TODO
+
+throwDebris :: EdictReference -> B.ByteString -> Float -> V3 Float -> Quake ()
+throwDebris _ _ _ _ = do
+    io (putStrLn "GameMisc.throwDebris") >> undefined -- TODO
+
+becomeExplosion1 :: EdictReference -> Quake ()
+becomeExplosion1 _ = do
+    io (putStrLn "GameMisc.becomeExplosion1") >> undefined -- TODO
+
+becomeExplosion2 :: EdictReference -> Quake ()
+becomeExplosion2 _ = do
+    io (putStrLn "GameMisc.becomeExplosion2") >> undefined -- TODO
