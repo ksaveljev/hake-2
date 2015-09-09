@@ -645,7 +645,50 @@ spMiscDeadSoldier er@(EdictReference edictIdx) = do
         linkEntity er
 
 spMiscViper :: EdictReference -> Quake ()
-spMiscViper _ = io (putStrLn "GameMisc.spMiscViper") >> undefined -- TODO
+spMiscViper edictRef@(EdictReference edictIdx) = do
+    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let dprintf = gameImport^.giDprintf
+        modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    case edict^.eTarget of
+      Nothing -> do
+        dprintf ("misc_viper without a target at " `B.append` Lib.vtos (edict^.eAbsMin) `B.append` "\n")
+        GameUtil.freeEdict edictRef
+
+      Just _ -> do
+        let speed = if (edict^.eSpeed) == 0 then 300 else edict^.eSpeed
+
+        modelIdx <- modelIndex (Just "models/ships/viper/tris.md2")
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+          eSpeed .= speed
+          eMoveType .= Constants.moveTypePush
+          eSolid .= Constants.solidNot
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) 0
+          eMaxs .= V3 16 16 32
+          eThink .= Just GameFunc.funcTrainFind
+          eNextThink .= levelTime + Constants.frameTime
+          eUse .= Just miscViperUse
+          eSvFlags %= (.|. Constants.svfNoClient)
+          eMoveInfo.miAccel .= speed
+          eMoveInfo.miDecel .= speed
+          eMoveInfo.miSpeed .= speed
+
+        linkEntity edictRef
+
+miscViperUse :: EntUse
+miscViperUse =
+  GenericEntUse "misc_viper_use" $ \selfRef@(EdictReference selfIdx) otherRef activatoRef -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eUse .= Just GameFunc.trainUse
+
+    entUse (GameFunc.trainUse) selfRef otherRef activatoRef
 
 spMiscBigViper :: EdictReference -> Quake ()
 spMiscBigViper _ = io (putStrLn "GameMisc.spMiscBigViper") >> undefined -- TODO
