@@ -801,10 +801,22 @@ barrelDelay =
   GenericEntDie "barrel_delay" $ \_ _ _ _ _ -> do
     io (putStrLn "GameMisc.barrelDelay") >> undefined -- TODO
 
+{-
+- QUAKED misc_explobox (0 .5 .8) (-16 -16 0) (16 16 40) Large exploding
+- box. You can override its mass (100), health (80), and dmg (150).
+-}
 barrelTouch :: EntTouch
 barrelTouch =
-  GenericEntTouch "barrel_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameMisc.barrelTouch") >> undefined -- TODO
+  GenericEntTouch "barrel_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+    unless (isNothing (other^.eGroundEntity) || (other^.eGroundEntity) == Just selfRef) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      let ratio = fromIntegral (other^.eMass) / fromIntegral (self^.eMass)
+          v = (self^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)
+
+      void $ M.walkMove selfRef (Math3D.vectorYaw v) (20 * ratio * Constants.frameTime)
 
 gibDie :: EntDie
 gibDie =
