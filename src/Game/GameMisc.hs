@@ -713,7 +713,30 @@ spMiscBigViper edictRef@(EdictReference edictIdx) = do
     linkEntity edictRef
 
 spMiscViperBomb :: EdictReference -> Quake ()
-spMiscViperBomb _ = io (putStrLn "GameMisc.spMiscViperBomb") >> undefined -- TODO
+spMiscViperBomb selfRef@(EdictReference selfIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modelIdx <- modelIndex (Just "models/objects/bomb/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidNot
+      eMins .= V3 (-8) (-8) (-8)
+      eMaxs .= V3 8 8 8
+      eEntityState.esModelIndex .= modelIdx
+      eDmg %= (\v -> if v == 0 then 1000 else v)
+      eUse .= Just miscViperBombUse
+      eSvFlags %= (.|. Constants.svfNoClient)
+
+    linkEntity selfRef
+
+miscViperBombUse :: EntUse
+miscViperBombUse =
+  GenericEntUse "misc_viper_bomb_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.miscViperBombUse") >> undefined -- TODO
 
 spMiscStroggShip :: EdictReference -> Quake ()
 spMiscStroggShip edictRef@(EdictReference edictIdx) = do
