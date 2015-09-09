@@ -1114,5 +1114,17 @@ becomeExplosion1 selfRef@(EdictReference selfIdx) = do
     GameUtil.freeEdict selfRef
 
 becomeExplosion2 :: EdictReference -> Quake ()
-becomeExplosion2 _ = do
-    io (putStrLn "GameMisc.becomeExplosion2") >> undefined -- TODO
+becomeExplosion2 selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writePosition = gameImport^.giWritePosition
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcTempEntity
+    writeByte Constants.teExplosion2
+    writePosition (self^.eEntityState.esOrigin)
+    multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
+
+    GameUtil.freeEdict selfRef
