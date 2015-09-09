@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=))
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3, norm, normalize, dot)
+import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -236,7 +236,65 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
 -}
 canDamage :: EdictReference -> EdictReference -> Quake Bool
 canDamage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) = do
-    io (putStrLn "GameCombat.canDamage") >> undefined -- TODO
+    Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+    Just inflictor <- preuse $ gameBaseGlobals.gbGEdicts.ix inflictorIdx
+    v3o <- use $ globals.vec3Origin
+    trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+
+    -- bmodels need special checking because their origin is 0,0,0
+    if (targ^.eMoveType) == Constants.moveTypePush
+      then do
+        let dest = fmap (* 0.5) ((targ^.eAbsMin) + (targ^.eAbsMax))
+
+        traceT <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) dest (Just inflictorRef) Constants.maskSolid
+
+        if | (traceT^.tFraction) == 1.0 -> return True
+           | (traceT^.tEnt) == Just targRef -> return True
+           | otherwise -> return False
+
+      else do
+        traceT <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) (targ^.eEntityState.esOrigin) (Just inflictorRef) Constants.maskSolid
+
+        if (traceT^.tFraction) == 1.0
+          then
+            return True
+
+          else do
+            let V3 a b c = (targ^.eEntityState.esOrigin)
+                dest = V3 (a + 15) (b + 15) c
+
+            traceT' <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) dest (Just inflictorRef) Constants.maskSolid
+
+            if (traceT'^.tFraction) == 1.0
+              then
+                return True
+
+              else do
+                let dest' = V3 (a + 15) (b - 15) c
+                
+                traceT'' <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) dest' (Just inflictorRef) Constants.maskSolid
+
+                if (traceT''^.tFraction) == 1.0
+                  then
+                    return True
+
+                  else do
+                    let dest'' = V3 (a - 15) (b + 15) c
+
+                    traceT''' <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) dest'' (Just inflictorRef) Constants.maskSolid
+
+                    if (traceT'''^.tFraction) == 1.0
+                      then
+                        return True
+
+                      else do
+                        let dest''' = V3 (a - 15) (b - 15) c
+
+                        traceT'''' <- trace (inflictor^.eEntityState.esOrigin) (Just v3o) (Just v3o) dest''' (Just inflictorRef) Constants.maskSolid
+
+                        return $ if (traceT''''^.tFraction) == 1.0
+                                   then True
+                                   else False
 
 spawnDamage :: Int -> V3 Float -> V3 Float -> Int -> Quake ()
 spawnDamage dmgType origin normal damage = do
