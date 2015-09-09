@@ -6,6 +6,7 @@ module Render.Fast.Warp where
 import Control.Applicative (Const)
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), _1, _2)
 import Control.Monad (when, unless, liftM)
+import Data.Bits ((.&.))
 import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _y, _z, V4, _xyz, dot)
@@ -27,6 +28,9 @@ import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Math3D as Math3D
+
+turbScale :: Float
+turbScale = 256 / (2 * pi)
 
 sideFront :: Int
 sideFront = 0
@@ -450,8 +454,46 @@ rAddSkySurface surfRef = do
               constructVerts polyRef origin (idx + 1) maxIdx
 
 emitWaterPolys :: IORef MSurfaceT -> Quake ()
-emitWaterPolys _ = do
-    io (putStrLn "Warp.emitWaterPolys") >> undefined -- TODO
+emitWaterPolys surfRef = do
+    newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
+    let rdt = newRefDef^.rdTime
+
+    surf <- io $ readIORef surfRef
+    let rdt' = truncate (rdt * 0.5) :: Int
+        scroll = if (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0
+                   then (-64) * (rdt * 0.5 - fromIntegral rdt')
+                   else 0
+
+    polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+    drawWaterPolys polygonCache scroll rdt (surf^.msPolys)
+
+  where drawWaterPolys :: MV.IOVector GLPolyT -> Float -> Float -> Maybe (GLPolyReference) -> Quake ()
+        drawWaterPolys _ _ _ Nothing = return ()
+        drawWaterPolys polygonCache scroll rdt (Just polyRef@(GLPolyReference polyIdx)) = do
+          poly <- io $ MV.read polygonCache polyIdx
+          GL.glBegin GL.gl_TRIANGLE_FAN
+          drawPolyVerts polyRef rdt scroll 0 (poly^.glpNumVerts)
+          GL.glEnd
+          drawWaterPolys polygonCache scroll rdt (poly^.glpNext)
+
+        drawPolyVerts :: GLPolyReference -> Float -> Float -> Int -> Int -> Quake ()
+        drawPolyVerts polyRef rdt scroll idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              os <- Polygon.getPolyS1 polyRef idx
+              ot <- Polygon.getPolyT1 polyRef idx
+
+              let s = (os + (sinV UV.! ((truncate ((ot * 0.125 + rdt) * turbScale)) .&. 255)) + scroll) * (1.0 / 64)
+                  t = (os + (sinV UV.! ((truncate ((os * 0.125 + rdt) * turbScale)) .&. 255))) * (1.0 / 64)
+
+              GL.glTexCoord2f (realToFrac s) (realToFrac t)
+
+              x <- Polygon.getPolyX polyRef idx
+              y <- Polygon.getPolyY polyRef idx
+              z <- Polygon.getPolyZ polyRef idx
+              GL.glVertex3f (realToFrac x) (realToFrac y) (realToFrac z)
+
+              drawPolyVerts polyRef rdt scroll (idx + 1) maxIdx
 
 clipSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Int -> Quake ()
 clipSkyPolygon nump vecs stage = do

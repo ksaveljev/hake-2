@@ -568,7 +568,7 @@ loadFaces buffer lump = do
           calcSurfaceExtents model texInfo surfRef
 
           when (texInfoFlags .&. Constants.surfWarp /= 0) $ do
-            io $ modifyIORef' surfRef (\v -> v { _msFlags = flags .|. Constants.surfWarp
+            io $ modifyIORef' surfRef (\v -> v { _msFlags = flags .|. Constants.surfDrawTurb
                                                , _msExtents = (16384, 16384)
                                                , _msTextureMins = (-8192, -8192)
                                                })

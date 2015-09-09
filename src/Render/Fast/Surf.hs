@@ -852,6 +852,7 @@ glRenderLightmappedPoly surfRef = do
             else
               return False
 
+        -- TODO: from Quake () to IO () ?
         drawArrays :: Maybe GLPolyReference -> Quake ()
         drawArrays Nothing = return ()
         drawArrays (Just (GLPolyReference polyIdx)) = do
