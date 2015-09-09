@@ -690,8 +690,27 @@ miscViperUse =
 
     entUse (GameFunc.trainUse) selfRef otherRef activatoRef
 
+{-
+- QUAKED misc_bigviper (1 .5 0) (-176 -120 -24) (176 120 72) This is a
+- large stationary viper as seen in Paul's intro
+-}
 spMiscBigViper :: EdictReference -> Quake ()
-spMiscBigViper _ = io (putStrLn "GameMisc.spMiscBigViper") >> undefined -- TODO
+spMiscBigViper edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modelIdx <- modelIndex (Just "models/ships/bigviper/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eMins .= V3 (-176) (-120) (-24)
+      eMaxs .= V3 176 120 72
+      eEntityState.esModelIndex .= modelIdx
+
+    linkEntity edictRef
 
 spMiscViperBomb :: EdictReference -> Quake ()
 spMiscViperBomb _ = io (putStrLn "GameMisc.spMiscViperBomb") >> undefined -- TODO
