@@ -1053,10 +1053,20 @@ funcObjectUse =
     GameUtil.killBox selfRef
     void $ think funcObjectRelease selfRef
 
+{-
+- QUAKED func_object (0 .5 .8) ? TRIGGER_SPAWN ANIMATED ANIMATED_FAST This
+- is solid bmodel that will fall if it's support it removed.
+-}
 funcObjectTouch :: EntTouch
 funcObjectTouch =
-  GenericEntTouch "func_object_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameMisc.funcObjectTouch") >> undefined -- TODO
+  GenericEntTouch "func_object_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) plane _ -> do
+    -- TODO: jake2 checks if (plane == null)
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+    unless ((plane^.cpNormal._z) < 1.0 || (other^.eTakeDamage) == Constants.damageNo) $ do
+      v3o <- use $ globals.vec3Origin
+      GameCombat.damage otherRef selfRef selfRef v3o (self^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 miscBlackHoleUse :: EntUse
 miscBlackHoleUse =
