@@ -4,7 +4,7 @@ module Game.GameCombat where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=))
 import Control.Monad (when, unless, liftM)
-import Data.Bits ((.|.), (.&.))
+import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3, norm, normalize, dot)
 import qualified Data.ByteString as B
@@ -407,5 +407,50 @@ killed targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
         die (fromJust $ targ^.eDie) targRef inflictorRef attackerRef damage point
 
 reactToDamage :: EdictReference -> EdictReference -> Quake ()
-reactToDamage _ _ = do
-    io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
+reactToDamage targRef@(EdictReference targIdx) attackerRef@(EdictReference attackerIdx) = do
+    skip <- shouldSkip
+
+    unless skip $ do
+      -- we no know that we are not both good guys
+      Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+      Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+
+      -- if attacker is a client, get mad at them because he's good and we're not
+      case attacker^.eClient of
+        Just (GClientReference gClientIdx) -> do
+          gameBaseGlobals.gbGEdicts.ix targIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiSoundTarget))
+
+          -- this can only happen in coop (both new and old enemies are clients)
+          -- only switch if can't see the current enemy
+          targEnemyClient <- case targ^.eEnemy of
+                               Nothing -> return Nothing
+                               Just (EdictReference enemyIdx) -> do
+                                 Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                                 return (enemy^.eClient)
+
+          when (isJust targEnemyClient) $ do
+            io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
+
+          gameBaseGlobals.gbGEdicts.ix targIdx.eEnemy .= Just attackerRef
+
+          when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $
+            GameUtil.foundTarget targRef
+
+        Nothing -> do
+          io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
+  
+  where shouldSkip :: Quake Bool
+        shouldSkip = do
+          Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+          Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+
+          if | isJust (attacker^.eClient) && (attacker^.eSvFlags) .&. Constants.svfMonster /= 0 ->
+                 return True
+             | attackerRef == targRef || Just attackerRef == (targ^.eEnemy) ->
+                 return True
+               -- if we are a good guy monster and our attacker is a player
+               -- or another good guy, do not get mad at them
+             | (targ^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0 && (isJust (attacker^.eClient) || (attacker^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0) ->
+                 return True
+             | otherwise ->
+                 return False
