@@ -484,7 +484,7 @@ emitWaterPolys surfRef = do
               ot <- Polygon.getPolyT1 polyRef idx
 
               let s = (os + (sinV UV.! ((truncate ((ot * 0.125 + rdt) * turbScale)) .&. 255)) + scroll) * (1.0 / 64)
-                  t = (os + (sinV UV.! ((truncate ((os * 0.125 + rdt) * turbScale)) .&. 255))) * (1.0 / 64)
+                  t = (ot + (sinV UV.! ((truncate ((os * 0.125 + rdt) * turbScale)) .&. 255))) * (1.0 / 64)
 
               GL.glTexCoord2f (realToFrac s) (realToFrac t)
 
