@@ -1094,8 +1094,48 @@ commanderBodyDrop =
     io (putStrLn "GameMisc.commanderBodyDrop") >> undefined -- TODO
 
 throwDebris :: EdictReference -> B.ByteString -> Float -> V3 Float -> Quake ()
-throwDebris _ _ _ _ = do
-    io (putStrLn "GameMisc.throwDebris") >> undefined -- TODO
+throwDebris selfRef@(EdictReference selfIdx) modelName speed origin = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    chunkRef@(EdictReference chunkIdx) <- GameUtil.spawn
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    c1 <- Lib.crandom
+    c2 <- Lib.crandom
+    c3 <- Lib.crandom
+
+    let v = V3 (100 * c1) (100 * c2) (100 + 100 * c3)
+
+    r1 <- Lib.randomF
+    r2 <- Lib.randomF
+    r3 <- Lib.randomF
+
+    let avelocity = V3 (r1 * 600) (r2 * 600) (r3 * 600)
+
+    r <- Lib.randomF
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix chunkIdx) $ do
+      eEntityState.esOrigin .= origin
+      eVelocity .= (self^.eVelocity) + fmap (* speed) v
+      eMoveType .= Constants.moveTypeBounce
+      eSolid .= Constants.solidNot
+      eAVelocity .= avelocity
+      eThink .= Just GameUtil.freeEdictA
+      eNextThink .= levelTime + 5 + r * 5
+      eEntityState.esFrame .= 0
+      eFlags .= 0
+      eClassName .= "debris"
+      eTakeDamage .= Constants.damageYes
+      eDie .= Just debrisDie
+
+    setModel chunkRef (Just modelName)
+
+    linkEntity chunkRef
 
 becomeExplosion1 :: EdictReference -> Quake ()
 becomeExplosion1 selfRef@(EdictReference selfIdx) = do
@@ -1127,4 +1167,9 @@ becomeExplosion2 selfRef@(EdictReference selfIdx) = do
     writePosition (self^.eEntityState.esOrigin)
     multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
 
+    GameUtil.freeEdict selfRef
+
+debrisDie :: EntDie
+debrisDie =
+  GenericEntDie "debris_die" $ \selfRef _ _ _ _ ->
     GameUtil.freeEdict selfRef
