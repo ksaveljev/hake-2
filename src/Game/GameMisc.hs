@@ -833,8 +833,77 @@ funcExplosiveExplode =
 
 pointCombatTouch :: EntTouch
 pointCombatTouch =
-  GenericEntTouch "point_combat_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameMisc.pointCombatTouch") >> undefined -- TODO
+  GenericEntTouch "point_combat_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) plane surf -> do
+    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+    when ((other^.eMoveTarget) == Just selfRef) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      if | isJust (self^.eTarget) -> do
+             target <- GameBase.pickTarget (self^.eTarget)
+
+             zoom (gameBaseGlobals.gbGEdicts.ix otherIdx) $ do
+               eTarget .= (self^.eTarget)
+               eGoalEntity .= target
+               eMoveTarget .= target
+
+             when (isNothing target) $ do
+               dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+               dprintf ((self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` " target " `B.append` (fromJust $ self^.eTarget) `B.append` " does not exist\n")
+               gameBaseGlobals.gbGEdicts.ix otherIdx.eMoveTarget .= Just selfRef
+
+             gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= Nothing
+
+         | (self^.eSpawnFlags) .&. 1 /= 0 && (other^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 -> do
+             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+             zoom (gameBaseGlobals.gbGEdicts.ix otherIdx.eMonsterInfo) $ do
+               miPauseTime .= levelTime + 100000000
+               miAIFlags %= (.|. Constants.aiStandGround)
+            
+             void $ think (fromJust $ other^.eMonsterInfo.miStand) otherRef
+
+         | otherwise ->
+             return ()
+
+      Just other' <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+      when ((other'^.eMoveTarget) == Just selfRef) $ do
+        zoom (gameBaseGlobals.gbGEdicts.ix otherIdx) $ do
+          eTarget .= Nothing
+          eMoveTarget .= Nothing
+          eGoalEntity .= (other'^.eEnemy)
+          eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiCombatPoint))
+      when (isJust (self^.ePathTarget)) $ do
+        let saveTarget = self^.eTarget
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= (self^.ePathTarget)
+
+        enemyClient <- case other'^.eEnemy of
+                         Nothing -> return Nothing
+                         Just (EdictReference enemyIdx) -> do
+                           Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                           return (enemy^.eClient)
+
+        oldEnemyClient <- case other'^.eOldEnemy of
+                            Nothing -> return Nothing
+                            Just (EdictReference oldEnemyIdx) -> do
+                              Just oldEnemy <- preuse $ gameBaseGlobals.gbGEdicts.ix oldEnemyIdx
+                              return (oldEnemy^.eClient)
+
+        activatorClient <- case other'^.eActivator of
+                             Nothing -> return Nothing
+                             Just (EdictReference activatorIdx) -> do
+                               Just activator <- preuse $ gameBaseGlobals.gbGEdicts.ix activatorIdx
+                               return (activator^.eClient)
+
+        let activator = if | isJust enemyClient -> (other'^.eEnemy)
+                           | isJust oldEnemyClient -> (other'^.eOldEnemy)
+                           | isJust activatorClient -> (other'^.eActivator)
+                           | otherwise -> Just otherRef
+
+        GameUtil.useTargets selfRef activator
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= saveTarget
 
 {-
 - QUAKED misc_strogg_ship (1 .5 0) (-16 -16 0) (16 16 32) This is a Storgg
