@@ -716,6 +716,11 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
     let start = edict^.eEntityState.esOrigin
         end = start + pushV3
 
+    when (edictIdx == 81) $ do
+      io $ print "PUSHING 81"
+      io (print ("start = " ++ show start))
+      io (print ("push = " ++ show pushV3))
+
     -- FIXME: test this
     -- a goto statement was replaced
     traceT <- tryToPush start end
@@ -738,6 +743,15 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
           let trace = gameImport^.giTrace
               linkEntity = gameImport^.giLinkEntity
 
+          when (edictIdx == 81) $ do
+            io (print "TRACE")
+            io (print ("clipmask = " ++ show (edict^.eClipMask)))
+            io (print ("start = " ++ show start))
+            io (print ("mins = " ++ show (edict^.eMins)))
+            io (print ("maxs = " ++ show (edict^.eMaxs)))
+            io (print ("end = " ++ show end))
+            io (print ("mask = " ++ show mask))
+
           traceT <- trace start
                           (Just $ edict^.eMins)
                           (Just $ edict^.eMaxs)
@@ -747,6 +761,9 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
 
           gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= (traceT^.tEndPos)
           linkEntity er
+
+          when (edictIdx == 81) $
+            io (print ("IMPACT " ++ show (traceT^.tFraction)))
 
           if traceT^.tFraction /= 1.0
             then do
@@ -769,6 +786,9 @@ pushEntity er@(EdictReference edictIdx) pushV3 = do
 impact :: EdictReference -> TraceT -> Quake ()
 impact er@(EdictReference edictIdx) traceT = do
     let Just tr@(EdictReference traceIdx) = traceT^.tEnt
+
+    when (edictIdx == 81) $
+      io $ print "IMPACT 81"
 
     Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
     Just traceEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx

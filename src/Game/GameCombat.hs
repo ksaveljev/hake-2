@@ -228,8 +228,14 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
             else
               return (damage', mod'')
 
+{-
+- CanDamage
+- 
+- Returns true if the inflictor can directly damage the target. Used for
+- explosions and melee attacks.
+-}
 canDamage :: EdictReference -> EdictReference -> Quake Bool
-canDamage _ _ = do
+canDamage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) = do
     io (putStrLn "GameCombat.canDamage") >> undefined -- TODO
 
 spawnDamage :: Int -> V3 Float -> V3 Float -> Int -> Quake ()

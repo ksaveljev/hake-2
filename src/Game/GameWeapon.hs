@@ -24,6 +24,8 @@ blasterTouch =
   GenericEntTouch "blaster_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) plane maybeSurf -> do
     Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
+    io (print "BLASTER TOUCH")
+
     unless (Just otherRef == (self^.eOwner)) $ do
       if isJust maybeSurf && ((fromJust maybeSurf)^.csFlags) .&. Constants.surfSky /= 0
         then
@@ -81,6 +83,9 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
 
     boltRef@(EdictReference boltIdx) <- GameUtil.spawn
 
+    io (print "FIRE BLASTER")
+    io (print ("boltIdx = " ++ show boltIdx))
+
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let linkEntity = gameImport^.giLinkEntity
         trace = gameImport^.giTrace
@@ -103,7 +108,8 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
       eEntityState.esAngles .= dir
       eVelocity .= fmap (* (fromIntegral speed)) dir
       eMoveType .= Constants.moveTypeFlyMissile
-      eClipMask .= Constants.solidBbox
+      eClipMask .= Constants.maskShot
+      eSolid .= Constants.solidBbox
       eEntityState.esEffects %= (.|. effect)
       eMins .= V3 0 0 0
       eMaxs .= V3 0 0 0
