@@ -735,8 +735,39 @@ spMiscViperBomb selfRef@(EdictReference selfIdx) = do
 
 miscViperBombUse :: EntUse
 miscViperBombUse =
-  GenericEntUse "misc_viper_bomb_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.miscViperBombUse") >> undefined -- TODO
+  GenericEntUse "misc_viper_bomb_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSolid .= Constants.solidBbox
+      eSvFlags %= (.&. (complement Constants.svfNoClient))
+      eEntityState.esEffects %= (.|. Constants.efRocket)
+      eUse .= Nothing
+      eMoveType .= Constants.moveTypeToss
+      ePrethink .= Just miscViperBombPrethink
+      eTouch .= Just miscViperBombTouch
+      eActivator .= activatorRef
+
+    es <- GameBase.gFind Nothing GameBase.findByClass "misc_viper"
+
+    case es of
+      Nothing -> return () -- jake2 doesn't do it though
+      Just (EdictReference viperIdx) -> do
+        Just viper <- preuse $ gameBaseGlobals.gbGEdicts.ix viperIdx
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eVelocity .= fmap (* (viper^.eMoveInfo.miSpeed)) (viper^.eMoveInfo.miDir)
+          eTimeStamp .= levelTime
+          eMoveInfo.miDir .= (viper^.eMoveInfo.miDir)
+
+miscViperBombPrethink :: EntThink
+miscViperBombPrethink =
+  GenericEntThink "misc_viper_bomb_prethink" $ \_ -> do
+    io (putStrLn "GameMisc.miscViperBombPrethink") >> undefined -- TODO
+
+miscViperBombTouch :: EntTouch
+miscViperBombTouch =
+  GenericEntTouch "misc_viper_bomb_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameMisc.miscViperBombTouch") >> undefined -- TODO
 
 spMiscStroggShip :: EdictReference -> Quake ()
 spMiscStroggShip edictRef@(EdictReference edictIdx) = do
