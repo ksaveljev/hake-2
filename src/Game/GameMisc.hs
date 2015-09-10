@@ -761,8 +761,20 @@ miscViperBombUse =
 
 miscViperBombPrethink :: EntThink
 miscViperBombPrethink =
-  GenericEntThink "misc_viper_bomb_prethink" $ \_ -> do
-    io (putStrLn "GameMisc.miscViperBombPrethink") >> undefined -- TODO
+  GenericEntThink "misc_viper_bomb_prethink" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let diff = (self^.eTimeStamp) - levelTime
+        diff' = if diff < (-1.0) then -1.0 else diff
+        V3 a b c = fmap (* (1.0 + diff')) (self^.eMoveInfo.miDir)
+        V3 a' b' c' = Math3D.vectorAngles (V3 a b diff')
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eGroundEntity .= Nothing
+      eEntityState.esAngles .= V3 a' b' ((self^.eEntityState.esAngles._z) + 10)
+
+    return True
 
 miscViperBombTouch :: EntTouch
 miscViperBombTouch =
