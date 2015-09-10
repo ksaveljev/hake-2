@@ -776,10 +776,21 @@ miscViperBombPrethink =
 
     return True
 
+{-
+- QUAKED misc_viper_bomb (1 0 0) (-8 -8 -8) (8 8 8) "dmg" how much boom
+- should the bomb make?
+-}
 miscViperBombTouch :: EntTouch
 miscViperBombTouch =
-  GenericEntTouch "misc_viper_bomb_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameMisc.miscViperBombTouch") >> undefined -- TODO
+  GenericEntTouch "misc_viper_bomb_touch" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    GameUtil.useTargets selfRef (self^.eActivator)
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esOrigin._z .= (self^.eAbsMin._z) + 1
+
+    GameCombat.radiusDamage selfRef selfRef (fromIntegral $ self^.eDmg) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modBomb
+    becomeExplosion2 selfRef
 
 spMiscStroggShip :: EdictReference -> Quake ()
 spMiscStroggShip edictRef@(EdictReference edictIdx) = do
