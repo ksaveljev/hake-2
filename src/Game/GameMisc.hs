@@ -984,19 +984,17 @@ spMiscGibLeg edictRef@(EdictReference edictIdx) = do
 - target_spawner
 -}
 spMiscGibHead :: EdictReference -> Quake ()
-spMiscGibHead er@(EdictReference edictIdx) = do
+spMiscGibHead edictRef@(EdictReference edictIdx) = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
-    setModel er (Just "models/objects/gibs/head/tris.md2")
-
-    -- IMPROVE? :)
     r1 <- Lib.randomF
     r2 <- Lib.randomF
     r3 <- Lib.randomF
 
-    time <- use $ gameBaseGlobals.gbLevel.llTime
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
     zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
       eSolid .= Constants.solidNot
@@ -1008,12 +1006,33 @@ spMiscGibHead er@(EdictReference edictIdx) = do
       eDeadFlag .= Constants.deadDead
       eAVelocity .= V3 (r1 * 200) (r2 * 200) (r3 * 200)
       eThink .= Just GameUtil.freeEdictA
-      eNextThink .= time + 30
+      eNextThink .= levelTime + 30
 
-    linkEntity er
+    setModel edictRef (Just "models/objects/gibs/head/tris.md2")
 
+    linkEntity edictRef
+
+{-
+- QUAKED target_character (0 0 1) ? used with target_string (must be on
+- same "team") "count" is position in the string (starts at 1)
+-}
 spTargetCharacter :: EdictReference -> Quake ()
-spTargetCharacter _ = io (putStrLn "GameMisc.spTargetCharacter") >> undefined -- TODO
+spTargetCharacter selfRef@(EdictReference selfIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMoveType .= Constants.moveTypePush
+      eSolid .= Constants.solidBsp
+      eEntityState.esFrame .= 12
+
+    setModel selfRef (self^.eiModel)
+
+    linkEntity selfRef
 
 spTargetString :: EdictReference -> Quake ()
 spTargetString _ = io (putStrLn "GameMisc.spTargetString") >> undefined -- TODO
