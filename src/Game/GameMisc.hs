@@ -894,8 +894,24 @@ spLightMine1 edictRef@(EdictReference edictIdx) = do
 
     linkEntity edictRef
 
+{-
+- QUAKED light_mine2 (0 1 0) (-2 -2 -12) (2 2 12)
+-}
 spLightMine2 :: EdictReference -> Quake ()
-spLightMine2 _ = io (putStrLn "GameMisc.spLightMine2") >> undefined -- TODO
+spLightMine2 edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modelIdx <- modelIndex (Just "models/objects/minelite/light2/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eEntityState.esModelIndex .= modelIdx
+    
+    linkEntity edictRef
 
 spMiscGibArm :: EdictReference -> Quake ()
 spMiscGibArm _ = io (putStrLn "GameMisc.spMiscGibArm") >> undefined -- TODO
