@@ -7,7 +7,7 @@ import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -1388,10 +1388,81 @@ funcExplosiveSpawn =
   GenericEntUse "func_explosive_spawn" $ \_ _ _ -> do
     io (putStrLn "GameMisc.funcExplosiveSpawn") >> undefined -- TODO
 
+{-
+- QUAKED func_explosive (0 .5 .8) ? Trigger_Spawn ANIMATED ANIMATED_FAST
+- Any brush that you want to explode or break apart. If you want an
+- ex0plosion, set dmg and it will do a radius explosion of that amount at
+- the center of the bursh.
+- 
+- If targeted it will not be shootable.
+- 
+- health defaults to 100.
+- 
+- mass defaults to 75. This determines how much debris is emitted when it
+- explodes. You get one large chunk per 100 of mass (up to 8) and one small
+- chunk per 25 of mass (up to 16). So 800 gives the most.
+-}
 funcExplosiveExplode :: EntDie
 funcExplosiveExplode =
-  GenericEntDie "func_explosive_explode" $ \_ _ _ _ _ -> do
-    io (putStrLn "GameMisc.funcExplosiveExplode") >> undefined -- TODO
+  GenericEntDie "func_explosive_explode" $ \selfRef@(EdictReference selfIdx) inflictorRef@(EdictReference inflictorIdx) attackerRef damage point -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    -- bmodel origins are (0 0 0), we need to adjust that here
+    let size = fmap (* 0.5) (self^.eSize)
+        origin = (self^.eAbsMin) + size
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEntityState.esOrigin .= origin
+      eTakeDamage .= Constants.damageNo
+
+    when ((self^.eDmg) /= 0) $
+      GameCombat.radiusDamage selfRef attackerRef (fromIntegral $ self^.eDmg) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modExplosive
+
+    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    Just inflictor <- preuse $ gameBaseGlobals.gbGEdicts.ix inflictorIdx
+
+    let velocity = fmap (* 150) (normalize ((self'^.eEntityState.esOrigin) - (inflictor^.eEntityState.esOrigin)))
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eVelocity .= velocity
+
+    -- start chunks towards the center
+    let mass = if (self'^.eMass) == 0 then 75 else self'^.eMass
+        size' = fmap (* 0.5) size
+
+    -- big chunks
+    when (mass >= 100) $ do
+      let count = mass `div` 100
+          count' = if count > 8 then 8 else count
+
+      explosionDebris selfRef "models/objects/debris1/tris.md2" 1 origin size' count'
+
+    -- small chunks
+    let count = mass `div` 25
+        count' = if count > 16 then 16 else count
+
+    explosionDebris selfRef "models/objects/debris2/tris.md2" 2 origin size' count'
+
+    GameUtil.useTargets selfRef (Just attackerRef)
+    
+    Just self'' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    
+    if (self''^.eDmg) /= 0
+      then becomeExplosion1 selfRef
+      else GameUtil.freeEdict selfRef
+
+  where explosionDebris :: EdictReference -> B.ByteString -> Float -> V3 Float -> V3 Float -> Int -> Quake ()
+        explosionDebris selfRef modelName speed origin size count
+          | count <= 0 = return ()
+          | otherwise = do
+              r1 <- Lib.crandom
+              r2 <- Lib.crandom
+              r3 <- Lib.crandom
+              let a = (origin^._x) + r1 * (size^._x)
+                  b = (origin^._y) + r2 * (size^._y)
+                  c = (origin^._z) + r3 * (size^._z)
+
+              throwDebris selfRef modelName speed (V3 a b c)
+              explosionDebris selfRef modelName speed origin size (count - 1)
 
 pointCombatTouch :: EntTouch
 pointCombatTouch =
