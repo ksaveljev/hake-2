@@ -1640,15 +1640,25 @@ funcObjectTouch =
       v3o <- use $ globals.vec3Origin
       GameCombat.damage otherRef selfRef selfRef v3o (self^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
+{-
+- QUAKED misc_blackhole (1 .5 0) (-8 -8 -8) (8 8 8)
+-}
 miscBlackHoleUse :: EntUse
 miscBlackHoleUse =
-  GenericEntUse "misc_blackhole_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.miscBlackHoleUse") >> undefined -- TODO
+  GenericEntUse "misc_blackhole_use" $ \edictRef _ _ ->
+    GameUtil.freeEdict edictRef
 
 miscBlackHoleThink :: EntThink
 miscBlackHoleThink =
-  GenericEntThink "misc_blackhole_think" $ \_ -> do
-    io (putStrLn "GameMisc.miscBlackHoleThink") >> undefined -- TODO
+  GenericEntThink "misc_blackhole_think" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEntityState.esFrame %= (\v -> if v + 1 < 19 then v + 1 else 0)
+      eNextThink .= levelTime + Constants.frameTime
+
+    return True
 
 miscEasterTankThink :: EntThink
 miscEasterTankThink =
