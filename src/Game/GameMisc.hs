@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameMisc where
 
-import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~))
+import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~), (+=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -828,7 +828,52 @@ spMiscStroggShip edictRef@(EdictReference edictIdx) = do
         linkEntity edictRef
 
 spMiscSatelliteDish :: EdictReference -> Quake ()
-spMiscSatelliteDish _ = io (putStrLn "GameMisc.spMiscSatelliteDish") >> undefined -- TODO
+spMiscSatelliteDish edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modelIdx <- modelIndex (Just "models/objects/satellite/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eMins .= V3 (-64) (-64) 0
+      eMaxs .= V3 64 64 128
+      eEntityState.esModelIndex .= modelIdx
+      eUse .= Just miscSatelliteDishUse
+
+    linkEntity edictRef
+
+miscSatelliteDishUse :: EntUse
+miscSatelliteDishUse =
+  GenericEntUse "misc_satellite_dish_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEntityState.esFrame .= 0
+      eThink .= Just miscSatelliteDishThink
+      eNextThink .= levelTime + Constants.frameTime
+
+{-
+- QUAKED misc_satellite_dish (1 .5 0) (-64 -64 0) (64 64 128)
+-}
+miscSatelliteDishThink :: EntThink
+miscSatelliteDishThink =
+  GenericEntThink "misc_satellite_dish_think" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if (self^.eEntityState.esFrame) + 1 < 38
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esFrame += 1
+          eNextThink .= levelTime + Constants.frameTime
+      else
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame += 1
+
+    return True
 
 spLightMine1 :: EdictReference -> Quake ()
 spLightMine1 _ = io (putStrLn "GameMisc.spLightMine1") >> undefined -- TODO
