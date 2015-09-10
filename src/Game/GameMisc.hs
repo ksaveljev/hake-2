@@ -1555,10 +1555,43 @@ miscStroggShipUse =
 
     entUse GameFunc.trainUse selfRef otherRef activatorRef
 
+{-
+- QUAKED func_wall (0 .5 .8) ? TRIGGER_SPAWN TOGGLE START_ON ANIMATED
+- ANIMATED_FAST This is just a solid wall if not inhibited
+- 
+- TRIGGER_SPAWN the wall will not be present until triggered it will then
+- blink in to existance; it will kill anything that was in it's way
+- 
+- TOGGLE only valid for TRIGGER_SPAWN walls this allows the wall to be
+- turned on and off
+- 
+- START_ON only valid for TRIGGER_SPAWN walls the wall will initially be
+- present
+-}
 funcWallUse :: EntUse
 funcWallUse =
-  GenericEntUse "func_wall_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.funcWallUse") >> undefined -- TODO
+  GenericEntUse "func_wall_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSolid) == Constants.solidNot
+      then do
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eSolid .= Constants.solidBsp
+          eSvFlags %= (.&. (complement Constants.svfNoClient))
+
+        void $ GameUtil.killBox selfRef
+
+      else
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eSolid .= Constants.solidNot
+          eSvFlags %= (.|. Constants.svfNoClient)
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    when ((self'^.eSpawnFlags) .&. 2 == 0) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eUse .= Nothing
 
 {-
 - QUAKED misc_banner (1 .5 0) (-4 -4 -4) (4 4 4) The origin is the bottom
