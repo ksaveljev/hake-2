@@ -1203,8 +1203,15 @@ funcClockFormatCountdown selfRef@(EdictReference selfIdx) = do
 
 funcClockUse :: EntUse
 funcClockUse =
-  GenericEntUse "func_clock_use" $ \_ _ _ -> do
-    io (putStrLn "GameMisc.funcClockUse") >> undefined -- TODO
+  GenericEntUse "func_clock_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eSpawnFlags) .&. 8 == 0) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eUse .= Nothing
+
+    when (isNothing (self^.eActivator)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eActivator .= activatorRef
+      void $ think (fromJust $ self^.eThink) selfRef
 
 spMiscTeleporter :: EdictReference -> Quake ()
 spMiscTeleporter _ = io (putStrLn "GameMisc.spMiscTeleporter") >> undefined -- TODO
