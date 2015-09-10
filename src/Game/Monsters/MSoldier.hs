@@ -18,6 +18,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
@@ -145,6 +146,42 @@ frameWalk209 = 256
 frameWalk218 :: Int
 frameWalk218 = 265
 
+frameDeath101 :: Int
+frameDeath101 = 272
+
+frameDeath136 :: Int
+frameDeath136 = 307
+
+frameDeath201 :: Int
+frameDeath201 = 308
+
+frameDeath235 :: Int
+frameDeath235 = 342
+
+frameDeath301 :: Int
+frameDeath301 = 343
+
+frameDeath345 :: Int
+frameDeath345 = 387
+
+frameDeath401 :: Int
+frameDeath401 = 388
+
+frameDeath453 :: Int
+frameDeath453 = 440
+
+frameDeath501 :: Int
+frameDeath501 = 441
+
+frameDeath524 :: Int
+frameDeath524 = 464
+
+frameDeath601 :: Int
+frameDeath601 = 465
+
+frameDeath610 :: Int
+frameDeath610 = 474
+
 blasterFlash :: UV.Vector Int
 blasterFlash =
     UV.fromList [ Constants.mz2SoldierBlaster1
@@ -199,8 +236,61 @@ soldierDead =
 
 soldierDie :: EntDie
 soldierDie =
-  GenericEntDie "soldier_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MSoldier.soldierDie") >> undefined -- TODO
+  GenericEntDie "soldier_die" $ \selfRef@(EdictReference selfIdx) inflictorRef@(EdictReference inflictorIdx) attackerRef@(EdictReference attackerIdx) damage point -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    -- check for gib
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do
+           let sound = gameImport^.giSound
+               soundIndex = gameImport^.giSoundIndex
+
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/chest/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead -> do
+           return ()
+
+       | otherwise -> do
+           -- regular death
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eEntityState.esSkinNum %= (.|. 1)
+
+           Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+           let sound = gameImport^.giSound
+
+           soundIdx <- if | (self'^.eEntityState.esSkinNum) == 1 -> use $ mSoldierGlobals.msSoundDeathLight
+                          | (self'^.eEntityState.esSkinNum) == 3 -> use $ mSoldierGlobals.msSoundDeath
+                          | otherwise -> use $ mSoldierGlobals.msSoundDeathSS
+
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           if abs (((self'^.eEntityState.esOrigin._z) + fromIntegral (self'^.eViewHeight)) - (point^._z)) <= 4
+             then
+               -- head shot
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just soldierMoveDeath3
+
+             else do
+               n <- liftM (`mod` 5) Lib.rand
+
+               let currentMove = if | n == 0 -> Just soldierMoveDeath1
+                                    | n == 1 -> Just soldierMoveDeath2
+                                    | n == 2 -> Just soldierMoveDeath4
+                                    | n == 3 -> Just soldierMoveDeath5
+                                    | otherwise -> Just soldierMoveDeath6
+
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= currentMove
 
 soldierFramesPain1 :: V.Vector MFrameT
 soldierFramesPain1 =
@@ -938,6 +1028,251 @@ soldierFramesDuck =
 
 soldierMoveDuck :: MMoveT
 soldierMoveDuck = MMoveT "soldierMoveDuck" frameDuck01 frameDuck05 soldierFramesDuck (Just soldierRun)
+
+soldierFramesDeath1 :: V.Vector MFrameT
+soldierFramesDeath1 =
+    V.fromList [ MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove) (-10) Nothing
+               , MFrameT (Just GameAI.aiMove) (-10) Nothing
+               , MFrameT (Just GameAI.aiMove) (-10) Nothing
+               , MFrameT (Just GameAI.aiMove)  (-5) Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  (Just soldierFire6)
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  (Just soldierFire7)
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               , MFrameT (Just GameAI.aiMove)    0  Nothing
+               ]
+
+soldierMoveDeath1 :: MMoveT
+soldierMoveDeath1 = MMoveT "soldierMoveDeath1" frameDeath101 frameDeath136 soldierFramesDeath1 (Just soldierDead)
+
+soldierFramesDeath2 :: V.Vector MFrameT
+soldierFramesDeath2 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+soldierMoveDeath2 :: MMoveT
+soldierMoveDeath2 = MMoveT "soldierMoveDeath2" frameDeath201 frameDeath235 soldierFramesDeath2 (Just soldierDead)
+
+soldierFramesDeath3 :: V.Vector MFrameT
+soldierFramesDeath3 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+soldierMoveDeath3 :: MMoveT
+soldierMoveDeath3 = MMoveT "soldierMoveDetah3" frameDeath301 frameDeath345 soldierFramesDeath3 (Just soldierDead)
+
+soldierFramesDeath4 :: V.Vector MFrameT
+soldierFramesDeath4 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+soldierMoveDeath4 :: MMoveT
+soldierMoveDeath4 = MMoveT "soldierMoveDeath4" frameDeath401 frameDeath453 soldierFramesDeath4 (Just soldierDead)
+
+soldierFramesDeath5 :: V.Vector MFrameT
+soldierFramesDeath5 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove) (-5) Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+soldierMoveDeath5 :: MMoveT
+soldierMoveDeath5 = MMoveT "soldierMoveDeath5" frameDeath501 frameDeath524 soldierFramesDeath5 (Just soldierDead)
+
+soldierFramesDeath6 :: V.Vector MFrameT
+soldierFramesDeath6 =
+    V.fromList [ MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               , MFrameT (Just GameAI.aiMove) 0 Nothing
+               ]
+
+soldierMoveDeath6 :: MMoveT
+soldierMoveDeath6 = MMoveT "soldierMoveDeath6" frameDeath601 frameDeath610 soldierFramesDeath6 (Just soldierDead)
 
 soldierAttack :: EntThink
 soldierAttack =
