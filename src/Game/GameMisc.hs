@@ -1113,9 +1113,23 @@ spFuncClock selfRef@(EdictReference selfIdx) = do
                levelTime <- use $ gameBaseGlobals.gbLevel.llTime
                gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + 1
 
+-- don't let field width of any clock messages change, or it
+-- could cause an overwrite after a game load
 funcClockReset :: EdictReference -> Quake ()
-funcClockReset _ = do
-    io (putStrLn "GameMisc.funcClockReset") >> undefined -- TODO
+funcClockReset selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. 1 /= 0
+      then
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eActivator .= Nothing
+          eHealth .= 0
+          eWait .= fromIntegral (self^.eCount)
+      else
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eActivator .= Nothing
+          eHealth .= (self^.eCount)
+          eWait .= 0
 
 funcClockThink :: EntThink
 funcClockThink =
