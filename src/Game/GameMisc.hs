@@ -5,6 +5,7 @@ module Game.GameMisc where
 import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~), (+=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
+import Data.Char (ord)
 import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
@@ -1035,7 +1036,49 @@ spTargetCharacter selfRef@(EdictReference selfIdx) = do
     linkEntity selfRef
 
 spTargetString :: EdictReference -> Quake ()
-spTargetString _ = io (putStrLn "GameMisc.spTargetString") >> undefined -- TODO
+spTargetString selfRef@(EdictReference selfIdx) = do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMessage %= (\v -> if isNothing v then Just "" else v)
+      eUse .= Just targetStringUse
+
+{-
+- QUAKED target_string (0 0 1) (-8 -8 -8) (8 8 8)
+-}
+targetStringUse :: EntUse
+targetStringUse =
+  GenericEntUse "target_string_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just message = self^.eMessage
+
+    setFrame message (self^.eTeamMaster)
+
+  where setFrame :: B.ByteString -> Maybe EdictReference -> Quake ()
+        setFrame _ Nothing = return ()
+        setFrame message (Just (EdictReference edictIdx)) = do
+          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+          if (edict^.eCount) == 0
+            then
+              setFrame message (edict^.eTeamChain)
+
+            else do
+              let n = (edict^.eCount) - 1
+
+              if n >= B.length message
+                then do
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= 12
+                  setFrame message (edict^.eTeamChain)
+
+                else do
+                  let c = message `BC.index` n
+                      frame = if | c >= '0' && c <= '9' -> ord c - ord '0'
+                                 | c == '-' -> 10
+                                 | c == ':' -> 11
+                                 | otherwise -> 12
+
+                  gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= frame
+                  setFrame message (edict^.eTeamChain)
 
 spFuncClock :: EdictReference -> Quake ()
 spFuncClock _ = io (putStrLn "GameMisc.spFuncClock") >> undefined -- TODO
