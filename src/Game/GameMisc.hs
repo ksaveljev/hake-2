@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameMisc where
 
-import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~), (+=))
+import Control.Lens (use, preuse, (^.), ix, (.=), zoom, (%=), (&), (+~), (+=), (-=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (ord)
@@ -1131,10 +1131,75 @@ funcClockReset selfRef@(EdictReference selfIdx) = do
           eHealth .= (self^.eCount)
           eWait .= 0
 
+{-
+- QUAKED func_clock (0 0 1) (-8 -8 -8) (8 8 8) TIMER_UP TIMER_DOWN
+- START_OFF MULTI_USE target a target_string with this
+- 
+- The default is to be a time of day clock
+- 
+- TIMER_UP and TIMER_DOWN run for "count" seconds and the fire "pathtarget"
+- If START_OFF, this entity must be used before it starts
+- 
+- "style" 0 "xx" 1 "xx:xx" 2 "xx:xx:xx"
+-}
 funcClockThink :: EntThink
 funcClockThink =
-  GenericEntThink "func_clock_think" $ \_ -> do
-    io (putStrLn "GameMisc.funcClockThink") >> undefined -- TODO
+  GenericEntThink "func_clock_think" $ \selfRef@(EdictReference selfIdx) -> do
+    done <- checkEnemy selfRef
+
+    if done
+      then
+        return True
+
+      else do
+        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+        if | (self^.eSpawnFlags) .&. 1 /= 0 -> do
+               funcClockFormatCountdown selfRef
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eHealth += 1
+
+           | (self^.eSpawnFlags) .&. 2 /= 0 -> do
+               funcClockFormatCountdown selfRef
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eHealth -= 1
+
+           | otherwise -> do
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eMessage .= Just "SOME TIME" -- TODO: FIXME: show time
+
+        io (putStrLn "GameMisc.funcClockThink") >> undefined -- TODO
+
+  where checkEnemy :: EdictReference -> Quake Bool
+        checkEnemy (EdictReference selfIdx) = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+          case self^.eEnemy of
+            Nothing -> do
+              es <- GameBase.gFind Nothing GameBase.findByTarget (fromJust $ self^.eTarget)
+
+              case es of
+                Nothing ->
+                  return True
+
+                Just _ -> do
+                  gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= es
+                  return False
+
+            _ -> return False
+
+funcClockFormatCountdown :: EdictReference -> Quake ()
+funcClockFormatCountdown selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if | (self^.eStyle) == 0 ->
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eMessage .= Just (BC.pack $ show (self^.eHealth)) -- IMPROVE?
+
+       | (self^.eStyle) == 1 ->
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eMessage .= Just (BC.pack (show ((self^.eHealth) `div` 60)) `B.append` ":" `B.append` BC.pack (show ((self^.eHealth) `mod` 60)))
+
+       | (self^.eStyle) == 2 ->
+           io (putStrLn "GameMisc.funcClockFormatCountdown") >> undefined -- TODO
+
+       | otherwise ->
+           return ()
 
 funcClockUse :: EntUse
 funcClockUse =
