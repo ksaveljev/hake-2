@@ -946,8 +946,38 @@ spMiscGibArm edictRef@(EdictReference edictIdx) = do
 
     linkEntity edictRef
 
+{-
+- QUAKED misc_gib_leg (1 0 0) (-8 -8 -8) (8 8 8) Intended for use with the
+- target_spawner
+-}
 spMiscGibLeg :: EdictReference -> Quake ()
-spMiscGibLeg _ = io (putStrLn "GameMisc.spMiscGibLeg") >> undefined -- TODO
+spMiscGibLeg edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    r1 <- Lib.randomF
+    r2 <- Lib.randomF
+    r3 <- Lib.randomF
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eSolid .= Constants.solidNot
+      eEntityState.esEffects %= (.|. Constants.efGib)
+      eTakeDamage .= Constants.damageYes
+      eDie .= Just gibDie
+      eMoveType .= Constants.moveTypeToss
+      eSvFlags %= (.|. Constants.svfMonster)
+      eDeadFlag .= Constants.deadDead
+      eAVelocity .= V3 (r1 * 200) (r2 * 200) (r3 * 200)
+      eThink .= Just GameUtil.freeEdictA
+      eNextThink .= levelTime + 30
+
+    setModel edictRef (Just "models/objects/gibs/leg/tris.md2")
+
+    linkEntity edictRef
 
 {-
 - QUAKED misc_gib_head (1 0 0) (-8 -8 -8) (8 8 8) Intended for use with the
