@@ -1081,7 +1081,51 @@ targetStringUse =
                   setFrame message (edict^.eTeamChain)
 
 spFuncClock :: EdictReference -> Quake ()
-spFuncClock _ = io (putStrLn "GameMisc.spFuncClock") >> undefined -- TODO
+spFuncClock selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if | isNothing (self^.eTarget) -> do
+           dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+           dprintf ((self^.eClassName) `B.append` " with no target at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+           GameUtil.freeEdict selfRef
+
+       | (self^.eSpawnFlags) .&. 2 /= 0 && (self^.eCount) == 0 -> do
+           dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+           dprintf ((self^.eClassName) `B.append` " with no count at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+           GameUtil.freeEdict selfRef
+
+       | otherwise -> do
+           when ((self^.eSpawnFlags) .&. 1 /= 0 && (self^.eCount) == 0) $
+             gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= 60 * 60
+
+           funcClockReset selfRef
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eMessage .= Just ""
+             eThink .= Just funcClockThink
+
+           Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+           if (self'^.eSpawnFlags) .&. 4 /= 0
+             then 
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eUse .= Just funcClockUse
+             else do
+               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + 1
+
+funcClockReset :: EdictReference -> Quake ()
+funcClockReset _ = do
+    io (putStrLn "GameMisc.funcClockReset") >> undefined -- TODO
+
+funcClockThink :: EntThink
+funcClockThink =
+  GenericEntThink "func_clock_think" $ \_ -> do
+    io (putStrLn "GameMisc.funcClockThink") >> undefined -- TODO
+
+funcClockUse :: EntUse
+funcClockUse =
+  GenericEntUse "func_clock_use" $ \_ _ _ -> do
+    io (putStrLn "GameMisc.funcClockUse") >> undefined -- TODO
 
 spMiscTeleporter :: EdictReference -> Quake ()
 spMiscTeleporter _ = io (putStrLn "GameMisc.spMiscTeleporter") >> undefined -- TODO
