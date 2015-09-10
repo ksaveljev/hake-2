@@ -875,8 +875,24 @@ miscSatelliteDishThink =
 
     return True
 
+{-
+- QUAKED light_mine1 (0 1 0) (-2 -2 -12) (2 2 12)
+-}
 spLightMine1 :: EdictReference -> Quake ()
-spLightMine1 _ = io (putStrLn "GameMisc.spLightMine1") >> undefined -- TODO
+spLightMine1 edictRef@(EdictReference edictIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modelIdx <- modelIndex (Just "models/objects/minelite/light1/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
+      eMoveType .= Constants.moveTypeNone
+      eSolid .= Constants.solidBbox
+      eEntityState.esModelIndex .= modelIdx
+
+    linkEntity edictRef
 
 spLightMine2 :: EdictReference -> Quake ()
 spLightMine2 _ = io (putStrLn "GameMisc.spLightMine2") >> undefined -- TODO
