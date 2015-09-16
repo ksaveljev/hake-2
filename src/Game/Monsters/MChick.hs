@@ -14,6 +14,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Util.Lib as Lib
 
 frameAttack101 :: Int
@@ -445,8 +446,48 @@ chickMoveDeath1 = MMoveT "chickMoveDeath1" frameDeath101 frameDeath112 chickFram
 
 chickDie :: EntDie
 chickDie =
-  GenericEntDie "chick_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MChick.chickDie") >> undefined -- TODO
+  GenericEntDie "chick_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    -- check for gib
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do -- regular death
+           n <- liftM (`mod` 2) Lib.rand
+
+           let currentMove = if n == 0 then chickMoveDeath1 else chickMoveDeath2
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just currentMove
+
+           sfx <- if n == 0
+                    then use $ mChickGlobals.mChickSoundDeath1
+                    else use $ mChickGlobals.mChickSoundDeath2
+
+           sound (Just selfRef) Constants.chanVoice sfx 1 Constants.attnNorm 0
 
 chickDuckDown :: EntThink
 chickDuckDown =
