@@ -565,8 +565,9 @@ chickDodge =
 
 chickSlash :: EntThink
 chickSlash =
-  GenericEntThink "ChickSlash" $ \_ -> do
-    io (putStrLn "MChick.chickSlash") >> undefined -- TODO
+  GenericEntThink "ChickSlash" $ \selfRef@(EdictReference selfIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveSlash
+    return True
 
 chickRocket :: EntThink
 chickRocket =
