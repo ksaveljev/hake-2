@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), (%=), (+=), (-=), zoom)
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
-import Linear (V3(..), _z)
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.Vector as V
 
 import Quake
@@ -16,6 +16,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 frameAttack101 :: Int
@@ -566,7 +567,18 @@ chickDodge =
 chickSlash :: EntThink
 chickSlash =
   GenericEntThink "ChickSlash" $ \selfRef@(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveSlash
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 10
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundMeleeSwing <- use $ mChickGlobals.mChickSoundMeleeSwing
+    sound (Just selfRef) Constants.chanWeapon soundMeleeSwing 1 Constants.attnNorm 0
+
+    r <- Lib.rand
+
+    GameWeapon.fireHit selfRef aim (10 + fromIntegral (r `mod` 6)) 100
+
     return True
 
 chickRocket :: EntThink
