@@ -17,6 +17,7 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
@@ -627,8 +628,33 @@ chickAttack1 =
 
 chickReRocket :: EntThink
 chickReRocket =
-  GenericEntThink "chick_rerocket" $ \_ -> do
-    io (putStrLn "MChick.chickReRocket") >> undefined -- TODO
+  GenericEntThink "chick_rerocket" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    done <- if (enemy^.eHealth) > 0 && GameUtil.range self enemy > Constants.rangeMelee
+              then do
+                vis <- GameUtil.visible selfRef enemyRef
+                r <- Lib.randomF
+
+                if vis && r <= 0.6
+                  then do
+                    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveAttack1
+                    return True
+                  else
+                    return False
+
+              else
+                return False
+
+
+    unless done $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveEndAttack1
+
+    return True
 
 chickFramesStartAttack1 :: V.Vector MFrameT
 chickFramesStartAttack1 =
