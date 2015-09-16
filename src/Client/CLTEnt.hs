@@ -846,83 +846,246 @@ parseTEnt = do
            CLFX.bubbleTrail pos pos2
 
        | any (== entType) [Constants.teParasiteAttack, Constants.teMedicCableAttack] -> do
-           io (print "CLTEnt.parseTEnt 17") >> undefined -- TODO
+           Just modParasiteSegment <- use $ clTEntGlobals.clteModParasiteSegment
+           void $ parseBeam modParasiteSegment
 
          -- boss teleporting to station
        | entType == Constants.teBossTPort -> do
-           io (print "CLTEnt.parseTEnt 18") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           CLFX.bigTeleportParticles pos
+           soundIdx <- S.registerSound "misc/bigtele.wav"
+           S.startSound (Just pos) (EdictReference 0) 0 soundIdx 1 Constants.attnNone 0
 
        | entType == Constants.teGrappleCable -> do
-           io (print "CLTEnt.parseTEnt 19") >> undefined -- TODO
+           Just modGrappleCable <- use $ clTEntGlobals.clteModGrappleCable
+           void $ parseBeam2 modGrappleCable
 
        | entType == Constants.teWeldingSparks -> do
-           io (print "CLTEnt.parseTEnt 20") >> undefined -- TODO
+           cnt <- MSG.readByte (globals.netMessage)
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           color <- MSG.readByte (globals.netMessage)
+
+           CLFX.particleEffect2 pos dir color cnt
+
+           exRef <- allocExplosion
+
+           flashModel <- use $ clTEntGlobals.clteModFlash
+
+           let ent = newEntityT { _enFlags = Constants.rfBeam
+                                , _eModel  = flashModel
+                                , _eOrigin = pos
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+           r <- Lib.rand
+
+           let ex = newExplosionT { _eType       = exFlash
+                                  , _eEnt        = entRef
+                                  , _eStart      = fromIntegral serverTime - 0.1
+                                  , _eLight      = 100 + fromIntegral (r `mod` 75)
+                                  , _eLightColor = V3 1.0 1.0 0.3
+                                  , _eFrames     = 2
+                                  }
+
+           io $ writeIORef exRef ex
 
        | entType == Constants.teGreenBlood -> do
-           io (print "CLTEnt.parseTEnt 21") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           CLFX.particleEffect2 pos dir 0xDF 30
 
        | entType == Constants.teTunnelSparks -> do
-           io (print "CLTEnt.parseTEnt 22") >> undefined -- TODO
+           cnt <- MSG.readByte (globals.netMessage)
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           color <- MSG.readByte (globals.netMessage)
+           CLFX.particleEffect3 pos dir color cnt
 
        | any (== entType) [Constants.teBlaster2, Constants.teFlechette] -> do
-           io (print "CLTEnt.parseTEnt 23") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+
+           if entType == Constants.teBlaster2
+             then CLNewFX.blasterParticles2 pos dir 0xD0
+             else CLNewFX.blasterParticles2 pos dir 0x6F
+
+           exRef <- allocExplosion
+
+           explodeModel <- use $ clTEntGlobals.clteModExplode
+
+           let a = (acos (dir^._z)) / pi * 180
+               b = if | (dir^._x) /= 0 -> (atan2 (dir^._y) (dir^._x)) / pi * 180
+                      | (dir^._y) > 0 -> 90
+                      | (dir^._y) < 0 -> 270
+                      | otherwise -> 0
+               ent = newEntityT { _enFlags  = Constants.rfFullBright .|. Constants.rfTranslucent
+                                , _eSkinNum = if entType == Constants.teBlaster2 then 1 else 2
+                                , _eModel   = explodeModel
+                                , _eOrigin  = pos
+                                , _eAngles  = V3 a b 0
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+
+           let ex = newExplosionT { _eType       = exMisc
+                                  , _eEnt        = entRef
+                                  , _eStart      = fromIntegral (serverTime - 100)
+                                  , _eLight      = 150
+                                  , _eLightColor = if entType == Constants.teBlaster2 then V3 0 1 0 else V3 0.19 0.41 0.75
+                                  , _eFrames     = 4
+                                  }
+
+           io $ writeIORef exRef ex
+
+           sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
+
+           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teLightning -> do
-           io (print "CLTEnt.parseTEnt 24") >> undefined -- TODO
+           Just modLightning <- use $ clTEntGlobals.clteModLightning
+           ent <- parseLightning modLightning
+           sfxLightning <- use $ clTEntGlobals.clteSfxLightning
+           S.startSound Nothing (EdictReference ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
 
        | entType == Constants.teDebugTrail -> do
-           io (print "CLTEnt.parseTEnt 25") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           pos2 <- MSG.readPos (globals.netMessage)
+           CLNewFX.debugTrail pos pos2
 
        | entType == Constants.tePlainExplosion -> do
-           io (print "CLTEnt.parseTEnt 26") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           exRef <- allocExplosion
+
+           r <- Lib.rand
+           f <- Lib.randomF
+           explo4Model <- use $ clTEntGlobals.clteModExplo4
+
+           let ent = newEntityT { _enFlags  = Constants.rfFullBright
+                                , _eModel   = explo4Model
+                                , _eOrigin  = pos
+                                , _eAngles  = V3 0 (fromIntegral $ r `mod` 360) 0
+                                }
+
+           entRef <- io $ newIORef ent
+           serverTime <- use $ globals.cl.csFrame.fServerTime
+
+           let ex = newExplosionT { _eType       = exPoly
+                                  , _eEnt        = entRef
+                                  , _eStart      = fromIntegral (serverTime - 100)
+                                  , _eLight      = 350
+                                  , _eLightColor = V3 1.0 0.5 0.5
+                                  , _eFrames     = 15
+                                  , _eBaseFrame  = if f < 0.5 then 15 else 0
+                                  }
+
+           io $ writeIORef exRef ex
+
+           sfx <- if entType == Constants.teRocketExplosionWater
+                    then use $ clTEntGlobals.clteSfxWatrExp
+                    else use $ clTEntGlobals.clteSfxRockExp
+
+           S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
 
        | entType == Constants.teFlashlight -> do
-           io (print "CLTEnt.parseTEnt 27") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           ent <- MSG.readShort (globals.netMessage)
+           CLNewFX.flashlight ent pos
 
        | entType == Constants.teForceWall -> do
-           io (print "CLTEnt.parseTEnt 28") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           pos2 <- MSG.readPos (globals.netMessage)
+           color <- MSG.readByte (globals.netMessage)
+           CLNewFX.forceWall pos pos2 color
 
        | entType == Constants.teHeatBeam -> do
-           io (print "CLTEnt.parseTEnt 29") >> undefined -- TODO
+           Just modHeatBeam <- use $ clTEntGlobals.clteModHeatBeam
+           void $ parsePlayerBeam modHeatBeam
 
        | entType == Constants.teMonsterHeatBeam -> do
-           io (print "CLTEnt.parseTEnt 30") >> undefined -- TODO
+           Just modMonsterHeatBeam <- use $ clTEntGlobals.clteModMonsterHeatBeam
+           void $ parsePlayerBeam modMonsterHeatBeam
 
        | entType == Constants.teHeatBeamSparks -> do
-           io (print "CLTEnt.parseTEnt 31") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           let cnt = 50
+               r = 8
+               magnitude = 60
+               color = r .&. 0xFF
+
+           CLNewFX.particleSteamEffect pos dir color cnt magnitude
+
+           sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teHeatBeamSteam -> do
-           io (print "CLTEnt.parseTEnt 32") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+
+           let cnt = 20
+               color = 0xE0
+               magnitude = 60
+
+           CLNewFX.particleSteamEffect pos dir color cnt magnitude
+
+           sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teSteam -> do
-           io (print "CLTEnt.parseTEnt 33") >> undefined -- TODO
+           parseSteam
 
        | entType == Constants.teBubbleTrail2 -> do
-           io (print "CLTEnt.parseTEnt 34") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           pos2 <- MSG.readPos (globals.netMessage)
+
+           CLNewFX.bubbleTrail2 pos pos2 8
+
+           sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teMoreBlood -> do
-           io (print "CLTEnt.parseTEnt 35") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           CLFX.particleEffect pos dir 0xE8 250
 
        | entType == Constants.teChainFistSmoke -> do
-           io (print "CLTEnt.parseTEnt 36") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           CLNewFX.particleSmokeEffect pos (V3 0 0 1) 0 20 20
 
        | entType == Constants.teElectricSparks -> do
-           io (print "CLTEnt.parseTEnt 37") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           dir <- MSG.readDir (globals.netMessage)
+           CLFX.particleEffect pos dir 0x75 40
+
+           sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
+           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teTrackerExplosion -> do
-           io (print "CLTEnt.parseTEnt 38") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+
+           CLNewFX.colorFlash pos 0 150 (-1) (-1) (-1)
+           CLNewFX.colorExplosionParticles pos 0 1
+
+           sfxDisrExp <- use $ clTEntGlobals.clteSfxDisrExp
+           S.startSound (Just pos) (EdictReference 0) 0 sfxDisrExp 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teTeleportEffect, Constants.teDBallGoal] -> do
-           io (print "CLTEnt.parseTEnt 39") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           CLFX.teleportParticles pos
 
        | entType == Constants.teWidowBeamOut -> do
-           io (print "CLTEnt.parseTEnt 40") >> undefined -- TODO
+           parseWidow
 
        | entType == Constants.teNukeBlast -> do
-           io (print "CLTEnt.parseTEnt 41") >> undefined -- TODO
+           parseNuke
 
        | entType == Constants.teWidowSplash -> do
-           io (print "CLTEnt.parseTEnt 42") >> undefined -- TODO
+           pos <- MSG.readPos (globals.netMessage)
+           CLNewFX.widowSplash pos
 
        | otherwise -> do
            Com.comError Constants.errDrop "CL_ParseTEnt: bad type"
@@ -1013,3 +1176,31 @@ smokeAndFlash origin = do
 parseLaser :: Int -> Quake ()
 parseLaser _ = do
     io (putStrLn "CLTEnt.parseLaser") >> undefined -- TODO
+
+parseBeam :: IORef ModelT -> Quake Int
+parseBeam _ = do
+    io (putStrLn "CLTEnt.parseBeam") >> undefined -- TODO
+
+parseBeam2 :: IORef ModelT -> Quake Int
+parseBeam2 _ = do
+    io (putStrLn "CLTEnt.parseBeam2") >> undefined -- TODO
+
+parseLightning :: IORef ModelT -> Quake Int
+parseLightning _ = do
+    io (putStrLn "CLTEnt.parseLightning") >> undefined -- TODO
+
+parsePlayerBeam :: IORef ModelT -> Quake Int
+parsePlayerBeam _ = do
+    io (putStrLn "CLTEnt.parsePlayerBeam") >> undefined -- TODO
+
+parseSteam :: Quake ()
+parseSteam = do
+    io (putStrLn "CLTEnt.parseSteam") >> undefined -- TODO
+
+parseWidow :: Quake ()
+parseWidow = do
+    io (putStrLn "CLTEnt.praseWidow") >> undefined -- TODO
+
+parseNuke :: Quake ()
+parseNuke = do
+    io (putStrLn "CLTEnt.parseNuke") >> undefined -- TODO

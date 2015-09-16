@@ -177,6 +177,10 @@ teleporterParticles ent = do
 
               addTeleporterParticles (p^.cpNext) (idx + 1) maxIdx
 
+bigTeleportParticles :: V3 Float -> Quake ()
+bigTeleportParticles _ = do
+    io (putStrLn "CLFX.bigTeleportParticles") >> undefined -- TODO
+
 {-
 - ============== CL_EntityEvent ==============
 - 
@@ -373,6 +377,10 @@ particleEffect org dir color count = do
 particleEffect2 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect2 org dir color count = do
     io (putStrLn "CLFX.particleEffect2") >> undefined -- TODO
+
+particleEffect3 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+particleEffect3 _ _ _ _ = do
+    io (putStrLn "CLFX.particleEffect3") >> undefined -- TODO
 
 explosionParticles :: V3 Float -> Quake ()
 explosionParticles org = do
