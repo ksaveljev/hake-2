@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), (%=), (+=), (-=), zoom)
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -17,7 +17,10 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameAttack101 :: Int
 frameAttack101 = 0
@@ -583,8 +586,22 @@ chickSlash =
 
 chickRocket :: EntThink
 chickRocket =
-  GenericEntThink "ChickRocket" $ \_ -> do
-    io (putStrLn "MChick.chickRocket") >> undefined -- TODO
+  GenericEntThink "ChickRocket" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2ChickRocket1) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = normalize (vec - start)
+
+    Monster.monsterFireRocket selfRef start dir 50 500 Constants.mz2ChickRocket1
+
+    return True
 
 chickPreAttack1 :: EntThink
 chickPreAttack1 =

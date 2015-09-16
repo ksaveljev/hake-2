@@ -307,3 +307,7 @@ monsterDeathUse selfRef@(EdictReference selfIdx) = do
 
     when (isJust (self'^.eTarget)) $
       GameUtil.useTargets selfRef (self'^.eEnemy)
+
+monsterFireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireRocket _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireRocket") >> undefined -- TODO
