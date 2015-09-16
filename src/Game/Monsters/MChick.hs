@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MChick where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), (+=), (-=), zoom)
-import Control.Monad (when)
+import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -348,8 +350,34 @@ chickMovePain3 = MMoveT "chickMovePain3" framePain301 framePain321 chickFramesPa
 
 chickPain :: EntPain
 chickPain =
-  GenericEntPain "chick_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MChick.chickPain") >> undefined -- TODO
+  GenericEntPain "chick_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      r <- Lib.randomF
+
+      sfx <- if | r < 0.33 -> use $ mChickGlobals.mChickSoundPain1
+                | r < 0.66 -> use $ mChickGlobals.mChickSoundPain2
+                | otherwise -> use $ mChickGlobals.mChickSoundPain3
+
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      sound (Just selfRef) Constants.chanVoice sfx 1 Constants.attnNorm 0
+
+      skillValue <- liftM (^.cvValue) skillCVar
+      
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        let painMove = if | damage <= 10 -> chickMovePain1
+                          | damage <= 25 -> chickMovePain2
+                          | otherwise -> chickMovePain3
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just painMove
 
 chickDead :: EntThink
 chickDead =
