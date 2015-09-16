@@ -141,8 +141,41 @@ setLightStyle csIdx = do
               in Just (a / d, (str, d, idx + 1))
 
 teleporterParticles :: EntityStateT -> Quake ()
-teleporterParticles _ = do
-    io (putStrLn "CLFX.teleporterParticles") >> undefined -- TODO
+teleporterParticles ent = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addTeleporterParticles freeParticles 0 8
+
+  where addTeleporterParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addTeleporterParticles Nothing _ _ = return ()
+        addTeleporterParticles (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.rand
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = 0xDB
+                                              , _cpOrg = V3 ((ent^.esOrigin._x) - 16 + fromIntegral (o1 .&. 31)) ((ent^.esOrigin._y) - 16 + fromIntegral (o2 .&. 31)) ((ent^.esOrigin._z) - 8 + fromIntegral (o3 .&. 7))
+                                              , _cpVel = V3 (v1 * 14) (v2 * 14) (80 + fromIntegral (v3 .&. 3))
+                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = -0.5
+                                              })
+
+              addTeleporterParticles (p^.cpNext) (idx + 1) maxIdx
 
 {-
 - ============== CL_EntityEvent ==============
