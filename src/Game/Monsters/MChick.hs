@@ -5,6 +5,7 @@ module Game.Monsters.MChick where
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), (+=), (-=), zoom)
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isJust)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
@@ -551,8 +552,16 @@ chickMoveDuck = MMoveT "chickMoveDuck" frameDuck01 frameDuck07 chickFramesDuck (
 
 chickDodge :: EntDodge
 chickDodge =
-  GenericEntDodge "chick_dodge" $ \_ _ _ -> do
-    io (putStrLn "MChick.chickDodge") >> undefined -- TODO
+  GenericEntDodge "chick_dodge" $ \selfRef@(EdictReference selfIdx) attackerRef _ -> do
+    r <- Lib.randomF
+
+    unless (r > 0.25) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      when (isJust (self^.eEnemy)) $ do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveDuck
 
 chickSlash :: EntThink
 chickSlash =
