@@ -3,7 +3,7 @@
 module Game.Monsters.MChick where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), (+=), (-=), zoom)
-import Control.Monad (when, unless, liftM)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
 import Linear (V3(..), _x, _y, _z, normalize)
@@ -22,6 +22,9 @@ import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 frameAttack101 :: Int
 frameAttack101 = 0
@@ -804,5 +807,54 @@ chickSight =
 - Trigger_Spawn Sight
 -}
 spMonsterChick :: EdictReference -> Quake ()
-spMonsterChick _ = do
-    io (putStrLn "MChick.spMonsterChick") >> undefined -- TODO
+spMonsterChick selfRef@(EdictReference selfIdx) = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    soundIndex (Just "chick/chkatck1.wav") >>= (mChickGlobals.mChickSoundMissilePrelaunch .=)
+    soundIndex (Just "chick/chkatck2.wav") >>= (mChickGlobals.mChickSoundMissileLaunch .=)
+    soundIndex (Just "chick/chkatck3.wav") >>= (mChickGlobals.mChickSoundMeleeSwing .=)
+    soundIndex (Just "chick/chkatck4.wav") >>= (mChickGlobals.mChickSoundMeleeHit .=)
+    soundIndex (Just "chick/chkatck5.wav") >>= (mChickGlobals.mChickSoundMissileReload .=)
+    soundIndex (Just "chick/chkdeth1.wav") >>= (mChickGlobals.mChickSoundDeath1 .=)
+    soundIndex (Just "chick/chkdeth2.wav") >>= (mChickGlobals.mChickSoundDeath2 .=)
+    soundIndex (Just "chick/chkfall1.wav") >>= (mChickGlobals.mChickSoundFallDown .=)
+    soundIndex (Just "chick/chkidle1.wav") >>= (mChickGlobals.mChickSoundIdle1 .=)
+    soundIndex (Just "chick/chkidle2.wav") >>= (mChickGlobals.mChickSoundIdle2 .=)
+    soundIndex (Just "chick/chkpain1.wav") >>= (mChickGlobals.mChickSoundPain1 .=)
+    soundIndex (Just "chick/chkpain2.wav") >>= (mChickGlobals.mChickSoundPain2 .=)
+    soundIndex (Just "chick/chkpain3.wav") >>= (mChickGlobals.mChickSoundPain3 .=)
+    soundIndex (Just "chick/chksght1.wav") >>= (mChickGlobals.mChickSoundSight .=)
+    soundIndex (Just "chick/chksrch1.wav") >>= (mChickGlobals.mChickSoundSearch .=)
+
+    modelIdx <- modelIndex (Just "models/monsters/bitch/tris.md2")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMoveType .= Constants.moveTypeStep
+      eSolid .= Constants.solidBbox
+      eEntityState.esModelIndex .= modelIdx
+      eMins .= V3 (-16) (-16) 0
+      eMaxs .= V3 16 16 56
+      eHealth .= 175
+      eGibHealth .= (-70)
+      eMass .= 200
+      ePain .= Just chickPain
+      eDie .= Just chickDie
+      eMonsterInfo.miStand .= Just chickStand
+      eMonsterInfo.miWalk .= Just chickWalk
+      eMonsterInfo.miRun .= Just chickRun
+      eMonsterInfo.miDodge .= Just chickDodge
+      eMonsterInfo.miAttack .= Just chickAttack
+      eMonsterInfo.miMelee .= Just chickMelee
+      eMonsterInfo.miSight .= Just chickSight
+
+    linkEntity selfRef
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+      miCurrentMove .= Just chickMoveStand
+      miScale .= modelScale
+
+    void $ think GameAI.walkMonsterStart selfRef
