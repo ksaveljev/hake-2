@@ -5,8 +5,8 @@ module Game.Monsters.MActor where
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isNothing, isJust)
-import Linear (V3(..))
+import Data.Maybe (isNothing, isJust, fromJust)
+import Linear (V3(..), _y)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
@@ -15,6 +15,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameMisc as GameMisc
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -462,8 +463,47 @@ actorAttack =
 
 actorUse :: EntUse
 actorUse =
-  GenericEntUse "actor_use" $ \_ _ _ -> do
-    io (putStrLn "MActor.actorUse") >> undefined -- TODO
+  GenericEntUse "actor_use" $ \selfRef@(EdictReference selfIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    target <- GameBase.pickTarget (self^.eTarget)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eGoalEntity .= target
+      eMoveTarget .= target
+
+    case target of
+      Nothing -> badTarget selfRef
+      Just (EdictReference targetIdx) -> do
+        Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
+
+        if (target^.eClassName) /= "target_actor"
+          then
+            badTarget selfRef
+          else do
+            let v = (target^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+                yaw = Math3D.vectorYaw v
+
+            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+              eIdealYaw .= yaw
+              eEntityState.esAngles._y .= yaw -- TODO: use Constants.yaw instead of using _y directly
+
+            void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
+
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget .= Nothing
+
+  where badTarget :: EdictReference -> Quake ()
+        badTarget selfRef@(EdictReference selfIdx) = do
+          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+
+          dprintf ((self^.eClassName) `B.append` " has bad target " `B.append` (fromJust $ self^.eTarget) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+            eTarget .= Nothing
+            eMonsterInfo.miPauseTime .= 100000000
+
+          void $ think (fromJust $ self^.eMonsterInfo.miStand) selfRef
 
 {-
 - QUAKED target_actor (.5 .3 0) (-8 -8 -8) (8 8 8) JUMP SHOOT ATTACK x HOLD
