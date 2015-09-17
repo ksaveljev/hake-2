@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MActor where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -15,6 +16,10 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
+
+maxActorNames :: Int
+maxActorNames = 8
 
 frameAttack01 :: Int
 frameAttack01 = 0
@@ -258,8 +263,8 @@ actorFramesFlipOff =
                , MFrameT (Just GameAI.aiTurn) 0 Nothing
                ]
 
-actorFramesMoveFlipOff :: MMoveT
-actorFramesMoveFlipOff = MMoveT "actorFramesMoveFlipOff" frameFlip01 frameFlip14 actorFramesFlipOff (Just actorRun)
+actorMoveFlipOff :: MMoveT
+actorMoveFlipOff = MMoveT "actorFramesFlipOff" frameFlip01 frameFlip14 actorFramesFlipOff (Just actorRun)
 
 actorFramesTaunt :: V.Vector MFrameT
 actorFramesTaunt =
@@ -290,8 +295,49 @@ messages = V.fromList [ "Watch it", "#$@*&", "Idiot", "Check your targets" ]
 
 actorPain :: EntPain
 actorPain =
-  GenericEntPain "actor_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MActor.actorPain") >> undefined -- TODO
+  GenericEntPain "actor_pain" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+      r <- Lib.randomF
+
+      if isJust (other^.eClient) && r < 0.4
+        then do
+          let v = (other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+
+          r' <- Lib.randomF
+          r'' <- Lib.rand
+
+          let currentMove = if r' < 0.5
+                              then actorMoveFlipOff
+                              else actorMoveTaunt
+
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+            eIdealYaw .= Math3D.vectorYaw v
+            eMonsterInfo.miCurrentMove .= Just currentMove
+
+          -- FIXME: does the ent-id work out ?
+          let name = actorNames V.! ((self^.eIndex) `mod` maxActorNames)
+
+          cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
+          cprintf (Just otherRef) Constants.printChat (name `B.append` ": " `B.append` (messages V.! (fromIntegral r'' `mod` 3)) `B.append` "!\n")
+
+        else do
+          n <- liftM (`mod` 3) Lib.rand
+
+          let currentMove = if | n == 0 -> actorMovePain1
+                               | n == 1 -> actorMovePain2
+                               | otherwise -> actorMovePain3
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 actorDead :: EntThink
 actorDead =
