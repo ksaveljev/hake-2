@@ -11,6 +11,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 frameFlpbit01 :: Int
@@ -213,8 +214,10 @@ flipperMovePain1 = MMoveT "flipperMovePain1" frameFlppn201 frameFlppn205 flipper
 
 flipperBite :: EntThink
 flipperBite =
-  GenericEntThink "flipper_bite" $ \_ -> do
-    io (putStrLn "MFlipper.flipperBite") >> undefined -- TODO
+  GenericEntThink "flipper_bite" $ \selfRef@(EdictReference selfIdx) -> do
+    let aim = V3 (fromIntegral Constants.meleeDistance) 0 0
+    GameWeapon.fireHit selfRef aim 5 0
+    return True
 
 flipperPreAttack :: EntThink
 flipperPreAttack =
