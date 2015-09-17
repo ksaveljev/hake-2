@@ -3,7 +3,7 @@
 module Game.Monsters.MBrain where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=), (+=))
-import Control.Monad (unless, when, liftM)
+import Control.Monad (unless, when, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _z)
@@ -17,7 +17,11 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+
+modelScale :: Float
+modelScale = 1.0
 
 frameWalk101 :: Int
 frameWalk101 = 0
@@ -724,5 +728,63 @@ brainMoveAttack2 = MMoveT "brainMoveAttack2" frameAttack201 frameAttack217 brain
 - Trigger_Spawn Sight
 -}
 spMonsterBrain :: EdictReference -> Quake ()
-spMonsterBrain _ = do
-    io (putStrLn "MBrain.spMonsterBrain") >> undefined -- TODO
+spMonsterBrain selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "brain/brnatck1.wav") >>= (mBrainGlobals.mBrainSoundChestOpen .=)
+        soundIndex (Just "brain/brnatck2.wav") >>= (mBrainGlobals.mBrainSoundTentaclesExtend .=)
+        soundIndex (Just "brain/brnatck3.wav") >>= (mBrainGlobals.mBrainSoundTentaclesRetract .=)
+        soundIndex (Just "brain/brndeth1.wav") >>= (mBrainGlobals.mBrainSoundDeath .=)
+        soundIndex (Just "brain/brnidle1.wav") >>= (mBrainGlobals.mBrainSoundIdle1 .=)
+        soundIndex (Just "brain/brnidle2.wav") >>= (mBrainGlobals.mBrainSoundIdle2 .=)
+        soundIndex (Just "brain/brnlens1.wav") >>= (mBrainGlobals.mBrainSoundIdle3 .=)
+        soundIndex (Just "brain/brnpain1.wav") >>= (mBrainGlobals.mBrainSoundPain1 .=)
+        soundIndex (Just "brain/brnpain2.wav") >>= (mBrainGlobals.mBrainSoundPain2 .=)
+        soundIndex (Just "brain/brnsght1.wav") >>= (mBrainGlobals.mBrainSoundSight .=)
+        soundIndex (Just "brain/brnsrch1.wav") >>= (mBrainGlobals.mBrainSoundSearch .=)
+        soundIndex (Just "brain/melee1.wav") >>= (mBrainGlobals.mBrainSoundMelee1 .=)
+        soundIndex (Just "brain/melee2.wav") >>= (mBrainGlobals.mBrainSoundMelee2 .=)
+        soundIndex (Just "brain/melee3.wav") >>= (mBrainGlobals.mBrainSoundMelee3 .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/brain/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 32
+          eHealth .= 300
+          eGibHealth .= (-150)
+          eMass .= 400
+          ePain .= Just brainPain
+          eDie .= Just brainDie
+          eMonsterInfo.miStand .= Just brainStand
+          eMonsterInfo.miWalk .= Just brainWalk
+          eMonsterInfo.miRun .= Just brainRun
+          eMonsterInfo.miDodge .= Just brainDodge
+          eMonsterInfo.miMelee .= Just brainMelee
+          eMonsterInfo.miSight .= Just brainSight
+          eMonsterInfo.miSearch .= Just brainSearch
+          eMonsterInfo.miIdle .= Just brainIdle
+          eMonsterInfo.miPowerArmorType .= Constants.powerArmorScreen
+          eMonsterInfo.miPowerArmorPower .= 100
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just brainMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
