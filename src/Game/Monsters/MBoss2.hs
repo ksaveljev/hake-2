@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss2 where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
-import Control.Monad (void)
+import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), norm)
 import qualified Data.Vector as V
@@ -145,8 +146,32 @@ boss2ReAttackMg =
 
 boss2Pain :: EntPain
 boss2Pain =
-  GenericEntPain "boss2_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MBoss2.boss2Pain") >> undefined -- TODO
+  GenericEntPain "boss2_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      (soundPain, currentMove) <- if | damage < 10 -> do
+                                         soundPain <- use $ mBoss2Globals.mb2SoundPain3
+                                         return (soundPain, boss2MovePainLight)
+
+                                     | damage < 30 -> do
+                                         soundPain <- use $ mBoss2Globals.mb2SoundPain1
+                                         return (soundPain, boss2MovePainLight)
+
+                                     | otherwise -> do
+                                         soundPain <- use $ mBoss2Globals.mb2SoundPain2
+                                         return (soundPain, boss2MovePainHeavy)
+
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNone 0
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 boss2Dead :: EntThink
 boss2Dead =
