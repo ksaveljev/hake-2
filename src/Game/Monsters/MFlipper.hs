@@ -2,12 +2,14 @@
 module Game.Monsters.MFlipper where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM)
 import Data.Bits ((.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -262,8 +264,33 @@ flipperMelee =
 
 flipperPain :: EntPain
 flipperPain =
-  GenericEntPain "flipper_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MFlipper.flipperPain") >> undefined -- TODO
+  GenericEntPain "flipper_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        n <- Lib.rand
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+
+        (soundPain, currentMove) <- if (n + 1) `mod` 2 == 0
+                                      then do
+                                        soundPain <- use $ mFlipperGlobals.mFlipperSoundPain1
+                                        return (soundPain, flipperMovePain1)
+                                      else do
+                                        soundPain <- use $ mFlipperGlobals.mFlipperSoundPain2
+                                        return (soundPain, flipperMovePain2)
+
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 flipperDead :: EntThink
 flipperDead =
