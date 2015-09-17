@@ -12,13 +12,18 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 maxActorNames :: Int
 maxActorNames = 8
@@ -527,8 +532,62 @@ actorMachineGun :: EdictReference -> Quake ()
 actorMachineGun _ = do
     io (putStrLn "MActor.actorMachineGun") >> undefined -- TODO
 
+{-
+- QUAKED misc_actor (1 .5 0) (-16 -16 -24) (16 16 32)
+-}
 spMiscActor :: EdictReference -> Quake ()
-spMiscActor _ = io (putStrLn "MActor.spMiscActor") >> undefined -- TODO
+spMiscActor selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    let dprintf = gameImport^.giDprintf
+        modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    if | deathmatchValue /= 0 ->
+           GameUtil.freeEdict selfRef
+
+       | isNothing (self^.eTargetName) -> do
+           dprintf ("untargeted " `B.append` (self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+           GameUtil.freeEdict selfRef
+
+       | isNothing (self^.eTarget) -> do
+           dprintf ((self^.eClassName) `B.append` " with no target at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+           GameUtil.freeEdict selfRef
+
+       | otherwise -> do
+           modelIdx <- modelIndex (Just "players/male/tris.md2")
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eMoveType .= Constants.moveTypeStep
+             eSolid .= Constants.solidBbox
+             eEntityState.esModelIndex .= modelIdx
+             eMins .= V3 (-16) (-16) (-24)
+             eMaxs .= V3 16 16 32
+             eHealth %= (\v -> if v == 0 then 100 else v)
+             eMass .= 200
+             ePain .= Just actorPain
+             eDie .= Just actorDie
+             eMonsterInfo.miStand .= Just actorStand
+             eMonsterInfo.miWalk .= Just actorWalk
+             eMonsterInfo.miRun .= Just actorRun
+             eMonsterInfo.miAttack .= Just actorAttack
+             eMonsterInfo.miMelee .= Nothing
+             eMonsterInfo.miSight .= Nothing
+             eMonsterInfo.miAIFlags %= (.|. Constants.aiGoodGuy)
+
+           linkEntity selfRef
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+             miCurrentMove .= Just actorMoveStand
+             miScale .= modelScale
+
+           void $ think GameAI.walkMonsterStart selfRef
+
+           -- actors always start in a dormant state, they *must* be used
+           -- to get going
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eUse .= Just actorUse
 
 spTargetActor :: EdictReference -> Quake ()
 spTargetActor selfRef@(EdictReference selfIdx) = do
