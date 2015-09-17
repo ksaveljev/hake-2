@@ -2,13 +2,14 @@
 module Game.Monsters.MBerserk where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
-import Control.Monad (void)
+import Control.Monad (void, unless, liftM, when)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _x)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -395,8 +396,31 @@ berserkMovePain2 = MMoveT "berserkMovePain2" framePainB1 framePainB20 berserkFra
 
 berserkPain :: EntPain
 berserkPain =
-  GenericEntPain "berserk_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MBerserk.berserkPain") >> undefined -- TODO
+  GenericEntPain "berserk_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      soundPain <- use $ mBerserkGlobals.mBerserkSoundPain
+      sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        r <- Lib.randomF
+
+        let currentMove = if damage < 20 || r < 0.5
+                            then berserkMovePain1
+                            else berserkMovePain2
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 berserkDead :: EntThink
 berserkDead =
