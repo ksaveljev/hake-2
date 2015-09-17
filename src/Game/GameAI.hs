@@ -763,3 +763,8 @@ aiRunSlide selfRef@(EdictReference selfIdx) distance = do
       Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miLefty .= 1 - (self'^.eMonsterInfo.miLefty)
       void $ M.walkMove selfRef ((self'^.eIdealYaw) - ofs) distance
+
+flyMonsterStart :: EntThink
+flyMonsterStart =
+  GenericEntThink "flymonster_start" $ \_ -> do
+    io (putStrLn "GameAI.flyMonsterStart") >> undefined -- TODO

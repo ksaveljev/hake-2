@@ -10,12 +10,16 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monsters.MSuperTank as MSuperTank
 import qualified Util.Lib as Lib
+
+modelScale :: Float
+modelScale = 1.0
 
 frameStand30 :: Int
 frameStand30 = 0
@@ -519,5 +523,58 @@ boss2FramesDeath =
 boss2MoveDeath :: MMoveT
 boss2MoveDeath = MMoveT "boss2MoveDeath" frameDeath2 frameDeath50 boss2FramesDeath (Just boss2Dead)
 
+{-
+- QUAKED monster_boss2 (1 .5 0) (-56 -56 0) (56 56 80) Ambush Trigger_Spawn
+- Sight
+-}
 spMonsterBoss2 :: EdictReference -> Quake ()
-spMonsterBoss2 _ = io (putStrLn "MBoss2.spMonsterBoss2") >> undefined -- TODO
+spMonsterBoss2 selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "bosshovr/bhvpain1.wav") >>= (mBoss2Globals.mb2SoundPain1 .=)
+        soundIndex (Just "bosshovr/bhvpain2.wav") >>= (mBoss2Globals.mb2SoundPain2 .=)
+        soundIndex (Just "bosshovr/bhvpain3.wav") >>= (mBoss2Globals.mb2SoundPain3 .=)
+        soundIndex (Just "bosshovr/bhvdeth1.wav") >>= (mBoss2Globals.mb2SoundDeath .=)
+        soundIndex (Just "bosshovr/bhvunqv1.wav") >>= (mBoss2Globals.mb2SoundSearch1 .=)
+
+        soundIdx <- soundIndex (Just "bosshovr/bhvengn1.wav")
+        modelIdx <- modelIndex (Just "models/monsters/boss2/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esSound .= soundIdx
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-56) (-56) 0
+          eMaxs .= V3 56 56 80
+          eHealth .= 2000
+          eGibHealth .= (-200)
+          eMass .= 1000
+          eFlags %= (.|. Constants.flImmuneLaser)
+          ePain .= Just boss2Pain
+          eDie .= Just boss2Die
+          eMonsterInfo.miStand .= Just boss2Stand
+          eMonsterInfo.miWalk .= Just boss2Walk
+          eMonsterInfo.miRun .= Just boss2Run
+          eMonsterInfo.miAttack .= Just boss2Attack
+          eMonsterInfo.miSearch .= Just boss2Search
+          eMonsterInfo.miCheckAttack .= Just boss2CheckAttack
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just boss2MoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.flyMonsterStart selfRef
