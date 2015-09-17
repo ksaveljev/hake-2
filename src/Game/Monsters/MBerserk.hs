@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBerserk where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
@@ -13,6 +14,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
@@ -474,8 +476,44 @@ berserkMoveDeath2 = MMoveT "berserkMoveDeath2" frameDeathC1 frameDeathC8 berserk
 
 berserkDie :: EntDie
 berserkDie =
-  GenericEntDie "berserk_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MBerserk.berserkDie") >> undefined -- TODO
+  GenericEntDie "berserk_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+
+    if | (self^.eHealth) < (self^.eGibHealth) -> do
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do
+           soundDie <- use $ mBerserkGlobals.mBerserkSoundDie
+           sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
+
+           let currentMove = if damage >= 50
+                               then berserkMoveDeath1
+                               else berserkMoveDeath2
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just currentMove
 
 {-
 - QUAKED monster_berserk (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
