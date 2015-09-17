@@ -3,7 +3,7 @@
 module Game.Monsters.MFlipper where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (when, unless, liftM)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
@@ -16,7 +16,11 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+
+modelScale :: Float
+modelScale = 1.0
 
 frameFlpbit01 :: Int
 frameFlpbit01 = 0
@@ -420,5 +424,52 @@ flipperDie =
 - Trigger_Spawn Sight
 -}
 spMonsterFlipper :: EdictReference -> Quake ()
-spMonsterFlipper _ = do
-    io (putStrLn "MFlipper.spMonsterFlipper") >> undefined -- TODO
+spMonsterFlipper selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "flipper/flppain1.wav") >>= (mFlipperGlobals.mFlipperSoundPain1 .=)
+        soundIndex (Just "flipper/flppain2.wav") >>= (mFlipperGlobals.mFlipperSoundPain2 .=)
+        soundIndex (Just "flipper/flpdeth1.wav") >>= (mFlipperGlobals.mFlipperSoundDeath .=)
+        soundIndex (Just "flipper/flpatck1.wav") >>= (mFlipperGlobals.mFlipperSoundChomp .=)
+        soundIndex (Just "flipper/flpatck2.wav") >>= (mFlipperGlobals.mFlipperSoundAttack .=)
+        soundIndex (Just "flipper/flpidle1.wav") >>= (mFlipperGlobals.mFlipperSoundIdle .=)
+        soundIndex (Just "flipper/flpsrch1.wav") >>= (mFlipperGlobals.mFlipperSoundSearch .=)
+        soundIndex (Just "flipper/flpsght1.wav") >>= (mFlipperGlobals.mFlipperSoundSight .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/flipper/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) 0
+          eMaxs .= V3 16 16 32
+          eHealth .= 50
+          eGibHealth .= (-30)
+          eMass .= 100
+          ePain .= Just flipperPain
+          eDie .= Just flipperDie
+          eMonsterInfo.miStand .= Just flipperStand
+          eMonsterInfo.miWalk .= Just flipperWalk
+          eMonsterInfo.miRun .= Just flipperStartRun
+          eMonsterInfo.miMelee .= Just flipperMelee
+          eMonsterInfo.miSight .= Just flipperSight
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just flipperMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.swimMonsterStart selfRef

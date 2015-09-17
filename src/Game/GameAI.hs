@@ -768,3 +768,8 @@ flyMonsterStart :: EntThink
 flyMonsterStart =
   GenericEntThink "flymonster_start" $ \_ -> do
     io (putStrLn "GameAI.flyMonsterStart") >> undefined -- TODO
+
+swimMonsterStart :: EntThink
+swimMonsterStart =
+  GenericEntThink "swimmonster_start" $ \_ -> do
+    io (putStrLn "GameAI.swimMonsterStart") >> undefined -- TODO
