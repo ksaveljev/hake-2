@@ -5,7 +5,7 @@ import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=), (+=))
 import Control.Monad (unless, when)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
-import Linear (V3(..), _z)
+import Linear (V3(..), _x, _z)
 import qualified Data.Vector as V
 
 import Quake
@@ -13,6 +13,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 frameWalk101 :: Int
@@ -372,8 +373,20 @@ brainSwingRight =
 
 brainHitRight :: EntThink
 brainHitRight =
-  GenericEntThink "brain_hit_right" $ \_ -> do
-    io (putStrLn "MBrain.brainHitRight") >> undefined -- TODO
+  GenericEntThink "brain_hit_right" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 8
+    r <- Lib.rand
+
+    hit <- GameWeapon.fireHit selfRef aim (15 + (fromIntegral r `mod` 5)) 40
+
+    when hit $ do
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      soundMelee <- use $ mBrainGlobals.mBrainSoundMelee3
+      sound (Just selfRef) Constants.chanWeapon soundMelee 1 Constants.attnNorm 0
+
+    return True
 
 brainSwingLeft :: EntThink
 brainSwingLeft =
