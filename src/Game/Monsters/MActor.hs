@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _y)
+import Linear (V3(..), _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
@@ -486,7 +486,7 @@ actorUse =
 
             zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
               eIdealYaw .= yaw
-              eEntityState.esAngles._y .= yaw -- TODO: use Constants.yaw instead of using _y directly
+              eEntityState.esAngles._y .= yaw -- IMPROVE: use Constants.yaw instead of using _y directly
 
             void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
 
@@ -531,4 +531,36 @@ spMiscActor :: EdictReference -> Quake ()
 spMiscActor _ = io (putStrLn "MActor.spMiscActor") >> undefined -- TODO
 
 spTargetActor :: EdictReference -> Quake ()
-spTargetActor _ = io (putStrLn "MActor.spTargetActor") >> undefined -- TODO
+spTargetActor selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let dprintf = gameImport^.giDprintf
+        linkEntity = gameImport^.giLinkEntity
+
+    when (isNothing (self^.eTargetName)) $ do
+      dprintf ((self^.eClassName) `B.append` " with no targetname at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSolid .= Constants.solidTrigger
+      eTouch .= Just targetActorTouch
+      eMins .= V3 (-8) (-8) (-8)
+      eMaxs .= V3 8 8 8
+      eSvFlags .= Constants.svfNoClient
+
+    when ((self^.eSpawnFlags) .&. 1 /= 0) $ do
+      gameBaseGlobals.gbSpawnTemp.stHeight %= (\v -> if v == 0 then 200 else v)
+
+      let speed = if (self^.eSpeed) == 0 then 200 else self^.eSpeed
+          angle = if (self^.eEntityState.esAngles._y) == 0 then 360 else self^.eEntityState.esAngles._y -- IMPROVE: use Constants.yaw instead of using _y directly
+
+      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+        eSpeed .= speed
+        eEntityState.esAngles._y .= angle -- IMPROVE: use Constants.yaw
+
+      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveDir)
+
+      height <- use $ gameBaseGlobals.gbSpawnTemp.stHeight
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveDir._z .= fromIntegral height
+
+    linkEntity selfRef
