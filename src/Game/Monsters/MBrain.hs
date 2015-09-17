@@ -427,8 +427,20 @@ brainChestOpen =
 
 brainTentacleAttack :: EntThink
 brainTentacleAttack =
-  GenericEntThink "brain_tentacle_attack" $ \_ -> do
-    io (putStrLn "MBrain.brainTentacleAttack") >> undefined -- TODO
+  GenericEntThink "brain_tentacle_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    let aim = V3 (fromIntegral Constants.meleeDistance) 0 8
+    r <- Lib.rand
+
+    hit <- GameWeapon.fireHit selfRef aim (10 + (fromIntegral r `mod` 5)) (-600)
+
+    when hit $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags %= (.|. 65536)
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundTentaclesRetract <- use $ mBrainGlobals.mBrainSoundTentaclesRetract
+    sound (Just selfRef) Constants.chanWeapon soundTentaclesRetract 1 Constants.attnNorm 0
+
+    return True
 
 brainFramesAttack1 :: V.Vector MFrameT
 brainFramesAttack1 =
