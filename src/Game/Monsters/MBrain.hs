@@ -398,8 +398,20 @@ brainSwingLeft =
 
 brainHitLeft :: EntThink
 brainHitLeft =
-  GenericEntThink "brain_hit_left" $ \_ -> do
-    io (putStrLn "MBrain.brainHitLeft") >> undefined -- TODO
+  GenericEntThink "brain_hit_left" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 8
+    r <- Lib.rand
+
+    hit <- GameWeapon.fireHit selfRef aim (15 + (fromIntegral r `mod` 5)) 40
+
+    when hit $ do
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      soundMelee <- use $ mBrainGlobals.mBrainSoundMelee3
+      sound (Just selfRef) Constants.chanWeapon soundMelee 1 Constants.attnNorm 0
+
+    return True
 
 brainChestOpen :: EntThink
 brainChestOpen =
