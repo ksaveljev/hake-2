@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBrain where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (-=), (%=), (+=))
-import Control.Monad (unless, when)
+import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _z)
@@ -10,6 +11,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -631,8 +633,37 @@ brainMoveDuck = MMoveT "brainMoveDuck" frameDuck01 frameDuck08 brainFramesDuck (
 
 brainPain :: EntPain
 brainPain =
-  GenericEntPain "brain_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MBrain.brainPain") >> undefined -- TODO
+  GenericEntPain "brain_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        r <- Lib.randomF
+
+        (soundPain, currentMove) <- if | r < 0.33 -> do
+                                           soundPain <- use $ mBrainGlobals.mBrainSoundPain1
+                                           return (soundPain, brainMovePain1)
+
+                                       | r < 0.66 -> do
+                                           soundPain <- use $ mBrainGlobals.mBrainSoundPain2
+                                           return (soundPain, brainMovePain2)
+
+                                       | otherwise -> do
+                                           soundPain <- use $ mBrainGlobals.mBrainSoundPain1
+                                           return (soundPain, brainMovePain3)
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 brainDie :: EntDie
 brainDie =
