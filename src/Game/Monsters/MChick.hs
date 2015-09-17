@@ -711,8 +711,30 @@ chickMoveEndAttack1 = MMoveT "chickMoveEndAttack1" frameAttack128 frameAttack132
 
 chickReSlash :: EntThink
 chickReSlash =
-  GenericEntThink "chick_reslash" $ \_ -> do
-    io (putStrLn "MChick.chickReSlash") >> undefined -- TODO
+  GenericEntThink "chick_reslash" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    done <- if (enemy^.eHealth) > 0 && GameUtil.range self enemy == Constants.rangeMelee
+              then do
+                r <- Lib.randomF
+
+                let currentMove = if r <= 0.9
+                                    then chickMoveSlash
+                                    else chickMoveEndSlash
+
+                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+                return True
+              else
+                return False
+
+
+    unless done $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveEndSlash
+
+    return True
 
 chickFramesSlash :: V.Vector MFrameT
 chickFramesSlash =
