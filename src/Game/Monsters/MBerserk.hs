@@ -16,7 +16,11 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+
+modelScale :: Float
+modelScale = 1.0
 
 frameStand1 :: Int
 frameStand1 = 0
@@ -520,4 +524,51 @@ berserkDie =
 - Trigger_Spawn Sight
 -}
 spMonsterBerserk :: EdictReference -> Quake ()
-spMonsterBerserk _ = io (putStrLn "MBerserk.spMonsterBerserk") >> undefined -- TODO
+spMonsterBerserk selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "berserk/berpain2.wav") >>= (mBerserkGlobals.mBerserkSoundPain .=)
+        soundIndex (Just "berserk/berdeth2.wav") >>= (mBerserkGlobals.mBerserkSoundDie .=)
+        soundIndex (Just "berserk/beridle1.wav") >>= (mBerserkGlobals.mBerserkSoundIdle .=)
+        soundIndex (Just "berserk/attack.wav") >>= (mBerserkGlobals.mBerserkSoundPunch .=)
+        soundIndex (Just "berserk/bersrch1.wav") >>= (mBerserkGlobals.mBerserkSoundSearch .=)
+        soundIndex (Just "berserk/sight.wav") >>= (mBerserkGlobals.mBerserkSoundSight .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/berserk/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 32
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eHealth .= 240
+          eGibHealth .= (-60)
+          eMass .= 250
+          ePain .= Just berserkPain
+          eDie .= Just berserkDie
+          eMonsterInfo.miStand .= Just berserkStand
+          eMonsterInfo.miWalk .= Just berserkWalk
+          eMonsterInfo.miRun .= Just berserkRun
+          eMonsterInfo.miDodge .= Nothing
+          eMonsterInfo.miAttack .= Nothing
+          eMonsterInfo.miMelee .= Just berserkMelee
+          eMonsterInfo.miSight .= Just berserkSight
+          eMonsterInfo.miSearch .= Just berserkSearch
+          eMonsterInfo.miCurrentMove .= Just berserkMoveStand
+          eMonsterInfo.miScale .= modelScale
+
+        linkEntity selfRef
+
+        void $ think GameAI.walkMonsterStart selfRef
