@@ -15,6 +15,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -390,8 +391,36 @@ actorMoveDeath2 = MMoveT "actorMoveDeath2" frameDeath201 frameDeath213 actorFram
 
 actorDie :: EntDie
 actorDie =
-  GenericEntDie "actor_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MActor.actorDie") >> undefined -- TODO
+  GenericEntDie "actor_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if | (self^.eHealth) <= (-80) -> do -- check for gib
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do -- regular death
+           n <- Lib.rand
+
+           let currentMove = if n `mod` 2 == 0
+                               then actorMoveDeath1
+                               else actorMoveDeath2
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just currentMove
 
 actorFire :: EntThink
 actorFire =
