@@ -169,8 +169,9 @@ gladiatorRun =
 
 gladiatorMelee :: EntThink
 gladiatorMelee =
-  GenericEntThink "GladiatorMelee" $ \_ -> do
-    io (putStrLn "MGladiator.gladiatorMelee") >> undefined -- TODO
+  GenericEntThink "GladiatorMelee" $ \selfRef@(EdictReference selfIdx) -> do
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMoveAttackMelee
+    return True
 
 gladiatorFramesAttackMelee :: V.Vector MFrameT
 gladiatorFramesAttackMelee =
