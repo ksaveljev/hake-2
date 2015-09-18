@@ -14,6 +14,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
@@ -674,8 +675,11 @@ flyerPain =
 
 flyerDie :: EntDie
 flyerDie =
-  GenericEntDie "flyer_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MFlyer.flyerDie") >> undefined -- TODO
+  GenericEntDie "flyer_die" $ \selfRef _ _ _ _ -> do
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundDie <- use $ mFlyerGlobals.mFlyerSoundDie
+    sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
+    GameMisc.becomeExplosion1 selfRef
 
 flyerFire :: EdictReference -> Int -> Quake ()
 flyerFire _ _ = do
