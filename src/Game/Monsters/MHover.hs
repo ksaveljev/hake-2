@@ -14,6 +14,8 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -122,8 +124,25 @@ hoverReAttack =
 
 hoverFireBlaster :: EntThink
 hoverFireBlaster =
-  GenericEntThink "hover_fire_blaster" $ \_ -> do
-    io (putStrLn "MHover.hoverFireBlaster") >> undefined -- TODO
+  GenericEntThink "hover_fire_blaster" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let effect = if (self^.eEntityState.esFrame) == frameAttack104
+                   then Constants.efHyperblaster
+                   else 0
+
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2HoverBlaster1) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = end - start
+
+    Monster.monsterFireBlaster selfRef start dir 1 1000 Constants.mz2HoverBlaster1 effect
+    return True
 
 hoverStand :: EntThink
 hoverStand =
