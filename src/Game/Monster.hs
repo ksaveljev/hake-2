@@ -315,3 +315,7 @@ monsterFireRocket _ _ _ _ _ _ = do
 monsterFireRailgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
 monsterFireRailgun _ _ _ _ _ _ = do
     io (putStrLn "Monster.monsterFireRailgun") >> undefined -- TODO
+
+monsterFireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireGrenade _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireGrenade") >> undefined -- TODO

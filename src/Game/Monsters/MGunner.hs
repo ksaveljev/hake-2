@@ -54,6 +54,15 @@ frameRunShoot06 = 107
 frameAttack101 :: Int
 frameAttack101 = 108
 
+frameAttack105 :: Int
+frameAttack105 = 112
+
+frameAttack108 :: Int
+frameAttack108 = 115
+
+frameAttack111 :: Int
+frameAttack111 = 118
+
 frameAttack121 :: Int
 frameAttack121 = 128
 
@@ -581,8 +590,22 @@ gunnerFire =
 
 gunnerGrenade :: EntThink
 gunnerGrenade =
-  GenericEntThink "GunnerGrenade" $ \_ -> do
-    io (putStrLn "MGunner.gunnerGrenade") >> undefined -- TODO
+  GenericEntThink "GunnerGrenade" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashNumber = if | (self^.eEntityState.esFrame) == frameAttack105 -> Constants.mz2GunnerGrenade1
+                         | (self^.eEntityState.esFrame) == frameAttack108 -> Constants.mz2GunnerGrenade2
+                         | (self^.eEntityState.esFrame) == frameAttack111 -> Constants.mz2GunnerGrenade3
+                         | otherwise -> Constants.mz2GunnerGrenade4
+
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+        -- FIXME: do a spread -225 -75 75 255 degrees around forward
+        aim = forward
+
+    Monster.monsterFireGrenade selfRef start aim 50 600 flashNumber
+
+    return True
 
 gunnerAttack :: EntThink
 gunnerAttack =
