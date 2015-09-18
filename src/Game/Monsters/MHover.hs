@@ -10,6 +10,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -182,8 +183,38 @@ hoverAttack =
 
 hoverPain :: EntPain
 hoverPain =
-  GenericEntPain "hover_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MHover.hoverPain") >> undefined -- TODO
+  GenericEntPain "hover_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        (soundPain, currentMove) <- if damage <= 25
+                                      then do
+                                        r <- Lib.randomF
+
+                                        if r < 0.5
+                                          then do
+                                            soundPain <- use $ mHoverGlobals.mHoverSoundPain1
+                                            return (soundPain, hoverMovePain3)
+                                          else do
+                                            soundPain <- use $ mHoverGlobals.mHoverSoundPain2
+                                            return (soundPain, hoverMovePain2)
+                                      else do
+                                        soundPain <- use $ mHoverGlobals.mHoverSoundPain1
+                                        return (soundPain, hoverMovePain1)
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 hoverDeadThink :: EntThink
 hoverDeadThink =
