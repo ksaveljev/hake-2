@@ -22,6 +22,9 @@ import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameStand1 :: Int
 frameStand1 = 0
 
@@ -425,7 +428,58 @@ gladiatorDie =
 - Trigger_Spawn Sight
 -}
 spMonsterGladiator :: EdictReference -> Quake ()
-spMonsterGladiator _ = do
-    -- do not forget that
-    -- self.monsterinfo.melee = gladiatorAttackMelee
-    io (putStrLn "MGladiator.spMonsterGladiator") >> undefined -- TODO
+spMonsterGladiator selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "gladiator/pain.wav") >>= (mGladiatorGlobals.mGladiatorSoundPain1 .=)
+        soundIndex (Just "gladiator/gldpain2.wav") >>= (mGladiatorGlobals.mGladiatorSoundPain2 .=)
+        soundIndex (Just "gladiator/glddeth2.wav") >>= (mGladiatorGlobals.mGladiatorSoundDie .=)
+        soundIndex (Just "gladiator/railgun.wav") >>= (mGladiatorGlobals.mGladiatorSoundGun .=)
+        soundIndex (Just "gladiator/melee1.wav") >>= (mGladiatorGlobals.mGladiatorSoundCleaverSwing .=)
+        soundIndex (Just "gladiator/melee2.wav") >>= (mGladiatorGlobals.mGladiatorSoundCleaverHit .=)
+        soundIndex (Just "gladiator/melee3.wav") >>= (mGladiatorGlobals.mGladiatorSoundCleaverMiss .=)
+        soundIndex (Just "gladiator/gldidle1.wav") >>= (mGladiatorGlobals.mGladiatorSoundIdle .=)
+        soundIndex (Just "gladiator/gldsrch1.wav") >>= (mGladiatorGlobals.mGladiatorSoundSearch .=)
+        soundIndex (Just "gladiator/sight.wav") >>= (mGladiatorGlobals.mGladiatorSoundSight .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/gladiatr/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-32) (-32) (-24)
+          eMaxs .= V3 32 32 64
+          eHealth .= 400
+          eGibHealth .= (-175)
+          eMass .= 400
+          ePain .= Just gladiatorPain
+          eDie .= Just gladiatorDie
+          eMonsterInfo.miStand .= Just gladiatorStand
+          eMonsterInfo.miWalk .= Just gladiatorWalk
+          eMonsterInfo.miRun .= Just gladiatorRun
+          eMonsterInfo.miDodge .= Nothing
+          eMonsterInfo.miAttack .= Just gladiatorAttack
+          eMonsterInfo.miMelee .= Just gladiatorAttackMelee
+          eMonsterInfo.miSight .= Just gladiatorSight
+          eMonsterInfo.miIdle .= Just gladiatorIdle
+          eMonsterInfo.miSearch .= Just gladiatorSearch
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just gladiatorMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
