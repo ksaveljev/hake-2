@@ -22,6 +22,9 @@ import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.15
+
 frameStand01 :: Int
 frameStand01 = 0
 
@@ -730,5 +733,57 @@ gunnerMoveAttackGrenade = MMoveT "gunnerMoveAttackGrenade" frameAttack101 frameA
 - Trigger_Spawn Sight
 -}
 spMonsterGunner :: EdictReference -> Quake ()
-spMonsterGunner _ = do
-    io (putStrLn "MGunner.spMonsterGunner") >> undefined -- TODO
+spMonsterGunner selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "gunner/death1.wav") >>= (mGunnerGlobals.mGunnerSoundDeath .=)
+        soundIndex (Just "gunner/gunpain2.wav") >>= (mGunnerGlobals.mGunnerSoundPain .=)
+        soundIndex (Just "gunner/gunpain1.wav") >>= (mGunnerGlobals.mGunnerSoundPain2 .=)
+        soundIndex (Just "gunner/gunidle1.wav") >>= (mGunnerGlobals.mGunnerSoundIdle .=)
+        soundIndex (Just "gunner/gunatck1.wav") >>= (mGunnerGlobals.mGunnerSoundOpen .=)
+        soundIndex (Just "gunner/gunsrch1.wav") >>= (mGunnerGlobals.mGunnerSoundSearch .=)
+        soundIndex (Just "gunner/sight1.wav") >>= (mGunnerGlobals.mGunnerSoundSight .=)
+
+        void $ soundIndex (Just "gunner/gunatck2.wav")
+        void $ soundIndex (Just "gunner/gunatck3.wav")
+
+        modelIdx <- modelIndex (Just "models/monsters/gunner/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 32
+          eHealth .= 175
+          eGibHealth .= (-70)
+          eMass .= 200
+          ePain .= Just gunnerPain
+          eDie .= Just gunnerDie
+          eMonsterInfo.miStand .= Just gunnerStand
+          eMonsterInfo.miWalk .= Just gunnerWalk
+          eMonsterInfo.miRun .= Just gunnerRun
+          eMonsterInfo.miDodge .= Just gunnerDodge
+          eMonsterInfo.miAttack .= Just gunnerAttack
+          eMonsterInfo.miMelee .= Nothing
+          eMonsterInfo.miSight .= Just gunnerSight
+          eMonsterInfo.miSearch .= Just gunnerSearch
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just gunnerMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
