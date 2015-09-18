@@ -17,7 +17,10 @@ import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameWeapon as GameWeapon
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 actionAttack1 :: Int
 actionAttack1 = 1
@@ -66,6 +69,15 @@ frameAttack121 = 78
 
 frameAttack201 :: Int
 frameAttack201 = 79
+
+frameAttack204 :: Int
+frameAttack204 = 82
+
+frameAttack207 :: Int
+frameAttack207 = 85
+
+frameAttack210 :: Int
+frameAttack210 = 88
 
 frameAttack217 :: Int
 frameAttack217 = 95
@@ -682,8 +694,24 @@ flyerDie =
     GameMisc.becomeExplosion1 selfRef
 
 flyerFire :: EdictReference -> Int -> Quake ()
-flyerFire _ _ = do
-    io (putStrLn "MFlyer.flyerFire") >> undefined -- TODO
+flyerFire selfRef@(EdictReference selfIdx) flashNumber = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let effect = if (self^.eEntityState.esFrame) `elem` [frameAttack204, frameAttack207, frameAttack210]
+                   then Constants.efHyperblaster
+                   else 0
+
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = end - start
+
+    Monster.monsterFireBlaster selfRef start dir 1 1000 flashNumber effect
 
 {-
 - QUAKED monster_flyer (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
