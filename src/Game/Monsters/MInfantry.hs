@@ -5,6 +5,7 @@ module Game.Monsters.MInfantry where
 import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=))
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.), (.|.))
+import Data.Maybe (isNothing)
 import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
@@ -60,6 +61,12 @@ framePain201 = 110
 
 framePain210 :: Int
 framePain210 = 119
+
+frameDuck01 :: Int
+frameDuck01 = 120
+
+frameDuck05 :: Int
+frameDuck05 = 124
 
 frameDeath101 :: Int
 frameDeath101 = 125
@@ -499,8 +506,43 @@ infantryDie =
 
 infantryDodge :: EntDodge
 infantryDodge =
-  GenericEntDodge "infantry_dodge" $ \_ _ _ -> do
-    io (putStrLn "MInfantry.infantryDodge") >> undefined -- TODO
+  GenericEntDodge "infantry_dodge" $ \selfRef@(EdictReference selfIdx) attackerRef _ -> do
+    r <- Lib.randomF
+
+    unless (r > 0.25) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      when (isNothing (self^.eEnemy)) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveDuck
+
+infantryFramesDuck :: V.Vector MFrameT
+infantryFramesDuck =
+    V.fromList [ MFrameT (Just GameAI.aiMove) (-2) (Just infantryDuckDown)
+               , MFrameT (Just GameAI.aiMove) (-5) (Just infantryDuckHold)
+               , MFrameT (Just GameAI.aiMove)   3  Nothing
+               , MFrameT (Just GameAI.aiMove)   4  (Just infantryDuckUp)
+               , MFrameT (Just GameAI.aiMove)   0  Nothing
+               ]
+
+infantryMoveDuck :: MMoveT
+infantryMoveDuck = MMoveT "infantryMoveDuck" frameDuck01 frameDuck05 infantryFramesDuck (Just infantryRun)
+
+infantryDuckDown :: EntThink
+infantryDuckDown =
+  GenericEntThink "infantry_duck_down" $ \_ -> do
+    io (putStrLn "MInfantry.infantryDuckDown") >> undefined -- TODO
+
+infantryDuckHold :: EntThink
+infantryDuckHold =
+  GenericEntThink "infantry_duck_hold" $ \_ -> do
+    io (putStrLn "MInfantry.infantryDuckHold") >> undefined -- TODO
+
+infantryDuckUp :: EntThink
+infantryDuckUp =
+  GenericEntThink "infantry_duck_up" $ \_ -> do
+    io (putStrLn "MInfantry.infantryDuckUp") >> undefined -- TODO
 
 infantryAttack :: EntThink
 infantryAttack =
