@@ -5,6 +5,7 @@ module Game.Monsters.MHover where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.))
+import Data.Maybe (isNothing)
 import Linear (V3(..))
 import qualified Data.Vector as V
 
@@ -14,6 +15,7 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
@@ -218,8 +220,15 @@ hoverPain =
 
 hoverDeadThink :: EntThink
 hoverDeadThink =
-  GenericEntThink "hover_deadthink" $ \_ -> do
-    io (putStrLn "MHover.hoverDeadThink") >> undefined -- TODO
+  GenericEntThink "hover_deadthink" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if isNothing (self^.eGroundEntity) && levelTime < (self^.eTimeStamp)
+      then gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
+      else GameMisc.becomeExplosion1 selfRef
+
+    return True
 
 hoverDead :: EntThink
 hoverDead =
