@@ -311,3 +311,7 @@ monsterDeathUse selfRef@(EdictReference selfIdx) = do
 monsterFireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
 monsterFireRocket _ _ _ _ _ _ = do
     io (putStrLn "Monster.monsterFireRocket") >> undefined -- TODO
+
+monsterFireRailgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireRailgun _ _ _ _ _ _ = do
+    io (putStrLn "Monster.monsterFireRailgun") >> undefined -- TODO

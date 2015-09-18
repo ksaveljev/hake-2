@@ -3,7 +3,7 @@ module Game.Monsters.MGladiator where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..))
+import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -11,7 +11,10 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameStand1 :: Int
 frameStand1 = 0
@@ -205,8 +208,17 @@ gladiatorAttackMelee =
 
 gladiatorGun :: EntThink
 gladiatorGun =
-  GenericEntThink "GladiatorGun" $ \_ -> do
-    io (putStrLn "MGladiator.gladiatorGun") >> undefined -- TODO
+  GenericEntThink "GladiatorGun" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2GladiatorRailgun1) forward right
+        -- calc direction to where we targeted
+        dir = normalize ((self^.ePos1) - start)
+
+    Monster.monsterFireRailgun selfRef start dir 50 100 Constants.mz2GladiatorRailgun1
+
+    return True
 
 gladiatorFramesAttackGun :: V.Vector MFrameT
 gladiatorFramesAttackGun =
