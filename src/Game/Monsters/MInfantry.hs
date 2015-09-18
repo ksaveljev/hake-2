@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MInfantry where
 
-import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=))
+import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=), (+=))
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
@@ -566,8 +566,16 @@ infantryDuckHold =
 
 infantryDuckUp :: EntThink
 infantryDuckUp =
-  GenericEntThink "infantry_duck_up" $ \_ -> do
-    io (putStrLn "MInfantry.infantryDuckUp") >> undefined -- TODO
+  GenericEntThink "infantry_duck_up" $ \selfRef@(EdictReference selfIdx) -> do
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
+      eMaxs._z += 32
+      eTakeDamage .= Constants.damageAim
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    return True
 
 infantryAttack :: EntThink
 infantryAttack =
