@@ -11,6 +11,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameCombat as GameCombat
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Game.GameWeapon as GameWeapon
@@ -372,8 +373,45 @@ floaterMoveAttack2 = MMoveT "floaterMoveAttack2" frameAttack201 frameAttack225 f
 
 floaterZap :: EntThink
 floaterZap =
-  GenericEntThink "floater_zap" $ \_ -> do
-    io (putStrLn "MFloat.floaterZap") >> undefined -- TODO
+  GenericEntThink "floater_zap" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let dir = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        -- FIXME: use a flash and replace these two lines with the
+        -- commented one
+        offset = V3 18.5 (-0.9) 10.0
+        origin = Math3D.projectSource (self^.eEntityState.esOrigin) offset forward right
+        -- origin = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        writeByte = gameImport^.giWriteByte
+        writePosition = gameImport^.giWritePosition
+        writeDir = gameImport^.giWriteDir
+        multicast = gameImport^.giMulticast
+
+    soundAttack2 <- use $ mFloatGlobals.mFloatSoundAttack2
+    sound (Just selfRef) Constants.chanWeapon soundAttack2 1 Constants.attnNorm 0
+
+    -- FIXME: use the flash, Luke
+    writeByte Constants.svcTempEntity
+    writeByte Constants.teSplash
+    writeByte 32
+    writePosition origin
+    writeDir dir
+    writeByte 1 -- sparks
+    multicast origin Constants.multicastPvs
+
+    r <- Lib.rand
+    v3o <- use $ globals.vec3Origin
+    GameCombat.damage enemyRef selfRef selfRef dir (enemy^.eEntityState.esOrigin) v3o (5 + fromIntegral (r `mod` 6)) (-10) Constants.damageEnergy Constants.modUnknown
+
+    return True
 
 floaterFramesAttack3 :: V.Vector MFrameT
 floaterFramesAttack3 =
