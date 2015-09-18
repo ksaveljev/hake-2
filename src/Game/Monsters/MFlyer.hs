@@ -3,9 +3,11 @@
 module Game.Monsters.MFlyer where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (when, unless, liftM)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.))
-import Linear (V3(..), _x)
+import Data.Char (toLower)
+import Linear (V3(..), _x, _z)
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -21,6 +23,9 @@ import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 actionAttack1 :: Int
 actionAttack1 = 1
@@ -718,5 +723,64 @@ flyerFire selfRef@(EdictReference selfIdx) flashNumber = do
 - Trigger_Spawn Sight
 -}
 spMonsterFlyer :: EdictReference -> Quake ()
-spMonsterFlyer _ = do
-    io (putStrLn "MFlyer.spMonsterFlyer") >> undefined -- TODO
+spMonsterFlyer selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        -- fix a map bug in jail5.bsp
+        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        mapName <- use $ gameBaseGlobals.gbLevel.llMapName
+        when (BC.map toLower mapName == "jail5" && (self^.eEntityState.esOrigin._z) == (-104)) $
+          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+            eTargetName .= (self^.eTarget)
+            eTarget .= Nothing
+
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "flyer/flysght1.wav") >>= (mFlyerGlobals.mFlyerSoundSight .=)
+        soundIndex (Just "flyer/flysrch1.wav") >>= (mFlyerGlobals.mFlyerSoundIdle .=)
+        soundIndex (Just "flyer/flypain1.wav") >>= (mFlyerGlobals.mFlyerSoundPain1 .=)
+        soundIndex (Just "flyer/flypain2.wav") >>= (mFlyerGlobals.mFlyerSoundPain2 .=)
+        soundIndex (Just "flyer/flyatck2.wav") >>= (mFlyerGlobals.mFlyerSoundSlash .=)
+        soundIndex (Just "flyer/flyatck1.wav") >>= (mFlyerGlobals.mFlyerSoundSproing .=)
+        soundIndex (Just "flyer/flydeth1.wav") >>= (mFlyerGlobals.mFlyerSoundDie .=)
+
+        void $ soundIndex (Just "flyer/flyatck3.wav")
+
+        soundIdx <- soundIndex (Just "flyer/flyidle1.wav")
+        modelIdx <- modelIndex (Just "models/monsters/flyer/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 32
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esSound .= soundIdx
+          eHealth .= 50
+          eMass .= 50
+          ePain .= Just flyerPain
+          eDie .= Just flyerDie
+          eMonsterInfo.miStand .= Just flyerStand
+          eMonsterInfo.miWalk .= Just flyerWalk
+          eMonsterInfo.miRun .= Just flyerRun
+          eMonsterInfo.miAttack .= Just flyerAttack
+          eMonsterInfo.miMelee .= Just flyerMelee
+          eMonsterInfo.miSight .= Just flyerSight
+          eMonsterInfo.miIdle .= Just flyerIdle
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just flyerMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.flyMonsterStart selfRef
