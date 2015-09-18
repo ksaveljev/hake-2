@@ -606,8 +606,17 @@ infantryAttack =
 
 infantryCockGun :: EntThink
 infantryCockGun =
-  GenericEntThink "infantry_cock_gun" $ \_ -> do
-    io (putStrLn "MInfantry.infantryCockGun") >> undefined -- TODO
+  GenericEntThink "infantry_cock_gun" $ \selfRef@(EdictReference selfIdx) -> do
+    soundWeaponCock <- use $ mInfantryGlobals.miSoundWeaponCock
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanWeapon soundWeaponCock 1 Constants.attnNorm 0
+
+    n <- Lib.rand
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= levelTime + (fromIntegral $ (n .&. 15) + 3 + 7) * Constants.frameTime
+
+    return True
 
 infantryFire :: EntThink
 infantryFire =
