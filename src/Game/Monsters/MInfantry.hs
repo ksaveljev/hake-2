@@ -5,7 +5,7 @@ module Game.Monsters.MInfantry where
 import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=))
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..))
+import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -17,7 +17,10 @@ import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 modelScale :: Float
 modelScale = 1
@@ -67,6 +70,9 @@ frameDeath120 = 144
 frameDeath201 :: Int
 frameDeath201 = 145
 
+frameDeath211 :: Int
+frameDeath211 = 155
+
 frameDeath225 :: Int
 frameDeath225 = 169
 
@@ -75,6 +81,9 @@ frameDeath301 = 170
 
 frameDeath309 :: Int
 frameDeath309 = 178
+
+frameAttack111 :: Int
+frameAttack111 = 194
 
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
@@ -331,8 +340,40 @@ aimAngles =
 
 infantryMachineGun :: EntThink
 infantryMachineGun =
-  GenericEntThink "InfantryMachineGun" $ \_ -> do
-    io (putStrLn "MInfantry.infantryMachineGun") >> undefined -- TODO
+  GenericEntThink "InfantryMachineGun" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    (start, forward, flashNumber) <- 
+      if (self^.eEntityState.esFrame) == frameAttack111
+        then do
+          let flashNumber = Constants.mz2InfantryMachinegun1
+              (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+              start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+          
+          case self^.eEnemy of
+            Just (EdictReference enemyIdx) -> do
+              Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+              let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)
+                  target = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+                  forward' = normalize (target - start)
+
+              return (start, forward', flashNumber)
+
+            Nothing -> do
+              let (Just forward', Just right', _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+              return (start, forward', flashNumber)
+
+        else do
+          let flashNumber = Constants.mz2InfantryMachinegun2 + (self^.eEntityState.esFrame) - frameDeath211
+              (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+              start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+              vec = (self^.eEntityState.esAngles) - (aimAngles V.! (flashNumber - Constants.mz2InfantryMachinegun2))
+              (Just forward', _, _) = Math3D.angleVectors vec True False False
+
+          return (start, forward', flashNumber)
+
+    Monster.monsterFireBullet selfRef start forward 3 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashNumber
+    return True
 
 infantryFramesDeath1 :: V.Vector MFrameT
 infantryFramesDeath1 =
