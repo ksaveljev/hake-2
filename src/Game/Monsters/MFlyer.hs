@@ -485,13 +485,15 @@ flyerMoveBankLeft = MMoveT "flyerMoveBankLeft" frameBankLeft01 frameBankLeft07 f
 
 flyerFireLeft :: EntThink
 flyerFireLeft =
-  GenericEntThink "flyer_fireleft" $ \_ -> do
-    io (putStrLn "MFlyer.flyerFireLeft") >> undefined -- TODO
+  GenericEntThink "flyer_fireleft" $ \selfRef -> do
+    flyerFire selfRef Constants.mz2FlyerBlaster1
+    return True
 
 flyerFireRight :: EntThink
 flyerFireRight =
-  GenericEntThink "flyer_fireright" $ \_ -> do
-    io (putStrLn "MFlyer.flyerFireRight") >> undefined -- TODO
+  GenericEntThink "flyer_fireright" $ \selfRef -> do
+    flyerFire selfRef Constants.mz2FlyerBlaster2
+    return True
 
 flyerFramesAttack2 :: V.Vector MFrameT
 flyerFramesAttack2 =
