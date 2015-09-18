@@ -14,6 +14,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameCombat as GameCombat
+import qualified Game.GameMisc as GameMisc
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Game.GameWeapon as GameWeapon
@@ -715,8 +716,11 @@ floaterPain =
 
 floaterDie :: EntDie
 floaterDie =
-  GenericEntDie "floater_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MFloat.floaterDie") >> undefined -- TODO
+  GenericEntDie "floater_die" $ \selfRef@(EdictReference selfIdx) _ _ _ _ -> do
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundDeath1 <- use $ mFloatGlobals.mFloatSoundDeath1
+    sound (Just selfRef) Constants.chanVoice soundDeath1 1 Constants.attnNorm 0
+    GameMisc.becomeExplosion1 selfRef
 
 {-
 - QUAKED monster_floater (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
