@@ -89,8 +89,20 @@ frameDeath301 = 170
 frameDeath309 :: Int
 frameDeath309 = 178
 
+frameAttack101 :: Int
+frameAttack101 = 184
+
 frameAttack111 :: Int
 frameAttack111 = 194
+
+frameAttack115 :: Int
+frameAttack115 = 198
+
+frameAttack201 :: Int
+frameAttack201 = 199
+
+frameAttack208 :: Int
+frameAttack208 = 206
 
 infantryFramesStand :: V.Vector MFrameT
 infantryFramesStand =
@@ -579,8 +591,75 @@ infantryDuckUp =
 
 infantryAttack :: EntThink
 infantryAttack =
-  GenericEntThink "infantry_attack" $ \_ -> do
-    io (putStrLn "MInfantry.infantryAttack") >> undefined -- TODO
+  GenericEntThink "infantry_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let currentMove = if GameUtil.range self enemy == Constants.rangeMelee
+                        then infantryMoveAttack2
+                        else infantryMoveAttack1
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
+
+infantryCockGun :: EntThink
+infantryCockGun =
+  GenericEntThink "infantry_cock_gun" $ \_ -> do
+    io (putStrLn "MInfantry.infantryCockGun") >> undefined -- TODO
+
+infantryFire :: EntThink
+infantryFire =
+  GenericEntThink "infantry_fire" $ \_ -> do
+    io (putStrLn "MInfantry.infantryFire") >> undefined -- TODO
+
+infantrySwing :: EntThink
+infantrySwing =
+  GenericEntThink "infantry_swing" $ \_ -> do
+    io (putStrLn "MInfantry.infantrySwing") >> undefined -- TODO
+
+infantrySmack :: EntThink
+infantrySmack =
+  GenericEntThink "infantry_smack" $ \_ -> do
+    io (putStrLn "MInfantry.infantrySmack") >> undefined -- TODO
+
+infantryFramesAttack1 :: V.Vector MFrameT
+infantryFramesAttack1 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge)   4  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-1) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-1) Nothing
+               , MFrameT (Just GameAI.aiCharge)   0  (Just infantryCockGun)
+               , MFrameT (Just GameAI.aiCharge) (-1) Nothing
+               , MFrameT (Just GameAI.aiCharge)   1  Nothing
+               , MFrameT (Just GameAI.aiCharge)   1  Nothing
+               , MFrameT (Just GameAI.aiCharge)   2  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-2) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-3) Nothing
+               , MFrameT (Just GameAI.aiCharge)   1  (Just infantryFire)
+               , MFrameT (Just GameAI.aiCharge)   5  Nothing
+               , MFrameT (Just GameAI.aiCharge) (-1) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-2) Nothing
+               , MFrameT (Just GameAI.aiCharge) (-3) Nothing
+               ]
+
+infantryMoveAttack1 :: MMoveT
+infantryMoveAttack1 = MMoveT "infantryMoveAttack1" frameAttack101 frameAttack115 infantryFramesAttack1 (Just infantryRun)
+
+infantryFramesAttack2 :: V.Vector MFrameT
+infantryFramesAttack2 =
+    V.fromList [ MFrameT (Just GameAI.aiCharge) 3 Nothing
+               , MFrameT (Just GameAI.aiCharge) 6 Nothing
+               , MFrameT (Just GameAI.aiCharge) 0 (Just infantrySwing)
+               , MFrameT (Just GameAI.aiCharge) 8 Nothing
+               , MFrameT (Just GameAI.aiCharge) 5 Nothing
+               , MFrameT (Just GameAI.aiCharge) 8 (Just infantrySmack)
+               , MFrameT (Just GameAI.aiCharge) 6 Nothing
+               , MFrameT (Just GameAI.aiCharge) 3 Nothing
+               ]
+
+infantryMoveAttack2 :: MMoveT
+infantryMoveAttack2 = MMoveT "infantryMoveAttack2" frameAttack201 frameAttack208 infantryFramesAttack2 (Just infantryRun)
 
 {-
 - QUAKED monster_infantry (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
