@@ -2,11 +2,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MInfantry where
 
-import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=))
+import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=))
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isNothing)
-import Linear (V3(..), normalize)
+import Linear (V3(..), normalize, _z)
 import qualified Data.Vector as V
 
 import Quake
@@ -531,8 +531,26 @@ infantryMoveDuck = MMoveT "infantryMoveDuck" frameDuck01 frameDuck05 infantryFra
 
 infantryDuckDown :: EntThink
 infantryDuckDown =
-  GenericEntThink "infantry_duck_down" $ \_ -> do
-    io (putStrLn "MInfantry.infantryDuckDown") >> undefined -- TODO
+  GenericEntThink "infantry_duck_down" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
+      then
+        return True
+
+      else do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
+          eMaxs._z -= 32
+          eTakeDamage .= Constants.damageYes
+          eMonsterInfo.miPauseTime .= levelTime + 1
+
+        linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+        linkEntity selfRef
+
+        return True
 
 infantryDuckHold :: EntThink
 infantryDuckHold =
