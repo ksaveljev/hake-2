@@ -18,6 +18,7 @@ import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
+import qualified Game.GameWeapon as GameWeapon
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
@@ -643,8 +644,18 @@ infantrySwing =
 
 infantrySmack :: EntThink
 infantrySmack =
-  GenericEntThink "infantry_smack" $ \_ -> do
-    io (putStrLn "MInfantry.infantrySmack") >> undefined -- TODO
+  GenericEntThink "infantry_smack" $ \selfRef@(EdictReference selfIdx) -> do
+    let aim = V3 (fromIntegral Constants.meleeDistance) 0 0
+    
+    n <- Lib.rand
+    hit <- GameWeapon.fireHit selfRef aim (5 + fromIntegral (n `mod` 5)) 50
+
+    when hit $ do
+      soundPunchHit <- use $ mInfantryGlobals.miSoundPunchHit
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      sound (Just selfRef) Constants.chanWeapon soundPunchHit 1 Constants.attnNorm 0
+
+    return True
 
 infantryFramesAttack1 :: V.Vector MFrameT
 infantryFramesAttack1 =
