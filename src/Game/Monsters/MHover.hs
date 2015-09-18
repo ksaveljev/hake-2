@@ -250,8 +250,44 @@ hoverDead =
 
 hoverDie :: EntDie
 hoverDie =
-  GenericEntDie "hover_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MHover.hoverDie") >> undefined -- TODO
+  GenericEntDie "hover_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do -- check for gib
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do -- regular death
+           r <- Lib.randomF
+
+           soundDeath <- if r < 0.5
+                           then use $ mHoverGlobals.mHoverSoundDeath1
+                           else use $ mHoverGlobals.mHoverSoundDeath2
+
+           sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just hoverMoveDeath1
 
 hoverSight :: EntInteract
 hoverSight =
