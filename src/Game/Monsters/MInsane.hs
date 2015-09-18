@@ -5,6 +5,7 @@ module Game.Monsters.MInsane where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
+import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -296,8 +297,26 @@ insaneStand =
 
 insaneDead :: EntThink
 insaneDead =
-  GenericEntThink "insane_dead" $ \_ -> do
-    io (putStrLn "MInsane.insaneDead") >> undefined -- TODO
+  GenericEntThink "insane_dead" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. 8 /= 0
+      then
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eFlags %= (.|. Constants.flFly)
+      else
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 (-8)
+          eMoveType .= Constants.moveTypeToss
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eSvFlags %= (.|. Constants.svfDeadMonster)
+      eNextThink .= 0
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    return True
 
 insaneDie :: EntDie
 insaneDie =
