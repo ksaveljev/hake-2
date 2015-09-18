@@ -4,6 +4,7 @@ module Game.Monsters.MFlyer where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Data.Bits ((.&.))
+import Linear (V3(..), _x)
 import qualified Data.Vector as V
 
 import Quake
@@ -11,6 +12,7 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 actionAttack1 :: Int
@@ -521,8 +523,18 @@ flyerMoveAttack2 = MMoveT "flyerMoveAttack2" frameAttack201 frameAttack217 flyer
 
 flyerSlashLeft :: EntThink
 flyerSlashLeft =
-  GenericEntThink "flyer_slash_left" $ \_ -> do
-    io (putStrLn "MFlyer.flyerSlashLeft") >> undefined -- TODO
+  GenericEntThink "flyer_slash_left" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 0
+
+    GameWeapon.fireHit selfRef aim 5 0
+  
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundSlash <- use $ mFlyerGlobals.mFlyerSoundSlash
+    sound (Just selfRef) Constants.chanWeapon soundSlash 1 Constants.attnNorm 0
+    
+    return True
 
 flyerSlashRight :: EntThink
 flyerSlashRight =
