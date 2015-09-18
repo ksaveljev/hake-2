@@ -3,12 +3,14 @@
 module Game.Monsters.MFlyer where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.))
 import Linear (V3(..), _x)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -640,8 +642,35 @@ flyerMelee =
 
 flyerPain :: EntPain
 flyerPain =
-  GenericEntPain "flyer_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MFlyer.flyerPain") >> undefined -- TODO
+  GenericEntPain "flyer_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) <= (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        n <- liftM (`mod` 3) Lib.rand
+
+        (soundPain, currentMove) <- if | n == 0 -> do
+                                           soundPain <- use $ mFlyerGlobals.mFlyerSoundPain1
+                                           return (soundPain, flyerMovePain1)
+                                       | n == 1 -> do
+                                           soundPain <- use $ mFlyerGlobals.mFlyerSoundPain2
+                                           return (soundPain, flyerMovePain2)
+                                       | otherwise -> do
+                                           soundPain <- use $ mFlyerGlobals.mFlyerSoundPain1
+                                           return (soundPain, flyerMovePain3)
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 flyerDie :: EntDie
 flyerDie =
