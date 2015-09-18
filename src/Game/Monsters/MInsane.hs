@@ -3,13 +3,16 @@
 module Game.Monsters.MInsane where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (when)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -38,6 +41,9 @@ frameStand94 = 93
 
 frameStand96 :: Int
 frameStand96 = 95
+
+frameStand99 :: Int
+frameStand99 = 98
 
 frameStand100 :: Int
 frameStand100 = 99
@@ -186,8 +192,43 @@ insaneRun =
 
 insanePain :: EntPain
 insanePain =
-  GenericEntPain "insane_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MInsane.insanePain") >> undefined -- TODO
+  GenericEntPain "insane_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      r <- Lib.rand
+      let r' = 1 + (r .&. 1)
+          l = if | (self^.eHealth) < 25 -> 25
+                 | (self^.eHealth) < 50 -> 50
+                 | (self^.eHealth) < 75 -> 75
+                 | otherwise -> 100
+
+      gameImport <- use $ gameBaseGlobals.gbGameImport
+
+      let soundIndex = gameImport^.giSoundIndex
+          sound = gameImport^.giSound
+
+      soundIdx <- soundIndex (Just ("player/male/pain" `B.append` BC.pack (show l) `B.append` "_" `B.append` BC.pack (show r') `B.append` ".wav"))
+      sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnIdle 0
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        -- don't go into pain frames if crucified
+        if (self^.eSpawnFlags) .&. 8 /= 0
+          then
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveStruggleCross
+
+          else do
+            let frame = self^.eEntityState.esFrame
+                currentMove = if frame >= frameCrawl1 && frame <= frameCrawl9 || frame >= frameStand99 && frame <= frameStand160
+                                then insaneMoveCrawlPain
+                                else insaneMoveStandPain
+
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 insaneOnGround :: EntThink
 insaneOnGround =
