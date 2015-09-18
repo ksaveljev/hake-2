@@ -2,12 +2,14 @@
 module Game.Monsters.MFloat where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -683,8 +685,33 @@ floaterMelee =
 
 floaterPain :: EntPain
 floaterPain =
-  GenericEntPain "floater_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MFloat.floaterPain") >> undefined -- TODO
+  GenericEntPain "floater_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        n <- Lib.rand
+        
+        (soundPain, currentMove) <- if (n + 1) `mod` 3 == 0
+                                      then do
+                                        soundPain <- use $ mFloatGlobals.mFloatSoundPain1
+                                        return (soundPain, floaterMovePain1)
+                                      else do
+                                        soundPain <- use $ mFloatGlobals.mFloatSoundPain2
+                                        return (soundPain, floaterMovePain2)
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 floaterDie :: EntDie
 floaterDie =
