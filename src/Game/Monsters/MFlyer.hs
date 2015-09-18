@@ -538,8 +538,18 @@ flyerSlashLeft =
 
 flyerSlashRight :: EntThink
 flyerSlashRight =
-  GenericEntThink "flyer_slash_right" $ \_ -> do
-    io (putStrLn "MFlyer.flyerSlashRight") >> undefined -- TODO
+  GenericEntThink "flyer_slash_right" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 0
+
+    GameWeapon.fireHit selfRef aim 5 0
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundSlash <- use $ mFlyerGlobals.mFlyerSoundSlash
+    sound (Just selfRef) Constants.chanWeapon soundSlash 1 Constants.attnNorm 0
+    
+    return True
 
 flyerLoopMelee :: EntThink
 flyerLoopMelee =
