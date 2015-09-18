@@ -22,6 +22,9 @@ import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameStand01 :: Int
 frameStand01 = 0
 
@@ -700,5 +703,56 @@ hoverMoveEndAttack = MMoveT "hoverMoveEndAttack" frameAttack107 frameAttack108 h
 - Trigger_Spawn Sight
 -}
 spMonsterHover :: EdictReference -> Quake ()
-spMonsterHover _ = do
-    io (putStrLn "MHover.spMonsterHover") >> undefined -- TODO
+spMonsterHover selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "hover/hovpain1.wav") >>= (mHoverGlobals.mHoverSoundPain1 .=)
+        soundIndex (Just "hover/hovpain2.wav") >>= (mHoverGlobals.mHoverSoundPain2 .=)
+        soundIndex (Just "hover/hovdeth1.wav") >>= (mHoverGlobals.mHoverSoundDeath1 .=)
+        soundIndex (Just "hover/hovdeth2.wav") >>= (mHoverGlobals.mHoverSoundDeath2 .=)
+        soundIndex (Just "hover/hovsght1.wav") >>= (mHoverGlobals.mHoverSoundSight .=)
+        soundIndex (Just "hover/hovsrch1.wav") >>= (mHoverGlobals.mHoverSoundSearch1 .=)
+        soundIndex (Just "hover/hovsrch2.wav") >>= (mHoverGlobals.mHoverSoundSearch2 .=)
+
+        void $ soundIndex (Just "hover/hovatck1.wav")
+
+        soundIdx <- soundIndex (Just "hover/hovidle1.wav")
+        modelIdx <- modelIndex (Just "models/monsters/hover/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esSound .= soundIdx
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-24) (-24) (-24)
+          eMaxs .= V3 24 24 32
+          eHealth .= 240
+          eGibHealth .= (-100)
+          eMass .= 150
+          ePain .= Just hoverPain
+          eDie .= Just hoverDie
+          eMonsterInfo.miStand .= Just hoverStand
+          eMonsterInfo.miWalk .= Just hoverWalk
+          eMonsterInfo.miRun .= Just hoverRun
+          eMonsterInfo.miAttack .= Just hoverStartAttack
+          eMonsterInfo.miSight .= Just hoverSight
+          eMonsterInfo.miSearch .= Just hoverSearch
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just hoverMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.flyMonsterStart selfRef
