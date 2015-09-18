@@ -16,6 +16,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
@@ -609,8 +610,21 @@ gunnerGrenade =
 
 gunnerAttack :: EntThink
 gunnerAttack =
-  GenericEntThink "gunner_attack" $ \_ -> do
-    io (putStrLn "MGunner.gunnerAttack") >> undefined -- TODO
+  GenericEntThink "gunner_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    r <- Lib.randomF
+
+    let currentMove = if GameUtil.range self enemy == Constants.rangeMelee
+                        then gunnerMoveAttackChain
+                        else if r <= 0.5
+                               then gunnerMoveAttackGrenade
+                               else gunnerMoveAttackChain
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 gunnerFireChain :: EntThink
 gunnerFireChain =
