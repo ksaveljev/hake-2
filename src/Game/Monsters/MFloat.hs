@@ -11,7 +11,10 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameActivate01 :: Int
 frameActivate01 = 0
@@ -21,6 +24,12 @@ frameActivate31 = 30
 
 frameAttack101 :: Int
 frameAttack101 = 31
+
+frameAttack104 :: Int
+frameAttack104 = 34
+
+frameAttack107 :: Int
+frameAttack107 = 37
 
 frameAttack114 :: Int
 frameAttack114 = 44
@@ -91,8 +100,25 @@ floaterIdle =
 
 floaterFireBlaster :: EntThink
 floaterFireBlaster =
-  GenericEntThink "floater_fire_blaster" $ \_ -> do
-    io (putStrLn "MFloat.floaterFireBlaster") >> undefined -- TODO
+  GenericEntThink "floater_fire_blaster" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let effect = if (self^.eEntityState.esFrame) == frameAttack104 || (self^.eEntityState.esFrame) == frameAttack107
+                   then Constants.efHyperblaster
+                   else 0
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2FloatBlaster1) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = end - start
+
+    Monster.monsterFireBlaster selfRef start dir 1 1000 Constants.mz2FloatBlaster1 effect
+
+    return True
 
 floaterFramesStand1 :: V.Vector MFrameT
 floaterFramesStand1 =
