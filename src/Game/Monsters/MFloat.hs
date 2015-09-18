@@ -2,7 +2,7 @@
 module Game.Monsters.MFloat where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (when, unless, liftM)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
@@ -15,11 +15,15 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameCombat as GameCombat
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
-import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 frameActivate01 :: Int
 frameActivate01 = 0
@@ -727,5 +731,63 @@ floaterDie =
 - Trigger_Spawn Sight
 -}
 spMonsterFloater :: EdictReference -> Quake ()
-spMonsterFloater _ = do
-    io (putStrLn "MFloat.spMonsterFloater") >> undefined -- TODO
+spMonsterFloater selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "floater/fltatck2.wav") >>= (mFloatGlobals.mFloatSoundAttack2 .=)
+        soundIndex (Just "floater/fltatck3.wav") >>= (mFloatGlobals.mFloatSoundAttack3 .=)
+        soundIndex (Just "floater/fltdeth1.wav") >>= (mFloatGlobals.mFloatSoundDeath1 .=)
+        soundIndex (Just "floater/fltidle1.wav") >>= (mFloatGlobals.mFloatSoundIdle .=)
+        soundIndex (Just "floater/fltpain1.wav") >>= (mFloatGlobals.mFloatSoundPain1 .=)
+        soundIndex (Just "floater/fltpain2.wav") >>= (mFloatGlobals.mFloatSoundPain2 .=)
+        soundIndex (Just "floater/fltsght1.wav") >>= (mFloatGlobals.mFloatSoundSight .=)
+
+        void $ soundIndex (Just "floater/fltatck1.wav")
+
+        soundIdx <- soundIndex (Just "floater/fltsrch1.wav")
+        modelIdx <- modelIndex (Just "models/monsters/float/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esSound .= soundIdx
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-24) (-24) (-24)
+          eMaxs .= V3 24 24 32
+          eHealth .= 200
+          eGibHealth .= (-80)
+          eMass .= 300
+          ePain .= Just floaterPain
+          eDie .= Just floaterDie
+          eMonsterInfo.miStand .= Just floaterStand
+          eMonsterInfo.miWalk .= Just floaterWalk
+          eMonsterInfo.miRun .= Just floaterRun
+          eMonsterInfo.miAttack .= Just floaterAttack
+          eMonsterInfo.miMelee .= Just floaterMelee
+          eMonsterInfo.miSight .= Just floaterSight
+          eMonsterInfo.miIdle .= Just floaterIdle
+
+        linkEntity selfRef
+
+        r <- Lib.randomF
+
+        let currentMove = if r <= 0.5
+                            then floaterMoveStand1
+                            else floaterMoveStand2
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just currentMove
+          miScale .= modelScale
+
+        void $ think GameAI.flyMonsterStart selfRef
