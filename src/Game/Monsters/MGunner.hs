@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MGunner where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=))
-import Control.Monad (when)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -362,8 +364,33 @@ gunnerMovePain1 = MMoveT "gunnerMovePain1" framePain101 framePain118 gunnerFrame
 
 gunnerPain :: EntPain
 gunnerPain =
-  GenericEntPain "gunner_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MGunner.gunnerPain") >> undefined -- TODO
+  GenericEntPain "gunner_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      sound <- use $ gameBaseGlobals.gbGameImport.giSound
+      r <- Lib.rand
+      soundPain <- if r .&. 1 /= 0
+                     then use $ mGunnerGlobals.mGunnerSoundPain
+                     else use $ mGunnerGlobals.mGunnerSoundPain2
+
+      sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nighmare
+        let currentMove = if | damage <= 10 -> gunnerMovePain3
+                             | damage <= 25 -> gunnerMovePain2
+                             | otherwise -> gunnerMovePain1
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 gunnerDead :: EntThink
 gunnerDead =
