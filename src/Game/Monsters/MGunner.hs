@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MGunner where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=))
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..), _z)
@@ -465,8 +465,34 @@ gunnerDie =
 
 gunnerDuckDown :: EntThink
 gunnerDuckDown =
-  GenericEntThink "gunner_duck_down" $ \_ -> do
-    io (putStrLn "MGunner.gunnerDuckDown") >> undefined -- TODO
+  GenericEntThink "gunner_duck_down" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
+      then
+        return True
+
+      else do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
+
+        skillValue <- liftM (^.cvValue) skillCVar
+
+        when (skillValue >= 2) $ do
+          r <- Lib.randomF
+          when (r > 0.5) $
+            void $ think gunnerGrenade selfRef
+
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMaxs._z -= 32
+          eTakeDamage .= Constants.damageYes
+          eMonsterInfo.miPauseTime .= levelTime + 1
+
+        linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+        linkEntity selfRef
+
+        return True
 
 gunnerDuckHold :: EntThink
 gunnerDuckHold =
