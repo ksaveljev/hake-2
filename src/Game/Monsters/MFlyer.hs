@@ -13,6 +13,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameWeapon as GameWeapon
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 actionAttack1 :: Int
@@ -598,8 +599,22 @@ flyerFramesLoopMelee =
 
 flyerCheckMelee :: EntThink
 flyerCheckMelee =
-  GenericEntThink "flyer_check_melee" $ \_ -> do
-    io (putStrLn "MFlyer.flyerCheckMelee") >> undefined -- TODO
+  GenericEntThink "flyer_check_melee" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    r <- Lib.randomF
+
+    let currentMove = if GameUtil.range self enemy == Constants.rangeMelee
+                        then if r <= 0.8
+                               then flyerMoveLoopMelee
+                               else flyerMoveEndMelee
+                        else flyerMoveEndMelee
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 flyerMoveLoopMelee :: MMoveT
 flyerMoveLoopMelee = MMoveT "flyerMoveLoopMelee" frameAttack107 frameAttack118 flyerFramesLoopMelee (Just flyerCheckMelee)
