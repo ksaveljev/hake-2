@@ -4,7 +4,7 @@ module Game.Monsters.MInfantry where
 
 import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=))
 import Control.Monad (liftM, void, when, unless)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
 import Linear (V3(..), normalize, _z)
 import qualified Data.Vector as V
@@ -554,8 +554,15 @@ infantryDuckDown =
 
 infantryDuckHold :: EntThink
 infantryDuckHold =
-  GenericEntThink "infantry_duck_hold" $ \_ -> do
-    io (putStrLn "MInfantry.infantryDuckHold") >> undefined -- TODO
+  GenericEntThink "infantry_duck_hold" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if levelTime >= (self^.eMonsterInfo.miPauseTime)
+      then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
+      else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
+
+    return True
 
 infantryDuckUp :: EntThink
 infantryDuckUp =
