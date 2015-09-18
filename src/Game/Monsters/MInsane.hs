@@ -146,8 +146,23 @@ insaneCross =
 
 insaneWalk :: EntThink
 insaneWalk =
-  GenericEntThink "insane_walk" $ \_ -> do
-    io (putStrLn "MInsane.insaneWalk") >> undefined -- TODO
+  GenericEntThink "insane_walk" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. 16 /= 0 && (self^.eEntityState.esFrame) == frameCrawlPain10
+      then do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveDown
+        return True
+
+      else do
+        r <- Lib.randomF
+
+        let currentMove = if | (self^.eSpawnFlags) .&. 4 /= 0 -> insaneMoveCrawl
+                             | r <= 0.5 -> insaneMoveWalkNormal
+                             | otherwise -> insaneMoveWalkInsane
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        return True
 
 insaneRun :: EntThink
 insaneRun =
