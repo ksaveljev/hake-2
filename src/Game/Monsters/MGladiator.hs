@@ -2,12 +2,15 @@
 module Game.Monsters.MGladiator where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..), normalize, norm)
+import Data.Maybe (isJust)
+import Linear (V3(..), normalize, norm, _z)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -295,8 +298,42 @@ gladiatorMovePainAir = MMoveT "gladiatorMovePainAir" framePainUp1 framePainUp7 g
 
 gladiatorPain :: EntPain
 gladiatorPain =
-  GenericEntPain "gladiator_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MGladiator.gladiatorPain") >> undefined -- TODO
+  GenericEntPain "gladiator_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if levelTime < (self^.ePainDebounceTime)
+      then do
+        when (isJust (self^.eMonsterInfo.miCurrentMove)) $ do
+          let Just currentMove = self^.eMonsterInfo.miCurrentMove
+
+          when ((self^.eVelocity._z) > 100 && (currentMove^.mmId) == "gladiatorMovePain") $
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMovePainAir
+
+      else do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+        r <- Lib.randomF
+
+        soundPain <- if r < 0.5
+                       then use $ mGladiatorGlobals.mGladiatorSoundPain1
+                       else use $ mGladiatorGlobals.mGladiatorSoundPain2
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+        skillValue <- liftM (^.cvValue) skillCVar
+
+        unless (skillValue == 3) $ do -- no pain anims in nightmare
+          let currentMove = if (self^.eVelocity._z) > 100
+                              then gladiatorMovePainAir
+                              else gladiatorMovePain
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 gladiatorDead :: EntThink
 gladiatorDead =
