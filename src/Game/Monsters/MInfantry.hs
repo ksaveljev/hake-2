@@ -634,8 +634,12 @@ infantryFire =
 
 infantrySwing :: EntThink
 infantrySwing =
-  GenericEntThink "infantry_swing" $ \_ -> do
-    io (putStrLn "MInfantry.infantrySwing") >> undefined -- TODO
+  GenericEntThink "infantry_swing" $ \selfRef@(EdictReference selfIdx) -> do
+    soundPunchSwing <- use $ mInfantryGlobals.miSoundPunchSwing
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanWeapon soundPunchSwing 1 Constants.attnNorm 0
+
+    return True
 
 infantrySmack :: EntThink
 infantrySmack =
