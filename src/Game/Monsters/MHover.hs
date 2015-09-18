@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MHover where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.))
 import Linear (V3(..))
 import qualified Data.Vector as V
@@ -11,7 +13,9 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameStand01 :: Int
 frameStand01 = 0
@@ -96,8 +100,25 @@ frameAttack108 = 204
 
 hoverReAttack :: EntThink
 hoverReAttack =
-  GenericEntThink "hover_reattack" $ \_ -> do
-    io (putStrLn "MHover.hoverReAttack") >> undefined -- TODO
+  GenericEntThink "hover_reattack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    currentMove <- if (enemy^.eHealth) > 0
+                     then do
+                       vis <- GameUtil.visible selfRef enemyRef
+                       r <- Lib.randomF
+
+                       return $ if vis && r <= 0.6
+                                  then hoverMoveAttack1
+                                  else hoverMoveEndAttack
+                     else
+                       return hoverMoveEndAttack
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 hoverFireBlaster :: EntThink
 hoverFireBlaster =
