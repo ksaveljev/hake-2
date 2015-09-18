@@ -660,8 +660,25 @@ gunnerFramesFireChain =
 
 gunnerReFireChain :: EntThink
 gunnerReFireChain =
-  GenericEntThink "gunner_refire_chain" $ \_ -> do
-    io (putStrLn "MGunner.gunnerReFireChain") >> undefined -- TODO
+  GenericEntThink "gunner_refire_chain" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    currentMove <- if (enemy^.eHealth) > 0
+                     then do
+                       vis <- GameUtil.visible selfRef enemyRef
+                       r <- Lib.randomF
+
+                       return $ if vis && r <= 0.5
+                                  then gunnerMoveFireChain
+                                  else gunnerMoveEndFireChain
+                     else
+                       return gunnerMoveEndFireChain
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 gunnerMoveFireChain :: MMoveT
 gunnerMoveFireChain = MMoveT "gunnerMoveFireChain" frameAttack216 frameAttack223 gunnerFramesFireChain (Just gunnerReFireChain)
