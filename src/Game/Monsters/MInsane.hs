@@ -238,8 +238,26 @@ insaneOnGround =
 
 insaneCheckDown :: EntThink
 insaneCheckDown =
-  GenericEntThink "insane_checkdown" $ \_ -> do
-    io (putStrLn "MInsane.insaneCheckDown") >> undefined -- TODO
+  GenericEntThink "insane_checkdown" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eSpawnFlags) .&. 32 /= 0 -- always stand
+      then
+        return True
+
+      else do
+        r <- Lib.randomF
+
+        when (r < 0.3) $ do
+          r' <- Lib.randomF
+
+          let currentMove = if r' < 0.5
+                              then insaneMoveUpToDown
+                              else insaneMoveJumpDown
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+
+        return True
 
 insaneCheckUp :: EntThink
 insaneCheckUp =
