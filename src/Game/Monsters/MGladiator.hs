@@ -3,7 +3,7 @@ module Game.Monsters.MGladiator where
 
 import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..), normalize)
+import Linear (V3(..), normalize, norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -238,8 +238,33 @@ gladiatorMoveAttackGun = MMoveT "gladiatorMoveAttackGun" frameAttack1 frameAttac
 
 gladiatorAttack :: EntThink
 gladiatorAttack =
-  GenericEntThink "gladiator_attack" $ \_ -> do
-    io (putStrLn "MGladiator.gladiatorAttack") >> undefined -- TODO
+  GenericEntThink "gladiator_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    -- a small safe zone
+    let v = (self^.eEntityState.esOrigin) - (enemy^.eEntityState.esOrigin)
+        range = norm v
+
+    if range <= fromIntegral Constants.meleeDistance + 32
+      then
+        return True
+
+      else do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        soundGun <- use $ mGladiatorGlobals.mGladiatorSoundGun
+        sound (Just selfRef) Constants.chanWeapon soundGun 1 Constants.attnNorm 0
+
+        let V3 a b c = enemy^.eEntityState.esOrigin
+            pos1 = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          ePos1 .= pos1
+          eMonsterInfo.miCurrentMove .= Just gladiatorMoveAttackGun
+
+        return True
 
 gladiatorFramesPain :: V.Vector MFrameT
 gladiatorFramesPain =
