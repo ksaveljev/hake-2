@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
-import Linear (V3(..), _z)
+import Linear (V3(..), _z, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -16,7 +16,10 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameStand01 :: Int
 frameStand01 = 0
@@ -558,8 +561,23 @@ gunnerOpenGun =
 
 gunnerFire :: EntThink
 gunnerFire =
-  GenericEntThink "GunnerFire" $ \_ -> do
-    io (putStrLn "MGunner.gunnerFire") >> undefined -- TODO
+  GenericEntThink "GunnerFire" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashNumber = Constants.mz2GunnerMachinegun1 + (self^.eEntityState.esFrame) - frameAttack216
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)
+        target = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        aim = normalize (target - start)
+
+    Monster.monsterFireBullet selfRef start aim 3 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashNumber
+
+    return True
 
 gunnerGrenade :: EntThink
 gunnerGrenade =
