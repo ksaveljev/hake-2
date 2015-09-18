@@ -13,6 +13,7 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -324,8 +325,16 @@ floaterMoveAttack1 = MMoveT "floaterMoveAttack1" frameAttack101 frameAttack114 f
 
 floaterWham :: EntThink
 floaterWham =
-  GenericEntThink "floater_wham" $ \_ -> do
-    io (putStrLn "MFloat.floaterWham") >> undefined -- TODO
+  GenericEntThink "floater_wham" $ \selfRef@(EdictReference selfIdx) -> do
+    soundAttack3 <- use $ mFloatGlobals.mFloatSoundAttack3
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanWeapon soundAttack3 1 Constants.attnNorm 0
+
+    r <- Lib.rand
+    let aim = V3 (fromIntegral Constants.meleeDistance) 0 0
+    GameWeapon.fireHit selfRef aim (5 + fromIntegral (r `mod` 6)) (-50)
+
+    return True
 
 floaterFramesAttack2 :: V.Vector MFrameT
 floaterFramesAttack2 =
