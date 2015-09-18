@@ -5,6 +5,7 @@ module Game.Monsters.MGunner where
 import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isNothing)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
@@ -536,8 +537,16 @@ gunnerMoveDuck = MMoveT "gunnerMoveDuck" frameDuck01 frameDuck08 gunnerFramesDuc
 
 gunnerDodge :: EntDodge
 gunnerDodge =
-  GenericEntDodge "gunner_dodge" $ \_ _ _ -> do
-    io (putStrLn "MGunner.gunnerDodge") >> undefined -- TODO
+  GenericEntDodge "gunner_dodge" $ \selfRef@(EdictReference selfIdx) attackerRef _ -> do
+    r <- Lib.randomF
+
+    unless (r > 0.25) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      when (isNothing (self^.eEnemy)) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gunnerMoveDuck
 
 gunnerOpenGun :: EntThink
 gunnerOpenGun =
