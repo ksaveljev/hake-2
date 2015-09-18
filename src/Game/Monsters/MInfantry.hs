@@ -620,8 +620,17 @@ infantryCockGun =
 
 infantryFire :: EntThink
 infantryFire =
-  GenericEntThink "infantry_fire" $ \_ -> do
-    io (putStrLn "MInfantry.infantryFire") >> undefined -- TODO
+  GenericEntThink "infantry_fire" $ \selfRef@(EdictReference selfIdx) -> do
+    void $ think infantryMachineGun selfRef
+
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    if levelTime >= (self^.eMonsterInfo.miPauseTime)
+      then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
+      else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
+
+    return True
 
 infantrySwing :: EntThink
 infantrySwing =
