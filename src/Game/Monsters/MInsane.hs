@@ -18,8 +18,12 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 frameStand1 :: Int
 frameStand1 = 0
@@ -772,5 +776,78 @@ insaneMoveStruggleCross = MMoveT "insaneMoveStruggleCross" frameCross16 frameCro
 - CRAWL CRUCIFIED STAND_GROUND ALWAYS_STAND
 -}
 spMiscInsane :: EdictReference -> Quake ()
-spMiscInsane _ = do
-    io (putStrLn "MInsane.spMiscInsane") >> undefined -- TODO
+spMiscInsane selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+
+        soundIndex (Just "insane/insane11.wav") >>= (mInsaneGlobals.mInsaneSoundFist .=)
+        soundIndex (Just "insane/insane5.wav") >>= (mInsaneGlobals.mInsaneSoundShake .=)
+        soundIndex (Just "insane/insane7.wav") >>= (mInsaneGlobals.mInsaneSoundMoan.=)
+        soundScream0 <- soundIndex (Just "insane/insane1.wav")
+        soundScream1 <- soundIndex (Just "insane/insane2.wav")
+        soundScream2 <- soundIndex (Just "insane/insane3.wav")
+        soundScream3 <- soundIndex (Just "insane/insane4.wav")
+        soundScream4 <- soundIndex (Just "insane/insane6.wav")
+        soundScream5 <- soundIndex (Just "insane/insane8.wav")
+        soundScream6 <- soundIndex (Just "insane/insane9.wav")
+        soundScream7 <- soundIndex (Just "insane/insane10.wav")
+        mInsaneGlobals.mInsaneSoundScream .= UV.fromList [ soundScream0, soundScream1, soundScream2, soundScream3, soundScream4, soundScream5, soundScream6, soundScream7 ]
+
+        modelIdx <- modelIndex (Just "models/monsters/insane/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 32
+          eHealth .= 100
+          eGibHealth .= (-50)
+          eMass .= 300
+          ePain .= Just insanePain
+          eDie .= Just insaneDie
+          eMonsterInfo.miStand .= Just insaneStand
+          eMonsterInfo.miWalk .= Just insaneWalk
+          eMonsterInfo.miRun .= Just insaneRun
+          eMonsterInfo.miDodge .= Nothing
+          eMonsterInfo.miAttack .= Nothing
+          eMonsterInfo.miMelee .= Nothing
+          eMonsterInfo.miSight .= Nothing
+          eMonsterInfo.miAIFlags %= (.|. Constants.aiGoodGuy)
+
+        linkEntity selfRef
+
+        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+        when ((self^.eSpawnFlags) .&. 16 /= 0) $ -- stand ground
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiStandGround)
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just insaneMoveStandNormal
+          miScale .= modelScale
+
+        if (self^.eSpawnFlags) .&. 8 /= 0 -- crucified ?
+          then do
+            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+              eMins .= V3 (-16) 0 0
+              eMaxs .= V3 16 8 32
+              eFlags %= (.|. Constants.flNoKnockback)
+
+            void $ think GameAI.flyMonsterStart selfRef
+
+          else do
+            void $ think GameAI.walkMonsterStart selfRef
+
+            r <- Lib.rand
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= fromIntegral r `mod` 3
