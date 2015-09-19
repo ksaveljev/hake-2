@@ -17,7 +17,9 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameStand1 :: Int
 frameStand1 = 0
@@ -320,8 +322,53 @@ insaneDead =
 
 insaneDie :: EntDie
 insaneDie =
-  GenericEntDie "insane_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MInsane.insaneDie") >> undefined -- TODO
+  GenericEntDie "insane_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnIdle 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do
+           r <- Lib.rand
+           soundIdx <- soundIndex (Just ("player/male/death" `B.append` BC.pack (show ((r `mod` 4) + 1)) `B.append` ".wav"))
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnIdle 0
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+
+           if (self^.eSpawnFlags) .&. 8 /= 0
+             then
+               void $ think insaneDead selfRef
+             else do
+               let frame = self^.eEntityState.esFrame
+
+               let currentMove = if frame >= frameCrawl1 && frame <= frameCrawl9 || frame >= frameStand99 && frame <= frameStand160
+                                   then insaneMoveCrawlDeath
+                                   else insaneMoveStandDeath
+
+               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 insaneFramesStandNormal :: V.Vector MFrameT
 insaneFramesStandNormal =
