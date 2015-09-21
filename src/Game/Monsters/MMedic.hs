@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3(..), _z)
+import Linear (V3(..), _z, norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -17,6 +17,7 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameMisc as GameMisc
+import qualified Game.GameSpawn as GameSpawn
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
@@ -97,6 +98,18 @@ frameAttack30 = 206
 
 frameAttack33 :: Int
 frameAttack33 = 209
+
+frameAttack42 :: Int
+frameAttack42 = 218
+
+frameAttack43 :: Int
+frameAttack43 = 219
+
+frameAttack44 :: Int
+frameAttack44 = 220
+
+frameAttack50 :: Int
+frameAttack50 = 226
 
 frameAttack60 :: Int
 frameAttack60 = 236
@@ -706,8 +719,8 @@ medicHookLaunch =
     sound (Just selfRef) Constants.chanWeapon soundHookLaunch 1 Constants.attnNorm 0
     return True
 
-medicCableOffset :: V.Vector (V3 Float)
-medicCableOffset =
+medicCableOffsets :: V.Vector (V3 Float)
+medicCableOffsets =
     V.fromList [ V3 45.0  (-9.2) 15.5
                , V3 48.4  (-9.7) 15.2
                , V3 47.8  (-9.8) 15.8
@@ -722,8 +735,116 @@ medicCableOffset =
 
 medicCableAttack :: EntThink
 medicCableAttack =
-  GenericEntThink "medic_cable_attack" $ \_ -> do
-    io (putStrLn "MMedic.medicCableAttack") >> undefined -- TODO
+  GenericEntThink "medic_cable_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    if not (enemy^.eInUse)
+      then
+        return True
+
+      else do
+        -- check for max distance
+        let (Just f, Just r, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+            offset = medicCableOffsets V.! ((self^.eEntityState.esFrame) - frameAttack42)
+            start = Math3D.projectSource (self^.eEntityState.esOrigin) offset f r
+            dir = start - (enemy^.eEntityState.esOrigin)
+            distance = norm dir
+
+        if distance > 256
+          then
+            return True
+
+          else do
+            -- check for min/max pitch
+            let V3 a _ _ = Math3D.vectorAngles dir
+                a' = if a < (-180) then a + 360 else a
+
+            if abs a' > 45
+              then
+                return True
+
+              else do
+                gameImport <- use $ gameBaseGlobals.gbGameImport
+
+                let trace = gameImport^.giTrace
+                    sound = gameImport^.giSound
+                    writeByte = gameImport^.giWriteByte
+                    writeShort = gameImport^.giWriteShort
+                    writePosition = gameImport^.giWritePosition
+                    multicast = gameImport^.giMulticast
+
+                traceT <- trace start Nothing Nothing (enemy^.eEntityState.esOrigin) (Just selfRef) Constants.maskShot
+
+                if (traceT^.tFraction) /= 1.0 && (traceT^.tEnt) /= (self^.eEnemy)
+                  then
+                    return True
+
+                  else do
+                    if | (self^.eEntityState.esFrame) == frameAttack43 -> do
+                           soundHookHit <- use $ mMedicGlobals.mMedicSoundHookHit
+                           sound (self^.eEnemy) Constants.chanAuto soundHookHit 1 Constants.attnNorm 0
+
+                           gameBaseGlobals.gbGEdicts.ix enemyIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiResurrecting)
+
+                       | (self^.eEntityState.esFrame) == frameAttack50 -> do
+                           zoom (gameBaseGlobals.gbGEdicts.ix enemyIdx) $ do
+                             eSpawnFlags .= 0
+                             eMonsterInfo.miAIFlags .= 0
+                             eTarget .= Nothing
+                             eTargetName .= Nothing
+                             eCombatTarget .= Nothing
+                             eDeathTarget .= Nothing
+                             eOwner .= Just selfRef
+
+                           GameSpawn.callSpawn enemyRef
+
+                           gameBaseGlobals.gbGEdicts.ix enemyIdx.eOwner .= Nothing
+
+                           Just enemy' <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+                           when (isJust (enemy'^.eThink)) $ do
+                             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+                             gameBaseGlobals.gbGEdicts.ix enemyIdx.eNextThink .= levelTime
+                             void $ think (fromJust (enemy'^.eThink)) enemyRef
+
+                           gameBaseGlobals.gbGEdicts.ix enemyIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiResurrecting)
+
+                           Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+                           when (isJust (self'^.eOldEnemy)) $ do
+                             let Just (EdictReference oldEnemyIdx) = self'^.eOldEnemy
+                             Just oldEnemy <- preuse $ gameBaseGlobals.gbGEdicts.ix oldEnemyIdx
+
+                             when (isJust (oldEnemy^.eClient)) $ do
+                               gameBaseGlobals.gbGEdicts.ix enemyIdx.eEnemy .= (self'^.eOldEnemy)
+                               GameUtil.foundTarget enemyRef
+
+                       | (self^.eEntityState.esFrame) == frameAttack44 -> do
+                           soundHookHeal <- use $ mMedicGlobals.mMedicSoundHookHeal
+                           sound (Just selfRef) Constants.chanWeapon soundHookHeal 1 Constants.attnNorm 0
+
+                       | otherwise ->
+                           return ()
+
+                    -- adjust start for beam origin being in middle of a segment
+                    let start' = start + fmap (* 8) f
+
+                    -- adjust end z for end spot since the monster is currently dead
+                    Just enemy' <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                    let V3 ea eb ec = enemy'^.eEntityState.esOrigin
+                        end = V3 ea eb ((enemy'^.eAbsMin._z) + (enemy'^.eSize._z) / 2)
+
+                    writeByte Constants.svcTempEntity
+                    writeByte Constants.teMedicCableAttack
+                    writeShort (self^.eIndex)
+                    writePosition start'
+                    writePosition end
+                    multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
+
+                    return True
 
 medicHookRetract :: EntThink
 medicHookRetract =

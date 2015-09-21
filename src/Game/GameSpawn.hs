@@ -41,7 +41,7 @@ import qualified Game.Monsters.MGunner as MGunner
 import qualified Game.Monsters.MHover as MHover
 import qualified Game.Monsters.MInfantry as MInfantry
 import qualified Game.Monsters.MInsane as MInsane
-import qualified Game.Monsters.MMedic as MMedic
+import {-# SOURCE #-} qualified Game.Monsters.MMedic as MMedic
 import qualified Game.Monsters.MMutant as MMutant
 import qualified Game.Monsters.MParasite as MParasite
 import qualified Game.Monsters.MSoldier as MSoldier
