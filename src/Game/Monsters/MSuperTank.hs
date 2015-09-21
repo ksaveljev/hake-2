@@ -5,7 +5,7 @@ module Game.Monsters.MSuperTank where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..), normalize)
+import Linear (V3(..), _y, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -318,8 +318,29 @@ superTankRocket =
 
 superTankMachineGun :: EntThink
 superTankMachineGun =
-  GenericEntThink "supertankMachineGun" $ \_ -> do
-    io (putStrLn "MSuperTank.superTankMachineGun") >> undefined -- TODO
+  GenericEntThink "supertankMachineGun" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashNumber = Constants.mz2SupertankMachinegun1 + (self^.eEntityState.esFrame) - frameAttack101
+        -- FIXME!!!
+        dir = V3 0 (self^.eEntityState.esAngles._y) 0
+        (Just forward, Just right, _) = Math3D.angleVectors dir True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+
+    case self^.eEnemy of
+      Just (EdictReference enemyIdx) -> do
+        Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+        let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* 0) (enemy^.eVelocity)
+            vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+            forward' = normalize (vec - start)
+
+        Monster.monsterFireBullet selfRef start forward' 6 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashNumber
+
+      Nothing ->
+        Monster.monsterFireBullet selfRef start forward 6 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashNumber
+
+    return True
 
 superTankAttack :: EntThink
 superTankAttack =
