@@ -5,7 +5,7 @@ module Game.Monsters.MSuperTank where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..), _y, normalize)
+import Linear (V3(..), _y, normalize, norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -344,8 +344,26 @@ superTankMachineGun =
 
 superTankAttack :: EntThink
 superTankAttack =
-  GenericEntThink "supertank_attack" $ \_ -> do
-    io (putStrLn "MSuperTank.superTankAttack") >> undefined -- TODO
+  GenericEntThink "supertank_attack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+        range = norm vec
+
+    currentMove <- if range <= 160
+                     then
+                       return superTankMoveAttack1
+                     else do
+                       r <- Lib.randomF
+                       return $ if r < 0.3
+                                  then superTankMoveAttack1
+                                  else superTankMoveAttack2
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 superTankFramesTurnRight :: V.Vector MFrameT
 superTankFramesTurnRight =
