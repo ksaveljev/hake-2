@@ -11,6 +11,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
@@ -388,8 +389,34 @@ medicMovePain2 = MMoveT "medicMovePain2" framePainB1 framePainB15 medicFramesPai
 
 medicPain :: EntPain
 medicPain =
-  GenericEntPain "medic_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MMedic.medicPain") >> undefined -- TODO
+  GenericEntPain "medic_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        r <- Lib.randomF
+
+        (soundPain, currentMove) <- if r < 0.5
+                                      then do
+                                        soundPain <- use $ mMedicGlobals.mMedicSoundPain1
+                                        return (soundPain, medicMovePain1)
+                                      else do
+                                        soundPain <- use $ mMedicGlobals.mMedicSoundPain2
+                                        return (soundPain, medicMovePain2)
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
 
 medicFireBlaster :: EntThink
 medicFireBlaster =
