@@ -4,7 +4,7 @@ module Game.Monsters.MMutant where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=))
 import Control.Monad (when, void, unless, liftM)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
 import Linear (V3(..), _x, _z, norm, normalize)
 import qualified Data.Vector as V
@@ -27,6 +27,9 @@ frameAttack01 = 0
 
 frameAttack02 :: Int
 frameAttack02 = 1
+
+frameAttack05 :: Int
+frameAttack05 = 4
 
 frameAttack08 :: Int
 frameAttack08 = 7
@@ -458,8 +461,29 @@ mutantJumpTakeOff =
 
 mutantCheckLanding :: EntThink
 mutantCheckLanding =
-  GenericEntThink "mutant_check_landing" $ \_ -> do
-    io (putStrLn "MMutant.mutantCheckLanding") >> undefined -- TODO
+  GenericEntThink "mutant_check_landing" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    case self^.eGroundEntity of
+      Just _ -> do
+        soundThud <- use $ mMutantGlobals.mMutantSoundThud
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanWeapon soundThud 1 Constants.attnNorm 0
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miAttackFinished .= 0
+          miAIFlags %= (.&. (complement Constants.aiDucked))
+
+      Nothing -> do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        let nextFrame = if levelTime > (self^.eMonsterInfo.miAttackFinished)
+                          then frameAttack02
+                          else frameAttack05
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= nextFrame
+
+    return True
 
 mutantFramesJump :: V.Vector MFrameT
 mutantFramesJump =
