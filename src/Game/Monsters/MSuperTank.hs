@@ -42,6 +42,9 @@ frameAttack208 = 27
 frameAttack211 :: Int
 frameAttack211 = 30
 
+frameAttack214 :: Int
+frameAttack214 = 33
+
 frameAttack227 :: Int
 frameAttack227 = 46
 
@@ -642,8 +645,40 @@ superTankMoveEndAttack1 = MMoveT "superTankMoveEndAttack1" frameAttack107 frameA
 
 superTankPain :: EntPain
 superTankPain =
-  GenericEntPain "supertank_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MSuperTank.superTankPain") >> undefined -- TODO
+  GenericEntPain "supertank_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      -- Lessen the chance of him going into his pain frames
+      r <- Lib.randomF
+
+      unless (damage <= 25 && r < 0.2) $ do
+        -- don't go into pain if he's firing his rockets
+        skillValue <- liftM (^.cvValue) skillCVar
+
+        unless (skillValue >= 2 && (self^.eEntityState.esFrame) >= frameAttack201 && (self^.eEntityState.esFrame) <= frameAttack214) $ do
+          gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+          unless (skillValue == 3) $ do -- no pain anims in nightmare
+            (soundPain, currentMove) <- if | damage <= 10 -> do
+                                               soundPain <- use $ mSuperTankGlobals.mSuperTankSoundPain1
+                                               return (soundPain, superTankMovePain1)
+                                           | damage <= 25 -> do
+                                               soundPain <- use $ mSuperTankGlobals.mSuperTankSoundPain3
+                                               return (soundPain, superTankMovePain2)
+                                           | otherwise -> do
+                                               soundPain <- use $ mSuperTankGlobals.mSuperTankSoundPain2
+                                               return (soundPain, superTankMovePain3)
+
+            sound <- use $ gameBaseGlobals.gbGameImport.giSound
+            sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 superTankDie :: EntDie
 superTankDie =
