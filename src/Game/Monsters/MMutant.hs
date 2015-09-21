@@ -324,8 +324,22 @@ mutantHitLeft =
 
 mutantHitRight :: EntThink
 mutantHitRight =
-  GenericEntThink "mutant_hit_right" $ \_ -> do
-    io (putStrLn "MMutant.mutantHitRight") >> undefined -- TODO
+  GenericEntThink "mutant_hit_right" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 8
+
+    r <- Lib.rand
+    hit <- GameWeapon.fireHit selfRef aim (10 + fromIntegral (r `mod` 5)) 100
+
+    soundIdx <- if hit
+                  then use $ mMutantGlobals.mMutantSoundHit2
+                  else use $ mMutantGlobals.mMutantSoundSwing
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+    return True
 
 mutantCheckReFire :: EntThink
 mutantCheckReFire =
