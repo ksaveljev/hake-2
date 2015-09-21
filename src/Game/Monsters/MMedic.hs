@@ -3,6 +3,7 @@
 module Game.Monsters.MMedic where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=), (-=))
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
 import Linear (V3(..), _z)
@@ -315,8 +316,38 @@ medicMoveRun = MMoveT "medicMoveRun" frameRun1 frameRun6 medicFramesRun Nothing
 
 medicRun :: EntThink
 medicRun =
-  GenericEntThink "medic_run" $ \_ -> do
-    io (putStrLn "MMedic.medicRun") >> undefined -- TODO
+  GenericEntThink "medic_run" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    done <- if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic == 0
+              then do
+                deadMonster <- medicFindDeadMonster selfRef
+
+                case deadMonster of
+                  Nothing ->
+                    return False
+
+                  Just (EdictReference deadMonsterIdx) -> do
+                    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                      eOldEnemy .= (self^.eEnemy)
+                      eEnemy .= deadMonster
+                      eMonsterInfo.miAIFlags %= (.|. Constants.aiMedic)
+
+                    gameBaseGlobals.gbGEdicts.ix deadMonsterIdx.eOwner .= Just selfRef
+                    GameUtil.foundTarget selfRef
+                    return True
+
+              else
+                return False
+
+    unless done $ do
+      let currentMove = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+                          then medicMoveStand
+                          else medicMoveRun
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+
+    return True
 
 medicFramesPain1 :: V.Vector MFrameT
 medicFramesPain1 =
