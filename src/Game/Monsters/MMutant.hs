@@ -3,17 +3,19 @@
 module Game.Monsters.MMutant where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _x)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
+import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
@@ -343,8 +345,31 @@ mutantHitRight =
 
 mutantCheckReFire :: EntThink
 mutantCheckReFire =
-  GenericEntThink "mutant_check_refire" $ \_ -> do
-    io (putStrLn "MMutant.mutantCheckReFire") >> undefined -- TODO
+  GenericEntThink "mutant_check_refire" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    done <- case self^.eEnemy of
+              Nothing ->
+                return True
+
+              Just (EdictReference enemyIdx) -> do
+                Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+                return $ if not (enemy^.eInUse) || (enemy^.eHealth) <= 0
+                           then True
+                           else False
+
+    unless done $ do
+      skillValue <- liftM (^.cvValue) skillCVar
+      r <- Lib.randomF
+
+      let Just (EdictReference enemyIdx) = self^.eEnemy
+      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+      when (skillValue == 3 && r < 0.5 || GameUtil.range self enemy == Constants.rangeMelee) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miNextFrame .= frameAttack09
+
+    return True
 
 mutantFramesAttack :: V.Vector MFrameT
 mutantFramesAttack =
