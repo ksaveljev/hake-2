@@ -5,7 +5,7 @@ module Game.Monsters.MParasite where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..))
+import Linear (V3(..), norm)
 import qualified Data.Vector as V
 
 import Quake
@@ -537,4 +537,12 @@ spMonsterParasite =
     io (putStrLn "MParasite.spMonsterParasite") >> undefined -- TODO
 
 parasiteDrainAttackOK :: V3 Float -> V3 Float -> Bool
-parasiteDrainAttackOK = undefined -- TODO MParasite.parasiteDrainAttackOK
+parasiteDrainAttackOK start end =
+    let dir = start - end
+    in if norm dir > 256
+         then False
+         else let V3 a _ _ = Math3D.vectorAngles dir
+                  a' = if a < (-180) then a + 360 else a
+              in if abs a' > 30
+                   then False
+                   else True
