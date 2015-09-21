@@ -630,8 +630,16 @@ medicMoveDuck = MMoveT "medicMoveDuck" frameDuck1 frameDuck16 medicFramesDuck (J
 
 medicDodge :: EntDodge
 medicDodge =
-  GenericEntDodge "medic_dodge" $ \_ _ _ -> do
-    io (putStrLn "MMedic.medicDodge") >> undefined -- TODO
+  GenericEntDodge "medic_dodge" $ \selfRef@(EdictReference selfIdx) attackerRef _ -> do
+    r <- Lib.randomF
+
+    unless (r > 0.25) $ do
+      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+      when (isNothing (self^.eEnemy)) $
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
+
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just medicMoveDuck
 
 medicFramesAttackHyperBlaster :: V.Vector MFrameT
 medicFramesAttackHyperBlaster =
