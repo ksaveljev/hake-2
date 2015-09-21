@@ -904,9 +904,15 @@ medicAttack =
 
 medicCheckAttack :: EntThink
 medicCheckAttack =
-  GenericEntThink "medic_checkattack" $ \_ -> do
-    io (putStrLn "MMedic.medicCheckAttack") >> undefined -- TODO
+  GenericEntThink "medic_checkattack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
 
+    if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic /= 0
+      then do
+        void $ think medicAttack selfRef
+        return True
+      else
+        think GameUtil.mCheckAttack selfRef
 
 {-
 - QUAKED monster_medic (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
