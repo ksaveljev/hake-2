@@ -12,7 +12,9 @@ module Game.GameBaseGlobals ( module Game.GameBaseGlobals
 
 import Control.Lens (makeLenses)
 import Linear (V3(..))
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 
 import Internal
 import Game.CVarT
@@ -40,7 +42,7 @@ initialGameBaseGlobals =
                   , _gbSndFry            = 0
                   , _gbMeansOfDeath      = 0
                   , _gbNumEdicts         = 0
-                  , _gbGEdicts           = V.generate (Constants.maxEdicts + 1) newEdictT -- one extra for "dummy edict"
+                  , _gbGEdicts           = unsafePerformIO $ V.thaw $ V.generate (Constants.maxEdicts + 1) newEdictT -- one extra for "dummy edict"
                   , _gbItemList          = GameItemList.itemList
                   , _gbPushed            = V.replicate Constants.maxEdicts newPushedT
                   , _gbPushedP           = 0

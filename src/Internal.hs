@@ -787,7 +787,7 @@ data GameBaseGlobals =
                   , _gbSndFry            :: !Int
                   , _gbMeansOfDeath      :: !Int
                   , _gbNumEdicts         :: !Int
-                  , _gbGEdicts           :: V.Vector EdictT
+                  , _gbGEdicts           :: MV.IOVector EdictT
                   , _gbItemList          :: V.Vector GItemT
                   , _gbPushed            :: V.Vector PushedT
                   , _gbPushedP           :: !Int

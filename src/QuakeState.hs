@@ -46,7 +46,9 @@ module QuakeState ( QuakeState(..)
                   , vGlobals
                   , netChannelGlobals
                   , clTEntGlobals
-                  , EdictReference(..)
+                  , EdictReference
+                  , readEdictT
+                  , modifyEdictT
                   , ClientReference(..)
                   , GClientReference(..)
                   , CModelReference(..)
@@ -116,7 +118,9 @@ module QuakeState ( QuakeState(..)
                   , module QCommon.NetChannelGlobals
                   ) where
 
-import Control.Lens (makeLenses)
+import Control.Lens (use, makeLenses)
+import Control.Monad.State.Strict (liftIO)
+import qualified Data.Vector.Mutable as MV
 
 import Internal
 import Globals
@@ -215,3 +219,13 @@ initialQuakeState =
              , _netChannelGlobals     = initialNetChannelGlobals
              , _clTEntGlobals         = initialCLTEntGlobals
              }
+
+readEdictT :: EdictReference -> Quake EdictT
+readEdictT (EdictReference edictIdx) = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    liftIO $ MV.read edicts edictIdx
+
+modifyEdictT :: EdictReference -> (EdictT -> EdictT) -> Quake ()
+modifyEdictT (EdictReference edictIdx) f = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    liftIO $ MV.modify edicts f edictIdx
