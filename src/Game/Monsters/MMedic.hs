@@ -112,8 +112,26 @@ medicFindDeadMonster selfRef@(EdictReference selfIdx) = do
 
 medicIdle :: EntThink
 medicIdle =
-  GenericEntThink "medic_idle" $ \_ -> do
-    io (putStrLn "MMedic.medicIdle") >> undefined -- TODO
+  GenericEntThink "medic_idle" $ \selfRef@(EdictReference selfIdx) -> do
+    soundIdle1 <- use $ mMedicGlobals.mMedicSoundIdle1
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanVoice soundIdle1 1 Constants.attnIdle 0
+
+    deadMonster <- medicFindDeadMonster selfRef
+
+    case deadMonster of
+      Nothing ->
+        return True
+
+      Just (EdictReference deadMonsterIdx) -> do
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEnemy .= deadMonster
+          eMonsterInfo.miAIFlags %= (.|. Constants.aiMedic)
+
+        gameBaseGlobals.gbGEdicts.ix deadMonsterIdx.eOwner .= Just selfRef
+
+        GameUtil.foundTarget selfRef
+        return True
 
 medicSearch :: EntThink
 medicSearch =
