@@ -23,6 +23,9 @@ import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameAttack01 :: Int
 frameAttack01 = 0
 
@@ -754,5 +757,65 @@ mutantDie =
 -}
 spMonsterMutant :: EntThink
 spMonsterMutant =
-  GenericEntThink "SP_monster_mutant" $ \_ -> do
-    io (putStrLn "MMutant.spMonsterMutant") >> undefined -- TODO
+  GenericEntThink "SP_monster_mutant" $ \selfRef@(EdictReference selfIdx) -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then do
+        GameUtil.freeEdict selfRef
+        return False
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "mutant/mutatck1.wav") >>= (mMutantGlobals.mMutantSoundSwing .=)
+        soundIndex (Just "mutant/mutatck2.wav") >>= (mMutantGlobals.mMutantSoundHit .=)
+        soundIndex (Just "mutant/mutatck3.wav") >>= (mMutantGlobals.mMutantSoundHit2 .=)
+        soundIndex (Just "mutant/mutdeth1.wav") >>= (mMutantGlobals.mMutantSoundDeath .=)
+        soundIndex (Just "mutant/mutidle1.wav") >>= (mMutantGlobals.mMutantSoundIdle .=)
+        soundIndex (Just "mutant/mutpain1.wav") >>= (mMutantGlobals.mMutantSoundPain1 .=)
+        soundIndex (Just "mutant/mutpain2.wav") >>= (mMutantGlobals.mMutantSoundPain2 .=)
+        soundIndex (Just "mutant/mutsght1.wav") >>= (mMutantGlobals.mMutantSoundSight .=)
+        soundIndex (Just "mutant/mutsrch1.wav") >>= (mMutantGlobals.mMutantSoundSearch .=)
+        soundIndex (Just "mutant/step1.wav") >>= (mMutantGlobals.mMutantSoundStep1 .=)
+        soundIndex (Just "mutant/step2.wav") >>= (mMutantGlobals.mMutantSoundStep2 .=)
+        soundIndex (Just "mutant/step3.wav") >>= (mMutantGlobals.mMutantSoundStep3 .=)
+        soundIndex (Just "mutant/thud1.wav") >>= (mMutantGlobals.mMutantSoundThud .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/mutant/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-32) (-32) (-24)
+          eMaxs .= V3 32 32 48
+          eHealth .= 300
+          eGibHealth .= (-120)
+          eMass .= 300
+          ePain .= Just mutantPain
+          eDie .= Just mutantDie
+          eMonsterInfo.miStand .= Just mutantStand
+          eMonsterInfo.miWalk .= Just mutantWalk
+          eMonsterInfo.miRun .= Just mutantRun
+          eMonsterInfo.miDodge .= Nothing
+          eMonsterInfo.miAttack .= Just mutantJump
+          eMonsterInfo.miMelee .= Just mutantMelee
+          eMonsterInfo.miSight .= Just mutantSight
+          eMonsterInfo.miSearch .= Just mutantSearch
+          eMonsterInfo.miIdle .= Just mutantIdle
+          eMonsterInfo.miCheckAttack .= Just mutantCheckAttack
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just mutantMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
+
+        return True
