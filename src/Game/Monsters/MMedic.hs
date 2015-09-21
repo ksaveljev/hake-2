@@ -24,6 +24,9 @@ import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameWalk1 :: Int
 frameWalk1 = 0
 
@@ -919,5 +922,61 @@ medicCheckAttack =
 - Trigger_Spawn Sight
 -}
 spMonsterMedic :: EdictReference -> Quake ()
-spMonsterMedic _ = do
-    io (putStrLn "MMedic.spMonsterMedic") >> undefined -- TODO
+spMonsterMedic selfRef@(EdictReference selfIdx) = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "medic/idle.wav") >>= (mMedicGlobals.mMedicSoundIdle1 .=)
+        soundIndex (Just "medic/medpain1.wav") >>= (mMedicGlobals.mMedicSoundPain1 .=)
+        soundIndex (Just "medic/medpain2.wav") >>= (mMedicGlobals.mMedicSoundPain2 .=)
+        soundIndex (Just "medic/meddeth1.wav") >>= (mMedicGlobals.mMedicSoundDie .=)
+        soundIndex (Just "medic/medsght1.wav") >>= (mMedicGlobals.mMedicSoundSight .=)
+        soundIndex (Just "medic/medsrch1.wav") >>= (mMedicGlobals.mMedicSoundSearch .=)
+        soundIndex (Just "medic/medatck2.wav") >>= (mMedicGlobals.mMedicSoundHookLaunch .=)
+        soundIndex (Just "medic/medatck3.wav") >>= (mMedicGlobals.mMedicSoundHookHit .=)
+        soundIndex (Just "medic/medatck4.wav") >>= (mMedicGlobals.mMedicSoundHookHeal .=)
+        soundIndex (Just "medic/medatck5.wav") >>= (mMedicGlobals.mMedicSoundHookRetract .=)
+
+        void $ soundIndex (Just "medic/medatck1.wav")
+
+        modelIdx <- modelIndex (Just "models/monsters/medic/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-24) (-24) (-24)
+          eMaxs .= V3 24 24 32
+          eHealth .= 300
+          eGibHealth .= (-130)
+          eMass .= 400
+          ePain .= Just medicPain
+          eDie .= Just medicDie
+          eMonsterInfo.miStand .= Just medicStand
+          eMonsterInfo.miWalk .= Just medicWalk
+          eMonsterInfo.miRun .= Just medicRun
+          eMonsterInfo.miDodge .= Just medicDodge
+          eMonsterInfo.miAttack .= Just medicAttack
+          eMonsterInfo.miMelee .= Nothing
+          eMonsterInfo.miSight .= Just medicSight
+          eMonsterInfo.miIdle .= Just medicIdle
+          eMonsterInfo.miSearch .= Just medicSearch
+          eMonsterInfo.miCheckAttack .= Just medicCheckAttack
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just medicMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
