@@ -19,6 +19,9 @@ import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameBreak01 :: Int
 frameBreak01 = 0
 
@@ -533,8 +536,61 @@ parasiteDie =
 -}
 spMonsterParasite :: EntThink
 spMonsterParasite =
-  GenericEntThink "SP_monster_parasite" $ \_ -> do
-    io (putStrLn "MParasite.spMonsterParasite") >> undefined -- TODO
+  GenericEntThink "SP_monster_parasite" $ \selfRef@(EdictReference selfIdx) -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then do
+        GameUtil.freeEdict selfRef
+        return True
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "parasite/parpain1.wav") >>= (mParasiteGlobals.mParasiteSoundPain1 .=)
+        soundIndex (Just "parasite/parpain2.wav") >>= (mParasiteGlobals.mParasiteSoundPain2 .=)
+        soundIndex (Just "parasite/pardeth1.wav") >>= (mParasiteGlobals.mParasiteSoundDie .=)
+        soundIndex (Just "parasite/paratck1.wav") >>= (mParasiteGlobals.mParasiteSoundLaunch .=)
+        soundIndex (Just "parasite/paratck2.wav") >>= (mParasiteGlobals.mParasiteSoundImpact .=)
+        soundIndex (Just "parasite/paratck3.wav") >>= (mParasiteGlobals.mParasiteSoundSuck .=)
+        soundIndex (Just "parasite/paratck4.wav") >>= (mParasiteGlobals.mParasiteSoundReelIn .=)
+        soundIndex (Just "parasite/parsght1.wav") >>= (mParasiteGlobals.mParasiteSoundSight .=)
+        soundIndex (Just "parasite/paridle1.wav") >>= (mParasiteGlobals.mParasiteSoundTap .=)
+        soundIndex (Just "parasite/paridle2.wav") >>= (mParasiteGlobals.mParasiteSoundScratch .=)
+        soundIndex (Just "parasite/parsrch1.wav") >>= (mParasiteGlobals.mParasiteSoundSearch .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/parasite/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-16) (-16) (-24)
+          eMaxs .= V3 16 16 24
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eHealth .= 175
+          eGibHealth .= (-50)
+          eMass .= 250
+          ePain .= Just parasitePain
+          eDie .= Just parasiteDie
+          eMonsterInfo.miStand .= Just parasiteStand
+          eMonsterInfo.miWalk .= Just parasiteStartWalk
+          eMonsterInfo.miRun .= Just parasiteStartRun
+          eMonsterInfo.miAttack .= Just parasiteAttack
+          eMonsterInfo.miSight .= Just parasiteSight
+          eMonsterInfo.miIdle .= Just parasiteIdle
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just parasiteMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
+        return True
 
 parasiteDrainAttackOK :: V3 Float -> V3 Float -> Bool
 parasiteDrainAttackOK start end =
