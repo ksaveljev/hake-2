@@ -508,8 +508,15 @@ mutantJump =
 
 mutantCheckMelee :: EntThink
 mutantCheckMelee =
-  GenericEntThink "mutant_check_melee" $ \_ -> do
-    io (putStrLn "MMutant.mutantCheckMelee") >> undefined -- TODO
+  GenericEntThink "mutant_check_melee" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    return $ if GameUtil.range self enemy == Constants.rangeMelee
+               then True
+               else False
 
 mutantCheckJump :: EntThink
 mutantCheckJump =
