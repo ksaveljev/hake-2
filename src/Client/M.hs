@@ -20,13 +20,14 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 checkGround :: EdictReference -> Quake ()
-checkGround edictRef@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+checkGround edictRef = do
+    edict <- readEdictT edictRef
 
     unless ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
       if (edict^.eVelocity._z) > 100
         then
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
+          modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+
         else do
           -- if the hull point one-quarter unit down is solid the entity is
           -- on ground
@@ -43,16 +44,17 @@ checkGround edictRef@(EdictReference edictIdx) = do
           -- check steepness
           if (traceT^.tPlane.cpNormal._z) < 0.7 && not (traceT^.tStartSolid)
             then
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
+              modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+
             else do
               when (not (traceT^.tStartSolid) && not (traceT^.tAllSolid)) $ do
-                let Just (EdictReference traceIdx) = traceT^.tEnt
-                Just linkCount <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx.eLinkCount
+                let Just traceEntRef = traceT^.tEnt
+                traceEnt <- readEdictT traceEntRef
 
                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
                   eEntityState.esOrigin .= traceT^.tEndPos
                   eGroundEntity .= traceT^.tEnt
-                  eGroundEntityLinkCount .= linkCount
+                  eGroundEntityLinkCount .= (traceEnt^.eLinkCount)
                   eVelocity._z .= 0
 
 -- Stops the Flies.
