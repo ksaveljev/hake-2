@@ -2,16 +2,21 @@
 module Game.Monsters.MParasite where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameBreak01 :: Int
 frameBreak01 = 0
@@ -354,8 +359,30 @@ parasiteMovePain1 = MMoveT "parasiteMovePain1" framePain101 framePain111 parasit
 
 parasitePain :: EntPain
 parasitePain =
-  GenericEntPain "parasite_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MParasite.parasitePain") >> undefined -- TODO
+  GenericEntPain "parasite_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        r <- Lib.randomF
+
+        soundPain <- if r < 0.5
+                       then use $ mParasiteGlobals.mParasiteSoundPain1
+                       else use $ mParasiteGlobals.mParasiteSoundPain2
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMovePain1
 
 parasiteDrainAttack :: EntThink
 parasiteDrainAttack =
