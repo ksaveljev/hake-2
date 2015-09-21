@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MParasite where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
@@ -491,8 +492,40 @@ parasiteMoveDeath = MMoveT "parasiteMoveDeath" frameDeath101 frameDeath107 paras
 
 parasiteDie :: EntDie
 parasiteDie =
-  GenericEntDie "parasite_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MParasite.parasiteDie") >> undefined -- TODO
+  GenericEntDie "parasite_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do -- check for gib
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do -- regular death
+           soundDie <- use $ mParasiteGlobals.mParasiteSoundDie
+           sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just parasiteMoveDeath
 
 {-
 - QUAKED monster_parasite (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
