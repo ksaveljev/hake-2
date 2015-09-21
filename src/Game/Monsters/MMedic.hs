@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MMedic where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=), (-=))
 import Data.Bits ((.&.), (.|.), complement)
+import Data.Maybe (isNothing)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
@@ -11,6 +13,8 @@ import QuakeState
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 frameWalk1 :: Int
@@ -74,8 +78,37 @@ frameAttack60 :: Int
 frameAttack60 = 236
 
 medicFindDeadMonster :: EdictReference -> Quake (Maybe EdictReference)
-medicFindDeadMonster _ = do
-    io (putStrLn "MMedic.medicFindDeadMonster") >> undefined -- TODO
+medicFindDeadMonster selfRef@(EdictReference selfIdx) = do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    findDeadMonster (self^.eEntityState.esOrigin) Nothing Nothing
+
+  where findDeadMonster :: V3 Float -> Maybe EdictReference -> Maybe EdictReference -> Quake (Maybe EdictReference)
+        findDeadMonster origin currentRef bestRef = do
+          foundRef <- GameBase.findRadius currentRef origin 1024
+
+          case foundRef of
+            Nothing ->
+              return bestRef
+
+            Just edictRef@(EdictReference edictIdx) -> do
+              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+
+              if edictRef == selfRef || (edict^.eSvFlags) .&. Constants.svfMonster == 0 || (edict^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0 || isNothing (edict^.eOwner) || (edict^.eHealth) > 0 || (edict^.eNextThink) == 0
+                then
+                  findDeadMonster origin (Just edictRef) bestRef
+                else do
+                  vis <- GameUtil.visible selfRef edictRef
+
+                  if | not vis -> findDeadMonster origin (Just edictRef) bestRef
+                     | isNothing bestRef -> findDeadMonster origin (Just edictRef) (Just edictRef)
+                     | otherwise -> do
+                         let Just (EdictReference bestIdx) = bestRef
+                         Just best <- preuse $ gameBaseGlobals.gbGEdicts.ix bestIdx
+
+                         if (edict^.eMaxHealth) <= (best^.eMaxHealth)
+                           then findDeadMonster origin (Just edictRef) bestRef
+                           else findDeadMonster origin (Just edictRef) (Just edictRef)
 
 medicIdle :: EntThink
 medicIdle =
