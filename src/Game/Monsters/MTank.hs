@@ -16,6 +16,8 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -46,8 +48,14 @@ frameWalk25 = 54
 frameAttack101 :: Int
 frameAttack101 = 55
 
+frameAttack110 :: Int
+frameAttack110 = 64
+
 frameAttack111 :: Int
 frameAttack111 = 65
+
+frameAttack113 :: Int
+frameAttack113 = 67
 
 frameAttack116 :: Int
 frameAttack116 = 70
@@ -413,8 +421,25 @@ tankPain =
 
 tankBlaster :: EntThink
 tankBlaster =
-  GenericEntThink "TankBlaster" $ \_ -> do
-    io (putStrLn "MTank.tankBlaster") >> undefined -- TODO
+  GenericEntThink "TankBlaster" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashNumber = if | (self^.eEntityState.esFrame) == frameAttack110 -> Constants.mz2TankBlaster1
+                         | (self^.eEntityState.esFrame) == frameAttack113 -> Constants.mz2TankBlaster2
+                         | otherwise -> Constants.mz2TankBlaster3
+
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = end - start
+
+    Monster.monsterFireBlaster selfRef start dir 30 800 flashNumber Constants.efBlaster
+    return True
 
 tankStrike :: EntThink
 tankStrike =
