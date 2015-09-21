@@ -5,7 +5,7 @@ module Game.Monsters.MMutant where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..))
+import Linear (V3(..), _x)
 import qualified Data.Vector as V
 
 import Quake
@@ -14,6 +14,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
+import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 frameAttack01 :: Int
@@ -304,8 +305,22 @@ mutantRun =
 
 mutantHitLeft :: EntThink
 mutantHitLeft =
-  GenericEntThink "mutant_hit_left" $ \_ -> do
-    io (putStrLn "MMutant.mutantHitLeft") >> undefined -- TODO
+  GenericEntThink "mutant_hit_left" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 8
+
+    r <- Lib.rand
+    hit <- GameWeapon.fireHit selfRef aim (10 + fromIntegral (r `mod` 5)) 100
+
+    soundIdx <- if hit
+                  then use $ mMutantGlobals.mMutantSoundHit
+                  else use $ mMutantGlobals.mMutantSoundSwing
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanWeapon soundIdx 1 Constants.attnNorm 0
+
+    return True
 
 mutantHitRight :: EntThink
 mutantHitRight =
