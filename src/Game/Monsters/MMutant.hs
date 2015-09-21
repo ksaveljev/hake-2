@@ -625,8 +625,38 @@ mutantMovePain3 = MMoveT "mutantMovePain3" framePain301 framePain311 mutantFrame
 
 mutantPain :: EntPain
 mutantPain =
-  GenericEntPain "mutant_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MMutant.mutantPain") >> undefined -- TODO
+  GenericEntPain "mutant_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      unless (skillValue == 3) $ do -- no pain anims in nightmare
+        r <- Lib.randomF
+
+        (soundPain, currentMove) <- if | r < 0.33 -> do
+                                           soundPain <- use $ mMutantGlobals.mMutantSoundPain1
+                                           return (soundPain, mutantMovePain1)
+
+                                       | r < 0.66 -> do
+                                           soundPain <- use $ mMutantGlobals.mMutantSoundPain2
+                                           return (soundPain, mutantMovePain2)
+
+                                       | otherwise -> do
+                                           soundPain <- use $ mMutantGlobals.mMutantSoundPain1
+                                           return (soundPain, mutantMovePain3)
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
 
 mutantDead :: EntThink
 mutantDead =
