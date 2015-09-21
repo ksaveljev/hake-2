@@ -6,7 +6,7 @@ import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
-import Linear (V3(..), _x, _z, norm, normalize)
+import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -520,8 +520,29 @@ mutantCheckMelee =
 
 mutantCheckJump :: EntThink
 mutantCheckJump =
-  GenericEntThink "mutant_check_jump" $ \_ -> do
-    io (putStrLn "MMutant.mutantCheckJump") >> undefined -- TODO
+  GenericEntThink "mutant_check_jump" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just (EdictReference enemyIdx) = self^.eEnemy
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    if | (self^.eAbsMin._z) > ((enemy^.eAbsMin._z) + 0.75 * (enemy^.eSize._z)) ->
+           return False
+
+       | (self^.eAbsMax._z) < ((enemy^.eAbsMin._z) + 0.25 * (enemy^.eSize._z)) ->
+           return False
+
+       | otherwise -> do
+           let v0 = (self^.eEntityState.esOrigin._x) - (enemy^.eEntityState.esOrigin._x)
+               v1 = (self^.eEntityState.esOrigin._y) - (enemy^.eEntityState.esOrigin._y)
+               v2 = 0
+               distance = norm (V3 v0 v1 v2)
+
+           r <- Lib.randomF
+
+           return $ if | distance < 100 -> False
+                       | distance > 100 && r < 0.9 -> False
+                       | otherwise -> True
 
 mutantCheckAttack :: EntThink
 mutantCheckAttack =
