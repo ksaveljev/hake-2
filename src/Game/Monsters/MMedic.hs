@@ -17,7 +17,10 @@ import qualified Constants
 import qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameWalk1 :: Int
 frameWalk1 = 0
@@ -64,11 +67,29 @@ frameDeath30 = 176
 frameAttack1 :: Int
 frameAttack1 = 177
 
+frameAttack9 :: Int
+frameAttack9 = 185
+
+frameAttack12 :: Int
+frameAttack12 = 188
+
 frameAttack14 :: Int
 frameAttack14 = 190
 
 frameAttack15 :: Int
 frameAttack15 = 191
+
+frameAttack19 :: Int
+frameAttack19 = 195
+
+frameAttack22 :: Int
+frameAttack22 = 198
+
+frameAttack25 :: Int
+frameAttack25 = 201
+
+frameAttack28 :: Int
+frameAttack28 = 204
 
 frameAttack30 :: Int
 frameAttack30 = 206
@@ -420,8 +441,25 @@ medicPain =
 
 medicFireBlaster :: EntThink
 medicFireBlaster =
-  GenericEntThink "medic_fire_blaster" $ \_ -> do
-    io (putStrLn "MMedic.medicFireBlaster") >> undefined -- TODO
+  GenericEntThink "medic_fire_blaster" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let frame = self^.eEntityState.esFrame
+        effect = if | frame `elem` [ frameAttack9, frameAttack12 ] -> Constants.efBlaster
+                    | frame `elem` [ frameAttack19, frameAttack22, frameAttack25, frameAttack28 ] -> Constants.efHyperblaster
+                    | otherwise -> 0
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MedicBlaster1) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = end - start
+
+    Monster.monsterFireBlaster selfRef start dir 2 1000 Constants.mz2MedicBlaster1 effect
+    return True
 
 medicDead :: EntThink
 medicDead =
