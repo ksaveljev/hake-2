@@ -5,7 +5,8 @@ module Game.Monsters.MMutant where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..), _x)
+import Data.Maybe (isJust)
+import Linear (V3(..), _x, norm, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -15,12 +16,16 @@ import Game.Adapters
 import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
+import qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 frameAttack01 :: Int
 frameAttack01 = 0
+
+frameAttack02 :: Int
+frameAttack02 = 1
 
 frameAttack08 :: Int
 frameAttack08 = 7
@@ -393,8 +398,38 @@ mutantMelee =
 
 mutantJumpTouch :: EntTouch
 mutantJumpTouch =
-  GenericEntTouch "mutant_jump_touch" $ \_ _ _ _ -> do
-    io (putStrLn "MMutant.mutantJumpTouch") >> undefined -- TODO
+  GenericEntTouch "mutant_jump_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self^.eHealth) <= 0
+      then
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eTouch .= Nothing
+
+      else do
+        Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+
+        when ((other^.eTakeDamage) /= 0 && norm (self^.eVelocity) > 400) $ do
+          r <- Lib.randomF
+
+          let normal = normalize (self^.eVelocity)
+              point = (self^.eEntityState.esOrigin) + fmap (* (self^.eMaxs._x)) normal
+              damage = truncate (40 + 10 * r)
+
+          GameCombat.damage otherRef selfRef selfRef (self^.eVelocity) point normal damage damage 0 Constants.modUnknown
+
+        bottom <- M.checkBottom selfRef
+
+        if not bottom
+          then do
+            Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+            when (isJust (self'^.eGroundEntity)) $ do
+              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+                eMonsterInfo.miNextFrame .= frameAttack02
+                eTouch .= Nothing
+
+          else
+            gameBaseGlobals.gbGEdicts.ix selfIdx.eTouch .= Nothing
 
 mutantJumpTakeOff :: EntThink
 mutantJumpTakeOff =
