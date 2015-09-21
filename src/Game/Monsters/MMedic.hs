@@ -5,7 +5,7 @@ module Game.Monsters.MMedic where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
@@ -666,8 +666,16 @@ medicMoveAttackHyperBlaster = MMoveT "medicMoveAttackHyperBlaster" frameAttack15
 
 medicContinue :: EntThink
 medicContinue =
-  GenericEntThink "medic_continue" $ \_ -> do
-    io (putStrLn "MMedic.medicContinue") >> undefined -- TODO
+  GenericEntThink "medic_continue" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    vis <- GameUtil.visible selfRef (fromJust $ self^.eEnemy)
+    r <- Lib.randomF
+
+    when (vis && r <= 0.95) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just medicMoveAttackHyperBlaster
+
+    return True
 
 medicFramesAttackBlaster :: V.Vector MFrameT
 medicFramesAttackBlaster =
