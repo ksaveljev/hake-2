@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MTank where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
@@ -373,8 +374,42 @@ tankMovePain3 = MMoveT "tankMovePain3" framePain301 framePain316 tankFramesPain3
 
 tankPain :: EntPain
 tankPain =
-  GenericEntPain "tank_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MTank.tankPain") >> undefined -- TODO
+  GenericEntPain "tank_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    r <- Lib.randomF
+
+    let done = if damage <= 10 || levelTime < (self^.ePainDebounceTime) || damage <= 30 && r > 0.2
+                 then True
+                 else False
+
+    unless done $ do
+      -- If hard or nightmare, don't go into pain while attacking
+      skillValue <- liftM (^.cvValue) skillCVar
+
+      let frame = self^.eEntityState.esFrame
+          skip = if skillValue >= 2 && (frame >= frameAttack301 && frame <= frameAttack330 || frame >= frameAttack101 && frame <= frameAttack116)
+                   then True
+                   else False
+
+      unless skip $ do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+
+        soundPain <- use $ mTankGlobals.mTankSoundPain
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+
+        unless (skillValue == 3) $ do -- no pain anims in nightmare
+
+          let currentMove = if | damage <= 30 -> tankMovePain1
+                               | damage <= 60 -> tankMovePain2
+                               | otherwise -> tankMovePain3
+
+          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
 
 tankBlaster :: EntThink
 tankBlaster =
