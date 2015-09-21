@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSuperTank where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _y, normalize, norm)
@@ -756,7 +756,70 @@ spMonsterSuperTank =
         void $ think GameAI.walkMonsterStart selfRef
         return True
 
+-- Common Boss explode animation
 bossExplode :: EntThink
 bossExplode =
-  GenericEntThink "BossExplode" $ \_ -> do
-    io (putStrLn "MSuperTank.bossExplode") >> undefined -- TODO
+  GenericEntThink "BossExplode" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    r <- Lib.rand
+
+    let V3 a b c = self^.eEntityState.esOrigin
+        c' = c + 24 + fromIntegral (r .&. 15)
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eThink .= Just bossExplode
+      eCount += 1
+
+    if (self^.eCount) == 8
+      then do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= 0
+
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
+
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" 500 Constants.gibMetallic
+
+        GameMisc.throwGib selfRef "models/objects/gibs/chest/tris.md2" 500 Constants.gibOrganic
+
+        GameMisc.throwHead selfRef "models/objects/gibs/gear/tris.md2" 500 Constants.gibMetallic
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+        return True
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let writeByte = gameImport^.giWriteByte
+            writePosition = gameImport^.giWritePosition
+            multicast = gameImport^.giMulticast
+
+        let (a', b') = case (self^.eCount) of
+                         0 -> (a - 24, b - 24)
+                         1 -> (a + 24, b + 24)
+                         2 -> (a + 24, b - 24)
+                         3 -> (a - 24, b + 24)
+                         4 -> (a - 48, b - 48)
+                         5 -> (a + 48, b + 48)
+                         6 -> (a - 48, b + 48)
+                         7 -> (a + 48, b - 48)
+                         _ -> (a, b)
+
+        writeByte Constants.svcTempEntity
+        writeByte Constants.teExplosion1
+        writePosition (V3 a' b' c')
+        multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
+
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + 0.1
+
+        return True
