@@ -21,6 +21,9 @@ import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
+modelScale :: Float
+modelScale = 1.0
+
 frameAttack101 :: Int
 frameAttack101 = 0
 
@@ -699,8 +702,59 @@ superTankDie =
 -}
 spMonsterSuperTank :: EntThink
 spMonsterSuperTank =
-  GenericEntThink "SP_monster_supertank" $ \_ -> do
-    io (putStrLn "MSuperTank.spMonsterSuperTank") >> undefined -- TODO
+  GenericEntThink "SP_monster_supertank" $ \selfRef@(EdictReference selfIdx) -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    if deathmatchValue /= 0
+      then do
+        GameUtil.freeEdict selfRef
+        return True
+
+      else do
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let soundIndex = gameImport^.giSoundIndex
+            modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+
+        soundIndex (Just "bosstank/btkpain1.wav") >>= (mSuperTankGlobals.mSuperTankSoundPain1 .=)
+        soundIndex (Just "bosstank/btkpain2.wav") >>= (mSuperTankGlobals.mSuperTankSoundPain2 .=)
+        soundIndex (Just "bosstank/btkpain3.wav") >>= (mSuperTankGlobals.mSuperTankSoundPain3 .=)
+        soundIndex (Just "bosstank/btkdeth1.wav") >>= (mSuperTankGlobals.mSuperTankSoundDeath .=)
+        soundIndex (Just "bosstank/btkunqv1.wav") >>= (mSuperTankGlobals.mSuperTankSoundSearch1 .=)
+        soundIndex (Just "bosstank/btkunqv2.wav") >>= (mSuperTankGlobals.mSuperTankSoundSearch2 .=)
+        soundIndex (Just "bosstank/btkengn1.wav") >>= (mSuperTankGlobals.mSuperTankTreadSound .=)
+
+        modelIdx <- modelIndex (Just "models/monsters/boss1/tris.md2")
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+          eMoveType .= Constants.moveTypeStep
+          eSolid .= Constants.solidBbox
+          eEntityState.esModelIndex .= modelIdx
+          eMins .= V3 (-64) (-64) 0
+          eMaxs .= V3 64 64 112
+          eHealth .= 1500
+          eGibHealth .= (-500)
+          eMass .= 800
+          ePain .= Just superTankPain
+          eDie .= Just superTankDie
+          eMonsterInfo.miStand .= Just superTankStand
+          eMonsterInfo.miWalk .= Just superTankWalk
+          eMonsterInfo.miRun .= Just superTankRun
+          eMonsterInfo.miDodge .= Nothing
+          eMonsterInfo.miAttack .= Just superTankAttack
+          eMonsterInfo.miSearch .= Just superTankSearch
+          eMonsterInfo.miMelee .= Nothing
+          eMonsterInfo.miSight .= Nothing
+
+        linkEntity selfRef
+
+        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
+          miCurrentMove .= Just superTankMoveStand
+          miScale .= modelScale
+
+        void $ think GameAI.walkMonsterStart selfRef
+        return True
 
 bossExplode :: EntThink
 bossExplode =
