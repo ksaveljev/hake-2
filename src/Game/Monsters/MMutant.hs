@@ -546,8 +546,39 @@ mutantCheckJump =
 
 mutantCheckAttack :: EntThink
 mutantCheckAttack =
-  GenericEntThink "mutant_checkattack" $ \_ -> do
-    io (putStrLn "MMutant.mutantCheckAttack") >> undefined -- TODO
+  GenericEntThink "mutant_checkattack" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    case self^.eEnemy of
+      Nothing ->
+        return False
+
+      Just (EdictReference enemyIdx) -> do
+        Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+        if (enemy^.eHealth) <= 0
+          then
+            return False
+
+          else do
+            melee <- think mutantCheckMelee selfRef
+
+            if melee
+              then do
+                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asMelee
+                return True
+
+              else do
+                jump <- think mutantCheckJump selfRef
+
+                if jump
+                  then do
+                    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asMissile
+                    -- FIXME: play a jump sound here
+                    return True
+
+                  else
+                    return False
 
 mutantFramesPain1 :: V.Vector MFrameT
 mutantFramesPain1 =
