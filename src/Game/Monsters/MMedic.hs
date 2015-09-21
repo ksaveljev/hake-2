@@ -5,7 +5,7 @@ module Game.Monsters.MMedic where
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=), (-=))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust, isNothing)
 import Linear (V3(..), _z)
 import qualified Data.Vector as V
 
@@ -16,6 +16,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
 import qualified Game.Monsters.MFlash as MFlash
@@ -515,8 +516,48 @@ medicMoveDeath = MMoveT "medicMoveDeath" frameDeath1 frameDeath30 medicFramesDea
 
 medicDie :: EntDie
 medicDie =
-  GenericEntDie "medic_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MMedic.medicDie") >> undefined -- TODO
+  GenericEntDie "medic_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    -- if we had a pending patient, free him up for another medic
+    when (isJust (self^.eEnemy)) $ do
+      let Just (EdictReference enemyIdx) = self^.eEnemy
+      Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+      when ((enemy^.eOwner) == Just selfRef) $
+        gameBaseGlobals.gbGEdicts.ix enemyIdx.eOwner .= Nothing
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do -- check for gib
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do -- regular death
+           soundDie <- use $ mMedicGlobals.mMedicSoundDie
+           sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eMonsterInfo.miCurrentMove .= Just medicMoveDeath
 
 medicDuckDown :: EntThink
 medicDuckDown =
