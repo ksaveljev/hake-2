@@ -17,6 +17,7 @@ import qualified Constants
 import qualified Client.M as M
 import qualified Game.GameAI as GameAI
 import qualified Game.GameCombat as GameCombat
+import qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
@@ -709,8 +710,43 @@ mutantMoveDeath2 = MMoveT "mutantMoveDeath2" frameDeath201 frameDeath210 mutantF
 
 mutantDie :: EntDie
 mutantDie =
-  GenericEntDie "mutant_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MMutant.mutantDie") >> undefined -- TODO
+  GenericEntDie "mutant_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+           GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+
+           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+
+       | otherwise -> do
+           soundDeath <- use $ mMutantGlobals.mMutantSoundDeath
+           sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
+
+           r <- Lib.randomF
+
+           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+             eDeadFlag .= Constants.deadDead
+             eTakeDamage .= Constants.damageYes
+             eEntityState.esSkinNum .= 1
+             eMonsterInfo.miCurrentMove .= Just (if r < 0.5 then mutantMoveDeath1 else mutantMoveDeath2)
 
 {-
 - QUAKED monster_mutant (1 .5 0) (-32 -32 -24) (32 32 32) Ambush
