@@ -2,17 +2,21 @@
 module Game.Monsters.MTank where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
-import Control.Monad (void)
-import Data.Bits ((.&.), (.|.))
+import Control.Monad (void, when, unless, liftM)
+import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..))
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameStand01 :: Int
 frameStand01 = 0
@@ -192,8 +196,36 @@ tankStand =
 
 tankRun :: EntThink
 tankRun =
-  GenericEntThink "tank_run" $ \_ -> do
-    io (putStrLn "MTank.tankRun") >> undefined -- TODO
+  GenericEntThink "tank_run" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    case self^.eEnemy of
+      Nothing ->
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiBrutal))
+
+      Just (EdictReference enemyIdx) -> do
+        Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+        case enemy^.eClient of
+          Nothing -> gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiBrutal))
+          Just _ -> gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiBrutal)
+
+    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    if (self'^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
+      then do
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just tankMoveStand
+
+      else do
+        let currentMove = case self'^.eMonsterInfo.miCurrentMove of
+                            Nothing -> tankMoveStartRun
+                            Just move -> if (move^.mmId) == "tankMoveWalk" || (move^.mmId) == "tankMoveStartRun"
+                                           then tankMoveRun
+                                           else tankMoveStartRun
+
+        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+
+    return True
 
 tankWalk :: EntThink
 tankWalk =
