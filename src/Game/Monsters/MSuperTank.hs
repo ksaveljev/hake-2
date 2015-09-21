@@ -587,8 +587,24 @@ superTankMoveAttack2 = MMoveT "superTankMoveAttack2" frameAttack201 frameAttack2
 
 superTankReAttack1 :: EntThink
 superTankReAttack1 =
-  GenericEntThink "supertank_reattack1" $ \_ -> do
-    io (putStrLn "MSuperTank.superTankReAttack1") >> undefined -- TODO
+  GenericEntThink "supertank_reattack1" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
+
+    vis <- GameUtil.visible selfRef enemyRef
+    r <- Lib.randomF
+
+    let currentMove = if vis
+                        then
+                          if r < 0.9
+                            then superTankMoveAttack1
+                            else superTankMoveEndAttack1
+                        else
+                          superTankMoveEndAttack1
+
+    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    return True
 
 superTankFramesAttack1 :: V.Vector MFrameT
 superTankFramesAttack1 =
