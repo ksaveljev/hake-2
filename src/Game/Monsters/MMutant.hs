@@ -2,11 +2,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MMutant where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (+=))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust)
-import Linear (V3(..), _x, norm, normalize)
+import Linear (V3(..), _x, _z, norm, normalize)
 import qualified Data.Vector as V
 
 import Quake
@@ -20,6 +20,7 @@ import qualified Game.GameCombat as GameCombat
 import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameAttack01 :: Int
 frameAttack01 = 0
@@ -433,8 +434,27 @@ mutantJumpTouch =
 
 mutantJumpTakeOff :: EntThink
 mutantJumpTakeOff =
-  GenericEntThink "mutant_jump_takeoff" $ \_ -> do
-    io (putStrLn "MMutant.mutantJumpTakeOff") >> undefined -- TODO
+  GenericEntThink "mutant_jump_takeoff" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    soundSight <- use $ mMutantGlobals.mMutantSoundSight
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanVoice soundSight 1 Constants.attnNorm 0
+
+    let (Just forward, _, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True False False
+        V3 a b _ = fmap (* 600) forward
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
+      eEntityState.esOrigin._z += 1
+      eVelocity .= V3 a b 250
+      eGroundEntity .= Nothing
+      eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
+      eMonsterInfo.miAttackFinished .= levelTime + 3
+      eTouch .= Just mutantJumpTouch
+
+    return True
 
 mutantCheckLanding :: EntThink
 mutantCheckLanding =
