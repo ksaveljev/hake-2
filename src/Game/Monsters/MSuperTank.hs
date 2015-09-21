@@ -1,17 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MSuperTank where
 
 import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
-import Linear (V3(..))
+import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
+import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameAttack101 :: Int
 frameAttack101 = 0
@@ -27,6 +35,12 @@ frameAttack120 = 19
 
 frameAttack201 :: Int
 frameAttack201 = 20
+
+frameAttack208 :: Int
+frameAttack208 = 27
+
+frameAttack211 :: Int
+frameAttack211 = 30
 
 frameAttack227 :: Int
 frameAttack227 = 46
@@ -282,8 +296,25 @@ superTankDead =
 
 superTankRocket :: EntThink
 superTankRocket =
-  GenericEntThink "supertankRocket" $ \_ -> do
-    io (putStrLn "MSuperTank.superTankRocket") >> undefined -- TODO
+  GenericEntThink "supertankRocket" $ \selfRef@(EdictReference selfIdx) -> do
+    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+
+    let flashNumber = if | (self^.eEntityState.esFrame) == frameAttack208 -> Constants.mz2SupertankRocket1
+                         | (self^.eEntityState.esFrame) == frameAttack211 -> Constants.mz2SupertankRocket2
+                         | otherwise -> Constants.mz2SupertankRocket3
+
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+        Just (EdictReference enemyIdx) = self^.eEnemy
+
+    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = normalize (vec - start)
+
+    Monster.monsterFireRocket selfRef start dir 50 500 flashNumber
+    return True
 
 superTankMachineGun :: EntThink
 superTankMachineGun =
