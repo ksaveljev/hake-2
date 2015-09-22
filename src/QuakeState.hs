@@ -47,6 +47,7 @@ module QuakeState ( QuakeState(..)
                   , netChannelGlobals
                   , clTEntGlobals
                   , EdictReference
+                  , worldRef
                   , readEdictT
                   , modifyEdictT
                   , ClientReference(..)
@@ -229,3 +230,6 @@ modifyEdictT :: EdictReference -> (EdictT -> EdictT) -> Quake ()
 modifyEdictT (EdictReference edictIdx) f = do
     edicts <- use $ gameBaseGlobals.gbGEdicts
     liftIO $ MV.modify edicts f edictIdx
+
+worldRef :: EdictReference
+worldRef = EdictReference 0
