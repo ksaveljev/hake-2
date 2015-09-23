@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=), (&), (.~), (%~))
 import Control.Monad (when, liftM, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, fromJust)
@@ -21,23 +21,21 @@ import qualified Util.Math3D as Math3D
 
 blasterTouch :: EntTouch
 blasterTouch =
-  GenericEntTouch "blaster_touch" $ \selfRef@(EdictReference selfIdx) otherRef@(EdictReference otherIdx) plane maybeSurf -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    io (print "BLASTER TOUCH")
+  GenericEntTouch "blaster_touch" $ \selfRef otherRef plane maybeSurf -> do
+    self <- readEdictT selfRef
 
     unless (Just otherRef == (self^.eOwner)) $ do
       if isJust maybeSurf && ((fromJust maybeSurf)^.csFlags) .&. Constants.surfSky /= 0
         then
           GameUtil.freeEdict selfRef
         else do
-          let Just ownerRef@(EdictReference ownerIdx) = self^.eOwner
-          Just owner <- preuse $ gameBaseGlobals.gbGEdicts.ix ownerIdx
+          let Just ownerRef = self^.eOwner
+          owner <- readEdictT ownerRef
 
           when (isJust (owner^.eClient)) $
             PlayerWeapon.playerNoise ownerRef (self^.eEntityState.esOrigin) Constants.pNoiseImpact
 
-          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+          other <- readEdictT otherRef
 
           if (other^.eTakeDamage) /= 0
             then do
@@ -77,16 +75,13 @@ fireHit _ _ _ _ = do
 - =================
 -}
 fireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Bool -> Quake ()
-fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect hyper = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+fireBlaster selfRef start direction damage speed effect hyper = do
+    self <- readEdictT selfRef
     let dir = normalize direction
 
-    boltRef@(EdictReference boltIdx) <- GameUtil.spawn
-
-    io (print "FIRE BLASTER")
-    io (print ("boltIdx = " ++ show boltIdx))
-
+    boltRef <- GameUtil.spawn
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let linkEntity = gameImport^.giLinkEntity
         trace = gameImport^.giTrace
         modelIndex = gameImport^.giModelIndex
@@ -101,29 +96,28 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
     soundIdx <- soundIndex (Just "misc/lasfly.wav")
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    zoom (gameBaseGlobals.gbGEdicts.ix boltIdx) $ do
-      eSvFlags .= Constants.svfDeadMonster
-      eEntityState.esOrigin .= start
-      eEntityState.esOldOrigin .= start
-      eEntityState.esAngles .= dir
-      eVelocity .= fmap (* (fromIntegral speed)) dir
-      eMoveType .= Constants.moveTypeFlyMissile
-      eClipMask .= Constants.maskShot
-      eSolid .= Constants.solidBbox
-      eEntityState.esEffects %= (.|. effect)
-      eMins .= V3 0 0 0
-      eMaxs .= V3 0 0 0
-      eEntityState.esModelIndex .= modelIdx
-      eEntityState.esSound .= soundIdx
-      eOwner .= Just selfRef
-      eTouch .= Just blasterTouch
-      eNextThink .= levelTime + 2
-      eThink .= Just GameUtil.freeEdictA
-      eDmg .= damage
-      eClassName .= "bolt"
+    modifyEdictT boltRef (\v -> v & eSvFlags .~ Constants.svfDeadMonster
+                                  & eEntityState.esOrigin .~ start
+                                  & eEntityState.esOldOrigin .~ start
+                                  & eEntityState.esAngles .~ dir
+                                  & eVelocity .~ fmap (* (fromIntegral speed)) dir
+                                  & eMoveType .~ Constants.moveTypeFlyMissile
+                                  & eClipMask .~ Constants.maskShot
+                                  & eSolid .~ Constants.solidBbox
+                                  & eEntityState.esEffects %~ (.|. effect)
+                                  & eMins .~ V3 0 0 0
+                                  & eMaxs .~ V3 0 0 0
+                                  & eEntityState.esModelIndex .~ modelIdx
+                                  & eEntityState.esSound .~ soundIdx
+                                  & eOwner .~ Just selfRef
+                                  & eTouch .~ Just blasterTouch
+                                  & eNextThink .~ levelTime + 2
+                                  & eThink .~ Just GameUtil.freeEdictA
+                                  & eDmg .~ damage
+                                  & eClassName .~ "bolt")
 
     when hyper $
-      gameBaseGlobals.gbGEdicts.ix boltIdx.eSpawnFlags .= 1
+      modifyEdictT boltRef (\v -> v & eSpawnFlags .~ 1)
 
     linkEntity boltRef
 
@@ -133,7 +127,7 @@ fireBlaster selfRef@(EdictReference selfIdx) start direction damage speed effect
     traceT <- trace (self^.eEntityState.esOrigin) Nothing Nothing start (Just boltRef) Constants.maskShot
 
     when ((traceT^.tFraction) < 1.0) $ do
-      gameBaseGlobals.gbGEdicts.ix boltIdx.eEntityState.esOrigin .= start + fmap (* (-10)) dir
+      modifyEdictT boltRef (\v -> v & eEntityState.esOrigin .~ start + fmap (* (-10)) dir)
       dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
       touch blasterTouch boltRef (fromJust $ traceT^.tEnt) dummyPlane Nothing
 
@@ -165,7 +159,7 @@ fireRail _ _ _ _ _ = do
 - =================
 -}
 checkDodge :: EdictReference -> V3 Float -> V3 Float -> Int -> Quake ()
-checkDodge selfRef@(EdictReference selfIdx) start dir speed = do
+checkDodge selfRef start dir speed = do
     skillValue <- liftM (^.cvValue) skillCVar
 
     -- easy mode only ducks one quarter of the time
@@ -178,9 +172,9 @@ checkDodge selfRef@(EdictReference selfIdx) start dir speed = do
       traceT <- trace start Nothing Nothing end (Just selfRef) Constants.maskShot
 
       when (isJust (traceT^.tEnt)) $ do
-        let Just (EdictReference traceEntIdx) = traceT^.tEnt
-        Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
-        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        let Just traceEntRef = traceT^.tEnt
+        traceEnt <- readEdictT traceEntRef
+        self <- readEdictT selfRef
 
         when ((traceEnt^.eSvFlags) .&. Constants.svfMonster /= 0 && (traceEnt^.eHealth) > 0 && isJust (traceEnt^.eMonsterInfo.miDodge) && GameUtil.inFront traceEnt self) $ do
           let v = (traceT^.tEndPos) - start
@@ -189,8 +183,8 @@ checkDodge selfRef@(EdictReference selfIdx) start dir speed = do
           dodge (fromJust $ traceEnt^.eMonsterInfo.miDodge) (fromJust $ traceT^.tEnt) selfRef eta
 
 fireLead :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
-fireLead selfRef@(EdictReference selfIdx) start aimDir damage kick impact hspread vspread mod' = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let contentMask = Constants.maskShot .|. Constants.maskWater
@@ -234,8 +228,8 @@ fireLead selfRef@(EdictReference selfIdx) start aimDir damage kick impact hsprea
         sendGunPuffAndFlash traceT water = do
           when (not (isJust (traceT^.tSurface) && ((fromJust (traceT^.tSurface))^.csFlags) .&. Constants.surfSky /= 0)) $ do
             when ((traceT^.tFraction) < 1.0) $ do
-              let Just traceEntRef@(EdictReference traceEntIdx) = traceT^.tEnt
-              Just traceEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix traceEntIdx
+              let Just traceEntRef = traceT^.tEnt
+              traceEnt <- readEdictT traceEntRef
 
               if (traceEnt^.eTakeDamage) /= 0
                 then
@@ -255,7 +249,7 @@ fireLead selfRef@(EdictReference selfIdx) start aimDir damage kick impact hsprea
                     writeDir (traceT^.tPlane.cpNormal)
                     multicast (traceT^.tEndPos) Constants.multicastPvs
 
-                    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+                    self <- readEdictT selfRef
                     when (isJust (self^.eClient)) $
                       PlayerWeapon.playerNoise selfRef (traceT^.tEndPos) Constants.pNoiseImpact
 
