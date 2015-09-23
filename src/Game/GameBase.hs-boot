@@ -20,7 +20,7 @@ findByClass :: EdictT -> B.ByteString -> Bool
 
 gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
 
-setMoveDir :: Traversal' QuakeState (V3 Float) -> Traversal' QuakeState (V3 Float) -> Quake ()
+setMoveDir :: EdictReference -> Quake ()
 
 exitLevel :: Quake ()
 

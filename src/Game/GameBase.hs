@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameBase where
 
-import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix)
+import Control.Lens (use, (^.), (.=), Traversal', preuse, zoom, ix, (&), (.~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
@@ -160,6 +160,23 @@ gFind ref findBy str = do
                  | findBy edict str -> return $ Just (EdictReference idx)
                  | otherwise -> findEdict (idx + 1) maxIdx
 
+setMoveDir :: EdictReference -> Quake ()
+setMoveDir edictRef = do
+    edict <- readEdictT edictRef
+
+    let angles = edict^.eEntityState.esAngles
+        moveDir = edict^.eMoveDir
+        moveDir' = if | angles == vecUp -> moveDirUp
+                      | angles == vecDown -> moveDirDown
+                      | otherwise -> let (Just forward, _, _) = Math3D.angleVectors angles True False False
+                                    in forward
+
+    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+                                   & eMoveDir .~ moveDir')
+
+{-
+- used this version when Vector EdictT in GameBaseGlobals was immutable
+-
 setMoveDir :: Traversal' QuakeState (V3 Float) -> Traversal' QuakeState (V3 Float) -> Quake ()
 setMoveDir anglesLens moveDirLens = do
     Just angles <- preuse anglesLens
@@ -170,6 +187,7 @@ setMoveDir anglesLens moveDirLens = do
                      in moveDirLens .= updatedMoveDir
 
     anglesLens .= V3 0 0 0
+    -}
 
 exitLevel :: Quake ()
 exitLevel = io (putStrLn "GameBase.exitLevel") >> undefined -- TODO
