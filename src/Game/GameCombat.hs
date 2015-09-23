@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameCombat where
 
-import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=))
+import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=), (&), (.~), (%~), (+~), (-~))
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
@@ -22,19 +22,19 @@ import qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()
-radiusDamage inflictorRef@(EdictReference inflictorIdx) attackerRef dmg ignoreRef radius mod' = do
+radiusDamage inflictorRef attackerRef dmg ignoreRef radius mod' = do
     radiusDamage' Nothing
 
   where radiusDamage' :: Maybe EdictReference -> Quake ()
         radiusDamage' edictRef = do
-          Just inflictor <- preuse $ gameBaseGlobals.gbGEdicts.ix inflictorIdx
+          inflictor <- readEdictT inflictorRef
           edictit <- GameBase.findRadius edictRef (inflictor^.eEntityState.esOrigin) radius
 
           case edictit of
             Nothing -> return ()
 
-            Just entRef@(EdictReference entIdx) -> do
-              Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+            Just entRef -> do
+              ent <- readEdictT entRef
 
               if | edictit == ignoreRef -> radiusDamage' edictit
                  | (ent^.eTakeDamage) == 0 -> radiusDamage' edictit
@@ -57,8 +57,8 @@ radiusDamage inflictorRef@(EdictReference inflictorIdx) attackerRef dmg ignoreRe
                      radiusDamage' edictit
 
 damage :: EdictReference -> EdictReference -> EdictReference -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
-damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) attackerRef@(EdictReference attackerIdx) dir point normal damage knockback dflags mod' = do
-    Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+damage targRef inflictorRef attackerRef dir point normal damage knockback dflags mod' = do
+    targ <- readEdictT targRef
 
     unless ((targ^.eTakeDamage) == 0) $ do
       -- friendly fire avoidance
@@ -69,8 +69,7 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
       skillValue <- liftM (^.cvValue) skillCVar
       coopValue <- liftM (^.cvValue) coopCVar
 
-      Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
-      Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+      attacker <- readEdictT attackerRef
 
       (damage', mod'') <- updateDamageAndMod targ deathmatchValue dmFlags skillValue coopValue
 
@@ -97,7 +96,7 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
                      -- the rocket jump hack...
                      else fmap (* (500 * fromIntegral knockback' / mass)) dir'
 
-        gameBaseGlobals.gbGEdicts.ix targIdx.eVelocity += kvel
+        modifyEdictT targRef (\v -> v & eVelocity +~ kvel)
 
       -- check for godmode
       (take, save) <- if (targ^.eFlags) .&. Constants.flGodMode /= 0 && dflags .&. Constants.damageNoProtection == 0
@@ -124,7 +123,7 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
 
                                   soundIdx <- soundIndex (Just "items/protect4.wav")
                                   sound (Just targRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
-                                  gameBaseGlobals.gbGEdicts.ix targIdx.ePainDebounceTime .= levelTime + 2
+                                  modifyEdictT targRef (\v -> v & ePainDebounceTime .~ levelTime + 2)
 
                                 return (0, damage'')
                               else
@@ -151,13 +150,13 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
                     if (targ^.eSvFlags) .&. Constants.svfMonster /= 0 || isJust client
                       then spawnDamage Constants.teBlood point normal take'''
                       else spawnDamage sparks point normal take'''
-
-                    gameBaseGlobals.gbGEdicts.ix targIdx.eHealth .= (targ^.eHealth) - take'''
+                    
+                    modifyEdictT targRef (\v -> v & eHealth .~ (targ^.eHealth) - take''')
 
                     if (targ^.eHealth) - take''' <= 0
                       then do
                         when ((targ^.eSvFlags) .&. Constants.svfMonster /= 0 || isJust client) $
-                          gameBaseGlobals.gbGEdicts.ix targIdx.eFlags %= (.|. Constants.flNoKnockback)
+                          modifyEdictT targRef (\v -> v & eFlags %~ (.|. Constants.flNoKnockback))
 
                         killed targRef inflictorRef attackerRef take''' point
                         return True
@@ -169,14 +168,14 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
         unless done $ do
           if | (targ^.eSvFlags) .&. Constants.svfMonster /= 0 -> do
                  reactToDamage targRef attackerRef
-                 Just targ' <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+                 targ' <- readEdictT targRef
 
                  when ((targ'^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0 && take''' /= 0) $ do
                    pain (fromJust $ targ'^.ePain) targRef attackerRef (fromIntegral knockback) take'''
                    -- nightmare mode monsters don't go into pain frames often
                    when (skillValue == 3) $ do
                      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                     gameBaseGlobals.gbGEdicts.ix targIdx.ePainDebounceTime .= levelTime + 5
+                     modifyEdictT targRef (\v -> v & ePainDebounceTime .~ levelTime + 5)
 
              | isJust client -> do
                  when ((targ^.eFlags) .&. Constants.flGodMode == 0 && take''' /= 0) $
@@ -235,9 +234,10 @@ damage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorId
 - explosions and melee attacks.
 -}
 canDamage :: EdictReference -> EdictReference -> Quake Bool
-canDamage targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) = do
-    Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
-    Just inflictor <- preuse $ gameBaseGlobals.gbGEdicts.ix inflictorIdx
+canDamage targRef inflictorRef = do
+    targ <- readEdictT targRef
+    inflictor <- readEdictT inflictorRef
+
     v3o <- use $ globals.vec3Origin
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
 
@@ -314,11 +314,11 @@ spawnDamage dmgType origin normal damage = do
     multicast origin Constants.multicastPvs
 
 checkPowerArmor :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Quake Int
-checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = do
+checkPowerArmor edictRef point normal damage dflags = do
     if | damage == 0 -> return 0
        | dflags .&. Constants.damageNoArmor /= 0 -> return 0
        | otherwise -> do
-           Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+           edict <- readEdictT edictRef
 
            if | isJust (edict^.eClient) -> do
                   powerArmorType <- GameItems.powerArmorType edictRef
@@ -347,7 +347,7 @@ checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = 
           if | powerAmorType == Constants.powerArmorNone -> return 0
              | power == 0 -> return 0
              | otherwise -> do
-                 Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+                 edict <- readEdictT edictRef
 
                  let maybeDamageInfo = if powerAmorType == Constants.powerArmorScreen
                                          then let (Just forward, _, _) = Math3D.angleVectors (edict^.eEntityState.esAngles) True False False
@@ -376,13 +376,13 @@ checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = 
                          spawnDamage paTeType point normal save'
 
                          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                         gameBaseGlobals.gbGEdicts.ix edictIdx.ePowerArmorTime .= levelTime + 0.2
+                         modifyEdictT edictRef (\v -> v & ePowerArmorTime .~ levelTime + 0.2)
 
                          let powerUsed = save' `div` damagePerCell
 
                          case edict^.eClient of
                            Nothing ->
-                             gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miPowerArmorPower -= powerUsed
+                            modifyEdictT edictRef (\v -> v & eMonsterInfo.miPowerArmorPower -~ powerUsed)
 
                            Just (GClientReference gClientIdx) -> do
                              Just (GItemReference itemIdx) <- GameItems.findItem "Cells"
@@ -392,8 +392,8 @@ checkPowerArmor edictRef@(EdictReference edictIdx) point normal damage dflags = 
                          return save'
 
 checkArmor :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake Int
-checkArmor edictRef@(EdictReference edictIdx) point normal damage sparks dflags = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+checkArmor edictRef point normal damage sparks dflags = do
+    edict <- readEdictT edictRef
 
     if | damage == 0 -> return 0
        | isNothing (edict^.eClient) -> return 0
@@ -438,64 +438,66 @@ checkTeamDamage _ _ =
     return False
 
 killed :: EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
-killed targRef@(EdictReference targIdx) inflictorRef@(EdictReference inflictorIdx) attackerRef@(EdictReference attackerIdx) damage point = do
-    Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
+killed targRef inflictorRef attackerRef damage point = do
+    targ <- readEdictT targRef
 
     Com.dprintf ("Killing a " `B.append` (targ^.eClassName) `B.append` "\n")
 
     when ((targ^.eHealth) < -999) $
-      gameBaseGlobals.gbGEdicts.ix targIdx.eHealth .= (-999)
+      modifyEdictT targRef (\v -> v & eHealth .~ (-999))
 
-    gameBaseGlobals.gbGEdicts.ix targIdx.eEnemy .= Just attackerRef
+    modifyEdictT targRef (\v -> v & eEnemy .~ Just attackerRef)
 
     when ((targ^.eSvFlags) .&. Constants.svfMonster /= 0 && (targ^.eDeadFlag) /= Constants.deadDead) $
       when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy == 0) $ do
         gameBaseGlobals.gbLevel.llKilledMonsters += 1
         coopValue <- liftM (^.cvValue) coopCVar
-        Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+
+        attacker <- readEdictT attackerRef
+
         when (coopValue /= 0 && isJust (attacker^.eClient)) $ do
           let Just (GClientReference attackerClientIdx) = attacker^.eClient
           gameBaseGlobals.gbGame.glClients.ix attackerClientIdx.gcResp.crScore += 1
           -- medics won't heal monsters that they kill themselves
           when ((attacker^.eClassName) == "monster_medic") $
-            gameBaseGlobals.gbGEdicts.ix targIdx.eOwner .= Just attackerRef
+            modifyEdictT targRef (\v -> v & eOwner .~ Just attackerRef)
 
     if (targ^.eMoveType) `elem` [ Constants.moveTypePush, Constants.moveTypeStop, Constants.moveTypeNone ] -- doors, triggers, etc
       then
         die (fromJust $ targ^.eDie) targRef inflictorRef attackerRef damage point
       else do
         when ((targ^.eSvFlags) .&. Constants.svfMonster /= 0 && (targ^.eDeadFlag) /= Constants.deadDead) $ do
-          gameBaseGlobals.gbGEdicts.ix targIdx.eTouch .= Nothing
+          modifyEdictT targRef (\v -> v & eTouch .~ Nothing)
           Monster.monsterDeathUse targRef
 
         die (fromJust $ targ^.eDie) targRef inflictorRef attackerRef damage point
 
 reactToDamage :: EdictReference -> EdictReference -> Quake ()
-reactToDamage targRef@(EdictReference targIdx) attackerRef@(EdictReference attackerIdx) = do
+reactToDamage targRef attackerRef = do
     skip <- shouldSkip
 
     unless skip $ do
       -- we no know that we are not both good guys
-      Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
-      Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+      targ <- readEdictT targRef
+      attacker <- readEdictT attackerRef
 
       -- if attacker is a client, get mad at them because he's good and we're not
       case attacker^.eClient of
         Just (GClientReference gClientIdx) -> do
-          gameBaseGlobals.gbGEdicts.ix targIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiSoundTarget))
+          modifyEdictT targRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
 
           -- this can only happen in coop (both new and old enemies are clients)
           -- only switch if can't see the current enemy
           targEnemyClient <- case targ^.eEnemy of
                                Nothing -> return Nothing
-                               Just (EdictReference enemyIdx) -> do
-                                 Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                               Just enemyRef -> do
+                                 enemy <- readEdictT enemyRef
                                  return (enemy^.eClient)
 
           when (isJust targEnemyClient) $ do
             io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
 
-          gameBaseGlobals.gbGEdicts.ix targIdx.eEnemy .= Just attackerRef
+          modifyEdictT targRef (\v -> v & eEnemy .~ Just attackerRef)
 
           when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $
             GameUtil.foundTarget targRef
@@ -505,8 +507,8 @@ reactToDamage targRef@(EdictReference targIdx) attackerRef@(EdictReference attac
   
   where shouldSkip :: Quake Bool
         shouldSkip = do
-          Just targ <- preuse $ gameBaseGlobals.gbGEdicts.ix targIdx
-          Just attacker <- preuse $ gameBaseGlobals.gbGEdicts.ix attackerIdx
+          targ <- readEdictT targRef
+          attacker <- readEdictT attackerRef
 
           if | isJust (attacker^.eClient) && (attacker^.eSvFlags) .&. Constants.svfMonster /= 0 ->
                  return True
