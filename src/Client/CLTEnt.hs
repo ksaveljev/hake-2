@@ -591,13 +591,13 @@ parseTEnt = do
              case cnt of
                1 -> do
                  sfxRef <- use $ clTEntGlobals.clteSfxRic1
-                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+                 S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
                2 -> do
                  sfxRef <- use $ clTEntGlobals.clteSfxRic2
-                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+                 S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
                3 -> do
                  sfxRef <- use $ clTEntGlobals.clteSfxRic3
-                 S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+                 S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
                _ ->
                  return ()
 
@@ -611,7 +611,7 @@ parseTEnt = do
 
            -- FIXME: replace or remove this sound
            sfxRef <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
          -- bullet hitting wall
        | entType == Constants.teShotgun -> do
@@ -637,7 +637,7 @@ parseTEnt = do
              sfxRef <- if | r' == 0 -> use $ clTEntGlobals.clteSfxSpark5
                           | r' == 1 -> use $ clTEntGlobals.clteSfxSpark6
                           | otherwise -> use $ clTEntGlobals.clteSfxSpark7
-             S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnStatic 0
+             S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnStatic 0
 
        | entType == Constants.teLaserSparks -> do
            cnt <- MSG.readByte (globals.netMessage)
@@ -685,7 +685,7 @@ parseTEnt = do
            io $ writeIORef exRef ex
 
            sfxRef <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
          -- railgun effect
        | entType == Constants.teRailTrail -> do
@@ -693,7 +693,7 @@ parseTEnt = do
            pos2 <- MSG.readPos (globals.netMessage)
            CLFX.railTrail pos pos2
            sfxRef <- use $ clTEntGlobals.clteSfxRailg
-           S.startSound (Just pos2) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos2) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -729,7 +729,7 @@ parseTEnt = do
                        then use $ clTEntGlobals.clteSfxWatrExp
                        else use $ clTEntGlobals.clteSfxGrenExp
 
-           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.tePlasmaExplosion -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -764,7 +764,7 @@ parseTEnt = do
            CLFX.explosionParticles pos
 
            sfxRef <- use $ clTEntGlobals.clteSfxRockExp
-           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -805,7 +805,7 @@ parseTEnt = do
                        then use $ clTEntGlobals.clteSfxWatrExp
                        else use $ clTEntGlobals.clteSfxRockExp
 
-           S.startSound (Just pos) (EdictReference 0) 0 sfxRef 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.teBfgExplosion -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -854,7 +854,7 @@ parseTEnt = do
            pos <- MSG.readPos (globals.netMessage)
            CLFX.bigTeleportParticles pos
            soundIdx <- S.registerSound "misc/bigtele.wav"
-           S.startSound (Just pos) (EdictReference 0) 0 soundIdx 1 Constants.attnNone 0
+           S.startSound (Just pos) worldRef 0 soundIdx 1 Constants.attnNone 0
 
        | entType == Constants.teGrappleCable -> do
            Just modGrappleCable <- use $ clTEntGlobals.clteModGrappleCable
@@ -942,13 +942,13 @@ parseTEnt = do
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
 
-           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teLightning -> do
            Just modLightning <- use $ clTEntGlobals.clteModLightning
            ent <- parseLightning modLightning
            sfxLightning <- use $ clTEntGlobals.clteSfxLightning
-           S.startSound Nothing (EdictReference ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
+           S.startSound Nothing (newEdictReference ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
 
        | entType == Constants.teDebugTrail -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -988,7 +988,7 @@ parseTEnt = do
                     then use $ clTEntGlobals.clteSfxWatrExp
                     else use $ clTEntGlobals.clteSfxRockExp
 
-           S.startSound (Just pos) (EdictReference 0) 0 sfx 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfx 1 Constants.attnNorm 0
 
        | entType == Constants.teFlashlight -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -1020,7 +1020,7 @@ parseTEnt = do
            CLNewFX.particleSteamEffect pos dir color cnt magnitude
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teHeatBeamSteam -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -1033,7 +1033,7 @@ parseTEnt = do
            CLNewFX.particleSteamEffect pos dir color cnt magnitude
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teSteam -> do
            parseSteam
@@ -1045,7 +1045,7 @@ parseTEnt = do
            CLNewFX.bubbleTrail2 pos pos2 8
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teMoreBlood -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -1062,7 +1062,7 @@ parseTEnt = do
            CLFX.particleEffect pos dir 0x75 40
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
-           S.startSound (Just pos) (EdictReference 0) 0 sfxLashIt 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teTrackerExplosion -> do
            pos <- MSG.readPos (globals.netMessage)
@@ -1071,7 +1071,7 @@ parseTEnt = do
            CLNewFX.colorExplosionParticles pos 0 1
 
            sfxDisrExp <- use $ clTEntGlobals.clteSfxDisrExp
-           S.startSound (Just pos) (EdictReference 0) 0 sfxDisrExp 1 Constants.attnNorm 0
+           S.startSound (Just pos) worldRef 0 sfxDisrExp 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teTeleportEffect, Constants.teDBallGoal] -> do
            pos <- MSG.readPos (globals.netMessage)
