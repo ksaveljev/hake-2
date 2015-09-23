@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.PlayerTrail where
 
-import Control.Lens ((^.), (.=), ix)
+import Control.Lens ((^.), (.=), ix, (&), (.~))
 import Control.Monad (liftM, when)
 import Linear (V3)
 import qualified Data.Vector as V
@@ -40,9 +40,9 @@ init = do
 
   where initTrail :: Int -> Quake EdictReference
         initTrail _ = do
-          er@(EdictReference idx) <- GameUtil.spawn
-          gameBaseGlobals.gbGEdicts.ix idx.eClassName .= "player_trail"
-          return er
+          edictRef <- GameUtil.spawn
+          modifyEdictT edictRef (\v -> v & eClassName .~ "player_trail")
+          return edictRef
 
 lastSpot :: Quake EdictReference
 lastSpot = do
