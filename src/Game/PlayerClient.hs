@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerClient where
 
-import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=))
+import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=), (&), (.~), (%~), (+~), (-~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
@@ -45,14 +45,16 @@ clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined 
 - will. 
 -}
 clientConnect :: EdictReference -> B.ByteString -> Quake (Bool, B.ByteString)
-clientConnect edictRef@(EdictReference edictIdx) userInfo = do
+clientConnect edictRef userInfo = do
     -- check to see if they are on the banned IP list
     value <- Info.valueForKey userInfo "ip"
     banned <- GameSVCmds.filterPacket value
+
     if banned
       then do
         userInfo' <- Info.setValueForKey userInfo "rejmsg" "Banned."
         return (False, userInfo')
+
       else do
         -- check for a spectator
         value' <- Info.valueForKey userInfo "spectator"
@@ -65,6 +67,7 @@ clientConnect edictRef@(EdictReference edictIdx) userInfo = do
                                  -- check for a password
                                  pass <- Info.valueForKey userInfo "password"
                                  actualPassword <- liftM (^.cvString) spectatorPasswordCVar
+
                                  if not (passwordOK actualPassword pass)
                                    then do
                                      info <- Info.setValueForKey userInfo "rejmsg" "Password required or incorrect."
@@ -75,15 +78,20 @@ clientConnect edictRef@(EdictReference edictIdx) userInfo = do
         if done
           then 
             return (False, userInfo')
+
           else do
+            edict <- readEdictT edictRef
+
             -- they can connect
-            let gClientIdx = edictIdx - 1
+            let gClientIdx = (edict^.eIndex) - 1
                 gClientRef = GClientReference gClientIdx
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eClient .= Just gClientRef
+
+            modifyEdictT edictRef (\v -> v & eClient .~ Just gClientRef)
 
             -- if there is already a body waiting for us (a loadgame), just
             -- take it, otherwise spawn one from scratch
-            Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+            let inUse = edict^.eInUse
+
             unless inUse $ do
               -- clear the respawning variables
               initClientResp gClientRef
@@ -102,7 +110,7 @@ clientConnect edictRef@(EdictReference edictIdx) userInfo = do
               Just netName <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpNetName
               dprintf $ netName `B.append` " connected\n"
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= 0 -- make sure we start with known default
+            modifyEdictT edictRef (\v -> v & eSvFlags .~ 0) -- make sure we start with known default
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpConnected .= True
 
             return (True, userInfo'')
@@ -144,34 +152,33 @@ initBodyQue = do
 
   where spawnBodyQue :: Int -> Quake ()
         spawnBodyQue _ = do
-          EdictReference idx <- GameUtil.spawn
-          gameBaseGlobals.gbGEdicts.ix idx.eClassName .= "bodyque"
+          bodyRef <- GameUtil.spawn
+          modifyEdictT bodyRef (\v -> v & eClassName .~ "bodyque")
 
 spInfoPlayerStart :: EdictReference -> Quake ()
-spInfoPlayerStart (EdictReference edictIdx) = do
+spInfoPlayerStart edictRef = do
     coopValue <- liftM (^.cvValue) coopCVar
 
     unless (coopValue == 0) $ do
       mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
 
       when (mapName == "security") $ do
-        time <- use $ gameBaseGlobals.gbLevel.llTime
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         -- invoke one of our gross, ugly, disgusting hacks
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eThink .= Just spCreateCoopSpots
-          eNextThink .= time + Constants.frameTime
+        modifyEdictT edictRef (\v -> v & eThink .~ Just spCreateCoopSpots
+                                       & eNextThink .~ levelTime + Constants.frameTime)
 
 {-
 - QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) potential
 - spawning position for deathmatch games.
 -}
 spInfoPlayerDeathmatch :: EdictReference -> Quake ()
-spInfoPlayerDeathmatch er = do
+spInfoPlayerDeathmatch edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue == 0
-      then GameUtil.freeEdict er
-      else void $ think GameMisc.spMiscTeleporterDest er
+      then GameUtil.freeEdict edictRef
+      else void $ think GameMisc.spMiscTeleporterDest edictRef
 
 {-
 - QUAKED info_player_coop (1 0 1) (-16 -16 -24) (16 16 32) potential
