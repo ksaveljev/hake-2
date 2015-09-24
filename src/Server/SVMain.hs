@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVMain where
 
-import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), ix, zoom)
+import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), ix, zoom, (&), (.~))
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
 import Data.Maybe (isJust)
@@ -166,10 +166,10 @@ statusString = do
               Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
               if (client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned
                 then do
-                  let Just (EdictReference edictIdx) = client^.cEdict
-                  Just gclientRef <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
-                  let Just (GClientReference gclientIdx) = gclientRef
-                  Just clientStats <- preuse $ gameBaseGlobals.gbGame.glClients.ix gclientIdx.gcPlayerState.psStats
+                  let Just edictRef = client^.cEdict
+                  gClientRef <- readEdictT edictRef >>= \e -> return (e^.eClient)
+                  let Just (GClientReference gClientIdx) = gClientRef
+                  Just clientStats <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats
 
                   let player = BC.pack (show $ clientStats UV.! Constants.statFrags) `B.append`
                                " " `B.append` BC.pack (show $ client^.cPing) `B.append`
@@ -362,10 +362,10 @@ calcPings = do
                 svGlobals.svServerStatic.ssClients.ix idx.cPing .= ping
                 
                 -- let the game dll know about the ping
-                let Just (EdictReference edictIdx) = client^.cEdict
-                Just gclient <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
-                let Just (GClientReference gclientIdx) = gclient
-                gameBaseGlobals.gbGame.glClients.ix gclientIdx.gcPing .= ping
+                let Just edictRef = client^.cEdict
+                gClientRef <- readEdictT edictRef >>= \e -> return (e^.eClient)
+                let Just (GClientReference gClientIdx) = gClientRef
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPing .= ping
 
               updateClientPing (idx + 1) maxIdx
 
@@ -486,7 +486,7 @@ prepWorldFrame = do
           | idx >= maxIdx = return ()
           | otherwise = do
               -- events only last for a single message
-              gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esEvent .= 0
+              modifyEdictT (newEdictReference idx) (\v -> v & eEntityState.esEvent .~ 0)
               resetEdictEvent (idx + 1) maxIdx
 
 {-
@@ -643,13 +643,14 @@ gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport 
 
     let edictIdx = clientIdx + 1
 
-    svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict .= Just (EdictReference edictIdx)
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict .= Just (newEdictReference edictIdx)
 
     -- save challenge for checksumming
     svGlobals.svServerStatic.ssClients.ix clientIdx.cChallenge .= challenge
 
     -- get the game a chance to reject this connection or modify the userinfo
-    (allowed, userInfo') <- PlayerClient.clientConnect (EdictReference edictIdx) userInfo
+    (allowed, userInfo') <- PlayerClient.clientConnect (newEdictReference edictIdx) userInfo
+
     if not allowed
       then do
         value <- Info.valueForKey userInfo' "rejmsg"
