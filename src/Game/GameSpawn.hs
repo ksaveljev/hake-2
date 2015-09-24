@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameSpawn where
 
-import Control.Lens (use, (^.), (.=), (%=), preuse, ix)
+import Control.Lens (use, (^.), (.=), (%=), preuse, ix, (&), (.~), (%~))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, (.|.))
 import Data.Char (toLower)
@@ -111,13 +111,13 @@ spawnEntities mapName entities spawnPoint = do
                     err <- use $ gameBaseGlobals.gbGameImport.giError
                     err $ "ED_LoadFromFile: found " `B.append` token `B.append` " when expecting {"
 
-                  ent@(EdictReference edictIdx) <- if initial
-                                                     then return (EdictReference 0)
-                                                     else GameUtil.spawn
+                  edictRef <- if initial
+                                then return worldRef
+                                else GameUtil.spawn
 
-                  updatedIdx <- parseEdict ent entities newIdx
+                  updatedIdx <- parseEdict edictRef entities newIdx
+                  edict <- readEdictT edictRef
 
-                  Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
                   Com.dprintf $ "spawning ent[" `B.append` BC.pack (show $ edict^.eIndex) `B.append` -- IMPROVE
                                 "], classname=" `B.append` (edict^.eClassName) `B.append`
                                 ", flags=" `B.append` BC.pack (show $ edict^.eSpawnFlags) -- IMPROVE: show flags in hex
@@ -127,11 +127,13 @@ spawnEntities mapName entities spawnPoint = do
                         BC.map toLower (edict^.eClassName) == "trigger_once" &&
                         isJust (edict^.eiModel) &&
                         BC.map toLower (fromJust (edict^.eiModel)) == "*27") $
-                    gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.&. (complement Constants.spawnFlagNotHard))
+                    modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement Constants.spawnFlagNotHard)))
 
                   -- remove things (except the world) from different skill levels or deathmatch
-                  removed <- if edictIdx == 0
-                               then return False
+                  removed <- if edictRef == worldRef
+                               then
+                                 return False
+
                                else do
                                  deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -140,33 +142,39 @@ spawnEntities mapName entities spawnPoint = do
                                               if ((edict^.eSpawnFlags) .&. Constants.spawnFlagNotDeathmatch) /= 0
                                                 then do
                                                   Com.dprintf "->inhibited.\n"
-                                                  GameUtil.freeEdict ent
+                                                  GameUtil.freeEdict edictRef
                                                   return True
-                                                else return False
+                                                else
+                                                  return False
+
                                             else do
                                               skillValue <- liftM (^.cvValue) skillCVar
+
                                               if (skillValue == 0 && (edict^.eSpawnFlags .&. Constants.spawnFlagNotEasy) /= 0) ||
                                                  (skillValue == 1 && (edict^.eSpawnFlags .&. Constants.spawnFlagNotMedium) /= 0) ||
                                                  ((skillValue == 2 || skillValue == 3) && (edict^.eSpawnFlags .&. Constants.spawnFlagNotHard) /= 0)
                                                  then do
                                                    Com.dprintf "->inhibited.\n"
-                                                   GameUtil.freeEdict ent
+                                                   GameUtil.freeEdict edictRef
                                                    return True
-                                                 else return False
+                                                 else
+                                                   return False
 
                                  if freed
                                    then do
                                      let flags = Constants.spawnFlagNotEasy .|. Constants.spawnFlagNotMedium .|. Constants.spawnFlagNotHard .|. Constants.spawnFlagNotCoop .|. Constants.spawnFlagNotDeathmatch
-                                     gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.&. (complement flags))
+                                     modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement flags)))
                                      return True
                                    else do
                                      return False
 
 
                   if removed
-                    then parseEntities False updatedIdx (inhibited + 1)
+                    then
+                      parseEntities False updatedIdx (inhibited + 1)
+
                     else do
-                      callSpawn ent
+                      callSpawn edictRef
                       Com.dprintf "\n"
 
                       parseEntities False updatedIdx inhibited
@@ -178,12 +186,12 @@ spawnEntities mapName entities spawnPoint = do
 - should be a properly initialized empty edict.
 -}
 parseEdict :: EdictReference -> B.ByteString -> Int -> Quake Int
-parseEdict er entities idx = do
+parseEdict edictRef entities idx = do
     gameBaseGlobals.gbSpawnTemp .= newSpawnTempT
 
     (newIdx, initial) <- parse False idx
 
-    unless initial $ GameUtil.clearEdict er
+    unless initial $ GameUtil.clearEdict edictRef
 
     return newIdx
 
@@ -199,7 +207,9 @@ parseEdict er entities idx = do
 
             Just token -> do
               if token == "}"
-                then return (newIdx, initial)
+                then
+                  return (newIdx, initial)
+
                 else do
                   let keyName = token
                   (anotherComToken, finalIdx) <- Com.parse entities (B.length entities) newIdx
@@ -218,13 +228,15 @@ parseEdict er entities idx = do
                       -- keynames with a leading underscore are used for utility comments,
                       -- and are immediately discarded by quake
                       if BC.head keyName == '_'
-                        then parse True finalIdx
+                        then
+                          parse True finalIdx
+
                         else do
-                          parseField (BC.map toLower keyName) anotherToken er
+                          parseField (BC.map toLower keyName) anotherToken edictRef
                           parse True finalIdx
 
 parseField :: B.ByteString -> B.ByteString -> EdictReference -> Quake ()
-parseField key value (EdictReference idx) = do
+parseField key value edictRef = do
     when (key == "nextmap") $
       Com.println $ "nextmap: " `B.append` value
 
@@ -232,12 +244,15 @@ parseField key value (EdictReference idx) = do
     let (updatedSt, didUpdateSpawnTemp) = setSpawnTempField st key value
 
     if didUpdateSpawnTemp
-      then gameBaseGlobals.gbSpawnTemp .= updatedSt
+      then
+        gameBaseGlobals.gbSpawnTemp .= updatedSt
+
       else do
-        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+        edict <- readEdictT edictRef
         let (updatedEdict, didUpdateEdict) = setEdictField edict key value
         if didUpdateEdict
-          then gameBaseGlobals.gbGEdicts.ix idx .= updatedEdict
+          then
+            writeEdictT edictRef updatedEdict
           else do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ "??? The key [" `B.append` key `B.append` "] is not a field\n"
@@ -322,9 +337,9 @@ newString str = let len = B.length str
 - Finds the spawn function for the entity and calls it.
 -}
 callSpawn :: EdictReference -> Quake ()
-callSpawn er@(EdictReference edictIdx) = do
+callSpawn edictRef = do
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     -- IMPROVE: does it apply to our code?
     -- if (null == ent.classname) {
@@ -337,14 +352,17 @@ callSpawn er@(EdictReference edictIdx) = do
     itemSpawnIndex <- checkItemSpawn edictClassName 1 numItems
 
     case itemSpawnIndex of
-      Just gItemReference -> GameItems.spawnItem er gItemReference
+      Just gItemReference ->
+        GameItems.spawnItem edictRef gItemReference
+
       Nothing -> do
         -- check normal spawn functions
         let spawnIdx = V.findIndex (\s -> edictClassName == BC.map toLower (s^.spName)) spawns
 
         case spawnIdx of
           Just idx ->
-            void $ think ((spawns V.! idx)^.spSpawn) er
+            void $ think ((spawns V.! idx)^.spSpawn) edictRef
+
           Nothing -> do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ edictClassName `B.append` " doesn't have a spawn function\n"
@@ -378,28 +396,33 @@ findTeams = do
         findNextTeam maxIdx idx c c2
           | idx >= maxIdx = return (c, c2)
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              let edictRef = newEdictReference idx
+              edict <- readEdictT edictRef
 
               if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
-                then findNextTeam maxIdx (idx + 1) c c2
+                then
+                  findNextTeam maxIdx (idx + 1) c c2
+
                 else do
-                  gameBaseGlobals.gbGEdicts.ix idx.eTeamMaster .= Just (EdictReference idx)
-                  c2' <- findTeamMembers (fromJust $ edict^.eTeam) (EdictReference idx) (EdictReference idx) maxIdx (idx + 1) c2
+                  modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
+                  c2' <- findTeamMembers (fromJust $ edict^.eTeam) edictRef edictRef maxIdx (idx + 1) c2
                   findNextTeam maxIdx (idx + 1) (c + 1) c2'
 
         findTeamMembers :: B.ByteString -> EdictReference -> EdictReference -> Int -> Int -> Int -> Quake Int
-        findTeamMembers teamName master chain@(EdictReference chainIdx) maxIdx idx c2
+        findTeamMembers teamName master chainRef maxIdx idx c2
           | idx >= maxIdx = return c2
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              let edictRef = newEdictReference idx
+              edict <- readEdictT edictRef
 
               if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eTeam)
-                then findTeamMembers teamName master chain maxIdx (idx + 1) c2
+                then
+                  findTeamMembers teamName master chainRef maxIdx (idx + 1) c2
                 else do
-                  gameBaseGlobals.gbGEdicts.ix chainIdx.eTeamChain .= Just (EdictReference idx)
-                  gameBaseGlobals.gbGEdicts.ix idx.eTeamMaster .= Just master
-                  gameBaseGlobals.gbGEdicts.ix idx.eFlags %= (.|. Constants.flTeamSlave)
-                  findTeamMembers teamName master (EdictReference idx) maxIdx (idx + 1) (c2 + 1)
+                  modifyEdictT chainRef (\v -> v & eTeamChain .~ Just edictRef)
+                  modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just master
+                                                 & eFlags %~ (.|. Constants.flTeamSlave))
+                  findTeamMembers teamName master edictRef maxIdx (idx + 1) (c2 + 1)
 
 spawns :: V.Vector SpawnT
 spawns = V.fromList [ SpawnT "item_health" spItemHealth
@@ -594,16 +617,15 @@ spFuncClock =
 -}
 spWorldSpawn :: EntThink
 spWorldSpawn =
-  GenericEntThink "SP_worldspawn" $ \(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "SP_worldspawn" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx .= edict { _eMoveType    = Constants.moveTypePush
-                                                   , _eSolid       = Constants.solidBsp
-                                                   -- since the world doesn't use G_Spawn()
-                                                   , _eInUse       = True
-                                                   -- world model is always index 1
-                                                   , _eEntityState = (edict^.eEntityState) { _esModelIndex = 1 }
-                                                   }
+    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                   & eSolid .~ Constants.solidBsp
+                                   -- since the world doesn't use G_Spawn()
+                                   & eInUse .~ True
+                                   -- world model is always index 1
+                                   & eEntityState.esModelIndex .~ 1)
 
     -- reserve some spots for dead player bodies for coop / deathmatch
     PlayerClient.initBodyQue
@@ -615,6 +637,7 @@ spWorldSpawn =
 
     -- make some data visible to the server
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let configString = gameImport^.giConfigString
         imageIndex = gameImport^.giImageIndex
         soundIndex = gameImport^.giSoundIndex
@@ -622,6 +645,7 @@ spWorldSpawn =
         cvarSet = gameImport^.giCVarSet
 
     let msg = edict^.eMessage
+
     if isJust msg && B.length (fromJust msg) > 0
       then do
         configString Constants.csName (fromJust msg)
@@ -631,6 +655,7 @@ spWorldSpawn =
         gameBaseGlobals.gbLevel.llLevelName .= mapName
 
     spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+
     if B.length (spawnTemp^.stSky) > 0
       then configString Constants.csSky (spawnTemp^.stSky)
       else configString Constants.csSky "unit1_"
@@ -644,6 +669,7 @@ spWorldSpawn =
 
     -- status bar program
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
     if deathmatchValue /= 0
       then configString Constants.csStatusBar dmStatusBar
       else configString Constants.csStatusBar singleStatusBar
@@ -772,177 +798,177 @@ spWorldSpawn =
 
 spFuncWall :: EntThink
 spFuncWall =
-  GenericEntThink "SP_func_wall" $ \edictReference -> do
-    GameMisc.spFuncWall edictReference
+  GenericEntThink "SP_func_wall" $ \edictRef -> do
+    GameMisc.spFuncWall edictRef
     return True
 
 spFuncObject :: EntThink
 spFuncObject =
-  GenericEntThink "SP_func_object" $ \edictReference -> do
-    GameMisc.spFuncObject edictReference
+  GenericEntThink "SP_func_object" $ \edictRef -> do
+    GameMisc.spFuncObject edictRef
     return True
 
 spFuncTimer :: EntThink
 spFuncTimer =
-  GenericEntThink "SP_func_timer" $ \edictReference -> do
-    GameFunc.spFuncTimer edictReference
+  GenericEntThink "SP_func_timer" $ \edictRef -> do
+    GameFunc.spFuncTimer edictRef
     return True
 
 spFuncExplosive :: EntThink
 spFuncExplosive =
-  GenericEntThink "SP_func_explosive" $ \edictReference -> do
-    GameMisc.spFuncExplosive edictReference
+  GenericEntThink "SP_func_explosive" $ \edictRef -> do
+    GameMisc.spFuncExplosive edictRef
     return True
 
 spTriggerAlways :: EntThink
 spTriggerAlways =
-  GenericEntThink "SP_trigger_always" $ \edictReference -> do
-    GameTrigger.spTriggerAlways edictReference
+  GenericEntThink "SP_trigger_always" $ \edictRef -> do
+    GameTrigger.spTriggerAlways edictRef
     return True
 
 spTriggerOnce :: EntThink
 spTriggerOnce =
-  GenericEntThink "SP_trigger_once" $ \edictReference -> do
-    GameTrigger.spTriggerOnce edictReference
+  GenericEntThink "SP_trigger_once" $ \edictRef -> do
+    GameTrigger.spTriggerOnce edictRef
     return True
 
 spTriggerMultiple :: EntThink
 spTriggerMultiple =
-  GenericEntThink "SP_trigger_multiple" $ \edictReference -> do
-    GameTrigger.spTriggerMultiple edictReference
+  GenericEntThink "SP_trigger_multiple" $ \edictRef -> do
+    GameTrigger.spTriggerMultiple edictRef
     return True
 
 spTriggerRelay :: EntThink
 spTriggerRelay =
-  GenericEntThink "SP_trigger_relay" $ \edictReference -> do
-    GameTrigger.spTriggerRelay edictReference
+  GenericEntThink "SP_trigger_relay" $ \edictRef -> do
+    GameTrigger.spTriggerRelay edictRef
     return True
 
 spTriggerPush :: EntThink
 spTriggerPush =
-  GenericEntThink "SP_trigger_push" $ \edictReference -> do
-    GameTrigger.spTriggerPush edictReference
+  GenericEntThink "SP_trigger_push" $ \edictRef -> do
+    GameTrigger.spTriggerPush edictRef
     return True
 
 spTriggerHurt :: EntThink
 spTriggerHurt =
-  GenericEntThink "SP_trigger_hurt" $ \edictReference -> do
-    GameTrigger.spTriggerHurt edictReference
+  GenericEntThink "SP_trigger_hurt" $ \edictRef -> do
+    GameTrigger.spTriggerHurt edictRef
     return True
 
 spTriggerKey :: EntThink
 spTriggerKey =
-  GenericEntThink "SP_trigger_key" $ \edictReference -> do
-    GameTrigger.spTriggerKey edictReference
+  GenericEntThink "SP_trigger_key" $ \edictRef -> do
+    GameTrigger.spTriggerKey edictRef
     return True
 
 spTriggerCounter :: EntThink
 spTriggerCounter =
-  GenericEntThink "SP_trigger_counter" $ \edictReference -> do
-    GameTrigger.spTriggerCounter edictReference
+  GenericEntThink "SP_trigger_counter" $ \edictRef -> do
+    GameTrigger.spTriggerCounter edictRef
     return True
 
 spTriggerGravity :: EntThink
 spTriggerGravity =
-  GenericEntThink "SP_trigger_gravity" $ \edictReference -> do
-    GameTrigger.spTriggerGravity edictReference
+  GenericEntThink "SP_trigger_gravity" $ \edictRef -> do
+    GameTrigger.spTriggerGravity edictRef
     return True
 
 spTriggerMonsterJump :: EntThink
 spTriggerMonsterJump =
-  GenericEntThink "SP_trigger_monsterjump" $ \edictReference -> do
-    GameTrigger.spTriggerMonsterJump edictReference
+  GenericEntThink "SP_trigger_monsterjump" $ \edictRef -> do
+    GameTrigger.spTriggerMonsterJump edictRef
     return True
 
 spTargetTempEntity :: EntThink
 spTargetTempEntity =
-  GenericEntThink "SP_target_temp_entity" $ \edictReference -> do
-    GameTarget.spTargetTempEntity edictReference
+  GenericEntThink "SP_target_temp_entity" $ \edictRef -> do
+    GameTarget.spTargetTempEntity edictRef
     return True
 
 spTargetSpeaker :: EntThink
 spTargetSpeaker =
-  GenericEntThink "SP_target_speaker" $ \edictReference -> do
-    GameTarget.spTargetSpeaker edictReference
+  GenericEntThink "SP_target_speaker" $ \edictRef -> do
+    GameTarget.spTargetSpeaker edictRef
     return True
 
 spTargetExplosion :: EntThink
 spTargetExplosion =
-  GenericEntThink "SP_target_explosion" $ \edictReference -> do
-    GameTarget.spTargetExplosion edictReference
+  GenericEntThink "SP_target_explosion" $ \edictRef -> do
+    GameTarget.spTargetExplosion edictRef
     return True
 
 spTargetChangeLevel :: EntThink
 spTargetChangeLevel =
-  GenericEntThink "SP_target_changelevel" $ \edictReference -> do
-    GameTarget.spTargetChangeLevel edictReference
+  GenericEntThink "SP_target_changelevel" $ \edictRef -> do
+    GameTarget.spTargetChangeLevel edictRef
     return True
 
 spTargetSecret :: EntThink
 spTargetSecret =
-  GenericEntThink "SP_target_secret" $ \edictReference -> do
-    GameTarget.spTargetSecret edictReference
+  GenericEntThink "SP_target_secret" $ \edictRef -> do
+    GameTarget.spTargetSecret edictRef
     return True
 
 spTargetGoal :: EntThink
 spTargetGoal =
-  GenericEntThink "SP_target_goal" $ \edictReference -> do
-    GameTarget.spTargetGoal edictReference
+  GenericEntThink "SP_target_goal" $ \edictRef -> do
+    GameTarget.spTargetGoal edictRef
     return True
 
 
 spTargetSplash :: EntThink
 spTargetSplash =
-  GenericEntThink "SP_target_splash" $ \edictReference -> do
-    GameTarget.spTargetSplash edictReference
+  GenericEntThink "SP_target_splash" $ \edictRef -> do
+    GameTarget.spTargetSplash edictRef
     return True
 
 spTargetSpawner :: EntThink
 spTargetSpawner =
-  GenericEntThink "SP_target_spawner" $ \edictReference -> do
-    GameTarget.spTargetSpawner edictReference
+  GenericEntThink "SP_target_spawner" $ \edictRef -> do
+    GameTarget.spTargetSpawner edictRef
     return True
 
 spTargetBlaster :: EntThink
 spTargetBlaster =
-  GenericEntThink "SP_target_blaster" $ \edictReference -> do
-    GameTarget.spTargetBlaster edictReference
+  GenericEntThink "SP_target_blaster" $ \edictRef -> do
+    GameTarget.spTargetBlaster edictRef
     return True
 
 spTargetCrossLevelTrigger :: EntThink
 spTargetCrossLevelTrigger =
-  GenericEntThink "SP_target_crosslevel_trigger" $ \edictReference -> do
-    GameTarget.spTargetCrossLevelTrigger edictReference
+  GenericEntThink "SP_target_crosslevel_trigger" $ \edictRef -> do
+    GameTarget.spTargetCrossLevelTrigger edictRef
     return True
 
 spTargetCrossLevelTarget :: EntThink
 spTargetCrossLevelTarget =
-  GenericEntThink "SP_target_crosslevel_target" $ \edictReference -> do
-    GameTarget.spTargetCrossLevelTarget edictReference
+  GenericEntThink "SP_target_crosslevel_target" $ \edictRef -> do
+    GameTarget.spTargetCrossLevelTarget edictRef
     return True
 
 spTargetLaser :: EntThink
 spTargetLaser =
-  GenericEntThink "SP_target_laser" $ \edictReference -> do
-    GameTarget.spTargetLaser edictReference
+  GenericEntThink "SP_target_laser" $ \edictRef -> do
+    GameTarget.spTargetLaser edictRef
     return True
 
 spTargetHelp :: EntThink
 spTargetHelp =
-  GenericEntThink "SP_target_help" $ \edictReference -> do
-    GameTarget.spTargetHelp edictReference
+  GenericEntThink "SP_target_help" $ \edictRef -> do
+    GameTarget.spTargetHelp edictRef
     return True
 
 spTargetActor :: EntThink
 spTargetActor =
-  GenericEntThink "SP_target_actor" $ \edictReference -> do
-    MActor.spTargetActor edictReference
+  GenericEntThink "SP_target_actor" $ \edictRef -> do
+    MActor.spTargetActor edictRef
     return True
 
 spTargetLightRamp :: EntThink
 spTargetLightRamp =
-  GenericEntThink "SP_target_lightramp" $ \edictReference -> do
-    GameTarget.spTargetLightRamp edictReference
+  GenericEntThink "SP_target_lightramp" $ \edictRef -> do
+    GameTarget.spTargetLightRamp edictRef
     return True
 
 spTargetEarthquake :: EntThink
