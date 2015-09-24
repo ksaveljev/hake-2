@@ -305,8 +305,8 @@ chickMoveWalk = MMoveT "chickMoveWalk" frameWalk11 frameWalk20 chickFramesWalk N
 
 chickWalk :: EntThink
 chickWalk =
-  GenericEntThink "chick_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveWalk
+  GenericEntThink "chick_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveWalk)
     return True
 
 chickFramesPain1 :: V.Vector MFrameT
@@ -766,8 +766,8 @@ chickMoveEndSlash = MMoveT "chickMoveEndSlash" frameAttack213 frameAttack216 chi
 
 chickStartSlash :: EntThink
 chickStartSlash =
-  GenericEntThink "chick_slash" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just chickMoveSlash
+  GenericEntThink "chick_slash" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveSlash)
     return True
 
 chickFramesStartSlash :: V.Vector MFrameT

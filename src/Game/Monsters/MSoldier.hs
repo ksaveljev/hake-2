@@ -371,7 +371,7 @@ soldierPain =
     self <- readEdictT selfRef
 
     when ((self^.eHealth) < ((self^.eMaxHealth) `div` 2)) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum %~ (.|. 1)
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum %~ (.|. 1))
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -689,8 +689,8 @@ soldierCock =
     soundCock <- use $ mSoldierGlobals.msSoundCock
 
     if frame == frameStand322
-      then sound (Just self) Constants.chanWeapon soundCock 1 Constants.attnIdle 0
-      else sound (Just self) Constants.chanWeapon soundCock 1 Constants.attnNorm 0
+      then sound (Just selfRef) Constants.chanWeapon soundCock 1 Constants.attnIdle 0
+      else sound (Just selfRef) Constants.chanWeapon soundCock 1 Constants.attnNorm 0
 
     return True
 
@@ -787,7 +787,7 @@ soldierFire selfRef flashNumber = do
 
            Monster.monsterFireBullet selfRef start aim 2 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashIndex
 
-           pauseTime <- readEdictT selfRef >>= \e -> return (e^.ePauseTime)
+           pauseTime <- readEdictT selfRef >>= \e -> return (e^.eMonsterInfo.miPauseTime)
 
            if levelTime >= pauseTime
              then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
@@ -814,7 +814,7 @@ soldierAttack1Refire1 =
 
 soldierAttack1Refire2 :: EntThink
 soldierAttack1Refire2 =
-  GenericEntThink "soldier_attack1_refire2" $ \seflRef -> do
+  GenericEntThink "soldier_attack1_refire2" $ \selfRef -> do
     self <- readEdictT selfRef
     let Just enemyRef = self^.eEnemy
     enemy <- readEdictT enemyRef
@@ -926,7 +926,7 @@ soldierDuckHold =
     self <- readEdictT selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    let updateMI = if time >= self^.eMonsterInfo.miPauseTime
+    let updateMI = if levelTime >= self^.eMonsterInfo.miPauseTime
                      then (.&. (complement Constants.aiHoldFrame))
                      else (.|. Constants.aiHoldFrame)
 
@@ -1359,7 +1359,7 @@ spMonsterSoldierX =
                                   & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 32
                                   & eMoveType .~ Constants.moveTypeStep
-                                  & eSolid .~ Constants.solidBbox)
+                                  & eSolid .~ Constants.solidBbox
                                   & eMass .~ 100
                                   & ePain .~ Just soldierPain
                                   & eDie  .~ Just soldierDie

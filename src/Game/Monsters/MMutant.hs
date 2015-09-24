@@ -380,7 +380,7 @@ mutantCheckReFire =
       enemy <- readEdictT enemyRef
 
       when (skillValue == 3 && r < 0.5 || GameUtil.range self enemy == Constants.rangeMelee) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFram .~ frameAttack09)
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttack09)
 
     return True
 
@@ -436,7 +436,7 @@ mutantJumpTouch =
                                             & eTouch .~ Nothing)
 
           else
-            modifyEdictT selfRef (\v -> v & eTouch .~ Nothing0
+            modifyEdictT selfRef (\v -> v & eTouch .~ Nothing)
 
 mutantJumpTakeOff :: EntThink
 mutantJumpTakeOff =
@@ -572,7 +572,7 @@ mutantCheckAttack =
 
                 if jump
                   then do
-                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile0
+                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile)
                     -- FIXME: play a jump sound here
                     return True
 
