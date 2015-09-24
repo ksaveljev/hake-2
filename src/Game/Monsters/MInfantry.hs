@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MInfantry where
 
-import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=), (+=))
+import Control.Lens ((^.), use, (.=), ix, zoom, preuse, (%=), (-=), (+=), (&), (.~), (%~), (+~), (-~))
 import Control.Monad (liftM, void, when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing)
@@ -136,8 +136,8 @@ infantryMoveStand = MMoveT "infantryMoveStand" frameStand50 frameStand71 infantr
 
 infantryStand :: EntThink
 infantryStand =
-  GenericEntThink "infantry_stand" $ \(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveStand
+  GenericEntThink "infantry_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just infantryMoveStand)
     return True
 
 infantryFramesFidget :: V.Vector MFrameT
@@ -198,11 +198,12 @@ infantryMoveFidget = MMoveT "infantryMoveFidget" frameStand01 frameStand49 infan
 
 infantryFidget :: EntThink
 infantryFidget =
-  GenericEntThink "infantry_fidget" $ \er@(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveFidget
+  GenericEntThink "infantry_fidget" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just infantryMoveFidget)
+
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundIdle <- use $ mInfantryGlobals.miSoundIdle
-    sound (Just er) Constants.chanVoice soundIdle 1 Constants.attnIdle 0
+    sound (Just selfRef) Constants.chanVoice soundIdle 1 Constants.attnIdle 0
     return True
 
 infantryFramesWalk :: V.Vector MFrameT
@@ -226,8 +227,8 @@ infantryMoveWalk = MMoveT "infantryMoveWalk" frameWalk03 frameWalk14 infantryFra
 
 infantryWalk :: EntThink
 infantryWalk =
-  GenericEntThink "infantry_walk" $ \(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveWalk
+  GenericEntThink "infantry_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just infantryMoveWalk)
     return True
 
 infantryFramesRun :: V.Vector MFrameT
@@ -247,14 +248,15 @@ infantryMoveRun = MMoveT "infantryMoveRun" frameRun01 frameRun08 infantryFramesR
 
 infantryRun :: EntThink
 infantryRun =
-  GenericEntThink "infantry_run" $ \(EdictReference edictIdx) -> do
-    Just aiFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miAIFlags
+  GenericEntThink "infantry_run" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let aiFlags = self^.eMonsterInfo.miAIFlags
 
     let nextMove = if aiFlags .&. Constants.aiStandGround /= 0
                      then infantryMoveStand
                      else infantryMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just nextMove
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
     return True
 
 infantryFramesPain1 :: V.Vector MFrameT
@@ -293,15 +295,15 @@ infantryMovePain2 = MMoveT "infantryMovePain2" framePain201 framePain210 infantr
 
 infantryPain :: EntPain
 infantryPain =
-  GenericEntPain "infantry_pain" $ \er@(EdictReference edictIdx) _ _ _ -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    time <- use $ gameBaseGlobals.gbLevel.llTime
+  GenericEntPain "infantry_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    when ((edict^.eHealth) < (edict^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= 1
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
-    unless (time < (edict^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= time + 3
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -309,37 +311,37 @@ infantryPain =
         n <- (liftM (`mod` 2) Lib.rand)
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
 
-        if n == 0
-          then do
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain1
-            soundPain1 <- use $ mInfantryGlobals.miSoundPain1
-            sound (Just er) Constants.chanVoice soundPain1 1 Constants.attnNorm 0
-          else do
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo.miCurrentMove .= Just infantryMovePain2
-            soundPain2 <- use $ mInfantryGlobals.miSoundPain2
-            sound (Just er) Constants.chanVoice soundPain2 1 Constants.attnNorm 0
+        (soundPain, currentMove) <- if n == 0
+                                      then do
+                                        soundPain <- use $ mInfantryGlobals.miSoundPain1
+                                        return (soundPain, infantryMovePain1)
+                                      else do
+                                        soundPain <- use $ mInfantryGlobals.miSoundPain2
+                                        return (soundPain, infantryMovePain2)
+
+        sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 infantrySight :: EntInteract
 infantrySight =
-  GenericEntInteract "infantry_sight" $ \er _ -> do
+  GenericEntInteract "infantry_sight" $ \selfRef _ -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundSight <- use $ mInfantryGlobals.miSoundSight
-    sound (Just er) Constants.chanBody soundSight 1 Constants.attnNorm 0
+    sound (Just selfRef) Constants.chanBody soundSight 1 Constants.attnNorm 0
     return True
 
 infantryDead :: EntThink
 infantryDead =
-  GenericEntThink "infantry_dead" $ \er@(EdictReference edictIdx) -> do
+  GenericEntThink "infantry_dead" $ \selfRef -> do
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster))
 
-    linkEntity er
-    void $ think M.flyCheck er
+    linkEntity selfRef
+    void $ think M.flyCheck selfRef
     return True
 
 aimAngles :: V.Vector (V3 Float)
@@ -360,8 +362,8 @@ aimAngles =
 
 infantryMachineGun :: EntThink
 infantryMachineGun =
-  GenericEntThink "InfantryMachineGun" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "InfantryMachineGun" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     (start, forward, flashNumber) <- 
       if (self^.eEntityState.esFrame) == frameAttack111
@@ -371,8 +373,9 @@ infantryMachineGun =
               start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
           
           case self^.eEnemy of
-            Just (EdictReference enemyIdx) -> do
-              Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+            Just enemyRef -> do
+              enemy <- readEdictT enemyRef
+
               let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)
                   target = V3 a b (c + fromIntegral (enemy^.eViewHeight))
                   forward' = normalize (target - start)
@@ -473,9 +476,10 @@ infantryMoveDeath3 = MMoveT "infantryMoveDeath3" frameDeath301 frameDeath309 inf
 
 infantryDie :: EntDie
 infantryDie =
-  GenericEntDie "infantry_die" $ \er@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "infantry_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let sound = gameImport^.giSound
         soundIndex = gameImport^.giSoundIndex
 
@@ -483,28 +487,25 @@ infantryDie =
     if (self^.eHealth) <= (self^.eGibHealth)
       then do
         udeath <- soundIndex (Just "misc/udeath.wav")
-        sound (Just er) Constants.chanVoice udeath 1 Constants.attnNorm 0
+        sound (Just selfRef) Constants.chanVoice udeath 1 Constants.attnNorm 0
 
-        -- IMPROVE? repetition here
-        GameMisc.throwGib er "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
-        GameMisc.throwGib er "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
 
-        -- IMPROVE? repetition here
-        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
-        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
-        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
-        GameMisc.throwGib er "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
 
-        GameMisc.throwHead er "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+        modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
       else
         unless ((self^.eDeadFlag) == Constants.deadDead) $ do
           -- regular death
-          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-            eDeadFlag .= Constants.deadDead
-            eTakeDamage .= Constants.damageYes
+          modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                        & eTakeDamage .~ Constants.damageYes)
 
           n <- liftM (`mod` 3) Lib.rand
           soundDie1 <- use $ mInfantryGlobals.miSoundDie1
@@ -514,21 +515,21 @@ infantryDie =
                                          | n == 1 -> (infantryMoveDeath2, soundDie1)
                                          | otherwise -> (infantryMoveDeath3, soundDie2)
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just nextMove
-          sound (Just er) Constants.chanVoice nextSound 1 Constants.attnNorm 0
+          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+          sound (Just selfRef) Constants.chanVoice nextSound 1 Constants.attnNorm 0
 
 infantryDodge :: EntDodge
 infantryDodge =
-  GenericEntDodge "infantry_dodge" $ \selfRef@(EdictReference selfIdx) attackerRef _ -> do
+  GenericEntDodge "infantry_dodge" $ \selfRef attackerRef _ -> do
     r <- Lib.randomF
 
     unless (r > 0.25) $ do
-      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self <- readEdictT selfRef
 
       when (isNothing (self^.eEnemy)) $
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Just attackerRef
+        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just infantryMoveDuck
+      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just infantryMoveDuck)
 
 infantryFramesDuck :: V.Vector MFrameT
 infantryFramesDuck =
@@ -544,8 +545,8 @@ infantryMoveDuck = MMoveT "infantryMoveDuck" frameDuck01 frameDuck05 infantryFra
 
 infantryDuckDown :: EntThink
 infantryDuckDown =
-  GenericEntThink "infantry_duck_down" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "infantry_duck_down" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
       then
@@ -554,11 +555,10 @@ infantryDuckDown =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMonsterInfo.miAIFlags %= (.|. Constants.aiDucked)
-          eMaxs._z -= 32
-          eTakeDamage .= Constants.damageYes
-          eMonsterInfo.miPauseTime .= levelTime + 1
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
+                                      & eMaxs._z -~ 32
+                                      & eTakeDamage .~ Constants.damageYes
+                                      & eMonsterInfo.miPauseTime .~ levelTime + 1)
 
         linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
         linkEntity selfRef
@@ -567,23 +567,22 @@ infantryDuckDown =
 
 infantryDuckHold :: EntThink
 infantryDuckHold =
-  GenericEntThink "infantry_duck_hold" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "infantry_duck_hold" $ \selfRef -> do
+    self <- readEdictT selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
-      else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
+      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 infantryDuckUp :: EntThink
 infantryDuckUp =
-  GenericEntThink "infantry_duck_up" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiDucked))
-      eMaxs._z += 32
-      eTakeDamage .= Constants.damageAim
+  GenericEntThink "infantry_duck_up" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+                                  & eMaxs._z +~ 32
+                                  & eTakeDamage .~ Constants.damageAim)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -592,22 +591,21 @@ infantryDuckUp =
 
 infantryAttack :: EntThink
 infantryAttack =
-  GenericEntThink "infantry_attack" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "infantry_attack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let currentMove = if GameUtil.range self enemy == Constants.rangeMelee
                         then infantryMoveAttack2
                         else infantryMoveAttack1
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 infantryCockGun :: EntThink
 infantryCockGun =
-  GenericEntThink "infantry_cock_gun" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "infantry_cock_gun" $ \selfRef -> do
     soundWeaponCock <- use $ mInfantryGlobals.miSoundWeaponCock
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanWeapon soundWeaponCock 1 Constants.attnNorm 0
@@ -615,36 +613,35 @@ infantryCockGun =
     n <- Lib.rand
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= levelTime + (fromIntegral $ (n .&. 15) + 3 + 7) * Constants.frameTime
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + (fromIntegral $ (n .&. 15) + 3 + 7) * Constants.frameTime)
 
     return True
 
 infantryFire :: EntThink
 infantryFire =
-  GenericEntThink "infantry_fire" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "infantry_fire" $ \selfRef -> do
     void $ think infantryMachineGun selfRef
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
-      else gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiHoldFrame)
+      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 infantrySwing :: EntThink
 infantrySwing =
-  GenericEntThink "infantry_swing" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "infantry_swing" $ \selfRef -> do
     soundPunchSwing <- use $ mInfantryGlobals.miSoundPunchSwing
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanWeapon soundPunchSwing 1 Constants.attnNorm 0
-
     return True
 
 infantrySmack :: EntThink
 infantrySmack =
-  GenericEntThink "infantry_smack" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "infantry_smack" $ \selfRef -> do
     let aim = V3 (fromIntegral Constants.meleeDistance) 0 0
     
     n <- Lib.rand
@@ -699,13 +696,16 @@ infantryMoveAttack2 = MMoveT "infantryMoveAttack2" frameAttack201 frameAttack208
 - Trigger_Spawn Sight
 -}
 spMonsterInfantry :: EdictReference -> Quake ()
-spMonsterInfantry er@(EdictReference edictIdx) = do
+spMonsterInfantry selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
-      then GameUtil.freeEdict er
+      then
+        GameUtil.freeEdict selfRef
+
       else do
         gameImport <- use $ gameBaseGlobals.gbGameImport
+
         let soundIndex = gameImport^.giSoundIndex
             modelIndex = gameImport^.giModelIndex
             linkEntity = gameImport^.giLinkEntity
@@ -724,35 +724,30 @@ spMonsterInfantry er@(EdictReference edictIdx) = do
         soundIndex (Just "infantry/infsrch1.wav") >>= (mInfantryGlobals.miSoundSearch .=)
         soundIndex (Just "infantry/infidle1.wav") >>= (mInfantryGlobals.miSoundIdle .=)
 
-        tris <- modelIndex (Just "models/monsters/infantry/tris.md2")
+        modelIdx <- modelIndex (Just "models/monsters/infantry/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eMoveType                 .= Constants.moveTypeStep
-          eSolid                    .= Constants.solidBbox
-          eEntityState.esModelIndex .= tris
-          eMins                     .= V3 (-16) (-16) (-24)
-          eMaxs                     .= V3 16 16 32
+        modifyEdictT selfRef (\v -> v & eMoveType                 .~ Constants.moveTypeStep
+                                      & eSolid                    .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins                     .~ V3 (-16) (-16) (-24)
+                                      & eMaxs                     .~ V3 16 16 32
+                                      & eHealth    .~ 100
+                                      & eGibHealth .~ -40
+                                      & eMass      .~ 200
+                                      & ePain .~ Just infantryPain
+                                      & eDie  .~ Just infantryDie
+                                      & eMonsterInfo.miStand  .~ Just infantryStand
+                                      & eMonsterInfo.miWalk   .~ Just infantryWalk
+                                      & eMonsterInfo.miRun    .~ Just infantryRun
+                                      & eMonsterInfo.miDodge  .~ Just infantryDodge
+                                      & eMonsterInfo.miAttack .~ Just infantryAttack
+                                      & eMonsterInfo.miMelee  .~ Nothing
+                                      & eMonsterInfo.miSight  .~ Just infantrySight
+                                      & eMonsterInfo.miIdle   .~ Just infantryFidget)
 
-          eHealth    .= 100
-          eGibHealth .= -40
-          eMass      .= 200
+        linkEntity selfRef
 
-          ePain .= Just infantryPain
-          eDie  .= Just infantryDie
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just infantryMoveStand
+                                      & eMonsterInfo.miScale       .~ modelScale)
 
-          eMonsterInfo.miStand  .= Just infantryStand
-          eMonsterInfo.miWalk   .= Just infantryWalk
-          eMonsterInfo.miRun    .= Just infantryRun
-          eMonsterInfo.miDodge  .= Just infantryDodge
-          eMonsterInfo.miAttack .= Just infantryAttack
-          eMonsterInfo.miMelee  .= Nothing
-          eMonsterInfo.miSight  .= Just infantrySight
-          eMonsterInfo.miIdle   .= Just infantryFidget
-
-        linkEntity er
-
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just infantryMoveStand
-          miScale       .= modelScale
-
-        void $ think GameAI.walkMonsterStart er
+        void $ think GameAI.walkMonsterStart selfRef

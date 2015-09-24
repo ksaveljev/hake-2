@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MBoss3 where
 
-import Control.Lens (preuse, use, ix, (^.), (.=), (+=), zoom)
+import Control.Lens (preuse, use, ix, (^.), (.=), (+=), zoom, (&), (.~), (%~), (+~))
 import Control.Monad (liftM, void)
 import Linear (V3(..))
 
@@ -15,8 +15,8 @@ import qualified Game.Monsters.MBoss32 as MBoss32
 
 useBoss3 :: EntUse
 useBoss3 =
-  GenericEntUse "Use_Boss3" $ \edictRef@(EdictReference edictIdx) _ _ -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntUse "Use_Boss3" $ \edictRef _ _ -> do
+    edict <- readEdictT edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let writeByte = gameImport^.giWriteByte
@@ -31,15 +31,15 @@ useBoss3 =
 
 thinkBoss3Stand :: EntThink
 thinkBoss3Stand =
-  GenericEntThink "Think_Boss3Stand" $ \(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "Think_Boss3Stand" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     if (edict^.eEntityState.esFrame) == MBoss32.frameStand260
-      then gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MBoss32.frameStand201
-      else gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame += 1
+      then modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MBoss32.frameStand201)
+      else modifyEdictT edictRef (\v -> v & eEntityState.esFrame +~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= levelTime + Constants.frameTime
+    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
 {-
@@ -48,32 +48,34 @@ thinkBoss3Stand =
 - Just stands and cycles in one place until targeted, then teleports away.
 -}
 spMonsterBoss3Stand :: EdictReference -> Quake ()
-spMonsterBoss3Stand selfRef@(EdictReference selfIdx) = do
+spMonsterBoss3Stand selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
-      then GameUtil.freeEdict selfRef
+      then
+        GameUtil.freeEdict selfRef
+
       else do
         gameImport <- use $ gameBaseGlobals.gbGameImport
+
         let modelIndex = gameImport^.giModelIndex
             soundIndex = gameImport^.giSoundIndex
             linkEntity = gameImport^.giLinkEntity
 
-        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        self <- readEdictT selfRef
         modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMoveType                 .= Constants.moveTypeStep
-          eSolid                    .= Constants.solidBbox
-          eiModel                   .= Just "models/monsters/boss3/rider/tris.md2"
-          eEntityState.esModelIndex .= modelIdx
-          eEntityState.esFrame      .= MBoss32.frameStand201
-          eMins                     .= V3 (-32) (-32) 0
-          eMaxs                     .= V3 32 32 90
-          eUse                      .= Just useBoss3
-          eThink                    .= Just thinkBoss3Stand
-          eNextThink                .= levelTime + Constants.frameTime
+        modifyEdictT selfRef (\v -> v & eMoveType                 .~ Constants.moveTypeStep
+                                      & eSolid                    .~ Constants.solidBbox
+                                      & eiModel                   .~ Just "models/monsters/boss3/rider/tris.md2"
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eEntityState.esFrame      .~ MBoss32.frameStand201
+                                      & eMins                     .~ V3 (-32) (-32) 0
+                                      & eMaxs                     .~ V3 32 32 90
+                                      & eUse                      .~ Just useBoss3
+                                      & eThink                    .~ Just thinkBoss3Stand
+                                      & eNextThink                .~ levelTime + Constants.frameTime)
 
         void $ soundIndex (Just "misc/bigtele.wav")
 

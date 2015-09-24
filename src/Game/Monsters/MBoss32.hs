@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss32 where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (+=))
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (+=), (&), (.~), (%~), (+~))
 import Data.Bits ((.|.), (.&.))
 import Linear (V3(..), norm)
 import qualified Data.Vector as V
@@ -82,7 +82,7 @@ frameWalk213 = 486
 
 makronTaunt :: EntThink
 makronTaunt =
-  GenericEntThink "makron_taunt" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "makron_taunt" $ \selfRef -> do
     r <- Lib.randomF
 
     soundTaunt <- if | r <= 0.3 -> use $ mBoss32Globals.mb32SoundTaunt1
@@ -90,14 +90,14 @@ makronTaunt =
                      | otherwise -> use $ mBoss32Globals.mb32SoundTaunt3
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
-
     sound (Just selfRef) Constants.chanAuto soundTaunt 1 Constants.attnNone 0
+
     return True
 
 makronStand :: EntThink
 makronStand =
-  GenericEntThink "makron_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just makronMoveStand
+  GenericEntThink "makron_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveStand)
     return True
 
 makronHit :: EntThink
@@ -105,8 +105,8 @@ makronHit =
   GenericEntThink "makron_hit" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundHit <- use $ mBoss32Globals.mb32SoundHit
-
     sound (Just selfRef) Constants.chanAuto soundHit 1 Constants.attnNone 0
+
     return True
 
 makronPopUp :: EntThink
@@ -114,8 +114,8 @@ makronPopUp =
   GenericEntThink "makron_popup" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundPopUp <- use $ mBoss32Globals.mb32SoundPopUp
-
     sound (Just selfRef) Constants.chanBody soundPopUp 1 Constants.attnNone 0
+
     return True
 
 makronStepLeft :: EntThink
@@ -123,8 +123,8 @@ makronStepLeft =
   GenericEntThink "makron_step_left" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundStepLeft <- use $ mBoss32Globals.mb32SoundStepLeft
-
     sound (Just selfRef) Constants.chanBody soundStepLeft 1 Constants.attnNorm 0
+
     return True
 
 makronStepRight :: EntThink
@@ -132,8 +132,8 @@ makronStepRight =
   GenericEntThink "makron_step_right" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundStepRight <- use $ mBoss32Globals.mb32SoundStepRight
-
     sound (Just selfRef) Constants.chanBody soundStepRight 1 Constants.attnNorm 0
+
     return True
 
 makronBrainSplorch :: EntThink
@@ -141,8 +141,8 @@ makronBrainSplorch =
   GenericEntThink "makron_brainsplorch" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundBrainSplorch <- use $ mBoss32Globals.mb32SoundBrainSplorch
-
     sound (Just selfRef) Constants.chanVoice soundBrainSplorch 1 Constants.attnNorm 0
+
     return True
 
 makronPreRailGun :: EntThink
@@ -150,8 +150,8 @@ makronPreRailGun =
   GenericEntThink "makron_prerailgun" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundPreRailGun <- use $ mBoss32Globals.mb32SoundPreRailGun
-
     sound (Just selfRef) Constants.chanWeapon soundPreRailGun 1 Constants.attnNorm 0
+
     return True
 
 makronFramesStand :: V.Vector MFrameT
@@ -262,13 +262,12 @@ makronMoveWalk = MMoveT "makronMoveWalk" frameWalk204 frameWalk213 makronFramesR
 
 makronDead :: EntThink
 makronDead =
-  GenericEntThink "makron_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-60) (-60) 0
-      eMaxs .= V3 60 60 72
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "makron_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-60) (-60) 0
+                                  & eMaxs .~ V3 60 60 72
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -277,20 +276,20 @@ makronDead =
 
 makronWalk :: EntThink
 makronWalk =
-  GenericEntThink "makron_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just makronMoveWalk
+  GenericEntThink "makron_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveWalk)
     return True
 
 makronRun :: EntThink
 makronRun =
-  GenericEntThink "makron_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "makron_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then makronMoveStand
                    else makronMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 makronFramesPain6 :: V.Vector MFrameT
@@ -511,32 +510,32 @@ makronMoveSight = MMoveT "makronMoveSight" frameActive01 frameActive13 makronFra
 
 makronBFG :: EntThink
 makronBFG =
-  GenericEntThink "makronBFG" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "makronBFG" $ \selfRef -> do
     io (putStrLn "MBoss32.makronBFG") >> undefined -- TODO
 
 makronSaveLoc :: EntThink
 makronSaveLoc =
-  GenericEntThink "MakronSaveloc" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "MakronSaveloc" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let V3 a b c = (enemy^.eEntityState.esOrigin)
 
     -- save for aiming the shot
-    gameBaseGlobals.gbGEdicts.ix selfIdx.ePos1 .= V3 a b (c + fromIntegral (enemy^.eViewHeight))
+    modifyEdictT selfRef (\v -> v & ePos1 .~ V3 a b (c + fromIntegral (enemy^.eViewHeight)))
     return True
 
 -- FIXME: He's not firing from the proper Z
 makronRailGun :: EntThink
 makronRailGun =
-  GenericEntThink "MakronRailgun" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "MakronRailgun" $ \selfRef -> do
     io (putStrLn "MBoss32.makronRailGun") >> undefined -- TODO
 
 -- FIXME: This is all wrong. He's not firing at the proper angles.
 makronHyperBlaster :: EntThink
 makronHyperBlaster =
-  GenericEntThink "MakronHyperblaster" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "MakronHyperblaster" $ \selfRef -> do
     io (putStrLn "MBoss32.makronHyperBlaster") >> undefined -- TODO
 
 makronPain :: EntPain
@@ -546,18 +545,18 @@ makronPain =
 
 makronSight :: EntInteract
 makronSight =
-  GenericEntInteract "makron_sight" $ \(EdictReference selfIdx) _ -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just makronMoveSight
+  GenericEntInteract "makron_sight" $ \selfRef _ -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight)
     return True
 
 makronAttack :: EntThink
 makronAttack =
-  GenericEntThink "makron_attack" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "makron_attack" $ \selfRef -> do
     r <- Lib.randomF
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm vec
@@ -566,28 +565,29 @@ makronAttack =
                     | r <= 0.6 -> makronMoveAttack4
                     | otherwise -> makronMoveAttack5
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 -- Makron Torso. This needs to be spawned in
 makronTorsoThink :: EntThink
 makronTorsoThink =
-  GenericEntThink "makron_torso_think" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "makron_torso_think" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eEntityState.esFrame) < 365
-      then gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame += 1
-      else gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame .= 346
+      then modifyEdictT selfRef (\v -> v & eEntityState.esFrame +~ 1)
+      else modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 346)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
+    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     return True
 
 makronTorso :: EntThink
 makronTorso =
-  GenericEntThink "makron_torso" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "makron_torso" $ \edictRef -> do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let modelIndex = gameImport^.giModelIndex
         soundIndex = gameImport^.giSoundIndex
         linkEntity = gameImport^.giLinkEntity
@@ -596,16 +596,15 @@ makronTorso =
     modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
     soundIdx <- soundIndex (Just "makron/spine.wav")
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMoveType .= Constants.moveTypeNone
-      eSolid .= Constants.solidNot
-      eMins .= V3 (-8) (-8) 0
-      eMaxs .= V3 8 8 8
-      eEntityState.esFrame .= 346
-      eEntityState.esModelIndex .= modelIdx
-      eThink .= Just makronTorsoThink
-      eNextThink .= levelTime + 2 * Constants.frameTime
-      eEntityState.esSound .= soundIdx
+    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+                                   & eSolid .~ Constants.solidNot
+                                   & eMins .~ V3 (-8) (-8) 0
+                                   & eMaxs .~ V3 8 8 8
+                                   & eEntityState.esFrame .~ 346
+                                   & eEntityState.esModelIndex .~ modelIdx
+                                   & eThink .~ Just makronTorsoThink
+                                   & eNextThink .~ levelTime + 2 * Constants.frameTime
+                                   & eEntityState.esSound .~ soundIdx)
 
     linkEntity edictRef
 

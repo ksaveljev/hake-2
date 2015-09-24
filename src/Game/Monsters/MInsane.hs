@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MInsane where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
@@ -147,24 +147,24 @@ insaneScream =
 
 insaneCross :: EntThink
 insaneCross =
-  GenericEntThink "insane_cross" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "insane_cross" $ \selfRef -> do
     r <- Lib.randomF
 
     let action = if r < 0.8
                    then insaneMoveCross
                    else insaneMoveStruggleCross
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 insaneWalk :: EntThink
 insaneWalk =
-  GenericEntThink "insane_walk" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_walk" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. 16 /= 0 && (self^.eEntityState.esFrame) == frameCrawlPain10
       then do
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveDown
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
         return True
 
       else do
@@ -174,17 +174,17 @@ insaneWalk =
                              | r <= 0.5 -> insaneMoveWalkNormal
                              | otherwise -> insaneMoveWalkInsane
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
         return True
 
 insaneRun :: EntThink
 insaneRun =
-  GenericEntThink "insane_run" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. 16 /= 0 && (self^.eEntityState.esFrame) == frameCrawlPain10
       then do
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveDown
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
         return True
 
       else do
@@ -194,17 +194,17 @@ insaneRun =
                              | r <= 0.5 -> insaneMoveRunNormal
                              | otherwise -> insaneMoveRunInsane
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
         return True
 
 insanePain :: EntPain
 insanePain =
-  GenericEntPain "insane_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "insane_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       r <- Lib.rand
       let r' = 1 + (r .&. 1)
@@ -227,7 +227,7 @@ insanePain =
         -- don't go into pain frames if crucified
         if (self^.eSpawnFlags) .&. 8 /= 0
           then
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveStruggleCross
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStruggleCross)
 
           else do
             let frame = self^.eEntityState.esFrame
@@ -235,18 +235,18 @@ insanePain =
                                 then insaneMoveCrawlPain
                                 else insaneMoveStandPain
 
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 insaneOnGround :: EntThink
 insaneOnGround =
-  GenericEntThink "insane_onground" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveDown
+  GenericEntThink "insane_onground" $ \selfRef-> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
     return True
 
 insaneCheckDown :: EntThink
 insaneCheckDown =
-  GenericEntThink "insane_checkdown" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_checkdown" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. 32 /= 0 -- always stand
       then
@@ -262,33 +262,35 @@ insaneCheckDown =
                               then insaneMoveUpToDown
                               else insaneMoveJumpDown
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
         return True
 
 insaneCheckUp :: EntThink
 insaneCheckUp =
-  GenericEntThink "insane_checkup" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_checkup" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     -- If Hold_Ground and Crawl are set
     if (self^.eSpawnFlags) .&. 4 /= 0 && (self^.eSpawnFlags) .&. 16 /= 0
-      then return True
+      then
+        return True
+
       else do
         r <- Lib.randomF
 
         when (r < 0.5) $
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just insaneMoveDownToUp
+          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDownToUp)
 
         return True
 
 insaneStand :: EntThink
 insaneStand =
-  GenericEntThink "insane_stand" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_stand" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     action <- if | (self^.eSpawnFlags) .&. 8 /= 0 -> do -- If crucified
-                     gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiStandGround)
+                     modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
                      return insaneMoveCross
 
                  | (self^.eSpawnFlags) .&. 4 /= 0 && (self^.eSpawnFlags) .&. 16 /= 0 ->
@@ -298,26 +300,24 @@ insaneStand =
                      r <- Lib.randomF
                      return $ if r < 0.5 then insaneMoveStandNormal else insaneMoveStandInsane
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 insaneDead :: EntThink
 insaneDead =
-  GenericEntThink "insane_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "insane_dead" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. 8 /= 0
       then
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eFlags %= (.|. Constants.flFly)
+        modifyEdictT selfRef (\v -> v & eFlags %~ (.|. Constants.flFly))
       else
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMins .= V3 (-16) (-16) (-24)
-          eMaxs .= V3 16 16 (-8)
-          eMoveType .= Constants.moveTypeToss
+        modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                      & eMaxs .~ V3 16 16 (-8)
+                                      & eMoveType .~ Constants.moveTypeToss)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+    modifyEdictT selfRef (\v -> v & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -326,9 +326,8 @@ insaneDead =
 
 insaneDie :: EntDie
 insaneDie =
-  GenericEntDie "insane_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
+  GenericEntDie "insane_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -348,7 +347,7 @@ insaneDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -358,9 +357,8 @@ insaneDie =
            soundIdx <- soundIndex (Just ("player/male/death" `B.append` BC.pack (show ((r `mod` 4) + 1)) `B.append` ".wav"))
            sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnIdle 0
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes)
 
            if (self^.eSpawnFlags) .&. 8 /= 0
              then
@@ -372,7 +370,7 @@ insaneDie =
                                    then insaneMoveCrawlDeath
                                    else insaneMoveStandDeath
 
-               gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+               modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 insaneFramesStandNormal :: V.Vector MFrameT
 insaneFramesStandNormal =
@@ -776,7 +774,7 @@ insaneMoveStruggleCross = MMoveT "insaneMoveStruggleCross" frameCross16 frameCro
 - CRAWL CRUCIFIED STAND_GROUND ALWAYS_STAND
 -}
 spMiscInsane :: EdictReference -> Quake ()
-spMiscInsane selfRef@(EdictReference selfIdx) = do
+spMiscInsane selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -806,43 +804,40 @@ spMiscInsane selfRef@(EdictReference selfIdx) = do
 
         modelIdx <- modelIndex (Just "models/monsters/insane/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-16) (-16) (-24)
-          eMaxs .= V3 16 16 32
-          eHealth .= 100
-          eGibHealth .= (-50)
-          eMass .= 300
-          ePain .= Just insanePain
-          eDie .= Just insaneDie
-          eMonsterInfo.miStand .= Just insaneStand
-          eMonsterInfo.miWalk .= Just insaneWalk
-          eMonsterInfo.miRun .= Just insaneRun
-          eMonsterInfo.miDodge .= Nothing
-          eMonsterInfo.miAttack .= Nothing
-          eMonsterInfo.miMelee .= Nothing
-          eMonsterInfo.miSight .= Nothing
-          eMonsterInfo.miAIFlags %= (.|. Constants.aiGoodGuy)
+        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-16) (-16) (-24)
+                                      & eMaxs .~ V3 16 16 32
+                                      & eHealth .~ 100
+                                      & eGibHealth .~ (-50)
+                                      & eMass .~ 300
+                                      & ePain .~ Just insanePain
+                                      & eDie .~ Just insaneDie
+                                      & eMonsterInfo.miStand .~ Just insaneStand
+                                      & eMonsterInfo.miWalk .~ Just insaneWalk
+                                      & eMonsterInfo.miRun .~ Just insaneRun
+                                      & eMonsterInfo.miDodge .~ Nothing
+                                      & eMonsterInfo.miAttack .~ Nothing
+                                      & eMonsterInfo.miMelee .~ Nothing
+                                      & eMonsterInfo.miSight .~ Nothing
+                                      & eMonsterInfo.miAIFlags %~ (.|. Constants.aiGoodGuy))
 
         linkEntity selfRef
 
-        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        self <- readEdictT selfRef
 
         when ((self^.eSpawnFlags) .&. 16 /= 0) $ -- stand ground
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiStandGround)
+          modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just insaneMoveStandNormal
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStandNormal
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         if (self^.eSpawnFlags) .&. 8 /= 0 -- crucified ?
           then do
-            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-              eMins .= V3 (-16) 0 0
-              eMaxs .= V3 16 8 32
-              eFlags %= (.|. Constants.flNoKnockback)
+            modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) 0 0
+                                          & eMaxs .~ V3 16 8 32
+                                          & eFlags %~ (.|. Constants.flNoKnockback))
 
             void $ think GameAI.flyMonsterStart selfRef
 
@@ -850,4 +845,4 @@ spMiscInsane selfRef@(EdictReference selfIdx) = do
             void $ think GameAI.walkMonsterStart selfRef
 
             r <- Lib.rand
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= fromIntegral r `mod` 3
+            modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ fromIntegral r `mod` 3)

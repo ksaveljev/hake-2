@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss31 where
 
-import Control.Lens (use, ix, (.=), zoom, preuse, (^.))
+import Control.Lens (use, ix, (.=), zoom, preuse, (^.), (&), (.~), (%~))
 import Control.Monad (void)
 import Data.Bits ((.&.))
 import qualified Data.Vector as V
@@ -91,7 +91,7 @@ frameWalk25 = 187
 
 jorgSearch :: EntThink
 jorgSearch =
-  GenericEntThink "jorg_search" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "jorg_search" $ \selfRef -> do
     r <- Lib.randomF
 
     soundSearch <- if | r <= 0.3 -> use (mBoss31Globals.mb31SoundSearch1)
@@ -99,8 +99,8 @@ jorgSearch =
                       | otherwise -> use (mBoss31Globals.mb31SoundSearch3)
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
-
     sound (Just selfRef) Constants.chanVoice soundSearch 1 Constants.attnNorm 0
+
     return True
 
 jorgIdle :: EntThink
@@ -108,8 +108,8 @@ jorgIdle =
   GenericEntThink "jorg_idle" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundIdle <- use $ mBoss31Globals.mb31SoundIdle
-
     sound (Just selfRef) Constants.chanVoice soundIdle 1 Constants.attnNorm 0
+
     return True
 
 jorgDeathHit :: EntThink
@@ -117,8 +117,8 @@ jorgDeathHit =
   GenericEntThink "jorg_death_hit" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundDeathHit <- use $ mBoss31Globals.mb31SoundDeathHit
-
     sound (Just selfRef) Constants.chanBody soundDeathHit 1 Constants.attnNorm 0
+
     return True
 
 jorgStepLeft :: EntThink
@@ -126,8 +126,8 @@ jorgStepLeft =
   GenericEntThink "jorg_step_left" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundStepLeft <- use $ mBoss31Globals.mb31SoundStepLeft
-
     sound (Just selfRef) Constants.chanBody soundStepLeft 1 Constants.attnNorm 0
+
     return True
 
 jorgStepRight :: EntThink
@@ -135,20 +135,20 @@ jorgStepRight =
   GenericEntThink "jorg_step_right" $ \selfRef -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundStepRight <- use $ mBoss31Globals.mb31SoundStepRight
-
     sound (Just selfRef) Constants.chanBody soundStepRight 1 Constants.attnNorm 0
+
     return True
 
 jorgStand :: EntThink
 jorgStand =
-  GenericEntThink "jorg_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just jorgMoveStand
+  GenericEntThink "jorg_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveStand)
     return True
 
 jorgReAttack1 :: EntThink
 jorgReAttack1 =
-  GenericEntThink "jorg_reattack1" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "jorg_reattack1" $ \selfRef -> do
+    self <- readEdictT selfRef
     let Just enemyRef = self^.eEnemy
     -- Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
     vis <- GameUtil.visible selfRef enemyRef
@@ -159,22 +159,21 @@ jorgReAttack1 =
 
         if r < 0.9
           then
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just jorgMoveAttack1
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack1)
+
           else do
-            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-              eEntityState.esSound .=0
-              eMonsterInfo.miCurrentMove .= Just jorgMoveEndAttack1
+            modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+                                          & eMonsterInfo.miCurrentMove .~ Just jorgMoveEndAttack1)
       else do
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .=0
-          eMonsterInfo.miCurrentMove .= Just jorgMoveEndAttack1
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+                                      & eMonsterInfo.miCurrentMove .~ Just jorgMoveEndAttack1)
 
     return True
 
 jorgAttack1 :: EntThink
 jorgAttack1 =
-  GenericEntThink "jorg_attack1" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= (Just jorgMoveAttack1)
+  GenericEntThink "jorg_attack1" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ (Just jorgMoveAttack1))
     return True
 
 jorgPain :: EntPain
@@ -356,20 +355,20 @@ jorgMoveEndWalk = MMoveT "jorgMoveEndWalk" frameWalk20 frameWalk25 jorgFramesEnd
 
 jorgWalk :: EntThink
 jorgWalk =
-  GenericEntThink "jorg_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just jorgMoveWalk
+  GenericEntThink "jorg_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveWalk)
     return True
 
 jorgRun :: EntThink
 jorgRun =
-  GenericEntThink "jorg_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "jorg_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then jorgMoveStand
                    else jorgMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 jorgFramesPain3 :: V.Vector MFrameT

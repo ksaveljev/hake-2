@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MGladiator where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom)
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Data.Maybe (isJust)
@@ -121,8 +121,8 @@ gladiatorMoveStand = MMoveT "gladiatorMoveStand" frameStand1 frameStand7 gladiat
 
 gladiatorStand :: EntThink
 gladiatorStand =
-  GenericEntThink "gladiator_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMoveStand
+  GenericEntThink "gladiator_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveStand)
     return True
 
 gladiatorFramesWalk :: V.Vector MFrameT
@@ -150,8 +150,8 @@ gladiatorMoveWalk = MMoveT "gladiatorMoveWalk" frameWalk1 frameWalk16 gladiatorF
 
 gladiatorWalk :: EntThink
 gladiatorWalk =
-  GenericEntThink "gladiator_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMoveWalk
+  GenericEntThink "gladiator_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveWalk)
     return True
 
 gladiatorFramesRun :: V.Vector MFrameT
@@ -169,20 +169,20 @@ gladiatorMoveRun = MMoveT "gladiatorMoveRun" frameRun1 frameRun6 gladiatorFrames
 
 gladiatorRun :: EntThink
 gladiatorRun =
-  GenericEntThink "gladiator_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "gladiator_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then gladiatorMoveStand
                    else gladiatorMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 gladiatorMelee :: EntThink
 gladiatorMelee =
-  GenericEntThink "GladiatorMelee" $ \selfRef@(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMoveAttackMelee
+  GenericEntThink "GladiatorMelee" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveAttackMelee)
     return True
 
 gladiatorFramesAttackMelee :: V.Vector MFrameT
@@ -211,14 +211,14 @@ gladiatorMoveAttackMelee = MMoveT "gladiatorMoveAttackMelee" frameMelee1 frameMe
 
 gladiatorAttackMelee :: EntThink
 gladiatorAttackMelee =
-  GenericEntThink "gladiator_melee" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMoveAttackMelee
+  GenericEntThink "gladiator_melee" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveAttackMelee)
     return True
 
 gladiatorGun :: EntThink
 gladiatorGun =
-  GenericEntThink "GladiatorGun" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "GladiatorGun" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2GladiatorRailgun1) forward right
@@ -247,11 +247,10 @@ gladiatorMoveAttackGun = MMoveT "gladiatorMoveAttackGun" frameAttack1 frameAttac
 
 gladiatorAttack :: EntThink
 gladiatorAttack =
-  GenericEntThink "gladiator_attack" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "gladiator_attack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     -- a small safe zone
     let v = (self^.eEntityState.esOrigin) - (enemy^.eEntityState.esOrigin)
@@ -269,9 +268,8 @@ gladiatorAttack =
         let V3 a b c = enemy^.eEntityState.esOrigin
             pos1 = V3 a b (c + fromIntegral (enemy^.eViewHeight))
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          ePos1 .= pos1
-          eMonsterInfo.miCurrentMove .= Just gladiatorMoveAttackGun
+        modifyEdictT selfRef (\v -> v & ePos1 .~ pos1
+                                      & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveAttackGun)
 
         return True
 
@@ -304,11 +302,11 @@ gladiatorMovePainAir = MMoveT "gladiatorMovePainAir" framePainUp1 framePainUp7 g
 
 gladiatorPain :: EntPain
 gladiatorPain =
-  GenericEntPain "gladiator_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "gladiator_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -318,10 +316,10 @@ gladiatorPain =
           let Just currentMove = self^.eMonsterInfo.miCurrentMove
 
           when ((self^.eVelocity._z) > 100 && (currentMove^.mmId) == "gladiatorMovePain") $
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just gladiatorMovePainAir
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMovePainAir)
 
       else do
-        gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+        modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
         r <- Lib.randomF
 
@@ -339,17 +337,16 @@ gladiatorPain =
                               then gladiatorMovePainAir
                               else gladiatorMovePain
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 gladiatorDead :: EntThink
 gladiatorDead =
-  GenericEntThink "gladiator_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "gladiator_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -387,9 +384,8 @@ gladiatorMoveDeath = MMoveT "gladiatorMoveDeath" frameDeath1 frameDeath22 gladia
 
 gladiatorDie :: EntDie
 gladiatorDie =
-  GenericEntDie "gladiator_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
+  GenericEntDie "gladiator_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -409,7 +405,7 @@ gladiatorDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -418,17 +414,16 @@ gladiatorDie =
            soundDie <- use $ mGladiatorGlobals.mGladiatorSoundDie
            sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
-             eMonsterInfo.miCurrentMove .= Just gladiatorMoveDeath
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveDeath)
 
 {-
 - QUAKED monster_gladiator (1 .5 0) (-32 -32 -24) (32 32 64) Ambush
 - Trigger_Spawn Sight
 -}
 spMonsterGladiator :: EdictReference -> Quake ()
-spMonsterGladiator selfRef@(EdictReference selfIdx) = do
+spMonsterGladiator selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     
     if deathmatchValue /= 0
@@ -455,31 +450,29 @@ spMonsterGladiator selfRef@(EdictReference selfIdx) = do
 
         modelIdx <- modelIndex (Just "models/monsters/gladiatr/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-32) (-32) (-24)
-          eMaxs .= V3 32 32 64
-          eHealth .= 400
-          eGibHealth .= (-175)
-          eMass .= 400
-          ePain .= Just gladiatorPain
-          eDie .= Just gladiatorDie
-          eMonsterInfo.miStand .= Just gladiatorStand
-          eMonsterInfo.miWalk .= Just gladiatorWalk
-          eMonsterInfo.miRun .= Just gladiatorRun
-          eMonsterInfo.miDodge .= Nothing
-          eMonsterInfo.miAttack .= Just gladiatorAttack
-          eMonsterInfo.miMelee .= Just gladiatorAttackMelee
-          eMonsterInfo.miSight .= Just gladiatorSight
-          eMonsterInfo.miIdle .= Just gladiatorIdle
-          eMonsterInfo.miSearch .= Just gladiatorSearch
+        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-32) (-32) (-24)
+                                      & eMaxs .~ V3 32 32 64
+                                      & eHealth .~ 400
+                                      & eGibHealth .~ (-175)
+                                      & eMass .~ 400
+                                      & ePain .~ Just gladiatorPain
+                                      & eDie .~ Just gladiatorDie
+                                      & eMonsterInfo.miStand .~ Just gladiatorStand
+                                      & eMonsterInfo.miWalk .~ Just gladiatorWalk
+                                      & eMonsterInfo.miRun .~ Just gladiatorRun
+                                      & eMonsterInfo.miDodge .~ Nothing
+                                      & eMonsterInfo.miAttack .~ Just gladiatorAttack
+                                      & eMonsterInfo.miMelee .~ Just gladiatorAttackMelee
+                                      & eMonsterInfo.miSight .~ Just gladiatorSight
+                                      & eMonsterInfo.miIdle .~ Just gladiatorIdle
+                                      & eMonsterInfo.miSearch .~ Just gladiatorSearch)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just gladiatorMoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gladiatorMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef
