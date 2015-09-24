@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameTrigger where
 
-import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom)
+import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom, (&), (.~), (%~))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isJust)
@@ -19,9 +19,10 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 spTriggerMultiple :: EdictReference -> Quake ()
-spTriggerMultiple er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+spTriggerMultiple edictRef = do
+    edict <- readEdictT edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
         soundIndex = gameImport^.giSoundIndex
@@ -32,34 +33,31 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
                         | otherwise -> Nothing
 
     when (isJust noiseIndex) $ do
-      si <- soundIndex noiseIndex
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eNoiseIndex .= si
+      noiseIdx <- soundIndex noiseIndex
+      modifyEdictT edictRef (\v -> v & eNoiseIndex .~ noiseIdx)
 
     when ((edict^.eWait) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 0.2
+      modifyEdictT edictRef (\v -> v & eWait .~ 0.2)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eTouch .= Just touchMulti
-      eMoveType .= Constants.moveTypeNone
-      eSvFlags %= (.|. Constants.svfNoClient)
+    modifyEdictT edictRef (\v -> v & eTouch .~ Just touchMulti
+                                   & eMoveType .~ Constants.moveTypeNone
+                                   & eSvFlags %~ (.|. Constants.svfNoClient))
     
     if (edict^.eSpawnFlags) .&. 4 /= 0
       then
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eSolid .= Constants.solidNot
-          eUse .= Just triggerEnable
+        modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidNot
+                                       & eUse .~ Just triggerEnable)
       else
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eSolid .= Constants.solidTrigger
-          eUse .= Just useMulti
+        modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidTrigger
+                                       & eUse .~ Just useMulti)
 
     origin <- use $ globals.vec3Origin
 
     unless ((edict^.eEntityState.esAngles) == origin) $
-      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir)
+      GameBase.setMoveDir edictRef
 
-    setModel er (edict^.eiModel)
-    linkEntity er
+    setModel edictRef (edict^.eiModel)
+    linkEntity edictRef
 
 {-
 - QUAKED trigger_once (.5 .5 .5) ? x x TRIGGERED Triggers once, then
@@ -73,26 +71,26 @@ spTriggerMultiple er@(EdictReference edictIdx) = do
 - "message" string to be displayed when triggered
 -}
 spTriggerOnce :: EdictReference -> Quake ()
-spTriggerOnce er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+spTriggerOnce edictRef = do
+    edict <- readEdictT edictRef
 
     -- make old maps work because I messed up on flag assignments here
     -- triggered was on bit 1 when it should have been on bit 4
     when ((edict^.eSpawnFlags) .&. 1 /= 0) $ do
       let v = (edict^.eMins) + fmap (* 0.5) (edict^.eSize)
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eSpawnFlags %= (.&. (complement 1))
-        eSpawnFlags %= (.|. 4)
+
+      modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
+                                     & eSpawnFlags %~ (.|. 4))
 
       dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
       dprintf $ "fixed TRIGGERED flag on " `B.append` (edict^.eClassName) `B.append` (Lib.vtos v) `B.append` "\n"
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= -1
-    spTriggerMultiple er
+    modifyEdictT edictRef (\v -> v & eWait .~ (-1))
+    spTriggerMultiple edictRef
 
 spTriggerRelay :: EdictReference -> Quake ()
-spTriggerRelay (EdictReference edictIdx) =
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just triggerRelayUse
+spTriggerRelay edictRef =
+    modifyEdictT edictRef (\v -> v & eUse .~ Just triggerRelayUse)
 
 spTriggerKey :: EdictReference -> Quake ()
 spTriggerKey _ = io (putStrLn "GameTrigger.spTriggerKey") >> undefined -- TODO
@@ -101,13 +99,13 @@ spTriggerCounter :: EdictReference -> Quake ()
 spTriggerCounter _ = io (putStrLn "GameTrigger.spTriggerCounter") >> undefined -- TODO
 
 spTriggerAlways :: EdictReference -> Quake ()
-spTriggerAlways er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+spTriggerAlways edictRef = do
+    edict <- readEdictT edictRef
 
     when ((edict^.eDelay) < 0.2) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eDelay .= 0.2
+      modifyEdictT edictRef (\v -> v & eDelay .~ 0.2)
 
-    GameUtil.useTargets er (Just er)
+    GameUtil.useTargets edictRef (Just edictRef)
 
 spTriggerPush :: EdictReference -> Quake ()
 spTriggerPush _ = io (putStrLn "GameTrigger.spTriggerPush") >> undefined -- TODO
@@ -132,12 +130,12 @@ triggerRelayUse =
 
 touchMulti :: EntTouch
 touchMulti =
-  GenericEntTouch "Touch_Multi" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) _ _ -> do
+  GenericEntTouch "Touch_Multi" $ \edictRef otherRef _ _ -> do
     done <- shouldReturn edictRef otherRef
 
     unless done $ do
-      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-      Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+      edict <- readEdictT edictRef
+      other <- readEdictT otherRef
       vec3origin <- use $ globals.vec3Origin
 
       done' <- if (edict^.eMoveDir) /= vec3origin
@@ -150,13 +148,13 @@ touchMulti =
                    return False
 
       unless done' $ do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eActivator .= Just otherRef
+        modifyEdictT edictRef (\v -> v & eActivator .~ Just otherRef)
         multiTrigger edictRef
 
   where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
-        shouldReturn (EdictReference edictIdx) (EdictReference otherIdx) = do
-          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
-          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+        shouldReturn edictRef otherRef = do
+          other <- readEdictT otherRef
+          spawnFlags <- readEdictT edictRef >>= \e -> return (e^.eSpawnFlags)
 
           if | isJust (other^.eClient) -> return $ if spawnFlags .&. 2 /= 0 then True else False
              | (other^.eSvFlags) .&. Constants.svfMonster /= 0 -> return $ if spawnFlags .&. 1 == 0 then True else False
@@ -176,47 +174,44 @@ useMulti =
 -- ent.activator should be set to the activator so it can be held through a
 -- delay so wait for the delay time before firing
 multiTrigger :: EdictReference -> Quake ()
-multiTrigger edictRef@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+multiTrigger edictRef = do
+    edict <- readEdictT edictRef
 
     when ((edict^.eNextThink) == 0) $ do
       GameUtil.useTargets edictRef (edict^.eActivator)
 
-      Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      edict' <- readEdictT edictRef
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       
       if (edict'^.eWait) > 0
         then
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eThink .= Just multiWait
-            eNextThink .= levelTime + (edict'^.eWait)
+          modifyEdictT edictRef (\v -> v & eThink .~ Just multiWait
+                                         & eNextThink .~ levelTime + (edict'^.eWait))
         else
           -- we can't just remove (self) here, because this is a touch
           -- function
           -- called while looping through area links...
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eTouch .= Nothing
-            eNextThink .= levelTime + (Constants.frameTime)
-            eThink .= Just GameUtil.freeEdictA
+          modifyEdictT edictRef (\v -> v & eTouch .~ Nothing
+                                         & eNextThink .~ levelTime + (Constants.frameTime)
+                                         & eThink .~ Just GameUtil.freeEdictA)
 
 initTrigger :: EdictReference -> Quake ()
-initTrigger selfRef@(EdictReference selfIdx) = do
+initTrigger selfRef = do
     v3o <- use $ globals.vec3Origin
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
 
     unless ((self^.eEntityState.esAngles) == v3o) $
-      GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveDir)
+      GameBase.setMoveDir selfRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eSolid .= Constants.solidTrigger
-      eMoveType .= Constants.moveTypeNone
-      eSvFlags .= Constants.svfNoClient
+    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidTrigger
+                                  & eMoveType .~ Constants.moveTypeNone
+                                  & eSvFlags .~ Constants.svfNoClient)
 
     setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
     setModel selfRef (self^.eiModel)
 
 multiWait :: EntThink
 multiWait =
-  GenericEntThink "multi_wait" $ \(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= 0
+  GenericEntThink "multi_wait" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eNextThink .~ 0)
     return True
