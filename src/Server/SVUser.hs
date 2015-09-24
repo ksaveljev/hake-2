@@ -4,7 +4,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVUser where
 
-import Control.Lens ((.=), preuse, ix, use, (^.), zoom, (-=))
+import Control.Lens ((.=), preuse, ix, use, (^.), zoom, (-=), (&), (.~))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.))
 import Data.Maybe (fromJust)
@@ -253,10 +253,10 @@ newF = do
            -- game server
            when (state == Constants.ssGame) $ do
              -- set up the entity for the client
-             let edictIdx = playerNum + 1
-             gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esNumber .= edictIdx
+             let edictRef = newEdictReference (playerNum + 1)
+             modifyEdictT edictRef (\v -> v & eEntityState.esNumber .~ playerNum + 1)
              zoom (svGlobals.svServerStatic.ssClients.ix clientIdx) $ do
-               cEdict .= Just (EdictReference edictIdx)
+               cEdict .= Just edictRef
                cLastCmd .= newUserCmdT
 
              -- begin fetching configstrings
