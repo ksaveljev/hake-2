@@ -319,7 +319,7 @@ actorPain =
 
       if isJust (other^.eClient) && r < 0.4
         then do
-          let v = (other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+          let a = (other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
 
           r' <- Lib.randomF
           r'' <- Lib.rand
@@ -328,7 +328,7 @@ actorPain =
                               then actorMoveFlipOff
                               else actorMoveTaunt
 
-          modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw v
+          modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw a
                                         & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
           -- FIXME: does the ent-id work out ?
@@ -582,7 +582,7 @@ spMiscActor selfRef = do
 
            -- actors always start in a dormant state, they *must* be used
            -- to get going
-           modifyEdictT selfRef (\v -> v & eUse . Just actorUse)
+           modifyEdictT selfRef (\v -> v & eUse .~ Just actorUse)
 
 spTargetActor :: EdictReference -> Quake ()
 spTargetActor selfRef = do

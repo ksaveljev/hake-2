@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MParasite where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), norm)
@@ -138,74 +138,74 @@ parasiteSearch =
 
 parasiteStartWalk :: EntThink
 parasiteStartWalk =
-  GenericEntThink "parasite_start_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveStartWalk
+  GenericEntThink "parasite_start_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveStartWalk)
     return True
 
 parasiteWalk :: EntThink
 parasiteWalk =
-  GenericEntThink "parasite_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveWalk
+  GenericEntThink "parasite_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveWalk)
     return True
 
 parasiteStand :: EntThink
 parasiteStand =
-  GenericEntThink "parasite_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveStand
+  GenericEntThink "parasite_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveStand)
     return True
 
 parasiteEndFidget :: EntThink
 parasiteEndFidget =
-  GenericEntThink "parasite_end_fidget" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveEndFidget
+  GenericEntThink "parasite_end_fidget" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveEndFidget)
     return True
 
 parasiteDoFidget :: EntThink
 parasiteDoFidget =
-  GenericEntThink "parasite_do_fidget" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveFidget
+  GenericEntThink "parasite_do_fidget" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveFidget)
     return True
 
 parasiteReFidget :: EntThink
 parasiteReFidget =
-  GenericEntThink "parasite_refidget" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "parasite_refidget" $ \selfRef -> do
     r <- Lib.randomF
 
     let action = if r <= 0.8
                    then parasiteMoveFidget
                    else parasiteMoveEndFidget
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 parasiteIdle :: EntThink
 parasiteIdle =
-  GenericEntThink "parasite_idle" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveStartFidget
+  GenericEntThink "parasite_idle" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveStartFidget)
     return True
 
 parasiteStartRun :: EntThink
 parasiteStartRun =
-  GenericEntThink "parasite_start_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "parasite_start_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then parasiteMoveStand
                    else parasiteMoveStartRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 parasiteRun :: EntThink
 parasiteRun =
-  GenericEntThink "parasite_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "parasite_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then parasiteMoveStand
                    else parasiteMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 parasiteFramesStartFidget :: V.Vector MFrameT
@@ -363,16 +363,16 @@ parasiteMovePain1 = MMoveT "parasiteMovePain1" framePain101 framePain111 parasit
 
 parasitePain :: EntPain
 parasitePain =
-  GenericEntPain "parasite_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "parasite_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -386,7 +386,7 @@ parasitePain =
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMovePain1
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMovePain1)
 
 parasiteDrainAttack :: EntThink
 parasiteDrainAttack =
@@ -460,19 +460,18 @@ parasiteMoveBreak = MMoveT "parasiteMoveBreak" frameBreak01 frameBreak32 parasit
 
 parasiteAttack :: EntThink
 parasiteAttack =
-  GenericEntThink "parasite_attack" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just parasiteMoveDrain
+  GenericEntThink "parasite_attack" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveDrain)
     return True
 
 parasiteDead :: EntThink
 parasiteDead =
-  GenericEntThink "parasite_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "parasite_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -495,8 +494,8 @@ parasiteMoveDeath = MMoveT "parasiteMoveDeath" frameDeath101 frameDeath107 paras
 
 parasiteDie :: EntDie
 parasiteDie =
-  GenericEntDie "parasite_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "parasite_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -516,7 +515,7 @@ parasiteDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -525,10 +524,9 @@ parasiteDie =
            soundDie <- use $ mParasiteGlobals.mParasiteSoundDie
            sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
-             eMonsterInfo.miCurrentMove .= Just parasiteMoveDeath
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         & eMonsterInfo.miCurrentMove .~ Just parasiteMoveDeath)
 
 {-
 - QUAKED monster_parasite (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
@@ -536,7 +534,7 @@ parasiteDie =
 -}
 spMonsterParasite :: EntThink
 spMonsterParasite =
-  GenericEntThink "SP_monster_parasite" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "SP_monster_parasite" $ \selfRef -> do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -565,29 +563,27 @@ spMonsterParasite =
 
         modelIdx <- modelIndex (Just "models/monsters/parasite/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-16) (-16) (-24)
-          eMaxs .= V3 16 16 24
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eHealth .= 175
-          eGibHealth .= (-50)
-          eMass .= 250
-          ePain .= Just parasitePain
-          eDie .= Just parasiteDie
-          eMonsterInfo.miStand .= Just parasiteStand
-          eMonsterInfo.miWalk .= Just parasiteStartWalk
-          eMonsterInfo.miRun .= Just parasiteStartRun
-          eMonsterInfo.miAttack .= Just parasiteAttack
-          eMonsterInfo.miSight .= Just parasiteSight
-          eMonsterInfo.miIdle .= Just parasiteIdle
+        modifyEdictT selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-16) (-16) (-24)
+                                      & eMaxs .~ V3 16 16 24
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eHealth .~ 175
+                                      & eGibHealth .~ (-50)
+                                      & eMass .~ 250
+                                      & ePain .~ Just parasitePain
+                                      & eDie .~ Just parasiteDie
+                                      & eMonsterInfo.miStand .~ Just parasiteStand
+                                      & eMonsterInfo.miWalk .~ Just parasiteStartWalk
+                                      & eMonsterInfo.miRun .~ Just parasiteStartRun
+                                      & eMonsterInfo.miAttack .~ Just parasiteAttack
+                                      & eMonsterInfo.miSight .~ Just parasiteSight
+                                      & eMonsterInfo.miIdle .~ Just parasiteIdle)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just parasiteMoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just parasiteMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef
         return True
