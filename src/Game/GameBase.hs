@@ -88,30 +88,32 @@ runFrame = do
         treatObjects maxIdx idx
          | idx >= maxIdx = return ()
          | otherwise = do
-             let er = EdictReference idx
-             Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+             let edictRef = newEdictReference idx
+             edict <- readEdictT edictRef
 
              if not (edict^.eInUse)
-               then treatObjects maxIdx (idx + 1)
+               then
+                 treatObjects maxIdx (idx + 1)
+
                else do
-                 gameBaseGlobals.gbLevel.llCurrentEntity .= Just er
-                 gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esOldOrigin .= (edict^.eEntityState.esOrigin)
+                 gameBaseGlobals.gbLevel.llCurrentEntity .= Just edictRef
+                 modifyEdictT edictRef (\v -> v & eEntityState.esOldOrigin .~ (edict^.eEntityState.esOrigin))
 
                  -- if the ground entity moved, make sure we are still on it
                  when (isJust (edict^.eGroundEntity)) $ do
-                   let Just (EdictReference groundIdx) = edict^.eGroundEntity
-                   Just groundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix groundIdx
+                   let Just groundRef = edict^.eGroundEntity
+                   groundEdict <- readEdictT groundRef
 
                    when (groundEdict^.eLinkCount /= (edict^.eGroundEntityLinkCount)) $ do
-                     gameBaseGlobals.gbGEdicts.ix idx.eGroundEntity .= Nothing
+                     modifyEdictT edictRef (\v -> v & eGroundEntity .~ Nothing)
                      when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
-                       M.checkGround er
+                       M.checkGround edictRef
 
                  maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
                  if idx > 0 && idx <= maxClientsValue
-                   then PlayerClient.clientBeginServerFrame er
-                   else runEntity er
+                   then PlayerClient.clientBeginServerFrame edictRef
+                   else runEntity edictRef
 
                  treatObjects maxIdx (idx + 1)
 
@@ -135,19 +137,19 @@ findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
 
 gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
 gFind ref findBy str = do
-    let (EdictReference edictIdx) = case ref of
-                                      Nothing -> EdictReference 0
-                                      Just (EdictReference refIdx) -> EdictReference (refIdx + 1)
+    let edictRef = case ref of
+                     Nothing -> worldRef
+                     Just ref' -> nextEdictReference ref'
 
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
-    findEdict edictIdx numEdicts
+    findEdict edictRef (newEdictReference numEdicts)
 
-  where findEdict :: Int -> Int -> Quake (Maybe EdictReference)
-        findEdict idx maxIdx
-          | idx >= maxIdx = return Nothing
+  where findEdict :: EdictReference -> EdictReference -> Quake (Maybe EdictReference)
+        findEdict edictRef maxEdictRef
+          | edictRef >= maxEdictRef = return Nothing
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              edict <- readEdictT edictRef
 
               -- TODO: do we need this?
               {-
@@ -156,9 +158,9 @@ gFind ref findBy str = do
               }
               -}
 
-              if | not (edict^.eInUse) -> findEdict (idx + 1) maxIdx
-                 | findBy edict str -> return $ Just (EdictReference idx)
-                 | otherwise -> findEdict (idx + 1) maxIdx
+              if | not (edict^.eInUse) -> findEdict (nextEdictReference edictRef) maxEdictRef
+                 | findBy edict str -> return $ Just edictRef
+                 | otherwise -> findEdict (nextEdictReference edictRef) maxEdictRef
 
 setMoveDir :: EdictReference -> Quake ()
 setMoveDir edictRef = do
@@ -200,10 +202,10 @@ checkDMRules = do
     unless (intermissionTime /= 0 || deathmatchValue == 0) $ do
       timeLimitValue <- liftM (^.cvValue) timeLimitCVar
       fragLimitValue <- liftM (truncate . (^.cvValue)) fragLimitCVar
-      time <- use $ gameBaseGlobals.gbLevel.llTime
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
 
-      if timeLimitValue /= 0 && time >= timeLimitValue * 60
+      if timeLimitValue /= 0 && levelTime >= timeLimitValue * 60
         then do
           bprintf Constants.printHigh "Timelimit hit.\n"
           endDMLevel
@@ -219,15 +221,18 @@ checkDMRules = do
         checkFragLimit fragLimit idx maxIdx
           | idx >= maxIdx = return False
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix (idx + 1)
+              edict <- readEdictT (newEdictReference (idx + 1))
 
               if edict^.eInUse
                 then do
                   Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix idx
+
                   if (client^.gcResp.crScore) >= fragLimit
                     then return True
                     else checkFragLimit fragLimit (idx + 1) maxIdx
-                else checkFragLimit fragLimit (idx + 1) maxIdx
+
+                else
+                  checkFragLimit fragLimit (idx + 1) maxIdx
 
 checkNeedPass :: Quake ()
 checkNeedPass = do
@@ -257,27 +262,28 @@ clientEndServerFrames = do
         calcPlayerViews idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix (idx + 1)
+              let edictRef = newEdictReference (idx + 1)
+              edict <- readEdictT edictRef
 
               unless (not (edict^.eInUse) || isNothing (edict^.eClient)) $
-                PlayerView.clientEndServerFrame (EdictReference (idx + 1))
+                PlayerView.clientEndServerFrame edictRef
 
               calcPlayerViews (idx + 1) maxIdx
 
 runEntity :: EdictReference -> Quake ()
-runEntity er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+runEntity edictRef = do
+    edict <- readEdictT edictRef
 
     when (isJust (edict^.ePrethink)) $
-      void (think (fromJust $ edict^.ePrethink) er)
+      void (think (fromJust $ edict^.ePrethink) edictRef)
 
     let moveType = edict^.eMoveType
 
-    if | any (== moveType) [Constants.moveTypePush, Constants.moveTypeStop] -> SV.physicsPusher er
-       | moveType == Constants.moveTypeNone -> SV.physicsNone er
-       | moveType == Constants.moveTypeNoClip -> SV.physicsNoClip er
-       | moveType == Constants.moveTypeStep -> SV.physicsStep er
-       | any (== moveType) [Constants.moveTypeToss, Constants.moveTypeBounce, Constants.moveTypeFly, Constants.moveTypeFlyMissile] -> SV.physicsToss er
+    if | any (== moveType) [Constants.moveTypePush, Constants.moveTypeStop] -> SV.physicsPusher edictRef
+       | moveType == Constants.moveTypeNone -> SV.physicsNone edictRef
+       | moveType == Constants.moveTypeNoClip -> SV.physicsNoClip edictRef
+       | moveType == Constants.moveTypeStep -> SV.physicsStep edictRef
+       | any (== moveType) [Constants.moveTypeToss, Constants.moveTypeBounce, Constants.moveTypeFly, Constants.moveTypeFlyMissile] -> SV.physicsToss edictRef
        | otherwise -> do
            err <- use $ gameBaseGlobals.gbGameImport.giError
            err $ "SV_Physics: bad movetype " `B.append` BC.pack (show moveType) -- IMPROVE?
@@ -315,7 +321,9 @@ pickTarget targetName = do
               edictRef <- gFind ref findBy (fromJust targetName)
 
               if isNothing edictRef
-                then return (foundRefs, num)
+                then
+                  return (foundRefs, num)
+
                 else do
                   let Just foundEdictRef = edictRef
                   searchForTargets edictRef findBy (foundEdictRef : foundRefs) (num + 1)
@@ -334,8 +342,8 @@ clipVelocity v3in normal overbounce =
     in (isBlocked, v3out)
 
 touchTriggers :: EdictReference -> Quake ()
-touchTriggers er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+touchTriggers edictRef = do
+    edict <- readEdictT edictRef
 
     -- dead things don't activate triggers!
     unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eHealth <= 0)) $ do
@@ -353,14 +361,16 @@ touchTriggers er@(EdictReference edictIdx) = do
         touchEdicts idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just hitRef@(EdictReference hitIdx) <- preuse $ gameBaseGlobals.gbTouch.ix idx
-              Just hit <- preuse $ gameBaseGlobals.gbGEdicts.ix hitIdx
+              Just hitRef <- preuse $ gameBaseGlobals.gbTouch.ix idx
+              hit <- readEdictT hitRef
 
               if not (hit^.eInUse) || isNothing (hit^.eTouch)
-                then touchEdicts (idx + 1) maxIdx
+                then
+                  touchEdicts (idx + 1) maxIdx
+
                 else do
                   dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
-                  touch (fromJust $ hit^.eTouch) hitRef er dummyPlane Nothing
+                  touch (fromJust $ hit^.eTouch) hitRef edictRef dummyPlane Nothing
 
 addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
 addPointToBound v mins maxs =
@@ -378,25 +388,25 @@ endDMLevel = io (putStrLn "GameBase.endDMLevel") >> undefined -- TODO
 
 findRadius :: Maybe EdictReference -> V3 Float -> Float -> Quake (Maybe EdictReference)
 findRadius fromRef org rad = do
-    let (EdictReference edictIdx) = case fromRef of
-                                      Nothing -> EdictReference 0
-                                      Just (EdictReference refIdx) -> EdictReference (refIdx + 1)
+    let edictRef = case fromRef of
+                     Nothing -> worldRef
+                     Just ref -> nextEdictReference ref
 
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
-    findEdict edictIdx numEdicts
+    findEdict edictRef (newEdictReference numEdicts)
 
-  where findEdict :: Int -> Int -> Quake (Maybe EdictReference)
-        findEdict idx maxIdx
-          | idx >= maxIdx = return Nothing
+  where findEdict :: EdictReference -> EdictReference -> Quake (Maybe EdictReference)
+        findEdict edictRef maxEdictRef
+          | edictRef >= maxEdictRef = return Nothing
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              edict <- readEdictT edictRef
 
-              if | not (edict^.eInUse) -> findEdict (idx + 1) maxIdx
-                 | (edict^.eSolid) == Constants.solidNot -> findEdict (idx + 1) maxIdx
+              if | not (edict^.eInUse) -> findEdict (nextEdictReference edictRef) maxEdictRef
+                 | (edict^.eSolid) == Constants.solidNot -> findEdict (nextEdictReference edictRef) maxEdictRef
                  | otherwise -> do
                      let eorg = org - ((edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs)))
 
                      if norm eorg > rad
-                       then findEdict (idx + 1) maxIdx
-                       else return $ Just (EdictReference idx)
+                       then findEdict (nextEdictReference edictRef) maxEdictRef
+                       else return $ Just edictRef

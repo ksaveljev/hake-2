@@ -49,6 +49,7 @@ module QuakeState ( QuakeState(..)
                   , EdictReference
                   , worldRef
                   , newEdictReference
+                  , nextEdictReference
                   , readEdictT
                   , modifyEdictT
                   , writeEdictT
@@ -243,3 +244,6 @@ worldRef = EdictReference 0
 
 newEdictReference :: Int -> EdictReference
 newEdictReference = EdictReference
+
+nextEdictReference :: EdictReference -> EdictReference
+nextEdictReference (EdictReference edictIdx) = EdictReference (edictIdx + 1)

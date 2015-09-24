@@ -97,7 +97,7 @@ type XCommandT = Quake ()
 type KeyFuncT = Int -> Quake B.ByteString
 
 -- reference to gameBaseGlobals.gbGEdicts
-newtype EdictReference = EdictReference Int deriving (Eq, Show)
+newtype EdictReference = EdictReference Int deriving (Eq, Show, Ord)
 
 -- reference to svGlobals.svServerStatic.ssClients
 newtype ClientReference = ClientReference Int
