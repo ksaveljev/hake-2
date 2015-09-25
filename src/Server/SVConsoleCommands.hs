@@ -372,17 +372,17 @@ gameMapF = do
               edicts <- use $ gameBaseGlobals.gbGEdicts
               savedInUse <- mapM (\i -> do
                                         let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
-                                            inuse = (edicts V.! edictIdx)^.eInUse
-                                        gameBaseGlobals.gbGEdicts.ix i.eInUse .= False
-                                        return inuse
+                                            inUse = (edicts V.! edictIdx)^.eInUse
+                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= False
+                                        return inUse
                                 ) [0..maxClientsValue-1]
 
               writeLevelFile
 
               -- we must restore these for clients to transfer over correctly
-              mapM_ (\(i, inuse) -> do
+              mapM_ (\(i, inUse) -> do
                                     let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
-                                    gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inuse
+                                    gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inUse
                     ) ([0..] `zip` savedInUse)
 
         -- start up the next map
