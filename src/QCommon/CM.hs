@@ -300,11 +300,9 @@ loadBrushes lump = do
       Com.dprintf "brushes:(firstbrushside, numsides, contents)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
+    mapM_ (\i -> readMapBrush buf i >>= writeCBrushT (newCBrushReference i)) [0..count-1]
 
-    updatedMapBrushes <- mapM (readMapBrush buf) [0..count-1]
-    cmGlobals.cmMapBrushes %= (V.// updatedMapBrushes)
-
-  where readMapBrush :: BL.ByteString -> Int -> Quake (Int, CBrushT)
+  where readMapBrush :: BL.ByteString -> Int -> Quake CBrushT
         readMapBrush buf idx = do
           let offset = fromIntegral $ (lump^.lFileOfs) + idx * dBrushTSize
               brush = newDBrushT (BL.drop offset buf)
@@ -320,7 +318,7 @@ loadBrushes lump = do
                           "| " `B.append` BC.pack (show $ brush^.dbContents) `B.append` -- IMPROVE ?
                           "|\n"
 
-          return (idx, cbrush)
+          return cbrush
 
 loadLeafs :: LumpT -> Quake ()
 loadLeafs lump = do
@@ -673,7 +671,7 @@ initBoxHull = do
                            , _cbCheckCount     = 0
                            }
 
-    cmGlobals.cmMapBrushes %= (V.// [(numBrushes, boxBrush)])
+    writeCBrushT (newCBrushReference numBrushes) boxBrush
 
     let boxLeaf = CLeafT { _clContents       = Constants.contentsMonster
                          , _clCluster        = 0
@@ -1022,7 +1020,8 @@ testInLeaf leafNum = do
           | idx >= maxIdx = return ()
           | otherwise = do
               Just brushNum <- liftM (fmap fromIntegral) (preuse $ cmGlobals.cmMapLeafBrushes.ix (firstLeafBrush + idx))
-              Just brush <- preuse $ cmGlobals.cmMapBrushes.ix brushNum
+              let brushRef = newCBrushReference brushNum
+              brush <- readCBrushT brushRef
 
               checkCount <- use $ cmGlobals.cmCheckCount
               if (brush^.cbCheckCount) == checkCount
@@ -1030,7 +1029,7 @@ testInLeaf leafNum = do
                 then
                   traceLine firstLeafBrush (idx + 1) maxIdx
                 else do
-                  cmGlobals.cmMapBrushes.ix brushNum.cbCheckCount .= checkCount
+                  modifyCBrushT brushRef (\v -> v & cbCheckCount .~ checkCount)
 
                   traceContents <- use $ cmGlobals.cmTraceContents
                   if (brush^.cbContents) .&. traceContents == 0
@@ -1147,14 +1146,15 @@ traceToLeaf leafNum = do
           | idx >= maxIdx = return ()
           | otherwise = do
               Just brushNum <- liftM (fmap fromIntegral) (preuse $ cmGlobals.cmMapLeafBrushes.ix (firstLeafBrush + idx))
-              Just b <- preuse $ cmGlobals.cmMapBrushes.ix brushNum
+              let brushRef = newCBrushReference brushNum
+              b <- readCBrushT brushRef
               checkCount <- use $ cmGlobals.cmCheckCount
 
               if (b^.cbCheckCount) == checkCount
                 then -- already checked this brush in another leaf
                   traceLineAgainstAllBrushes firstLeafBrush (idx + 1) maxIdx
                 else do
-                  cmGlobals.cmMapBrushes.ix brushNum.cbCheckCount .= checkCount
+                  modifyCBrushT brushRef (\v -> v & cbCheckCount .~ checkCount)
                   traceContents <- use $ cmGlobals.cmTraceContents
 
                   if (b^.cbContents) .&. traceContents == 0

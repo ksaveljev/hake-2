@@ -65,6 +65,11 @@ module QuakeState ( QuakeState(..)
                   , readCPlaneT
                   , modifyCPlaneT
                   , writeCPlaneT
+                  , CBrushReference
+                  , newCBrushReference
+                  , readCBrushT
+                  , modifyCBrushT
+                  , writeCBrushT
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -269,3 +274,21 @@ writeCPlaneT (CPlaneReference planeIdx) plane = do
 
 newCPlaneReference :: Int -> CPlaneReference
 newCPlaneReference = CPlaneReference
+
+readCBrushT :: CBrushReference -> Quake CBrushT
+readCBrushT (CBrushReference brushIdx) = do
+    mapBrushes <- use $ cmGlobals.cmMapBrushes
+    liftIO $ MV.read mapBrushes brushIdx
+
+modifyCBrushT :: CBrushReference -> (CBrushT -> CBrushT) -> Quake ()
+modifyCBrushT (CBrushReference brushIdx) f = do
+    mapBrushes <- use $ cmGlobals.cmMapBrushes
+    liftIO $ MV.modify mapBrushes f brushIdx
+
+writeCBrushT :: CBrushReference -> CBrushT -> Quake ()
+writeCBrushT (CBrushReference brushIdx) brush = do
+    mapBrushes <- use $ cmGlobals.cmMapBrushes
+    liftIO $ MV.write mapBrushes brushIdx brush
+
+newCBrushReference :: Int -> CBrushReference
+newCBrushReference = CBrushReference

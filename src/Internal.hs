@@ -111,6 +111,9 @@ newtype CModelReference = CModelReference Int
 -- reference to cmGlobals.cmMapPlanes
 newtype CPlaneReference = CPlaneReference Int
 
+-- reference to cmGlobals.cmMapBrushes
+newtype CBrushReference = CBrushReference Int
+
 -- reference to svGlobals.svLinks
 newtype LinkReference = LinkReference Int
 
@@ -1372,7 +1375,7 @@ data CMGlobals =
             , _cmNumCModels      :: !Int
             , _cmMapCModels      :: V.Vector CModelT
             , _cmNumBrushes      :: !Int
-            , _cmMapBrushes      :: V.Vector CBrushT
+            , _cmMapBrushes      :: MV.IOVector CBrushT
             , _cmNumVisibility   :: !Int
             , _cmMapVisibility   :: BL.ByteString
             , _cmMapVis          :: DVisT
