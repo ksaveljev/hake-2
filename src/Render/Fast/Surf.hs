@@ -11,6 +11,7 @@ import Data.Maybe (fromJust, isNothing)
 import Data.Word (Word8)
 import Foreign.Marshal.Array (withArray)
 import Linear (V3(..), dot, _w, _xyz, _x, _y, _z)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Unsafe as BU
@@ -41,6 +42,9 @@ import qualified Util.Math3D as Math3D
 
 dummy :: B.ByteString
 dummy = B.replicate (4 * 128 * 128) 0
+
+temp :: MSV.IOVector Word8
+temp = unsafePerformIO $ MSV.new (4 * 128 * 128)
 
 glLightmapFormat :: GL.GLenum
 glLightmapFormat = GL.gl_RGBA
@@ -730,7 +734,6 @@ glRenderLightmappedPoly surfRef = do
                       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- io $ MSV.new (4 * 128 * 128)
                       Light.rBuildLightMap surf temp 0 (smax * 4)
                       -- io $ print "TEMPTEMPTEMP DYNAMIC"
                       -- io $ print ("flags = " ++ show (surf^.msFlags) ++
@@ -761,7 +764,6 @@ glRenderLightmappedPoly surfRef = do
                       let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
                           tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
 
-                      temp <- io $ MSV.new (4 * 128 * 128)
                       Light.rBuildLightMap surf temp 0 (smax * 4)
                       -- io $ print "TEMPTEMPTEMP"
                       -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
