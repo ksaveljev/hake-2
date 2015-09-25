@@ -12,6 +12,7 @@ import Linear (V3(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 
 import Quake
 import QuakeState
@@ -77,17 +78,14 @@ spawnEntities mapName entities spawnPoint = do
     gameBaseGlobals.gbLevel .= newLevelLocalsT
 
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
-    let newEdicts = map (\i -> (i, newEdictT i)) [0..maxEntities-1]
-    gameBaseGlobals.gbGEdicts %= (V.// newEdicts)
+    mapM_ (\i -> writeEdictT (newEdictReference i) (newEdictT i)) [0..maxEntities-1]
 
     gameBaseGlobals.gbLevel.llMapName .= mapName
     gameBaseGlobals.gbGame.glSpawnPoint .= spawnPoint
 
     -- set client fields on player ents
     maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
-    edicts <- use $ gameBaseGlobals.gbGEdicts
-    let updatedEdicts = V.imap (\idx edict -> if idx >= 1 && idx <= maxClients then edict { _eClient = Just (GClientReference (idx - 1)) } else edict) edicts
-    gameBaseGlobals.gbGEdicts .= updatedEdicts
+    mapM_ (\i -> modifyEdictT (newEdictReference i) (\v -> v & eClient .~ Just (GClientReference (i - 1)))) [1..maxClients]
 
     inhibited <- parseEntities True 0 0
 
