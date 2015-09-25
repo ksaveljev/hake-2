@@ -369,8 +369,19 @@ useEnviroSuit =
     io (putStrLn "GameItems.useEnviroSuit") >> undefined -- TODO
 
 pickupAncientHead :: EntInteract
-pickupAncientHead = PickupAncientHead "pickup_ancienthead" $ \_ _ -> do
-  io (putStrLn "GameItems.pickupAncientHead") >> undefined -- TODO
+pickupAncientHead =
+  PickupAncientHead "pickup_ancienthead" $ \edictRef otherRef -> do
+    modifyEdictT otherRef (\v -> v & eMaxHealth +~ 2)
+
+    edict <- readEdictT edictRef
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
+      let Just (GItemReference gItemIdx) = edict^.eItem
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      setRespawn edictRef (fromIntegral $ gItem^.giQuantity)
+
+    return True
 
 pickupAdrenaline :: EntInteract
 pickupAdrenaline =
