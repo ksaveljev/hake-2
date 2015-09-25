@@ -765,8 +765,11 @@ dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
 
 dropTempTouch :: EntTouch
 dropTempTouch =
-  GenericEntTouch "drop_temp_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameItems.dropTempTouch") >> undefined -- TODO
+  GenericEntTouch "drop_temp_touch" $ \edictRef otherRef plane surf -> do
+    edict <- readEdictT edictRef
+
+    unless (Just otherRef == (edict^.eOwner)) $
+      touch touchItem edictRef otherRef plane surf
 
 dropMakeTouchable :: EntThink
 dropMakeTouchable =
