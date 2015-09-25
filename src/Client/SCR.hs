@@ -9,7 +9,7 @@ import Data.Bits ((.&.), complement, shiftR)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
 import Data.Monoid (mempty, (<>))
-import Linear (V3(..))
+import Linear (V3(..), _y)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -269,7 +269,38 @@ updateScreen2 = do
                      drawLoading
 
 timeRefreshF :: XCommandT
-timeRefreshF = io (putStrLn "SCR.timeRefreshF") >> undefined -- TODO
+timeRefreshF = do
+    state <- use $ globals.cls.csState
+
+    when (state == Constants.caActive) $ do
+      start <- Timer.milliseconds
+
+      c <- Cmd.argc
+      Just renderer <- use $ globals.re
+
+      if c == 2
+        then do -- run without page flipping
+          (renderer^.rRefExport.reBeginFrame) 0
+
+          mapM_ (\i -> do
+                        globals.cl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
+                        use (globals.cl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
+                ) [0..127]
+
+          renderer^.rRefExport.reEndFrame
+
+        else do
+          mapM_ (\i -> do
+                        globals.cl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
+                        (renderer^.rRefExport.reBeginFrame) 0
+                        use (globals.cl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
+                        renderer^.rRefExport.reEndFrame
+                ) [0..127]
+
+      stop <- Timer.milliseconds
+      let time = fromIntegral (stop - start) / 1000
+
+      Com.printf (BC.pack (show time) `B.append` " seconds (" `B.append` BC.pack (show (128.0 / time)) `B.append` " fps)\n") -- IMPROVE?
 
 loadingF :: XCommandT
 loadingF = beginLoadingPlaque
