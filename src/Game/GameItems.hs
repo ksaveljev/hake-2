@@ -483,8 +483,29 @@ spItemHealthLarge edictRef = do
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
         void $ soundIndex (Just "items/l_health.wav")
 
+{-
+- QUAKED item_health_mega (.3 .3 1) (-16 -16 -16) (16 16 16)
+-}
 spItemHealthMega :: EdictReference -> Quake ()
-spItemHealthMega _ = io (putStrLn "GameItems.spItemHealthMega") >> undefined -- TODO
+spItemHealthMega selfRef = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    if deathmatchValue /= 0 && dmFlagsValue .&. Constants.dfNoHealth /= 0
+      then
+        GameUtil.freeEdict selfRef
+
+      else do
+        modifyEdictT selfRef (\v -> v & eiModel .~ Just "models/items/mega_h/tris.md2"
+                                      & eCount .~ 100)
+
+        Just health <- findItem "Health"
+        spawnItem selfRef health
+
+        soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+        soundIndex (Just "items/m_health.wav")
+
+        modifyEdictT selfRef (\v -> v & eStyle .~ Constants.healthIgnoreMax .|. Constants.healthTimed)
 
 dropToFloor :: EntThink
 dropToFloor =
