@@ -378,8 +378,41 @@ pickupAdrenaline = PickupAdrenaline "pickup_adrenaline" $ \_ _ -> do
 
 pickupBandolier :: EntInteract
 pickupBandolier =
-  GenericEntInteract "pickup_bandolier" $ \_ _ -> do
-    io (putStrLn "GameItems.pickupBandolier") >> undefined -- TODO
+  GenericEntInteract "pickup_bandolier" $ \edictRef otherRef -> do
+    other <- readEdictT otherRef
+    let Just gClientRef = other^.eClient
+
+    checkMaxAmmo gClientRef
+
+    checkBullets gClientRef
+    checkShells gClientRef
+
+    edict <- readEdictT edictRef
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
+      let Just (GItemReference gItemIdx) = edict^.eItem
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      setRespawn edictRef (fromIntegral $ gItem^.giQuantity)
+
+    return True
+
+  where checkMaxAmmo :: GClientReference -> Quake ()
+        checkMaxAmmo (GClientReference gClientIdx) = do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+          when ((gClient^.gcPers.cpMaxBullets) < 250) $
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxBullets .= 250
+
+          when ((gClient^.gcPers.cpMaxShells) < 150) $
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxShells .= 150
+
+          when ((gClient^.gcPers.cpMaxCells) < 250) $
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxCells .= 250
+
+          when ((gClient^.gcPers.cpMaxSlugs) < 75) $
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxSlugs .= 75
+
 
 pickupPack :: EntInteract
 pickupPack =
@@ -387,7 +420,7 @@ pickupPack =
     other <- readEdictT otherRef
     let Just gClientRef = other^.eClient
 
-    setMaxAmmo gClientRef
+    checkMaxAmmo gClientRef
 
     checkBullets gClientRef
     checkShells gClientRef
@@ -406,8 +439,8 @@ pickupPack =
 
     return True
       
-  where setMaxAmmo :: GClientReference -> Quake ()
-        setMaxAmmo (GClientReference gClientIdx) = do
+  where checkMaxAmmo :: GClientReference -> Quake ()
+        checkMaxAmmo (GClientReference gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           when ((gClient^.gcPers.cpMaxBullets) < 300) $
@@ -428,83 +461,83 @@ pickupPack =
           when ((gClient^.gcPers.cpMaxSlugs) < 100) $
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxSlugs .= 100
 
-        checkBullets :: GClientReference -> Quake ()
-        checkBullets (GClientReference gClientIdx) = do
-          foundItem <- findItem "Bullets"
+checkBullets :: GClientReference -> Quake ()
+checkBullets (GClientReference gClientIdx) = do
+  foundItem <- findItem "Bullets"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxBullets) then gClient^.gcPers.cpMaxBullets else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxBullets) then gClient^.gcPers.cpMaxBullets else v + (gItem^.giQuantity))
 
-        checkShells :: GClientReference -> Quake ()
-        checkShells (GClientReference gClientIdx) = do
-          foundItem <- findItem "Shells"
+checkShells :: GClientReference -> Quake ()
+checkShells (GClientReference gClientIdx) = do
+  foundItem <- findItem "Shells"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxShells) then gClient^.gcPers.cpMaxShells else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxShells) then gClient^.gcPers.cpMaxShells else v + (gItem^.giQuantity))
 
-        checkCells :: GClientReference -> Quake ()
-        checkCells (GClientReference gClientIdx) = do
-          foundItem <- findItem "Cells"
+checkCells :: GClientReference -> Quake ()
+checkCells (GClientReference gClientIdx) = do
+  foundItem <- findItem "Cells"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxCells) then gClient^.gcPers.cpMaxCells else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxCells) then gClient^.gcPers.cpMaxCells else v + (gItem^.giQuantity))
 
-        checkGrenades :: GClientReference -> Quake ()
-        checkGrenades (GClientReference gClientIdx) = do
-          foundItem <- findItem "Grenades"
+checkGrenades :: GClientReference -> Quake ()
+checkGrenades (GClientReference gClientIdx) = do
+  foundItem <- findItem "Grenades"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxGrenades) then gClient^.gcPers.cpMaxGrenades else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxGrenades) then gClient^.gcPers.cpMaxGrenades else v + (gItem^.giQuantity))
 
-        checkRockets :: GClientReference -> Quake ()
-        checkRockets (GClientReference gClientIdx) = do
-          foundItem <- findItem "Rockets"
+checkRockets :: GClientReference -> Quake ()
+checkRockets (GClientReference gClientIdx) = do
+  foundItem <- findItem "Rockets"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxRockets) then gClient^.gcPers.cpMaxRockets else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxRockets) then gClient^.gcPers.cpMaxRockets else v + (gItem^.giQuantity))
 
-        checkSlugs :: GClientReference -> Quake ()
-        checkSlugs (GClientReference gClientIdx) = do
-          foundItem <- findItem "Slugs"
+checkSlugs :: GClientReference -> Quake ()
+checkSlugs (GClientReference gClientIdx) = do
+  foundItem <- findItem "Slugs"
 
-          case foundItem of
-            Nothing ->
-              return ()
+  case foundItem of
+    Nothing ->
+      return ()
 
-            Just (GItemReference gItemIdx) -> do
-              Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-              Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxSlugs) then gClient^.gcPers.cpMaxSlugs else v + (gItem^.giQuantity))
+    Just (GItemReference gItemIdx) -> do
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxSlugs) then gClient^.gcPers.cpMaxSlugs else v + (gItem^.giQuantity))
 
 pickupKey :: EntInteract
 pickupKey =
