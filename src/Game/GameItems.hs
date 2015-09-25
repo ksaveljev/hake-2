@@ -373,8 +373,26 @@ pickupAncientHead = PickupAncientHead "pickup_ancienthead" $ \_ _ -> do
   io (putStrLn "GameItems.pickupAncientHead") >> undefined -- TODO
 
 pickupAdrenaline :: EntInteract
-pickupAdrenaline = PickupAdrenaline "pickup_adrenaline" $ \_ _ -> do
-  io (putStrLn "GameItems.pickupAdrenaline") >> undefined -- TODO
+pickupAdrenaline =
+  PickupAdrenaline "pickup_adrenaline" $ \edictRef otherRef -> do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    when (deathmatchValue == 0) $
+      modifyEdictT otherRef (\v -> v & eMaxHealth +~ 1)
+
+    other <- readEdictT otherRef
+
+    when ((other^.eHealth) < (other^.eMaxHealth)) $
+      modifyEdictT otherRef (\v -> v & eHealth .~ (other^.eMaxHealth))
+
+    edict <- readEdictT edictRef
+
+    when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
+      let Just (GItemReference gItemIdx) = edict^.eItem
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      setRespawn edictRef (fromIntegral $ gItem^.giQuantity)
+
+    return True
 
 pickupBandolier :: EntInteract
 pickupBandolier =
