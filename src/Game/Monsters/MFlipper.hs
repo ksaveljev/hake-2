@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MFlipper where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.|.))
 import Linear (V3(..))
@@ -76,8 +76,8 @@ flipperMoveStand = MMoveT "flipperMoveStand" frameFlphor01 frameFlphor01 flipper
 
 flipperStand :: EntThink
 flipperStand =
-  GenericEntThink "flipper_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveStand
+  GenericEntThink "flipper_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveStand)
     return True
 
 flipperFramesRun :: V.Vector MFrameT
@@ -117,8 +117,8 @@ flipperMoveRunLoop = MMoveT "flipperMoveRunLoop" frameFlpver06 frameFlpver29 fli
 
 flipperRunLoop :: EntThink
 flipperRunLoop =
-  GenericEntThink "flipper_run_loop" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveRunLoop
+  GenericEntThink "flipper_run_loop" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveRunLoop)
     return True
 
 flipperFramesRunStart :: V.Vector MFrameT
@@ -136,8 +136,8 @@ flipperMoveRunStart = MMoveT "flipperMoveRunStart" frameFlpver01 frameFlpver06 f
 
 flipperRun :: EntThink
 flipperRun =
-  GenericEntThink "flipper_run" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveRunStart
+  GenericEntThink "flipper_run" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveRunStart)
     return True
 
 -- Standard Swimming
@@ -174,8 +174,8 @@ flipperMoveWalk = MMoveT "flipperMoveWalk" frameFlphor01 frameFlphor24 flipperFr
 
 flipperWalk :: EntThink
 flipperWalk =
-  GenericEntThink "flipper_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveWalk
+  GenericEntThink "flipper_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveWalk)
     return True
 
 flipperFramesStartRun :: V.Vector MFrameT
@@ -192,8 +192,8 @@ flipperMoveStartRun = MMoveT "flipperMoveStartRun" frameFlphor01 frameFlphor05 f
 
 flipperStartRun :: EntThink
 flipperStartRun =
-  GenericEntThink "flipper_start_run" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveStartRun
+  GenericEntThink "flipper_start_run" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveStartRun)
     return True
 
 flipperFramesPain2 :: V.Vector MFrameT
@@ -222,7 +222,7 @@ flipperMovePain1 = MMoveT "flipperMovePain1" frameFlppn201 frameFlppn205 flipper
 
 flipperBite :: EntThink
 flipperBite =
-  GenericEntThink "flipper_bite" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "flipper_bite" $ \selfRef -> do
     let aim = V3 (fromIntegral Constants.meleeDistance) 0 0
     GameWeapon.fireHit selfRef aim 5 0
     return True
@@ -264,22 +264,22 @@ flipperMoveAttack = MMoveT "flipperMoveAttack" frameFlpbit01 frameFlpbit20 flipp
 
 flipperMelee :: EntThink
 flipperMelee =
-  GenericEntThink "flipper_melee" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flipperMoveAttack
+  GenericEntThink "flipper_melee" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveAttack)
     return True
 
 flipperPain :: EntPain
 flipperPain =
-  GenericEntPain "flipper_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "flipper_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -296,17 +296,16 @@ flipperPain =
                                         return (soundPain, flipperMovePain2)
 
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 flipperDead :: EntThink
 flipperDead =
-  GenericEntThink "flipper_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "flipper_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -386,8 +385,8 @@ flipperSight =
 
 flipperDie :: EntDie
 flipperDie =
-  GenericEntDie "flipper_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "flipper_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -405,7 +404,7 @@ flipperDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -414,17 +413,16 @@ flipperDie =
            soundDeath <- use $ mFlipperGlobals.mFlipperSoundDeath
            sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
-             eMonsterInfo.miCurrentMove .= Just flipperMoveDeath
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         & eMonsterInfo.miCurrentMove .~ Just flipperMoveDeath)
 
 {-
 - QUAKED monster_flipper (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
 spMonsterFlipper :: EdictReference -> Quake ()
-spMonsterFlipper selfRef@(EdictReference selfIdx) = do
+spMonsterFlipper selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -449,27 +447,25 @@ spMonsterFlipper selfRef@(EdictReference selfIdx) = do
 
         modelIdx <- modelIndex (Just "models/monsters/flipper/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-16) (-16) 0
-          eMaxs .= V3 16 16 32
-          eHealth .= 50
-          eGibHealth .= (-30)
-          eMass .= 100
-          ePain .= Just flipperPain
-          eDie .= Just flipperDie
-          eMonsterInfo.miStand .= Just flipperStand
-          eMonsterInfo.miWalk .= Just flipperWalk
-          eMonsterInfo.miRun .= Just flipperStartRun
-          eMonsterInfo.miMelee .= Just flipperMelee
-          eMonsterInfo.miSight .= Just flipperSight
+        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-16) (-16) 0
+                                      & eMaxs .~ V3 16 16 32
+                                      & eHealth .~ 50
+                                      & eGibHealth .~ (-30)
+                                      & eMass .~ 100
+                                      & ePain .~ Just flipperPain
+                                      & eDie .~ Just flipperDie
+                                      & eMonsterInfo.miStand .~ Just flipperStand
+                                      & eMonsterInfo.miWalk .~ Just flipperWalk
+                                      & eMonsterInfo.miRun .~ Just flipperStartRun
+                                      & eMonsterInfo.miMelee .~ Just flipperMelee
+                                      & eMonsterInfo.miSight .~ Just flipperSight)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just flipperMoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flipperMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.swimMonsterStart selfRef

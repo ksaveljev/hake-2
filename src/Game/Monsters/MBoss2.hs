@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss2 where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (&), (.~), (%~))
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), norm)
@@ -80,61 +80,62 @@ frameDeath50 = 180
 
 boss2Stand :: EntThink
 boss2Stand =
-  GenericEntThink "boss2_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just boss2MoveStand
+  GenericEntThink "boss2_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just boss2MoveStand)
     return True
 
 boss2Run :: EntThink
 boss2Run =
-  GenericEntThink "boss2_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "boss2_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then boss2MoveStand
                    else boss2MoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 boss2Walk :: EntThink
 boss2Walk =
-  GenericEntThink "boss2_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just boss2MoveWalk
+  GenericEntThink "boss2_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just boss2MoveWalk)
     return True
 
 boss2Attack :: EntThink
 boss2Attack =
-  GenericEntThink "boss2_attack" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "boss2_attack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm vec
 
     action <- if range <= 125
-                then return boss2MoveAttackPreMg
+                then
+                  return boss2MoveAttackPreMg
                 else do
                   r <- Lib.randomF
                   return $ if r <= 0.6
                              then boss2MoveAttackPreMg
                              else boss2MoveAttackRocket
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 boss2AttackMg :: EntThink
 boss2AttackMg =
-  GenericEntThink "boss2_attack_mg" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just boss2MoveAttackMg
+  GenericEntThink "boss2_attack_mg" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just boss2MoveAttackMg)
     return True
 
 boss2ReAttackMg :: EntThink
 boss2ReAttackMg =
-  GenericEntThink "boss2_reattack_mg" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "boss2_reattack_mg" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     action <- if GameUtil.inFront self enemy
                 then do
@@ -145,21 +146,21 @@ boss2ReAttackMg =
                 else
                   return boss2MoveAttackPostMg
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 boss2Pain :: EntPain
 boss2Pain =
-  GenericEntPain "boss2_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "boss2_pain" $ \selfRef _ _ damage -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       (soundPain, currentMove) <- if | damage < 10 -> do
                                          soundPain <- use $ mBoss2Globals.mb2SoundPain3
@@ -175,17 +176,16 @@ boss2Pain =
 
       sound <- use $ gameBaseGlobals.gbGameImport.giSound
       sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNone 0
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 boss2Dead :: EntThink
 boss2Dead =
-  GenericEntThink "boss2_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-56) (-56) 0
-      eMaxs .= V3 56 56 80
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "boss2_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-56) (-56) 0
+                                  & eMaxs .~ V3 56 56 80
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -194,17 +194,16 @@ boss2Dead =
 
 boss2Die :: EntDie
 boss2Die =
-  GenericEntDie "boss2_die" $ \selfRef@(EdictReference selfIdx) _ _ _ _ -> do
+  GenericEntDie "boss2_die" $ \selfRef _ _ _ _ -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundDeath <- use $ mBoss2Globals.mb2SoundDeath
 
     sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNone 0
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eDeadFlag .= Constants.deadDead
-      eTakeDamage .= Constants.damageNo
-      eCount .= 0
-      eMonsterInfo.miCurrentMove .= Just boss2MoveDeath
+    modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                  & eTakeDamage .~ Constants.damageNo
+                                  & eCount .~ 0
+                                  & eMonsterInfo.miCurrentMove .~ Just boss2MoveDeath)
 
 boss2CheckAttack :: EntThink
 boss2CheckAttack =
@@ -528,7 +527,7 @@ boss2MoveDeath = MMoveT "boss2MoveDeath" frameDeath2 frameDeath50 boss2FramesDea
 - Sight
 -}
 spMonsterBoss2 :: EdictReference -> Quake ()
-spMonsterBoss2 selfRef@(EdictReference selfIdx) = do
+spMonsterBoss2 selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -551,30 +550,28 @@ spMonsterBoss2 selfRef@(EdictReference selfIdx) = do
         soundIdx <- soundIndex (Just "bosshovr/bhvengn1.wav")
         modelIdx <- modelIndex (Just "models/monsters/boss2/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .= soundIdx
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-56) (-56) 0
-          eMaxs .= V3 56 56 80
-          eHealth .= 2000
-          eGibHealth .= (-200)
-          eMass .= 1000
-          eFlags %= (.|. Constants.flImmuneLaser)
-          ePain .= Just boss2Pain
-          eDie .= Just boss2Die
-          eMonsterInfo.miStand .= Just boss2Stand
-          eMonsterInfo.miWalk .= Just boss2Walk
-          eMonsterInfo.miRun .= Just boss2Run
-          eMonsterInfo.miAttack .= Just boss2Attack
-          eMonsterInfo.miSearch .= Just boss2Search
-          eMonsterInfo.miCheckAttack .= Just boss2CheckAttack
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-56) (-56) 0
+                                      & eMaxs .~ V3 56 56 80
+                                      & eHealth .~ 2000
+                                      & eGibHealth .~ (-200)
+                                      & eMass .~ 1000
+                                      & eFlags %~ (.|. Constants.flImmuneLaser)
+                                      & ePain .~ Just boss2Pain
+                                      & eDie .~ Just boss2Die
+                                      & eMonsterInfo.miStand .~ Just boss2Stand
+                                      & eMonsterInfo.miWalk .~ Just boss2Walk
+                                      & eMonsterInfo.miRun .~ Just boss2Run
+                                      & eMonsterInfo.miAttack .~ Just boss2Attack
+                                      & eMonsterInfo.miSearch .~ Just boss2Search
+                                      & eMonsterInfo.miCheckAttack .~ Just boss2CheckAttack)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just boss2MoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just boss2MoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.flyMonsterStart selfRef

@@ -97,7 +97,7 @@ type XCommandT = Quake ()
 type KeyFuncT = Int -> Quake B.ByteString
 
 -- reference to gameBaseGlobals.gbGEdicts
-newtype EdictReference = EdictReference Int deriving (Eq, Show)
+newtype EdictReference = EdictReference Int deriving (Eq, Show, Ord)
 
 -- reference to svGlobals.svServerStatic.ssClients
 newtype ClientReference = ClientReference Int
@@ -787,7 +787,7 @@ data GameBaseGlobals =
                   , _gbSndFry            :: !Int
                   , _gbMeansOfDeath      :: !Int
                   , _gbNumEdicts         :: !Int
-                  , _gbGEdicts           :: V.Vector EdictT
+                  , _gbGEdicts           :: MV.IOVector EdictT
                   , _gbItemList          :: V.Vector GItemT
                   , _gbPushed            :: V.Vector PushedT
                   , _gbPushedP           :: !Int
@@ -1360,7 +1360,7 @@ data CMGlobals =
             , _cmNumTexInfo      :: !Int
             , _cmMapSurfaces     :: V.Vector MapSurfaceT
             , _cmNumPlanes       :: !Int
-            , _cmMapPlanes       :: V.Vector CPlaneT
+            , _cmMapPlanes       :: MV.IOVector CPlaneT
             , _cmNumNodes        :: !Int
             , _cmMapNodes        :: V.Vector CNodeT
             , _cmNumLeafs        :: !Int

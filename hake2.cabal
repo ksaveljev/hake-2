@@ -40,6 +40,6 @@ executable hake2
                      , stm
   hs-source-dirs:      src
   default-language:    Haskell2010
-  ghc-options:         -O2 -rtsopts
+  ghc-options:         -O0 -rtsopts
   c-sources:           cbits/udp.c
   include-dirs:        cbits

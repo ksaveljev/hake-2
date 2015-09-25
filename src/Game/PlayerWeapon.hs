@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=), (&), (.~), (%~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, isNothing, fromJust)
@@ -32,8 +32,8 @@ import qualified Util.Math3D as Math3D
 -}
 useWeapon :: ItemUse
 useWeapon =
-  GenericItemUse "Use_Weapon" $ \edictRef@(EdictReference edictIdx) gItemRef@(GItemReference gItemIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericItemUse "Use_Weapon" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -74,7 +74,7 @@ weaponBlaster =
 
 weaponBlasterFire :: EntThink
 weaponBlasterFire =
-  GenericEntThink "Weapon_Blaster_Fire" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "Weapon_Blaster_Fire" $ \edictRef -> do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     let damage = if deathmatchValue /= 0 then 15 else 10
@@ -82,16 +82,18 @@ weaponBlasterFire =
 
     blasterFire edictRef v3o damage False Constants.efBlaster
 
-    Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
 
     return True
 
 pickupWeapon :: EntInteract
 pickupWeapon =
-  GenericEntInteract "Pickup_Weapon" $ \edictRef@(EdictReference edictIdx) otherRef@(EdictReference otherIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+  GenericEntInteract "Pickup_Weapon" $ \edictRef otherRef -> do
+    edict <- readEdictT edictRef
+    other <- readEdictT otherRef
+
     let Just (GItemReference itemIdx) = edict^.eItem
     Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
     let index = item^.giIndex
@@ -123,13 +125,13 @@ pickupWeapon =
           when ((edict^.eSpawnFlags) .&. Constants.droppedPlayerItem == 0) $ do
             when (deathmatchValue /= 0) $
               if dmFlagsValue .&. Constants.dfWeaponsStay /= 0
-                then gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flRespawn)
+                then modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn))
                 else GameItems.setRespawn edictRef 30
 
             when (coopValue /= 0) $
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flRespawn)
+              modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn))
 
-        Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        edict' <- readEdictT edictRef
         Just otherClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix otherClientIdx
 
         blasterIdx <- GameItems.findItem "blaster"
@@ -141,12 +143,13 @@ pickupWeapon =
 
 dropWeapon :: ItemDrop
 dropWeapon =
-  GenericItemDrop "Drop_Weapon" $ \edictRef@(EdictReference edictIdx) itemRef@(GItemReference gItemIdx) -> do
+  GenericItemDrop "Drop_Weapon" $ \edictRef itemRef@(GItemReference gItemIdx) -> do
     dmFlagsValue :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
 
     when (dmFlagsValue .&. Constants.dfWeaponsStay == 0) $ do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
-      Just (Just (GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+      edict <- readEdictT edictRef
+      let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       let index = gItem^.giIndex
@@ -170,8 +173,8 @@ weaponShotgun =
 
 weaponShotgunFire :: EntThink
 weaponShotgunFire =
-  GenericEntThink "weapon_shotgun_fire" $ \edictRef@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "weapon_shotgun_fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -319,7 +322,7 @@ weaponRailgun =
 
 weaponRailgunFire :: EntThink
 weaponRailgunFire =
-  GenericEntThink "weapon_railgun_fire" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "weapon_railgun_fire" $ \edictRef -> do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
     isQuad <- use $ gameBaseGlobals.gbIsQuad
@@ -333,7 +336,7 @@ weaponRailgunFire =
                                   then (150 * 4, 250 * 4)
                                   else (150, 250)
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -383,8 +386,9 @@ weaponBFGFire =
     io (putStrLn "PlayerWeapon.weaponBFGFire") >> undefined -- TODO
 
 changeWeapon :: EdictReference -> Quake ()
-changeWeapon edictRef@(EdictReference edictIdx) = do
-    Just (Just gClientRef@(GClientReference gClientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+changeWeapon edictRef = do
+    edict <- readEdictT edictRef
+    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
 
     checkGrenadeTime gClientRef
 
@@ -406,10 +410,10 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
 
       if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
         then do
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain1
+          modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain1)
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
         else do
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain301
+          modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain301)
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain304
 
   where checkGrenadeTime :: GClientReference -> Quake ()
@@ -425,7 +429,7 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
 
         setVisibleModel :: GClientReference -> Quake ()
         setVisibleModel (GClientReference gClientIdx) = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when ((edict^.eEntityState.esModelIndex) == 255) $ do
             Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
@@ -436,7 +440,7 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
                      Just weaponModel <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx.giWeaponModel
                      return $ (weaponModel .&. 0xFF) `shiftL` 8
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSkinNum .= (edictIdx - 1) .|. i
+            modifyEdictT edictRef (\v -> v & eEntityState.esSkinNum .~ ((edict^.eIndex) - 1) .|. i)
 
         setAmmoAndGunIndex :: GClientReference -> Quake Bool
         setAmmoAndGunIndex (GClientReference gClientIdx) = do
@@ -483,8 +487,8 @@ changeWeapon edictRef@(EdictReference edictIdx) = do
 - =================
 -}
 thinkWeapon :: EdictReference -> Quake ()
-thinkWeapon edictRef@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+thinkWeapon edictRef = do
+    edict <- readEdictT edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
 
     -- if just died, put the weapon away
@@ -509,8 +513,8 @@ thinkWeapon edictRef@(EdictReference edictIdx) = do
         void $ think (fromJust $ weapon^.giWeaponThink) edictRef
 
 weaponGeneric :: EdictReference -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
-weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
+    edict <- readEdictT edictRef
     let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -530,10 +534,10 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
 
                   if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                     then do
-                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
+                      modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain4 + 1)
                       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
                     else do
-                      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain304 + 1
+                      modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain304 + 1)
                       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain301
 
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
@@ -560,10 +564,10 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
 
              if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                then do
-                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRPain4 + 1
+                 modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain4 + 1)
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain1
                else do
-                 gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.framePain304 + 1
+                 modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain304 + 1)
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain301
 
        | otherwise -> do
@@ -585,10 +589,10 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
 
                                if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
                                  then do
-                                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameCRAttack1 - 1
+                                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRAttack1 - 1)
                                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRAttack9
                                  else do
-                                   gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esFrame .= MPlayer.frameAttack1 - 1
+                                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameAttack1 - 1)
                                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameAttack8
 
                                return False
@@ -600,7 +604,7 @@ weaponGeneric edictRef@(EdictReference edictIdx) frameActiveLast frameFireLast f
                                  sound <- use $ gameBaseGlobals.gbGameImport.giSound
                                  soundIdx <- soundIndex (Just "weapons/noammo.wav")
                                  sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
-                                 gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime + 1
+                                 modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
                                noAmmoWeaponChange edictRef
                                return False
@@ -670,11 +674,11 @@ weaponGrenadeFire _ _ = do
     io (putStrLn "PlayerWeapon.weaponGrenadeFire") >> undefined -- TODO
 
 blasterFire :: EdictReference -> V3 Float -> Int -> Bool -> Int -> Quake ()
-blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
+blasterFire edictRef gOffset dmg hyper effect = do
     isQuad <- use $ gameBaseGlobals.gbIsQuad
     isSilenced <- use $ gameBaseGlobals.gbIsSilenced
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -695,7 +699,7 @@ blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
         multicast = gameImport^.giMulticast
 
     writeByte Constants.svcMuzzleFlash
-    writeShort edictIdx
+    writeShort (edict^.eIndex)
     if hyper
       then writeByte (Constants.mzHyperblaster .|. isSilenced)
       else writeByte (Constants.mzBlaster .|. isSilenced)
@@ -716,8 +720,8 @@ blasterFire edictRef@(EdictReference edictIdx) gOffset dmg hyper effect = do
 - ===============
 -}
 playerNoise :: EdictReference -> V3 Float -> Int -> Quake ()
-playerNoise whoRef@(EdictReference whoIdx) noiseLocation noiseType = do
-    Just who <- preuse $ gameBaseGlobals.gbGEdicts.ix whoIdx
+playerNoise whoRef noiseLocation noiseType = do
+    who <- readEdictT whoRef
     let Just (GClientReference gClientIdx) = who^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
@@ -730,31 +734,28 @@ playerNoise whoRef@(EdictReference whoIdx) noiseLocation noiseType = do
 
        | otherwise -> do
            when (isNothing (who^.eMyNoise)) $ do
-             noiseRef@(EdictReference noiseIdx) <- GameUtil.spawn
+             noiseRef <- GameUtil.spawn
 
-             zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx) $ do
-               eClassName .= "player_noise"
-               eMins .= V3 (-8) (-8) (-8)
-               eMaxs .= V3 8 8 8
-               eOwner .= Just whoRef
-               eSvFlags .= Constants.svfNoClient
+             modifyEdictT noiseRef (\v -> v & eClassName .~ "player_noise"
+                                            & eMins .~ V3 (-8) (-8) (-8)
+                                            & eMaxs .~ V3 8 8 8
+                                            & eOwner .~ Just whoRef
+                                            & eSvFlags .~ Constants.svfNoClient)
 
-             noiseRef'@(EdictReference noiseIdx') <- GameUtil.spawn
+             noiseRef' <- GameUtil.spawn
 
-             zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx') $ do
-               eClassName .= "player_noise"
-               eMins .= V3 (-8) (-8) (-8)
-               eMaxs .= V3 8 8 8
-               eOwner .= Just whoRef
-               eSvFlags .= Constants.svfNoClient
+             modifyEdictT noiseRef' (\v -> v & eClassName .~ "player_noise"
+                                             & eMins .~ V3 (-8) (-8) (-8)
+                                             & eMaxs .~ V3 8 8 8
+                                             & eOwner .~ Just whoRef
+                                             & eSvFlags .~ Constants.svfNoClient)
 
-             zoom (gameBaseGlobals.gbGEdicts.ix whoIdx) $ do
-               eMyNoise .= Just noiseRef
-               eMyNoise2 .= Just noiseRef'
+             modifyEdictT whoRef (\v -> v & eMyNoise .~ Just noiseRef
+                                          & eMyNoise2 .~ Just noiseRef')
 
-           Just who' <- preuse $ gameBaseGlobals.gbGEdicts.ix whoIdx
+           who' <- readEdictT whoRef
 
-           Just noiseRef@(EdictReference noiseIdx) <-
+           Just noiseRef <-
              if noiseType == Constants.pNoiseSelf || noiseType == Constants.pNoiseWeapon
                then do
                  frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
@@ -773,14 +774,13 @@ playerNoise whoRef@(EdictReference whoIdx) noiseLocation noiseType = do
 
                  return (who'^.eMyNoise2)
 
-           Just noise <- preuse $ gameBaseGlobals.gbGEdicts.ix noiseIdx
+           noise <- readEdictT noiseRef
            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-           zoom (gameBaseGlobals.gbGEdicts.ix noiseIdx) $ do
-             eEntityState.esOrigin .= noiseLocation
-             eAbsMin .= (noiseLocation - (noise^.eMaxs))
-             eAbsMax .= (noiseLocation + (noise^.eMaxs))
-             eTeleportTime .= levelTime
+           modifyEdictT noiseRef (\v -> v & eEntityState.esOrigin .~ noiseLocation
+                                          & eAbsMin .~ (noiseLocation - (noise^.eMaxs))
+                                          & eAbsMax .~ (noiseLocation + (noise^.eMaxs))
+                                          & eTeleportTime .~ levelTime)
 
            linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
            linkEntity noiseRef

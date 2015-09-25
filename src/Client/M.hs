@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.M where
 
-import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~))
+import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~), (&), (.~), (+~), (-~))
 import Control.Monad (unless, when, void)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, fromJust, isJust)
@@ -20,17 +20,18 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 checkGround :: EdictReference -> Quake ()
-checkGround edictRef@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+checkGround edictRef = do
+    edict <- readEdictT edictRef
 
     unless ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
       if (edict^.eVelocity._z) > 100
         then
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
+          modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+
         else do
           -- if the hull point one-quarter unit down is solid the entity is
           -- on ground
-          let point = let V3 a b c = edict^.eEntityState.esOrigin in V3 a b (c - 0.25)
+          let point = (edict^.eEntityState.esOrigin) & _z -~ 0.25
 
           trace <- use $ gameBaseGlobals.gbGameImport.giTrace
           traceT <- trace (edict^.eEntityState.esOrigin) 
@@ -43,75 +44,73 @@ checkGround edictRef@(EdictReference edictIdx) = do
           -- check steepness
           if (traceT^.tPlane.cpNormal._z) < 0.7 && not (traceT^.tStartSolid)
             then
-              gameBaseGlobals.gbGEdicts.ix edictIdx.eGroundEntity .= Nothing
+              modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+
             else do
               when (not (traceT^.tStartSolid) && not (traceT^.tAllSolid)) $ do
-                let Just (EdictReference traceIdx) = traceT^.tEnt
-                Just linkCount <- preuse $ gameBaseGlobals.gbGEdicts.ix traceIdx.eLinkCount
+                let Just traceEntRef = traceT^.tEnt
+                traceEnt <- readEdictT traceEntRef
 
-                zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                  eEntityState.esOrigin .= traceT^.tEndPos
-                  eGroundEntity .= traceT^.tEnt
-                  eGroundEntityLinkCount .= linkCount
-                  eVelocity._z .= 0
+                modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos)
+                                               & eGroundEntity .~ (traceT^.tEnt)
+                                               & eGroundEntityLinkCount .~ (traceEnt^.eLinkCount)
+                                               & eVelocity._z .~ 0)
 
 -- Stops the Flies.
 fliesOff :: EntThink
 fliesOff =
-  GenericEntThink "m_fliesoff" $ \(EdictReference edictIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
-      esEffects %= (.&. (complement Constants.efFlies))
-      esSound .= 0
+  GenericEntThink "m_fliesoff" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement Constants.efFlies))
+                                   & eEntityState.esSound .~ 0)
 
     return True
 
 -- Starts the Flies as setting the animation flag in the entity.
 fliesOn :: EntThink
 fliesOn =
-  GenericEntThink "m_flies_on" $ \(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "m_flies_on" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     unless ((edict^.eWaterLevel) /= 0) $ do
-      time <- use $ gameBaseGlobals.gbLevel.llTime
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
-      inflies <- soundIndex (Just "infantry/inflies1.wav")
+      soundIdx <- soundIndex (Just "infantry/inflies1.wav")
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eEntityState.esEffects %= (.|. Constants.efFlies)
-        eEntityState.esSound .= inflies
-        eThink .= Just fliesOff
-        eNextThink .= time + 60
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efFlies)
+                                     & eEntityState.esSound .~ soundIdx
+                                     & eThink .~ Just fliesOff
+                                     & eNextThink .~ levelTime + 60)
 
     return True
 
 -- Adds some flies after a random time
 flyCheck :: EntThink
 flyCheck =
-  GenericEntThink "m_fly_check" $ \(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "m_fly_check" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     f <- Lib.randomF
 
     unless ((edict^.eWaterLevel /= 0) || f > 0.5) $ do
-      time <- use $ gameBaseGlobals.gbLevel.llTime
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       nf <- Lib.randomF
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eThink .= Just fliesOn
-        eNextThink .= time + 5 + 10 * nf
+      modifyEdictT edictRef (\v -> v & eThink .~ Just fliesOn
+                                     & eNextThink .~ levelTime + 5 + 10 * nf)
 
     return True
 
 dropToFloor :: EntThink
 dropToFloor =
-  GenericEntThink "m_drop_to_floor" $ \edictRef@(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin._z += 1
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    let end' = let V3 a b c = edict^.eEntityState.esOrigin in V3 a b (c - 256)
+  GenericEntThink "m_drop_to_floor" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eEntityState.esOrigin._z +~ 1)
 
+    edict <- readEdictT edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let trace = gameImport^.giTrace
         linkEntity = gameImport^.giLinkEntity
+        end' = (edict^.eEntityState.esOrigin) & _z -~ 256
 
     traceT <- trace (edict^.eEntityState.esOrigin)
                     (Just $ edict^.eMins)
@@ -123,11 +122,14 @@ dropToFloor =
     if (traceT^.tFraction) == 1 || (traceT^.tAllSolid)
       then
         return True
+
       else do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOrigin .= traceT^.tEndPos
+        modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+
         linkEntity edictRef
         checkGround edictRef
         catagorizePosition edictRef
+
         return True
 
 {-
@@ -135,8 +137,8 @@ dropToFloor =
 - is not a staircase.
 -}
 checkBottom :: EdictReference -> Quake Bool
-checkBottom edictRef@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+checkBottom edictRef = do
+    edict <- readEdictT edictRef
 
     let mins = (edict^.eEntityState.esOrigin) + (edict^.eMins)
         maxs = (edict^.eEntityState.esOrigin) + (edict^.eMaxs)
@@ -148,6 +150,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
 
     case done of
       Just v -> return v
+
       Nothing -> do
         gameBaseGlobals.gbCYes += 1
         return True -- we got out easy
@@ -162,8 +165,10 @@ checkBottom edictRef@(EdictReference edictIdx) = do
                   start = V3 a b c
 
               gameImport <- use $ gameBaseGlobals.gbGameImport
+
               let pointContents = gameImport^.giPointContents
                   trace = gameImport^.giTrace
+
               contents <- pointContents start
 
               if contents /= Constants.contentsSolid
@@ -181,6 +186,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
                   if (traceT^.tFraction) == 1
                     then
                       return (Just False)
+
                     else do
                       let mid = traceT^.tEndPos._z
                           bottom = traceT^.tEndPos._z
@@ -190,6 +196,7 @@ checkBottom edictRef@(EdictReference edictIdx) = do
 
                       case done of
                         Just _ -> return done
+
                         Nothing -> do
                           gameBaseGlobals.gbCYes += 1
                           return (Just True)
@@ -220,49 +227,53 @@ checkBottom edictRef@(EdictReference edictIdx) = do
                 else checkCorners mins maxs start' stop' mid bottom' x maxX (y + 1) maxY
 
 walkMove :: EdictReference -> Float -> Float -> Quake Bool
-walkMove edictRef@(EdictReference edictIdx) yaw dist = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+walkMove edictRef yaw dist = do
+    edict <- readEdictT edictRef
+
     if isNothing (edict^.eGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
       then
         return False
+
       else do
         let yaw' = yaw * pi * 2 / 360
             move = V3 ((cos yaw') * dist) ((sin yaw') * dist) 0
+
         SV.moveStep edictRef move True
 
 catagorizePosition :: EdictReference -> Quake ()
-catagorizePosition (EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+catagorizePosition edictRef = do
+    edict <- readEdictT edictRef
     pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
 
-    let point = let V3 a b c = edict^.eEntityState.esOrigin in V3 a b (c + (edict^.eMins._z) + 1)
+    let point = (edict^.eEntityState.esOrigin) & _z +~ (edict^.eMins._z) + 1
     cont <- pointContents point
 
     if cont .&. Constants.maskWater == 0
       then do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 0
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterType .= 0
-      else do
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 1
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterType .= cont
+        modifyEdictT edictRef (\v -> v & eWaterLevel .~ 0
+                                       & eWaterType .~ 0)
 
-        let point' = _z %~ (+26) $ point
+      else do
+        modifyEdictT edictRef (\v -> v & eWaterLevel .~ 1
+                                       & eWaterType .~ cont)
+
+        let point' = point & _z +~ 26
         cont' <- pointContents point'
 
         unless (cont' .&. Constants.maskWater == 0) $ do
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 2
-          let point'' = _z %~ (+22) $ point'
+          modifyEdictT edictRef (\v -> v & eWaterLevel .~ 2)
+          let point'' = point' & _z +~ 22
           cont'' <- pointContents point''
 
           when (cont'' .&. Constants.maskWater /= 0) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eWaterLevel .= 3
+            modifyEdictT edictRef (\v -> v & eWaterLevel .~ 3)
 
 moveFrame :: EdictReference -> Quake ()
-moveFrame selfRef@(EdictReference selfIdx) = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+moveFrame selfRef = do
+    self <- readEdictT selfRef
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
+    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     let Just move = self^.eMonsterInfo.miCurrentMove
 
@@ -272,9 +283,8 @@ moveFrame selfRef@(EdictReference selfIdx) = do
 
     done <- if (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame)
               then do
-                zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                  eEntityState.esFrame .= self^.eMonsterInfo.miNextFrame
-                  eMonsterInfo.miNextFrame .= 0
+                modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ (self^.eMonsterInfo.miNextFrame)
+                                              & eMonsterInfo.miNextFrame .~ 0)
 
                 return False
               else do
@@ -282,7 +292,7 @@ moveFrame selfRef@(EdictReference selfIdx) = do
                           then do
                             void $ think (fromJust $ move^.mmEndFunc) selfRef
 
-                            Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+                            self' <- readEdictT selfRef
 
                             -- check for death
                             if (self'^.eSvFlags) .&. Constants.svfDeadMonster /= 0
@@ -295,31 +305,32 @@ moveFrame selfRef@(EdictReference selfIdx) = do
                 if done
                   then
                     return True
+
                   else do
                     -- regrab move, endfunc is very likely to change it
-                    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+                    self' <- readEdictT selfRef
                     let Just move' = self'^.eMonsterInfo.miCurrentMove
 
                     if (self'^.eEntityState.esFrame) < (move'^.mmFirstFrame) || (self'^.eEntityState.esFrame) > (move'^.mmLastFrame)
                       then do
-                        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                          eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiHoldFrame))
-                          eEntityState.esFrame .= move'^.mmFirstFrame
+                        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame))
+                                                      & eEntityState.esFrame .~ (move'^.mmFirstFrame))
 
                         return False
+
                       else do
                         when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0) $ do
                           if (self'^.eEntityState.esFrame) + 1 > move'^.mmLastFrame
                             then
-                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame .= move'^.mmFirstFrame
+                              modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ (move'^.mmFirstFrame))
                             else
-                              gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esFrame += 1
+                              modifyEdictT selfRef (\v -> v & eEntityState.esFrame +~ 1)
 
                         return False
 
     unless done $ do
       -- regrab move, endfunc is very likely to change it
-      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self' <- readEdictT selfRef
       let Just move' = self'^.eMonsterInfo.miCurrentMove
           index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
           frame = (move'^.mmFrame) V.! index
@@ -341,20 +352,24 @@ moveFrame selfRef@(EdictReference selfIdx) = do
         void $ think (fromJust $ frame^.mfThink) selfRef
 
 worldEffects :: EdictReference -> Quake ()
-worldEffects edictRef@(EdictReference edictIdx) = do
+worldEffects edictRef = do
     checkWaterDamage
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     if edict^.eWaterLevel == 0
       then do
         when ((edict^.eFlags) .&. Constants.flInWater /= 0) $ do
           gameImport <- use $ gameBaseGlobals.gbGameImport
+
           let sound = gameImport^.giSound
               soundIndex = gameImport^.giSoundIndex
-          idx <- soundIndex (Just "player/watr_out.wav")
-          sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.&. (complement Constants.flInWater))
+
+          soundIdx <- soundIndex (Just "player/watr_out.wav")
+          sound (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+
+          modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
+
       else do
         checkLava
         checkSlime
@@ -362,7 +377,7 @@ worldEffects edictRef@(EdictReference edictIdx) = do
 
   where checkWaterDamage :: Quake ()
         checkWaterDamage = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when ((edict^.eHealth) > 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -370,7 +385,7 @@ worldEffects edictRef@(EdictReference edictIdx) = do
             -- TODO: refactor, too much same stuff here
             if (edict^.eFlags) .&. Constants.flSwim == 0
               then if | (edict^.eWaterLevel) < 3 ->
-                          gameBaseGlobals.gbGEdicts.ix edictIdx.eAirFinished .= levelTime + 12
+                          modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 12)
 
                       | (edict^.eAirFinished) < levelTime -> do
                           -- drown!
@@ -379,13 +394,14 @@ worldEffects edictRef@(EdictReference edictIdx) = do
                                 dmg' = if dmg > 15 then 15 else dmg
 
                             v3o <- use $ globals.vec3Origin
-                            GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
-                            gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime + 1
+                            GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+
+                            modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
                       | otherwise -> return ()
 
               else if | (edict^.eWaterLevel) > 0 ->
-                          gameBaseGlobals.gbGEdicts.ix edictIdx.eAirFinished .= levelTime + 9
+                          modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 9)
 
                       | (edict^.eAirFinished) < levelTime -> do
                           -- suffocate!
@@ -394,93 +410,92 @@ worldEffects edictRef@(EdictReference edictIdx) = do
                                 dmg' = if dmg > 15 then 15 else dmg
 
                             v3o <- use $ globals.vec3Origin
-                            GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
-                            gameBaseGlobals.gbGEdicts.ix edictIdx.ePainDebounceTime .= levelTime + 1
+                            GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+
+                            modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
                       | otherwise -> return ()
 
         checkLava :: Quake ()
         checkLava = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when ((edict^.eWaterType) .&. Constants.contentsLava /= 0 && (edict^.eFlags) .&. Constants.flImmuneLava == 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
             when ((edict^.eDamageDebounceTime) < levelTime) $ do
               v3o <- use $ globals.vec3Origin
-              GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o (10 * (edict^.eWaterLevel)) 0 0 Constants.modLava
+              GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (10 * (edict^.eWaterLevel)) 0 0 Constants.modLava
 
         checkSlime :: Quake ()
         checkSlime = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when ((edict^.eWaterType) .&. Constants.contentsSlime /= 0 && (edict^.eFlags) .&. Constants.flImmuneSlime == 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
             when ((edict^.eDamageDebounceTime) < levelTime) $ do
               v3o <- use $ globals.vec3Origin
-              GameCombat.damage edictRef (EdictReference 0) (EdictReference 0) v3o (edict^.eEntityState.esOrigin) v3o (4 * (edict^.eWaterLevel)) 0 0 Constants.modSlime
+              GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (4 * (edict^.eWaterLevel)) 0 0 Constants.modSlime
 
         checkInWater :: Quake ()
         checkInWater = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when ((edict^.eFlags) .&. Constants.flInWater == 0) $ do
             when ((edict^.eSvFlags) .&. Constants.svfDeadMonster == 0) $ do
               gameImport <- use $ gameBaseGlobals.gbGameImport
+
               let sound = gameImport^.giSound
                   soundIndex = gameImport^.giSoundIndex
 
               if | (edict^.eWaterType) .&. Constants.contentsLava /= 0 -> do
                      r <- Lib.randomF
-                     idx <- if r <= 0.5
-                              then soundIndex (Just "player/lava1.wav")
-                              else soundIndex (Just "player/lava2.wav")
-                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+                     soundIdx <- if r <= 0.5
+                                   then soundIndex (Just "player/lava1.wav")
+                                   else soundIndex (Just "player/lava2.wav")
+                     sound (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
 
                  | (edict^.eWaterType) .&. Constants.contentsSlime /= 0 -> do
-                     idx <- soundIndex (Just "player/watr_in.wav")
-                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+                     soundIdx <- soundIndex (Just "player/watr_in.wav")
+                     sound (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
 
                  | (edict^.eWaterType) .&. Constants.contentsWater /= 0 -> do
-                     idx <- soundIndex (Just "player/watr_in.wav")
-                     sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
+                     soundIdx <- soundIndex (Just "player/watr_in.wav")
+                     sound (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
 
                  | otherwise -> return ()
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eFlags %= (.|. Constants.flInWater)
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eDamageDebounceTime .= 0
+            modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
+                                           & eDamageDebounceTime .~ 0)
 
 setEffects :: EdictReference -> Quake ()
-setEffects (EdictReference edictIdx) = do
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
-      esEffects %= (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
-      esRenderFx %= (.&. (complement (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue)))
+setEffects edictRef = do
+    modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
+                                   & eEntityState.esRenderFx %~ (.&. (complement (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue))))
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     when ((edict^.eMonsterInfo.miAIFlags) .&. Constants.aiResurrecting /= 0) $ do
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
-        esEffects %= (.|. Constants.efColorShell)
-        esRenderFx %= (.|. Constants.rfShellRed)
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                     & eEntityState.esRenderFx %~ (.|. Constants.rfShellRed))
 
     unless ((edict^.eHealth) <= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
       when ((edict^.ePowerArmorTime) > levelTime) $
         if | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorScreen ->
-               gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efPowerScreen)
+               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
 
            | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorShield ->
-               zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
-                 esEffects %= (.|. Constants.efColorShell)
-                 esRenderFx %= (.|. Constants.rfShellGreen)
+               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                              & eEntityState.esRenderFx %~ (.|. Constants.rfShellGreen))
 
            | otherwise -> return ()
 
 changeYaw :: EdictReference -> Quake ()
-changeYaw (EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+changeYaw edictRef = do
+    edict <- readEdictT edictRef
 
     let current = Math3D.angleMod (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw))
         ideal = edict^.eIdealYaw
@@ -501,11 +516,11 @@ changeYaw (EdictReference edictIdx) = do
                      2 -> _z
                      _ -> undefined -- shouldn't happen
 
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles.access .= Math3D.angleMod (current + move'')
+      modifyEdictT edictRef (\v -> v & eEntityState.esAngles.access .~ Math3D.angleMod (current + move''))
 
 moveToGoal :: EdictReference -> Float -> Quake ()
-moveToGoal edictRef@(EdictReference edictIdx) dist = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+moveToGoal edictRef dist = do
+    edict <- readEdictT edictRef
 
     let skip = isNothing (edict^.eGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
     -- if the next step hits the enemy, return immediately
@@ -517,16 +532,20 @@ moveToGoal edictRef@(EdictReference edictIdx) dist = do
     -- io (print $ "skip = " ++ show skip ++ " skip' = " ++ show skip')
 
     unless (skip || skip') $ do
-      Just edict' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      edict' <- readEdictT edictRef
+
       -- bump around
       r <- Lib.rand
+
       if r .&. 3 == 1
         then do
           when (edict'^.eInUse) $
             SV.newChaseDir edictRef (edict'^.eGoalEntity) dist
         else do
           v <- SV.stepDirection edictRef (edict'^.eIdealYaw) dist
+
           unless v $ do
-            Just edict'' <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+            edict'' <- readEdictT edictRef
+
             when (edict''^.eInUse) $
               SV.newChaseDir edictRef (edict''^.eGoalEntity) dist

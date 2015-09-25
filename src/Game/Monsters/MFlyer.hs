@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MFlyer where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.))
 import Data.Char (toLower)
@@ -317,39 +317,39 @@ flyerMoveRun = MMoveT "flyerMoveRun" frameStand01 frameStand45 flyerFramesRun No
 
 flyerRun :: EntThink
 flyerRun =
-  GenericEntThink "flyer_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "flyer_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then flyerMoveStand
                    else flyerMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 flyerWalk :: EntThink
 flyerWalk =
-  GenericEntThink "flyer_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveWalk
+  GenericEntThink "flyer_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveWalk)
     return True
 
 flyerStand :: EntThink
 flyerStand =
-  GenericEntThink "flyer_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStand
+  GenericEntThink "flyer_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStand)
     return True
 
 flyerNextMove :: EntThink
 flyerNextMove =
-  GenericEntThink "flyer_nextmove" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "flyer_nextmove" $ \selfRef -> do
     nextMove <- use $ mFlyerGlobals.mFlyerNextMove
 
     if | nextMove == actionAttack1 ->
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStartMelee
+           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStartMelee)
        | nextMove == actionAttack2 ->
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveAttack2
+           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveAttack2)
        | nextMove == actionRun ->
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveRun
+           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveRun)
        | otherwise ->
            return ()
 
@@ -384,14 +384,14 @@ flyerMoveStop = MMoveT "flyerMoveStop" frameStop01 frameStop07 flyerFramesStop N
 
 flyerStop :: EntThink
 flyerStop =
-  GenericEntThink "flyer_stop" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStop
+  GenericEntThink "flyer_stop" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStop)
     return True
 
 flyerStart :: EntThink
 flyerStart =
-  GenericEntThink "flyer_start" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStart
+  GenericEntThink "flyer_start" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStart)
     return True
 
 flyerFramesRollRight :: V.Vector MFrameT
@@ -544,8 +544,8 @@ flyerMoveAttack2 = MMoveT "flyerMoveAttack2" frameAttack201 frameAttack217 flyer
 
 flyerSlashLeft :: EntThink
 flyerSlashLeft =
-  GenericEntThink "flyer_slash_left" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "flyer_slash_left" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 0
 
@@ -559,8 +559,8 @@ flyerSlashLeft =
 
 flyerSlashRight :: EntThink
 flyerSlashRight =
-  GenericEntThink "flyer_slash_right" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "flyer_slash_right" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 0
 
@@ -574,8 +574,8 @@ flyerSlashRight =
 
 flyerLoopMelee :: EntThink
 flyerLoopMelee =
-  GenericEntThink "flyer_loop_melee" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveLoopMelee
+  GenericEntThink "flyer_loop_melee" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveLoopMelee)
     return True
 
 flyerFramesStartMelee :: V.Vector MFrameT
@@ -619,11 +619,10 @@ flyerFramesLoopMelee =
 
 flyerCheckMelee :: EntThink
 flyerCheckMelee =
-  GenericEntThink "flyer_check_melee" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "flyer_check_melee" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     r <- Lib.randomF
 
@@ -633,7 +632,7 @@ flyerCheckMelee =
                                else flyerMoveEndMelee
                         else flyerMoveEndMelee
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 flyerMoveLoopMelee :: MMoveT
@@ -641,35 +640,35 @@ flyerMoveLoopMelee = MMoveT "flyerMoveLoopMelee" frameAttack107 frameAttack118 f
 
 flyerAttack :: EntThink
 flyerAttack =
-  GenericEntThink "flyer_attack" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveAttack2
+  GenericEntThink "flyer_attack" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveAttack2)
     return True
 
 flyerSetStart :: EntThink
 flyerSetStart =
-  GenericEntThink "flyer_setstart" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "flyer_setstart" $ \selfRef -> do
     mFlyerGlobals.mFlyerNextMove .= actionRun
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStart
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStart)
     return True
 
 flyerMelee :: EntThink
 flyerMelee =
-  GenericEntThink "flyer_melee" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just flyerMoveStartMelee
+  GenericEntThink "flyer_melee" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStartMelee)
     return True
 
 flyerPain :: EntPain
 flyerPain =
-  GenericEntPain "flyer_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "flyer_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) <= (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -688,7 +687,7 @@ flyerPain =
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 flyerDie :: EntDie
 flyerDie =
@@ -699,8 +698,8 @@ flyerDie =
     GameMisc.becomeExplosion1 selfRef
 
 flyerFire :: EdictReference -> Int -> Quake ()
-flyerFire selfRef@(EdictReference selfIdx) flashNumber = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+flyerFire selfRef flashNumber = do
+    self <- readEdictT selfRef
 
     let effect = if (self^.eEntityState.esFrame) `elem` [frameAttack204, frameAttack207, frameAttack210]
                    then Constants.efHyperblaster
@@ -708,9 +707,9 @@ flyerFire selfRef@(EdictReference selfIdx) flashNumber = do
 
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
-        Just (EdictReference enemyIdx) = self^.eEnemy
+        Just enemyRef = self^.eEnemy
 
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    enemy <- readEdictT enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -723,7 +722,7 @@ flyerFire selfRef@(EdictReference selfIdx) flashNumber = do
 - Trigger_Spawn Sight
 -}
 spMonsterFlyer :: EdictReference -> Quake ()
-spMonsterFlyer selfRef@(EdictReference selfIdx) = do
+spMonsterFlyer selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -732,12 +731,12 @@ spMonsterFlyer selfRef@(EdictReference selfIdx) = do
 
       else do
         -- fix a map bug in jail5.bsp
-        Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        self <- readEdictT selfRef
         mapName <- use $ gameBaseGlobals.gbLevel.llMapName
+
         when (BC.map toLower mapName == "jail5" && (self^.eEntityState.esOrigin._z) == (-104)) $
-          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-            eTargetName .= (self^.eTarget)
-            eTarget .= Nothing
+          modifyEdictT selfRef (\v -> v & eTargetName .~ (self^.eTarget)
+                                        & eTarget .~ Nothing)
 
         gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -758,29 +757,27 @@ spMonsterFlyer selfRef@(EdictReference selfIdx) = do
         soundIdx <- soundIndex (Just "flyer/flyidle1.wav")
         modelIdx <- modelIndex (Just "models/monsters/flyer/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-16) (-16) (-24)
-          eMaxs .= V3 16 16 32
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esSound .= soundIdx
-          eHealth .= 50
-          eMass .= 50
-          ePain .= Just flyerPain
-          eDie .= Just flyerDie
-          eMonsterInfo.miStand .= Just flyerStand
-          eMonsterInfo.miWalk .= Just flyerWalk
-          eMonsterInfo.miRun .= Just flyerRun
-          eMonsterInfo.miAttack .= Just flyerAttack
-          eMonsterInfo.miMelee .= Just flyerMelee
-          eMonsterInfo.miSight .= Just flyerSight
-          eMonsterInfo.miIdle .= Just flyerIdle
+        modifyEdictT selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-16) (-16) (-24)
+                                      & eMaxs .~ V3 16 16 32
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esSound .~ soundIdx
+                                      & eHealth .~ 50
+                                      & eMass .~ 50
+                                      & ePain .~ Just flyerPain
+                                      & eDie .~ Just flyerDie
+                                      & eMonsterInfo.miStand .~ Just flyerStand
+                                      & eMonsterInfo.miWalk .~ Just flyerWalk
+                                      & eMonsterInfo.miRun .~ Just flyerRun
+                                      & eMonsterInfo.miAttack .~ Just flyerAttack
+                                      & eMonsterInfo.miMelee .~ Just flyerMelee
+                                      & eMonsterInfo.miSight .~ Just flyerSight
+                                      & eMonsterInfo.miIdle .~ Just flyerIdle)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just flyerMoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just flyerMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.flyMonsterStart selfRef

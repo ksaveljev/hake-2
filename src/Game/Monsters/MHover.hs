@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MHover where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.))
 import Data.Maybe (isNothing)
@@ -108,11 +108,10 @@ frameAttack108 = 204
 
 hoverReAttack :: EntThink
 hoverReAttack =
-  GenericEntThink "hover_reattack" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "hover_reattack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     currentMove <- if (enemy^.eHealth) > 0
                      then do
@@ -125,13 +124,13 @@ hoverReAttack =
                      else
                        return hoverMoveEndAttack
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 hoverFireBlaster :: EntThink
 hoverFireBlaster =
-  GenericEntThink "hover_fire_blaster" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "hover_fire_blaster" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let effect = if (self^.eEntityState.esFrame) == frameAttack104
                    then Constants.efHyperblaster
@@ -139,9 +138,9 @@ hoverFireBlaster =
 
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2HoverBlaster1) forward right
-        Just (EdictReference enemyIdx) = self^.eEnemy
+        Just enemyRef = self^.eEnemy
 
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    enemy <- readEdictT enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -152,52 +151,52 @@ hoverFireBlaster =
 
 hoverStand :: EntThink
 hoverStand =
-  GenericEntThink "hover_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just hoverMoveStand
+  GenericEntThink "hover_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just hoverMoveStand)
     return True
 
 hoverRun :: EntThink
 hoverRun =
-  GenericEntThink "hover_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "hover_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then hoverMoveStand
                    else hoverMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 hoverWalk :: EntThink
 hoverWalk =
-  GenericEntThink "hover_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just hoverMoveWalk
+  GenericEntThink "hover_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just hoverMoveWalk)
     return True
 
 hoverStartAttack :: EntThink
 hoverStartAttack =
-  GenericEntThink "hover_start_attack" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just hoverMoveStartAttack
+  GenericEntThink "hover_start_attack" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just hoverMoveStartAttack)
     return True
 
 hoverAttack :: EntThink
 hoverAttack =
-  GenericEntThink "hover_attack" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just hoverMoveAttack1
+  GenericEntThink "hover_attack" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just hoverMoveAttack1)
     return True
 
 hoverPain :: EntPain
 hoverPain =
-  GenericEntPain "hover_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "hover_pain" $ \selfRef _ _ damage -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -219,32 +218,31 @@ hoverPain =
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 hoverDeadThink :: EntThink
 hoverDeadThink =
-  GenericEntThink "hover_deadthink" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "hover_deadthink" $ \selfRef -> do
+    self <- readEdictT selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if isNothing (self^.eGroundEntity) && levelTime < (self^.eTimeStamp)
-      then gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + Constants.frameTime
+      then modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
       else GameMisc.becomeExplosion1 selfRef
 
     return True
 
 hoverDead :: EntThink
 hoverDead =
-  GenericEntThink "hover_dead" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "hover_dead" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eThink .= Just hoverDeadThink
-      eNextThink .= levelTime + Constants.frameTime
-      eTimeStamp .= levelTime + 15
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eThink .~ Just hoverDeadThink
+                                  & eNextThink .~ levelTime + Constants.frameTime
+                                  & eTimeStamp .~ levelTime + 15)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -253,8 +251,8 @@ hoverDead =
 
 hoverDie :: EntDie
 hoverDie =
-  GenericEntDie "hover_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "hover_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -273,7 +271,7 @@ hoverDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -287,10 +285,9 @@ hoverDie =
 
            sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
-             eMonsterInfo.miCurrentMove .= Just hoverMoveDeath1
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         & eMonsterInfo.miCurrentMove .~ Just hoverMoveDeath1)
 
 hoverSight :: EntInteract
 hoverSight =
@@ -703,7 +700,7 @@ hoverMoveEndAttack = MMoveT "hoverMoveEndAttack" frameAttack107 frameAttack108 h
 - Trigger_Spawn Sight
 -}
 spMonsterHover :: EdictReference -> Quake ()
-spMonsterHover selfRef@(EdictReference selfIdx) = do
+spMonsterHover selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -730,29 +727,27 @@ spMonsterHover selfRef@(EdictReference selfIdx) = do
         soundIdx <- soundIndex (Just "hover/hovidle1.wav")
         modelIdx <- modelIndex (Just "models/monsters/hover/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .= soundIdx
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-24) (-24) (-24)
-          eMaxs .= V3 24 24 32
-          eHealth .= 240
-          eGibHealth .= (-100)
-          eMass .= 150
-          ePain .= Just hoverPain
-          eDie .= Just hoverDie
-          eMonsterInfo.miStand .= Just hoverStand
-          eMonsterInfo.miWalk .= Just hoverWalk
-          eMonsterInfo.miRun .= Just hoverRun
-          eMonsterInfo.miAttack .= Just hoverStartAttack
-          eMonsterInfo.miSight .= Just hoverSight
-          eMonsterInfo.miSearch .= Just hoverSearch
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-24) (-24) (-24)
+                                      & eMaxs .~ V3 24 24 32
+                                      & eHealth .~ 240
+                                      & eGibHealth .~ (-100)
+                                      & eMass .~ 150
+                                      & ePain .~ Just hoverPain
+                                      & eDie .~ Just hoverDie
+                                      & eMonsterInfo.miStand .~ Just hoverStand
+                                      & eMonsterInfo.miWalk .~ Just hoverWalk
+                                      & eMonsterInfo.miRun .~ Just hoverRun
+                                      & eMonsterInfo.miAttack .~ Just hoverStartAttack
+                                      & eMonsterInfo.miSight .~ Just hoverSight
+                                      & eMonsterInfo.miSearch .~ Just hoverSearch)
 
         linkEntity selfRef
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just hoverMoveStand
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just hoverMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.flyMonsterStart selfRef

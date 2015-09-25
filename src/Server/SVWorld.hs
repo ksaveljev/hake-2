@@ -4,7 +4,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVWorld where
 
-import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2, Lens', (&), (.~))
+import Control.Lens ((.=), (^.), (-=), (+=), use, preuse, ix, set, zoom, _1, _2, Lens', (&), (.~), (+~), (-~))
 import Control.Monad (void, unless, when)
 import Data.Bits ((.&.), (.|.), shiftL)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -77,28 +77,28 @@ removeLink (LinkReference idx) = do
     svGlobals.svLinks.ix prevLinkIdx.lNext .= link^.lNext
 
 unlinkEdict :: EdictReference -> Quake ()
-unlinkEdict (EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-    let lr@(LinkReference linkIdx) = edict^.eArea
+unlinkEdict edictRef = do
+    edict <- readEdictT edictRef
+    let linkRef@(LinkReference linkIdx) = edict^.eArea
 
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
     unless (isNothing (link^.lPrev)) $ do
-      removeLink lr
+      removeLink linkRef
       svGlobals.svLinks.ix linkIdx .= link { _lNext = Nothing, _lPrev = Nothing }
 
 linkEdict :: EdictReference -> Quake ()
-linkEdict er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+linkEdict edictRef = do
+    edict <- readEdictT edictRef
     let LinkReference linkIdx = edict^.eArea
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
 
     when (isJust (link^.lPrev)) $
-      unlinkEdict er
+      unlinkEdict edictRef
 
     -- don't add the world and the one not in use
-    unless (edictIdx == 0 || not (edict^.eInUse)) $ do
+    unless ((edict^.eIndex) == 0 || not (edict^.eInUse)) $ do
       -- set the size
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSize .= (edict^.eMaxs) - (edict^.eMins)
+      modifyEdictT edictRef (\v -> v & eSize .~ (edict^.eMaxs) - (edict^.eMins))
 
       -- encode the size into the entity_state for client prediction
       solid <- if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
@@ -128,7 +128,7 @@ linkEdict er@(EdictReference edictIdx) = do
                   | otherwise ->
                       return  0
 
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSolid .= solid
+      modifyEdictT edictRef (\v -> v & eEntityState.esSolid .~ solid)
 
       -- set the abs box
       if solid == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
@@ -140,27 +140,24 @@ linkEdict er@(EdictReference edictIdx) = do
               maxMax = F.maximum aMaxs
               m = F.maximum [minMax, maxMax]
 
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eAbsMin .= fmap (m `subtract`) (edict^.eEntityState.esOrigin)
-            eAbsMax .= fmap (+ m) (edict^.eEntityState.esOrigin)
+          modifyEdictT edictRef (\v -> v & eAbsMin .~ fmap (m `subtract`) (edict^.eEntityState.esOrigin)
+                                         & eAbsMax .~ fmap (+ m) (edict^.eEntityState.esOrigin))
 
         else
           -- normal
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eAbsMin .= (edict^.eEntityState.esOrigin) + (edict^.eMins)
-            eAbsMax .= (edict^.eEntityState.esOrigin) + (edict^.eMaxs)
+          modifyEdictT edictRef (\v -> v & eAbsMin .~ (edict^.eEntityState.esOrigin) + (edict^.eMins)
+                                         & eAbsMax .~ (edict^.eEntityState.esOrigin) + (edict^.eMaxs))
 
       -- because movement is clipped an epsilon away from an actual edge,
       -- we must fully check even when bouding boxes don't quite touch
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eAbsMin -= 1
-        eAbsMax += 1
-        -- link to PVS leafs
-        eNumClusters .= 0
-        eAreaNum .= 0
-        eAreaNum2 .= 0
+      modifyEdictT edictRef (\v -> v & eAbsMin -~ 1
+                                     & eAbsMax +~ 1
+                                       -- link to PVS leafs
+                                     & eNumClusters .~ 0
+                                     & eAreaNum .~ 0
+                                     & eAreaNum2 .~ 0)
 
-      Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      updatedEdict <- readEdictT edictRef
       (numLeafs, Just iw) <- CM.boxLeafNums (updatedEdict^.eAbsMin)
                                            (updatedEdict^.eAbsMax)
                                            (svGlobals.svLeafs)
@@ -174,18 +171,17 @@ linkEdict er@(EdictReference edictIdx) = do
 
       if numLeafs >= 128
         then -- assume we missed some leafs, and mark by headnode
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eNumClusters .= (-1)
-            eHeadNode .= topnode
+          modifyEdictT edictRef (\v -> v & eNumClusters .~ (-1)
+                                         & eHeadNode .~ topnode)
         else do
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eNumClusters .= 0
+          modifyEdictT edictRef (\v -> v & eNumClusters .~ 0)
           setHeadNode topnode 0 numLeafs
 
       -- if first time, make sure old_origin is valid
       when ((updatedEdict^.eLinkCount) == 0) $
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esOldOrigin .= (updatedEdict^.eEntityState.esOrigin)
+        modifyEdictT edictRef (\v -> v & eEntityState.esOldOrigin .~ (updatedEdict^.eEntityState.esOrigin))
 
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eLinkCount += 1
+      modifyEdictT edictRef (\v -> v & eLinkCount +~ 1)
 
       unless ((updatedEdict^.eSolid) == Constants.solidNot) $ do
         -- find the first node that the ent's box crosses
@@ -203,7 +199,7 @@ linkEdict er@(EdictReference edictIdx) = do
           svGlobals.svClusters.ix idx .= leafCluster
 
           area <- CM.leafArea (leafs UV.! idx)
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+          edict <- readEdictT edictRef
 
           when (area /= 0) $
             -- doors may legally straggle two areas,
@@ -215,9 +211,9 @@ linkEdict er@(EdictReference edictIdx) = do
                 when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
                   Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eAbsMin)) `B.append` "\n"
 
-                gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum2 .= area
+                modifyEdictT edictRef (\v -> v & eAreaNum2 .~ area)
               else do
-                gameBaseGlobals.gbGEdicts.ix edictIdx.eAreaNum .= area
+                modifyEdictT edictRef (\v -> v & eAreaNum .~ area)
 
         setHeadNode :: Int -> Int -> Int -> Quake ()
         setHeadNode topnode idx maxIdx
@@ -227,24 +223,25 @@ linkEdict er@(EdictReference edictIdx) = do
               let c = clusters UV.! idx
 
               if c == -1 -- not a visible leaf
-                then setHeadNode topnode (idx + 1) maxIdx
+                then
+                  setHeadNode topnode (idx + 1) maxIdx
+
                 else do
                   let foundIndex = UV.findIndex (\v -> v == c) (UV.take idx clusters)
 
                   if isNothing foundIndex
                     then do
-                      Just numClusters <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eNumClusters
+                      edict <- readEdictT edictRef
+                      let numClusters = edict^.eNumClusters
 
                       if numClusters == Constants.maxEntClusters
                         then do
                           -- assume we missed some leafs, and mark by headnode
-                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                            eNumClusters .= (-1)
-                            eHeadNode .= topnode
+                          modifyEdictT edictRef (\v -> v & eNumClusters .~ (-1)
+                                                         & eHeadNode .~ topnode)
                         else do
-                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                            eClusterNums.ix numClusters .= c
-                            eNumClusters += 1
+                          modifyEdictT edictRef (\v -> v & eClusterNums.ix numClusters .~ c
+                                                         & eNumClusters +~ 1)
 
                           setHeadNode topnode (idx + 1) maxIdx
 
@@ -299,8 +296,8 @@ areaEdictsR nodeIdx = do
           | startIdx == linkIdx = return ()
           | otherwise = do
               Just link <- preuse $ svGlobals.svLinks.ix linkIdx
-              let Just (EdictReference edictIdx) = link^.lEdict
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              let Just edictRef = link^.lEdict
+              edict <- readEdictT edictRef
               areaMaxs <- use $ svGlobals.svAreaMaxs
               areaMins <- use $ svGlobals.svAreaMins
               areaCount <- use $ svGlobals.svAreaCount
@@ -313,7 +310,7 @@ areaEdictsR nodeIdx = do
                      return ()
                  | otherwise -> do
                      zoom (svGlobals) $ do
-                       svAreaList.ix areaCount .= EdictReference edictIdx
+                       svAreaList.ix areaCount .= newEdictReference (edict^.eIndex)
                        svAreaCount += 1
 
                      findTouching startIdx (fromJust $ link^.lNext)
@@ -378,9 +375,9 @@ trace start maybeMins maybeMaxs end passEdict contentMask = do
     boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
 
     if (boxTraceT^.tFraction) == 0 -- blocked by the world
-      then return $ boxTraceT { _tEnt = Just (EdictReference 0) }
+      then return $ boxTraceT { _tEnt = Just worldRef }
       else do
-        let updatedClip = clip { _mcTrace = boxTraceT { _tEnt = Just (EdictReference 0) }
+        let updatedClip = clip { _mcTrace = boxTraceT { _tEnt = Just worldRef }
                                , _mcContentMask = contentMask
                                , _mcStart = start
                                , _mcEnd = end
@@ -441,8 +438,8 @@ clipMoveToEntities initialClip = do
         tryClipping idx maxIdx clip
           | idx >= maxIdx = return clip
           | otherwise = do
-              Just touchRef@(EdictReference touchIdx) <- preuse $ svGlobals.svTouchList.ix idx
-              Just touchEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix touchIdx
+              Just touchRef <- preuse $ svGlobals.svTouchList.ix idx
+              touchEdict <- readEdictT touchRef
 
               (done, skip) <- shouldSkip touchRef touchEdict clip
 
@@ -499,8 +496,8 @@ clipMoveToEntities initialClip = do
                  if (touchEdict^.eOwner) == (clip^.mcPassEdict)
                    then return (False, True) -- don't clip against own missiles
                    else do
-                     let Just (EdictReference passEdictIdx) = clip^.mcPassEdict
-                     Just passEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix passEdictIdx
+                     let Just passEdictRef = clip^.mcPassEdict
+                     passEdict <- readEdictT passEdictRef
                      if passEdict^.eOwner == (Just touchRef)
                        then return (False, True) -- don't clip against owner
                        else return (False, False)
@@ -543,8 +540,8 @@ pointContents p = do
         collectContents contents idx maxIdx
           | idx >= maxIdx = return contents
           | otherwise = do
-              Just (EdictReference edictIdx) <- preuse $ svGlobals.svTouch.ix idx
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+              Just edictRef <- preuse $ svGlobals.svTouch.ix idx
+              edict <- readEdictT edictRef
               -- might intersect, so do an exact clip
               headNode <- hullForEntity edict
               when ((edict^.eSolid) /= Constants.solidBsp) $

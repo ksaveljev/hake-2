@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameAI where
 
-import Control.Lens (use, (^.), ix, preuse, (.=), (%=), zoom)
+import Control.Lens (use, (^.), ix, preuse, (.=), (%=), zoom, (&), (.~), (%~))
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Maybe (isNothing, isJust, fromJust)
@@ -27,9 +27,9 @@ import qualified Util.Math3D as Math3D
 -}
 aiTurn :: AI
 aiTurn =
-  GenericAI "ai_turn" $ \selfRef@(EdictReference selfIdx) dist -> do
+  GenericAI "ai_turn" $ \selfRef dist -> do
     when (dist /= 0) $ do
-      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self <- readEdictT selfRef
       void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
     v <- GameUtil.findTarget selfRef
@@ -43,9 +43,9 @@ aiTurn =
 -}
 aiStand :: AI
 aiStand =
-  GenericAI "ai_stand" $ \selfRef@(EdictReference selfIdx) dist -> do
+  GenericAI "ai_stand" $ \selfRef dist -> do
     when (dist /= 0) $ do
-      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self <- readEdictT selfRef
       void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
     checkAIStandGround selfRef
@@ -54,21 +54,21 @@ aiStand =
       >>= tryToIdle selfRef
 
   where checkAIStandGround :: EdictReference -> Quake Bool
-        checkAIStandGround selfRef@(EdictReference selfIdx) = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        checkAIStandGround selfRef = do
+          self <- readEdictT selfRef
 
           if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
             then do
               case self^.eEnemy of
-                Just (EdictReference enemyIdx) -> do
-                  Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                Just enemyRef -> do
+                  enemy <- readEdictT enemyRef
                   let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
                       idealYaw = Math3D.vectorYaw v
 
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= idealYaw
+                  modifyEdictT selfRef (\v -> v & eIdealYaw .~ idealYaw)
 
                   when ((self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) /= idealYaw && (self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $ do
-                    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround)))
+                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround))))
                     void $ think (fromJust $ self^.eMonsterInfo.miRun) selfRef
 
                   M.changeYaw selfRef
@@ -87,8 +87,8 @@ aiStand =
 
         checkPauseTime :: EdictReference -> Bool -> Quake Bool
         checkPauseTime _ True = return True
-        checkPauseTime selfRef@(EdictReference selfIdx) _ = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        checkPauseTime selfRef _ = do
+          self <- readEdictT selfRef
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
           if levelTime > (self^.eMonsterInfo.miPauseTime)
@@ -100,8 +100,8 @@ aiStand =
 
         tryToIdle :: EdictReference -> Bool -> Quake ()
         tryToIdle _ True = return ()
-        tryToIdle selfRef@(EdictReference selfIdx) _ = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        tryToIdle selfRef _ = do
+          self <- readEdictT selfRef
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
           when ((self^.eSpawnFlags) .&. 1 == 0 && isJust (self^.eMonsterInfo.miIdle) && levelTime > (self^.eMonsterInfo.miIdleTime)) $ do
@@ -110,40 +110,40 @@ aiStand =
             if (self^.eMonsterInfo.miIdleTime) /= 0
               then do
                 void $ think (fromJust $ self^.eMonsterInfo.miIdle) selfRef
-                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + 15 + rf * 15
+                modifyEdictT selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + 15 + rf * 15)
               else do
-                gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + rf * 15
+                modifyEdictT selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + rf * 15)
 
 -- Turns towards target and advances
 -- Use this call with a distance of 0 to replace ai_face
 aiCharge :: AI
 aiCharge =
-  GenericAI "ai_charge" $ \selfRef@(EdictReference selfIdx) dist -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericAI "ai_charge" $ \selfRef dist -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
-    let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+    let a = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= Math3D.vectorYaw v
+    modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw a)
     M.changeYaw selfRef
 
     when (dist /= 0) $ do
-      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self' <- readEdictT selfRef
       void $ M.walkMove selfRef (self'^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
 -- Move the specified distance at current facing. This replaces the QC
 -- functions: ai_forward, ai_back, ai_pain, and ai_painforward
 aiMove :: AI
 aiMove =
-  GenericAI "ai_move" $ \selfRef@(EdictReference selfIdx) dist -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericAI "ai_move" $ \selfRef dist -> do
+    self <- readEdictT selfRef
     void $ M.walkMove selfRef (self^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw)) dist
 
 -- The monster is walking it's beat.
 aiWalk :: AI
 aiWalk =
-  GenericAI "ai_walk" $ \selfRef@(EdictReference selfIdx) dist -> do
+  GenericAI "ai_walk" $ \selfRef dist -> do
     -- io (print "GameAI.aiWalk!")
     -- io (print $ "dist = " ++ show dist)
     M.moveToGoal selfRef dist
@@ -152,7 +152,7 @@ aiWalk =
     found <- GameUtil.findTarget selfRef
 
     unless found $ do
-      Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+      self <- readEdictT selfRef
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
       when (isJust (self^.eMonsterInfo.miSearch) && levelTime > (self^.eMonsterInfo.miIdleTime)) $ do
@@ -161,15 +161,15 @@ aiWalk =
         if (self^.eMonsterInfo.miIdleTime) /= 0
           then do
             void $ think (fromJust $ self^.eMonsterInfo.miSearch) selfRef
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + 15 + r * 15
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + 15 + r * 15)
           else
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miIdleTime .= levelTime + r * 15
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + r * 15)
 
 -- The monster has an enemy it is trying to kill.
 aiRun :: AI
 aiRun =
-  GenericAI "ai_run" $ \selfRef@(EdictReference selfIdx) dist -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericAI "ai_run" $ \selfRef dist -> do
+    self <- readEdictT selfRef
 
     -- if we're going to a combat point, just proceed
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0
@@ -178,8 +178,8 @@ aiRun =
       else do
         if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget /= 0
           then do
-            let Just (EdictReference enemyIdx) = self^.eEnemy
-            Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+            let Just enemyRef = self^.eEnemy
+            enemy <- readEdictT enemyRef
             let v = (self^.eEntityState.esOrigin) - (enemy^.eEntityState.esOrigin)
             -- ...and reached it
             if norm v < 64
@@ -187,9 +187,8 @@ aiRun =
                 -- don't move, just stand and listen
                 void $ think (fromJust $ self^.eMonsterInfo.miStand) selfRef
                 -- since now it is aware and does not need to be triggered again.
-                zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                  eSpawnFlags %= (.&. (complement 1))
-                  eEnemy .= Nothing
+                modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
+                                              & eEnemy .~ Nothing)
               else
                 M.moveToGoal selfRef dist
 
@@ -207,35 +206,35 @@ aiRun =
             checkSliding selfRef dist
 
         checkSliding :: EdictReference -> Float -> Quake ()
-        checkSliding selfRef@(EdictReference selfIdx) dist = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        checkSliding selfRef dist = do
+          self <- readEdictT selfRef
 
           if (self^.eMonsterInfo.miAttackState) == Constants.asSliding
             then aiRunSlide selfRef dist
             else checkEnemyVis selfRef dist
 
         checkEnemyVis :: EdictReference -> Float -> Quake ()
-        checkEnemyVis selfRef@(EdictReference selfIdx) dist = do
+        checkEnemyVis selfRef dist = do
           enemyVis <- use $ gameBaseGlobals.gbEnemyVis
 
           if enemyVis
             then do
               M.moveToGoal selfRef dist
 
-              Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-              let Just (EdictReference enemyIdx) = self^.eEnemy
-              Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+              self <- readEdictT selfRef
+              let Just enemyRef = self^.eEnemy
+              enemy <- readEdictT enemyRef
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiLostSight))
-                eMonsterInfo.miLastSighting .= (enemy^.eEntityState.esOrigin)
-                eMonsterInfo.miTrailTime .= levelTime
+              modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiLostSight))
+                                            & eMonsterInfo.miLastSighting .~ (enemy^.eEntityState.esOrigin)
+                                            & eMonsterInfo.miTrailTime .~ levelTime)
+
             else
               checkCoopEnemy selfRef dist
 
         checkCoopEnemy :: EdictReference -> Float -> Quake ()
-        checkCoopEnemy selfRef@(EdictReference selfIdx) dist = do
+        checkCoopEnemy selfRef dist = do
           coopValue <- liftM (^.cvValue) coopCVar
 
           -- coop will change to another enemy if visible
@@ -249,25 +248,25 @@ aiRun =
               checkSearchTime selfRef dist
 
         checkSearchTime :: EdictReference -> Float -> Quake ()
-        checkSearchTime selfRef@(EdictReference selfIdx) dist = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        checkSearchTime selfRef dist = do
+          self <- readEdictT selfRef
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
           if (self^.eMonsterInfo.miSearchTime) /= 0 && levelTime > (self^.eMonsterInfo.miSearchTime + 20)
             then do
               M.moveToGoal selfRef dist
-              gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miSearchTime .= 0
+              modifyEdictT selfRef (\v -> v & eMonsterInfo.miSearchTime .~ 0)
             else
               proceedRun selfRef dist
 
         proceedRun :: EdictReference -> Float -> Quake ()
-        proceedRun selfRef@(EdictReference selfIdx) dist = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        proceedRun selfRef dist = do
+          self <- readEdictT selfRef
 
           let save = self^.eGoalEntity
           tempGoal <- GameUtil.spawn
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= Just tempGoal
+          modifyEdictT selfRef (\v -> v & eGoalEntity .~ Just tempGoal)
 
           new1 <- calcNew1 selfRef
 
@@ -276,40 +275,38 @@ aiRun =
           M.moveToGoal selfRef dist
 
           GameUtil.freeEdict tempGoal
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= save -- TODO: jake2 checks for self != null here, do we need it?
+          modifyEdictT selfRef (\v -> v & eGoalEntity .~ save) -- TODO: jake2 checks for self != null here, do we need it?
 
         calcNew1 :: EdictReference -> Quake Bool
-        calcNew1 selfRef@(EdictReference selfIdx) = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        calcNew1 selfRef = do
+          self <- readEdictT selfRef
 
           new1 <- if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiLostSight == 0
                     then do
                       -- just lost sight of the player, decide where to go first
-                      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (\v -> (v .|. (Constants.aiLostSight .|. Constants.aiPursuitLastSeen)) .&. complement (Constants.aiPursueNext .|. Constants.aiPursueTemp))
+                      modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (\v -> (v .|. (Constants.aiLostSight .|. Constants.aiPursuitLastSeen)) .&. complement (Constants.aiPursueNext .|. Constants.aiPursueTemp)))
                       return True
                     else
                       return False
 
-          Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          self' <- readEdictT selfRef
 
           if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiPursueNext /= 0
             then do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-                miAIFlags %= (.&. (complement Constants.aiPursueNext))
-                -- give ourself more time since we got this far
-                miSearchTime .= levelTime + 5
+              modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiPursueNext))
+                                              -- give ourself more time since we got this far
+                                            & eMonsterInfo.miSearchTime .~ levelTime + 5)
 
               (maybeMarker, new1') <- if | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiPursueTemp /= 0 -> do
-                                             zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-                                               miAIFlags %= (.&. (complement Constants.aiPursueTemp))
-                                               miLastSighting .= (self^.eMonsterInfo.miSavedGoal)
+                                             modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiPursueTemp))
+                                                                           & eMonsterInfo.miLastSighting .~ (self^.eMonsterInfo.miSavedGoal))
 
                                              return (Nothing, True)
 
                                          | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiPursuitLastSeen /= 0 -> do
-                                             gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiPursuitLastSeen))
+                                             modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiPursuitLastSeen)))
                                              marker <- PlayerTrail.pickFirst selfRef
                                              return (marker, new1)
 
@@ -321,44 +318,44 @@ aiRun =
                 Nothing ->
                   return new1'
 
-                Just (EdictReference markerIdx) -> do
-                  Just marker <- preuse $ gameBaseGlobals.gbGEdicts.ix markerIdx
-                  zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                    eMonsterInfo.miTrailTime .= (marker^.eTimeStamp)
-                    eEntityState.esAngles._y .= (marker^.eEntityState.esAngles._y) -- TODO: use Constants.yaw instead _y directly
-                    eIdealYaw .= (marker^.eEntityState.esAngles._y) -- TODO: use Constants.yaw instead _y directly
+                Just markerRef -> do
+                  marker <- readEdictT markerRef
+
+                  modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ (marker^.eTimeStamp)
+                                                & eEntityState.esAngles._y .~ (marker^.eEntityState.esAngles._y) -- TODO: use Constants.yaw instead _y directly
+                                                & eIdealYaw .~ (marker^.eEntityState.esAngles._y)) -- TODO: use Constants.yaw instead _y directly
 
                   return True
             else
               return new1
 
         pursueNext :: EdictReference -> Float -> Bool -> Quake ()
-        pursueNext selfRef@(EdictReference selfIdx) dist new1 = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+        pursueNext selfRef dist new1 = do
+          self <- readEdictT selfRef
           let v = (self^.eEntityState.esOrigin) - (self^.eMonsterInfo.miLastSighting)
               d1 = norm v
           dist' <- if d1 <= dist
                      then do
-                       gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.|. Constants.aiPursueNext)
+                       modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiPursueNext))
                        return d1
                      else
                        return dist
 
-          let Just (EdictReference goalEntityIdx) = self^.eGoalEntity
-          gameBaseGlobals.gbGEdicts.ix goalEntityIdx.eEntityState.esOrigin .= (self^.eMonsterInfo.miLastSighting)
+          let Just goalEntityRef = self^.eGoalEntity
+          modifyEdictT goalEntityRef (\v -> v & eEntityState.esOrigin .~ (self^.eMonsterInfo.miLastSighting))
 
           correctCourse selfRef dist' new1
 
         correctCourse :: EdictReference -> Float -> Bool -> Quake ()
-        correctCourse selfRef@(EdictReference selfIdx) dist new1 = do
+        correctCourse selfRef dist new1 = do
           when new1 $ do
-            Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+            self <- readEdictT selfRef
             trace <- use $ gameBaseGlobals.gbGameImport.giTrace
             traceT <- trace (self^.eEntityState.esOrigin) (Just $ self^.eMins) (Just $ self^.eMaxs) (self^.eMonsterInfo.miLastSighting) (Just selfRef) Constants.maskPlayerSolid
 
             when ((traceT^.tFraction) < 1) $ do
-              let Just (EdictReference goalEntityIdx) = self^.eGoalEntity
-              Just goalEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix goalEntityIdx
+              let Just goalEntityRef = self^.eGoalEntity
+              goalEntity <- readEdictT goalEntityRef
 
               let v = (goalEntity^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
                   d1 = norm v
@@ -366,11 +363,11 @@ aiRun =
                   d2 = d1 * ((center + 1) / 2)
                   yaw = Math3D.vectorYaw v
 
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                eEntityState.esAngles._y .= yaw -- use Constants.yaw instead of directly using _y
-                eIdealYaw .= yaw
+              modifyEdictT selfRef (\v -> v & eEntityState.esAngles._y .~ yaw -- use Constants.yaw instead of directly using _y
+                                            & eIdealYaw .~ yaw)
 
-              Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+              self' <- readEdictT selfRef
+
               let (Just vForward, Just vRight, _) = Math3D.angleVectors (self'^.eEntityState.esAngles) True True False
                   v' = V3 d2 (-16) 0
                   leftTarget = Math3D.projectSource (self'^.eEntityState.esOrigin) v' vForward vRight
@@ -390,36 +387,34 @@ aiRun =
                                          then Math3D.projectSource (self'^.eEntityState.esOrigin) (V3 (d2 * left * 0.5) (-16) 0) vForward vRight
                                          else leftTarget
 
-                     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                       eMonsterInfo.miSavedGoal .= (self'^.eMonsterInfo.miLastSighting)
-                       eMonsterInfo.miLastSighting .= leftTarget'
-                       eMonsterInfo.miAIFlags %= (.|. Constants.aiPursueTemp)
-                       eEntityState.esAngles._y .= Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)) -- TODO: use Constants.yaw instead of using _y directly
-                       eIdealYaw .= Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin))
-                       
-                     gameBaseGlobals.gbGEdicts.ix goalEntityIdx.eEntityState.esOrigin .= leftTarget'
+                     modifyEdictT selfRef (\v -> v & eMonsterInfo.miSavedGoal .~ (self'^.eMonsterInfo.miLastSighting)
+                                                   & eMonsterInfo.miLastSighting .~ leftTarget'
+                                                   & eMonsterInfo.miAIFlags %~ (.|. Constants.aiPursueTemp)
+                                                   & eEntityState.esAngles._y .~ Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)) -- TODO: use Constants.yaw instead of using _y directly
+                                                   & eIdealYaw .~ Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)))
+
+                     modifyEdictT goalEntityRef (\v -> v & eEntityState.esOrigin .~ leftTarget')
 
                  | right >= center' && right > left -> do
                      let rightTarget' = if right < 1
                                           then Math3D.projectSource (self'^.eEntityState.esOrigin) (V3 (d2 * right * 0.5) 16 0) vForward vRight
                                           else rightTarget
 
-                     zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                       eMonsterInfo.miSavedGoal .= (self'^.eMonsterInfo.miLastSighting)
-                       eMonsterInfo.miLastSighting .= rightTarget'
-                       eMonsterInfo.miAIFlags %= (.|. Constants.aiPursueTemp)
-                       eEntityState.esAngles._y .= Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin))
-                       eIdealYaw .= Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin))
+                     modifyEdictT selfRef (\v -> v & eMonsterInfo.miSavedGoal .~ (self'^.eMonsterInfo.miLastSighting)
+                                                   & eMonsterInfo.miLastSighting .~ rightTarget'
+                                                   & eMonsterInfo.miAIFlags %~ (.|. Constants.aiPursueTemp)
+                                                   & eEntityState.esAngles._y .~ Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin))
+                                                   & eIdealYaw .~ Math3D.vectorYaw (rightTarget' - (self'^.eEntityState.esOrigin)))
 
-                     gameBaseGlobals.gbGEdicts.ix goalEntityIdx.eEntityState.esOrigin .= rightTarget'
+                     modifyEdictT goalEntityRef (\v -> v & eEntityState.esOrigin .~ rightTarget')
 
                  | otherwise ->
                      return ()
 
 walkMonsterStart :: EntThink
 walkMonsterStart =
-  GenericEntThink "walkmonster_start" $ \edictRef@(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eThink .= Just walkMonsterStartGo
+  GenericEntThink "walkmonster_start" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eThink .~ Just walkMonsterStartGo)
     void $ Monster.monsterStart edictRef
     return True
 
@@ -435,11 +430,13 @@ aiSetSightClient :: Quake ()
 aiSetSightClient = do
     sightClient <- use $ gameBaseGlobals.gbLevel.llSightClient
 
-    let start = if isNothing sightClient
-                  then 1
-                  else let Just (EdictReference idx) = sightClient
-                       in idx
-        check = start
+    start <- case sightClient of
+               Nothing -> return 1
+               Just edictRef -> do
+                 edict <- readEdictT edictRef
+                 return (edict^.eIndex)
+
+    let check = start
 
     maxClientsValue <- use $ gameBaseGlobals.gbGame.glMaxClients
 
@@ -451,19 +448,21 @@ aiSetSightClient = do
                          then 1
                          else check + 1
 
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix check'
+          edict <- readEdictT (newEdictReference check')
 
           if | (edict^.eInUse) && (edict^.eHealth) > 0 && (edict^.eFlags) .&. Constants.flNoTarget == 0 ->
-                 gameBaseGlobals.gbLevel.llSightClient .= Just (EdictReference check') -- got one
+                 gameBaseGlobals.gbLevel.llSightClient .= Just (newEdictReference check') -- got one
              | check' == start ->
                  gameBaseGlobals.gbLevel.llSightClient .= Nothing
              | otherwise -> lookThroughClients maxClients start check'
 
 walkMonsterStartGo :: EntThink
 walkMonsterStartGo =
-  GenericEntThink "walkmonster_start_go" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "walkmonster_start_go" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+    self <- readEdictT selfRef
+
+    let spawnFlags = self^.eSpawnFlags
 
     -- preuse (gameBaseGlobals.gbGEdicts.ix selfIdx) >>= \(Just blah) -> do
       -- io (print "GameAI: BEFORE")
@@ -472,23 +471,31 @@ walkMonsterStartGo =
 
     when (spawnFlags .&. 2 == 0 && levelTime < 1) $ do
       void $ think M.dropToFloor selfRef
-      Just groundEntity <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eGroundEntity
+
+      self' <- readEdictT selfRef
+      let groundEntity = self'^.eGroundEntity
+
       when (isJust groundEntity) $ do
         ok <- M.walkMove selfRef 0 0
-        when (not ok) $ do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-          dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
-          dprintf ((self^.eClassName) `B.append` " in solid at " `B.append` (Lib.vtos (self^.eEntityState.esOrigin)) `B.append` "\n")
-          
-    Just yawSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eYawSpeed
-    when (yawSpeed == 0) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eYawSpeed .= 40
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eViewHeight .= 25
+        when (not ok) $ do
+          self'' <- readEdictT selfRef
+          dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+          dprintf ((self''^.eClassName) `B.append` " in solid at " `B.append` (Lib.vtos (self''^.eEntityState.esOrigin)) `B.append` "\n")
+          
+    self' <- readEdictT selfRef
+    let yawSpeed = self'^.eYawSpeed
+
+    when (yawSpeed == 0) $
+      modifyEdictT selfRef (\v -> v & eYawSpeed .~ 40)
+
+    modifyEdictT selfRef (\v -> v & eViewHeight .~ 25)
 
     Monster.monsterStartGo selfRef
 
-    Just spawnFlags' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+    self'' <- readEdictT selfRef
+    let spawnFlags' = self''^.eSpawnFlags
+
     when (spawnFlags' .&. 2 /= 0) $
       void $ think Monster.monsterTriggeredStart selfRef
 
@@ -523,7 +530,7 @@ walkMonsterStartGo =
 - walkmove(angle, speed) primitive is all or nothing
 -}
 aiCheckAttack :: EdictReference -> Float -> Quake Bool
-aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
+aiCheckAttack selfRef dist = do
     -- this causes monsters to run blindly to the combat point w/o firing
     result <- checkBlindRun
 
@@ -544,23 +551,23 @@ aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
         if done
           then
             return True
+
           else do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eShowHostile .= truncate levelTime + 1 -- wake up other
+            modifyEdictT selfRef (\v -> v & eShowHostile .~ truncate levelTime + 1) -- wake up other
 
             -- monsters check knowledge of enemy
-            Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+            self <- readEdictT selfRef
             enemyVis <- GameUtil.visible selfRef (fromJust $ self^.eEnemy)
             gameBaseGlobals.gbEnemyVis .= enemyVis
 
-            let Just (EdictReference enemyIdx) = self^.eEnemy
-            Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+            let Just enemyRef = self^.eEnemy
+            enemy <- readEdictT enemyRef
 
             when enemyVis $
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                eMonsterInfo.miSearchTime .= levelTime + 5
-                eMonsterInfo.miLastSighting .= (enemy^.eEntityState.esOrigin)
+              modifyEdictT selfRef (\v -> v & eMonsterInfo.miSearchTime .~ levelTime + 5
+                                            & eMonsterInfo.miLastSighting .~ (enemy^.eEntityState.esOrigin))
 
             let enemyInFront = GameUtil.inFront self enemy
                 enemyRange = GameUtil.range self enemy
@@ -587,34 +594,37 @@ aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
 
   where checkBlindRun :: Quake (Maybe Bool)
         checkBlindRun = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          self <- readEdictT selfRef
 
           case self^.eGoalEntity of
             Nothing ->
               return Nothing
 
-            Just (EdictReference goalEntityIdx) -> do
+            Just goalEntityRef -> do
               if | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0 ->
                      return (Just False)
 
                  | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget /= 0 -> do
                      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                     let Just (EdictReference enemyIdx) = self^.eEnemy
-                     Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+                     let Just enemyRef = self^.eEnemy
+                     enemy <- readEdictT enemyRef
 
                      if levelTime - (enemy^.eTeleportTime) > 5.0
                        then do
                          when ((self^.eGoalEntity) == (self^.eEnemy)) $ do
                            case self^.eMoveTarget of
-                             Just _ -> gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eMoveTarget)
-                             Nothing -> gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= Nothing
+                             Just _ -> modifyEdictT selfRef (\v -> v & eGoalEntity .~ (self^.eMoveTarget))
+                             Nothing -> modifyEdictT selfRef (\v -> v & eGoalEntity .~ Nothing)
 
-                         gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiSoundTarget))
+                         modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
+
                          when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $
-                           gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround)))
+                           modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround))))
+
                          return Nothing
+
                        else do
-                         gameBaseGlobals.gbGEdicts.ix selfIdx.eShowHostile .= truncate levelTime + 1
+                         modifyEdictT selfRef (\v -> v & eShowHostile .~ truncate levelTime + 1)
                          return (Just False)
 
                  | otherwise ->
@@ -622,14 +632,14 @@ aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
 
         checkIfEnemyIsDead :: Quake Bool
         checkIfEnemyIsDead = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          self <- readEdictT selfRef
 
           case self^.eEnemy of
             Nothing ->
               return True
 
-            Just (EdictReference enemyIdx) -> do
-              Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+            Just enemyRef -> do
+              enemy <- readEdictT enemyRef
 
               if | not (enemy^.eInUse) ->
                      return True
@@ -637,7 +647,7 @@ aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
                  | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic /= 0 ->
                      if (enemy^.eHealth) > 0
                        then do
-                         gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAIFlags %= (.&. (complement Constants.aiMedic))
+                         modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiMedic)))
                          return True
                        else
                          return False
@@ -653,56 +663,57 @@ aiCheckAttack selfRef@(EdictReference selfIdx) dist = do
 
         lookForOtherTarget :: Quake Bool
         lookForOtherTarget = do
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eEnemy .= Nothing
+          modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
 
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+          self <- readEdictT selfRef
           oldEnemy <- case self^.eOldEnemy of
                         Nothing -> return Nothing
-                        Just (EdictReference oldEnemyIdx) -> preuse $ gameBaseGlobals.gbGEdicts.ix oldEnemyIdx
+                        Just oldEnemyRef -> liftM Just (readEdictT oldEnemyRef)
 
           if isJust oldEnemy && ((fromJust oldEnemy)^.eHealth) > 0
             then do
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                eEnemy .= (self^.eOldEnemy)
-                eOldEnemy .= Nothing
+              modifyEdictT selfRef (\v -> v & eEnemy .~ (self^.eOldEnemy)
+                                            & eOldEnemy .~ Nothing)
 
               huntTarget selfRef
 
               return False
+
             else do
               case self^.eMoveTarget of
                 Just _ -> do
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eMoveTarget)
+                  modifyEdictT selfRef (\v -> v & eGoalEntity .~ (self^.eMoveTarget))
                   void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
+
                 Nothing -> do
                   -- we need the pausetime otherwise the stand code
                   -- will just revert to walking with no target and
                   -- the monsters will wonder around aimlessly trying
                   -- to hunt the world entity
                   levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                  gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miPauseTime .= levelTime + 100000000
+                  modifyEdictT selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + 100000000)
                   void $ think (fromJust $ self^.eMonsterInfo.miStand) selfRef
 
               return True
 
 -- Decides running or standing according to flag AI_STAND_GROUND
 huntTarget :: EdictReference -> Quake ()
-huntTarget selfRef@(EdictReference selfIdx) = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+huntTarget selfRef = do
+    self <- readEdictT selfRef
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eGoalEntity .= (self^.eEnemy)
+    modifyEdictT selfRef (\v -> v & eGoalEntity .~ (self^.eEnemy))
 
     void $ if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
              then think (fromJust $ self^.eMonsterInfo.miStand) selfRef
              else think (fromJust $ self^.eMonsterInfo.miRun) selfRef
 
-    Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just (EdictReference enemyIdx) = self'^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    self' <- readEdictT selfRef
+    let Just enemyRef = self'^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let vec = (enemy^.eEntityState.esOrigin) - (self'^.eEntityState.esOrigin)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= Math3D.vectorYaw vec
+    modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw vec)
 
     -- wait a while before first attack
     when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround == 0) $
@@ -717,41 +728,41 @@ facingIdeal self =
 
 -- Turn and close until within an angle to launch a melee attack.
 aiRunMelee :: EdictReference -> Quake ()
-aiRunMelee selfRef@(EdictReference selfIdx) = do
+aiRunMelee selfRef = do
     enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    modifyEdictT selfRef (\v ->v & eIdealYaw .~ enemyYaw)
     M.changeYaw selfRef
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
 
     when (facingIdeal self) $ do
       void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
+      modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asStraight)
 
 -- Turn in place until within an angle to launch a missile attack.
 aiRunMissile :: EdictReference -> Quake ()
-aiRunMissile selfRef@(EdictReference selfIdx) = do
+aiRunMissile selfRef = do
     enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    modifyEdictT selfRef (\v -> v & eIdealYaw .~ enemyYaw)
     M.changeYaw selfRef
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
 
     when (facingIdeal self) $ do
       void $ think (fromJust $ self^.eMonsterInfo.miAttack) selfRef
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miAttackState .= Constants.asStraight
+      modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asStraight)
 
 -- Strafe sideways, but stay at aproximately the same range.
 aiRunSlide :: EdictReference -> Float -> Quake ()
-aiRunSlide selfRef@(EdictReference selfIdx) distance = do
+aiRunSlide selfRef distance = do
     enemyYaw <- use $ gameBaseGlobals.gbEnemyYaw
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eIdealYaw .= enemyYaw
+    modifyEdictT selfRef (\v -> v & eIdealYaw .~ enemyYaw)
     M.changeYaw selfRef
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
 
     let ofs = if (self^.eMonsterInfo.miLefty) /= 0
                 then 90
@@ -760,8 +771,8 @@ aiRunSlide selfRef@(EdictReference selfIdx) distance = do
     ok <- M.walkMove selfRef ((self^.eIdealYaw) + ofs) distance
 
     unless ok $ do
-      Just self' <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miLefty .= 1 - (self'^.eMonsterInfo.miLefty)
+      self' <- readEdictT selfRef
+      modifyEdictT selfRef (\v -> v & eMonsterInfo.miLefty .~ 1 - (self'^.eMonsterInfo.miLefty))
       void $ M.walkMove selfRef ((self'^.eIdealYaw) - ofs) distance
 
 flyMonsterStart :: EntThink

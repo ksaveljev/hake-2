@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Server.SVGame where
 
-import Control.Lens (use, (.=), ix, zoom, preuse, (^.))
+import Control.Lens (use, (.=), ix, zoom, preuse, (^.), (&), (.~))
 import Control.Monad (when, unless, liftM)
 import Data.Bits ((.&.), shiftL, shiftR)
 import Data.Maybe (isNothing, fromJust)
@@ -30,8 +30,9 @@ import qualified Server.SVWorld as SVWorld
 - Sends the contents of the mutlicast buffer to a single client.
 -}
 unicast :: EdictReference -> Bool -> Quake ()
-unicast (EdictReference edictIdx) reliable = do
-    Just p <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eIndex
+unicast edictRef reliable = do
+    edict <- readEdictT edictRef
+    let p = edict^.eIndex
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
     unless (p < 1 || p > maxClientsValue) $ do
@@ -63,9 +64,11 @@ cprintfHigh edictRef str = cprintf (Just edictRef) Constants.printHigh str
 cprintf :: Maybe EdictReference -> Int -> B.ByteString -> Quake ()
 cprintf maybeEdict level str = do
     case maybeEdict of
-      Nothing -> Com.printf str
-      Just (EdictReference edictIdx) -> do
-        Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      Nothing ->
+        Com.printf str
+
+      Just edictRef -> do
+        edict <- readEdictT edictRef
 
         maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
@@ -82,14 +85,15 @@ cprintf maybeEdict level str = do
 - centerprint to a single client.
 -}
 centerPrintf :: EdictReference -> B.ByteString -> Quake ()
-centerPrintf er@(EdictReference edictIdx) str = do
-    Just n <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eIndex
+centerPrintf edictRef str = do
+    edict <- readEdictT edictRef
+    let n = edict^.eIndex
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
     unless (n < 1 || n > maxClientsValue) $ do
       MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcCenterPrint)
       MSG.writeString (svGlobals.svServer.sMulticast) str
-      unicast er True
+      unicast edictRef True
 
 {-
 -  PF_error
@@ -108,25 +112,24 @@ pfError2 level str = Com.comError level str
 - Also sets mins and maxs for inline bmodels.
 -}
 setModel :: EdictReference -> Maybe B.ByteString -> Quake ()
-setModel er@(EdictReference edictIdx) name = do
+setModel edictRef name = do
     when (isNothing name) $
       Com.comError Constants.errDrop "PF_setmodel: NULL"
 
     let modelName = fromJust name
     idx <- SVInit.modelIndex name
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esModelIndex .= idx
+    modifyEdictT edictRef (\v -> v & eEntityState.esModelIndex .~ idx)
 
     -- if it is an inline model, get the size information for it
     when (BC.head modelName == '*') $ do
       (CModelReference modelIdx) <- CM.inlineModel modelName
       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eMins .= (model^.cmMins)
-        eMaxs .= (model^.cmMaxs)
+      modifyEdictT edictRef (\v -> v & eMins .~ (model^.cmMins)
+                                     & eMaxs .~ (model^.cmMaxs))
 
-      SVWorld.linkEdict er
+      SVWorld.linkEdict edictRef
 
 configString :: Int -> B.ByteString -> Quake ()
 configString index val = do

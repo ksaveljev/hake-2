@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.Monsters.MFloat where
 
-import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=))
+import Control.Lens (use, preuse, ix, zoom, (^.), (.=), (%=), (&), (.~), (%~))
 import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..))
@@ -109,17 +109,17 @@ floaterIdle =
 
 floaterFireBlaster :: EntThink
 floaterFireBlaster =
-  GenericEntThink "floater_fire_blaster" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "floater_fire_blaster" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let effect = if (self^.eEntityState.esFrame) == frameAttack104 || (self^.eEntityState.esFrame) == frameAttack107
                    then Constants.efHyperblaster
                    else 0
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2FloatBlaster1) forward right
-        Just (EdictReference enemyIdx) = self^.eEnemy
+        Just enemyRef = self^.eEnemy
 
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+    enemy <- readEdictT enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -249,14 +249,14 @@ floaterMoveStand2 = MMoveT "floaterMoveStand2" farmeStand201 frameStand252 float
 
 floaterStand :: EntThink
 floaterStand =
-  GenericEntThink "floater_stand" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "floater_stand" $ \selfRef -> do
     r <- Lib.randomF
 
     let action = if r <= 0.5
                    then floaterMoveStand1
                    else floaterMoveStand2
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterFramesActivate :: V.Vector MFrameT
@@ -298,14 +298,14 @@ floaterMoveActivate = MMoveT "floaterMoveActivate" frameActivate01 frameActivate
 
 floaterRun :: EntThink
 floaterRun =
-  GenericEntThink "floater_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "floater_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then floaterMoveStand1
                    else floaterMoveRun
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterFramesAttack1 :: V.Vector MFrameT
@@ -333,7 +333,7 @@ floaterMoveAttack1 = MMoveT "floaterMoveAttack1" frameAttack101 frameAttack114 f
 
 floaterWham :: EntThink
 floaterWham =
-  GenericEntThink "floater_wham" $ \selfRef@(EdictReference selfIdx) -> do
+  GenericEntThink "floater_wham" $ \selfRef -> do
     soundAttack3 <- use $ mFloatGlobals.mFloatSoundAttack3
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanWeapon soundAttack3 1 Constants.attnNorm 0
@@ -380,11 +380,10 @@ floaterMoveAttack2 = MMoveT "floaterMoveAttack2" frameAttack201 frameAttack225 f
 
 floaterZap :: EntThink
 floaterZap =
-  GenericEntThink "floater_zap" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-
-    let Just enemyRef@(EdictReference enemyIdx) = self^.eEnemy
-    Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
+  GenericEntThink "floater_zap" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
 
     let dir = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
@@ -482,13 +481,12 @@ floaterFramesDeath =
 
 floaterDead :: EntThink
 floaterDead =
-  GenericEntThink "floater_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "floater_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -666,40 +664,40 @@ floaterMoveRun = MMoveT "floaterMoveRun" frameStand101 frameStand152 floaterFram
 
 floaterWalk :: EntThink
 floaterWalk =
-  GenericEntThink "floater_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just floaterMoveWalk
+  GenericEntThink "floater_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveWalk)
     return True
 
 floaterAttack :: EntThink
 floaterAttack =
-  GenericEntThink "floater_attack" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just floaterMoveAttack1
+  GenericEntThink "floater_attack" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveAttack1)
     return True
 
 floaterMelee :: EntThink
 floaterMelee =
-  GenericEntThink "floater_melee" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "floater_melee" $ \selfRef -> do
     r <- Lib.randomF
 
     let action = if r < 0.5
                    then floaterMoveAttack3
                    else floaterMoveAttack2
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterPain :: EntPain
 floaterPain =
-  GenericEntPain "floater_pain" $ \selfRef@(EdictReference selfIdx) _ _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "floater_pain" $ \selfRef _ _ _ -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -716,11 +714,11 @@ floaterPain =
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 floaterDie :: EntDie
 floaterDie =
-  GenericEntDie "floater_die" $ \selfRef@(EdictReference selfIdx) _ _ _ _ -> do
+  GenericEntDie "floater_die" $ \selfRef _ _ _ _ -> do
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundDeath1 <- use $ mFloatGlobals.mFloatSoundDeath1
     sound (Just selfRef) Constants.chanVoice soundDeath1 1 Constants.attnNorm 0
@@ -731,7 +729,7 @@ floaterDie =
 - Trigger_Spawn Sight
 -}
 spMonsterFloater :: EdictReference -> Quake ()
-spMonsterFloater selfRef@(EdictReference selfIdx) = do
+spMonsterFloater selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -758,25 +756,24 @@ spMonsterFloater selfRef@(EdictReference selfIdx) = do
         soundIdx <- soundIndex (Just "floater/fltsrch1.wav")
         modelIdx <- modelIndex (Just "models/monsters/float/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .= soundIdx
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-24) (-24) (-24)
-          eMaxs .= V3 24 24 32
-          eHealth .= 200
-          eGibHealth .= (-80)
-          eMass .= 300
-          ePain .= Just floaterPain
-          eDie .= Just floaterDie
-          eMonsterInfo.miStand .= Just floaterStand
-          eMonsterInfo.miWalk .= Just floaterWalk
-          eMonsterInfo.miRun .= Just floaterRun
-          eMonsterInfo.miAttack .= Just floaterAttack
-          eMonsterInfo.miMelee .= Just floaterMelee
-          eMonsterInfo.miSight .= Just floaterSight
-          eMonsterInfo.miIdle .= Just floaterIdle
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-24) (-24) (-24)
+                                      & eMaxs .~ V3 24 24 32
+                                      & eHealth .~ 200
+                                      & eGibHealth .~ (-80)
+                                      & eMass .~ 300
+                                      & ePain .~ Just floaterPain
+                                      & eDie .~ Just floaterDie
+                                      & eMonsterInfo.miStand .~ Just floaterStand
+                                      & eMonsterInfo.miWalk .~ Just floaterWalk
+                                      & eMonsterInfo.miRun .~ Just floaterRun
+                                      & eMonsterInfo.miAttack .~ Just floaterAttack
+                                      & eMonsterInfo.miMelee .~ Just floaterMelee
+                                      & eMonsterInfo.miSight .~ Just floaterSight
+                                      & eMonsterInfo.miIdle .~ Just floaterIdle)
 
         linkEntity selfRef
 
@@ -786,8 +783,7 @@ spMonsterFloater selfRef@(EdictReference selfIdx) = do
                             then floaterMoveStand1
                             else floaterMoveStand2
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo) $ do
-          miCurrentMove .= Just currentMove
-          miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.flyMonsterStart selfRef

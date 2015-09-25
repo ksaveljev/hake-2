@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameFunc where
 
-import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=))
+import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=), (&), (.~), (%~), (-~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
@@ -49,45 +49,44 @@ trainBlockStops = 4
 
 spFuncButton :: EntThink
 spFuncButton =
-  GenericEntThink "sp_func_button" $ \er@(EdictReference edictIdx) -> do
+  GenericEntThink "sp_func_button" $ \edictRef -> do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let soundIndex = gameImport^.giSoundIndex
         setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
-    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir)
+    GameBase.setMoveDir edictRef
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMoveType .= Constants.moveTypeStop
-      eSolid .= Constants.solidBsp
+    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypeStop
+                                   & eSolid .~ Constants.solidBsp)
 
-    setModel er (edict^.eiModel)
+    setModel edictRef (edict^.eiModel)
 
     when ((edict^.eSounds) /= 1) $ do
-      soundIndex (Just "switches/butn2.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
+      soundIdx <- soundIndex (Just "switches/butn2.wav")
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundIdx)
 
-    when ((edict^.eSpeed) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed .= 40
-
-    Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed
+    let speed = if (edict^.eSpeed) == 0 then 40 else edict^.eSpeed
+    modifyEdictT edictRef (\v -> v & eSpeed .~ speed)
 
     when ((edict^.eAccel) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eAccel .= speed
+      modifyEdictT edictRef (\v -> v & eAccel .~ speed)
 
     when ((edict^.eDecel) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eDecel .= speed
+      modifyEdictT edictRef (\v -> v & eDecel .~ speed)
 
     when ((edict^.eWait) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 3
+      modifyEdictT edictRef (\v -> v & eWait .~ 3)
     
     lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     when (lip == 0) $
       gameBaseGlobals.gbSpawnTemp.stLip .= 4
 
     let origin = edict^.eEntityState.esOrigin
-    gameBaseGlobals.gbGEdicts.ix edictIdx.ePos1 .= origin
+    modifyEdictT edictRef (\v -> v & ePos1 .~ origin)
 
     lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     let moveDir = edict^.eMoveDir
@@ -99,85 +98,82 @@ spFuncButton =
              - (fromIntegral lip')
 
     let pos2 = origin + fmap (* dist) moveDir
-    gameBaseGlobals.gbGEdicts.ix edictIdx.ePos2 .= pos2
-
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eUse .= Just buttonUse
-      eEntityState.esEffects %= (.|. Constants.efAnim01)
+    modifyEdictT edictRef (\v -> v & ePos2 .~ pos2
+                                   & eUse .~ Just buttonUse
+                                   & eEntityState.esEffects %~ (.|. Constants.efAnim01))
 
     if (edict^.eHealth) /= 0
       then
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eMaxHealth .= (edict^.eHealth)
-          eDie .= Just buttonKilled
-          eTakeDamage .= Constants.damageYes
+        modifyEdictT edictRef (\v -> v & eMaxHealth .~ (edict^.eHealth)
+                                       & eDie .~ Just buttonKilled
+                                       & eTakeDamage .~ Constants.damageYes)
+
       else
         when (isNothing (edict^.eTargetName)) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eTouch .= Just buttonTouch
+          modifyEdictT edictRef (\v -> v & eTouch .~ Just buttonTouch)
 
-    Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    updatedEdict <- readEdictT edictRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-      miState .= Constants.stateBottom
-      miSpeed .= (updatedEdict^.eSpeed)
-      miAccel .= (updatedEdict^.eAccel)
-      miDecel .= (updatedEdict^.eDecel)
-      miWait .= (updatedEdict^.eWait)
-      miStartOrigin .= (updatedEdict^.ePos1)
-      miStartAngles .= (updatedEdict^.eEntityState.esAngles)
-      miEndOrigin .= (updatedEdict^.ePos2)
-      miEndAngles .= (updatedEdict^.eEntityState.esAngles)
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom
+                                   & eMoveInfo.miSpeed .~ (updatedEdict^.eSpeed)
+                                   & eMoveInfo.miAccel .~ (updatedEdict^.eAccel)
+                                   & eMoveInfo.miDecel .~ (updatedEdict^.eDecel)
+                                   & eMoveInfo.miWait .~ (updatedEdict^.eWait)
+                                   & eMoveInfo.miStartOrigin .~ (updatedEdict^.ePos1)
+                                   & eMoveInfo.miStartAngles .~ (updatedEdict^.eEntityState.esAngles)
+                                   & eMoveInfo.miEndOrigin .~ (updatedEdict^.ePos2)
+                                   & eMoveInfo.miEndAngles .~ (updatedEdict^.eEntityState.esAngles))
 
-    linkEntity er
+    linkEntity edictRef
     return True
 
 spFuncDoor :: EntThink
 spFuncDoor =
-  GenericEntThink "sp_func_door" $ \er@(EdictReference edictIdx) -> do
+  GenericEntThink "sp_func_door" $ \edictRef -> do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let soundIndex = gameImport^.giSoundIndex
         setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
-    GameBase.setMoveDir (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esAngles) (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir)
+    GameBase.setMoveDir edictRef
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     when ((edict^.eSounds) /= 1) $ do
-      soundIndex (Just "doors/dr1_strt.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundStart .=)
-      soundIndex (Just "doors/dr1_mid.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .=)
-      soundIndex (Just "doors/dr1_end.wav") >>= (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundEnd .=)
+      soundStart <- soundIndex (Just "doors/dr1_strt.wav")
+      soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
+      soundEnd <- soundIndex (Just "doors/dr1_end.wav")
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMoveType .= Constants.moveTypePush
-      eSolid .= Constants.solidBsp
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+                                     & eMoveInfo.miSoundMiddle .~ soundMiddle
+                                     & eMoveInfo.miSoundEnd .~ soundEnd)
 
-    setModel er (edict^.eiModel)
+    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                   & eSolid .~ Constants.solidBsp)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eBlocked .= Just doorBlocked
-      eUse .= Just doorUse
+    setModel edictRef (edict^.eiModel)
 
-    when ((edict^.eSpeed) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed .= 100
+    modifyEdictT edictRef (\v -> v & eBlocked .~ Just doorBlocked
+                                   & eUse .~ Just doorUse)
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
-    when (deathmatchValue /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed %= (* 2)
+    let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
+        speed' = if deathmatchValue /= 0 then speed * 2 else speed
 
-    Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed
+    modifyEdictT edictRef (\v -> v & eSpeed .~ speed')
 
     when ((edict^.eAccel) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eAccel .= speed
+      modifyEdictT edictRef (\v -> v & eAccel .~ speed')
 
     when ((edict^.eDecel) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eDecel .= speed
+      modifyEdictT edictRef (\v -> v & eDecel .~ speed')
 
     when ((edict^.eWait) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 3
+      modifyEdictT edictRef (\v -> v & eWait .~ 3)
 
     when ((edict^.eDmg) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg .= 2
+      modifyEdictT edictRef (\v -> v & eDmg .~ 2)
     
     lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     when (lip == 0) $
@@ -185,7 +181,7 @@ spFuncDoor =
 
     -- calculate second position
     let origin = edict^.eEntityState.esOrigin
-    gameBaseGlobals.gbGEdicts.ix edictIdx.ePos1 .= origin
+    modifyEdictT edictRef (\v -> v & ePos1 .~ origin)
 
     lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     let moveDir = edict^.eMoveDir
@@ -196,63 +192,61 @@ spFuncDoor =
              + (absMoveDir^._z) * (size^._z)
              - (fromIntegral lip')
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miDistance .= dist
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miDistance .~ dist)
 
     let pos2 = origin + fmap (* dist) moveDir
-    gameBaseGlobals.gbGEdicts.ix edictIdx.ePos2 .= pos2
+    modifyEdictT edictRef (\v -> v & ePos2 .~ pos2)
 
     -- if it starts open, switch the positions
     when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $ do
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eEntityState.esOrigin .= pos2
-        ePos2 .= origin
-        ePos1 .= pos2
+      modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ pos2
+                                     & ePos2 .~ origin
+                                     & ePos1 .~ pos2)
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miState .= Constants.stateBottom
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
 
     if (edict^.eHealth) /= 0
       then
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eTakeDamage .= Constants.damageYes
-          eMaxHealth .= (edict^.eHealth)
-          eDie .= Just doorKilled
+        modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+                                       & eMaxHealth .~ (edict^.eHealth)
+                                       & eDie .~ Just doorKilled)
+
       else
         when (isJust (edict^.eTargetName) && isJust (edict^.eMessage)) $ do
           void $ soundIndex (Just "misc/talk.wav")
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eTouch .= Just doorTouch
+          modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
 
-    Just updatedEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    updatedEdict <- readEdictT edictRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-      miSpeed .= (updatedEdict^.eSpeed)
-      miAccel .= (updatedEdict^.eAccel)
-      miDecel .= (updatedEdict^.eDecel)
-      miWait .= (updatedEdict^.eWait)
-      miStartOrigin .= (updatedEdict^.ePos1)
-      miStartAngles .= (updatedEdict^.eEntityState.esAngles)
-      miEndOrigin .= (updatedEdict^.ePos2)
-      miEndAngles .= (updatedEdict^.eEntityState.esAngles)
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miSpeed .~ (updatedEdict^.eSpeed)
+                                   & eMoveInfo.miAccel .~ (updatedEdict^.eAccel)
+                                   & eMoveInfo.miDecel .~ (updatedEdict^.eDecel)
+                                   & eMoveInfo.miWait .~ (updatedEdict^.eWait)
+                                   & eMoveInfo.miStartOrigin .~ (updatedEdict^.ePos1)
+                                   & eMoveInfo.miStartAngles .~ (updatedEdict^.eEntityState.esAngles)
+                                   & eMoveInfo.miEndOrigin .~ (updatedEdict^.ePos2)
+                                   & eMoveInfo.miEndAngles .~ (updatedEdict^.eEntityState.esAngles))
 
     when ((updatedEdict^.eSpawnFlags) .&. 16 /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
 
     when ((updatedEdict^.eSpawnFlags) .&. 64 /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
 
     -- to simplify logic elsewhere, make non-teamed doors into a team of one
     when (isNothing (updatedEdict^.eTeam)) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eTeamMaster .= Just er
+      modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
 
-    linkEntity er
+    linkEntity edictRef
 
-    time <- use $ gameBaseGlobals.gbLevel.llTime
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= time + Constants.frameTime
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     let nextThink = if (updatedEdict^.eHealth) /= 0 || isJust (updatedEdict^.eTargetName)
                       then thinkCalcMoveSpeed
                       else thinkSpawnDoorTrigger
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eThink .= Just nextThink
+    modifyEdictT edictRef (\v -> v & eThink .~ Just nextThink)
 
     return True
 
@@ -268,26 +262,27 @@ spFuncDoorRotating =
 
 spFuncConveyor :: EntThink
 spFuncConveyor =
-  GenericEntThink "sp_func_conveyor" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "sp_func_conveyor" $ \selfRef -> do
+    self <- readEdictT selfRef
 
-    when ((self^.eSpeed) == 0) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eSpeed .= 100
+    let speed = if (self^.eSpeed) == 0 then 100 else self^.eSpeed
+    modifyEdictT selfRef (\v -> v & eSpeed .~ speed)
 
     when ((self^.eSpawnFlags) .&. 1 == 0) $ do
-      Just speed <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpeed
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= truncate speed
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eSpeed .= 0
+      modifyEdictT selfRef (\v -> v & eCount .~ truncate speed
+                                     & eSpeed .~ 0)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eUse .= Just funcConveyorUse
+    modifyEdictT selfRef (\v -> v & eUse .~ Just funcConveyorUse)
     
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
     setModel selfRef (self^.eiModel)
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eSolid .= Constants.solidBsp
+    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidBsp)
     linkEntity selfRef
+
     return True
 
 {-
@@ -301,26 +296,26 @@ useKillBox =
 
 spFuncKillBox :: EntThink
 spFuncKillBox =
-  GenericEntThink "sp_func_killbox" $ \edictRef@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "sp_func_killbox" $ \edictRef -> do
+    edict <- readEdictT edictRef
     setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
 
     setModel edictRef (edict^.eiModel)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eUse .= Just useKillBox
-      eSvFlags .= Constants.svfNoClient
+    modifyEdictT edictRef (\v -> v & eUse .~ Just useKillBox
+                                   & eSvFlags .~ Constants.svfNoClient)
 
     return True
 
 spFuncRotating :: EntThink
 spFuncRotating =
-  GenericEntThink "sp_func_rotating" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "sp_func_rotating" $ \edictRef -> do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eSolid .= Constants.solidBsp
+    modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidBsp)
 
     updateMoveType edictRef
 
@@ -332,21 +327,21 @@ spFuncRotating =
 
     checkSpeedAndDmg edictRef
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eUse .= Just rotatingUse
+    modifyEdictT edictRef (\v -> v & eUse .~ Just rotatingUse)
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     when ((edict^.eDmg) /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eBlocked .= Just rotatingBlocked
+      modifyEdictT edictRef (\v -> v & eBlocked .~ Just rotatingBlocked)
 
     when ((edict^.eSpawnFlags) .&. 1 /= 0) $
       entUse (fromJust $ edict^.eUse) edictRef Nothing Nothing
 
     when ((edict^.eSpawnFlags) .&. 64 /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAll)
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
 
     when ((edict^.eSpawnFlags) .&. 128 /= 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esEffects %= (.|. Constants.efAnimAllFast)
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
 
     setModel edictRef (edict^.eiModel)
     linkEntity edictRef
@@ -354,46 +349,49 @@ spFuncRotating =
     return True
 
   where updateMoveType :: EdictReference -> Quake ()
-        updateMoveType (EdictReference edictIdx) = do
-          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+        updateMoveType edictRef = do
+          edict <- readEdictT edictRef
+          let spawnFlags = edict^.eSpawnFlags
 
           let moveType = if spawnFlags .&. 32 /= 0
                            then Constants.moveTypeStop
                            else Constants.moveTypePush
 
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveType .= moveType
+          modifyEdictT edictRef (\v -> v & eMoveType .~ moveType)
 
         updateRotationAxis :: EdictReference -> Quake ()
-        updateRotationAxis (EdictReference edictIdx) = do
-          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+        updateRotationAxis edictRef = do
+          edict <- readEdictT edictRef
+          let spawnFlags = edict^.eSpawnFlags
 
           let moveDir = if | spawnFlags .&. 4 /= 0 -> V3 0 0 1
                            | spawnFlags .&. 8 /= 0 -> V3 1 0 0
                            | otherwise -> V3 0 1 0
 
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir .= moveDir
+          modifyEdictT edictRef (\v -> v & eMoveDir .~ moveDir)
 
         checkRevereseRotation :: EdictReference -> Quake ()
-        checkRevereseRotation (EdictReference edictIdx) = do
-          Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags
+        checkRevereseRotation edictRef = do
+          edict <- readEdictT edictRef
+          let spawnFlags = edict^.eSpawnFlags
 
           when (spawnFlags .&. 2 /= 0) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveDir %= (fmap (0 -))
+            modifyEdictT edictRef (\v -> v & eMoveDir %~ (fmap (0 -)))
 
         checkSpeedAndDmg :: EdictReference -> Quake ()
-        checkSpeedAndDmg (EdictReference edictIdx) = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        checkSpeedAndDmg edictRef = do
+          edict <- readEdictT edictRef
 
           when ((edict^.eSpeed) == 0) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed .= 100
+            modifyEdictT edictRef (\v -> v & eSpeed .~ 100)
 
           when ((edict^.eDmg) == 0) $
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg .= 2
+            modifyEdictT edictRef (\v -> v & eDmg .~ 2)
 
 triggerElevatorInit :: EntThink
 triggerElevatorInit =
-  GenericEntThink "trigger_elevator_init" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "trigger_elevator_init" $ \selfRef -> do
+    self <- readEdictT selfRef
     dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
 
     case self^.eTarget of
@@ -403,7 +401,7 @@ triggerElevatorInit =
 
       Just target -> do
         maybeMoveTargetRef <- GameBase.pickTarget (self^.eTarget)
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveTarget .= maybeMoveTargetRef
+        modifyEdictT selfRef (\v -> v & eMoveTarget .~ maybeMoveTargetRef)
 
         case maybeMoveTargetRef of
           Nothing -> do
@@ -411,28 +409,25 @@ triggerElevatorInit =
             return True
             
           Just moveTargetRef -> do
-            let (EdictReference moveTargetIdx) = moveTargetRef
-            Just moveTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix moveTargetIdx
+            moveTarget <- readEdictT moveTargetRef
 
             if (moveTarget^.eClassName) /= "func_train"
               then do
                 dprintf ("trigger_elevator target " `B.append` target `B.append` " is not a train\n")
                 return True
               else do
-                zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                  eUse .= Just triggerElevatorUse
-                  eSvFlags .= Constants.svfNoClient
+                modifyEdictT selfRef (\v -> v & eUse .~ Just triggerElevatorUse
+                                              & eSvFlags .~ Constants.svfNoClient)
 
                 return True
 
 spTriggerElevator :: EntThink
 spTriggerElevator =
-  GenericEntThink "sp_trigger_elevator" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "sp_trigger_elevator" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eThink .= Just triggerElevatorInit
-      eNextThink .= levelTime + Constants.frameTime
+    modifyEdictT selfRef (\v -> v & eThink .~ Just triggerElevatorInit
+                                  & eNextThink .~ levelTime + Constants.frameTime)
 
     return True
 
@@ -443,99 +438,99 @@ spFuncWater :: EdictReference -> Quake ()
 spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
 
 spFuncTrain :: EdictReference -> Quake ()
-spFuncTrain er@(EdictReference edictIdx) = do
+spFuncTrain edictRef = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let setModel = gameImport^.giSetModel
         soundIndex = gameImport^.giSoundIndex
         linkEntity = gameImport^.giLinkEntity
         dprintf = gameImport^.giDprintf
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMoveType .= Constants.moveTypePush
-      eEntityState.esAngles .= V3 0 0 0
-      eBlocked .= Just trainBlocked
-      eSolid .= Constants.solidBsp
+    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                   & eEntityState.esAngles .~ V3 0 0 0
+                                   & eBlocked .~ Just trainBlocked
+                                   & eSolid .~ Constants.solidBsp)
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     if (edict^.eSpawnFlags) .&. trainBlockStops /= 0
-      then gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg .= 0
+      then
+        modifyEdictT edictRef (\v -> v & eDmg .~ 0)
+
       else
         when ((edict^.eDmg) == 0) $
-          gameBaseGlobals.gbGEdicts.ix edictIdx.eDmg .= 100
+          modifyEdictT edictRef (\v -> v & eDmg .~ 100)
 
-    setModel er (edict^.eiModel)
+    setModel edictRef (edict^.eiModel)
 
     noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
+
     when (isJust noise) $ do
       noiseIdx <- soundIndex noise
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miSoundMiddle .= noiseIdx
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundMiddle .~ noiseIdx)
 
-    when ((edict^.eSpeed) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed .= 100
+    let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
+    modifyEdictT edictRef (\v -> v & eSpeed .~ speed
+                                   & eMoveInfo.miSpeed .~ speed
+                                   & eMoveInfo.miAccel .~ speed
+                                   & eMoveInfo.miDecel .~ speed
+                                   & eUse .~ Just trainUse)
 
-    Just selfSpeed <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eSpeed
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eMoveInfo.miSpeed .= selfSpeed
-      eMoveInfo.miAccel .= selfSpeed
-      eMoveInfo.miDecel .= selfSpeed
-      eUse .= Just trainUse
-
-    linkEntity er
+    linkEntity edictRef
 
     if isJust (edict^.eTarget)
       then do
-        time <- use $ gameBaseGlobals.gbLevel.llTime
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         -- start trains on the second frame, to make sure their targets
         -- have had a chance to spawn
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eThink .= Just funcTrainFind
-          eNextThink .= time + Constants.frameTime
+        modifyEdictT edictRef (\v -> v & eThink .~ Just funcTrainFind
+                                       & eNextThink .~ levelTime + Constants.frameTime)
+
       else
         dprintf $ "func_train without a target at " `B.append` Lib.vtos (edict^.eAbsMin) `B.append` "\n"
 
 spFuncTimer :: EdictReference -> Quake ()
-spFuncTimer er@(EdictReference edictIdx) = do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+spFuncTimer edictRef = do
+    edict <- readEdictT edictRef
 
     when ((edict^.eWait) == 0) $
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eWait .= 1
+      modifyEdictT edictRef (\v -> v & eWait .~ 1)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-      eUse .= Just funcTimerUse
-      eThink .= Just funcTimerThink
+    modifyEdictT edictRef (\v -> v & eUse .~ Just funcTimerUse
+                                   & eThink .~ Just funcTimerThink)
 
     when ((edict^.eRandom) >= (edict^.eWait)) $ do
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eRandom .= (edict^.eWait) - Constants.frameTime
+      modifyEdictT edictRef (\v -> v & eRandom .~ (edict^.eWait) - Constants.frameTime)
       dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
       dprintf $ "func_timer at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " has random >= wait\n"
     
     when (((edict^.eSpawnFlags) .&. 1) /= 0) $ do
-      time <- use $ gameBaseGlobals.gbLevel.llTime
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       pauseTime <- use $ gameBaseGlobals.gbSpawnTemp.stPauseTime
       cr <- Lib.crandom
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eNextThink .= time + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
-        eActivator .= Just er
 
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eSvFlags .= Constants.svfNoClient
+      modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
+                                     & eActivator .~ Just edictRef)
+
+    modifyEdictT edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
 
 funcTimerUse :: EntUse
 funcTimerUse =
-  GenericEntUse "func_timer_use" $ \selfRef@(EdictReference selfIdx) _ activator -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eActivator .= activator
+  GenericEntUse "func_timer_use" $ \selfRef _ activator -> do
+    modifyEdictT selfRef (\v -> v & eActivator .~ activator)
 
     -- if on, turn it off
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
+
     if (self^.eNextThink) /= 0
       then
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= 0
+        modifyEdictT selfRef (\v -> v & eNextThink .~ 0)
       else
         -- turn it on
         if (self^.eDelay) /= 0
           then do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + (self^.eDelay)
+            modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eDelay))
           else
             void $ think funcTimerThink selfRef
 
@@ -556,14 +551,14 @@ funcTimerUse =
 -}
 funcTimerThink :: EntThink
 funcTimerThink =
-  GenericEntThink "func_timer_think" $ \edictRef@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "func_timer_think" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     GameUtil.useTargets edictRef (edict^.eActivator)
 
-    time <- use $ gameBaseGlobals.gbLevel.llTime
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     r <- Lib.crandom
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eNextThink .= time + (edict^.eWait) + r * (edict^.eRandom)
+    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eWait) + r * (edict^.eRandom))
 
     return True
 
@@ -574,18 +569,18 @@ trainBlocked =
 
 trainUse :: EntUse
 trainUse =
-  GenericEntUse "train_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eActivator .= activatorRef
+  GenericEntUse "train_use" $ \selfRef _ activatorRef -> do
+    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
 
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. trainStartOn /= 0
       then
         unless ((self^.eSpawnFlags) .&. trainToggle == 0) $ do
-          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-            eSpawnFlags %= (.&. (complement trainStartOn))
-            eVelocity .= V3 0 0 0
-            eNextThink .= 0
+          modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+                                        & eVelocity .~ V3 0 0 0
+                                        & eNextThink .~ 0)
+
       else
         if isJust (self^.eTargetEnt)
           then trainResume selfRef
@@ -593,9 +588,10 @@ trainUse =
 
 funcTrainFind :: EntThink
 funcTrainFind =
-  GenericEntThink "func_train_find" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "func_train_find" $ \selfRef -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
+
     let dprintf = gameImport^.giDprintf
         linkEntity = gameImport^.giLinkEntity
 
@@ -609,38 +605,35 @@ funcTrainFind =
           then
             dprintf $ "train_find: target " `B.append` (fromJust $ self^.eTarget) `B.append` " not found\n"
           else do
-            let Just (EdictReference entIdx) = entRef
-            Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+            ent <- readEdictT (fromJust entRef)
 
             let origin = ent^.eEntityState.esOrigin
                 mins = self^.eMins
 
-            zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-              eTarget .= (ent^.eTarget)
-              eEntityState.esOrigin .= (origin - mins)
+            modifyEdictT selfRef (\v -> v & eTarget .~ (ent^.eTarget)
+                                          & eEntityState.esOrigin .~ (origin - mins))
 
             linkEntity selfRef
 
             -- if not triggered, start immediately
             when (isNothing (self^.eTargetName)) $
-              gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags %= (.|. trainStartOn)
+              modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
-            Just updatedSelf <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+            updatedSelf <- readEdictT selfRef
 
             when ((updatedSelf^.eSpawnFlags) .&. trainStartOn /= 0) $ do
-              time <- use $ gameBaseGlobals.gbLevel.llTime
+              levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-              zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-                eNextThink .= time + Constants.frameTime
-                eThink .= Just trainNext
-                eActivator .= Just selfRef
+              modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+                                            & eThink .~ Just trainNext
+                                            & eActivator .~ Just selfRef)
 
     return True
 
 doorUse :: EntUse
 doorUse =
-  GenericEntUse "door_use" $ \selfRef@(EdictReference selfIdx) _ activatorRef -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntUse "door_use" $ \selfRef _ activatorRef -> do
+    self <- readEdictT selfRef
 
     unless ((self^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
       done <- if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
@@ -658,11 +651,12 @@ doorUse =
 
   where triggerPairedDoors :: Maybe EdictReference -> Maybe EdictReference -> Quake ()
         triggerPairedDoors _ Nothing = return ()
-        triggerPairedDoors activatorRef (Just edictRef@(EdictReference edictIdx)) = do
-          Just teamChain <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eTeamChain
-          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-            eMessage .= Nothing
-            eTouch .= Nothing
+        triggerPairedDoors activatorRef (Just edictRef) = do
+          edict <- readEdictT edictRef
+          let teamChain = edict^.eTeamChain
+
+          modifyEdictT edictRef (\v -> v & eMessage .~ Nothing
+                                         & eTouch .~ Nothing)
           doorGoUp edictRef activatorRef
           triggerPairedDoors activatorRef teamChain
 
@@ -683,8 +677,8 @@ doorTouch =
 
 thinkCalcMoveSpeed :: EntThink
 thinkCalcMoveSpeed =
-  GenericEntThink "think_calc_movespeed" $ \er@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "think_calc_movespeed" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     -- only the team master does this
     unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
@@ -694,22 +688,24 @@ thinkCalcMoveSpeed =
       let time = minDist / (edict^.eMoveInfo.miSpeed)
 
       -- adjust speeds so they will all complete at the same time
-      adjustSpeeds (Just er) time
+      adjustSpeeds (Just edictRef) time
 
     return True
 
   where findSmallestDistance :: Maybe EdictReference -> Float -> Quake Float
         findSmallestDistance Nothing minDist = return minDist
-        findSmallestDistance (Just (EdictReference entIdx)) minDist = do
-          Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+        findSmallestDistance (Just entRef) minDist = do
+          ent <- readEdictT entRef
+
           let dist = abs (ent^.eMoveInfo.miDistance)
               minDist' = if dist < minDist then dist else minDist
+
           findSmallestDistance (ent^.eTeamChain) minDist'
 
         adjustSpeeds :: Maybe EdictReference -> Float -> Quake ()
         adjustSpeeds Nothing _ = return ()
-        adjustSpeeds (Just (EdictReference entIdx)) time = do
-          Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+        adjustSpeeds (Just entRef) time = do
+          ent <- readEdictT entRef
 
           let newspeed = (abs $ ent^.eMoveInfo.miSpeed) / time
               ratio = newspeed / (ent^.eMoveInfo.miSpeed)
@@ -720,17 +716,16 @@ thinkCalcMoveSpeed =
                         then newspeed
                         else (ent^.eMoveInfo.miDecel) * ratio
 
-          zoom (gameBaseGlobals.gbGEdicts.ix entIdx.eMoveInfo) $ do
-            miAccel .= accel
-            miDecel .= decel
-            miSpeed .= newspeed
+          modifyEdictT entRef (\v -> v & eMoveInfo.miAccel .~ accel
+                                       & eMoveInfo.miDecel .~ decel
+                                       & eMoveInfo.miSpeed .~ newspeed)
 
           adjustSpeeds (ent^.eTeamChain) time
 
 thinkSpawnDoorTrigger :: EntThink
 thinkSpawnDoorTrigger =
-  GenericEntThink "think_spawn_door_trigger" $ \er@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "think_spawn_door_trigger" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     -- only the team leader spawns a trigger
     unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
@@ -742,38 +737,39 @@ thinkSpawnDoorTrigger =
       let expandedMins = (V3 (-60) (-60) 0) + mins'
           expandedMaxs = (V3 60 60 0) + maxs'
 
-      otherRef@(EdictReference otherIdx) <- GameUtil.spawn
+      otherRef <- GameUtil.spawn
 
-      zoom (gameBaseGlobals.gbGEdicts.ix otherIdx) $ do
-        eMins .= expandedMins
-        eMaxs .= expandedMaxs
-        eOwner .= Just er
-        eSolid .= Constants.solidTrigger
-        eMoveType .= Constants.moveTypeNone
-        eTouch .= Just touchDoorTrigger
+      modifyEdictT otherRef (\v -> v & eMins .~ expandedMins
+                                     & eMaxs .~ expandedMaxs
+                                     & eOwner .~ Just edictRef
+                                     & eSolid .~ Constants.solidTrigger
+                                     & eMoveType .~ Constants.moveTypeNone
+                                     & eTouch .~ Just touchDoorTrigger)
 
       linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
       linkEntity otherRef
 
       when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $
-        doorUseAreaPortals er True
+        doorUseAreaPortals edictRef True
         
-      void $ think thinkCalcMoveSpeed er
+      void $ think thinkCalcMoveSpeed edictRef 
 
     return True
 
   where teamChainAddPointToBound :: Maybe EdictReference -> V3 Float -> V3 Float -> Quake (V3 Float, V3 Float)
         teamChainAddPointToBound Nothing mins maxs = return (mins, maxs)
-        teamChainAddPointToBound (Just (EdictReference otherIdx)) mins maxs = do
-          Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
+        teamChainAddPointToBound (Just otherRef) mins maxs = do
+          other <- readEdictT otherRef
+
           let (mins', maxs') = GameBase.addPointToBound (other^.eAbsMin) mins maxs
               (mins'', maxs'') = GameBase.addPointToBound (other^.eAbsMax) mins' maxs'
+
           teamChainAddPointToBound (other^.eTeamChain) mins'' maxs''
 
 buttonUse :: EntUse
 buttonUse =
-  GenericEntUse "button_use" $ \selfRef@(EdictReference selfIdx) _ activator -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eActivator .= activator
+  GenericEntUse "button_use" $ \selfRef _ activatorRef -> do
+    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
     void $ think buttonFire selfRef
 
 buttonTouch :: EntTouch
@@ -783,13 +779,12 @@ buttonTouch =
 
 buttonKilled :: EntDie
 buttonKilled =
-  GenericEntDie "button_killed" $ \selfRef@(EdictReference selfIdx) _ attacker _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "button_killed" $ \selfRef _ attackerRef _ _ -> do
+    self <- readEdictT selfRef
 
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eActivator .= Just attacker
-      eHealth .= (self^.eMaxHealth)
-      eTakeDamage .= Constants.damageNo
+    modifyEdictT selfRef (\v -> v & eActivator .~ Just attackerRef
+                                  & eHealth .~ (self^.eMaxHealth)
+                                  & eTakeDamage .~ Constants.damageNo)
 
     void $ think buttonFire selfRef
 
@@ -800,46 +795,47 @@ buttonFire =
 
 trainNext :: EntThink
 trainNext =
-  GenericEntThink "train_next" $ \er@(EdictReference edictIdx) -> do
-    (done, entRef) <- pickNextTarget er True
+  GenericEntThink "train_next" $ \edictRef -> do
+    (done, entRef) <- pickNextTarget edictRef True
 
     unless done $ do
-      let Just (EdictReference entIdx) = entRef
-      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-      Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
+      edict <- readEdictT edictRef
+      ent <- readEdictT (fromJust entRef)
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-        eMoveInfo.miWait .= (ent^.eMoveInfo.miWait)
-        eTargetEnt .= entRef
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miWait .~ (ent^.eMoveInfo.miWait)
+                                     & eTargetEnt .~ entRef)
 
       when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
         when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
           sound <- use $ gameBaseGlobals.gbGameImport.giSound
-          sound (Just er) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
-        gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= (edict^.eMoveInfo.miSoundMiddle)
+          sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+
+        modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
 
       let dest = (ent^.eEntityState.esOrigin) - (edict^.eMins)
 
-      zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-        miState .= Constants.stateTop
-        miStartOrigin .= (edict^.eEntityState.esOrigin)
-        miEndOrigin .= dest
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop
+                                     & eMoveInfo.miStartOrigin .~ (edict^.eEntityState.esOrigin)
+                                     & eMoveInfo.miEndOrigin .~ dest)
 
-      moveCalc er dest trainWait
+      moveCalc edictRef dest trainWait
 
-      gameBaseGlobals.gbGEdicts.ix edictIdx.eSpawnFlags %= (.|. trainStartOn)
+      modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
     return True
 
   where pickNextTarget :: EdictReference -> Bool -> Quake (Bool, Maybe EdictReference)
-        pickNextTarget er@(EdictReference edictIdx) first = do
-          Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+        pickNextTarget selfRef first = do
+          self <- readEdictT selfRef
           gameImport <- use $ gameBaseGlobals.gbGameImport
+
           let dprintf = gameImport^.giDprintf
               linkEntity = gameImport^.giLinkEntity
 
           if isNothing (self^.eTarget)
-            then return (True, Nothing)
+            then
+              return (True, Nothing)
+
             else do
               entRef <- GameBase.pickTarget (self^.eTarget)
 
@@ -848,9 +844,8 @@ trainNext =
                   dprintf $ "train_next: bad target " `B.append` (fromJust $ self^.eTarget) `B.append` "\n"
                   return (True, Nothing)
                 else do
-                  let Just (EdictReference entIdx) = entRef
-                  Just ent <- preuse $ gameBaseGlobals.gbGEdicts.ix entIdx
-                  gameBaseGlobals.gbGEdicts.ix edictIdx.eTarget .= (ent^.eTarget)
+                  ent <- readEdictT (fromJust entRef)
+                  modifyEdictT selfRef (\v -> v & eTarget .~ (ent^.eTarget))
 
                   -- check for a teleport path_corner
                   if (ent^.eSpawnFlags) .&. 1 /= 0
@@ -861,24 +856,25 @@ trainNext =
                           return (True, entRef)
                         else do
                           let origin = ((ent^.eEntityState.esOrigin) - (self^.eMins))
-                          zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState) $ do
-                            esOrigin .= origin
-                            esOldOrigin .= origin
-                            esEvent .= Constants.evOtherTeleport
 
-                          linkEntity er
+                          modifyEdictT selfRef (\v -> v & eEntityState.esOrigin .~ origin
+                                                        & eEntityState.esOldOrigin .~ origin
+                                                        & eEntityState.esEvent .~ Constants.evOtherTeleport)
 
-                          pickNextTarget er False
+                          linkEntity selfRef
+
+                          pickNextTarget selfRef False
 
                     else return (False, entRef)
 
 touchDoorTrigger :: EntTouch
 touchDoorTrigger =
-  GenericEntTouch "touch_door_trigger" $ \(EdictReference selfIdx) otherRef@(EdictReference otherIdx) _ _ -> do
-    Just other <- preuse $ gameBaseGlobals.gbGEdicts.ix otherIdx
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
-    let Just ownerRef@(EdictReference ownerIdx) = self^.eOwner
-    Just owner <- preuse $ gameBaseGlobals.gbGEdicts.ix ownerIdx
+  GenericEntTouch "touch_door_trigger" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+
+    let Just ownerRef = self^.eOwner
+    owner <- readEdictT ownerRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     let skip = (other^.eHealth) <= 0 
@@ -887,7 +883,7 @@ touchDoorTrigger =
             || levelTime < (self^.eTouchDebounceTime)
 
     unless skip $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eTouchDebounceTime .= levelTime + 1
+      modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 1)
       entUse doorUse ownerRef (Just otherRef) (Just otherRef)
 
 {-
@@ -917,10 +913,10 @@ touchDoorTrigger =
 -}
 
 doorUseAreaPortals :: EdictReference -> Bool -> Quake ()
-doorUseAreaPortals (EdictReference selfIdx) open = do
-    Just maybeTarget <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eTarget
+doorUseAreaPortals selfRef open = do
+    self <- readEdictT selfRef
 
-    case maybeTarget of
+    case self^.eTarget of
       Nothing -> return ()
       Just target -> setAreaPortals target Nothing
 
@@ -930,8 +926,8 @@ doorUseAreaPortals (EdictReference selfIdx) open = do
 
           case maybeFoundRef of
             Nothing -> return ()
-            Just (EdictReference foundIdx) -> do
-              Just foundEdict <- preuse $ gameBaseGlobals.gbGEdicts.ix foundIdx
+            Just foundRef -> do
+              foundEdict <- readEdictT foundRef
               when (BC.map toLower (foundEdict^.eClassName) == "func_areaportal") $ do
                 setAreaPortalState <- use $ gameBaseGlobals.gbGameImport.giSetAreaPortalState
                 setAreaPortalState (foundEdict^.eStyle) open
@@ -942,28 +938,26 @@ trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
 
 trainWait :: EntThink
 trainWait =
-  GenericEntThink "train_wait" $ \edictRef@(EdictReference edictIdx) -> do
+  GenericEntThink "train_wait" $ \edictRef -> do
     done <- checkPathTarget edictRef
 
     unless done $ do
-      Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+      edict <- readEdictT edictRef
 
       if edict^.eMoveInfo.miWait /= 0
         then do
           if | edict^.eMoveInfo.miWait > 0 -> do
-                 time <- use $ gameBaseGlobals.gbLevel.llTime
+                 levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                   eNextThink .= time + (edict^.eMoveInfo.miWait)
-                   eThink .= Just trainNext
+                 modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eMoveInfo.miWait)
+                                                & eThink .~ Just trainNext)
 
              | (edict^.eSpawnFlags) .&. trainToggle /= 0 -> do
                  void $ think trainNext edictRef
 
-                 zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-                   eSpawnFlags %= (.&. (complement trainStartOn))
-                   eVelocity .= V3 0 0 0
-                   eNextThink .= 0
+                 modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+                                                & eVelocity .~ V3 0 0 0
+                                                & eNextThink .~ 0)
 
              | otherwise -> return ()
 
@@ -972,47 +966,47 @@ trainWait =
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
               sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-            gameBaseGlobals.gbGEdicts.ix edictIdx.eEntityState.esSound .= 0
+            modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0)
 
         else void $ think trainNext edictRef
 
     return True
 
   where checkPathTarget :: EdictReference -> Quake Bool
-        checkPathTarget (EdictReference edictIdx) = do
-          Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
-          let Just targetRef@(EdictReference targetIdx) = edict^.eTargetEnt
-          Just target <- preuse $ gameBaseGlobals.gbGEdicts.ix targetIdx
+        checkPathTarget edictRef = do
+          edict <- readEdictT edictRef
+          let Just targetRef = edict^.eTargetEnt
+          target <- readEdictT targetRef
 
           if isJust $ target^.ePathTarget
             then do
               let saveTarget = target^.eTarget
-              gameBaseGlobals.gbGEdicts.ix targetIdx.eTarget .= (target^.ePathTarget)
+              modifyEdictT targetRef (\v -> v & eTarget .~ (target^.ePathTarget))
 
               GameUtil.useTargets targetRef (edict^.eActivator)
 
-              gameBaseGlobals.gbGEdicts.ix targetIdx.eTarget .= saveTarget
+              modifyEdictT targetRef (\v -> v & eTarget .~ saveTarget)
 
               -- make sure we didn't get killed by a killtarget
-              Just inUse <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse
+              edict' <- readEdictT edictRef
+              let inUse = edict'^.eInUse
               return $ if inUse then False else True
 
             else return False
 
 moveCalc :: EdictReference -> V3 Float -> EntThink -> Quake ()
-moveCalc er@(EdictReference edictIdx) dest func = do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= V3 0 0 0
+moveCalc edictRef dest func = do
+    modifyEdictT edictRef (\v -> v & eVelocity .~ V3 0 0 0)
 
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+    edict <- readEdictT edictRef
 
     let dir = dest - (edict^.eEntityState.esOrigin)
 
-    zoom (gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo) $ do
-      miDir .= normalize dir
-      miRemainingDistance .= sqrt (quadrance dir) -- TODO: make sure we are correct here
-      miEndFunc .= Just func
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miDir .~ normalize dir
+                                   & eMoveInfo.miRemainingDistance .~ sqrt (quadrance dir) -- TODO: make sure we are correct here
+                                   & eMoveInfo.miEndFunc .~ Just func)
 
-    time <- use $ gameBaseGlobals.gbLevel.llTime
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miAccel) && (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miDecel)
       then do
@@ -1020,20 +1014,21 @@ moveCalc er@(EdictReference edictIdx) dest func = do
 
         let comparedEntity = if (edict^.eFlags) .&. Constants.flTeamSlave /= 0
                                then edict^.eTeamMaster
-                               else Just er
+                               else Just edictRef
 
         if currentEntity == comparedEntity
-          then void $ think moveBegin er
+          then
+            void $ think moveBegin edictRef
+
           else
-            zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-              eNextThink .= time + Constants.frameTime
-              eThink .= Just moveBegin
+            modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+                                           & eThink .~ Just moveBegin)
+
       else do
         -- aceelerative
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eMoveInfo.miCurrentSpeed .= 0
-          eThink .= Just thinkAccelMove
-          eNextThink .= time + Constants.frameTime
+        modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ 0
+                                       & eThink .~ Just thinkAccelMove
+                                       & eNextThink .~ levelTime + Constants.frameTime)
 
 angleMoveCalc :: EdictReference -> EntThink -> Quake ()
 angleMoveCalc _ _ = do
@@ -1041,25 +1036,26 @@ angleMoveCalc _ _ = do
 
 moveBegin :: EntThink
 moveBegin =
-  GenericEntThink "move_begin" $ \edictRef@(EdictReference edictIdx) -> do
-    Just moveInfo <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo
+  GenericEntThink "move_begin" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let moveInfo = edict^.eMoveInfo
 
     if (moveInfo^.miSpeed) * Constants.frameTime >= (moveInfo^.miRemainingDistance)
       then do
         void $ think moveFinal edictRef
         return True
+
       else do
         let velocity = fmap (* (moveInfo^.miSpeed)) (moveInfo^.miDir)
             frames :: Int = floor $ ((moveInfo^.miRemainingDistance) / (moveInfo^.miSpeed)) / Constants.frameTime
             framesF :: Float = fromIntegral frames
 
-        time <- use $ gameBaseGlobals.gbLevel.llTime
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eVelocity .= velocity
-          eMoveInfo.miRemainingDistance -= framesF * (moveInfo^.miSpeed) * Constants.frameTime
-          eNextThink .= time + (framesF * Constants.frameTime)
-          eThink .= Just moveFinal
+        modifyEdictT edictRef (\v -> v & eVelocity .~ velocity
+                                       & eMoveInfo.miRemainingDistance -~ framesF * (moveInfo^.miSpeed) * Constants.frameTime
+                                       & eNextThink .~ levelTime + (framesF * Constants.frameTime)
+                                       & eThink .~ Just moveFinal)
 
         return True
 
@@ -1070,8 +1066,8 @@ thinkAccelMove =
 
 moveFinal :: EntThink
 moveFinal =
-  GenericEntThink "move_final" $ \edictRef@(EdictReference edictIdx) -> do
-    Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx
+  GenericEntThink "move_final" $ \edictRef -> do
+    edict <- readEdictT edictRef
 
     if (edict^.eMoveInfo.miRemainingDistance) == 0
       then do
@@ -1079,20 +1075,20 @@ moveFinal =
         return True
       else do
         let velocity = fmap (* ((edict^.eMoveInfo.miRemainingDistance) / Constants.frameTime)) (edict^.eMoveInfo.miDir)
-        time <- use $ gameBaseGlobals.gbLevel.llTime
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         
-        zoom (gameBaseGlobals.gbGEdicts.ix edictIdx) $ do
-          eVelocity .= velocity
-          eThink .= Just moveDone
-          eNextThink .= time + Constants.frameTime
+        modifyEdictT edictRef (\v -> v & eVelocity .~ velocity
+                                       & eThink .~ Just moveDone
+                                       & eNextThink .~ levelTime + Constants.frameTime)
 
         return True
 
 moveDone :: EntThink
 moveDone =
-  GenericEntThink "move_done" $ \edictRef@(EdictReference edictIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix edictIdx.eVelocity .= V3 0 0 0
-    Just endFunc <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eMoveInfo.miEndFunc
+  GenericEntThink "move_done" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eVelocity .~ V3 0 0 0)
+    edict <- readEdictT edictRef
+    let endFunc = edict^.eMoveInfo.miEndFunc
 
     void $ think (fromJust endFunc) edictRef
 
@@ -1100,23 +1096,22 @@ moveDone =
 
 rotatingUse :: EntUse
 rotatingUse =
-  GenericEntUse "rotating_use" $ \(EdictReference selfIdx) _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntUse "rotating_use" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
     vec3origin <- use $ globals.vec3Origin
 
     if (self^.eAVelocity) /= vec3origin
       then
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .= 0
-          eAVelocity .= V3 0 0 0
-          eTouch .= Nothing
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+                                      & eAVelocity .~ V3 0 0 0
+                                      & eTouch .~ Nothing)
+
       else do
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esSound .= (self^.eMoveInfo.miSoundMiddle)
-          eAVelocity .= fmap (* (self^.eSpeed)) (self^.eMoveDir)
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ (self^.eMoveInfo.miSoundMiddle)
+                                      & eAVelocity .~ fmap (* (self^.eSpeed)) (self^.eMoveDir))
 
         when ((self^.eSpawnFlags) .&. 16 /= 0) $
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eTouch .= Just rotatingTouch
+          modifyEdictT selfRef (\v -> v & eTouch .~ Just rotatingTouch)
 
 rotatingBlocked :: EntBlocked
 rotatingBlocked =
@@ -1129,8 +1124,8 @@ rotatingTouch =
     io (putStrLn "GameFunc.rotatingTouch") >> undefined -- TODO
 
 doorGoUp :: EdictReference -> Maybe EdictReference -> Quake ()
-doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+doorGoUp selfRef activatorRef = do
+    self <- readEdictT selfRef
 
     unless ((self^.eMoveInfo.miState) == Constants.stateUp) $ do
       if (self^.eMoveInfo.miState) == Constants.stateTop
@@ -1138,15 +1133,17 @@ doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
           -- reset top wait time
           when ((self^.eMoveInfo.miWait) >= 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eNextThink .= levelTime + (self^.eMoveInfo.miWait)
+            modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
+
         else do
           when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
             when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
               sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= self^.eMoveInfo.miSoundMiddle
 
-          gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateUp
+            modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
+
+          modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateUp)
 
           if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miEndOrigin) doorHitTop
              | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitTop
@@ -1157,47 +1154,48 @@ doorGoUp selfRef@(EdictReference selfIdx) activatorRef = do
 
 doorHitTop :: EntThink
 doorHitTop =
-  GenericEntThink "door_hit_top" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "door_hit_top" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= 0
+      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateTop
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop)
 
     if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
       then
         return True
+
       else do
         when ((self^.eMoveInfo.miWait) >= 0) $ do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-          zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-            eThink .= Just doorGoDown
-            eNextThink .= levelTime + (self^.eMoveInfo.miWait)
+
+          modifyEdictT selfRef (\v -> v & eThink .~ Just doorGoDown
+                                        & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
 
         return True
 
 doorGoDown :: EntThink
 doorGoDown =
-  GenericEntThink "door_go_down" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "door_go_down" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= self^.eMoveInfo.miSoundMiddle
+
+      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
 
     when ((self^.eMaxHealth) /= 0) $ do
-      zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-        eTakeDamage .= Constants.damageYes
-        eHealth .= self^.eMaxHealth
+      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageYes
+                                    & eHealth .~ self^.eMaxHealth)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateDown
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateDown)
 
     if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miStartOrigin) doorHitBottom
        | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitBottom
@@ -1207,16 +1205,17 @@ doorGoDown =
 
 doorHitBottom :: EntThink
 doorHitBottom =
-  GenericEntThink "door_hit_bottom" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "door_hit_bottom" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSound .= 0
+      
+      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMoveInfo.miState .= Constants.stateBottom
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
     doorUseAreaPortals selfRef False
     return True
 
@@ -1227,22 +1226,21 @@ doorHitBottom =
 -}
 funcConveyorUse :: EntUse
 funcConveyorUse =
-  GenericEntUse "func_conveyor_use" $ \(EdictReference selfIdx) _ _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntUse "func_conveyor_use" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
 
     if (self^.eSpawnFlags) .&. 1 /= 0
       then do
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eSpeed .= 0
-          eSpawnFlags %= (.&. (complement 1))
+        modifyEdictT selfRef (\v -> v & eSpeed .~ 0
+                                      & eSpawnFlags %~ (.&. (complement 1)))
       else do
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eSpeed .= fromIntegral (self^.eCount)
-          eSpawnFlags %= (.|. 1)
+        modifyEdictT selfRef (\v -> v & eSpeed .~ fromIntegral (self^.eCount)
+                                      & eSpawnFlags %~ (.|. 1))
 
-    Just spawnFlags <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx.eSpawnFlags
+    self' <- readEdictT selfRef
+    let spawnFlags = self'^.eSpawnFlags
     when (spawnFlags .&. 2 == 0) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eCount .= 0
+      modifyEdictT selfRef (\v -> v & eCount .~ 0)
 
 triggerElevatorUse :: EntUse
 triggerElevatorUse =

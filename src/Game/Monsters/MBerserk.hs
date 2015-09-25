@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBerserk where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=))
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (&), (.~), (%~))
 import Control.Monad (void, unless, liftM, when)
 import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _x)
@@ -106,18 +106,22 @@ berserkSearch =
 
 berserkFidget :: EntThink
 berserkFidget =
-  GenericEntThink "berserk_fidget" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "berserk_fidget" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
-      then return True
+      then
+        return True
+
       else do
         r <- Lib.randomF
 
         if r > 0.15
-          then return True
+          then
+            return True
+
           else do
-            gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just berserkMoveStandFidget
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStandFidget)
             soundIdle <- use $ mBerserkGlobals.mBerserkSoundIdle
             sound <- use $ gameBaseGlobals.gbGameImport.giSound
             sound (Just selfRef) Constants.chanWeapon soundIdle 1 Constants.attnIdle 0
@@ -137,8 +141,8 @@ berserkMoveStand = MMoveT "berserkMoveStand" frameStand1 frameStand5 berserkFram
 
 berserkStand :: EntThink
 berserkStand =
-  GenericEntThink "berserk_stand" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just berserkMoveStand
+  GenericEntThink "berserk_stand" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStand)
     return True
 
 berserkFramesStandFidget :: V.Vector MFrameT
@@ -189,8 +193,8 @@ berserkMoveWalk = MMoveT "berserkMoveWalk" frameWalkC1 frameWalkC11 berserkFrame
 
 berserkWalk :: EntThink
 berserkWalk =
-  GenericEntThink "berserk_walk" $ \(EdictReference selfIdx) -> do
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just berserkMoveWalk
+  GenericEntThink "berserk_walk" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveWalk)
     return True
 
 {-
@@ -230,14 +234,14 @@ berserkMoveRun1 = MMoveT "berserkMoveRun1" frameRun1 frameRun6 berserkFramesRun1
 
 berserkRun :: EntThink
 berserkRun =
-  GenericEntThink "berserk_run" $ \(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "berserk_run" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then berserkMoveStand
                    else berserkMoveRun1
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 berserkAttackSpike :: EntThink
@@ -275,8 +279,8 @@ berserkMoveAttackSpike = MMoveT "berserkMoveAttackSpike" frameAttC1 frameAttC8 b
 
 berserkAttackClub :: EntThink
 berserkAttackClub =
-  GenericEntThink "berserk_attack_club" $ \selfRef@(EdictReference selfIdx) -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntThink "berserk_attack_club" $ \selfRef -> do
+    self <- readEdictT selfRef
 
     r <- Lib.rand
     let n = r `mod` 6 + 5
@@ -331,14 +335,14 @@ berserkMoveAttackStrike = MMoveT "berserkMoveAttackStrike" frameAttC21 frameAttC
 
 berserkMelee :: EntThink
 berserkMelee =
-  GenericEntThink "berserk_melee" $ \(EdictReference selfIdx) -> do
+  GenericEntThink "berserk_melee" $ \selfRef -> do
     r <- Lib.rand
 
     let action = if r .&. 1 == 0
                    then berserkMoveAttackSpike
                    else berserkMoveAttackClub
 
-    gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just action
+    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 {-
@@ -402,16 +406,16 @@ berserkMovePain2 = MMoveT "berserkMovePain2" framePainB1 framePainB20 berserkFra
 
 berserkPain :: EntPain
 berserkPain =
-  GenericEntPain "berserk_pain" $ \selfRef@(EdictReference selfIdx) _ _ damage -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntPain "berserk_pain" $ \selfRef _ _ damage -> do
+    self <- readEdictT selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      gameBaseGlobals.gbGEdicts.ix selfIdx.eEntityState.esSkinNum .= 1
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      gameBaseGlobals.gbGEdicts.ix selfIdx.ePainDebounceTime .= levelTime + 3
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       sound <- use $ gameBaseGlobals.gbGameImport.giSound
       soundPain <- use $ mBerserkGlobals.mBerserkSoundPain
@@ -426,17 +430,16 @@ berserkPain =
                             then berserkMovePain1
                             else berserkMovePain2
 
-        gameBaseGlobals.gbGEdicts.ix selfIdx.eMonsterInfo.miCurrentMove .= Just currentMove
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 berserkDead :: EntThink
 berserkDead =
-  GenericEntThink "berserk_dead" $ \selfRef@(EdictReference selfIdx) -> do
-    zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-      eMins .= V3 (-16) (-16) (-24)
-      eMaxs .= V3 16 16 (-8)
-      eMoveType .= Constants.moveTypeToss
-      eSvFlags %= (.|. Constants.svfDeadMonster)
-      eNextThink .= 0
+  GenericEntThink "berserk_dead" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+                                  & eMaxs .~ V3 16 16 (-8)
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster)
+                                  & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
@@ -480,8 +483,8 @@ berserkMoveDeath2 = MMoveT "berserkMoveDeath2" frameDeathC1 frameDeathC8 berserk
 
 berserkDie :: EntDie
 berserkDie =
-  GenericEntDie "berserk_die" $ \selfRef@(EdictReference selfIdx) _ _ damage _ -> do
-    Just self <- preuse $ gameBaseGlobals.gbGEdicts.ix selfIdx
+  GenericEntDie "berserk_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -501,7 +504,7 @@ berserkDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           gameBaseGlobals.gbGEdicts.ix selfIdx.eDeadFlag .= Constants.deadDead
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -514,17 +517,16 @@ berserkDie =
                                then berserkMoveDeath1
                                else berserkMoveDeath2
 
-           zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-             eDeadFlag .= Constants.deadDead
-             eTakeDamage .= Constants.damageYes
-             eMonsterInfo.miCurrentMove .= Just currentMove
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 {-
 - QUAKED monster_berserk (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
 spMonsterBerserk :: EdictReference -> Quake ()
-spMonsterBerserk selfRef@(EdictReference selfIdx) = do
+spMonsterBerserk selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     if deathmatchValue /= 0
@@ -547,27 +549,26 @@ spMonsterBerserk selfRef@(EdictReference selfIdx) = do
 
         modelIdx <- modelIndex (Just "models/monsters/berserk/tris.md2")
 
-        zoom (gameBaseGlobals.gbGEdicts.ix selfIdx) $ do
-          eEntityState.esModelIndex .= modelIdx
-          eMins .= V3 (-16) (-16) (-24)
-          eMaxs .= V3 16 16 32
-          eMoveType .= Constants.moveTypeStep
-          eSolid .= Constants.solidBbox
-          eHealth .= 240
-          eGibHealth .= (-60)
-          eMass .= 250
-          ePain .= Just berserkPain
-          eDie .= Just berserkDie
-          eMonsterInfo.miStand .= Just berserkStand
-          eMonsterInfo.miWalk .= Just berserkWalk
-          eMonsterInfo.miRun .= Just berserkRun
-          eMonsterInfo.miDodge .= Nothing
-          eMonsterInfo.miAttack .= Nothing
-          eMonsterInfo.miMelee .= Just berserkMelee
-          eMonsterInfo.miSight .= Just berserkSight
-          eMonsterInfo.miSearch .= Just berserkSearch
-          eMonsterInfo.miCurrentMove .= Just berserkMoveStand
-          eMonsterInfo.miScale .= modelScale
+        modifyEdictT selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-16) (-16) (-24)
+                                      & eMaxs .~ V3 16 16 32
+                                      & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eHealth .~ 240
+                                      & eGibHealth .~ (-60)
+                                      & eMass .~ 250
+                                      & ePain .~ Just berserkPain
+                                      & eDie .~ Just berserkDie
+                                      & eMonsterInfo.miStand .~ Just berserkStand
+                                      & eMonsterInfo.miWalk .~ Just berserkWalk
+                                      & eMonsterInfo.miRun .~ Just berserkRun
+                                      & eMonsterInfo.miDodge .~ Nothing
+                                      & eMonsterInfo.miAttack .~ Nothing
+                                      & eMonsterInfo.miMelee .~ Just berserkMelee
+                                      & eMonsterInfo.miSight .~ Just berserkSight
+                                      & eMonsterInfo.miSearch .~ Just berserkSearch
+                                      & eMonsterInfo.miCurrentMove .~ Just berserkMoveStand
+                                      & eMonsterInfo.miScale .~ modelScale)
 
         linkEntity selfRef
 

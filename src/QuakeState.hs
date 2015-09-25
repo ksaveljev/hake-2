@@ -46,7 +46,13 @@ module QuakeState ( QuakeState(..)
                   , vGlobals
                   , netChannelGlobals
                   , clTEntGlobals
-                  , EdictReference(..)
+                  , EdictReference
+                  , worldRef
+                  , newEdictReference
+                  , nextEdictReference
+                  , readEdictT
+                  , modifyEdictT
+                  , writeEdictT
                   , ClientReference(..)
                   , GClientReference(..)
                   , CModelReference(..)
@@ -54,7 +60,11 @@ module QuakeState ( QuakeState(..)
                   , GItemReference(..)
                   , UserCmdReference(..)
                   , GLPolyReference(..)
-                  , CPlaneReference(..)
+                  , CPlaneReference
+                  , newCPlaneReference
+                  , readCPlaneT
+                  , modifyCPlaneT
+                  , writeCPlaneT
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -116,7 +126,9 @@ module QuakeState ( QuakeState(..)
                   , module QCommon.NetChannelGlobals
                   ) where
 
-import Control.Lens (makeLenses)
+import Control.Lens (use, makeLenses)
+import Control.Monad.State.Strict (liftIO)
+import qualified Data.Vector.Mutable as MV
 
 import Internal
 import Globals
@@ -215,3 +227,45 @@ initialQuakeState =
              , _netChannelGlobals     = initialNetChannelGlobals
              , _clTEntGlobals         = initialCLTEntGlobals
              }
+
+readEdictT :: EdictReference -> Quake EdictT
+readEdictT (EdictReference edictIdx) = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    liftIO $ MV.read edicts edictIdx
+
+modifyEdictT :: EdictReference -> (EdictT -> EdictT) -> Quake ()
+modifyEdictT (EdictReference edictIdx) f = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    liftIO $ MV.modify edicts f edictIdx
+
+writeEdictT :: EdictReference -> EdictT -> Quake ()
+writeEdictT (EdictReference edictIdx) edict = do
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    liftIO $ MV.write edicts edictIdx edict
+
+worldRef :: EdictReference
+worldRef = EdictReference 0
+
+newEdictReference :: Int -> EdictReference
+newEdictReference = EdictReference
+
+nextEdictReference :: EdictReference -> EdictReference
+nextEdictReference (EdictReference edictIdx) = EdictReference (edictIdx + 1)
+
+readCPlaneT :: CPlaneReference -> Quake CPlaneT
+readCPlaneT (CPlaneReference planeIdx) = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.read mapPlanes planeIdx
+
+modifyCPlaneT :: CPlaneReference -> (CPlaneT -> CPlaneT) -> Quake ()
+modifyCPlaneT (CPlaneReference planeIdx) f = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.modify mapPlanes f planeIdx
+
+writeCPlaneT :: CPlaneReference -> CPlaneT -> Quake ()
+writeCPlaneT (CPlaneReference planeIdx) plane = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.write mapPlanes planeIdx plane
+
+newCPlaneReference :: Int -> CPlaneReference
+newCPlaneReference = CPlaneReference

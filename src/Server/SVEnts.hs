@@ -4,7 +4,7 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 module Server.SVEnts where
 
-import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=))
+import Control.Lens (use, Lens', (^.), preuse, ix, Traversal', (.=), (+=), (&), (.~))
 import Control.Monad (when, liftM)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL)
 import Data.Maybe (isJust, fromJust)
@@ -311,8 +311,8 @@ buildClientFrame :: ClientReference -> Quake ()
 buildClientFrame (ClientReference clientIdx) = do
     -- io (print "buildClientFrame")
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
-    let Just clEntRef@(EdictReference clEntIdx) = client^.cEdict
-    Just clEnt <- preuse $ gameBaseGlobals.gbGEdicts.ix clEntIdx
+    let Just clEntRef = client^.cEdict
+    clEnt <- readEdictT clEntRef
 
     case clEnt^.eClient of
       Nothing -> return () -- not in game yet
@@ -358,7 +358,7 @@ buildClientFrame (ClientReference clientIdx) = do
         collectEdicts org clientPHS clientArea clEntRef frame idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just edict <- preuse $ gameBaseGlobals.gbGEdicts.ix idx
+              edict <- readEdictT (newEdictReference idx)
 
               -- io (print $ "working through edict " ++ show idx)
 
@@ -373,7 +373,7 @@ buildClientFrame (ClientReference clientIdx) = do
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
-                     skip <- if EdictReference idx /= clEntRef
+                     skip <- if newEdictReference idx /= clEntRef
                                then do
                                  blocked <- isBlockedByDoor clientArea edict
 
@@ -441,10 +441,10 @@ buildClientFrame (ClientReference clientIdx) = do
                         
                          when ((edict^.eEntityState.esNumber) /= idx) $ do
                            Com.dprintf "FIXING ENT.S.NUMBER!!!\n"
-                           gameBaseGlobals.gbGEdicts.ix idx.eEntityState.esNumber .= idx
+                           modifyEdictT (newEdictReference idx) (\v -> v & eEntityState.esNumber .~ idx)
 
-                         preuse (gameBaseGlobals.gbGEdicts.ix idx.eEntityState) >>= \(Just entityState) ->
-                           svGlobals.svServerStatic.ssClientEntities.ix index .= entityState
+                         readEdictT (newEdictReference idx) >>= \edict' ->
+                           svGlobals.svServerStatic.ssClientEntities.ix index .= (edict'^.eEntityState)
 
                          -- don't mark players missiles as solid
                          preuse (svGlobals.svServerStatic.ssClients.ix clientIdx) >>= \(Just client) ->

@@ -3,13 +3,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server.SVConsoleCommands where
 
-import Data.Char (isDigit)
-import Data.Maybe (isJust)
-import Data.Traversable (traverse)
-import Control.Lens (use, preuse, (.=), (^.), (%=))
+import Control.Lens (use, preuse, (.=), (^.), (%=), (&), (.~))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
 import Control.Exception (handle, IOException)
+import Data.Char (isDigit)
+import Data.Maybe (isJust)
+import Data.Traversable (traverse)
 import System.Directory (doesFileExist, removeFile, copyFile)
 import System.FilePath (takeFileName)
 import System.FilePath.Glob (namesMatching)
@@ -369,11 +369,10 @@ gameMapF = do
               -- at spawn points instead of occupying body shells
               maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
               clients <- use $ svGlobals.svServerStatic.ssClients
-              edicts <- use $ gameBaseGlobals.gbGEdicts
               savedInUse <- mapM (\i -> do
-                                        let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
-                                            inUse = (edicts V.! edictIdx)^.eInUse
-                                        gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= False
+                                        let Just edictRef = (clients V.! i)^.cEdict
+                                        inUse <- readEdictT edictRef >>= \e -> return (e^.eInUse)
+                                        modifyEdictT edictRef (\v -> v & eInUse .~ False)
                                         return inUse
                                 ) [0..maxClientsValue-1]
 
@@ -381,8 +380,8 @@ gameMapF = do
 
               -- we must restore these for clients to transfer over correctly
               mapM_ (\(i, inUse) -> do
-                                    let Just (EdictReference edictIdx) = (clients V.! i)^.cEdict
-                                    gameBaseGlobals.gbGEdicts.ix edictIdx.eInUse .= inUse
+                                    let Just edictRef = (clients V.! i)^.cEdict
+                                    modifyEdictT edictRef (\v -> v & eInUse .~ inUse)
                     ) ([0..] `zip` savedInUse)
 
         -- start up the next map
@@ -485,8 +484,8 @@ saveGameF = do
     deathmatchValue <- CVar.variableValue "deathmatch"
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
-    Just (Just (EdictReference edictIdx)) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
-    Just (Just (GClientReference clientIdx)) <- preuse $ gameBaseGlobals.gbGEdicts.ix edictIdx.eClient
+    Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
+    Just (GClientReference clientIdx) <- readEdictT edictRef >>= \e -> return (e^.eClient)
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
     let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth
 
