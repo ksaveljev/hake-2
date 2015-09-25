@@ -24,6 +24,7 @@ import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import qualified Game.GameUtil as GameUtil
 import qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 initItems :: Quake ()
 initItems = do
@@ -706,8 +707,71 @@ useItem =
     linkEntity edictRef
 
 dropItem :: EdictReference -> GItemReference -> Quake EdictReference
-dropItem _ _ = do
-    io (putStrLn "GameItems.dropItem") >> undefined -- TODO
+dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    droppedRef <- GameUtil.spawn
+    edict <- readEdictT edictRef
+    Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        trace = gameImport^.giTrace
+        linkEntity = gameImport^.giLinkEntity
+
+    modifyEdictT droppedRef (\v -> v & eClassName .~ (item^.giClassName)
+                                     & eItem .~ Just gItemRef
+                                     & eSpawnFlags .~ Constants.droppedItem
+                                     & eEntityState.esEffects .~ (item^.giWorldModelFlags)
+                                     & eEntityState.esRenderFx .~ Constants.rfGlow
+                                     & eMins .~ V3 (-15) (-15) (-15)
+                                     & eMaxs .~ V3 15 15 15
+                                     & eSolid .~ Constants.solidTrigger
+                                     & eMoveType .~ Constants.moveTypeToss
+                                     & eTouch .~ Just dropTempTouch
+                                     & eOwner .~ Just edictRef)
+
+    setModel droppedRef (item^.giWorldModel)
+    
+    forward <- case edict^.eClient of
+                 Just (GClientReference gClientIdx) -> do
+                   Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                   let (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+                       offset = V3 24 0 (-16)
+                       origin = Math3D.projectSource (edict^.eEntityState.esOrigin) offset forward right
+                   
+                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ origin)
+                   dropped <- readEdictT droppedRef
+
+                   traceT <- trace (edict^.eEntityState.esOrigin) (Just $ dropped^.eMins) (Just $ dropped^.eMaxs) (dropped^.eEntityState.esOrigin) (Just edictRef) Constants.contentsSolid
+                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+                   return forward
+
+                 Nothing -> do
+                   let (Just forward, _, _) = Math3D.angleVectors (edict^.eEntityState.esAngles) True False False
+                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ (edict^.eEntityState.esOrigin))
+                   return forward
+
+    let V3 a b c = fmap (* 100) forward
+        velocity = V3 a b 300
+
+    modifyEdictT droppedRef (\v -> v & eVelocity .~ velocity
+                                     & eThink .~ Just dropMakeTouchable
+                                     & eNextThink .~ levelTime + 1)
+
+    linkEntity droppedRef
+
+    return droppedRef
+
+dropTempTouch :: EntTouch
+dropTempTouch =
+  GenericEntTouch "drop_temp_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameItems.dropTempTouch") >> undefined -- TODO
+
+dropMakeTouchable :: EntThink
+dropMakeTouchable =
+  GenericEntThink "drop_make_touchable" $ \_ -> do
+    io (putStrLn "GameItems.dropMakeTouchable") >> undefined -- TODO
 
 powerArmorType :: EdictReference -> Quake Int
 powerArmorType edictRef = do
