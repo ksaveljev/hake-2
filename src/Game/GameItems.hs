@@ -5,7 +5,7 @@ module Game.GameItems where
 
 import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), zoom, (&), (.~), (%~), (+~))
 import Control.Monad (when, void, liftM, unless)
-import Data.Bits ((.&.), (.|.), shiftL, complement)
+import Data.Bits ((.&.), (.|.), shiftL, complement, shiftR)
 import Data.Char (toLower)
 import Data.Maybe (fromJust, isNothing, isJust)
 import Linear (V3(..))
@@ -388,8 +388,45 @@ pickupPack =
 
 pickupKey :: EntInteract
 pickupKey =
-  GenericEntInteract "pickup_key" $ \_ _ -> do
-    io (putStrLn "GameItems.pickupKey") >> undefined -- TODO
+  GenericEntInteract "pickup_key" $ \edictRef otherRef -> do
+    coopValue <- liftM (^.cvValue) coopCVar
+    edict <- readEdictT edictRef
+    other <- readEdictT otherRef
+
+    let Just (GClientReference gClientIdx) = other^.eClient
+        Just (GItemReference gItemIdx) = edict^.eItem
+
+    Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    if coopValue /= 0
+      then do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+        if (edict^.eClassName) == "key_power_cube"
+          then do
+            if (gClient^.gcPers.cpPowerCubes) .&. (((edict^.eSpawnFlags) .&. 0xFF00) `shiftR` 8) /= 0
+              then
+                return False
+
+              else do
+                zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers) $ do
+                  cpInventory.ix (item^.giIndex) += 1
+                  cpPowerCubes %= (.|. (((edict^.eSpawnFlags) .&. 0xFF00) `shiftR` 8))
+
+                return True
+
+          else do
+            if (gClient^.gcPers.cpInventory) UV.! (item^.giIndex) /= 0
+              then
+                return False
+
+              else do
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) .= 1
+                return True
+
+      else do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) += 1
+        return True
 
 pickupHealth :: EntInteract
 pickupHealth = PickupHealth "pickup_health" $ \edictRef otherRef -> do
