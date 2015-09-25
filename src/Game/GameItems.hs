@@ -770,8 +770,17 @@ dropTempTouch =
 
 dropMakeTouchable :: EntThink
 dropMakeTouchable =
-  GenericEntThink "drop_make_touchable" $ \_ -> do
-    io (putStrLn "GameItems.dropMakeTouchable") >> undefined -- TODO
+  GenericEntThink "drop_make_touchable" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eTouch .~ Just touchItem)
+
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    when (deathmatchValue /= 0) $ do
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+      modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + 29
+                                     & eThink .~ Just GameUtil.freeEdictA)
+
+    return False
 
 powerArmorType :: EdictReference -> Quake Int
 powerArmorType edictRef = do
