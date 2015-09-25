@@ -766,8 +766,17 @@ getItemByIndex index = do
       else preuse $ gameBaseGlobals.gbItemList.ix index
 
 setRespawn :: EdictReference -> Float -> Quake ()
-setRespawn _ _ = do
-    io (putStrLn "GameItems.setRespawn") >> undefined -- TODO
+setRespawn edictRef delay = do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn)
+                                   & eSvFlags %~ (.|. Constants.svfNoClient)
+                                   & eSolid .~ Constants.solidNot
+                                   & eNextThink .~ levelTime + delay
+                                   & eThink .~ Just doRespawn)
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity edictRef
 
 addAmmo :: EdictReference -> GItemReference -> Int -> Quake Bool
 addAmmo edictRef (GItemReference gItemIdx) count = do
