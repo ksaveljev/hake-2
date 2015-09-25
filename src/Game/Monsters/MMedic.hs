@@ -143,7 +143,7 @@ medicFindDeadMonster selfRef = do
                   if | not vis -> findDeadMonster origin (Just edictRef) bestRef
                      | isNothing bestRef -> findDeadMonster origin (Just edictRef) (Just edictRef)
                      | otherwise -> do
-                         best <- readEdictT bestRef
+                         best <- readEdictT (fromJust bestRef)
 
                          if (edict^.eMaxHealth) <= (best^.eMaxHealth)
                            then findDeadMonster origin (Just edictRef) bestRef
