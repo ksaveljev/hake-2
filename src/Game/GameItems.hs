@@ -355,8 +355,23 @@ useInvulnerability =
 
 useSilencer :: ItemUse
 useSilencer =
-  GenericItemUse "use_silencer" $ \_ _ -> do
-    io (putStrLn "GameItems.useSilencer") >> undefined -- TODO
+  GenericItemUse "use_silencer" $ \edictRef (GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+    GameUtil.validateSelectedItem edictRef
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcSilencerShots += 30
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    soundIdx <- soundIndex (Just "items/damage.wav")
+    sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
 useBreather :: ItemUse
 useBreather =
