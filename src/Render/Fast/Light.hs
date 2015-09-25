@@ -540,21 +540,15 @@ recursiveLightPoint (MNodeChildReference nodeRef) start end = do
               let surfRef = (worldModel^.mSurfaces) V.! surfIndex
               surf <- io $ readIORef surfRef
 
-              io (print "SURF INDEX")
-              io (print surfIndex)
-              io (print (surf^.msFlags))
-
               if (surf^.msFlags) .&. (Constants.surfDrawTurb .|. Constants.surfDrawSky) /= 0
                 then
                   -- no lightmaps
                   calcPointColor worldModel mid (surfIndex + 1) (idx + 1) maxIdx
+
                 else do
                   let tex = surf^.msTexInfo
                       s = truncate (mid `dot` (tex^.mtiVecs._1._xyz) + (tex^.mtiVecs._1._w)) :: Int
                       t = truncate (mid `dot` (tex^.mtiVecs._2._xyz) + (tex^.mtiVecs._2._w)) :: Int
-
-                  io (print ("s = " ++ show s))
-                  io (print ("t = " ++ show t))
 
                   if s < fromIntegral (surf^.msTextureMins._1) || t < fromIntegral (surf^.msTextureMins._2)
                     then
@@ -565,8 +559,10 @@ recursiveLightPoint (MNodeChildReference nodeRef) start end = do
 
                       if | ds > fromIntegral (surf^.msExtents._1) || dt > fromIntegral (surf^.msExtents._2) ->
                              calcPointColor worldModel mid (surfIndex + 1) (idx + 1) maxIdx
+
                          | isNothing (surf^.msSamples) ->
                              return (Just 0)
+
                          | otherwise -> do
                              let ds' = ds `shiftR` 4
                                  dt' = dt `shiftR` 4
