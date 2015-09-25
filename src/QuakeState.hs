@@ -60,7 +60,11 @@ module QuakeState ( QuakeState(..)
                   , GItemReference(..)
                   , UserCmdReference(..)
                   , GLPolyReference(..)
-                  , CPlaneReference(..)
+                  , CPlaneReference
+                  , newCPlaneReference
+                  , readCPlaneT
+                  , modifyCPlaneT
+                  , writeCPlaneT
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -247,3 +251,21 @@ newEdictReference = EdictReference
 
 nextEdictReference :: EdictReference -> EdictReference
 nextEdictReference (EdictReference edictIdx) = EdictReference (edictIdx + 1)
+
+readCPlaneT :: CPlaneReference -> Quake CPlaneT
+readCPlaneT (CPlaneReference planeIdx) = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.read mapPlanes planeIdx
+
+modifyCPlaneT :: CPlaneReference -> (CPlaneT -> CPlaneT) -> Quake ()
+modifyCPlaneT (CPlaneReference planeIdx) f = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.modify mapPlanes f planeIdx
+
+writeCPlaneT :: CPlaneReference -> CPlaneT -> Quake ()
+writeCPlaneT (CPlaneReference planeIdx) plane = do
+    mapPlanes <- use $ cmGlobals.cmMapPlanes
+    liftIO $ MV.write mapPlanes planeIdx plane
+
+newCPlaneReference :: Int -> CPlaneReference
+newCPlaneReference = CPlaneReference

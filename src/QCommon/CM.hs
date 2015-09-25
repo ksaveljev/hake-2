@@ -5,7 +5,7 @@
 {-# LANGUAGE BangPatterns #-}
 module QCommon.CM where
 
-import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2, Traversal')
+import Control.Lens (use, (%=), (.=), (^.), (+=), ix, preuse, Lens', zoom, _1, _2, Traversal', (&), (.~))
 import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.|.), (.&.), shiftR, shiftL)
 import Data.Functor ((<$>))
@@ -417,11 +417,9 @@ loadPlanes lump = do
       Com.dprintf "cplanes(normal[0],normal[1],normal[2], dist, type, signbits)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
+    mapM_ (\i -> readMapPlane buf i >>= \p -> writeCPlaneT (newCPlaneReference i) p) [0..count-1]
 
-    updatedMapPlanes <- mapM (readMapPlane buf) [0..count-1]
-    cmGlobals.cmMapPlanes %= (V.// updatedMapPlanes)
-
-  where readMapPlane :: BL.ByteString -> Int -> Quake (Int, CPlaneT)
+  where readMapPlane :: BL.ByteString -> Int -> Quake CPlaneT
         readMapPlane buf idx = do
           let offset = fromIntegral $ (lump^.lFileOfs) + idx * dPlaneTSize
               plane = newDPlaneT (BL.drop offset buf)
@@ -441,7 +439,7 @@ loadPlanes lump = do
                           "| " `B.append` BC.pack (show $ cplane^.cpSignBits) `B.append` -- IMPROVE ?
                           "|\n"
 
-          return (idx, cplane)
+          return cplane
 
         getBits :: V3 Float -> Int8
         getBits (V3 a b c) =
@@ -727,7 +725,8 @@ initBoxHull = do
                            , _cpPad      = (0, 0)
                            }
 
-          cmGlobals.cmMapPlanes %= (V.// [(numPlanes + idx * 2, p1), (numPlanes + idx * 2 + 1, p2)])
+          writeCPlaneT (newCPlaneReference (numPlanes + idx * 2)) p1
+          writeCPlaneT (newCPlaneReference (numPlanes + idx * 2 + 1)) p2
 
         calcChildren :: Int -> Int -> Int -> Int -> Int -> (Int, Int)
         calcChildren idx side numLeafs emptyLeaf boxHeadNode =
@@ -885,7 +884,7 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
   | otherwise = do
       Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
       let planeIdx = fromJust (node^.cnPlane)
-      Just p <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+      p <- readCPlaneT (newCPlaneReference planeIdx)
       let s = Math3D.boxOnPlaneSide mins maxs p
 
       if | s == 1 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
@@ -1065,7 +1064,7 @@ recursiveHullCheck num p1f p2f p1 p2 = do
           -- and the offset for the size of the box
           Just node <- preuse $ cmGlobals.cmMapNodes.ix num
           let Just planeIdx = node^.cnPlane
-          Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+          plane <- readCPlaneT (newCPlaneReference planeIdx)
 
           (t1, t2, offset) <- findDistancesAndOffset plane
 
@@ -1189,7 +1188,7 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
               traceT <- use $ traceLens
 
               when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
-                Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ clipPlane)
+                plane <- readCPlaneT (newCPlaneReference (fromJust $ clipPlane))
                 Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
                 let Just surfaceIdx = brushSide^.cbsSurface
                 surface <- case brushSide^.cbsSurface of
@@ -1210,7 +1209,7 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
           | idx >= maxIdx = return (False, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix ((brush^.cbFirstBrushSide) + idx)
-              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix (fromJust $ side^.cbsPlane)
+              plane <- readCPlaneT (newCPlaneReference (fromJust $ side^.cbsPlane))
 
               -- FIXME: special case for axial
               traceIsPoint <- use $ cmGlobals.cmTraceIsPoint
@@ -1260,7 +1259,26 @@ headnodeForBox mins maxs = do
 
     mapPlanes <- use $ cmGlobals.cmMapPlanes
     -- this version is much better from the point of view of memory
-    -- consumption than two versions below
+    -- consumption and allocation than three versions below
+
+    modifyCPlaneT (newCPlaneReference (numPlanes +  0)) (\v -> v & cpDist .~ maxs^._x)
+    modifyCPlaneT (newCPlaneReference (numPlanes +  1)) (\v -> v & cpDist .~ - (maxs^._x))
+    modifyCPlaneT (newCPlaneReference (numPlanes +  2)) (\v -> v & cpDist .~ mins^._x)
+    modifyCPlaneT (newCPlaneReference (numPlanes +  3)) (\v -> v & cpDist .~ - (mins^._x))
+    modifyCPlaneT (newCPlaneReference (numPlanes +  4)) (\v -> v & cpDist .~ maxs^._y)
+    modifyCPlaneT (newCPlaneReference (numPlanes +  5)) (\v -> v & cpDist .~ - (maxs^._y))
+    modifyCPlaneT (newCPlaneReference (numPlanes +  6)) (\v -> v & cpDist .~ mins^._y)
+    modifyCPlaneT (newCPlaneReference (numPlanes +  7)) (\v -> v & cpDist .~ - (mins^._y))
+    modifyCPlaneT (newCPlaneReference (numPlanes +  8)) (\v -> v & cpDist .~ maxs^._z)
+    modifyCPlaneT (newCPlaneReference (numPlanes +  9)) (\v -> v & cpDist .~ - (maxs^._z))
+    modifyCPlaneT (newCPlaneReference (numPlanes + 10)) (\v -> v & cpDist .~ mins^._z)
+    modifyCPlaneT (newCPlaneReference (numPlanes + 11)) (\v -> v & cpDist .~ - (mins^._z))
+
+    {-
+    - this version has huge allocation rate due to needing to copy the
+    - vector (which is > 65536 elements long) every single time this method
+    - is called and it is sometimes called very often (10000 - 15000 times
+    - in very short timeframe)
     let !a = mapPlanes V.! (numPlanes +  0)
         !b = mapPlanes V.! (numPlanes +  1)
         !c = mapPlanes V.! (numPlanes +  2)
@@ -1287,6 +1305,8 @@ headnodeForBox mins maxs = do
                                    , (numPlanes + 10, k { _cpDist = mins^._z })
                                    , (numPlanes + 11, l { _cpDist = - (mins^._z) })
                                    ])
+    -}
+
     {-
     - this version builds a lot of thunks which reside in memory
     -
@@ -1356,7 +1376,7 @@ pointLeafNumR p num = do
           | n >= 0 = do
               Just node <- preuse $ cmGlobals.cmMapNodes.ix n
               let Just planeIdx = node^.cnPlane
-              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+              plane <- readCPlaneT (newCPlaneReference planeIdx)
 
               let d = if plane^.cpType < 3
                         then p^.(Math3D.v3Access (fromIntegral $ plane^.cpType)) - (plane^.cpDist)
@@ -1448,7 +1468,7 @@ testBoxInBrush mins maxs p1 traceLens brush = do
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix (firstBrushSide + idx)
               let Just planeIdx = side^.cbsPlane
-              Just plane <- preuse $ cmGlobals.cmMapPlanes.ix planeIdx
+              plane <- readCPlaneT (newCPlaneReference planeIdx)
 
               -- FIXME: special case for axial
               -- general box case

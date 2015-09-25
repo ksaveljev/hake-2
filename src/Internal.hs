@@ -1360,7 +1360,7 @@ data CMGlobals =
             , _cmNumTexInfo      :: !Int
             , _cmMapSurfaces     :: V.Vector MapSurfaceT
             , _cmNumPlanes       :: !Int
-            , _cmMapPlanes       :: V.Vector CPlaneT
+            , _cmMapPlanes       :: MV.IOVector CPlaneT
             , _cmNumNodes        :: !Int
             , _cmMapNodes        :: V.Vector CNodeT
             , _cmNumLeafs        :: !Int
