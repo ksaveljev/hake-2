@@ -864,7 +864,7 @@ executeLayoutString str = do
                 Com.comError Constants.errDrop "Pic >= MAX_IMAGES"
 
               Just cs <- preuse $ globals.cl.csConfigStrings.ix (Constants.csImages + value')
-              when (B.length cs > 0) $ do -- TODO: do we need to introduce Maybe ByteString in csConfigStrings ?
+              when (B.length cs > 0) $ do -- IMPROVE: do we need to introduce Maybe ByteString in csConfigStrings ?
                 addDirtyPoint x y
                 addDirtyPoint (x + 23) (y + 23)
                 Just renderer <- use $ globals.re

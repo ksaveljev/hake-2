@@ -770,5 +770,34 @@ setRespawn _ _ = do
     io (putStrLn "GameItems.setRespawn") >> undefined -- TODO
 
 addAmmo :: EdictReference -> GItemReference -> Int -> Quake Bool
-addAmmo _ _ _ = do
-    io (putStrLn "GameItems.addAmmo") >> undefined -- TODO
+addAmmo edictRef (GItemReference gItemIdx) count = do
+    edict <- readEdictT edictRef
+
+    case edict^.eClient of
+      Nothing ->
+        return False
+
+      Just (GClientReference gClientIdx) -> do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+        let m = if | (item^.giTag) == Constants.ammoBullets -> Just (gClient^.gcPers.cpMaxBullets)
+                   | (item^.giTag) == Constants.ammoShells -> Just (gClient^.gcPers.cpMaxShells)
+                   | (item^.giTag) == Constants.ammoRockets -> Just (gClient^.gcPers.cpMaxRockets)
+                   | (item^.giTag) == Constants.ammoGrenades -> Just (gClient^.gcPers.cpMaxGrenades)
+                   | (item^.giTag) == Constants.ammoCells -> Just (gClient^.gcPers.cpMaxCells)
+                   | (item^.giTag) == Constants.ammoSlugs -> Just (gClient^.gcPers.cpMaxSlugs)
+                   | otherwise -> Nothing
+
+        case m of
+          Nothing ->
+            return False
+
+          Just max' -> do
+            if (gClient^.gcPers.cpInventory) UV.! (item^.giIndex) == max'
+              then
+                return False
+
+              else do
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) %= (\v -> if v + count > max' then max' else v + count)
+                return True
