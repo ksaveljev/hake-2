@@ -742,3 +742,7 @@ megaHealthThink :: EntThink
 megaHealthThink =
   GenericEntThink "MegaHealth_think" $ \_ -> do
     io (putStrLn "GameUtil.megaHealthThink") >> undefined -- TODO
+
+validateSelectedItem :: EdictReference -> Quake ()
+validateSelectedItem _ = do
+    io (putStrLn "GameUtil.validateSelectedItem") >> undefined -- TODO

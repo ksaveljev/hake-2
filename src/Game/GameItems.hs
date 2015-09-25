@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.GameItems where
 
-import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), zoom, (&), (.~), (%~), (+~))
+import Control.Lens ((.=), (^.), use, preuse, ix, (%=), (+=), (-=), zoom, (&), (.~), (%~), (+~))
 import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement, shiftR)
 import Data.Char (toLower)
@@ -365,8 +365,30 @@ useBreather =
 
 useEnviroSuit :: ItemUse
 useEnviroSuit =
-  GenericItemUse "use_envirosuit" $ \_ _ -> do
-    io (putStrLn "GameItems.useEnviroSuit") >> undefined -- TODO
+  GenericItemUse "use_envirosuit" $ \edictRef (GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+    GameUtil.validateSelectedItem edictRef
+
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    levelFrameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+    let enviroFrameNum = if (gClient^.gcEnviroFrameNum) > fromIntegral levelFrameNum
+                           then (gClient^.gcEnviroFrameNum) + 300
+                           else fromIntegral levelFrameNum + 300
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcEnviroFrameNum .= enviroFrameNum
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    soundIdx <- soundIndex (Just "items/damage.wav")
+    sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
 pickupAncientHead :: EntInteract
 pickupAncientHead =
