@@ -345,8 +345,15 @@ pickupPowerup =
 
 dropGeneral :: ItemDrop
 dropGeneral =
-  GenericItemDrop "drop_general" $ \_ _ -> do
-    io (putStrLn "GameItems.dropGeneral") >> undefined -- TODO
+  GenericItemDrop "drop_general" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
+    dropItem edictRef gItemRef
+
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+    GameUtil.validateSelectedItem edictRef
 
 useInvulnerability :: ItemUse
 useInvulnerability =
