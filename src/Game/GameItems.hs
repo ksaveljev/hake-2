@@ -340,8 +340,34 @@ useQuad =
 
 pickupPowerup :: EntInteract
 pickupPowerup =
-  GenericEntInteract "pickup_powerup" $ \_ _ -> do
-    io (putStrLn "GameItems.pickupPowerup") >> undefined -- TODO
+  GenericEntInteract "pickup_powerup" $ \edictRef otherRef -> do
+    edict <- readEdictT edictRef
+    other <- readEdictT otherRef
+    let Just (GItemReference gItemIdx) = edict^.eItem
+    let Just (GClientReference gClientIdx) = other^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    skillValue <- liftM (^.cvValue) skillCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+
+    let quantity = (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)
+
+    if | skillValue == 1 && quantity >= 2 || skillValue >= 2 && quantity >= 1 ->
+           return False
+
+       | coopValue /= 0 && (gItem^.giFlags) .&. Constants.itStayCoop /= 0 && quantity > 0 ->
+           return False
+
+       | otherwise -> do
+           deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+           when (deathmatchValue /= 0) $ do
+             when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0) $
+               setRespawn edictRef (fromIntegral $ gItem^.giQuantity)
+
+             io (putStrLn "GameItems.pickupPowerup") >> undefined -- TODO
+
+           return True
 
 dropGeneral :: ItemDrop
 dropGeneral =
