@@ -350,8 +350,30 @@ dropGeneral =
 
 useInvulnerability :: ItemUse
 useInvulnerability =
-  GenericItemUse "use_invulnerability" $ \_ _ -> do
-    io (putStrLn "GameItems.useInvulnerability") >> undefined -- TODO
+  GenericItemUse "use_invulnerability" $ \edictRef (GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+    GameUtil.validateSelectedItem edictRef
+
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    levelFrameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+    let invincibleFrameNum = if (gClient^.gcInvincibleFrameNum) > fromIntegral levelFrameNum
+                               then (gClient^.gcInvincibleFrameNum) + 300
+                               else fromIntegral levelFrameNum + 300
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcInvincibleFrameNum .= invincibleFrameNum
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    soundIdx <- soundIndex (Just "items/protect.wav")
+    sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
 useSilencer :: ItemUse
 useSilencer =
