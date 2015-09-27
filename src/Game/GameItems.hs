@@ -330,8 +330,35 @@ pickupAmmo =
 
 dropAmmo :: ItemDrop
 dropAmmo =
-  GenericItemDrop "drop_ammo" $ \_ _ -> do
-    io (putStrLn "GameItems.dropAmmo") >> undefined -- TODO
+  GenericItemDrop "drop_ammo" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+    droppedRef <- dropItem edictRef gItemRef
+
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    let count = if (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex) >= (gItem^.giQuantity)
+                  then gItem^.giQuantity
+                  else (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)
+
+    modifyEdictT droppedRef (\v -> v & eCount .~ count)
+
+    weapon <- case gClient^.gcPers.cpWeapon of
+                Nothing -> return Nothing
+                Just (GItemReference weaponIdx) -> preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
+
+    dropped <- readEdictT droppedRef
+
+    if isJust weapon && ((fromJust weapon)^.giTag) == Constants.ammoGrenades && (gItem^.giTag) == Constants.ammoGrenades && ((gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)) - (dropped^.eCount) <= 0
+      then do
+        cprintf <- use $ gameBaseGlobals.gbGameImport.giCprintf
+        cprintf (Just edictRef) Constants.printHigh "Can't drop current weapon\n"
+        GameUtil.freeEdict droppedRef
+
+      else do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= (dropped^.eCount)
+        GameUtil.validateSelectedItem edictRef -- TODO: why does jake2 has same validate method in Cmd (which is used here)
 
 useQuad :: ItemUse
 useQuad =
