@@ -335,8 +335,39 @@ dropAmmo =
 
 useQuad :: ItemUse
 useQuad =
-  GenericItemUse "use_quad" $ \_ _ -> do
-    io (putStrLn "GameItems.useQuad") >> undefined -- TODO
+  GenericItemUse "use_quad" $ \edictRef (GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+    GameUtil.validateSelectedItem edictRef
+
+    quadDropTimeoutHack <- use $ gameItemsGlobals.giQuakeDropTimeoutHack
+
+    timeout <- if quadDropTimeoutHack /= 0
+                 then do
+                   gameItemsGlobals.giQuakeDropTimeoutHack .= 0
+                   return quadDropTimeoutHack
+                 else
+                   return 300
+
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    levelFrameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+
+    let quadFrameNum = if (gClient^.gcQuadFrameNum) > fromIntegral levelFrameNum
+                         then (gClient^.gcQuadFrameNum) + fromIntegral timeout
+                         else fromIntegral (levelFrameNum + timeout)
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcQuadFrameNum .= quadFrameNum
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+
+    soundIdx <- soundIndex (Just "items/damage.wav")
+    sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
 
 pickupPowerup :: EntInteract
 pickupPowerup =
