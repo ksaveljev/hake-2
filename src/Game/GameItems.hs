@@ -320,8 +320,16 @@ usePowerArmor =
 
 dropPowerArmor :: ItemDrop
 dropPowerArmor =
-  GenericItemDrop "drop_powerarmor" $ \_ _ -> do
-    io (putStrLn "GameItems.dropPowerArmor") >> undefined -- TODO
+  GenericItemDrop "drop_powerarmor" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    when ((edict^.eFlags) .&. Constants.flPowerArmor /= 0 && ((gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)) == 1) $
+      itemUse usePowerArmor edictRef gItemRef
+
+    itemDrop dropGeneral edictRef gItemRef
 
 pickupAmmo :: EntInteract
 pickupAmmo =

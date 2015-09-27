@@ -1178,7 +1178,7 @@ class ItemUseAdapter a where
     itemUse :: a -> EdictReference -> GItemReference -> Quake ()
 
 class ItemDropAdapter a where
-    drop :: a -> EdictReference -> GItemReference -> Quake ()
+    itemDrop :: a -> EdictReference -> GItemReference -> Quake ()
 
 class AIAdapter a where
     ai :: a -> EdictReference -> Float -> Quake ()
@@ -1317,7 +1317,7 @@ instance ItemUseAdapter ItemUse where
     itemUse (GenericItemUse _ _itemUse) = _itemUse
 
 instance ItemDropAdapter ItemDrop where
-    drop (GenericItemDrop _ _drop) = _drop
+    itemDrop (GenericItemDrop _ _itemDrop) = _itemDrop
 
 instance AIAdapter AI where
     ai (GenericAI _ _ai) = _ai
