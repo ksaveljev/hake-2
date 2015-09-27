@@ -315,8 +315,37 @@ pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" $ \_ _ -> do
 
 usePowerArmor :: ItemUse
 usePowerArmor =
-  GenericItemUse "use_powerarmor" $ \_ _ -> do
-    io (putStrLn "GameItems.usePowerArmor") >> undefined -- TODO
+  GenericItemUse "use_powerarmor" $ \edictRef _ -> do
+    edict <- readEdictT edictRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+        cprintf = gameImport^.giCprintf
+
+    if (edict^.eFlags) .&. Constants.flPowerArmor /= 0
+      then do
+        modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
+
+        soundIdx <- soundIndex (Just "misc/power2.wav")
+        sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+
+      else do
+        Just (GItemReference cellsIdx) <- findItem "cells"
+        Just cells <- preuse $ gameBaseGlobals.gbItemList.ix cellsIdx
+
+        let Just (GClientReference gClientIdx) = edict^.eClient
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+        if (gClient^.gcPers.cpInventory) UV.! (cells^.giIndex) == 0
+          then
+            cprintf (Just edictRef) Constants.printHigh "No cells for power armor.\n"
+
+          else do
+            modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flPowerArmor))
+
+            soundIdx <- soundIndex (Just "misc/power1.wav")
+            sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
 
 dropPowerArmor :: ItemDrop
 dropPowerArmor =
