@@ -325,8 +325,42 @@ dropPowerArmor =
 
 pickupAmmo :: EntInteract
 pickupAmmo =
-  GenericEntInteract "pickup_ammo" $ \_ _ -> do
-    io (putStrLn "GameItems.pickupAmmo") >> undefined -- TODO
+  GenericEntInteract "pickup_ammo" $ \edictRef otherRef -> do
+    edict <- readEdictT edictRef
+    let Just gItemRef@(GItemReference gItemIdx) = edict^.eItem
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    other <- readEdictT otherRef
+    let Just (GClientReference gClientIdx) = other^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    let weapon = (gItem^.giFlags) .&. Constants.itWeapon /= 0
+        count = if | weapon && dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0 -> 1000
+                   | (edict^.eCount) /= 0 -> edict^.eCount
+                   | otherwise -> gItem^.giQuantity
+        oldCount = (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)
+
+    added <- addAmmo otherRef gItemRef count
+
+    if not added
+      then
+        return False
+
+      else do
+        deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+        when (weapon && oldCount == 0) $ do
+          blasterIdx <- findItem "blaster"
+
+          when ((gClient^.gcPers.cpWeapon) /= (edict^.eItem) && (deathmatchValue == 0 || (gClient^.gcPers.cpWeapon) == blasterIdx)) $
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= (edict^.eItem)
+          
+        when ((edict^.eSpawnFlags) .&. (Constants.droppedItem .|. Constants.droppedPlayerItem) == 0 && deathmatchValue /= 0) $
+          setRespawn edictRef 30
+
+        return True
 
 dropAmmo :: ItemDrop
 dropAmmo =
