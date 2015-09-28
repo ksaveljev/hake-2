@@ -752,8 +752,103 @@ spTriggerElevator =
 
     return True
 
+{-
+- QUAKED func_plat (0 .5 .8) ? PLAT_LOW_TRIGGER speed default 150
+- 
+- Plats are always drawn in the extended position, so they will light
+- correctly.
+- 
+- If the plat is the target of another trigger or button, it will start out
+- disabled in the extended position until it is trigger, when it will lower
+- and become a normal plat.
+- 
+- "speed" overrides default 200. "accel" overrides default 500 "lip"
+- overrides default 8 pixel lip
+- 
+- If the "height" key is set, that will determine the amount the plat
+- moves, instead of being implicitly determoveinfoned by the model's
+- height.
+- 
+- Set "sounds" to one of the following: 1) base fast 2) chain slow
+-}
 spFuncPlat :: EdictReference -> Quake ()
-spFuncPlat _ = io (putStrLn "GameFunc.spFuncPlat") >> undefined -- TODO
+spFuncPlat edictRef = do
+    edict <- readEdictT edictRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+                                   & eSolid .~ Constants.solidBsp
+                                   & eMoveType .~ Constants.moveTypePush
+                                   & eBlocked .~ Just platBlocked
+                                   & eSpeed %~ (\s -> if s == 0 then 20 else s * 0.1)
+                                   & eAccel %~ (\a -> if a == 0 then 5 else a * 0.1)
+                                   & eDecel %~ (\d -> if d == 0 then 5 else d * 0.1)
+                                   & eDmg %~ (\d -> if d == 0 then 2 else d))
+
+    use (gameBaseGlobals.gbSpawnTemp) >>= \spawnTemp ->
+      when ((spawnTemp^.stLip) == 0) $
+        gameBaseGlobals.gbSpawnTemp.stLip .= 8
+
+    setModel edictRef (edict^.eiModel)
+
+    spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+
+    -- pos1 is the top position pos2 is the bottom
+    let pos1 = edict^.eEntityState.esOrigin
+        pos2 = if (spawnTemp^.stHeight) /= 0
+                 then (edict^.eEntityState.esOrigin) & _z -~ fromIntegral (spawnTemp^.stHeight)
+                 else (edict^.eEntityState.esOrigin) & _z -~ (edict^.eMaxs._z) - (edict^.eMins._z) - fromIntegral (spawnTemp^.stLip)
+
+    modifyEdictT edictRef (\v -> v & ePos1 .~ pos1
+                                   & ePos2 .~ pos2
+                                   & eUse .~ Just usePlat)
+
+    platSpawnInsideTrigger edictRef -- the "start moving" trigger
+
+    case edict^.eTargetName of
+      Just _ ->
+        modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateUp)
+
+      Nothing -> do
+        modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ pos2)
+        linkEntity edictRef
+        modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateBottom)
+
+    edict' <- readEdictT edictRef
+
+    soundStart <- soundIndex (Just "plats/pt1_strt.wav")
+    soundMiddle <- soundIndex (Just "plats/pt1_mid.wav")
+    soundEnd <- soundIndex (Just "plats/pt1_end.wav")
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miSpeed .~ (edict'^.eSpeed)
+                                   & eMoveInfo.miAccel .~ (edict'^.eAccel)
+                                   & eMoveInfo.miDecel .~ (edict'^.eDecel)
+                                   & eMoveInfo.miWait .~ (edict'^.eWait)
+                                   & eMoveInfo.miStartOrigin .~ (edict'^.ePos1)
+                                   & eMoveInfo.miStartAngles .~ (edict'^.eEntityState.esAngles)
+                                   & eMoveInfo.miEndOrigin .~ (edict'^.ePos2)
+                                   & eMoveInfo.miEndAngles .~ (edict'^.eEntityState.esAngles)
+                                   & eMoveInfo.miSoundStart .~ soundStart
+                                   & eMoveInfo.miSoundMiddle .~ soundMiddle
+                                   & eMoveInfo.miSoundEnd .~ soundEnd)
+
+platBlocked :: EntBlocked
+platBlocked =
+  GenericEntBlocked "plat_blocked" $ \_ _ -> do
+    io (putStrLn "GameFunc.platBlocked") >> undefined -- TODO
+
+usePlat :: EntUse
+usePlat =
+  GenericEntUse "use_plat" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.usePlat") >> undefined -- TODO
+
+platSpawnInsideTrigger :: EdictReference -> Quake ()
+platSpawnInsideTrigger _ = do
+    io (putStrLn "GameFunc.platSpawnInsideTrigger") >> undefined -- TODO
 
 spFuncWater :: EdictReference -> Quake ()
 spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
