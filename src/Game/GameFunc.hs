@@ -971,8 +971,25 @@ platSpawnInsideTrigger edictRef = do
 
 touchPlatCenter :: EntTouch
 touchPlatCenter =
-  GenericEntTouch "touch_plat_center" $ \_ _ _ _ -> do
-    io (putStrLn "GameFunc.touchPlatCenter") >> undefined -- TODO
+  GenericEntTouch "touch_plat_center" $ \edictRef otherRef _ _ -> do
+    edict <- readEdictT edictRef
+    other <- readEdictT otherRef
+
+    unless (isNothing (other^.eClient) || (other^.eHealth) <= 0) $ do
+      -- now point at the plat, not the trigger
+      -- TODO: make sure this is what the jake2 code does
+      let Just enemyRef = edict^.eEnemy
+      enemy <- readEdictT enemyRef
+
+      if | (enemy^.eMoveInfo.miState) == stateBottom ->
+             platGoUp enemyRef
+
+         | (enemy^.eMoveInfo.miState) == stateTop -> do
+             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+             modifyEdictT enemyRef (\v -> v & eNextThink .~ levelTime + 1) -- the player is still on the plat, so delay going down
+
+         | otherwise ->
+             return ()
 
 spFuncWater :: EdictReference -> Quake ()
 spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
