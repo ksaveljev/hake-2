@@ -42,6 +42,42 @@ secretFirstLeft = 2
 secretFirstDown :: Int
 secretFirstDown = 4
 
+platLowTrigger :: Int
+platLowTrigger = 1
+
+stateTop :: Int
+stateTop = 0
+
+stateBottom :: Int
+stateBottom = 1
+
+stateUp :: Int
+stateUp = 2
+
+stateDown :: Int
+stateDown = 3
+
+doorStartOpen :: Int
+doorStartOpen = 1
+
+doorReverse :: Int
+doorReverse = 2
+
+doorCrusher :: Int
+doorCrusher = 4
+
+doorNoMonster :: Int
+doorNoMonster = 8
+
+doorToggle :: Int
+doorToggle = 31
+
+doorXAxis :: Int
+doorXAxis = 64
+
+doorYAxis :: Int
+doorYAxis = 128
+
 {-
 - PLATS
 - 
@@ -444,8 +480,106 @@ doorSecretDie =
 
 spFuncDoorRotating :: EntThink
 spFuncDoorRotating =
-  GenericEntThink "sp_func_door_rotating" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncDoorRotating") >> undefined -- TODO
+  GenericEntThink "sp_func_door_rotating" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let dprintf = gameImport^.giDprintf
+        setModel = gameImport^.giSetModel
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    -- set the axis of rotation
+    let moveDir = if | (edict^.eSpawnFlags) .&. doorXAxis /= 0 -> V3 0 0 1.0
+                     | (edict^.eSpawnFlags) .&. doorYAxis /= 0 -> V3 1.0 0 0
+                     | otherwise -> V3 0 1.0 0
+        -- check for reverse rotation
+        moveDir' = if (edict^.eSpawnFlags) .&. doorReverse /= 0
+                     then fmap negate moveDir
+                     else moveDir
+
+    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+                                   & eMoveDir .~ moveDir')
+      
+    use (gameBaseGlobals.gbSpawnTemp) >>= \spawnTemp ->
+      when ((spawnTemp^.stDistance) == 0) $ do
+        dprintf ((edict^.eClassName) `B.append` " at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " with no distance set\n")
+        gameBaseGlobals.gbSpawnTemp.stDistance .= 90
+
+    spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+
+    let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
+
+    modifyEdictT edictRef (\v -> v & ePos1 .~ V3 0 0 0
+                                   & ePos2 .~ fmap (* fromIntegral (spawnTemp^.stDistance)) moveDir'
+                                   & eMoveInfo.miDistance .~ fromIntegral (spawnTemp^.stDistance)
+                                   & eMoveType .~ Constants.moveTypePush
+                                   & eSolid .~ Constants.solidBsp
+                                   & eBlocked .~ Just doorBlocked
+                                   & eUse .~ Just doorUse
+                                   & eSpeed .~ speed
+                                   & eAccel %~ (\a -> if a == 0 then speed else a)
+                                   & eDecel %~ (\d -> if d == 0 then speed else d)
+                                   & eWait %~ (\w -> if w == 0 then 3 else w)
+                                   & eDmg %~ (\d -> if d == 0 then 2 else d))
+
+    setModel edictRef (edict^.eiModel)
+
+    when ((edict^.eSounds) /= 1) $ do
+      soundStart <- soundIndex (Just "doors/dr1_strt.wav")
+      soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
+      soundEnd <- soundIndex (Just "doors/dr1_end.wav")
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+                                     & eMoveInfo.miSoundMiddle .~ soundMiddle
+                                     & eMoveInfo.miSoundEnd .~ soundEnd)
+
+    -- if it starts open, switch the positions
+    when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $ do
+      edict' <- readEdictT edictRef
+      modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ (edict'^.ePos2)
+                                     & ePos2 .~ (edict'^.ePos1)
+                                     & ePos1 .~ (edict'^.ePos2)
+                                     & eMoveDir %~ (fmap negate))
+
+    when ((edict^.eHealth) /= 0) $
+      modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+                                     & eDie .~ Just doorKilled
+                                     & eMaxHealth .~ (edict^.eHealth))
+
+    when (isJust (edict^.eTargetName) && isJust (edict^.eMessage)) $ do
+      void $ soundIndex (Just "misc/talk.wav")
+      modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
+
+    edict' <- readEdictT edictRef
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateBottom
+                                   & eMoveInfo.miSpeed .~ (edict'^.eSpeed)
+                                   & eMoveInfo.miAccel .~ (edict'^.eAccel)
+                                   & eMoveInfo.miDecel .~ (edict'^.eDecel)
+                                   & eMoveInfo.miWait .~ (edict'^.eWait)
+                                   & eMoveInfo.miStartOrigin .~ (edict'^.eEntityState.esOrigin)
+                                   & eMoveInfo.miStartAngles .~ (edict'^.ePos1)
+                                   & eMoveInfo.miEndOrigin .~ (edict'^.eEntityState.esOrigin)
+                                   & eMoveInfo.miEndAngles .~ (edict'^.ePos2))
+
+    when ((edict'^.eSpawnFlags) .&. 16 /= 0) $
+      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+      
+    -- to simplify logic elsewhere, make non-teamed doors into a team of one
+    when (isNothing (edict'^.eTeam)) $
+      modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
+
+    linkEntity edictRef
+
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+
+    let nextThink = if (edict'^.eHealth) /= 0 || isJust (edict'^.eTargetName)
+                      then Just thinkCalcMoveSpeed
+                      else Just thinkSpawnDoorTrigger
+
+    modifyEdictT edictRef (\v -> v & eThink .~ nextThink)
+    return True
 
 spFuncConveyor :: EntThink
 spFuncConveyor =
