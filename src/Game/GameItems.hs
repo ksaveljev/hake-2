@@ -310,8 +310,30 @@ pickupArmor = PickupArmor "pickup_armor" $ \edictRef otherRef -> do
   return True
 
 pickupPowerArmor :: EntInteract
-pickupPowerArmor = PickupPowerArmor "pickup_powerarmor" $ \_ _ -> do
-  io (putStrLn "GameItems.pickupPowerArmor") >> undefined -- TODO
+pickupPowerArmor =
+  PickupPowerArmor "pickup_powerarmor" $ \edictRef otherRef -> do
+    other <- readEdictT otherRef
+    let Just (GClientReference gClientIdx) = other^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    edict <- readEdictT edictRef
+    let Just gItemRef@(GItemReference gItemIdx) = edict^.eItem
+    Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+    let quantity = (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) += 1
+
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    when (deathmatchValue /= 0) $ do
+      when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0) $
+        setRespawn edictRef (fromIntegral $ gItem^.giQuantity)
+
+      when (quantity == 0) $
+        itemUse (fromJust $ gItem^.giUse) otherRef gItemRef
+
+    return True
 
 usePowerArmor :: ItemUse
 usePowerArmor =
