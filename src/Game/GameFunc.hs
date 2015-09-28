@@ -936,8 +936,43 @@ usePlat =
       Nothing -> void $ think platGoDown edictRef
 
 platSpawnInsideTrigger :: EdictReference -> Quake ()
-platSpawnInsideTrigger _ = do
-    io (putStrLn "GameFunc.platSpawnInsideTrigger") >> undefined -- TODO
+platSpawnInsideTrigger edictRef = do
+    edict <- readEdictT edictRef
+    spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+    triggerRef <- GameUtil.spawn
+
+    let tmin = (edict^.eMins) + V3 25 25 0
+        tmax = (edict^.eMaxs) + V3 (-25) (-25) 8
+        tmin' = tmin & _z .~ (tmax^._z) - ((edict^.ePos1._z) - (edict^.ePos2._z) + fromIntegral (spawnTemp^.stLip))
+        tmax' = if (edict^.eSpawnFlags) .&. platLowTrigger /= 0
+                  then tmax & _z .~ (tmin'^._z) + 8
+                  else tmax
+        (tmin'', tmax'') = if (tmax'^._x) - (tmin'^._x) <= 0
+                             then let tmin'' = tmin' & _x .~ ((edict^.eMins._x) + (edict^.eMaxs._x)) * 0.5
+                                      tmax'' = tmax' & _x .~ (tmin''^._x) + 1
+                                  in (tmin'', tmax'')
+                             else (tmin', tmax')
+
+        (tmin''', tmax''') = if (tmax''^._y) - (tmin''^._y) <= 0
+                               then let tmin''' = tmin'' & _y .~ ((edict^.eMins._y) + (edict^.eMaxs._y)) * 0.5
+                                        tmax''' = tmax'' & _y .~ (tmin''^._y) + 1
+                                    in (tmin''', tmax''')
+                               else (tmin'', tmax'')
+
+    modifyEdictT triggerRef (\v -> v & eTouch .~ Just touchPlatCenter
+                                     & eMoveType .~ Constants.moveTypeNone
+                                     & eSolid .~ Constants.solidTrigger
+                                     & eEnemy .~ Just edictRef
+                                     & eMins .~ tmin'''
+                                     & eMaxs .~ tmax''')
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity triggerRef
+
+touchPlatCenter :: EntTouch
+touchPlatCenter =
+  GenericEntTouch "touch_plat_center" $ \_ _ _ _ -> do
+    io (putStrLn "GameFunc.touchPlatCenter") >> undefined -- TODO
 
 spFuncWater :: EdictReference -> Quake ()
 spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
