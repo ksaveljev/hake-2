@@ -928,8 +928,12 @@ platHitTop =
 
 usePlat :: EntUse
 usePlat =
-  GenericEntUse "use_plat" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.usePlat") >> undefined -- TODO
+  GenericEntUse "use_plat" $ \edictRef _ _ -> do
+    edict <- readEdictT edictRef
+
+    case edict^.eThink of
+      Just _ -> return () -- already down
+      Nothing -> void $ think platGoDown edictRef
 
 platSpawnInsideTrigger :: EdictReference -> Quake ()
 platSpawnInsideTrigger _ = do
