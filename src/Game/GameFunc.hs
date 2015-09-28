@@ -864,8 +864,24 @@ platBlocked =
 
 platGoDown :: EntThink
 platGoDown =
-  GenericEntThink "plat_go_down" $ \_ -> do
-    io (putStrLn "GameFunc.platGoDown") >> undefined -- TODO
+  GenericEntThink "plat_go_down" $ \edictRef -> do
+    edict <- readEdictT edictRef
+
+    when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+      when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+
+      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateDown)
+    moveCalc edictRef (edict^.eMoveInfo.miEndOrigin) platHitBottom
+    return True
+
+platHitBottom :: EntThink
+platHitBottom =
+  GenericEntThink "plat_hit_bottom" $ \_ -> do
+    io (putStrLn "GameFunc.platHitBottom") >> undefined -- TODO
 
 platGoUp :: EdictReference -> Quake ()
 platGoUp _ = do
