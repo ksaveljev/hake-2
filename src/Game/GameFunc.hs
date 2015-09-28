@@ -838,8 +838,38 @@ spFuncPlat edictRef = do
 
 platBlocked :: EntBlocked
 platBlocked =
-  GenericEntBlocked "plat_blocked" $ \_ _ -> do
-    io (putStrLn "GameFunc.platBlocked") >> undefined -- TODO
+  GenericEntBlocked "plat_blocked" $ \selfRef otherRef -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    v3o <- use $ globals.vec3Origin
+
+    if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
+      then do
+        -- give it a chance to go away on it's own terms (like gibs)
+        GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
+
+        -- if it's still there, nuke it
+        -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+        other' <- readEdictT otherRef
+        when (other'^.eInUse) $
+          GameMisc.becomeExplosion1 otherRef
+
+      else do
+        GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
+
+        self' <- readEdictT selfRef
+        if (self'^.eMoveInfo.miState) == stateUp
+          then void $ think platGoDown selfRef
+          else platGoUp selfRef
+
+platGoDown :: EntThink
+platGoDown =
+  GenericEntThink "plat_go_down" $ \_ -> do
+    io (putStrLn "GameFunc.platGoDown") >> undefined -- TODO
+
+platGoUp :: EdictReference -> Quake ()
+platGoUp _ = do
+    io (putStrLn "GameFunc.platGoUp") >> undefined -- TODO
 
 usePlat :: EntUse
 usePlat =
