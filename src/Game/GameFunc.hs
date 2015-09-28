@@ -910,7 +910,21 @@ platGoUp edictRef = do
 platHitTop :: EntThink
 platHitTop =
   GenericEntThink "plat_hit_top" $ \edictRef -> do
-    io (putStrLn "GameFunc.platHitTop") >> undefined -- TODO
+    edict <- readEdictT edictRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+      when ((edict^.eMoveInfo.miSoundEnd) /= 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+
+      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0)
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateTop
+                                   & eThink .~ Just platGoDown
+                                   & eNextThink .~ levelTime + 3)
+
+    return True
 
 usePlat :: EntUse
 usePlat =
