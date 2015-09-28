@@ -438,8 +438,9 @@ doorSecretDone =
 
 doorSecretDie :: EntDie
 doorSecretDie =
-  GenericEntDie "door_secret_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "GameFunc.doorSecretDie") >> undefined -- TODO
+  GenericEntDie "door_secret_die" $ \selfRef _ attackerRef _ _ -> do
+    modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
+    entUse doorSecretUse selfRef (Just attackerRef) (Just attackerRef)
 
 spFuncDoorRotating :: EntThink
 spFuncDoorRotating =
