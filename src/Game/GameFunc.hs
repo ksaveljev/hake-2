@@ -361,8 +361,80 @@ doorSecretBlocked =
 
 doorSecretUse :: EntUse
 doorSecretUse =
-  GenericEntUse "door_secret_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.doorSecretUse") >> undefined -- TODO
+  GenericEntUse "door_secret_use" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
+    v3o <- use $ globals.vec3Origin
+
+    -- make sure we're not already moving
+    if not ((self^.eEntityState.esOrigin) == v3o)
+      then
+        return ()
+      else do
+        moveCalc selfRef (self^.ePos1) doorSecretMove1
+        doorUseAreaPortals selfRef True
+
+doorSecretMove1 :: EntThink
+doorSecretMove1 =
+  GenericEntThink "door_secret_move1" $ \selfRef -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1.0
+                                  & eThink .~ Just doorSecretMove2)
+    return True
+
+doorSecretMove2 :: EntThink
+doorSecretMove2 =
+  GenericEntThink "door_secret_move2" $ \selfRef -> do
+    self <- readEdictT selfRef
+    moveCalc selfRef (self^.ePos2) doorSecretMove3
+    return True
+
+doorSecretMove3 :: EntThink
+doorSecretMove3 =
+  GenericEntThink "door_secret_move3" $ \selfRef -> do
+    self <- readEdictT selfRef
+
+    if (self^.eWait) == -1
+      then
+        return True
+      else do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eWait)
+                                      & eThink .~ Just doorSecretMove4)
+        return True
+
+doorSecretMove4 :: EntThink
+doorSecretMove4 =
+  GenericEntThink "door_secret_move4" $ \selfRef -> do
+    self <- readEdictT selfRef
+    moveCalc selfRef (self^.ePos1) doorSecretMove5
+    return True
+
+doorSecretMove5 :: EntThink
+doorSecretMove5 =
+  GenericEntThink "door_secret_move5" $ \selfRef -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1.0
+                                  & eThink .~ Just doorSecretMove6)
+    return True
+
+doorSecretMove6 :: EntThink
+doorSecretMove6 =
+  GenericEntThink "door_secret_move6" $ \selfRef -> do
+    v3o <- use $ globals.vec3Origin
+    moveCalc selfRef v3o doorSecretDone
+    return True
+
+doorSecretDone :: EntThink
+doorSecretDone =
+  GenericEntThink "door_secret_move7" $ \selfRef -> do
+    self <- readEdictT selfRef
+
+    when (isNothing (self^.eTargetName) || (self^.eSpawnFlags) .&. secretAlwaysShoot /= 0) $
+      modifyEdictT selfRef (\v -> v & eHealth .~ 0
+                                    & eTakeDamage .~ Constants.damageYes)
+
+    doorUseAreaPortals selfRef False
+    return True
 
 doorSecretDie :: EntDie
 doorSecretDie =
