@@ -8,7 +8,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3(..), _x, _y, _z, normalize, quadrance)
+import Linear (V3(..), _x, _y, _z, normalize, quadrance, dot)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -20,6 +20,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 trainStartOn :: Int
 trainStartOn = 1
@@ -29,6 +30,15 @@ trainToggle = 2
 
 trainBlockStops :: Int
 trainBlockStops = 4
+
+secretAlwaysShoot :: Int
+secretAlwaysShoot = 1
+
+secretFirstLeft :: Int
+secretFirstLeft = 2
+
+secretFirstDown :: Int
+secretFirstDown = 4
 
 {-
 - PLATS
@@ -252,8 +262,91 @@ spFuncDoor =
 
 spFuncDoorSecret :: EntThink
 spFuncDoorSecret =
-  GenericEntThink "sp_func_door_secret" $ \_ -> do
-    io (putStrLn "GameFunc.spFuncDoorSecret") >> undefined -- TODO
+  GenericEntThink "sp_func_door_secret" $ \edictRef -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        setModel = gameImport^.giSetModel
+        linkEntity = gameImport^.giLinkEntity
+
+    soundStart <- soundIndex (Just "doors/dr1_strt.wav")
+    soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
+    soundEnd <- soundIndex (Just "doors/dr1_end.wav")
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+                                   & eMoveInfo.miSoundMiddle .~ soundMiddle
+                                   & eMoveInfo.miSoundEnd .~ soundEnd
+                                   & eMoveType .~ Constants.moveTypePush
+                                   & eSolid .~ Constants.solidBsp
+                                   & eBlocked .~ Just doorSecretBlocked
+                                   & eUse .~ Just doorSecretUse)
+
+    edict <- readEdictT edictRef
+
+    setModel edictRef (edict^.eiModel)
+
+    when (isNothing (edict^.eTargetName) || (edict^.eSpawnFlags) .&. secretAlwaysShoot /= 0) $
+      modifyEdictT edictRef (\v -> v & eHealth .~ 0
+                                     & eTakeDamage .~ Constants.damageYes
+                                     & eDie .~ Just doorSecretDie)
+
+    when ((edict^.eDmg) == 0) $
+      modifyEdictT edictRef (\v -> v & eDmg .~ 2)
+
+    when ((edict^.eWait) == 0) $
+      modifyEdictT edictRef (\v -> v & eWait .~ 5)
+
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miAccel .~ 50
+                                   & eMoveInfo.miDecel .~ 50
+                                   & eMoveInfo.miSpeed .~ 50)
+
+    -- calculate positions
+    let (Just forward, Just right, Just up) = Math3D.angleVectors (edict^.eEntityState.esAngles) True True True
+
+    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0)
+
+    let side = 1.0 - fromIntegral ((edict^.eSpawnFlags) .&. secretFirstLeft)
+        width = if (edict^.eSpawnFlags) .&. secretFirstDown /= 0
+                  then abs (up `dot` (edict^.eSize))
+                  else abs (right `dot` (edict^.eSize))
+        length = abs (forward `dot` (edict^.eSize))
+        pos1 = if (edict^.eSpawnFlags) .&. secretFirstDown /= 0
+                 then (edict^.eEntityState.esOrigin) + fmap (* ((-1) * width)) up
+                 else (edict^.eEntityState.esOrigin) + fmap (* (side * width)) right
+        pos2 = pos1 + fmap (* length) forward
+
+    modifyEdictT edictRef (\v -> v & ePos1 .~ pos1
+                                   & ePos2 .~ pos2)
+
+    if (edict^.eHealth) /= 0
+      then
+        modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+                                       & eDie .~ Just doorKilled
+                                       & eMaxHealth .~ (edict^.eHealth))
+      else do
+        void $ soundIndex (Just "misc/talk.wav")
+        modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
+
+    modifyEdictT edictRef (\v -> v & eClassName .~ "func_door")
+
+    linkEntity edictRef
+    return True
+
+doorSecretBlocked :: EntBlocked
+doorSecretBlocked =
+  GenericEntBlocked "door_secret_blocked" $ \_ _ -> do
+    io (putStrLn "GameFunc.doorSecretBlocked") >> undefined -- TODO
+
+doorSecretUse :: EntUse
+doorSecretUse =
+  GenericEntUse "door_secret_use" $ \_ _ _ -> do
+    io (putStrLn "GameFunc.doorSecretUse") >> undefined -- TODO
+
+doorSecretDie :: EntDie
+doorSecretDie =
+  GenericEntDie "door_secret_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "GameFunc.doorSecretDie") >> undefined -- TODO
 
 spFuncDoorRotating :: EntThink
 spFuncDoorRotating =
