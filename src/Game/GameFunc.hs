@@ -18,6 +18,8 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+import {-# SOURCE #-} qualified Game.GameCombat as GameCombat
+import {-# SOURCE #-} qualified Game.GameMisc as GameMisc
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -335,8 +337,27 @@ spFuncDoorSecret =
 
 doorSecretBlocked :: EntBlocked
 doorSecretBlocked =
-  GenericEntBlocked "door_secret_blocked" $ \_ _ -> do
-    io (putStrLn "GameFunc.doorSecretBlocked") >> undefined -- TODO
+  GenericEntBlocked "door_secret_blocked" $ \selfRef otherRef -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    v3o <- use $ globals.vec3Origin
+
+    if | (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient) -> do
+           -- give it a chance to go away on it's own terms (like gibs)
+           GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
+           -- if it's still there, nuke it
+           -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+           other' <- readEdictT otherRef
+           when (other'^.eInUse) $
+             GameMisc.becomeExplosion1 otherRef
+
+       | levelTime < (self^.eTouchDebounceTime) ->
+           return ()
+
+       | otherwise -> do
+           modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
+           GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 doorSecretUse :: EntUse
 doorSecretUse =
