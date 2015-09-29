@@ -1565,8 +1565,30 @@ buttonWait =
 
 buttonReturn :: EntThink
 buttonReturn =
-  GenericEntThink "button_return" $ \_ -> do
-    io (putStrLn "GameFunc.buttonReturn") >> undefined -- TODO
+  GenericEntThink "button_return" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateDown)
+
+    self <- readEdictT selfRef
+
+    moveCalc selfRef (self^.eMoveInfo.miStartOrigin) buttonDone
+
+    modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 0)
+
+    self' <- readEdictT selfRef
+
+    when ((self'^.eHealth) /= 0) $
+      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageYes)
+
+    return True
+
+buttonDone :: EntThink
+buttonDone =
+  GenericEntThink "button_done" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateBottom
+                                  & eEntityState.esEffects %~ (.&. (complement Constants.efAnim23))
+                                  & eEntityState.esEffects %~ (.|. Constants.efAnim01))
+
+    return True
 
 trainNext :: EntThink
 trainNext =
