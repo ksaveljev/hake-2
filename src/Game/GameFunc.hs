@@ -991,8 +991,88 @@ touchPlatCenter =
          | otherwise ->
              return ()
 
+{-
+- QUAKED func_water (0 .5 .8) ? START_OPEN func_water is a moveable water
+- brush. It must be targeted to operate. Use a non-water texture at your
+- own risk.
+- 
+- START_OPEN causes the water to move to its destination when spawned and
+- operate in reverse.
+- 
+- "angle" determines the opening direction (up or down only) "speed"
+- movement speed (25 default) "wait" wait before returning (-1 default, -1 =
+- TOGGLE) "lip" lip remaining at end of move (0 default) "sounds" (yes,
+- these need to be changed) 0) no sound 1) water 2) lava
+-}
 spFuncWater :: EdictReference -> Quake ()
-spFuncWater _ = io (putStrLn "GameFunc.spFuncWater") >> undefined -- TODO
+spFuncWater selfRef = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let setModel = gameImport^.giSetModel
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+
+    GameBase.setMoveDir selfRef
+
+    self <- readEdictT selfRef
+    spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
+    sounds <- case self^.eSounds of
+                1 -> do -- water
+                       soundStart <- soundIndex (Just "world/mov_watr.wav")
+                       soundEnd <- soundIndex (Just "world/stp_watr.wav")
+                       return $ Just (soundStart, soundEnd)
+
+                2 -> do -- laval
+                       soundStart <- soundIndex (Just "world/mov_watr.wav")
+                       soundEnd <- soundIndex (Just "world/stp_watr.wav")
+                       return $ Just (soundStart, soundEnd)
+
+                _ -> return Nothing
+
+    case sounds of
+      Nothing -> return ()
+      Just (soundStart, soundEnd) ->
+        modifyEdictT selfRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+                                      & eMoveInfo.miSoundEnd .~ soundEnd)
+
+    let absMoveDir = fmap abs (self^.eMoveDir)
+        distance = (absMoveDir^._x) * (self^.eSize._x) + (absMoveDir^._y) * (self^.eSize._y) + (absMoveDir^._z) * (self^.eSize._z) - fromIntegral (spawnTemp^.stLip)
+
+    modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                  & eSolid .~ Constants.solidBsp
+                                  & ePos1 .~ (self^.eEntityState.esOrigin)
+                                  & eMoveInfo.miDistance .~ distance
+                                  & ePos2 .~ (self^.eEntityState.esOrigin) + fmap (* distance) (self^.eMoveDir))
+
+    setModel selfRef (self^.eiModel)
+
+    -- if it starts open, switch the positions
+    when ((self^.eSpawnFlags) .&. doorStartOpen /= 0) $ do
+      self' <- readEdictT selfRef
+      modifyEdictT selfRef (\v -> v & eEntityState.esOrigin .~ (self'^.ePos2)
+                                    & ePos2 .~ (self'^.ePos1)
+                                    & ePos1 .~ (self'^.ePos2))
+
+    self' <- readEdictT selfRef
+
+    let speed = if (self'^.eSpeed) == 0 then 25 else self'^.eSpeed
+        wait = if (self'^.eWait) == 0 then -1 else self'^.eWait
+
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miStartOrigin .~ (self'^.ePos1)
+                                  & eMoveInfo.miStartAngles .~ (self'^.eEntityState.esAngles)
+                                  & eMoveInfo.miEndOrigin .~ (self'^.ePos2)
+                                  & eMoveInfo.miEndAngles .~ (self'^.eEntityState.esAngles)
+                                  & eSpeed .~ speed
+                                  & eMoveInfo.miSpeed .~ speed
+                                  & eMoveInfo.miAccel .~ speed
+                                  & eMoveInfo.miDecel .~ speed
+                                  & eWait .~ wait
+                                  & eMoveInfo.miWait .~ wait
+                                  & eUse .~ Just doorUse
+                                  & eSpawnFlags %~ (\f -> if wait == -1 then f .|. doorToggle else f)
+                                  & eClassName .~ "func_door")
+
+    linkEntity selfRef
 
 spFuncTrain :: EdictReference -> Quake ()
 spFuncTrain edictRef = do
