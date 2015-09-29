@@ -1524,8 +1524,27 @@ buttonKilled =
 
 buttonFire :: EntThink
 buttonFire =
-  GenericEntThink "button_fire" $ \_ -> do
-    io (putStrLn "GameFunc.buttonFire") >> undefined -- TODO
+  GenericEntThink "button_fire" $ \selfRef -> do
+    self <- readEdictT selfRef
+
+    if (self^.eMoveInfo.miState) == stateUp || (self^.eMoveInfo.miState) == stateTop
+      then
+        return True
+
+      else do
+        modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateUp)
+
+        when ((self^.eMoveInfo.miSoundStart) /= 0 && (self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+          sound <- use $ gameBaseGlobals.gbGameImport.giSound
+          sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+
+        moveCalc selfRef (self^.eMoveInfo.miEndOrigin) buttonWait
+        return True
+
+buttonWait :: EntThink
+buttonWait =
+  GenericEntThink "button_wait" $ \_ -> do
+    io (putStrLn "GameFunc.buttonWait") >> undefined -- TODO
 
 trainNext :: EntThink
 trainNext =
