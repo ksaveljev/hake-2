@@ -1201,8 +1201,28 @@ funcTimerThink =
 
 trainBlocked :: EntBlocked
 trainBlocked =
-  GenericEntBlocked "train_blocked" $ \_ _ -> do
-    io (putStrLn "GameFunc.trainBlocked") >> undefined -- TODO
+  GenericEntBlocked "train_blocked" $ \selfRef otherRef -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    v3o <- use $ globals.vec3Origin
+
+    if | (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient) -> do
+           -- give it a chance to go away on it's own terms (like gibs)
+           GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
+
+           -- if it's still there, nuke it
+           -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+           other' <- readEdictT otherRef
+           when (other'^.eInUse) $
+             GameMisc.becomeExplosion1 otherRef
+
+       | levelTime < (self^.eTouchDebounceTime) || (self^.eDmg) == 0 ->
+           return ()
+
+       | otherwise -> do
+           modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
+           GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 trainUse :: EntUse
 trainUse =
