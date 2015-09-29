@@ -1543,8 +1543,30 @@ buttonFire =
 
 buttonWait :: EntThink
 buttonWait =
-  GenericEntThink "button_wait" $ \_ -> do
-    io (putStrLn "GameFunc.buttonWait") >> undefined -- TODO
+  GenericEntThink "button_wait" $ \selfRef -> do
+    self <- readEdictT selfRef
+
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateTop
+                                  & eEntityState.esEffects %~ (.&. (complement Constants.efAnim01))
+                                  & eEntityState.esEffects %~ (.|. Constants.efAnim23))
+
+    GameUtil.useTargets selfRef (self^.eActivator)
+
+    modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 1)
+
+    self' <- readEdictT selfRef
+
+    when ((self'^.eMoveInfo.miWait) >= 0) $ do
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+      modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self'^.eMoveInfo.miWait)
+                                    & eThink .~ Just buttonReturn)
+
+    return True
+
+buttonReturn :: EntThink
+buttonReturn =
+  GenericEntThink "button_return" $ \_ -> do
+    io (putStrLn "GameFunc.buttonReturn") >> undefined -- TODO
 
 trainNext :: EntThink
 trainNext =
