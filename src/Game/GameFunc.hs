@@ -1731,7 +1731,22 @@ doorUseAreaPortals selfRef open = do
               setAreaPortals target maybeFoundRef
 
 trainResume :: EdictReference -> Quake ()
-trainResume _ = io (putStrLn "GameFunc.trainResume") >> undefined -- TODO
+trainResume selfRef = do
+    self <- readEdictT selfRef
+
+    let Just edictRef = self^.eTargetEnt
+
+    edict <- readEdictT edictRef
+
+    let dest = (edict^.eEntityState.esOrigin) - (self^.eMins)
+
+    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateTop
+                                  & eMoveInfo.miStartOrigin .~ (self^.eEntityState.esOrigin)
+                                  & eMoveInfo.miEndOrigin .~ dest)
+
+    moveCalc selfRef dest trainWait
+
+    modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
 trainWait :: EntThink
 trainWait =
