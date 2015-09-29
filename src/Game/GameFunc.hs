@@ -1381,8 +1381,29 @@ doorKilled =
 
 doorTouch :: EntTouch
 doorTouch =
-  GenericEntTouch "door_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameFunc.doorTouch") >> undefined -- TODO
+  GenericEntTouch "door_touch" $ \selfRef otherRef _ _ -> do
+    other <- readEdictT otherRef
+
+    case other^.eClient of
+      Nothing ->
+        return ()
+
+      Just _ -> do
+        self <- readEdictT selfRef
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        unless (levelTime < (self^.eTouchDebounceTime)) $ do
+          modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 5.0)
+
+          gameImport <- use $ gameBaseGlobals.gbGameImport
+
+          let centerPrintf = gameImport^.giCenterPrintf
+              soundIndex = gameImport^.giSoundIndex
+              sound = gameImport^.giSound
+
+          centerPrintf otherRef (fromJust $ self^.eMessage)
+          soundIdx <- soundIndex (Just "misc/talk1.wav")
+          sound (Just otherRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
 
 thinkCalcMoveSpeed :: EntThink
 thinkCalcMoveSpeed =
