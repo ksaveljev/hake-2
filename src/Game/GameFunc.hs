@@ -1319,8 +1319,48 @@ doorUse =
 
 doorBlocked :: EntBlocked
 doorBlocked =
-  GenericEntBlocked "door_blocked" $ \_ _ -> do
-    io (putStrLn "GameFunc.doorBlocked") >> undefined -- TODO
+  GenericEntBlocked "door_blocked" $ \selfRef otherRef -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    v3o <- use $ globals.vec3Origin
+
+    if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
+      then do
+        -- give it a chance to go away on it's own terms (like gibs)
+        GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
+
+        -- if it's still there, nuke it
+        -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+        other' <- readEdictT otherRef
+        when (other'^.eInUse) $
+          GameMisc.becomeExplosion1 otherRef
+
+      else do
+        GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
+
+        self' <- readEdictT selfRef
+
+        unless ((self'^.eSpawnFlags) .&. doorCrusher /= 0) $ do
+          -- if a door has a negative wait, it would never come back if
+          -- blocked, so let it just squash the object to death real fast
+          when ((self'^.eMoveInfo.miWait) >= 0) $ do
+            if (self'^.eMoveInfo.miState) == stateDown
+              then teamDoorGoUp (self'^.eTeamMaster)
+              else teamDoorGoDown (self'^.eTeamMaster)
+
+  where teamDoorGoUp :: Maybe EdictReference -> Quake ()
+        teamDoorGoUp Nothing = return ()
+        teamDoorGoUp (Just edictRef) = do
+          edict <- readEdictT edictRef
+          doorGoUp edictRef (edict^.eActivator)
+          teamDoorGoUp (edict^.eTeamChain)
+
+        teamDoorGoDown :: Maybe EdictReference -> Quake ()
+        teamDoorGoDown Nothing = return ()
+        teamDoorGoDown (Just edictRef) = do
+          edict <- readEdictT edictRef
+          void $ think doorGoDown edictRef
+          teamDoorGoDown (edict^.eTeamChain)
 
 doorKilled :: EntDie
 doorKilled =
