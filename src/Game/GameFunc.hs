@@ -1504,8 +1504,12 @@ buttonUse =
 
 buttonTouch :: EntTouch
 buttonTouch =
-  GenericEntTouch "button_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameFunc.buttonTouch") >> undefined -- TODO
+  GenericEntTouch "button_touch" $ \selfRef otherRef _ _ -> do
+    other <- readEdictT otherRef
+
+    unless (isNothing (other^.eClient) || (other^.eHealth) <= 0) $ do
+      modifyEdictT selfRef (\v -> v & eActivator .~ Just otherRef)
+      void $ think buttonFire selfRef
 
 buttonKilled :: EntDie
 buttonKilled =
