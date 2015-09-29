@@ -1364,8 +1364,20 @@ doorBlocked =
 
 doorKilled :: EntDie
 doorKilled =
-  GenericEntDie "door_killed" $ \_ _ _ _ _ -> do
-    io (putStrLn "GameFunc.doorKilled") >> undefined -- TODO
+  GenericEntDie "door_killed" $ \selfRef _ attackerRef _ _ -> do
+    self <- readEdictT selfRef
+    updateDoorTeam (self^.eTeamMaster)
+    entUse doorUse (fromJust $ self^.eTeamMaster) (Just attackerRef) (Just attackerRef)
+
+  where updateDoorTeam :: Maybe EdictReference -> Quake ()
+        updateDoorTeam Nothing = return ()
+        updateDoorTeam (Just edictRef) = do
+          edict <- readEdictT edictRef
+
+          modifyEdictT edictRef (\v -> v & eHealth .~ (edict^.eMaxHealth)
+                                         & eTakeDamage .~ Constants.damageNo)
+
+          updateDoorTeam (edict^.eTeamChain)
 
 doorTouch :: EntTouch
 doorTouch =
