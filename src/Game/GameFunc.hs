@@ -1843,8 +1843,30 @@ moveCalc edictRef dest func = do
                                        & eNextThink .~ levelTime + Constants.frameTime)
 
 angleMoveCalc :: EdictReference -> EntThink -> Quake ()
-angleMoveCalc _ _ = do
-    io (putStrLn "GameFunc.angleMoveCalc") >> undefined -- TODO
+angleMoveCalc edictRef func = do
+    modifyEdictT edictRef (\v -> v & eAVelocity .~ V3 0 0 0
+                                   & eMoveInfo.miEndFunc .~ Just func)
+
+    currentEntity <- use $ gameBaseGlobals.gbLevel.llCurrentEntity
+
+    edict <- readEdictT edictRef
+    let ent = if (edict^.eFlags) .&. Constants.flTeamSlave /= 0
+                then edict^.eTeamMaster
+                else Just edictRef
+
+    if currentEntity == ent
+      then
+        void $ think angleMoveBegin edictRef
+
+      else do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+                                       & eThink .~ Just angleMoveBegin)
+
+angleMoveBegin :: EntThink
+angleMoveBegin =
+  GenericEntThink "angle_move_begin" $ \_ -> do
+    io (putStrLn "GameFunc.angleMoveBegin") >> undefined -- TODO
 
 moveBegin :: EntThink
 moveBegin =
