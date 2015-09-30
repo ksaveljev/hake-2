@@ -2126,8 +2126,14 @@ rotatingBlocked =
 
 rotatingTouch :: EntTouch
 rotatingTouch =
-  GenericEntTouch "rotating_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameFunc.rotatingTouch") >> undefined -- TODO
+  GenericEntTouch "rotating_touch" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+
+    when ((self^.eAVelocity._x) /= 0 || (self^.eAVelocity._y) /= 0 || (self^.eAVelocity._z) /= 0) $ do
+      other <- readEdictT otherRef
+      v3o <- use $ globals.vec3Origin
+
+      GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 doorGoUp :: EdictReference -> Maybe EdictReference -> Quake ()
 doorGoUp selfRef activatorRef = do
