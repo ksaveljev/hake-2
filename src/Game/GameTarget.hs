@@ -634,5 +634,11 @@ targetEarthquakeThink =
 
 targetEarthquakeUse :: EntUse
 targetEarthquakeUse =
-  GenericEntUse "target_earthquake_use" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.targetEarthquakeUse") >> undefined -- TODO
+  GenericEntUse "target_earthquake_use" $ \selfRef _ activatorRef -> do
+    self <- readEdictT selfRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    modifyEdictT selfRef (\v -> v & eTimeStamp .~ levelTime + fromIntegral (self^.eCount)
+                                  & eNextThink .~ levelTime + Constants.frameTime
+                                  & eActivator .~ activatorRef
+                                  & eLastMoveTime .~ 0)
