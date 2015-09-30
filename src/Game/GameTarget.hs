@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Game.GameTarget where
 
 import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (&), (.~), (+~), (%~))
@@ -19,6 +20,7 @@ import qualified Game.GameBase as GameBase
 import qualified Game.GameCombat as GameCombat
 import qualified Game.GameSpawn as GameSpawn
 import qualified Game.GameUtil as GameUtil
+import {-# SOURCE #-} qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
 spTargetTempEntity :: EdictReference -> Quake ()
@@ -192,7 +194,17 @@ spTargetSpawner selfRef = do
       modifyEdictT selfRef (\v -> v & eMoveDir %~ fmap (* (self^.eSpeed)))
 
 spTargetBlaster :: EdictReference -> Quake ()
-spTargetBlaster _ = io (putStrLn "GameTarget.spTargetBlaster") >> undefined -- TODO
+spTargetBlaster selfRef = do
+    GameBase.setMoveDir selfRef
+
+    soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
+    soundIdx <- soundIndex (Just "weapons/laser2.wav")
+    
+    modifyEdictT selfRef (\v -> v & eUse .~ Just useTargetBlaster
+                                  & eNoiseIndex .~ soundIdx
+                                  & eDmg %~ (\d -> if d == 0 then 15 else d)
+                                  & eSpeed %~ (\s -> if s == 0 then 1000 else s)
+                                  & eSvFlags .~ Constants.svfNoClient)
 
 spTargetCrossLevelTrigger :: EdictReference -> Quake ()
 spTargetCrossLevelTrigger _ = io (putStrLn "GameTarget.spTargetCrossLevelTrigger") >> undefined -- TODO
@@ -392,12 +404,30 @@ useTargetSpawner =
         unlinkEntity = gameImport^.giUnlinkEntity
 
     unlinkEntity edictRef
-
     GameUtil.killBox edictRef
-
     linkEntity edictRef
 
     self' <- readEdictT selfRef
 
     when ((self'^.eSpeed) /= 0) $
       modifyEdictT edictRef (\v -> v & eVelocity .~ (self'^.eMoveDir))
+
+{-
+- QUAKED target_blaster (1 0 0) (-8 -8 -8) (8 8 8) NOTRAIL NOEFFECTS Fires
+- a blaster bolt in the set direction when triggered.
+- 
+- dmg default is 15 speed default is 1000
+-}
+useTargetBlaster :: EntUse
+useTargetBlaster =
+  GenericEntUse "use_target_blaster" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
+
+    let effect = if | (self^.eSpawnFlags) .&. 2 /= 0 -> 0
+                    | (self^.eSpawnFlags) .&. 1 /= 0 -> Constants.efHyperblaster
+                    | otherwise -> Constants.efBlaster
+    
+    GameWeapon.fireBlaster selfRef (self^.eEntityState.esOrigin) (self^.eMoveDir) (self^.eDmg) (truncate $ self^.eSpeed) Constants.efBlaster (Constants.modTargetBlaster /= 0) -- True
+
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    sound (Just selfRef) Constants.chanVoice (self^.eNoiseIndex) 1 Constants.attnNorm 0
