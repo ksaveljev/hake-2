@@ -8,7 +8,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3(..), _x, _y, _z, normalize, quadrance, dot)
+import Linear (V3(..), _x, _y, _z, normalize, quadrance, dot, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -1815,7 +1815,7 @@ moveCalc edictRef dest func = do
     let dir = dest - (edict^.eEntityState.esOrigin)
 
     modifyEdictT edictRef (\v -> v & eMoveInfo.miDir .~ normalize dir
-                                   & eMoveInfo.miRemainingDistance .~ sqrt (quadrance dir) -- TODO: make sure we are correct here
+                                   & eMoveInfo.miRemainingDistance .~ norm dir
                                    & eMoveInfo.miEndFunc .~ Just func)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -1865,8 +1865,46 @@ angleMoveCalc edictRef func = do
 
 angleMoveBegin :: EntThink
 angleMoveBegin =
-  GenericEntThink "angle_move_begin" $ \_ -> do
-    io (putStrLn "GameFunc.angleMoveBegin") >> undefined -- TODO
+  GenericEntThink "angle_move_begin" $ \edictRef -> do
+    edict <- readEdictT edictRef
+
+        -- set destdelta to the vector needed to move
+    let destDelta = if (edict^.eMoveInfo.miState) == stateUp
+                      then (edict^.eMoveInfo.miEndAngles) - (edict^.eEntityState.esAngles)
+                      else (edict^.eMoveInfo.miStartAngles) - (edict^.eEntityState.esAngles)
+        -- calculate length of vector
+        len = norm destDelta
+        -- divide by speed to get time to reach dest
+        travelTime = len / (edict^.eMoveInfo.miSpeed)
+
+    if travelTime < Constants.frameTime
+      then do
+        void $ think angleMoveFinal edictRef
+        return True
+
+      else do
+        let frames = floor (travelTime / Constants.frameTime) :: Int
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        -- scale the destdelta vector by the time spent traveling to get
+        -- velocity
+        modifyEdictT edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / travelTime)) destDelta
+                                       -- set nextthink to trigger a think when dest
+                                       -- is reached
+                                       & eNextThink .~ levelTime + fromIntegral frames * Constants.frameTime
+                                       & eThink .~ Just angleMoveFinal)
+
+        return True
+
+angleMoveFinal :: EntThink
+angleMoveFinal =
+  GenericEntThink "angle_move_final" $ \_ -> do
+    io (putStrLn "GameFunc.angleMoveFinal") >> undefined -- TODO
+
+angleMoveDone :: EntThink
+angleMoveDone =
+  GenericEntThink "angle_move_done" $ \_ -> do
+    io (putStrLn "GameFunc.angleMoveDone") >> undefined -- TODO
 
 moveBegin :: EntThink
 moveBegin =
