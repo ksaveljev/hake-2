@@ -7,7 +7,7 @@ import Control.Monad (liftM, when, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (V3(..))
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
@@ -627,10 +627,55 @@ targetLaserThink =
   GenericEntThink "target_laser_think" $ \selfRef -> do
     io (putStrLn "GameTarget.targetLaserThink") >> undefined -- TODO
 
+{-
+- QUAKED target_earthquake (1 0 0) (-8 -8 -8) (8 8 8) When triggered, this
+- initiates a level-wide earthquake. All players and monsters are affected.
+- "speed" severity of the quake (default:200) "count" duration of the quake
+- (default:5)
+-}
 targetEarthquakeThink :: EntThink
 targetEarthquakeThink =
-  GenericEntThink "target_earthquake_think" $ \_ -> do
-    io (putStrLn "GameTarget.targetEarthquakeThink") >> undefined -- TODO
+  GenericEntThink "target_earthquake_think" $ \selfRef -> do
+    self <- readEdictT selfRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    when ((self^.eLastMoveTime) < levelTime) $ do
+      positionedSound <- use $ gameBaseGlobals.gbGameImport.giPositionedSound
+      positionedSound (Just $ self^.eEntityState.esOrigin) selfRef Constants.chanAuto (self^.eNoiseIndex) 1.0 Constants.attnNone 0
+      modifyEdictT selfRef (\v -> v & eLastMoveTime .~ levelTime + 0.5)
+
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+
+    shakeEdicts (self^.eSpeed) 1 numEdicts
+
+    when (levelTime < (self^.eTimeStamp)) $
+      modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+
+    return True
+
+  where shakeEdicts :: Float -> Int -> Int -> Quake ()
+        shakeEdicts speed idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let edictRef = newEdictReference idx
+
+              edict <- readEdictT edictRef
+
+              if not (edict^.eInUse) || isNothing (edict^.eClient) || isNothing (edict^.eGroundEntity)
+                then
+                  shakeEdicts speed (idx + 1) maxIdx
+
+                else do
+                  c1 <- Lib.crandom
+                  c2 <- Lib.crandom
+                  let velocity = (edict^.eVelocity) & _x +~ (c1 * 150)
+                                                    & _y +~ (c2 * 150)
+                                                    & _z .~ speed * (100.0 / fromIntegral (edict^.eMass))
+
+                  modifyEdictT edictRef (\v -> v & eGroundEntity .~ Nothing
+                                                 & eVelocity .~ velocity)
+
+                  shakeEdicts speed (idx + 1) maxIdx
 
 targetEarthquakeUse :: EntUse
 targetEarthquakeUse =
