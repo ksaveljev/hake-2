@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameTarget where
 
-import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (&), (.~), (+~), (%~))
+import Control.Lens (ix, (.=), zoom, (^.), (+=), (%=), use, preuse, (&), (.~), (+~), (%~))
 import Control.Monad (liftM, when, void)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
@@ -207,7 +207,9 @@ spTargetBlaster selfRef = do
                                   & eSvFlags .~ Constants.svfNoClient)
 
 spTargetCrossLevelTrigger :: EdictReference -> Quake ()
-spTargetCrossLevelTrigger _ = io (putStrLn "GameTarget.spTargetCrossLevelTrigger") >> undefined -- TODO
+spTargetCrossLevelTrigger selfRef =
+    modifyEdictT selfRef (\v -> v & eSvFlags .~ Constants.svfNoClient
+                                  & eUse .~ Just triggerCrossLevelTriggerUse)
 
 spTargetCrossLevelTarget :: EdictReference -> Quake ()
 spTargetCrossLevelTarget _ = io (putStrLn "GameTarget.spTargetCrossLevelTarget") >> undefined -- TODO
@@ -431,3 +433,18 @@ useTargetBlaster =
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanVoice (self^.eNoiseIndex) 1 Constants.attnNorm 0
+
+{-
+- QUAKED target_crosslevel_trigger (.5 .5 .5) (-8 -8 -8) (8 8 8) trigger1
+- trigger2 trigger3 trigger4 trigger5 trigger6 trigger7 trigger8 Once this
+- trigger is touched/used, any trigger_crosslevel_target with the same
+- trigger number is automatically used when a level is started within the
+- same unit. It is OK to check multiple triggers. Message, delay, target,
+- and killtarget also work.
+-}
+triggerCrossLevelTriggerUse :: EntUse
+triggerCrossLevelTriggerUse =
+  GenericEntUse "trigger_crosslevel_trigger_use" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
+    gameBaseGlobals.gbGame.glServerFlags %= (.|. (self^.eSpawnFlags))
+    GameUtil.freeEdict selfRef
