@@ -1982,8 +1982,58 @@ thinkAccelMove =
         return True
 
 platAccelerate :: EdictReference -> Quake ()
-platAccelerate _ = do
-    io (putStrLn "GameFunc.platAccelerate") >> undefined -- TODO
+platAccelerate edictRef = do
+    edict <- readEdictT edictRef
+    let moveInfo = edict^.eMoveInfo
+
+         -- are we decelerating?
+    if | (moveInfo^.miRemainingDistance) <= (moveInfo^.miDecelDistance) -> do
+           when ((moveInfo^.miRemainingDistance) < (moveInfo^.miDecelDistance)) $
+             if (moveInfo^.miNextSpeed) /= 0
+               then
+                 modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miNextSpeed)
+                                                & eMoveInfo.miNextSpeed .~ 0)
+
+               else
+                 when ((moveInfo^.miCurrentSpeed) > (moveInfo^.miDecel)) $
+                   modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed -~ (moveInfo^.miDecel))
+
+         -- are we at full speed and need to start decelerating during this move?
+       | (moveInfo^.miCurrentSpeed) == (moveInfo^.miMoveSpeed) && (moveInfo^.miRemainingDistance) - (moveInfo^.miCurrentSpeed) < (moveInfo^.miDecelDistance) -> do
+           let p1Distance = (moveInfo^.miRemainingDistance) - (moveInfo^.miDecelDistance)
+               p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / (moveInfo^.miMoveSpeed)))
+               distance = p1Distance + p2Distance
+
+           modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miMoveSpeed)
+                                          & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
+
+         -- are we accelerating?
+       | (moveInfo^.miCurrentSpeed) < (moveInfo^.miSpeed) -> do
+           let oldSpeed = moveInfo^.miCurrentSpeed
+               -- figure simple acceleration up to move_speed
+               speed = (moveInfo^.miCurrentSpeed) + (moveInfo^.miAccel)
+               currentSpeed = if speed > (moveInfo^.miSpeed)
+                                then moveInfo^.miSpeed
+                                else speed
+
+           modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ currentSpeed)
+
+           -- are we accelerating throughout this entire move?
+           unless ((moveInfo^.miRemainingDistance) - currentSpeed >= (moveInfo^.miDecelDistance)) $ do
+             -- during this move we will accelerate from current_speed to
+             -- move_speed and cross over the decel_distance; figure the
+             -- average speed for the entire move
+             let p1Distance = (moveInfo^.miRemainingDistance) - (moveInfo^.miDecelDistance)
+                 p1Speed = (oldSpeed + (moveInfo^.miMoveSpeed)) / 2.0
+                 p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / p1Speed))
+                 distance = p1Distance + p2Distance
+
+             modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (p1Speed * (p1Distance / distance)) + ((moveInfo^.miMoveSpeed) * (p2Distance / distance))
+                                            & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
+
+         -- we are at constant velocity (move_speed)
+       | otherwise ->
+           return ()
 
 platCalcAcceleratedMove :: EdictReference -> Quake ()
 platCalcAcceleratedMove _ = do
