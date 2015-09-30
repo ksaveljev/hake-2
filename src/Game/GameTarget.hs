@@ -21,7 +21,8 @@ import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
 spTargetTempEntity :: EdictReference -> Quake ()
-spTargetTempEntity _ = io (putStrLn "GameTarget.spTargetTempEntity") >> undefined -- TODO
+spTargetTempEntity edictRef =
+    modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetTEnt)
 
 spTargetSpeaker :: EdictReference -> Quake ()
 spTargetSpeaker edictRef = do
@@ -334,3 +335,22 @@ targetExplosionExplode =
     modifyEdictT selfRef (\v -> v & eDelay .~ save)
 
     return True
+
+{-
+- QUAKED target_temp_entity (1 0 0) (-8 -8 -8) (8 8 8) Fire an origin based
+- temp entity event to the clients. "style" type byte
+-}
+useTargetTEnt :: EntUse
+useTargetTEnt =
+  GenericEntUse "Use_Target_Tent" $ \edictRef _ _ -> do
+    edict <- readEdictT edictRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writePosition = gameImport^.giWritePosition
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcTempEntity
+    writeByte (edict^.eStyle)
+    writePosition (edict^.eEntityState.esOrigin)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
