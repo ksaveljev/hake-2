@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Game.GameTarget where
 
-import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (&), (.~), (+~))
+import Control.Lens (ix, (.=), zoom, (^.), (+=), use, preuse, (&), (.~), (+~), (%~))
 import Control.Monad (liftM, when, void)
 import Data.Bits ((.&.), (.|.))
 import Data.Char (toLower)
@@ -17,6 +17,7 @@ import Game.Adapters
 import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameCombat as GameCombat
+import qualified Game.GameSpawn as GameSpawn
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 
@@ -180,7 +181,15 @@ spTargetSplash edictRef = do
     modifyEdictT edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
 
 spTargetSpawner :: EdictReference -> Quake ()
-spTargetSpawner _ = io (putStrLn "GameTarget.spTargetSpawner") >> undefined -- TODO
+spTargetSpawner selfRef = do
+    modifyEdictT selfRef (\v -> v & eUse .~ Just useTargetSpawner
+                                  & eSvFlags .~ Constants.svfNoClient)
+
+    self <- readEdictT selfRef
+
+    when ((self^.eSpeed) /= 0) $ do
+      GameBase.setMoveDir selfRef
+      modifyEdictT selfRef (\v -> v & eMoveDir %~ fmap (* (self^.eSpeed)))
 
 spTargetBlaster :: EdictReference -> Quake ()
 spTargetBlaster _ = io (putStrLn "GameTarget.spTargetBlaster") >> undefined -- TODO
@@ -354,3 +363,41 @@ useTargetTEnt =
     writeByte (edict^.eStyle)
     writePosition (edict^.eEntityState.esOrigin)
     multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+{-
+- QUAKED target_spawner (1 0 0) (-8 -8 -8) (8 8 8) Set target to the type
+- of entity you want spawned. Useful for spawning monsters and gibs in the
+- factory levels.
+- 
+- For monsters: Set direction to the facing you want it to have.
+- 
+- For gibs: Set direction if you want it moving and speed how fast it
+- should be moving otherwise it will just be dropped
+-}
+useTargetSpawner :: EntUse
+useTargetSpawner =
+  GenericEntUse "use_target_spawner" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
+    edictRef <- GameUtil.spawn
+
+    modifyEdictT edictRef (\v -> v & eClassName .~ fromJust (self^.eTarget)
+                                   & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
+                                   & eEntityState.esAngles .~ (self^.eEntityState.esAngles))
+
+    GameSpawn.callSpawn edictRef
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let linkEntity = gameImport^.giLinkEntity
+        unlinkEntity = gameImport^.giUnlinkEntity
+
+    unlinkEntity edictRef
+
+    GameUtil.killBox edictRef
+
+    linkEntity edictRef
+
+    self' <- readEdictT selfRef
+
+    when ((self'^.eSpeed) /= 0) $
+      modifyEdictT edictRef (\v -> v & eVelocity .~ (self'^.eMoveDir))

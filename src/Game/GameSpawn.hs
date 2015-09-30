@@ -23,7 +23,7 @@ import qualified Constants
 import qualified Game.GameFunc as GameFunc
 import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
-import qualified Game.GameTarget as GameTarget
+import {-# SOURCE #-} qualified Game.GameTarget as GameTarget
 import qualified Game.GameTrigger as GameTrigger
 import qualified Game.GameTurret as GameTurret
 import qualified Game.GameUtil as GameUtil
