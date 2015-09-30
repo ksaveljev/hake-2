@@ -1898,8 +1898,25 @@ angleMoveBegin =
 
 angleMoveFinal :: EntThink
 angleMoveFinal =
-  GenericEntThink "angle_move_final" $ \_ -> do
-    io (putStrLn "GameFunc.angleMoveFinal") >> undefined -- TODO
+  GenericEntThink "angle_move_final" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    v3o <- use $ globals.vec3Origin
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let move = if (edict^.eMoveInfo.miState) == stateUp
+                 then (edict^.eMoveInfo.miEndAngles) - (edict^.eEntityState.esAngles)
+                 else (edict^.eMoveInfo.miStartAngles) - (edict^.eEntityState.esAngles)
+
+    if move == v3o
+      then do
+        void $ think angleMoveDone edictRef
+        return True
+
+      else do
+        modifyEdictT edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / Constants.frameTime)) move
+                                       & eThink .~ Just angleMoveDone
+                                       & eNextThink .~ levelTime + Constants.frameTime)
+        return True
 
 angleMoveDone :: EntThink
 angleMoveDone =
