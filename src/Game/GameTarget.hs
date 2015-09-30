@@ -234,7 +234,24 @@ spTargetLightRamp :: EdictReference -> Quake ()
 spTargetLightRamp _ = io (putStrLn "GameTarget.spTargetLightRamp") >> undefined -- TODO
 
 spTargetEarthquake :: EdictReference -> Quake ()
-spTargetEarthquake _ = io (putStrLn "GameTarget.spTargetEarthquake") >> undefined -- TODO
+spTargetEarthquake selfRef = do
+    self <- readEdictT selfRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let dprintf = gameImport^.giDprintf
+        soundIndex = gameImport^.giSoundIndex
+
+    when (isNothing (self^.eTargetName)) $
+      dprintf ("untargeted " `B.append` (self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+
+    noiseIndex <- soundIndex (Just "world/quake.wav")
+
+    modifyEdictT selfRef (\v -> v & eCount %~ (\c -> if c == 0 then 5 else c)
+                                  & eSpeed %~ (\s -> if s == 0 then 200 else s)
+                                  & eSvFlags %~ (.|. Constants.svfNoClient)
+                                  & eThink .~ Just targetEarthquakeThink
+                                  & eUse .~ Just targetEarthquakeUse
+                                  & eNoiseIndex .~ noiseIndex)
 
 useTargetExplosion :: EntUse
 useTargetExplosion =
@@ -609,3 +626,13 @@ targetLaserThink :: EntThink
 targetLaserThink =
   GenericEntThink "target_laser_think" $ \selfRef -> do
     io (putStrLn "GameTarget.targetLaserThink") >> undefined -- TODO
+
+targetEarthquakeThink :: EntThink
+targetEarthquakeThink =
+  GenericEntThink "target_earthquake_think" $ \_ -> do
+    io (putStrLn "GameTarget.targetEarthquakeThink") >> undefined -- TODO
+
+targetEarthquakeUse :: EntUse
+targetEarthquakeUse =
+  GenericEntUse "target_earthquake_use" $ \_ _ _ -> do
+    io (putStrLn "GameTarget.targetEarthquakeUse") >> undefined -- TODO
