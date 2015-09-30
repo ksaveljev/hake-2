@@ -311,10 +311,22 @@ useTargetSpeaker =
         positionedSound <- use $ gameBaseGlobals.gbGameImport.giPositionedSound
         positionedSound (Just $ edict^.eEntityState.esOrigin) edictRef chan (edict^.eNoiseIndex) (edict^.eVolume) (edict^.eAttenuation) 0
 
+{-
+- QUAKED target_secret (1 0 1) (-8 -8 -8) (8 8 8) Counts a secret found.
+- These are single use targets.
+-}
 useTargetSecret :: EntUse
 useTargetSecret =
-  GenericEntUse "use_target_secret" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetSecret") >> undefined -- TODO
+  GenericEntUse "use_target_secret" $ \edictRef _ activatorRef -> do
+    edict <- readEdictT edictRef
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+
+    sound (Just edictRef) Constants.chanVoice (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+
+    gameBaseGlobals.gbLevel.llFoundSecrets += 1
+
+    GameUtil.useTargets edictRef activatorRef
+    GameUtil.freeEdict edictRef
 
 useTargetHelp :: EntUse
 useTargetHelp =
