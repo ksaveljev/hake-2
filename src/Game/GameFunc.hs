@@ -1920,8 +1920,13 @@ angleMoveFinal =
 
 angleMoveDone :: EntThink
 angleMoveDone =
-  GenericEntThink "angle_move_done" $ \_ -> do
-    io (putStrLn "GameFunc.angleMoveDone") >> undefined -- TODO
+  GenericEntThink "angle_move_done" $ \edictRef -> do
+    modifyEdictT edictRef (\v -> v & eAVelocity .~ V3 0 0 0)
+
+    edict <- readEdictT edictRef
+    void $ think (fromJust $ edict^.eMoveInfo.miEndFunc) edictRef
+
+    return True
 
 moveBegin :: EntThink
 moveBegin =
