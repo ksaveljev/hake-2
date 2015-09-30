@@ -1955,8 +1955,39 @@ moveBegin =
 
 thinkAccelMove :: EntThink
 thinkAccelMove =
-  GenericEntThink "think_accelmove" $ \_ -> do
-    io (putStrLn "GameFunc.thinkAccelMove") >> undefined -- TODO
+  GenericEntThink "think_accelmove" $ \edictRef -> do
+    edict <- readEdictT edictRef
+
+    modifyEdictT edictRef (\v -> v & eMoveInfo.miRemainingDistance -~ (edict^.eMoveInfo.miCurrentSpeed))
+
+    when ((edict^.eMoveInfo.miCurrentSpeed) == 0) $ -- starting or blocked
+      platCalcAcceleratedMove edictRef
+
+    platAccelerate edictRef
+
+    -- will the entire move complete on next frame?
+    edict' <- readEdictT edictRef
+
+    if (edict'^.eMoveInfo.miRemainingDistance) <= (edict'^.eMoveInfo.miCurrentSpeed)
+      then do
+        void $ think moveFinal edictRef
+        return True
+
+      else do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        modifyEdictT edictRef (\v -> v & eVelocity .~ fmap (* ((edict'^.eMoveInfo.miCurrentSpeed) * 10)) (edict'^.eMoveInfo.miDir)
+                                       & eNextThink .~ levelTime + Constants.frameTime
+                                       & eThink .~ Just thinkAccelMove)
+        return True
+
+platAccelerate :: EdictReference -> Quake ()
+platAccelerate _ = do
+    io (putStrLn "GameFunc.platAccelerate") >> undefined -- TODO
+
+platCalcAcceleratedMove :: EdictReference -> Quake ()
+platCalcAcceleratedMove _ = do
+    io (putStrLn "GameFunc.platCalcAcceleratedMove") >> undefined -- TODO
 
 moveFinal :: EntThink
 moveFinal =
