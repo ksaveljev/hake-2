@@ -253,10 +253,29 @@ useTargetExplosion =
         modifyEdictT selfRef (\v -> v & eThink .~ Just targetExplosionExplode
                                       & eNextThink .~ levelTime + (self^.eDelay))
 
+{-
+- QUAKED target_goal (1 0 1) (-8 -8 -8) (8 8 8) Counts a goal completed.
+- These are single use targets.
+-}
 useTargetGoal :: EntUse
 useTargetGoal =
-  GenericEntUse "use_target_goal" $ \_ _ _ -> do
-    io (putStrLn "GameTarget.useTargetGoal") >> undefined -- TODO
+  GenericEntUse "use_target_goal" $ \edictRef _ activatorRef -> do
+    edict <- readEdictT edictRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        configString = gameImport^.giConfigString
+
+    sound (Just edictRef) Constants.chanVoice (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+
+    gameBaseGlobals.gbLevel.llFoundGoals += 1
+
+    use (gameBaseGlobals.gbLevel) >>= \level ->
+      when ((level^.llFoundGoals) == (level^.llTotalGoals)) $
+        configString Constants.csCdTrack "0"
+
+    GameUtil.useTargets edictRef activatorRef
+    GameUtil.freeEdict edictRef
 
 {-
 - QUAKED target_speaker (1 0 0) (-8 -8 -8) (8 8 8) looped-on looped-off
