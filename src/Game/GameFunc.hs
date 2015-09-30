@@ -2036,8 +2036,35 @@ platAccelerate edictRef = do
            return ()
 
 platCalcAcceleratedMove :: EdictReference -> Quake ()
-platCalcAcceleratedMove _ = do
-    io (putStrLn "GameFunc.platCalcAcceleratedMove") >> undefined -- TODO
+platCalcAcceleratedMove edictRef = do
+    readEdictT edictRef >>= \edict ->
+      modifyEdictT edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ (edict^.eMoveInfo.miSpeed))
+
+    edict <- readEdictT edictRef
+    let moveInfo = edict^.eMoveInfo
+
+    if (moveInfo^.miRemainingDistance) < (moveInfo^.miAccel)
+      then
+        modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miRemainingDistance))
+
+      else do
+        let accelDist = accelerationDistance (moveInfo^.miSpeed) (moveInfo^.miAccel)
+            decelDist = accelerationDistance (moveInfo^.miSpeed) (moveInfo^.miDecel)
+
+        if (moveInfo^.miRemainingDistance) - accelDist - decelDist < 0
+          then do
+            let f = ((moveInfo^.miAccel) + (moveInfo^.miDecel)) / ((moveInfo^.miAccel) * (moveInfo^.miDecel))
+                moveSpeed = (-2 + sqrt (4 - 4 * f * (-2 * (moveInfo^.miRemainingDistance)))) / (2 * f)
+                decelDist' = accelerationDistance moveSpeed (moveInfo^.miDecel)
+
+            modifyEdictT edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ moveSpeed
+                                           & eMoveInfo.miDecelDistance .~ decelDist')
+
+          else do
+            modifyEdictT edictRef (\v -> v & eMoveInfo.miDecelDistance .~ decelDist)
+
+  where accelerationDistance :: Float -> Float -> Float
+        accelerationDistance target rate = target * ((target / rate) + 1) / 2
 
 moveFinal :: EntThink
 moveFinal =
