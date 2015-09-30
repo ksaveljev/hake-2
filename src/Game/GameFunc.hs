@@ -2117,8 +2117,12 @@ rotatingUse =
 
 rotatingBlocked :: EntBlocked
 rotatingBlocked =
-  GenericEntBlocked "rotating_blocked" $ \_ _ -> do
-    io (putStrLn "GameFunc.rotatingBlocked") >> undefined -- TODO
+  GenericEntBlocked "rotating_blocked" $ \selfRef otherRef -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    v3o <- use $ globals.vec3Origin
+
+    GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 rotatingTouch :: EntTouch
 rotatingTouch =
