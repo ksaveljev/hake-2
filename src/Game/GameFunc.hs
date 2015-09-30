@@ -2256,5 +2256,26 @@ funcConveyorUse =
 
 triggerElevatorUse :: EntUse
 triggerElevatorUse =
-  GenericEntUse "trigger_elevator_use" $ \_ _ _ -> do
-    io (putStrLn "GameFunc.triggerElevatorUse") >> undefined -- TODO
+  GenericEntUse "trigger_elevator_use" $ \selfRef (Just otherRef) _ -> do
+    self <- readEdictT selfRef
+    let Just moveTargetRef = self^.eMoveTarget
+    moveTarget <- readEdictT moveTargetRef
+
+    unless ((moveTarget^.eNextThink) /= 0) $ do
+      other <- readEdictT otherRef
+      dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+
+      case other^.ePathTarget of
+        Nothing ->
+          dprintf "elevator used with no pathtarget\n"
+
+        Just pathTarget -> do
+          foundTarget <- GameBase.pickTarget (other^.ePathTarget)
+
+          case foundTarget of
+            Nothing ->
+              dprintf ("elevator used with bad pathtarget: " `B.append` pathTarget `B.append` "\n")
+
+            Just targetRef -> do
+              modifyEdictT moveTargetRef (\v -> v & eTargetEnt .~ foundTarget)
+              trainResume moveTargetRef
