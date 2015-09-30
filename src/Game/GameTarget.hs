@@ -212,7 +212,16 @@ spTargetCrossLevelTrigger selfRef =
                                   & eUse .~ Just triggerCrossLevelTriggerUse)
 
 spTargetCrossLevelTarget :: EdictReference -> Quake ()
-spTargetCrossLevelTarget _ = io (putStrLn "GameTarget.spTargetCrossLevelTarget") >> undefined -- TODO
+spTargetCrossLevelTarget selfRef = do
+    self <- readEdictT selfRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let delay = if (self^.eDelay) == 0 then 1 else self^.eDelay
+
+    modifyEdictT selfRef (\v -> v & eDelay .~ delay
+                                  & eSvFlags .~ Constants.svfNoClient
+                                  & eThink .~ Just targetCrossLevelTargetThink
+                                  & eNextThink .~ levelTime + delay)
 
 spTargetLaser :: EdictReference -> Quake ()
 spTargetLaser _ = io (putStrLn "GameTarget.spTargetLaser") >> undefined -- TODO
@@ -448,3 +457,24 @@ triggerCrossLevelTriggerUse =
     self <- readEdictT selfRef
     gameBaseGlobals.gbGame.glServerFlags %= (.|. (self^.eSpawnFlags))
     GameUtil.freeEdict selfRef
+
+{-
+- QUAKED target_crosslevel_target (.5 .5 .5) (-8 -8 -8) (8 8 8) trigger1
+- trigger2 trigger3 trigger4 trigger5 trigger6 trigger7 trigger8 Triggered
+- by a trigger_crosslevel elsewhere within a unit. If multiple triggers are
+- checked, all must be true. Delay, target and killtarget also work.
+- 
+- "delay" delay before using targets if the trigger has been activated
+- (default 1)
+-}
+targetCrossLevelTargetThink :: EntThink
+targetCrossLevelTargetThink =
+  GenericEntThink "target_crosslevel_target_think" $ \selfRef -> do
+    self <- readEdictT selfRef
+    serverFlags <- use $ gameBaseGlobals.gbGame.glServerFlags
+
+    when ((self^.eSpawnFlags) == (serverFlags .&. Constants.sflCrossTriggerMask .&. (self^.eSpawnFlags))) $ do
+      GameUtil.useTargets selfRef (Just selfRef)
+      GameUtil.freeEdict selfRef
+
+    return True
