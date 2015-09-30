@@ -4,7 +4,7 @@ module Game.GameTarget where
 
 import Control.Lens (ix, (.=), zoom, (^.), (+=), (%=), use, preuse, (&), (.~), (+~), (%~))
 import Control.Monad (liftM, when, void)
-import Data.Bits ((.&.), (.|.))
+import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, fromJust, isNothing)
 import Linear (V3(..))
@@ -224,7 +224,11 @@ spTargetCrossLevelTarget selfRef = do
                                   & eNextThink .~ levelTime + delay)
 
 spTargetLaser :: EdictReference -> Quake ()
-spTargetLaser _ = io (putStrLn "GameTarget.spTargetLaser") >> undefined -- TODO
+spTargetLaser selfRef = do
+    -- let everything else get spawned before we start firing
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT selfRef (\v -> v & eThink .~ Just targetLaserStart
+                                  & eNextThink .~ levelTime + 1)
 
 spTargetLightRamp :: EdictReference -> Quake ()
 spTargetLightRamp _ = io (putStrLn "GameTarget.spTargetLightRamp") >> undefined -- TODO
@@ -478,3 +482,99 @@ targetCrossLevelTargetThink =
       GameUtil.freeEdict selfRef
 
     return True
+
+targetLaserStart :: EntThink
+targetLaserStart =
+  GenericEntThink "target_laser_start" $ \selfRef -> do
+    self <- readEdictT selfRef
+
+        -- set the beam diameter
+    let frame = if (self^.eSpawnFlags) .&. 64 /= 0
+                  then 16
+                  else 4
+        -- set the color
+        skinNum = if | (self^.eSpawnFlags) .&. 2 /= 0 -> 0xF2F2F0F0
+                     | (self^.eSpawnFlags) .&. 4 /= 0 -> 0xD0D1D2D3
+                     | (self^.eSpawnFlags) .&. 8 /= 0 -> 0xF3F3F1F1
+                     | (self^.eSpawnFlags) .&. 16 /= 0 -> 0xDCDDDEDF
+                     | (self^.eSpawnFlags) .&. 32 /= 0 -> 0xE0E1E2E3
+                     | otherwise -> self^.eEntityState.esSkinNum
+
+    modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+                                  & eSolid .~ Constants.solidNot
+                                  & eEntityState.esRenderFx %~ (.|. (Constants.rfBeam .|. Constants.rfTranslucent))
+                                  & eEntityState.esModelIndex .~ 1 -- must be non-zero
+                                  & eEntityState.esFrame .~ frame
+                                  & eEntityState.esSkinNum .~ skinNum)
+
+    when (isNothing (self^.eEnemy)) $
+      case self^.eTarget of
+        Just target -> do
+          foundTarget <- GameBase.gFind Nothing GameBase.findByTarget target
+
+          when (isNothing foundTarget) $ do
+            dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+            dprintf ((self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` ": " `B.append` target `B.append` " is a bad target\n")
+
+          modifyEdictT selfRef (\v -> v & eEnemy .~ foundTarget)
+
+        Nothing ->
+          GameBase.setMoveDir selfRef
+
+    modifyEdictT selfRef (\v -> v & eUse .~ Just targetLaserUse
+                                  & eThink .~ Just targetLaserThink
+                                  & eDmg %~ (\d -> if d == 0 then 1 else d)
+                                  & eMins .~ V3 (-8) (-8) (-8)
+                                  & eMaxs .~ V3 8 8 8)
+
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+
+    self' <- readEdictT selfRef
+
+    if (self'^.eSpawnFlags) .&. 1 /= 0
+      then targetLaserOn selfRef
+      else targetLaserOff selfRef
+
+    return True
+
+targetLaserOn :: EdictReference -> Quake ()
+targetLaserOn selfRef = do
+    self <- readEdictT selfRef
+
+    let activator = case self^.eActivator of
+                      Just _ -> self^.eActivator
+                      Nothing -> Just selfRef
+
+    modifyEdictT selfRef (\v -> v & eActivator .~ activator
+                                  & eSpawnFlags %~ (.|. 0x80000001)
+                                  & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+
+    void $ think targetLaserThink selfRef
+
+targetLaserOff :: EdictReference -> Quake ()
+targetLaserOff selfRef =
+    modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
+                                  & eSvFlags %~ (.|. Constants.svfNoClient)
+                                  & eNextThink .~ 0)
+
+targetLaserUse :: EntUse
+targetLaserUse =
+  GenericEntUse "target_laser_use" $ \selfRef _ activatorRef -> do
+    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
+
+    self <- readEdictT selfRef
+
+    if (self^.eSpawnFlags) .&. 1 /= 0
+      then targetLaserOff selfRef
+      else targetLaserOn selfRef
+
+{-
+- QUAKED target_laser (0 .5 .8) (-8 -8 -8) (8 8 8) START_ON RED GREEN BLUE
+- YELLOW ORANGE FAT When triggered, fires a laser. You can either set a
+- target or a direction.
+-}
+targetLaserThink :: EntThink
+targetLaserThink =
+  GenericEntThink "target_laser_think" $ \selfRef -> do
+    io (putStrLn "GameTarget.targetLaserThink") >> undefined -- TODO
