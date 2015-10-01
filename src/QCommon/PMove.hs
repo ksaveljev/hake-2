@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.PMove where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=), (&), (+~))
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=), (&), (+~), (-~))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement, shiftL, shiftR)
 import Data.Int (Int16)
@@ -783,7 +783,29 @@ friction = do
 
 waterMove :: Quake ()
 waterMove = do
-    io (putStrLn "PMove.waterMove") >> undefined -- TODO
+    pm <- use $ pMoveGlobals.pmPM
+    pml <- use $ pMoveGlobals.pmPML
+    waterSpeed <- use $ pMoveGlobals.pmWaterSpeed
+
+    -- user intentions
+    let wishVel = let vel = fmap (* (fromIntegral $ pm^.pmCmd.ucForwardMove)) (pml^.pmlForward) + fmap (* (fromIntegral $ pm^.pmCmd.ucSideMove)) (pml^.pmlRight)
+                  in if (pm^.pmCmd.ucForwardMove) == 0 && (pm^.pmCmd.ucSideMove) == 0 && (pm^.pmCmd.ucUpMove) == 0
+                       then vel & _z -~ 60 -- drift towards bottom
+                       else vel & _z +~ fromIntegral (pm^.pmCmd.ucUpMove)
+        wishVel' = addCurrents pm pml wishVel waterSpeed
+        wishDir = normalize wishVel'
+        wishSpeed = norm wishVel'
+
+    maxSpeed <- use $ pMoveGlobals.pmMaxSpeed
+
+    let (wishVel'', wishSpeed') = if wishSpeed > maxSpeed
+                                    then (fmap (* (maxSpeed / wishSpeed)) wishVel', maxSpeed * 0.5)
+                                    else (wishVel', wishSpeed * 0.5)
+
+    accel <- use $ pMoveGlobals.pmWaterAccelerate
+    accelerate wishDir wishSpeed' accel
+
+    stepSlideMove
 
 airMove :: Quake ()
 airMove = do
