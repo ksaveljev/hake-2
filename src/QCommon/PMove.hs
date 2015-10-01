@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module QCommon.PMove where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=))
+import Control.Lens (use, preuse, ix, (^.), (.=), zoom, (%=), (+=), (-=), (&), (+~))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), (.|.), complement, shiftL, shiftR)
 import Data.Int (Int16)
@@ -180,8 +180,73 @@ clampAngles = do
       pmlUp .= up
 
 flyMove :: Bool -> Quake ()
-flyMove _ = do
-    io (putStrLn "PMove.flyMove") >> undefined -- TODO
+flyMove doClip = do
+    pMoveGlobals.pmPM.pmViewHeight .= 22
+
+    -- friction
+    speed <- use (pMoveGlobals.pmPML.pmlVelocity) >>= \velocity -> return (norm velocity)
+
+    if speed < 1
+      then do
+        v3o <- use $ globals.vec3Origin
+        pMoveGlobals.pmPML.pmlVelocity .= v3o
+
+      else do
+        friction <- use (pMoveGlobals.pmFriction) >>= \f -> return (f * 1.5) -- extra friction
+        stopSpeed <- use $ pMoveGlobals.pmStopSpeed
+        frameTime <- use $ pMoveGlobals.pmPML.pmlFrameTime
+
+        let control = if speed < stopSpeed then stopSpeed else speed
+            drop = control * friction * frameTime
+            -- scale the velocity
+            newSpeed = if speed - drop < 0 then 0 else (speed - drop) / speed
+
+        pMoveGlobals.pmPML.pmlVelocity %= fmap (* newSpeed)
+
+    -- accelerate
+    fmove <- use $ pMoveGlobals.pmPM.pmCmd.ucForwardMove
+    smove <- use $ pMoveGlobals.pmPM.pmCmd.ucSideMove
+
+    zoom (pMoveGlobals.pmPML) $ do
+      pmlForward %= normalize
+      pmlRight %= normalize
+
+    pm <- use $ pMoveGlobals.pmPM
+    pml <- use $ pMoveGlobals.pmPML
+    
+    let wishVel = let v = fmap (* (fromIntegral fmove)) (pml^.pmlForward) + fmap (* (fromIntegral smove)) (pml^.pmlRight)
+                  in v & _z +~ (fromIntegral $ pm^.pmCmd.ucUpMove)
+        wishSpeed = norm wishVel
+        wishDir = normalize wishVel
+
+    maxSpeed <- use $ pMoveGlobals.pmMaxSpeed
+
+    -- clamp to server defined max speed
+    let (wishVel', wishSpeed') = if wishSpeed > maxSpeed
+                                   then (fmap (* (maxSpeed / wishSpeed)) wishVel, maxSpeed)
+                                   else (wishVel, wishSpeed)
+        currentSpeed = (pml^.pmlVelocity) `dot` wishDir
+        addSpeed = wishSpeed' - currentSpeed
+
+    unless (addSpeed <= 0) $ do
+      accelerate <- use $ pMoveGlobals.pmAccelerate
+
+      let accelSpeed = let a = accelerate * (pml^.pmlFrameTime) * wishSpeed'
+                       in if a > addSpeed then addSpeed else a
+          velocity = (fmap (* accelSpeed) wishDir) + (pml^.pmlVelocity)
+
+      pMoveGlobals.pmPML.pmlVelocity .= velocity
+
+      if doClip
+        then do
+          let end = (pml^.pmlOrigin) + fmap (* (pml^.pmlFrameTime)) velocity
+
+          Just traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) end
+          pMoveGlobals.pmPML.pmlOrigin .= (traceT^.tEndPos)
+
+        else do
+          -- move
+          pMoveGlobals.pmPML.pmlOrigin += fmap (* (pml^.pmlFrameTime)) velocity
 
 {-
 - On exit, the origin will have a value that is pre-quantized to the 0.125
