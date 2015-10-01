@@ -404,8 +404,94 @@ weaponChaingun =
 
 chaingunFire :: EntThink
 chaingunFire =
-  GenericEntThink "Chaingun_Fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.chaingunFire") >> undefined -- TODO
+  GenericEntThink "Chaingun_Fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+        writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    let (damage, kick) = let dmg = if deathmatchValue /= 0 then 6 else 8
+                         in if isQuad
+                              then (dmg * 4, 2 * 4)
+                              else (dmg, 2)
+
+    when ((gClient^.gcPlayerState.psGunFrame) == 5) $ do
+      soundIdx <- soundIndex (Just "weapons/chngnu1a.wav")
+      sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnIdle 0
+
+    if (gClient^.gcPlayerState.psGunFrame) == 14 && (gClient^.gcButtons) .&. Constants.buttonAttack == 0
+      then do
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcPlayerState.psGunFrame .= 32
+          gcWeaponSound .= 0
+
+      else do
+        let gunFrame = if (gClient^.gcPlayerState.psGunFrame) == 21 && (gClient^.gcButtons) .&. Constants.buttonAttack /= 0 && ((gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex)) /= 0
+                         then 15
+                         else (gClient^.gcPlayerState.psGunFrame) + 1
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= gunFrame
+
+        if gunFrame == 22
+          then do
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
+            soundIdx <- soundIndex (Just "weapons/chngnd1a.wav")
+            sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnIdle 0
+
+          else do
+            soundIdx <- soundIndex (Just "weapons/chngnl1a.wav")
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= soundIdx
+
+        let (frame, animEnd) = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                 then (MPlayer.frameCRAttack1 - (gunFrame .&. 1), MPlayer.frameCRAttack9)
+                                 else (MPlayer.frameAttack1 - (gunFrame .&. 1), MPlayer.frameAttack8)
+
+        modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ frame)
+
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcAnimPriority .= Constants.animAttack
+          gcAnimEnd .= animEnd
+
+        let shots = if | gunFrame <= 9 -> 1
+                       | gunFrame <= 14 -> if (gClient^.gcButtons) .&. Constants.buttonAttack /= 0 then 2 else 1
+                       | otherwise -> 3
+            ammo = (gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex)
+            shots' = if ammo < shots then ammo else shots
+
+        if shots' == 0
+          then do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            when (levelTime >= (edict^.ePainDebounceTime)) $ do
+              soundIdx <- soundIndex (Just "weapons/noammo.wav")
+              sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+              modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+
+            noAmmoWeaponChange edictRef
+
+          else do
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            a1 <- Lib.crandom
+            a2 <- Lib.crandom
+            a3 <- Lib.crandom
+
+            let kickOrigin = fmap (* 0.35) (V3 o1 o2 o3)
+                kickAngles = fmap (* 0.7) (V3 a1 a2 a3)
+
+            io (putStrLn "PlayerWeapon.chaingunFire") >> undefined -- TODO
+
+    return True
 
 weaponGrenade :: EntThink
 weaponGrenade = 
