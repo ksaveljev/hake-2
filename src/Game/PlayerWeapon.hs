@@ -3,11 +3,11 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.PlayerWeapon where
 
-import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=), (&), (.~), (%~))
+import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (+=), (-=), (%=), (&), (.~), (%~), (-~), (+~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), (.|.), shiftL, complement)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3(..), _x)
+import Linear (V3(..), _x, _y)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
@@ -233,8 +233,56 @@ weaponSuperShotgun =
 
 weaponSuperShotgunFire :: EntThink
 weaponSuperShotgunFire =
-  GenericEntThink "weapon_supershotgun_fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponSuperShotgunFire") >> undefined -- TODO
+  GenericEntThink "weapon_supershotgun_fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    let (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcKickOrigin .= fmap (* (-2)) forward
+      gcKickAngles._x -= 2
+
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+
+    let offset = V3 0 8 (fromIntegral (edict^.eViewHeight) - 8)
+        start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+        (damage, kick) = if isQuad
+                           then (6 * 4, 12 * 4)
+                           else (6, 12)
+        v = (gClient^.gcVAngle) & _y -~ 5 -- IMPROVE: use Constants.yaw instead of using _y directly
+        (Just forward', _, _) = Math3D.angleVectors v True False False
+
+    GameWeapon.fireShotgun edictRef start forward' damage kick Constants.defaultShotgunHspread Constants.defaultShotgunVspread (Constants.defaultSshotgunCount `div` 2) Constants.modSshotgun
+
+    let v' = (gClient^.gcVAngle) & _y +~ 5 -- IMPROVE: use Constants.yaw instead of using _y directly
+        (Just forward'', _, _) = Math3D.angleVectors v' True False False
+
+    GameWeapon.fireShotgun edictRef start forward'' damage kick Constants.defaultShotgunHspread Constants.defaultShotgunVspread (Constants.defaultSshotgunCount `div` 2) Constants.modSshotgun
+
+    -- send muzzle flash
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    writeByte Constants.svcMuzzleFlash
+    writeShort (edict^.eIndex)
+    writeByte (Constants.mzSShotgun .|. isSilenced)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+    playerNoise edictRef start Constants.pNoiseWeapon
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 2
+
+    return True
 
 weaponMachinegun :: EntThink
 weaponMachinegun = 
