@@ -468,9 +468,24 @@ catagorizePosition = do
         when (cont'' .&. Constants.maskWater /= 0) $
           pMoveGlobals.pmPM.pmWaterLevel .= 3
 
+-- Dead bodies have extra friction.
 deadMove :: Quake ()
 deadMove = do
-    io (putStrLn "PMove.deadMove") >> undefined -- TODO
+    pm <- use $ pMoveGlobals.pmPM
+
+    case pm^.pmGroundEntity of
+      Nothing ->
+        return ()
+
+      Just _ -> do
+        -- extra friction
+        pml <- use $ pMoveGlobals.pmPML
+
+        let forward = norm (pml^.pmlVelocity) - 20
+
+        pMoveGlobals.pmPML.pmlVelocity .= if forward <= 0
+                                            then V3 0 0 0
+                                            else fmap (* forward) (normalize (pml^.pmlVelocity))
 
 checkSpecialMovement :: Quake ()
 checkSpecialMovement = do
