@@ -295,8 +295,103 @@ weaponMachinegun =
 
 machinegunFire :: EntThink
 machinegunFire =
-  GenericEntThink "Machinegun_Fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.machinegunFire") >> undefined -- TODO
+  GenericEntThink "Machinegun_Fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+        writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    if (gClient^.gcButtons) .&. Constants.buttonAttack == 0
+      then do
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcMachinegunShots .= 0
+          gcPlayerState.psGunFrame += 1
+
+        return True
+
+      else do
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= if (gClient^.gcPlayerState.psGunFrame) == 5
+                                                                                     then 4
+                                                                                     else 5
+
+        if (gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex) < 1
+          then do
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= 6
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            when (levelTime >= (edict^.ePainDebounceTime)) $ do
+              soundIdx <- soundIndex (Just "weapons/noammo.wav")
+              sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+              modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+
+            noAmmoWeaponChange edictRef
+
+            return True
+
+          else do
+            isQuad <- use $ gameBaseGlobals.gbIsQuad
+            isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            a1 <- Lib.crandom
+            a2 <- Lib.crandom
+            a3 <- Lib.crandom
+
+            let (damage, kick) = if isQuad
+                                   then (8 * 4, 2 * 4)
+                                   else (8, 2)
+                kickOrigin = fmap (* 0.35) (V3 o1 o2 o3)
+                kickAngles = V3 ((-1.5) * fromIntegral (gClient^.gcMachinegunShots)) (a2 * 0.7) (a3 * 0.7)
+
+            zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+              gcKickOrigin .= kickOrigin
+              gcKickAngles .= kickAngles
+
+            -- raise the gun as it is firing
+            deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+            when (deathmatchValue == 0) $ do
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcMachinegunShots %= (\v -> if v + 1 > 9 then 9 else v + 1)
+
+            -- get start / end positions
+            let angles = (gClient^.gcVAngle) + kickAngles
+                (Just forward, Just right, _) = Math3D.angleVectors angles True True False
+                offset = V3 0 8 (fromIntegral (edict^.eViewHeight) - 8)
+                start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+
+            GameWeapon.fireBullet edictRef start forward damage kick Constants.defaultBulletHspread Constants.defaultBulletVspread Constants.modMachinegun
+
+            writeByte Constants.svcMuzzleFlash
+            writeShort (edict^.eIndex)
+            writeByte (Constants.mzMachinegun .|. isSilenced)
+            multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+            playerNoise edictRef start Constants.pNoiseWeapon
+
+            dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+            when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 1
+
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animAttack
+
+            r <- Lib.randomF
+            let (frame, animEnd) = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                     then (MPlayer.frameCRAttack1 - truncate (r + 0.25), MPlayer.frameCRAttack9)
+                                     else (MPlayer.frameAttack1 - truncate (r + 0.25), MPlayer.frameAttack8)
+
+            modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ frame)
+            gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= animEnd
+
+            return True
 
 weaponChaingun :: EntThink
 weaponChaingun = 

@@ -334,3 +334,13 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
               traceT' <- trace waterStart Nothing Nothing end (Just selfRef) Constants.maskShot
               sendGunPuffAndFlash traceT' water
               waterBubbleTrail traceT' waterStart water
+
+{-
+- ================= fire_bullet
+- 
+- Fires a single round. Used for machinegun and chaingun. Would be fine for
+- pistols, rifles, etc.... =================
+-}
+fireBullet :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireBullet selfRef start aimDir damage kick hspread vspread mod =
+    fireLead selfRef start aimDir damage kick Constants.teGunshot hspread vspread mod
