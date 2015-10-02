@@ -489,9 +489,38 @@ chaingunFire =
             let kickOrigin = fmap (* 0.35) (V3 o1 o2 o3)
                 kickAngles = fmap (* 0.7) (V3 a1 a2 a3)
 
-            io (putStrLn "PlayerWeapon.chaingunFire") >> undefined -- TODO
+            start <- doShots edictRef edict gClient damage kick (V3 0 0 0) 0 shots'
+
+            -- send muzzle flash
+            writeByte Constants.svcMuzzleFlash
+            writeShort (edict^.eIndex)
+            writeByte ((Constants.mzChaingun1 + shots' - 1) .|. isSilenced)
+            multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+            playerNoise edictRef start Constants.pNoiseWeapon
+
+            dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+            when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= shots'
 
     return True
+
+  where doShots :: EdictReference -> EdictT -> GClientT -> Int -> Int -> V3 Float -> Int -> Int -> Quake (V3 Float)
+        doShots edictRef edict gClient damage kick start idx maxIdx
+          | idx >= maxIdx = return start
+          | otherwise = do
+              r <- Lib.crandom
+              u <- Lib.crandom
+
+              let (Just forward, Just right, Just up) = Math3D.angleVectors (gClient^.gcVAngle) True True True
+                  offset = V3 0 (7 + r * 4) (u * 4 + fromIntegral (edict^.eViewHeight) - 8)
+                  start' = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+
+              GameWeapon.fireBullet edictRef start' forward damage kick Constants.defaultBulletHspread Constants.defaultBulletVspread Constants.modChaingun
+
+              doShots edictRef edict gClient damage kick start' (idx + 1) maxIdx
+
 
 weaponGrenade :: EntThink
 weaponGrenade = 
