@@ -787,8 +787,69 @@ weaponBFG =
 
 weaponBFGFire :: EntThink
 weaponBFGFire =
-  GenericEntThink "weapon_bfg_fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponBFGFire") >> undefined -- TODO
+  GenericEntThink "weapon_bfg_fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    if | (gClient^.gcPlayerState.psGunFrame) == 9 -> do
+           -- send muzzle flash
+           writeByte Constants.svcMuzzleFlash
+           writeShort (edict^.eIndex)
+           writeByte (Constants.mzBFG .|. isSilenced)
+           multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+           playerNoise edictRef (V3 0 0 0) Constants.pNoiseWeapon
+
+         -- cells can go down during windup (from power armor hits), so
+         -- check again and abort firing if we don't have enough now
+       | (gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex) < 50 ->
+           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+       | otherwise -> do
+           let damageRadius = 1000
+               damage = let d = if deathmatchValue /= 0 then 200 else 500
+                        in if isQuad then d * 4 else d
+               (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+
+           r <- Lib.crandom
+           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+             gcKickOrigin .= fmap (* (-2)) forward
+             -- make a big pitch kick with an inverse fall
+             gcVDmgPitch .= -40
+             gcVDmgRoll .= r * 8
+             gcVDmgTime .= levelTime + Constants.damageTime
+
+           Just gClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+           let offset = V3 8 8 (fromIntegral (edict^.eViewHeight) - 8)
+               start = projectSource gClient' (edict^.eEntityState.esOrigin) offset forward right
+
+           GameWeapon.fireBFG edictRef start forward damage 400 damageRadius
+
+           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+           playerNoise edictRef start Constants.pNoiseWeapon
+
+           dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+           when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 50
+
+    return True
 
 changeWeapon :: EdictReference -> Quake ()
 changeWeapon edictRef = do

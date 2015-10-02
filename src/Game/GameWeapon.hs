@@ -352,3 +352,7 @@ fireGrenade _ _ _ _ _ _ _ = do
 fireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
 fireRocket _ _ _ _ _ _ _ = do
     io (putStrLn "GameWeapon.fireRocket") >> undefined -- TODO
+
+fireBFG :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Quake ()
+fireBFG _ _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireBFG") >> undefined -- TODO
