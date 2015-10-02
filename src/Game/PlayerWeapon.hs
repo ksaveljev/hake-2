@@ -590,8 +590,51 @@ weaponRocketLauncher =
 
 weaponRocketLauncherFire :: EntThink
 weaponRocketLauncherFire =
-  GenericEntThink "Weapon_RocketLauncher_Fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponRocketLauncherFire") >> undefined -- TODO
+  GenericEntThink "Weapon_RocketLauncher_Fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    r <- Lib.randomF
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+        (damage, radiusDamage) = let d = 100 + truncate (r * 20.0)
+                                     rd = 120
+                                 in if isQuad
+                                      then (d * 4, rd * 4)
+                                      else (d, rd)
+        damageRadius = 120
+        (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+        offset = V3 8 8 (fromIntegral (edict^.eViewHeight) - 8)
+        start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcKickOrigin .= fmap (* (-2)) forward
+      gcKickAngles._x .= -1
+
+    GameWeapon.fireRocket edictRef start forward damage 650 damageRadius radiusDamage
+
+    -- send muzzle flash
+    writeByte Constants.svcMuzzleFlash
+    writeShort (edict^.eIndex)
+    writeByte (Constants.mzRocket .|. isSilenced)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+    playerNoise edictRef start Constants.pNoiseWeapon
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 1
+
+    return True
 
 weaponHyperBlaster :: EntThink
 weaponHyperBlaster = 
@@ -604,8 +647,74 @@ weaponHyperBlaster =
 
 weaponHyperBlasterFire :: EntThink
 weaponHyperBlasterFire =
-  GenericEntThink "Weapon_HyperBlaster_Fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponHyperBlasterFire") >> undefined -- TODO
+  GenericEntThink "Weapon_HyperBlaster_Fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+
+    if (gClient^.gcButtons) .&. Constants.buttonAttack == 0
+      then
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+      else do
+        if (gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex) == 0
+          then do
+            levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+            when (levelTime >= (edict^.ePainDebounceTime)) $ do
+              soundIdx <- soundIndex (Just "weapons/noammo.wav")
+              sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+              modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+
+            noAmmoWeaponChange edictRef
+
+          else do
+            deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+            let rotation = (fromIntegral (gClient^.gcPlayerState.psGunFrame) - 5) * 2 * pi / 6
+                offset = V3 ((-4) * sin rotation) 0 (4 * cos rotation)
+                effect = if (gClient^.gcPlayerState.psGunFrame) == 6 || (gClient^.gcPlayerState.psGunFrame) == 9
+                           then Constants.efHyperblaster
+                           else 0
+                damage = if deathmatchValue /= 0 then 15 else 20
+
+            blasterFire edictRef offset damage True effect
+
+            dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+            when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 1
+
+            let (frame, animEnd) = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                     then (MPlayer.frameCRAttack1 - 1, MPlayer.frameCRAttack9)
+                                     else (MPlayer.frameAttack1 - 1, MPlayer.frameAttack8)
+
+            modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ frame)
+
+            zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+              gcAnimPriority .= Constants.animAttack
+              gcAnimEnd .= animEnd
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+        Just gClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+        when ((gClient'^.gcPlayerState.psGunFrame) == 12 && (gClient'^.gcPers.cpInventory) UV.! (gClient'^.gcAmmoIndex) /= 0) $
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame .= 6
+
+    Just gClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    when ((gClient'^.gcPlayerState.psGunFrame) == 12) $ do
+      soundIdx <- soundIndex (Just "weapons/hyprbd1a.wav")
+      sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
+
+    return True
 
 weaponRailgun :: EntThink
 weaponRailgun = 

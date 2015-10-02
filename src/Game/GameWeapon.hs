@@ -348,3 +348,7 @@ fireBullet selfRef start aimDir damage kick hspread vspread mod =
 fireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Quake ()
 fireGrenade _ _ _ _ _ _ _ = do
     io (putStrLn "GameWeapon.fireGrenade") >> undefined -- TODO
+
+fireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
+fireRocket _ _ _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireRocket") >> undefined -- TODO
