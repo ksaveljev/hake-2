@@ -1136,8 +1136,44 @@ weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactiva
 
 
 weaponGrenadeFire :: EdictReference -> Bool -> Quake ()
-weaponGrenadeFire _ _ = do
-    io (putStrLn "PlayerWeapon.weaponGrenadeFire") >> undefined -- TODO
+weaponGrenadeFire edictRef held = do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+    let radius = 125 + 40
+        damage = if isQuad then 125 * 4 else 125
+        offset = V3 8 8 (fromIntegral (edict^.eViewHeight) - 8)
+        (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+        start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+        timer = (gClient^.gcGrenadeTime) - levelTime
+        speed = Constants.grenadeMinSpeed + truncate ((Constants.grenadeTimer - timer) * (fromIntegral (Constants.grenadeMaxSpeed - Constants.grenadeMinSpeed) / Constants.grenadeTimer))
+
+    GameWeapon.fireGrenade2 edictRef start forward damage speed timer radius held
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 1
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcGrenadeTime .= levelTime + 1.0
+
+    edict' <- readEdictT edictRef
+
+    unless ((edict'^.eDeadFlag) /= 0 || (edict'^.eEntityState.esModelIndex) /= 255 || (edict'^.eHealth) <= 0) $ do
+      let (priority, frame, animEnd) = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                         then (Constants.animAttack, MPlayer.frameCRAttack1 - 1, MPlayer.frameCRAttack3)
+                                         else (Constants.animReverse, MPlayer.frameWave08, MPlayer.frameWave01)
+
+      modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ frame)
+
+      zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+        gcAnimPriority .= priority
+        gcAnimEnd .= animEnd
 
 blasterFire :: EdictReference -> V3 Float -> Int -> Bool -> Int -> Quake ()
 blasterFire edictRef gOffset dmg hyper effect = do

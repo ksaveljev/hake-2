@@ -48,6 +48,12 @@ frameJump3 = 68
 frameJump6 :: Int
 frameJump6 = 71
 
+frameWave01 :: Int
+frameWave01 = 112
+
+frameWave08 :: Int
+frameWave08 = 119
+
 frameCRStnd01 :: Int
 frameCRStnd01 = 135
 
@@ -62,6 +68,9 @@ frameCRWalk6 = 159
 
 frameCRAttack1 :: Int
 frameCRAttack1 = 160
+
+frameCRAttack3 :: Int
+frameCRAttack3 = 162
 
 frameCRAttack9 :: Int
 frameCRAttack9 = 168

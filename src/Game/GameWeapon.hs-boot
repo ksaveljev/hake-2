@@ -24,3 +24,5 @@ fireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> 
 fireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
 
 fireBFG :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Quake ()
+
+fireGrenade2 :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Bool -> Quake ()
