@@ -324,3 +324,7 @@ forwardToServer = do
 clientCommand :: EdictReference -> Quake ()
 clientCommand _ = do
     io (putStrLn "Cmd.clientCommand") >> undefined -- TODO
+
+helpF :: EdictReference -> Quake ()
+helpF _ = do
+    io (putStrLn "Cmd.helpF") >> undefined -- TODO

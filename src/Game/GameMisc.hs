@@ -2089,3 +2089,7 @@ debrisDie :: EntDie
 debrisDie =
   GenericEntDie "debris_die" $ \selfRef _ _ _ _ ->
     GameUtil.freeEdict selfRef
+
+throwClientHead :: EdictReference -> Int -> Quake ()
+throwClientHead _ _ = do
+    io (putStrLn "GameMisc.throwClientHead") >> undefined -- TODO

@@ -9,17 +9,19 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _y)
+import Linear (V3(..), _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import CVarVariables
 import Game.Adapters
 import qualified Constants
+import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.Info as Info
 import qualified Game.GameChase  as GameChase
@@ -27,6 +29,7 @@ import qualified Game.GameItems as GameItems
 import qualified Game.GameMisc as GameMisc
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Game.PlayerHud as PlayerHud
 import qualified Game.PlayerTrail as PlayerTrail
 import qualified Game.PlayerView as PlayerView
@@ -689,8 +692,116 @@ playerPain =
 
 playerDie :: EntDie
 playerDie =
-  GenericEntDie "player_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "PlayerClient.playerDie") >> undefined -- TODO
+  GenericEntDie "player_die" $ \selfRef inflictorRef attackerRef damage _ -> do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let soundIndex = gameImport^.giSoundIndex
+        sound = gameImport^.giSound
+        linkEntity = gameImport^.giLinkEntity
+
+    modifyEdictT selfRef (\v -> v & eAVelocity .~ V3 0 0 0
+                                  & eTakeDamage .~ Constants.damageYes
+                                  & eMoveType .~ Constants.moveTypeToss
+                                  & eEntityState.esModelIndex2 .~ 0 -- remove linked weapon model
+                                  & eEntityState.esAngles._x .~ 0
+                                  & eEntityState.esAngles._z .~ 0
+                                  & eEntityState.esSound .~ 0
+                                  & eMaxs._z .~ (-8)
+                                  & eSvFlags %~ (.|. Constants.svfDeadMonster))
+
+    self <- readEdictT selfRef
+    let Just gClientRef@(GClientReference gClientIdx) = self^.eClient
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
+
+
+    when ((self^.eDeadFlag) == 0) $ do
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcRespawnTime .= levelTime + 1.0
+
+      lookAtKiller selfRef inflictorRef attackerRef
+
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsPMType .= Constants.pmDead
+
+      clientObituary selfRef inflictorRef attackerRef
+      tossClientWeapon selfRef
+
+      deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+      when (deathmatchValue /= 0) $
+        Cmd.helpF selfRef -- show scores
+
+      -- clear inventory
+      -- this is kind of ugly, but it's how we want to handle keys in coop
+      numItems <- use $ gameBaseGlobals.gbGame.glNumItems
+      coopValue <- liftM (^.cvValue) coopCVar
+      itemList <- use $ gameBaseGlobals.gbItemList
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      clearInventory gClientRef gClient coopValue itemList 0 numItems
+
+    -- remove powerups
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcQuadFrameNum .= 0
+      gcInvincibleFrameNum .= 0
+      gcBreatherFrameNum .= 0
+      gcEnviroFrameNum .= 0
+
+    modifyEdictT selfRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
+
+    if (self^.eHealth) < (-40) -- gib
+      then do
+        soundIdx <- soundIndex (Just "misc/udeath.wav")
+        sound (Just selfRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+        GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+        GameMisc.throwClientHead selfRef damage
+
+        modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
+
+      else -- normal death
+        when ((self^.eDeadFlag) == 0) $ do
+          Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+          gameBaseGlobals.gbPlayerDieIdx %= (\v -> (v + 1) `mod` 3)
+
+          -- start a death animation
+          playerDieIdx <- use $ gameBaseGlobals.gbPlayerDieIdx
+
+          let (frame, animEnd) = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
+                                   then
+                                     (MPlayer.frameCRDeath1 - 1, MPlayer.frameCRDeath5)
+                                   else
+                                     case playerDieIdx of
+                                       0 -> (MPlayer.frameDeath101 - 1, MPlayer.frameDeath106)
+                                       1 -> (MPlayer.frameDeath201 - 1, MPlayer.frameDeath206)
+                                       _ -> (MPlayer.frameDeath301 - 1, MPlayer.frameDeath308)
+
+          modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ frame)
+
+          zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+            gcAnimPriority .= Constants.animDeath
+            gcAnimEnd .= animEnd
+
+          r <- Lib.rand
+          let soundName = "*death" `B.append` BC.pack (show ((r `mod` 4) + 1)) `B.append` ".wav"
+          soundIdx <- soundIndex (Just soundName)
+          sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+
+    modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+    linkEntity selfRef
+
+  where clearInventory :: GClientReference -> GClientT -> Float -> V.Vector GItemT -> Int -> Int -> Quake ()
+        clearInventory gClientRef@(GClientReference gClientIdx) gClient coopValue itemList idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              when (coopValue /= 0 && ((itemList V.! idx)^.giFlags) .&. Constants.itKey /= 0) $
+                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crCoopRespawn.cpInventory.ix idx .= (gClient^.gcPers.cpInventory) UV.! idx
+
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix idx .= 0
+              clearInventory gClientRef gClient coopValue itemList (idx + 1) maxIdx
 
 spectatorRespawn :: EdictReference -> Quake ()
 spectatorRespawn _ = do
@@ -894,3 +1005,15 @@ defaultTrace start mins maxs end = do
     if (edict^.eHealth) > 0
       then liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskPlayerSolid
       else liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskDeadSolid
+
+tossClientWeapon :: EdictReference -> Quake ()
+tossClientWeapon _ = do
+    io (putStrLn "PlayerClient.tossClientWeapon") >> undefined -- TODO
+
+lookAtKiller :: EdictReference -> EdictReference -> EdictReference -> Quake ()
+lookAtKiller _ _ _ = do
+    io (putStrLn "PlayerClient.lookAtKiller") >> undefined -- TODO
+
+clientObituary :: EdictReference -> EdictReference -> EdictReference -> Quake ()
+clientObituary _ _ _ = do
+    io (putStrLn "PlayerClient.clientObituary") >> undefined -- TODO

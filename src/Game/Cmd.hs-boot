@@ -7,7 +7,13 @@ import QuakeState
 import QCommon.XCommandT
 
 addCommand :: B.ByteString -> Maybe XCommandT -> Quake ()
+
 argc :: Quake Int
+
 argv :: Int -> Quake B.ByteString
+
 executeString :: B.ByteString -> Quake ()
+
 clientCommand :: EdictReference -> Quake ()
+
+helpF :: EdictReference -> Quake ()

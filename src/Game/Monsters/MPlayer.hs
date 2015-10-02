@@ -80,3 +80,27 @@ frameCRPain1 = 169
 
 frameCRPain4 :: Int
 frameCRPain4 = 172
+
+frameCRDeath1 :: Int
+frameCRDeath1 = 173
+
+frameCRDeath5 :: Int
+frameCRDeath5 = 177
+
+frameDeath101 :: Int
+frameDeath101 = 178
+
+frameDeath106 :: Int
+frameDeath106 = 183
+
+frameDeath201 :: Int
+frameDeath201 = 184
+
+frameDeath206 :: Int
+frameDeath206 = 189
+
+frameDeath301 :: Int
+frameDeath301 = 190
+
+frameDeath308 :: Int
+frameDeath308 = 197
