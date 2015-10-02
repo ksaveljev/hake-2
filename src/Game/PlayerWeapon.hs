@@ -1288,8 +1288,85 @@ playerNoise whoRef noiseLocation noiseType = do
            linkEntity noiseRef
 
 noAmmoWeaponChange :: EdictReference -> Quake ()
-noAmmoWeaponChange _ = do
-    io (putStrLn "PlayerWeapon.noAmmoWeaponChange") >> undefined -- TODO
+noAmmoWeaponChange edictRef = do
+    edict <- readEdictT edictRef
+    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    checkSlugsAndRailgun gClientRef gClient
+
+  where checkSlugsAndRailgun :: GClientReference -> GClientT -> Quake ()
+        checkSlugsAndRailgun gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference slugsIdx) <- GameItems.findItem "slugs"
+          Just railgunRef@(GItemReference railgunIdx) <- GameItems.findItem "railgun"
+          Just slugs <- preuse $ gameBaseGlobals.gbItemList.ix slugsIdx
+          Just railgun <- preuse $ gameBaseGlobals.gbItemList.ix railgunIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (slugs^.giIndex) /= 0 && inventory UV.! (railgun^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just railgunRef
+            else checkCellsAndHyperblaster gClientRef gClient
+
+        checkCellsAndHyperblaster :: GClientReference -> GClientT -> Quake ()
+        checkCellsAndHyperblaster gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference cellsIdx) <- GameItems.findItem "cells"
+          Just hyperblasterRef@(GItemReference hyperblasterIdx) <- GameItems.findItem "hyperblaster"
+          Just cells <- preuse $ gameBaseGlobals.gbItemList.ix cellsIdx
+          Just hyperblaster <- preuse $ gameBaseGlobals.gbItemList.ix hyperblasterIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (cells^.giIndex) /= 0 && inventory UV.! (hyperblaster^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just hyperblasterRef
+            else checkBulletsAndChaingun gClientRef gClient
+
+        checkBulletsAndChaingun :: GClientReference -> GClientT -> Quake ()
+        checkBulletsAndChaingun gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference bulletsIdx) <- GameItems.findItem "bullets"
+          Just chaingunRef@(GItemReference chaingunIdx) <- GameItems.findItem "chaingun"
+          Just bullets <- preuse $ gameBaseGlobals.gbItemList.ix bulletsIdx
+          Just chaingun <- preuse $ gameBaseGlobals.gbItemList.ix chaingunIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (bullets^.giIndex) /= 0 && inventory UV.! (chaingun^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just chaingunRef
+            else checkBulletsAndMachinegun gClientRef gClient
+
+        checkBulletsAndMachinegun :: GClientReference -> GClientT -> Quake ()
+        checkBulletsAndMachinegun gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference bulletsIdx) <- GameItems.findItem "bullets"
+          Just machinegunRef@(GItemReference machinegunIdx) <- GameItems.findItem "machinegun"
+          Just bullets <- preuse $ gameBaseGlobals.gbItemList.ix bulletsIdx
+          Just machinegun <- preuse $ gameBaseGlobals.gbItemList.ix machinegunIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (bullets^.giIndex) /= 0 && inventory UV.! (machinegun^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just machinegunRef
+            else checkShellsAndSuperShotgun gClientRef gClient
+
+        checkShellsAndSuperShotgun :: GClientReference -> GClientT -> Quake ()
+        checkShellsAndSuperShotgun gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference shellsIdx) <- GameItems.findItem "shells"
+          Just superShotgunRef@(GItemReference superShotgunIdx) <- GameItems.findItem "super shotgun"
+          Just shells <- preuse $ gameBaseGlobals.gbItemList.ix shellsIdx
+          Just superShotgun <- preuse $ gameBaseGlobals.gbItemList.ix superShotgunIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (shells^.giIndex) > 1 && inventory UV.! (superShotgun^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just superShotgunRef
+            else checkShellsAndShotgun gClientRef gClient
+
+        checkShellsAndShotgun :: GClientReference -> GClientT -> Quake ()
+        checkShellsAndShotgun gClientRef@(GClientReference gClientIdx) gClient = do
+          Just (GItemReference shellsIdx) <- GameItems.findItem "shells"
+          Just shotgunRef@(GItemReference shotgunIdx)      <- GameItems.findItem "shotgun"
+          Just blasterRef <- GameItems.findItem "blaster"
+          Just shells <- preuse $ gameBaseGlobals.gbItemList.ix shellsIdx
+          Just shotgun <- preuse $ gameBaseGlobals.gbItemList.ix shotgunIdx
+          let inventory = gClient^.gcPers.cpInventory
+
+          if inventory UV.! (shells^.giIndex) /= 0 && inventory UV.! (shotgun^.giIndex) /= 0
+            then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just shotgunRef
+            else gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just blasterRef
 
 projectSource :: GClientT -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> V3 Float
 projectSource client point distance forward right =
