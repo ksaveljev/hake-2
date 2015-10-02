@@ -344,3 +344,7 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
 fireBullet :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireBullet selfRef start aimDir damage kick hspread vspread mod =
     fireLead selfRef start aimDir damage kick Constants.teGunshot hspread vspread mod
+
+fireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Quake ()
+fireGrenade _ _ _ _ _ _ _ = do
+    io (putStrLn "GameWeapon.fireGrenade") >> undefined -- TODO

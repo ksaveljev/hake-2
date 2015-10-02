@@ -538,8 +538,46 @@ weaponGrenadeLauncher =
 
 weaponGrenadeLauncherFire :: EntThink
 weaponGrenadeLauncherFire =
-  GenericEntThink "weapon_grenadelauncher_fire" $ \_ -> do
-    io (putStrLn "PlayerWeapon.weaponGrenadeLauncherFire") >> undefined -- TODO
+  GenericEntThink "weapon_grenadelauncher_fire" $ \edictRef -> do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    isQuad <- use $ gameBaseGlobals.gbIsQuad
+    isSilenced <- use $ gameBaseGlobals.gbIsSilenced
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+
+    let radius = 120 + 40
+        damage = if isQuad then 120 * 4 else 120
+        offset = V3 8 8 (fromIntegral (edict^.eViewHeight) - 8)
+        (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+        start = projectSource gClient (edict^.eEntityState.esOrigin) offset forward right
+
+    zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+      gcKickOrigin .= fmap (* (-2)) forward
+      gcKickAngles._x .= -1
+
+    GameWeapon.fireGrenade edictRef start forward damage 600 2.5 radius
+
+    writeByte Constants.svcMuzzleFlash
+    writeShort (edict^.eIndex)
+    writeByte (Constants.mzGrenade .|. isSilenced)
+    multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
+
+    playerNoise edictRef start Constants.pNoiseWeapon
+
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+    when (dmFlagsValue .&. Constants.dfInfiniteAmmo == 0) $
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gClient^.gcAmmoIndex) -= 1
+
+    return True
 
 weaponRocketLauncher :: EntThink
 weaponRocketLauncher = 
