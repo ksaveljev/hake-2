@@ -8,6 +8,7 @@ import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.), xor, (.&.))
 import Data.Maybe (fromJust, isNothing)
+import Linear (V4(..))
 import System.IO (IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 import System.Mem (performGC)
 import qualified Data.ByteString as B
@@ -366,7 +367,37 @@ drop = do
 - shouldn't cause any errors.
 -}
 disconnect :: Quake ()
-disconnect = io (putStrLn "CL.disconnect") >> undefined -- TODO
+disconnect = do
+    cl' <- use $ globals.cl
+    cls' <- use $ globals.cls
+
+    unless ((cls'^.csState) == Constants.caDisconnected) $ do
+      timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
+
+      when (timeDemoValue /= 0) $ do
+        ms <- Timer.milliseconds
+        
+        let time = fromIntegral (ms - (cl'^.csTimeDemoStart)) :: Float
+
+        when (time > 0) $
+          Com.printf (BC.pack (show (cl'^.csTimeDemoFrames)) `B.append` " frames, " `B.append` BC.pack (show (time / 1000.0)) `B.append` " seconds: " `B.append` BC.pack (show (fromIntegral (cl'^.csTimeDemoFrames) * 1000.0 / time)) `B.append` " fps\n") -- IMPROVE?
+
+      globals.cl.csRefDef.rdBlend .= V4 0 0 0 0
+      
+      Just renderer <- use $ globals.re
+      (renderer^.rRefExport.reCinematicSetPalette) Nothing
+
+      Menu.forceMenuOff
+
+      globals.cls.csConnectTime .= 0
+
+      SCR.stopCinematic
+
+      when (cls'^.csDemoRecording) $
+        stopF
+
+      -- send a disconnect message to the server
+      io (putStrLn "CL.disconnect") >> undefined -- TODO
 
 forwardToServerF :: XCommandT
 forwardToServerF = do

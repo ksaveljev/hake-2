@@ -174,3 +174,7 @@ draw = do
 menuKeyDown :: Int -> Quake ()
 menuKeyDown key = do
     io (putStrLn "Menu.menuKeyDown") >> undefined -- TODO
+
+forceMenuOff :: Quake ()
+forceMenuOff = do
+    io (putStrLn "Menu.forceMenuOff") >> undefined -- TODO
