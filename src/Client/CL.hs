@@ -4,7 +4,7 @@
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
-import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom, (&), (.~))
+import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom, (&), (.~), (%~))
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.), xor, (.&.))
 import Data.Maybe (fromJust, isNothing)
@@ -645,8 +645,55 @@ reconnectF = do
            | otherwise ->
                return ()
 
+-- Send the rest of the command line over as an unconnected command.
 rconF :: XCommandT
-rconF = io (putStrLn "CL.rconF") >> undefined -- TODO
+rconF = do
+    clientPassword <- liftM (^.cvString) rconClientPasswordCVar
+
+    if B.null clientPassword
+      then
+        Com.printf "You must set 'rcon_password' before\nissuing an rcon command.\n"
+
+      else do
+        NET.config True -- allow remote
+
+        let message = B.pack [0xFF, 0xFF, 0xFF, 0xFF] `B.append` "rcon " `B.append` clientPassword `B.append` " "
+        c <- Cmd.argc
+        message' <- buildMessage message 1 c
+
+        cls' <- use $ globals.cls
+
+        adr <- if (cls'^.csState) >= Constants.caConnected
+                 then do
+                   adr <- use $ globals.cls.csNetChan.ncRemoteAddress
+                   return (Just adr)
+
+                 else do
+                   address <- liftM (^.cvString) rconAddressCVar
+
+                   if B.null address
+                     then do
+                       Com.printf "You must either be connected,\nor set the 'rcon_address' cvar\nto issue rcon commands\n"
+                       return Nothing
+
+                     else do
+                       Just adr <- NET.stringToAdr address
+                       return (Just (adr & naPort %~ (\v -> if v == 0 then Constants.portServer else v)))
+
+        case adr of
+          Nothing ->
+            return ()
+
+          Just to -> do
+            let message'' = message' `B.append` "\0"
+            NET.sendPacket Constants.nsClient (B.length message'') message'' to
+
+  where buildMessage :: B.ByteString -> Int -> Int -> Quake B.ByteString
+        buildMessage msg idx maxIdx
+          | idx >= maxIdx = return msg
+          | otherwise = do
+              v <- Cmd.argv idx
+              buildMessage (msg `B.append` v `B.append` " ") (idx + 1) maxIdx
 
 {-
 - The server will send this command right before allowing the client into
