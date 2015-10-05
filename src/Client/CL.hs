@@ -857,7 +857,30 @@ checkForResend = do
               NetChannel.outOfBandPrint Constants.nsClient adr' "getchallenge\n"
 
 fixUpGender :: Quake ()
-fixUpGender = io (putStrLn "CL.fixUpGender") >> undefined -- TODO
+fixUpGender = do
+    genderAutoValue <- liftM (^.cvValue) genderAutoCVar
+
+    when (genderAutoValue /= 0) $ do
+      gender <- genderCVar
+
+      if gender^.cvModified
+        then
+          -- was set directly, don't override the user
+          CVar.update gender { _cvModified = False }
+
+        else do
+          skin <- liftM (^.cvString) skinCVar
+
+          if | "male" `BC.isPrefixOf` skin || "cyborg" `BC.isPrefixOf` skin ->
+                 CVar.set "gender" "male"
+
+             | "female" `BC.isPrefixOf` skin || "crackhor" `BC.isPrefixOf` skin ->
+                 CVar.set "gender" "female"
+
+             | otherwise ->
+                 CVar.set "gender" "none"
+
+          CVar.update gender { _cvModified = False }
 
 {-
 - SendConnectPacket
