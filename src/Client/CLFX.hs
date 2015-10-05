@@ -1231,3 +1231,7 @@ bfgParticles _ = do
 trapParticles :: EntityT -> Quake ()
 trapParticles _ = do
     io (putStrLn "CLFX.trapParticles") >> undefined -- TODO
+
+ionRipperTrail :: V3 Float -> V3 Float -> Quake ()
+ionRipperTrail _ _ = do
+    io (putStrLn "CLFX.ionRipperTrail") >> undefined -- TODO

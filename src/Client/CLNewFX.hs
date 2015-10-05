@@ -60,3 +60,11 @@ colorExplosionParticles _ _ _ = do
 widowSplash :: V3 Float -> Quake ()
 widowSplash _ = do
     io (putStrLn "CLNewFX.widowSplash") >> undefined -- TODO
+
+trackerTrail :: V3 Float -> V3 Float -> Int -> Quake ()
+trackerTrail _ _ _ = do
+    io (putStrLn "CLNewFX.trackerTrail") >> undefined -- TODO
+
+trackerShell :: V3 Float -> Quake ()
+trackerShell _ = do
+    io (putStrLn "CLNewFX.trackerShell") >> undefined -- TODO

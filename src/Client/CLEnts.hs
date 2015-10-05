@@ -1323,8 +1323,50 @@ addPacketEntities frame = do
                      ClientV.addLight (ent^.eOrigin) 225 1.0 1.0 0.0
                      return ent
 
-                 | otherwise -> do
-                     io (putStrLn "CLEnts.addAutomaticParticleTrails") >> undefined -- TODO
+                 | effects .&. Constants.efTrackerTrail /= 0 ->
+                     if effects .&. Constants.efTracker /= 0
+                       then do
+                         time <- use $ globals.cl.csTime
+                         let intensity = 50 + (500 * (sin (fromIntegral time / 500.0) + 1.0))
+                         -- FIXME: check out this effect in rendition
+                         -- TODO: there is an extra check in jake2 that we skipped
+                         ClientV.addLight (ent^.eOrigin) intensity (-1.0) (-1.0) (-1.0)
+                         return ent
+
+                       else do
+                         CLNewFX.trackerShell (cent^.ceLerpOrigin)
+                         ClientV.addLight (ent^.eOrigin) 155 (-1.0) (-1.0) (-1.0)
+                         return ent
+
+                 | effects .&. Constants.efTracker /= 0 -> do
+                     CLNewFX.trackerTrail (cent^.ceLerpOrigin) (ent^.eOrigin) 0
+                     -- FIXME: check out this effect in rendition
+                     -- TODO: there is an extra check in jake2 that we skipped
+                     ClientV.addLight (ent^.eOrigin) 200 (-1) (-1) (-1)
+                     return ent
+
+                 | effects .&. Constants.efGreenGib /= 0 -> do
+                     CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+                     return ent
+
+                 | effects .&. Constants.efIonRipper /= 0 -> do
+                     CLFX.ionRipperTrail (cent^.ceLerpOrigin) (ent^.eOrigin)
+                     ClientV.addLight (ent^.eOrigin) 100 1 0.5 0.5
+                     return ent
+
+                 | effects .&. Constants.efBlueHyperblaster /= 0 -> do
+                     ClientV.addLight (ent^.eOrigin) 200 0 0 1
+                     return ent
+
+                 | effects .&. Constants.efPlasma /= 0 -> do
+                     when (effects .&. Constants.efAnimAllFast /= 0) $
+                       CLFX.blasterTrail (cent^.ceLerpOrigin) (ent^.eOrigin)
+
+                     ClientV.addLight (ent^.eOrigin) 130 1 0.5 0.5
+                     return ent
+
+                 | otherwise ->
+                     return ent
             else
               return ent
 

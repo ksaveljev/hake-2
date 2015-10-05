@@ -802,7 +802,7 @@ fixCVarCheats = do
       {-
       numCheatVars <- use $ clientGlobals.cgNumCheatVars
       when (numCheatVars == 0) $ do
-        undefined -- TODO
+        ??? -- TODO
       -}
 
       -- make sure they are all set to the proper values
