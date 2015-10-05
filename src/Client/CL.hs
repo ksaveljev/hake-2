@@ -4,7 +4,7 @@
 module Client.CL where
 
 import Control.Concurrent (threadDelay)
-import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom)
+import Control.Lens (use, (.=), (^.), (+=), preuse, ix, zoom, (&), (.~))
 import Control.Monad (unless, liftM, when, void)
 import Data.Bits ((.|.), xor, (.&.))
 import Data.Maybe (fromJust, isNothing)
@@ -442,7 +442,77 @@ pauseF = do
         CVar.setValueF "paused" pausedValue
 
 pingServersF :: XCommandT
-pingServersF = io (putStrLn "CL.pingServersF") >> undefined -- TODO
+pingServersF = do
+    NET.config True -- allow remote
+
+    -- send a broadcast packet
+    Com.printf "pinging boardcast...\n"
+
+    adr <- checkNoUDP newNetAdrT >>= checkNoIPX
+
+    -- send a packet to each address book entry
+    pingAddressBook adr 0 16
+
+  where checkNoUDP :: NetAdrT -> Quake NetAdrT
+        checkNoUDP adr = do
+          Just noUDP <- CVar.get "noudp" "0" Constants.cvarNoSet
+
+          if (noUDP^.cvValue) == 0
+            then do
+              -- TODO: do we need port conversion? adr.port = BigShort (PORT_SERVER)
+              let adr' = adr & naType .~ Constants.naBroadcast
+                             & naPort .~ Constants.portServer
+
+              NetChannel.outOfBandPrint Constants.nsClient adr' ("info " `B.append` BC.pack (show Constants.protocolVersion)) -- IMPROVE?
+              return adr'
+
+            else
+              return adr
+
+        checkNoIPX :: NetAdrT -> Quake NetAdrT
+        checkNoIPX adr = do
+          Just noIPX <- CVar.get "noipx" "1" Constants.cvarNoSet
+
+          if (noIPX^.cvValue) == 0
+            then do
+              -- TODO: do we need port conversion? adr.port = BigShort (PORT_SERVER)
+              let adr' = adr & naType .~ Constants.naBroadcastIpx
+                             & naPort .~ Constants.portServer
+
+              NetChannel.outOfBandPrint Constants.nsClient adr' ("info " `B.append` BC.pack (show Constants.protocolVersion)) -- IMPROVE?
+              return adr'
+
+            else
+              return adr
+
+        pingAddressBook :: NetAdrT -> Int -> Int -> Quake ()
+        pingAddressBook adr idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let name = "adr" `B.append` BC.pack (show idx) -- IMPROVE?
+              adrString <- CVar.variableString name
+
+              if B.null adrString
+                then
+                  pingAddressBook adr (idx + 1) maxIdx
+
+                else do
+                  Com.printf ("pinging " `B.append` adrString `B.append` "...\n")
+
+                  maybeAdr <- NET.stringToAdr adrString
+
+                  case maybeAdr of
+                    Nothing -> do
+                      Com.printf ("Bad address: " `B.append` adrString `B.append` "\n")
+                      pingAddressBook adr (idx + 1) maxIdx
+
+                    Just adr' -> do
+                      let adr'' = if (adr'^.naPort) == 0
+                                    then adr' & naPort .~ Constants.portServer
+                                    else adr'
+
+                      NetChannel.outOfBandPrint Constants.nsClient adr'' ("info " `B.append` BC.pack (show Constants.protocolVersion)) -- IMPROVE?
+                      pingAddressBook adr'' (idx + 1) maxIdx
 
 {-
 - Skins_f
