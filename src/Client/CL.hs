@@ -397,7 +397,21 @@ disconnect = do
         stopF
 
       -- send a disconnect message to the server
-      io (putStrLn "CL.disconnect") >> undefined -- TODO
+      let fin = B.pack [fromIntegral Constants.clcStringCmd] `B.append` "disconnect"
+      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
+      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
+      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
+
+      clearState
+
+      -- stop download
+      case cls'^.csDownload of
+        Nothing -> return ()
+        Just handle -> do
+          Lib.fClose handle
+          globals.cls.csDownload .= Nothing
+
+      globals.cls.csState .= Constants.caDisconnected
 
 forwardToServerF :: XCommandT
 forwardToServerF = do
