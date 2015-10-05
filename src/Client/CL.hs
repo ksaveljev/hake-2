@@ -984,8 +984,13 @@ connectionlessPacket = do
 
       _ -> Com.printf "Unknown command.\n"
 
+-- Handle a reply from a ping.
 parseStatusMessage :: Quake ()
-parseStatusMessage = io (putStrLn "CL.parseStatusMessage") >> undefined -- TODO
+parseStatusMessage = do
+    s <- MSG.readString (globals.netMessage)
+    Com.printf (s `B.append` "\n")
+    adr <- use $ globals.netFrom
+    Menu.addToServerList adr s
 
 writeDemoMessage :: Quake ()
 writeDemoMessage = io (putStrLn "CL.writeDemoMessage") >> undefined -- TODO

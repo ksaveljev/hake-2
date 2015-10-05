@@ -178,3 +178,7 @@ menuKeyDown key = do
 forceMenuOff :: Quake ()
 forceMenuOff = do
     io (putStrLn "Menu.forceMenuOff") >> undefined -- TODO
+
+addToServerList :: NetAdrT -> B.ByteString -> Quake ()
+addToServerList _ _ = do
+    io (putStrLn "Menu.addToServerList") >> undefined -- TODO
