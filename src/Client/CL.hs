@@ -609,8 +609,41 @@ connectF = do
 
         -- CL_CheckForResend() will fire immediately
 
+-- The server is changing levels.
 reconnectF :: XCommandT
-reconnectF = io (putStrLn "CL.reconnectF") >> undefined -- TODO
+reconnectF = do
+    -- ZOID
+    -- if we are downloading, we dont' change! This so we don't suddenly
+    -- stop downloading a map
+    cls' <- use $ globals.cls
+
+    case cls'^.csDownload of
+      Just _ ->
+        return ()
+
+      Nothing -> do
+        S.stopAllSounds
+
+        if | (cls'^.csState) == Constants.caConnected -> do
+               Com.printf "reconnecting...\n"
+               globals.cls.csState .= Constants.caConnected
+               MSG.writeCharI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+               MSG.writeString (globals.cls.csNetChan.ncMessage) "new"
+
+           | not (B.null (cls'^.csServerName)) -> do
+               if (cls'^.csState) >= Constants.caConnected
+                 then do
+                   disconnect
+                   globals.cls.csConnectTime .= fromIntegral (cls'^.csRealTime) - 1500
+
+                 else
+                   globals.cls.csConnectTime .= (-99999) -- fire immediately
+
+               globals.cls.csState .= Constants.caConnecting
+               Com.printf "reconnecting...\n"
+
+           | otherwise ->
+               return ()
 
 rconF :: XCommandT
 rconF = io (putStrLn "CL.rconF") >> undefined -- TODO
