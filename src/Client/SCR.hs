@@ -1198,8 +1198,35 @@ debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = return () -- IMPLEMENT ME!
 
 playCinematic :: B.ByteString -> Quake ()
-playCinematic _ = do
-    io (putStrLn "SCR.playCinematic") >> undefined -- TODO
+playCinematic arg = do
+    globals.cl.csCinematicFrame .= 0
+
+    if ".pcx" `BC.isSuffixOf` arg
+      then do
+        -- static pcx image
+        let name = "pics/" `B.append` arg
+        cinematics <- use $ scrGlobals.scrCin
+        (picSize, Just palette, Just cinematics') <- loadPCX name True (Just cinematics)
+        scrGlobals.scrCin .= cinematics'
+
+        zoom (globals.cl) $ do
+          csCinematicFrame .= -1
+          csCinematicTime .= 1
+
+        endLoadingPlaque
+
+        globals.cls.csState .= Constants.caActive
+
+        when (picSize == 0 || isNothing (cinematics'^.cPic)) $ do
+          Com.println (name `B.append` " not found.")
+          globals.cl.csCinematicTime .= 0
+        
+      else do
+        io (putStrLn "SCR.playCinematic :: video") >> undefined -- TODO
+
+loadPCX :: B.ByteString -> Bool -> Maybe CinematicsT -> Quake (Int, Maybe B.ByteString, Maybe CinematicsT)
+loadPCX fileName loadPalette cinematics = do
+    io (putStrLn "SCR.loadPCX") >> undefined -- TODO
 
 {-
 - =============== SCR_TouchPics
