@@ -350,8 +350,42 @@ addLightStyles = do
               addLightStyle lightStyles (idx + 1) maxIdx
 
 itemRespawnParticles :: V3 Float -> Quake ()
-itemRespawnParticles _ = do
-    io (putStrLn "CLFX.itemRespawnParticles") >> undefined -- TODO
+itemRespawnParticles org = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addItemRespawnParticles freeParticles 0 64
+
+  where addItemRespawnParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addItemRespawnParticles Nothing _ _ = return ()
+        addItemRespawnParticles (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              color <- Lib.rand >>= \r -> return (r .&. 3)
+
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+              f <- Lib.randomF
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = 0xD4 + fromIntegral color -- green
+                                              , _cpOrg = V3 ((org^._x) + o1 * 8) ((org^._y) + o2 * 8) ((org^._z) + o3 * 8)
+                                              , _cpVel = V3 (v1 * 8) (v2 * 8) (v3 * 8)
+                                              , _cpAccel = V3 0 0 ((-0.2) * particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (1.0 + f * 0.3)
+                                              })
+
+              addItemRespawnParticles (p^.cpNext) (idx + 1) maxIdx
 
 teleportParticles :: V3 Float -> Quake ()
 teleportParticles _ = do
