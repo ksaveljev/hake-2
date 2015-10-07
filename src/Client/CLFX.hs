@@ -388,8 +388,34 @@ itemRespawnParticles org = do
               addItemRespawnParticles (p^.cpNext) (idx + 1) maxIdx
 
 teleportParticles :: V3 Float -> Quake ()
-teleportParticles _ = do
-    io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO
+teleportParticles org = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addTeleportParticles freeParticles (-16) (-16) (-16)
+
+  where addTeleportParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Int -> Quake ()
+        addTeleportParticles Nothing _ _ _ = return ()
+        addTeleportParticles (Just pRef) i j k
+          | i > 16 = return ()
+          | j > 16 = addTeleportParticles (Just pRef) (i + 4) (-16) (-16)
+          | k > 16 = addTeleportParticles (Just pRef) i (j + 4) (-16)
+          | otherwise = do
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              color <- Lib.rand >>= \r -> return $ fromIntegral (r .&. 7)
+
+              av <- Lib.rand
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = 7 + color
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.3 + fromIntegral (av .&. 7) * 0.02)
+                                              , _cpOrg = V3 () () ()
+              io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO
     
 {-
 - =============== CL_ParticleEffect ===============
