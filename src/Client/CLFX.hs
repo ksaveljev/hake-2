@@ -35,6 +35,9 @@ instantParticle = -10000.0
 particleGravity :: Float
 particleGravity = 40
 
+colorTable :: UV.Vector Int
+colorTable = UV.fromList [ 2 * 8, 13 * 8, 21 * 8, 18 * 8 ]
+
 runDLights :: Quake ()
 runDLights = do
     time <- use $ globals.cl.csTime
@@ -178,8 +181,42 @@ teleporterParticles ent = do
               addTeleporterParticles (p^.cpNext) (idx + 1) maxIdx
 
 bigTeleportParticles :: V3 Float -> Quake ()
-bigTeleportParticles _ = do
-    io (putStrLn "CLFX.bigTeleportParticles") >> undefined -- TODO
+bigTeleportParticles org = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBigTeleportParticles freeParticles 0 4096
+
+  where addBigTeleportParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addBigTeleportParticles Nothing _ _ = return ()
+        addBigTeleportParticles (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              color <- Lib.rand >>= \r -> return $ fromIntegral (colorTable UV.! (fromIntegral r .&. 3))
+              angle <- Lib.rand >>= \r -> return $ pi * 2 * fromIntegral (r .&. 1023) / 1023.0
+              dist <- Lib.rand >>= \r -> return $ fromIntegral (r .&. 31)
+
+              o <- Lib.rand
+              v1 <- Lib.rand
+              v2 <- Lib.rand
+              v3 <- Lib.rand
+              f <- Lib.randomF
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = color
+                                              , _cpOrg = V3 ((org^._x) + (cos angle) * dist) ((org^._y) + (sin angle) * dist) ((org^._z) + 8 + fromIntegral (o `mod` 90))
+                                              , _cpVel = V3 ((cos angle) * (70 + fromIntegral (v1 .&. 63))) ((sin angle) * (70 + fromIntegral (v2 .&. 63))) ((-100) + fromIntegral (v3 .&. 31))
+                                              , _cpAccel = V3 ((-100) * (cos angle)) ((-100) * (sin angle)) (particleGravity * 4)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-0.3) / (0.5 + f * 0.3)
+                                              })
+
+              addBigTeleportParticles (p^.cpNext) (idx + 1) maxIdx
 
 {-
 - ============== CL_EntityEvent ==============
