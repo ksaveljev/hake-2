@@ -483,7 +483,40 @@ particleEffect org dir color count = do
 
 particleEffect2 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect2 org dir color count = do
-    io (putStrLn "CLFX.particleEffect2") >> undefined -- TODO
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addParticleEffect2 freeParticles 0 count
+
+  where addParticleEffect2 :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addParticleEffect2 Nothing _ _ = return ()
+        addParticleEffect2 (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+
+              d <- Lib.rand >>= \r -> return (fromIntegral (r .&. 7))
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+              f <- Lib.randomF
+
+              io $ modifyIORef' pRef (\v -> v { _cpTime = fromIntegral time
+                                              , _cpColor = fromIntegral color
+                                              , _cpOrg = org + fmap (fromIntegral . (subtract 4)) (V3 o1 o2 o3) + fmap (* d) dir
+                                              , _cpVel = fmap (* 20) (V3 v1 v2 v3)
+                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
+                                              })
+
+              addParticleEffect2 (p^.cpNext) (idx + 1) (maxIdx)
 
 particleEffect3 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect3 _ _ _ _ = do
