@@ -21,6 +21,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
+import Util.Binary
 import qualified Constants
 import qualified Client.CLInv as CLInv
 import {-# SOURCE #-} qualified Client.Console as Console
@@ -29,6 +30,7 @@ import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import qualified Sound.S as S
@@ -1222,7 +1224,40 @@ playCinematic arg = do
           globals.cl.csCinematicTime .= 0
         
       else do
-        io (putStrLn "SCR.playCinematic :: video") >> undefined -- TODO
+        let name = "video/" `B.append` arg
+        -- cinematicFile <- FS.loadMappedFile name
+        cinematicFile <- FS.fOpenFile name
+        
+        case cinematicFile of
+          Nothing -> do
+            -- Com.comError Constants.errDrop ("Cinematic " `B.append` name `B.append` " not found.\n")
+            finishCinematic
+            globals.cl.csCinematicTime .= 0
+
+          Just cinematicFileHandle -> do
+            endLoadingPlaque
+
+            globals.cls.csState .= Constants.caActive
+
+            width     <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+            height    <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+            sRate     <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+            sWidth    <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+            sChannels <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+
+            zoom (scrGlobals.scrCin) $ do
+              cWidth     .= width
+              cHeight    .= height
+              cSRate     .= sRate
+              cSWidth    .= sWidth
+              cSChannels .= sChannels
+
+            huff1TableInit
+
+            scrGlobals.scrCin.cRestartSound .= True
+            globals.cl.csCinematicFrame .= 0
+            readNextFrame >>= (scrGlobals.scrCin.cPic .=)
+            Timer.milliseconds >>= \ms -> globals.cl.csCinematicTime .= ms
 
 loadPCX :: B.ByteString -> Bool -> Maybe CinematicsT -> Quake (Int, Maybe B.ByteString, Maybe CinematicsT)
 loadPCX fileName loadPalette cinematics = do
@@ -1321,3 +1356,7 @@ centerPrint str = do
         findEndOfLine idx
           | idx >= B.length str || str `BC.index` idx == '\n' = idx
           | otherwise = findEndOfLine (idx + 1)
+
+huff1TableInit :: Quake ()
+huff1TableInit = do
+    io (putStrLn "SCR.huff1TableInit") >> undefined -- TODO
