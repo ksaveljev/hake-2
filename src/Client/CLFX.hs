@@ -397,7 +397,7 @@ teleportParticles org = do
         addTeleportParticles (Just pRef) i j k
           | i > 16 = return ()
           | j > 16 = addTeleportParticles (Just pRef) (i + 4) (-16) (-16)
-          | k > 16 = addTeleportParticles (Just pRef) i (j + 4) (-16)
+          | k > 32 = addTeleportParticles (Just pRef) i (j + 4) (-16)
           | otherwise = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               p <- io $ readIORef pRef
@@ -408,14 +408,24 @@ teleportParticles org = do
               color <- Lib.rand >>= \r -> return $ fromIntegral (r .&. 7)
 
               av <- Lib.rand
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+
+              let dir = normalize (fmap fromIntegral (V3 (j * 8) (i * 8) (k * 8)))
+              vel <- Lib.rand >>= \r -> return (50 + fromIntegral (r .&. 63))
 
               io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
                                               , _cpTime = fromIntegral time
                                               , _cpColor = 7 + color
                                               , _cpAlpha = 1.0
                                               , _cpAlphaVel = (-1.0) / (0.3 + fromIntegral (av .&. 7) * 0.02)
-                                              , _cpOrg = V3 () () ()
-              io (putStrLn "CLFX.teleportParticles") >> undefined -- TODO
+                                              , _cpOrg = V3 ((org^._x) + fromIntegral i + fromIntegral (o1 .&. 3)) ((org^._y) + fromIntegral j + fromIntegral (o2 .&. 3)) ((org^._z) + fromIntegral k + fromIntegral (o3 .&. 3))
+                                              , _cpVel = fmap (* vel) dir
+                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              })
+
+              addTeleportParticles (p^.cpNext) i j (k + 4)
     
 {-
 - =============== CL_ParticleEffect ===============
