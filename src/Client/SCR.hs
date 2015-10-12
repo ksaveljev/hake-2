@@ -10,12 +10,14 @@ import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
 import Data.Monoid (mempty, (<>))
 import Linear (V3(..), _y)
+import System.IO (Handle)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -1227,6 +1229,7 @@ playCinematic arg = do
         let name = "video/" `B.append` arg
         -- cinematicFile <- FS.loadMappedFile name
         cinematicFile <- FS.fOpenFile name
+        globals.cl.csCinematicFile .= cinematicFile
         
         case cinematicFile of
           Nothing -> do
@@ -1359,4 +1362,55 @@ centerPrint str = do
 
 huff1TableInit :: Quake ()
 huff1TableInit = do
-    io (putStrLn "SCR.huff1TableInit") >> undefined -- TODO
+    Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
+    tableInit cinematicFileHandle 0 256
+
+  where tableInit :: Handle -> Int -> Int -> Quake ()
+        tableInit cinematicFileHandle idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              -- read a row of counts
+              counts <- io $ B.hGet cinematicFileHandle 256
+              let hCount = UV.generate 512 (\i -> if i < 256 then fromIntegral (counts `B.index` i) else 0)
+
+              -- build the nodes
+              let nodeBase = idx * 256 * 2
+                  (hNodes, hUsed, hCount', numHNodes) = initNodes (UV.replicate (256 * 256 * 2) 0) (UV.replicate 512 0) hCount nodeBase 256
+
+              zoom (scrGlobals.scrCin) $ do
+                cHNodes1 .= Just hNodes
+                cHUsed .= hUsed
+                cHCount .= hCount'
+                cNumHNodes1.ix idx .= numHNodes - 1
+              
+              tableInit cinematicFileHandle (idx + 1) maxIdx
+
+        initNodes :: UV.Vector Int -> UV.Vector Int -> UV.Vector Int -> Int -> Int -> (UV.Vector Int, UV.Vector Int, UV.Vector Int, Int)
+        initNodes hNodes hUsed hCount nodeBase numHNodes
+          | numHNodes >= 511 = (hNodes, hUsed, hCount, numHNodes)
+          | otherwise =
+              let index = nodeBase + (numHNodes - 256) * 2
+                  -- pick two lowest counts
+                  b1 = smallestNode1 hUsed hCount numHNodes
+              in if b1 == -1
+                   then (hNodes UV.// [(index, b1)], hUsed, hCount, numHNodes)
+                   else let hNodes' = hNodes UV.// [(index, b1)]
+                            hUsed' = hUsed UV.// [(b1, 1)]
+                            b2 = smallestNode1 hUsed' hCount numHNodes
+                        in if b2 == -1
+                             then (hNodes' UV.// [(index + 1, b2)], hUsed', hCount, numHNodes)
+                             else let hNodes'' = hNodes' UV.// [(index + 1, b2)]
+                                      hUsed'' = hUsed' UV.// [(b2, 1)]
+                                  in initNodes hNodes'' hUsed'' (hCount UV.// [(numHNodes, (hCount UV.! b1) + (hCount UV.! b2))]) nodeBase (numHNodes + 1)
+
+smallestNode1 :: UV.Vector Int -> UV.Vector Int -> Int -> Int
+smallestNode1 hUsed hCount numHNodes =
+    findBestNode 99999999 (-1) 0
+
+  where findBestNode :: Int -> Int -> Int -> Int
+        findBestNode best bestNode idx
+          | idx >= numHNodes = bestNode
+          | otherwise = if | hUsed UV.! idx /= 0 -> findBestNode best bestNode (idx + 1)
+                           | hCount UV.! idx == 0 -> findBestNode best bestNode (idx + 1)
+                           | (hCount UV.! idx) < best -> findBestNode (hCount UV.! idx) idx (idx + 1)
+                           | otherwise -> findBestNode best bestNode (idx + 1)

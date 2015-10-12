@@ -890,7 +890,7 @@ data ClientStateT =
                , _csVUp                    :: V3 Float
                , _csLayout                 :: B.ByteString
                , _csInventory              :: UV.Vector Int
-               , _csCinematicFile          :: Maybe B.ByteString
+               , _csCinematicFile          :: Maybe Handle
                , _csCinematicTime          :: !Int
                , _csCinematicFrame         :: !Int
                , _csCinematicPalette       :: B.ByteString
