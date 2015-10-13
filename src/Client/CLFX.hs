@@ -1479,8 +1479,46 @@ allocDLight key = do
                   findAnyDLight time dLights (idx + 1) maxIdx
 
 logoutEffect :: V3 Float -> Int -> Quake ()
-logoutEffect _ _ = do
-    io (putStrLn "CLFX.logoutEffect") >> undefined -- TODO
+logoutEffect org pType = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addLogoutEffect freeParticles 0 500
+
+  where addLogoutEffect :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addLogoutEffect Nothing _ _ = return ()
+        addLogoutEffect (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+              f <- Lib.randomF
+              o1 <- Lib.randomF
+              o2 <- Lib.randomF
+              o3 <- Lib.randomF
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              let r' = fromIntegral (r .&. 7)
+                  color = if | pType == Constants.mzLogin -> 0xD0 + r' -- green
+                             | pType == Constants.mzLogout -> 0x40 + r' -- red
+                             | otherwise -> 0xE0 + r' -- yellow
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = color
+                                              , _cpOrg = V3 ((org^._x) - 16 + o1 * 32) ((org^._y) - 16 + o2 * 32) ((org^._z) - 24 + o3 * 56)
+                                              , _cpVel = fmap (* 20) (V3 v1 v2 v3)
+                                              , _cpAccel = V3 0 0 (- particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (1.0 + f * 0.3)
+                                              })
+
+              addLogoutEffect (p^.cpNext) (idx + 1) maxIdx
 
 rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
 rocketTrail _ _ _ = do
