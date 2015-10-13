@@ -282,8 +282,50 @@ flashlight ent pos = do
                                      })
 
 forceWall :: V3 Float -> V3 Float -> Int -> Quake ()
-forceWall _ _ _ = do
-    io (putStrLn "CLNewFX.forceWall") >> undefined -- TODO
+forceWall start end color = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = fmap (* 4) (normalize vec)
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addForceWall freeParticles vec' move len
+
+  where addForceWall :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Quake ()
+        addForceWall Nothing _ _ _ = return ()
+        addForceWall (Just pRef) vec move len
+          | len <= 0 = return ()
+          | otherwise = do
+              f <- Lib.randomF
+
+              if f > 0.3
+                then do
+                  p <- io $ readIORef pRef
+                  clientGlobals.cgFreeParticles .= (p^.cpNext)
+                  activeParticles <- use $ clientGlobals.cgActiveParticles
+                  clientGlobals.cgActiveParticles .= Just pRef
+
+                  time <- use $ globals.cl.csTime
+                  f' <- Lib.randomF
+                  o1 <- Lib.crandom
+                  o2 <- Lib.crandom
+                  o3 <- Lib.crandom
+                  v2 <- Lib.crandom
+
+                  io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                                  , _cpTime = fromIntegral time
+                                                  , _cpAccel = V3 0 0 0
+                                                  , _cpAlpha = 1.0
+                                                  , _cpAlphaVel = (-1.0) / (3.0 + f' * 0.5)
+                                                  , _cpColor = fromIntegral color
+                                                  , _cpOrg = move + fmap (* 3) (V3 o1 o2 o3)
+                                                  , _cpVel = V3 0 0 ((-40) - v2 * 10)
+                                                  })
+
+                  addForceWall (p^.cpNext) vec (move + vec) (len - 4)
+
+                else
+                  addForceWall (Just pRef) vec (move + vec) (len - 4)
 
 particleSteamEffect :: V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
 particleSteamEffect _ _ _ _ _ = do
