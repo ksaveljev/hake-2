@@ -48,8 +48,42 @@ svcStrings =
                , "svc_packetentities", "svc_deltapacketentities", "svc_frame"
                ]
 
+-- Request a download from the server
 downloadF :: XCommandT
-downloadF = io (putStrLn "CLParse.downloadF") >> undefined -- TODO
+downloadF = do
+    c <- Com.argc
+
+    if c /= 2
+      then
+        Com.printf "Usage: download <filename>\n"
+
+      else do
+        fileName <- Com.argv 1
+
+        if ".." `BC.isInfixOf` fileName
+          then
+            Com.printf "Refusing to download a path with ..\n"
+
+          else do
+            loadedFile <- FS.loadFile fileName
+
+            case loadedFile of
+              Just _ -> -- it exists, no need to download
+                Com.printf "File already exists.\n"
+
+              Nothing -> do
+                globals.cls.csDownloadName .= fileName
+                Com.printf ("Downloading " `B.append` fileName `B.append` "\n")
+
+                -- download to a temp name, and only rename
+                -- to the real name when done, so if interrupted
+                -- a runt file wont be left
+                globals.cls.csDownloadTempName .= (Com.stripExtension fileName) `B.append` ".tmp"
+
+                MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
+                MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName)
+
+                globals.cls.csDownloadNumber += 1
 
 showNet :: B.ByteString -> Quake ()
 showNet str = do
