@@ -1,8 +1,10 @@
 module Client.CLNewFX where
 
 import Control.Lens (use, (^.), (.=))
+import Control.Monad (unless)
+import Data.Bits ((.&.))
 import Data.IORef (IORef, readIORef, modifyIORef')
-import Linear (V3(..), normalize)
+import Linear (V3(..), normalize, norm)
 
 import Quake
 import QuakeState
@@ -41,8 +43,72 @@ monsterPlasmaShell origin = do
               addMonsterPlasmaShell (p^.cpNext) (idx + 1) maxIdx
 
 heatBeam :: V3 Float -> V3 Float -> Quake ()
-heatBeam _ _ = do
-    io (putStrLn "CLNewFX.heatBeam") >> undefined -- TODO
+heatBeam start forward = do
+    let end = start + fmap (* 4096) forward
+        vec = end - start
+        len = norm vec
+        vec' = normalize vec
+
+    -- FIXME - pmm - these might end up using old values?
+    --               MakeNormalVectors (vec, right, up)
+    right <- use $ globals.cl.csVRight
+    up <- use $ globals.cl.csVUp
+
+    -- TODO: if (Globals.vidref_val == Defines.VIDREF_GL) { // GL mode
+    let move = start + fmap (* (-0.5)) right + fmap (* (-0.5)) up
+    -- otherwise assume SOFT
+
+
+    time <- use $ globals.cl.csTime
+    let ltime = fromIntegral time / 1000.0
+        startPt = truncate (ltime * 96) `mod` 32 :: Int
+        move' = move + fmap (* (fromIntegral startPt)) vec'
+        vec'' = fmap (* 32) vec'
+        rstep = pi / 10.0
+
+    addRings (fromIntegral startPt) vec'' move' len
+
+  where addRings :: Float -> V3 Float -> V3 Float -> Float -> Quake ()
+        addRings i vec move len
+          | i >= len = return ()
+          | i > 32 * 5 = return () -- don't bother after the 5th ring
+          | otherwise = do
+              freeParticles <- use $ clientGlobals.cgFreeParticles
+              done <- addRingParticles freeParticles i move 0 (pi * 2.0)
+              unless done $
+                addRings (i + 32) vec (move + vec) len
+
+        addRingParticles :: Maybe (IORef CParticleT) -> Float -> V3 Float -> Float -> Float -> Quake Bool
+        addRingParticles Nothing _ _ _ _ = return True
+        addRingParticles (Just pRef) i move rot maxRot
+          | rot >= maxRot = return False
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              right <- use $ globals.cl.csVRight
+              up <- use $ globals.cl.csVUp
+              r <- Lib.rand
+
+              let c = (cos rot) * 0.5
+                  s = (sin rot) * 0.5
+                  dir = if i < 10
+                          then fmap (* (c * (i / 10.0))) right + fmap (* (s * (i / 10.0))) up
+                          else fmap (* c) right + fmap (* s) up
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 0.5
+                                              , _cpAlphaVel = -1000.0
+                                              , _cpColor = 223 - fromIntegral (r .&. 7)
+                                              , _cpOrg = move + fmap (* 3) dir
+                                              , _cpVel = V3 0 0 0
+                                              })
+
+              addRingParticles (p^.cpNext) i move (rot + pi / 10.0) maxRot
 
 tagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
 tagTrail _ _ _ = do
