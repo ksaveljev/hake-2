@@ -1,13 +1,44 @@
 module Client.CLNewFX where
 
-import Linear (V3)
+import Control.Lens (use, (^.), (.=))
+import Data.IORef (IORef, readIORef, modifyIORef')
+import Linear (V3(..), normalize)
 
 import Quake
 import QuakeState
+import qualified Client.CLFX as CLFX
+import qualified Util.Lib as Lib
 
 monsterPlasmaShell :: V3 Float -> Quake ()
-monsterPlasmaShell _ = do
-    io (putStrLn "CLNewFX.monsterPlasmaShell") >> undefined -- TODO
+monsterPlasmaShell origin = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addMonsterPlasmaShell freeParticles 0 40
+
+  where addMonsterPlasmaShell :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addMonsterPlasmaShell Nothing _ _ = return ()
+        addMonsterPlasmaShell (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpTime = fromIntegral time
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = CLFX.instantParticle
+                                              , _cpColor = 0xE0
+                                              , _cpOrg = origin + fmap (* 10) (normalize (V3 o1 o2 o3))
+                                              })
+
+              addMonsterPlasmaShell (p^.cpNext) (idx + 1) maxIdx
 
 heatBeam :: V3 Float -> V3 Float -> Quake ()
 heatBeam _ _ = do
