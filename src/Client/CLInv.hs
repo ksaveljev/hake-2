@@ -1,11 +1,24 @@
 module Client.CLInv where
 
+import Control.Lens ((.=), ix)
+
 import Quake
+import QuakeState
+import qualified Constants
+import qualified QCommon.MSG as MSG
 
 drawInventory :: Quake ()
 drawInventory = do
     io (putStrLn "CLInv.drawInventory") >> undefined -- TODO
 
+-- IMPROVE: collect the whole vector and then update the state
 parseInventory :: Quake ()
-parseInventory = do
-    io (putStrLn "CLInv.parseInventory") >> undefined -- TODO
+parseInventory =
+    readInventory 0 Constants.maxItems
+
+  where readInventory :: Int -> Int -> Quake ()
+        readInventory idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              v <- MSG.readShort (globals.netMessage)
+              globals.cl.csInventory.ix idx .= v
