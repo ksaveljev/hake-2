@@ -654,8 +654,84 @@ blasterParticles org dir = do
                   drawParticles (idx + 1) maxIdx
 
 railTrail :: V3 Float -> V3 Float -> Quake ()
-railTrail _ _ = do
-    io (putStrLn "CLFX.railTrail") >> undefined -- TODO
+railTrail start end = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = normalize vec
+        (right, up) = Math3D.makeNormalVectors vec'
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addRailTrail freeParticles vec' right up move 0 len
+
+    let vec'' = fmap (* 0.75) vec'
+
+    freeParticles' <- use $ clientGlobals.cgFreeParticles
+    addRailTrail2 freeParticles' vec'' len move
+
+  where addRailTrail :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> Float -> Float -> Quake ()
+        addRailTrail Nothing _ _ _ _ _ _ = return ()
+        addRailTrail (Just pRef) vec right up move idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              let d = 0.1 * idx
+                  c = cos d
+                  s = sin d
+                  dir = fmap (* c) right + fmap (* s) up
+
+              time <- use $ globals.cl.csTime
+              f <- Lib.randomF
+              r <- Lib.rand
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles 
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (1.0 + f * 0.2)
+                                              , _cpColor = 0x74 + fromIntegral (r .&. 7)
+                                              , _cpOrg = move + fmap (* 3) dir
+                                              , _cpVel = fmap (* 6) dir
+                                              })
+
+              addRailTrail (p^.cpNext) vec right up (move + vec) (idx + 1) maxIdx
+
+        addRailTrail2 :: Maybe (IORef CParticleT) -> V3 Float -> Float -> V3 Float -> Quake ()
+        addRailTrail2 Nothing _ _ _ = return ()
+        addRailTrail2 (Just pRef) vec len move
+          | len <= 0 = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              f <- Lib.randomF
+              r <- Lib.rand
+
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles 
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.5 + f * 0.2)
+                                              , _cpColor = fromIntegral (r .&. 15)
+                                              , _cpOrg = move + fmap (* 3) (V3 o1 o2 o3)
+                                              , _cpVel = fmap (* 3) (V3 v1 v2 v3)
+                                              })
+
+              addRailTrail2 (p^.cpNext) vec (len - 0.75) (move + vec)
 
 bfgExplosionParticles :: V3 Float -> Quake ()
 bfgExplosionParticles _ = do

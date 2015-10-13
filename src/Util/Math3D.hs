@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Math3D where
 
-import Control.Lens (preuse, ix, (^.), Const)
+import Control.Lens (preuse, ix, (^.), Const, (&), (%~))
 import Data.Bits ((.&.), (.|.))
 import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z, dot, normalize, cross)
@@ -241,3 +241,13 @@ vectorAngles value1 =
                pitch = truncate ((atan2 (value1^._z) forward) * 180 / pi) :: Integer
                pitch' = fromIntegral $ if pitch < 0 then pitch + 360 else pitch
            in V3 (negate pitch') yaw' 0
+
+makeNormalVectors :: V3 Float -> (V3 Float, V3 Float)
+makeNormalVectors forward =
+        -- this rotate and negate guarantees a vector
+        -- not colinear with the original
+    let right = forward & _x %~ negate
+        d = right `dot` forward
+        right' = normalize (right + fmap (* (-d)) forward)
+        up = right' `cross` forward
+    in (right', up)
