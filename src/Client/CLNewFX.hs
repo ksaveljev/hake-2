@@ -328,8 +328,41 @@ forceWall start end color = do
                   addForceWall (Just pRef) vec (move + vec) (len - 4)
 
 particleSteamEffect :: V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
-particleSteamEffect _ _ _ _ _ = do
-    io (putStrLn "CLNewFX.particleSteamEffect") >> undefined -- TODO
+particleSteamEffect org dir color count magnitude = do
+    let (r, u) = Math3D.makeNormalVectors dir
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addParticleSteamEffect freeParticles r u 0
+
+  where addParticleSteamEffect :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Int -> Quake ()
+        addParticleSteamEffect Nothing _ _ _ = return ()
+        addParticleSteamEffect (Just pRef) r u idx
+          | idx >= count = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r' <- Lib.rand
+              f <- Lib.randomF
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              d <- Lib.crandom >>= \c -> return (c * fromIntegral magnitude / 3)
+              d' <- Lib.crandom >>= \c -> return (c * fromIntegral magnitude / 3)
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = fromIntegral color + fromIntegral (r' .&. 7)
+                                              , _cpOrg = org + fmap (* (fromIntegral magnitude * 0.1)) (V3 o1 o2 o3)
+                                              , _cpVel = fmap (* fromIntegral magnitude) dir + fmap (* d) r + fmap (* d') u
+                                              , _cpAccel = V3 0 0 (- CLFX.particleGravity / 2)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
+                                              })
+
+              addParticleSteamEffect (p^.cpNext) r u (idx + 1)
 
 bubbleTrail2 :: V3 Float -> V3 Float -> Int -> Quake ()
 bubbleTrail2 _ _ _ = do
