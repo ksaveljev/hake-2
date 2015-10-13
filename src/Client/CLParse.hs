@@ -11,7 +11,7 @@ import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.IORef (IORef)
 import Data.Maybe (isNothing)
-import System.IO (IOMode(ReadWriteMode), hFileSize)
+import System.IO (IOMode(ReadWriteMode), hFileSize, hClose)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -24,6 +24,7 @@ import qualified Constants
 import qualified Client.CL as CL
 import qualified Client.CLEnts as CLEnts
 import qualified Client.CLFX as CLFX
+import qualified Client.CLInv as CLInv
 import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import {-# SOURCE #-} qualified Client.SCR as SCR
@@ -126,9 +127,35 @@ parseServerMessage = do
 
                      | cmd == Constants.svcDisconnect -> Com.comError Constants.errDisconnect "Server disconnected\n"
 
-                     | cmd == Constants.svcReconnect -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcReconnect") >> undefined -- TODO
+                     | cmd == Constants.svcReconnect -> do
+                         Com.printf "Server disconnected, reconnecting\n"
 
-                     | cmd == Constants.svcPrint -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcPrint") >> undefined -- TODO
+                         download <- use $ globals.cls.csDownload
+
+                         case download of
+                           Nothing ->
+                             return ()
+
+                           Just downloadFile -> do
+                             -- ZOID, close download
+                             io $ handle (\(e :: IOException) -> return ()) (hClose downloadFile)
+                             globals.cls.csDownload .= Nothing
+
+                         globals.cls.csState .= Constants.caConnecting
+                         globals.cls.csConnectTime .= (-99999)
+                         -- fire immediately
+
+                     | cmd == Constants.svcPrint -> do
+                         i <- MSG.readByte (globals.netMessage)
+
+                         when (i == Constants.printChat) $ do
+                           S.startLocalSound "misc/talk.wav"
+                           globals.con.cOrMask .= 128
+
+                         str <- MSG.readString (globals.netMessage)
+                         Com.printf str
+
+                         globals.con.cOrMask .= 0
 
                      | cmd == Constants.svcCenterPrint -> do
                          str <- MSG.readString (globals.netMessage)
@@ -155,15 +182,18 @@ parseServerMessage = do
 
                      | cmd == Constants.svcMuzzleFlash2 -> CLFX.parseMuzzleFlash2
 
-                     | cmd == Constants.svcDownload -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcDownload") >> undefined -- TODO
+                     | cmd == Constants.svcDownload -> parseDownload
 
                      | cmd == Constants.svcFrame -> CLEnts.parseFrame
 
-                     | cmd == Constants.svcInventory -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcInventory") >> undefined -- TODO
+                     | cmd == Constants.svcInventory -> CLInv.parseInventory
 
-                     | cmd == Constants.svcLayout -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcLayout") >> undefined -- TODO
+                     | cmd == Constants.svcLayout -> do
+                         layout <- MSG.readString (globals.netMessage)
+                         globals.cl.csLayout .= layout
 
-                     | cmd == Constants.svcPlayerInfo || cmd == Constants.svcPacketEntities || cmd == Constants.svcDeltaPacketEntities -> io (putStrLn "CLParse.parseServerMessage#parseMessage#svcFinalErrorSmth") >> undefined -- TODO
+                     | cmd == Constants.svcPlayerInfo || cmd == Constants.svcPacketEntities || cmd == Constants.svcDeltaPacketEntities ->
+                         Com.comError Constants.errDrop "Out of place frame data"
 
                      | otherwise -> io (print cmd) >> Com.comError Constants.errDrop "CL_ParseServerMessage: Illegible server message\n"
 
@@ -540,3 +570,7 @@ parseStartSoundPacket = do
     -- if (null == Globals.cl.sound_precache[sound_num])
     --      return;
     S.startSound pos (newEdictReference ent) channel sound volume attenuation ofs
+
+parseDownload :: Quake ()
+parseDownload = do
+    io (putStrLn "CLParse.parseDownload") >> undefined -- TODO
