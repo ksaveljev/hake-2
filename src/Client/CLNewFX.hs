@@ -153,8 +153,45 @@ tagTrail start end color = do
               addTagTrail (p^.cpNext) vec (move + vec) (len - 5)
 
 blasterTrail2 :: V3 Float -> V3 Float -> Quake ()
-blasterTrail2 _ _ = do
-    io (putStrLn "CLNewFX.blasterTrail2") >> undefined -- TODO
+blasterTrail2 start end = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = fmap (* 5) (normalize vec)
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBlasterTrail2 freeParticles vec' move len
+
+  where addBlasterTrail2 :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Quake ()
+        addBlasterTrail2 Nothing _ _ _ = return ()
+        addBlasterTrail2 (Just pRef) vec move len
+          | len <= 0 = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              f <- Lib.randomF
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.3 + f * 0.2)
+                                              , _cpColor = 0xD0
+                                              , _cpOrg = move + V3 o1 o2 o3
+                                              , _cpVel = fmap (* 5) (V3 v1 v2 v3)
+                                              })
+
+              addBlasterTrail2 (p^.cpNext) vec (move + vec) (len - 5)
 
 blasterParticles2 :: V3 Float -> V3 Float -> Int -> Quake ()
 blasterParticles2 _ _ _ = do
