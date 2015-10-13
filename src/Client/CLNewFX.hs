@@ -194,8 +194,42 @@ blasterTrail2 start end = do
               addBlasterTrail2 (p^.cpNext) vec (move + vec) (len - 5)
 
 blasterParticles2 :: V3 Float -> V3 Float -> Int -> Quake ()
-blasterParticles2 _ _ _ = do
-    io (putStrLn "CLNewFX.blasterParticles2") >> undefined -- TODO
+blasterParticles2 org dir color = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBlasterParticles2 freeParticles 0 40
+
+  where addBlasterParticles2 :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addBlasterParticles2 Nothing _ _ = return ()
+        addBlasterParticles2 (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              f <- Lib.randomF
+              r <- Lib.rand
+              d <- Lib.rand >>= \d -> return (fromIntegral (d .&. 15))
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 (- CLFX.particleGravity)
+                                              , _cpColor = fromIntegral color + fromIntegral (r .&. 7)
+                                              , _cpOrg = org + fmap (fromIntegral . (subtract 4) . (.&. 7)) (V3 o1 o2 o3) + fmap (* d) dir
+                                              , _cpVel = fmap (* 30) dir + fmap (* 40) (V3 v1 v2 v3)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
+                                              })
+
+              addBlasterParticles2 (p^.cpNext) (idx + 1) maxIdx
 
 debugTrail :: V3 Float -> V3 Float -> Quake ()
 debugTrail _ _ = do
