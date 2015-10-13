@@ -1521,8 +1521,57 @@ logoutEffect org pType = do
               addLogoutEffect (p^.cpNext) (idx + 1) maxIdx
 
 rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
-rocketTrail _ _ _ = do
-    io (putStrLn "CLFX.rocketTrail") >> undefined -- TODO
+rocketTrail start end oldIdx = do
+    -- smoke
+    diminishingTrail start end oldIdx Constants.efRocket
+
+    -- fire
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = normalize vec
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addRocketTrail freeParticles vec' move len
+
+  where addRocketTrail :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Quake ()
+        addRocketTrail Nothing _ _ _ = return ()
+        addRocketTrail (Just pRef) vec move len
+          | len <= 0 = return ()
+          | otherwise = do
+              r <- Lib.rand
+
+              if r .&. 7 == 0
+                then do
+                  p <- io $ readIORef pRef
+                  clientGlobals.cgFreeParticles .= (p^.cpNext)
+                  activeParticles <- use $ clientGlobals.cgActiveParticles
+                  clientGlobals.cgActiveParticles .= Just pRef
+
+                  time <- use $ globals.cl.csTime
+                  r <- Lib.rand
+                  f <- Lib.randomF
+                  o1 <- Lib.crandom
+                  o2 <- Lib.crandom
+                  o3 <- Lib.crandom
+                  v1 <- Lib.crandom
+                  v2 <- Lib.crandom
+                  v3 <- Lib.crandom
+
+                  io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                                  , _cpAccel = V3 0 0 (- particleGravity)
+                                                  , _cpTime = fromIntegral time
+                                                  , _cpAlpha = 1.0
+                                                  , _cpAlphaVel = (-1.0) / (1.0 + f * 0.2)
+                                                  , _cpColor = 0xDC + fromIntegral (r .&. 3)
+                                                  , _cpOrg = move + fmap (* 5) (V3 o1 o2 o3)
+                                                  , _cpVel = fmap (* 20) (V3 v1 v2 v3)
+                                                  })
+
+                  addRocketTrail (p^.cpNext) vec (move + vec) (len - 1)
+
+                else
+                  addRocketTrail (Just pRef) vec (move + vec) (len - 1)
 
 blasterTrail :: V3 Float -> V3 Float -> Quake ()
 blasterTrail start end = do
