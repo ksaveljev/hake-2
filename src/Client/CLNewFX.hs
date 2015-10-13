@@ -10,6 +10,7 @@ import Quake
 import QuakeState
 import qualified Client.CLFX as CLFX
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 monsterPlasmaShell :: V3 Float -> Quake ()
 monsterPlasmaShell origin = do
@@ -232,8 +233,41 @@ blasterParticles2 org dir color = do
               addBlasterParticles2 (p^.cpNext) (idx + 1) maxIdx
 
 debugTrail :: V3 Float -> V3 Float -> Quake ()
-debugTrail _ _ = do
-    io (putStrLn "CLNewFX.debugTrail") >> undefined -- TODO
+debugTrail start end = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = normalize vec
+        (right, up) = Math3D.makeNormalVectors vec'
+        vec'' = fmap (* 3) vec
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addDebugTrail freeParticles vec'' move len
+
+  where addDebugTrail :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Quake ()
+        addDebugTrail Nothing _ _ _ = return ()
+        addDebugTrail (Just pRef) vec move len
+          | len <= 0 = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpVel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = -0.1
+                                              , _cpColor = 0x74 + fromIntegral (r .&. 7)
+                                              , _cpOrg = move
+                                              })
+
+              addDebugTrail (p^.cpNext) vec (move + vec) (len - 3)
 
 flashlight :: Int -> V3 Float -> Quake ()
 flashlight _ _ = do
