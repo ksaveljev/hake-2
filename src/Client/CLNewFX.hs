@@ -270,8 +270,16 @@ debugTrail start end = do
               addDebugTrail (p^.cpNext) vec (move + vec) (len - 3)
 
 flashlight :: Int -> V3 Float -> Quake ()
-flashlight _ _ = do
-    io (putStrLn "CLNewFX.flashlight") >> undefined -- TODO
+flashlight ent pos = do
+    dlRef <- CLFX.allocDLight ent
+    time <- use $ globals.cl.csTime
+
+    io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = pos
+                                     , _cdlRadius = 400
+                                     , _cdlMinLight = 250
+                                     , _cdlDie = fromIntegral time + 100
+                                     , _cdlColor = V3 1 1 1
+                                     })
 
 forceWall :: V3 Float -> V3 Float -> Int -> Quake ()
 forceWall _ _ _ = do
