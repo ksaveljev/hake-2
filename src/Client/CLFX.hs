@@ -5,7 +5,7 @@ module Client.CLFX where
 
 -- Client Graphics Effects
 
-import Control.Lens ((.=), ix, use, (^.), preuse, zoom, (&), (.~))
+import Control.Lens ((.=), ix, use, (^.), preuse, zoom, (&), (.~), (+~))
 import Control.Monad (unless, when, liftM)
 import Data.Bits ((.&.), complement)
 import Data.Char (ord)
@@ -771,8 +771,46 @@ bfgExplosionParticles org = do
               addBfgExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 bubbleTrail :: V3 Float -> V3 Float -> Quake ()
-bubbleTrail _ _ = do
-    io (putStrLn "CLFX.bubbleTrail") >> undefined -- TODO
+bubbleTrail start end = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = fmap (* 32) (normalize vec)
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBubbleTrail freeParticles vec' move 0 len
+
+  where addBubbleTrail :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Float -> Quake ()
+        addBubbleTrail Nothing _ _ _ _ = return ()
+        addBubbleTrail (Just pRef) vec move idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+              f <- Lib.randomF
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles 
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (1.0 + f * 0.2)
+                                              , _cpColor = 4 + fromIntegral (r .&. 7)
+                                              , _cpOrg = move + fmap (* 2) (V3 o1 o2 o3)
+                                              , _cpVel = (fmap (* 5) (V3 v1 v2 v3)) & _z +~ 6
+                                              })
+
+              addBubbleTrail (p^.cpNext) vec (move + vec) (idx + 32) maxIdx
 
 parseMuzzleFlash :: Quake ()
 parseMuzzleFlash = do
