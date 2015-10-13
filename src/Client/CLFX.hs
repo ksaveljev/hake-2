@@ -173,7 +173,7 @@ teleporterParticles ent = do
                                               , _cpColor = 0xDB
                                               , _cpOrg = V3 ((ent^.esOrigin._x) - 16 + fromIntegral (o1 .&. 31)) ((ent^.esOrigin._y) - 16 + fromIntegral (o2 .&. 31)) ((ent^.esOrigin._z) - 8 + fromIntegral (o3 .&. 7))
                                               , _cpVel = V3 (v1 * 14) (v2 * 14) (80 + fromIntegral (v3 .&. 3))
-                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              , _cpAccel = V3 0 0 (- particleGravity)
                                               , _cpAlpha = 1.0
                                               , _cpAlphaVel = -0.5
                                               })
@@ -422,7 +422,7 @@ teleportParticles org = do
                                               , _cpAlphaVel = (-1.0) / (0.3 + fromIntegral (av .&. 7) * 0.02)
                                               , _cpOrg = V3 ((org^._x) + fromIntegral i + fromIntegral (o1 .&. 3)) ((org^._y) + fromIntegral j + fromIntegral (o2 .&. 3)) ((org^._z) + fromIntegral k + fromIntegral (o3 .&. 3))
                                               , _cpVel = fmap (* vel) dir
-                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              , _cpAccel = V3 0 0 (- particleGravity)
                                               })
 
               addTeleportParticles (p^.cpNext) i j (k + 4)
@@ -463,7 +463,7 @@ particleEffect org dir color count = do
                   vRand = V3 v1 v2 v3
                   pOrg = org + fmap (fromIntegral . (subtract 4) . (.&. 7)) oRand + fmap (* d) dir
                   pVel = fmap (* 20) vRand
-                  pAccel = V3 0 0 (negate particleGravity)
+                  pAccel = V3 0 0 (- particleGravity)
                   pAlpha = 1.0
 
               r' <- Lib.randomF
@@ -512,7 +512,7 @@ particleEffect2 org dir color count = do
                                               , _cpColor = fromIntegral color
                                               , _cpOrg = org + fmap (fromIntegral . (subtract 4) . (.&. 7)) (V3 o1 o2 o3) + fmap (* d) dir
                                               , _cpVel = fmap (* 20) (V3 v1 v2 v3)
-                                              , _cpAccel = V3 0 0 (negate particleGravity)
+                                              , _cpAccel = V3 0 0 (- particleGravity)
                                               , _cpAlpha = 1.0
                                               , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
                                               })
@@ -586,7 +586,7 @@ explosionParticles org = do
                   vRand = V3 v1 v2 v3
                   pOrg = org + fmap (fromIntegral . (subtract 16) . (`mod` 32)) oRand
                   pVel = fmap (fromIntegral . (subtract 192) . (`mod` 384)) vRand
-                  pAccel = V3 0 0 (negate particleGravity)
+                  pAccel = V3 0 0 (- particleGravity)
                   pAlpha = 1.0
 
               r' <- Lib.randomF
@@ -646,7 +646,7 @@ blasterParticles org dir = do
                                                   , _cpColor = 0xE0 + fromIntegral (r .&. 7)
                                                   , _cpOrg = org + (V3 (fromIntegral $ (o1 .&. 7) - 4) (fromIntegral $ (o2 .&. 7) - 4) (fromIntegral $ (o3 .&. 7) - 4)) + fmap (* d) dir
                                                   , _cpVel = fmap (* 30) dir + fmap (* 40) (V3 v1 v2 v3)
-                                                  , _cpAccel = V3 0 0 (negate particleGravity)
+                                                  , _cpAccel = V3 0 0 (- particleGravity)
                                                   , _cpAlpha = 1.0
                                                   , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
                                                   })
@@ -734,8 +734,41 @@ railTrail start end = do
               addRailTrail2 (p^.cpNext) vec (len - 0.75) (move + vec)
 
 bfgExplosionParticles :: V3 Float -> Quake ()
-bfgExplosionParticles _ = do
-    io (putStrLn "CLFX.bfgExplosionParticles") >> undefined -- TODO
+bfgExplosionParticles org = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBfgExplosionParticles freeParticles 0 256
+
+  where addBfgExplosionParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addBfgExplosionParticles Nothing _ _ = return ()
+        addBfgExplosionParticles (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+              v1 <- Lib.rand
+              v2 <- Lib.rand
+              v3 <- Lib.rand
+              f <- Lib.randomF
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles 
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = 0xD0 + fromIntegral (r .&. 7)
+                                              , _cpOrg = org + fmap (\v -> fromIntegral ((v `mod` 32) - 16)) (V3 o1 o2 o3)
+                                              , _cpVel = fmap (\v -> fromIntegral ((v `mod` 384) - 192)) (V3 v1 v2 v3)
+                                              , _cpAccel = V3 0 0 (- particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-0.8) / (0.5 + f * 0.3)
+                                              })
+
+              addBfgExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 bubbleTrail :: V3 Float -> V3 Float -> Quake ()
 bubbleTrail _ _ = do
