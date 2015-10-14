@@ -463,8 +463,41 @@ colorFlash pos ent intensity r g b = do
                                      })
 
 colorExplosionParticles :: V3 Float -> Int -> Int -> Quake ()
-colorExplosionParticles _ _ _ = do
-    io (putStrLn "CLNewFX.colorExplosionParticles") >> undefined -- TODO
+colorExplosionParticles org color run = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addColorExplosionParticles freeParticles 0 128
+
+  where addColorExplosionParticles :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addColorExplosionParticles Nothing _ _ = return ()
+        addColorExplosionParticles (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+              f <- Lib.randomF
+              o1 <- Lib.rand
+              o2 <- Lib.rand
+              o3 <- Lib.rand
+              v1 <- Lib.rand
+              v2 <- Lib.rand
+              v3 <- Lib.rand
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = fromIntegral color + fromIntegral (fromIntegral r `mod` run)
+                                              , _cpOrg = org + fmap (fromIntegral . (subtract 16) . (`mod` 32)) (V3 o1 o2 o3)
+                                              , _cpVel = fmap (fromIntegral . (subtract 128) . (`mod` 256)) (V3 v1 v2 v3)
+                                              , _cpAccel = V3 0 0 (- CLFX.particleGravity)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-0.4) / (0.6 + f * 0.2)
+                                              })
+
+              addColorExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 widowSplash :: V3 Float -> Quake ()
 widowSplash _ = do
