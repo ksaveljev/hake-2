@@ -1,10 +1,10 @@
 module Client.CLNewFX where
 
-import Control.Lens (use, (^.), (.=))
+import Control.Lens (use, (^.), (.=), (&), (-~), (+~))
 import Control.Monad (unless)
 import Data.Bits ((.&.))
 import Data.IORef (IORef, readIORef, modifyIORef')
-import Linear (V3(..), normalize, norm)
+import Linear (V3(..), normalize, norm, _z)
 
 import Quake
 import QuakeState
@@ -364,9 +364,47 @@ particleSteamEffect org dir color count magnitude = do
 
               addParticleSteamEffect (p^.cpNext) r u (idx + 1)
 
-bubbleTrail2 :: V3 Float -> V3 Float -> Int -> Quake ()
-bubbleTrail2 _ _ _ = do
-    io (putStrLn "CLNewFX.bubbleTrail2") >> undefined -- TODO
+bubbleTrail2 :: V3 Float -> V3 Float -> Float -> Quake ()
+bubbleTrail2 start end dist = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = fmap (* dist) (normalize vec)
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addBubbleTrail2 freeParticles vec' move 0 len
+
+  where addBubbleTrail2 :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Float -> Float -> Quake ()
+        addBubbleTrail2 Nothing _ _ _ _ = return ()
+        addBubbleTrail2 (Just pRef) vec move i len
+          | i >= len = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              f <- Lib.randomF
+              r <- Lib.rand
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              v1 <- Lib.crandom
+              v2 <- Lib.crandom
+              v3 <- Lib.crandom
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (1.0 + f * 0.1)
+                                              , _cpColor = 4 + fromIntegral (r .&. 7)
+                                              , _cpOrg = (move + fmap (* 2) (V3 o1 o2 o3)) & _z -~ 4
+                                              , _cpVel = (fmap (* 10) (V3 v1 v2 v3)) & _z +~ 20
+                                              })
+
+              addBubbleTrail2 (p^.cpNext) vec (move + vec) (i + dist) len
 
 particleSmokeEffect :: V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
 particleSmokeEffect _ _ _ _ _ = do
