@@ -407,8 +407,43 @@ bubbleTrail2 start end dist = do
               addBubbleTrail2 (p^.cpNext) vec (move + vec) (i + dist) len
 
 particleSmokeEffect :: V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
-particleSmokeEffect _ _ _ _ _ = do
-    io (putStrLn "CLNewFX.particleSmokeEffect") >> undefined -- TODO
+particleSmokeEffect org dir color count magnitude = do
+    let (r, u) = Math3D.makeNormalVectors dir
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addParticleSmokeEffect freeParticles r u 0
+
+  where addParticleSmokeEffect :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> Int -> Quake ()
+        addParticleSmokeEffect Nothing _ _ _ = return ()
+        addParticleSmokeEffect (Just pRef) r u idx
+          | idx >= count = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              let magnitude' = fromIntegral magnitude
+
+              time <- use $ globals.cl.csTime
+              r' <- Lib.rand
+              o1 <- Lib.crandom
+              o2 <- Lib.crandom
+              o3 <- Lib.crandom
+              f <- Lib.randomF
+              d <- Lib.crandom >>= \c -> return (c * magnitude' / 3)
+              d' <- Lib.crandom >>= \c -> return (c * magnitude' / 3)
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpColor = fromIntegral color + fromIntegral (r' .&. 7)
+                                              , _cpOrg = org + fmap (* (magnitude' * 0.1)) (V3 o1 o2 o3)
+                                              , _cpVel = fmap (* magnitude') dir + fmap (* d) r + fmap (* d') u
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-1.0) / (0.5 + f * 0.3)
+                                              })
+
+              addParticleSmokeEffect (p^.cpNext) r u (idx + 1)
 
 colorFlash :: V3 Float -> Int -> Int -> Float -> Float -> Float -> Quake ()
 colorFlash _ _ _ _ _ _ = do
