@@ -5,12 +5,16 @@ import Control.Monad (unless)
 import Data.Bits ((.&.))
 import Data.IORef (IORef, readIORef, modifyIORef')
 import Linear (V3(..), normalize, norm, _z)
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
 import qualified Client.CLFX as CLFX
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+wsColorTable :: UV.Vector Int
+wsColorTable = UV.fromList [ 2 * 8, 13 * 8, 21 * 8, 18 * 8 ]
 
 monsterPlasmaShell :: V3 Float -> Quake ()
 monsterPlasmaShell origin = do
@@ -500,8 +504,40 @@ colorExplosionParticles org color run = do
               addColorExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 widowSplash :: V3 Float -> Quake ()
-widowSplash _ = do
-    io (putStrLn "CLNewFX.widowSplash") >> undefined -- TODO
+widowSplash org = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addWidowSplash freeParticles 0 256
+
+  where addWidowSplash :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addWidowSplash Nothing _ _ = return ()
+        addWidowSplash (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              v3o <- use $ globals.vec3Origin
+              time <- use $ globals.cl.csTime
+              r <- Lib.rand
+              d1 <- Lib.crandom
+              d2 <- Lib.crandom
+              d3 <- Lib.crandom
+              f <- Lib.randomF
+
+              let dir = normalize (V3 d1 d2 d3)
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpColor = fromIntegral (wsColorTable UV.! fromIntegral (r .&. 3))
+                                              , _cpOrg = org + fmap (* 45) dir
+                                              , _cpVel = v3o + fmap (* 40) dir
+                                              , _cpAccel = V3 0 0 (p^.cpAccel._z)
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = (-0.8) / (0.5 + f * 0.3)
+                                              })
+
+              addWidowSplash (p^.cpNext) (idx + 1) maxIdx
 
 trackerTrail :: V3 Float -> V3 Float -> Int -> Quake ()
 trackerTrail _ _ _ = do
