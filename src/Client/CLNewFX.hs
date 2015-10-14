@@ -446,8 +446,21 @@ particleSmokeEffect org dir color count magnitude = do
               addParticleSmokeEffect (p^.cpNext) r u (idx + 1)
 
 colorFlash :: V3 Float -> Int -> Int -> Float -> Float -> Float -> Quake ()
-colorFlash _ _ _ _ _ _ = do
-    io (putStrLn "CLNewFX.colorFlash") >> undefined -- TODO
+colorFlash pos ent intensity r g b = do
+    -- TODO: if ((Globals.vidref_val == Defines.VIDREF_SOFT)
+    let (r', g', b', intensity') = if r < 0 || g < 0 || b < 0
+                                     then (-r, -g, -b, -intensity)
+                                     else (r, g, b, intensity)
+
+    time <- use $ globals.cl.csTime
+
+    dlRef <- CLFX.allocDLight ent
+    io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = pos
+                                     , _cdlRadius = fromIntegral intensity'
+                                     , _cdlMinLight = 250
+                                     , _cdlDie = fromIntegral time + 100
+                                     , _cdlColor = V3 r' g' b'
+                                     })
 
 colorExplosionParticles :: V3 Float -> Int -> Int -> Quake ()
 colorExplosionParticles _ _ _ = do
