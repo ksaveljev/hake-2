@@ -4,7 +4,7 @@ import Control.Lens (use, (^.), (.=), (&), (-~), (+~))
 import Control.Monad (unless)
 import Data.Bits ((.&.))
 import Data.IORef (IORef, readIORef, modifyIORef')
-import Linear (V3(..), normalize, norm, _z)
+import Linear (V3(..), normalize, norm, _z, dot)
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -540,8 +540,41 @@ widowSplash org = do
               addWidowSplash (p^.cpNext) (idx + 1) maxIdx
 
 trackerTrail :: V3 Float -> V3 Float -> Int -> Quake ()
-trackerTrail _ _ _ = do
-    io (putStrLn "CLNewFX.trackerTrail") >> undefined -- TODO
+trackerTrail start end particleColor = do
+    let move = start
+        vec = end - start
+        len = norm vec
+        vec' = normalize vec
+        angleDir = Math3D.vectorAngles vec'
+        (Just forward, Just right, Just up) = Math3D.angleVectors angleDir True True True
+        vec'' = fmap (* 3) vec'
+
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addTrackerTrail freeParticles vec'' move forward up len
+
+  where addTrackerTrail :: Maybe (IORef CParticleT) -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> Float -> Quake ()
+        addTrackerTrail Nothing _ _ _ _ _ = return ()
+        addTrackerTrail (Just pRef) vec move forward up len
+          | len <= 0 = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpTime = fromIntegral time
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = -2.0
+                                              , _cpColor = fromIntegral particleColor
+                                              , _cpOrg = move + fmap (* (8 * cos (move `dot` forward))) up
+                                              , _cpVel = V3 0 0 5
+                                              })
+
+              addTrackerTrail (p^.cpNext) vec (move + vec) forward up (len - 3)
 
 trackerShell :: V3 Float -> Quake ()
 trackerShell _ = do
