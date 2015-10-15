@@ -577,5 +577,33 @@ trackerTrail start end particleColor = do
               addTrackerTrail (p^.cpNext) vec (move + vec) forward up (len - 3)
 
 trackerShell :: V3 Float -> Quake ()
-trackerShell _ = do
-    io (putStrLn "CLNewFX.trackerShell") >> undefined -- TODO
+trackerShell origin = do
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addTrackerShell freeParticles 0 300
+
+  where addTrackerShell :: Maybe (IORef CParticleT) -> Int -> Int -> Quake ()
+        addTrackerShell Nothing _ _ = return ()
+        addTrackerShell (Just pRef) idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              p <- io $ readIORef pRef
+              clientGlobals.cgFreeParticles .= (p^.cpNext)
+              activeParticles <- use $ clientGlobals.cgActiveParticles
+              clientGlobals.cgActiveParticles .= Just pRef
+
+              time <- use $ globals.cl.csTime
+              d1 <- Lib.crandom
+              d2 <- Lib.crandom
+              d3 <- Lib.crandom
+              let dir = normalize (V3 d1 d2 d3)
+
+              io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
+                                              , _cpTime = fromIntegral time
+                                              , _cpAccel = V3 0 0 0
+                                              , _cpAlpha = 1.0
+                                              , _cpAlphaVel = - CLFX.instantParticle
+                                              , _cpColor = 0
+                                              , _cpOrg = origin + fmap (* 40) dir
+                                              })
+
+              addTrackerShell (p^.cpNext) (idx + 1) maxIdx
