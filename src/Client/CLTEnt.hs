@@ -3,7 +3,7 @@
 module Client.CLTEnt where
 
 import Control.Lens (zoom, (.=), use, (^.), ix, preuse)
-import Control.Monad (void, when, liftM)
+import Control.Monad (void, when, liftM, unless)
 import Data.Bits (shiftR, (.|.), (.&.))
 import Data.IORef (newIORef, IORef, readIORef, modifyIORef', writeIORef)
 import Data.Maybe (isNothing, fromJust, isJust)
@@ -1205,8 +1205,62 @@ parseLaser colors = do
                   updateLaser time start end (idx + 1) maxIdx
 
 parseBeam :: IORef ModelT -> Quake Int
-parseBeam _ = do
-    io (putStrLn "CLTEnt.parseBeam") >> undefined -- TODO
+parseBeam modelRef = do
+    ent <- MSG.readShort (globals.netMessage)
+    start <- MSG.readPos (globals.netMessage)
+    end <- MSG.readPos (globals.netMessage)
+
+    ok <- updateBeam ent start end 0 Constants.maxBeams
+
+    unless ok $
+      Com.printf "beam list overflow!\n"
+    
+    return ent
+
+  where updateBeam :: Int -> V3 Float -> V3 Float -> Int -> Int -> Quake Bool
+        updateBeam ent start end idx maxIdx
+          | idx >= maxIdx = findFreeBeam ent start end 0 Constants.maxBeams
+          | otherwise = do
+              Just beam <- preuse $ clTEntGlobals.clteBeams.ix idx
+
+              if (beam^.bEntity) == ent
+                then do
+                  time <- use $ globals.cl.csTime
+
+                  zoom (clTEntGlobals.clteBeams.ix idx) $ do
+                    bEntity .= ent
+                    bModel .= Just modelRef
+                    bEndTime .= time + 200
+                    bStart .= start
+                    bEnd .= end
+                    bOffset .= V3 0 0 0
+
+                  return True
+
+                else
+                  updateBeam ent start end (idx + 1) maxIdx
+
+        findFreeBeam :: Int -> V3 Float -> V3 Float -> Int -> Int -> Quake Bool
+        findFreeBeam ent start end idx maxIdx
+          | idx >= maxIdx = return False
+          | otherwise = do
+              Just beam <- preuse $ clTEntGlobals.clteBeams.ix idx
+              time <- use $ globals.cl.csTime
+
+              if isNothing (beam^.bModel) || (beam^.bEndTime) < time
+                then do
+                  zoom (clTEntGlobals.clteBeams.ix idx) $ do
+                    bEntity .= ent
+                    bModel .= Just modelRef
+                    bEndTime .= time + 200
+                    bStart .= start
+                    bEnd .= end
+                    bOffset .= V3 0 0 0
+
+                  return True
+
+                else
+                  findFreeBeam ent start end (idx + 1) maxIdx
 
 parseBeam2 :: IORef ModelT -> Quake Int
 parseBeam2 _ = do
