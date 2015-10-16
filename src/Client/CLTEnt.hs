@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.CLTEnt where
 
-import Control.Lens (zoom, (.=), use, (^.), ix)
+import Control.Lens (zoom, (.=), use, (^.), ix, preuse)
 import Control.Monad (void, when, liftM)
 import Data.Bits (shiftR, (.|.), (.&.))
 import Data.IORef (newIORef, IORef, readIORef, modifyIORef', writeIORef)
@@ -1174,8 +1174,35 @@ smokeAndFlash origin = do
           io $ writeIORef exRef ex
 
 parseLaser :: Int -> Quake ()
-parseLaser _ = do
-    io (putStrLn "CLTEnt.parseLaser") >> undefined -- TODO
+parseLaser colors = do
+    start <- MSG.readPos (globals.netMessage)
+    end <- MSG.readPos (globals.netMessage)
+
+    time <- use $ globals.cl.csTime
+    updateLaser time start end 0 Constants.maxLasers
+  
+  where updateLaser :: Int -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
+        updateLaser time start end idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just laser <- preuse $ clTEntGlobals.clteLasers.ix idx
+
+              if (laser^.lEndTime) < time
+                then do
+                  r <- Lib.rand
+                  io $ modifyIORef' (laser^.lEnt) (\v -> v { _enFlags = Constants.rfTranslucent .|. Constants.rfBeam
+                                                           , _eOrigin = start
+                                                           , _eOldOrigin = end
+                                                           , _eAlpha = 0.3
+                                                           , _eSkinNum = (colors `shiftR` fromIntegral ((r `mod` 4) * 8)) .&. 0xFF
+                                                           , _eModel = Nothing
+                                                           , _eFrame = 4
+                                                           })
+
+                  clTEntGlobals.clteLasers.ix idx.lEndTime .= time + 100
+
+                else
+                  updateLaser time start end (idx + 1) maxIdx
 
 parseBeam :: IORef ModelT -> Quake Int
 parseBeam _ = do
