@@ -1263,8 +1263,39 @@ parseBeam modelRef = do
                   findFreeBeam ent start end (idx + 1) maxIdx
 
 parseBeam2 :: IORef ModelT -> Quake Int
-parseBeam2 _ = do
-    io (putStrLn "CLTEnt.parseBeam2") >> undefined -- TODO
+parseBeam2 modelRef = do
+    ent <- MSG.readShort (globals.netMessage)
+    start <- MSG.readPos (globals.netMessage)
+    end <- MSG.readPos (globals.netMessage)
+    offset <- MSG.readPos (globals.netMessage)
+
+    ok <- updateBeam ent start end offset 0 Constants.maxBeams
+
+    unless ok $
+      Com.printf "beam list overflow!\n"
+    
+    return ent
+
+  where updateBeam :: Int -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Quake Bool
+        updateBeam ent start end offset idx maxIdx
+          | idx >= maxIdx = findFreeBeam ent start end offset 0 Constants.maxBeams
+          | otherwise = do
+              Just beam <- preuse $ clTEntGlobals.clteBeams.ix idx
+
+              if (beam^.bEntity) == ent
+                then do
+                  undefined -- TODO
+
+                  return True
+
+                else
+                  updateBeam ent start end offset (idx + 1) maxIdx
+
+        findFreeBeam :: Int -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Quake Bool
+        findFreeBeam ent start end offset idx maxIdx
+          | idx >= maxIdx = return False
+          | otherwise = do
+              undefined -- TODO
 
 parseLightning :: IORef ModelT -> Quake Int
 parseLightning _ = do
