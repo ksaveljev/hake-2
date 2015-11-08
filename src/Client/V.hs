@@ -26,7 +26,11 @@ import qualified Sys.Timer as Timer
 import qualified Util.Math3D as Math3D
 
 gunNextF :: XCommandT
-gunNextF = io (putStrLn "V.gunNextF") >> undefined -- TODO
+gunNextF = do
+    globals.gunFrame += 1
+    gunFrame <- use $ globals.gunFrame
+
+    Com.printf ("frame " `B.append` BC.pack (show gunFrame) `B.append` "\n") -- IMPROVE
 
 gunPrevF :: XCommandT
 gunPrevF = io (putStrLn "V.gunPrevF") >> undefined -- TODO
