@@ -38,7 +38,21 @@ gunPrevF = do
     Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
 
 gunModelF :: XCommandT
-gunModelF = io (putStrLn "V.gunModelF") >> undefined -- TODO
+gunModelF = do
+    c <- Cmd.argc
+
+    if c /= 2
+      then
+        globals.gunModel .= Nothing
+
+      else do
+        v <- Cmd.argv 1
+        Just renderer <- use $ globals.re
+
+        let name = "models/" `B.append` v `B.append` "/tris.md2"
+            registerModel = renderer^.rRefExport.reRegisterModel
+
+        registerModel name >>= (globals.gunModel .=)
 
 viewPosF :: XCommandT
 viewPosF = io (putStrLn "V.viewPosF") >> undefined -- TODO
