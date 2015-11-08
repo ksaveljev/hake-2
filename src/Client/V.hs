@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.V where
 
-import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse)
+import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse, (%=))
 import Control.Monad (void, unless, liftM, when)
 import Data.Bits ((.|.), shiftL)
 import Data.IORef (IORef, readIORef)
@@ -28,12 +28,14 @@ import qualified Util.Math3D as Math3D
 gunNextF :: XCommandT
 gunNextF = do
     globals.gunFrame += 1
-    gunFrame <- use $ globals.gunFrame
-
-    Com.printf ("frame " `B.append` BC.pack (show gunFrame) `B.append` "\n") -- IMPROVE
+    gunFrame' <- use $ globals.gunFrame
+    Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
 
 gunPrevF :: XCommandT
-gunPrevF = io (putStrLn "V.gunPrevF") >> undefined -- TODO
+gunPrevF = do
+    globals.gunFrame %= (\v -> if v - 1 < 0 then 0 else v - 1)
+    gunFrame' <- use $ globals.gunFrame
+    Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
 
 gunModelF :: XCommandT
 gunModelF = io (putStrLn "V.gunModelF") >> undefined -- TODO
