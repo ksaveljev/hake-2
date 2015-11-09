@@ -7,6 +7,7 @@ import Data.Bits ((.|.), shiftL)
 import Data.IORef (IORef, readIORef)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z)
+import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Storable.Mutable as MSV
@@ -55,7 +56,10 @@ gunModelF = do
         registerModel name >>= (globals.gunModel .=)
 
 viewPosF :: XCommandT
-viewPosF = io (putStrLn "V.viewPosF") >> undefined -- TODO
+viewPosF = do
+    refDef <- use $ globals.cl.csRefDef
+    let line = printf "(%i %i %i) : %i\n" (truncate $ refDef^.rdViewOrg._x :: Int) (truncate $ refDef^.rdViewOrg._y :: Int) (truncate $ refDef^.rdViewOrg._z :: Int) (truncate $ refDef^.rdViewAngles._y :: Int) -- IMPROVE: use yaw instead of _y
+    Com.printf (BC.pack line)
 
 init :: Quake ()
 init = do
