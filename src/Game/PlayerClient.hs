@@ -9,7 +9,7 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isNothing, isJust, fromJust)
-import Linear (V3(..), _x, _y, _z)
+import Linear (V3(..), _x, _y, _z, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -249,8 +249,37 @@ spInfoPlayerIntermission = return ()
 
 spFixCoopSpots :: EntThink
 spFixCoopSpots =
-  GenericEntThink "SP_FixCoopSpots" $ \_ -> do
-    io (putStrLn "PlayerClient.spFixCoopSpots") >> undefined -- TODO
+  GenericEntThink "SP_FixCoopSpots" $ \selfRef -> do
+    fixSpots selfRef Nothing
+    
+  where fixSpots :: EdictReference -> Maybe EdictReference -> Quake Bool
+        fixSpots selfRef es = do
+          foundEdict <- GameBase.gFind es GameBase.findByClass "info_player_start"
+
+          case foundEdict of
+            Nothing ->
+              return True
+
+            Just edictRef -> do
+              edict <- readEdictT edictRef
+
+              case edict^.eTargetName of
+                Nothing ->
+                  fixSpots selfRef foundEdict
+
+                Just targetName -> do
+                  self <- readEdictT selfRef
+                  let d = (self^.eEntityState.esOrigin) - (edict^.eEntityState.esOrigin)
+
+                  if norm d < 384
+                    then do
+                      when (isNothing (self^.eTargetName) || BC.map toLower (fromJust $ self^.eTargetName) /= BC.map toLower targetName) $
+                        modifyEdictT selfRef (\v -> v & eTargetName .~ (edict^.eTargetName))
+
+                      return True
+
+                    else
+                      fixSpots selfRef foundEdict
 
 spCreateCoopSpots :: EntThink
 spCreateCoopSpots =
