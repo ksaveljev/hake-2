@@ -791,7 +791,18 @@ selectSpawnPoint edictRef = do
 
 selectDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
 selectDeathmatchSpawnPoint = do
-    io (putStrLn "PlayerClient.selectDeathmatchSpawnPoint") >> undefined -- TODO
+    dmFlagsValue <- liftM (^.cvValue) dmFlagsCVar
+    if (truncate dmFlagsValue) .&. Constants.dfSpawnFarthest /= 0
+      then selectFarthestDeathmatchSpawnPoint
+      else selectRandomDeathmatchSpawnPoint
+
+selectRandomDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectRandomDeathmatchSpawnPoint = do
+    undefined -- TODO
+
+selectFarthestDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectFarthestDeathmatchSpawnPoint = do
+    undefined -- TODO
 
 selectCoopSpawnPoint :: EdictReference -> Quake (Maybe EdictReference)
 selectCoopSpawnPoint _ = do
