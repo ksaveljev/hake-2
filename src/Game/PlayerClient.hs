@@ -283,8 +283,32 @@ spFixCoopSpots =
 
 spCreateCoopSpots :: EntThink
 spCreateCoopSpots =
-  GenericEntThink "SP_CreateCoopSpots" $ \_ -> do
-    io (putStrLn "PlayerClient.spCreateCoopSpots") >> undefined -- TODO
+  GenericEntThink "SP_CreateCoopSpots" $ \selfRef -> do
+    mapName <- use $ gameBaseGlobals.gbLevel.llMapName
+
+    when (BC.map toLower mapName == "security") $ do
+      spotRef <- GameUtil.spawn
+      modifyEdictT spotRef (\v -> v & eClassName .~ "info_player_coop"
+                                    & eEntityState.esOrigin .~ V3 (188 - 64) (-164) 80
+                                    & eTargetName .~ Just "jail3"
+                                    & eEntityState.esAngles._y .~ 90
+                                    )
+
+      spotRef' <- GameUtil.spawn
+      modifyEdictT spotRef' (\v -> v & eClassName .~ "info_player_coop"
+                                     & eEntityState.esOrigin .~ V3 (188 + 64) (-164) 80
+                                     & eTargetName .~ Just "jail3"
+                                     & eEntityState.esAngles._y .~ 90
+                                     )
+
+      spotRef'' <- GameUtil.spawn
+      modifyEdictT spotRef'' (\v -> v & eClassName .~ "info_player_coop"
+                                      & eEntityState.esOrigin .~ V3 (188 + 128) (-164) 80
+                                      & eTargetName .~ Just "jail3"
+                                      & eEntityState.esAngles._y .~ 90
+                                      )
+
+    return True
 
 {-
 - This will be called once for each server frame, before running any other
