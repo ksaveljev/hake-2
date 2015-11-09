@@ -3,7 +3,7 @@ module Client.V where
 
 import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse, (%=))
 import Control.Monad (void, unless, liftM, when)
-import Data.Bits ((.|.), shiftL)
+import Data.Bits ((.|.), shiftL, shiftR, (.&.))
 import Data.IORef (IORef, readIORef)
 import Data.Maybe (isJust, fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z)
@@ -231,9 +231,31 @@ clearScene = do
     vGlobals.vgNumEntities .= 0
     vGlobals.vgNumParticles .= 0
 
+{-
+- ================ V_TestParticles ================
+- 
+- If cl_testparticles is set, create 4096 particles in the view
+-
+-}
 testParticles :: Quake ()
 testParticles = do
-    io (putStrLn "V.testParticles") >> undefined -- TODO
+    vGlobals.vgNumParticles .= 0
+    testParticlesValue <- liftM (^.cvValue) clTestParticlesCVar
+    addTestParticles testParticlesValue 0 Constants.maxParticles
+
+  where addTestParticles :: Float -> Int -> Int -> Quake ()
+        addTestParticles testParticlesValue idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              cl' <- use $ globals.cl
+
+              let d = fromIntegral idx * 0.25
+                  r = 4 * (fromIntegral (idx .&. 7) - 3.5)
+                  u = 4 * (fromIntegral ((idx `shiftR` 3) .&. 7) - 3.5)
+                  origin = (cl'^.csRefDef.rdViewOrg) + fmap (* d) (cl'^.csVForward) + fmap (* r) (cl'^.csVRight) + fmap (* u) (cl'^.csVUp)
+
+              addParticle origin 8 testParticlesValue
+              addTestParticles testParticlesValue (idx + 1) maxIdx
 
 testEntities :: Quake ()
 testEntities = do
