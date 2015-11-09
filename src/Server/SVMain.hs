@@ -7,7 +7,7 @@ module Server.SVMain where
 import Control.Lens (use, preuse, (.=), (%=), (^.), (+=), ix, zoom, (&), (.~))
 import Control.Monad (void, when, liftM, unless)
 import Data.Bits ((.|.), (.&.))
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.Traversable (traverse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -134,7 +134,7 @@ dropClient (ClientReference clientIdx) = do
     MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (fromIntegral Constants.svcDisconnect)
 
     when ((client^.cState) == Constants.csSpawned) $
-      PlayerClient.clientDisconnect (client^.cEdict)
+      PlayerClient.clientDisconnect (fromJust $ client^.cEdict)
 
     when (isJust (client^.cDownload)) $
       svGlobals.svServerStatic.ssClients.ix clientIdx.cDownload .= Just ""

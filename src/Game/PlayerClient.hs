@@ -38,8 +38,43 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 -- Called when a player drops from the server. Will not be called between levels. 
-clientDisconnect :: Maybe EdictReference -> Quake ()
-clientDisconnect _ = io (putStrLn "PlayerClient.clientDisconnect") >> undefined -- TODO
+clientDisconnect :: EdictReference -> Quake ()
+clientDisconnect edictRef = do
+    edict <- readEdictT edictRef
+
+    case edict^.eClient of
+      Nothing ->
+        return ()
+
+      Just (GClientReference gClientIdx) -> do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+
+        let bprintf = gameImport^.giBprintf
+            writeByte = gameImport^.giWriteByte
+            writeShort = gameImport^.giWriteShort
+            multicast = gameImport^.giMulticast
+            unlinkEntity = gameImport^.giUnlinkEntity
+            configString = gameImport^.giConfigString
+
+        bprintf Constants.printHigh ((gClient^.gcPers.cpNetName) `B.append` " disconnected\n")
+
+        -- send effect
+        writeByte Constants.svcMuzzleFlash
+        writeShort (edict^.eIndex)
+        writeByte Constants.mzLogout
+        multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+        unlinkEntity edictRef
+
+        modifyEdictT edictRef (\v -> v & eEntityState.esModelIndex .~ 0
+                                       & eSolid .~ Constants.solidNot
+                                       & eInUse .~ False
+                                       & eClassName .~ "disconnected"
+                                       )
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpConnected .= False
+        configString (Constants.csPlayerSkins + ((edict^.eIndex) - 1)) ""
 
 {-
 - Called when a player begins connecting to the server. The game can refuse
