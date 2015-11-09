@@ -4,12 +4,13 @@ module Client.V where
 import Control.Lens (use, (^.), (.=), (+=), zoom, ix, preuse, (%=))
 import Control.Monad (void, unless, liftM, when)
 import Data.Bits ((.|.), shiftL, shiftR, (.&.))
-import Data.IORef (IORef, readIORef)
+import Data.IORef (IORef, readIORef, writeIORef, modifyIORef')
 import Data.Maybe (isJust, fromJust)
 import Linear (V3(..), V4(..), _x, _y, _z)
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
@@ -257,9 +258,36 @@ testParticles = do
               addParticle origin 8 testParticlesValue
               addTestParticles testParticlesValue (idx + 1) maxIdx
 
+{-
+- ================ V_TestEntities ================
+- 
+- If cl_testentities is set, create 32 player models
+-}
 testEntities :: Quake ()
 testEntities = do
-    io (putStrLn "V.testEntities") >> undefined -- TODO
+    vGlobals.vgNumEntities .= 32
+    entities <- use $ vGlobals.vgEntities
+    V.mapM_ (\ref -> io $ writeIORef ref newEntityT) entities
+
+    addTestEntities entities 0 32
+
+  where addTestEntities :: V.Vector (IORef EntityT) -> Int -> Int -> Quake ()
+        addTestEntities entities idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              cl' <- use $ globals.cl
+
+              let ref = entities V.! idx
+                  r = 64 * (fromIntegral (idx `mod` 4) - 1.5)
+                  f = 64 * (fromIntegral idx / 4) + 128
+                  origin = (cl'^.csRefDef.rdViewOrg) + fmap (* f) (cl'^.csVForward) + fmap (* r) (cl'^.csVRight)
+
+              io $ modifyIORef' ref (\v -> v { _eModel = (cl'^.csBaseClientInfo.ciModel)
+                                             , _eSkin = (cl'^.csBaseClientInfo.ciSkin)
+                                             , _eOrigin = origin
+                                             })
+
+              addTestEntities entities (idx + 1) maxIdx
 
 testLights :: Quake ()
 testLights = do
