@@ -289,9 +289,37 @@ testEntities = do
 
               addTestEntities entities (idx + 1) maxIdx
 
+{-
+- ================ V_TestLights ================
+- 
+- If cl_testlights is set, create 32 lights models
+-}
 testLights :: Quake ()
 testLights = do
-    io (putStrLn "V.testLights") >> undefined -- TODO
+    vGlobals.vgNumDLights .= 32
+    vGlobals.vgDLights %= fmap (const newDLightT)
+
+    addTestLights 0 32
+
+  where addTestLights :: Int -> Int -> Quake ()
+        addTestLights idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              cl' <- use $ globals.cl
+
+              let r = 64 * (fromIntegral (idx `mod` 4) - 1.5)
+                  f = 64 * (fromIntegral idx / 4) + 128
+                  origin = (cl'^.csRefDef.rdViewOrg) + fmap (* f) (cl'^.csVForward) + fmap (* r) (cl'^.csVRight)
+                  c1 = ((idx `mod` 6) + 1) .&. 1
+                  c2 = (((idx `mod` 6) + 1) .&. 2) `shiftR` 1
+                  c3 = (((idx `mod` 6) + 1) .&. 4) `shiftR` 2
+
+              vGlobals.vgDLights.ix idx .= newDLightT { _dlOrigin = origin
+                                                      , _dlColor = fmap fromIntegral (V3 c1 c2 c3)
+                                                      , _dlIntensity = 200
+                                                      }
+
+              addTestLights (idx + 1) maxIdx
 
 addParticle :: V3 Float -> Int -> Float -> Quake ()
 addParticle org color alpha = do
