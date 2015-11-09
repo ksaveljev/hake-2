@@ -536,9 +536,46 @@ clientBegin edictRef = do
         -- make sure all view stuff is valid
         PlayerView.clientEndServerFrame edictRef
 
+{-
+- A client has just connected to the server in deathmatch mode, so clear
+- everything out before starting them. 
+-}
 clientBeginDeathmatch :: EdictReference -> Quake ()
-clientBeginDeathmatch _ = do
-    io (putStrLn "PlayerClient.clientBeginDeathmatch") >> undefined -- TODO
+clientBeginDeathmatch edictRef = do
+    GameUtil.initEdict edictRef
+    edict <- readEdictT edictRef
+
+    let gClientIdx = (edict^.eIndex) - 1
+    initClientResp (GClientReference gClientIdx) -- TODO: jake uses ent.client to get the client ref
+
+    -- locate ent at a spawn point
+    putClientInServer edictRef
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+        bprintf = gameImport^.giBprintf
+
+    intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
+
+    if intermissionTime /= 0
+      then
+        PlayerHud.moveClientToIntermission edictRef
+
+      else do
+        -- send effect
+        writeByte Constants.svcMuzzleFlash
+        writeShort (edict^.eIndex)
+        writeByte Constants.mzLogin
+        multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    bprintf Constants.printHigh ((gClient^.gcPers.cpNetName) `B.append` " entered the game\n")
+
+    -- make sure all view stuff is valid
+    PlayerView.clientEndServerFrame edictRef
 
 -- Called when a player connects to a server or respawns in a deathmatch.
 putClientInServer :: EdictReference -> Quake ()
