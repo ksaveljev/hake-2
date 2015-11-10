@@ -939,9 +939,127 @@ playerDie =
               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix idx .= 0
               clearInventory gClientRef gClient coopValue itemList (idx + 1) maxIdx
 
+{-
+- Only called when pers.spectator changes note that resp.spectator should
+- be the opposite of pers.spectator here
+-}
 spectatorRespawn :: EdictReference -> Quake ()
-spectatorRespawn _ = do
-    io (putStrLn "PlayerClient.spectatorRespawn") >> undefined -- TODO
+spectatorRespawn edictRef = do
+    edict <- readEdictT edictRef
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+
+    let cprintf = gameImport^.giCprintf
+        bprintf = gameImport^.giBprintf
+        writeByte = gameImport^.giWriteByte
+        writeString = gameImport^.giWriteString
+        writeShort = gameImport^.giWriteShort
+        unicast = gameImport^.giUnicast
+        multicast = gameImport^.giMulticast
+
+    -- if the user wants to become a spectator, make sure he doesn't
+    -- exceed max_spectators
+    done <- if gClient^.gcPers.cpSpectator
+              then do
+                pass <- Info.valueForKey (gClient^.gcPers.cpUserInfo) "spectator"
+                actualPassword <- liftM (^.cvString) spectatorPasswordCVar
+
+                if not (passwordOK actualPassword pass)
+                  then do
+                    cprintf (Just edictRef) Constants.printHigh "Spectator password incorrect.\n"
+                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpSpectator .= False
+                    writeByte Constants.svcStuffText
+                    writeString "spectator 0\n"
+                    unicast edictRef True
+                    return True
+
+                  else do
+                    -- count spectators
+                    maxClientsValue <- liftM (^.cvValue) maxClientsCVar
+                    numSpec <- countSpectators 1 (truncate maxClientsValue) 0
+
+                    maxSpectatorsValue <- liftM (^.cvValue) maxSpectatorsCVar
+
+                    if numSpec >= truncate maxSpectatorsValue
+                      then do
+                        cprintf (Just edictRef) Constants.printHigh "Server spectator limit is full."
+                        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpSpectator .= False
+                        writeByte Constants.svcStuffText
+                        writeString "spectator 0\n"
+                        unicast edictRef True
+                        return True
+
+                      else
+                        return False
+
+              else do
+                -- he was a spectator and wants to join the game
+                -- he must have the right password
+                pass <- Info.valueForKey (gClient^.gcPers.cpUserInfo) "password"
+                actualPassword <- liftM (^.cvString) spectatorPasswordCVar
+
+                if not (passwordOK actualPassword pass)
+                  then do
+                    cprintf (Just edictRef) Constants.printHigh "Password incorrect.\n"
+                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpSpectator .= True
+                    writeByte Constants.svcStuffText
+                    writeString "spectator 1\n"
+                    unicast edictRef True
+                    return True
+
+                  else
+                    return False
+
+    unless done $ do
+      -- clear client on respawn
+      zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+        gcResp.crScore .= 0
+        gcPers.cpScore .= 0
+
+      modifyEdictT edictRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+      putClientInServer edictRef
+
+      -- add a teleportation effect
+      Just gClient' <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+      unless (gClient'^.gcPers.cpSpectator) $ do
+        -- send effect
+        writeByte Constants.svcMuzzleFlash
+        writeShort (edict^.eIndex)
+        writeByte Constants.mzLogin
+        multicast (edict^.eEntityState.esOrigin) Constants.multicastPvs
+
+        -- hold in place briefly
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcPlayerState.psPMoveState.pmsPMFlags .= pmfTimeTeleport
+          gcPlayerState.psPMoveState.pmsPMTime .= 14
+
+      levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcRespawnTime .= levelTime
+
+      if gClient'^.gcPers.cpSpectator
+        then bprintf Constants.printHigh ((gClient'^.gcPers.cpNetName) `B.append` " has moved to the sidelines\n")
+        else bprintf Constants.printHigh ((gClient'^.gcPers.cpNetName) `B.append` " joined the game\n")
+
+  where countSpectators :: Int -> Int -> Int -> Quake Int
+        countSpectators idx maxIdx acc
+          | idx > maxIdx = return acc
+          | otherwise = do
+              let ref = newEdictReference idx
+              edict <- readEdictT ref
+
+              if edict^.eInUse
+                then do
+                  let Just (GClientReference gClientIdx) = edict^.eClient
+                  Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                  if gClient^.gcPers.cpSpectator
+                    then countSpectators (idx + 1) maxIdx (acc + 1)
+                    else countSpectators (idx + 1) maxIdx acc
+
+                else
+                  countSpectators (idx + 1) maxIdx acc
 
 respawn :: EdictReference -> Quake ()
 respawn selfRef = do
@@ -1321,5 +1439,5 @@ lookAtKiller selfRef inflictorRef attackerRef = do
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcKillerYaw .= killerYaw'
 
 clientObituary :: EdictReference -> EdictReference -> EdictReference -> Quake ()
-clientObituary _ _ _ = do
+clientObituary selfRef inflictorRef attackerRef = do
     io (putStrLn "PlayerClient.clientObituary") >> undefined -- TODO
