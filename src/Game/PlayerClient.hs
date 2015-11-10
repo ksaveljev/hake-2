@@ -975,8 +975,47 @@ respawn selfRef = do
         addCommandString "menu_loadgame\n"
 
 copyToBodyQue :: EdictReference -> Quake ()
-copyToBodyQue _ = do
-    undefined -- TODO
+copyToBodyQue edictRef = do
+    maxClientsValue <- liftM (^.cvValue) maxClientsCVar
+    bodyQue <- use $ gameBaseGlobals.gbLevel.llBodyQue
+    let idx = truncate maxClientsValue + bodyQue + 1
+        bodyRef = newEdictReference idx
+
+    gameBaseGlobals.gbLevel.llBodyQue .= (bodyQue + 1) `mod` Constants.bodyQueueSize
+
+    -- FIXME: send an effect on the removed body
+
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let unlinkEntity = gameImport^.giUnlinkEntity
+        linkEntity = gameImport^.giLinkEntity
+
+    unlinkEntity edictRef
+    unlinkEntity bodyRef
+
+    edict <- readEdictT edictRef
+
+    modifyEdictT bodyRef (\v -> v & eEntityState .~ (edict^.eEntityState)
+                                  & eEntityState.esNumber .~ idx
+                                  & eSvFlags .~ (edict^.eSvFlags)
+                                  & eMins .~ (edict^.eMins)
+                                  & eMaxs .~ (edict^.eMaxs)
+                                  & eAbsMin .~ (edict^.eAbsMin)
+                                  & eAbsMax .~ (edict^.eAbsMax)
+                                  & eSize .~ (edict^.eSize)
+                                  & eSolid .~ (edict^.eSolid)
+                                  & eClipMask .~ (edict^.eClipMask)
+                                  & eOwner .~ (edict^.eOwner)
+                                  & eMoveType .~ (edict^.eMoveType)
+                                  & eDie .~ Just bodyDie
+                                  & eTakeDamage .~ Constants.damageYes
+                                  )
+
+    linkEntity bodyRef
+
+bodyDie :: EntDie
+bodyDie =
+  GenericEntDie "body_die" $ \_ _ _ _ _ -> do
+    io (putStrLn "PlayerClient.bodyDie") >> undefined -- TODO
 
 {-
 - This will be called once for each client frame, which will usually be a
