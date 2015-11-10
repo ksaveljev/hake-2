@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Game.PlayerClient where
 
-import Control.Lens (use, (^.), ix, preuse, (.=), zoom, (%=), (&), (.~), (%~), (+~), (-~))
+import Control.Lens (use, (^.), ix, preuse, (.=), (+=), (-=), zoom, (%=), (&), (.~), (%~), (+~), (-~))
 import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Char (toLower)
@@ -1231,9 +1231,58 @@ defaultTrace start mins maxs end = do
       then liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskPlayerSolid
       else liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskDeadSolid
 
+-- Drop items and weapons in deathmatch games.
 tossClientWeapon :: EdictReference -> Quake ()
-tossClientWeapon _ = do
-    io (putStrLn "PlayerClient.tossClientWeapon") >> undefined -- TODO
+tossClientWeapon selfRef = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+
+    unless (deathmatchValue == 0) $ do
+      self <- readEdictT selfRef
+      let Just (GClientReference gClientIdx) = self^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      itemRef <- case gClient^.gcPers.cpWeapon of
+                   Nothing ->
+                     return Nothing
+
+                   Just (GItemReference gItemIdx) -> do
+                     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+
+                     return $ if | (gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex) == 0 -> Nothing
+                                 | (gItem^.giPickupName) == Just "Blaster" -> Nothing
+                                 | otherwise -> gClient^.gcPers.cpWeapon
+
+      frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+      dmFlagsValue <- liftM (^.cvValue) dmFlagsCVar
+
+      let quad = if (truncate dmFlagsValue) .&. Constants.dfQuadDrop == 0
+                   then False
+                   else (gClient^.gcQuadFrameNum) > fromIntegral (frameNum + 10)
+          spread = if isJust itemRef && quad
+                     then 22.5
+                     else 0.0
+
+      case itemRef of
+        Nothing ->
+          return ()
+
+        Just gItemRef -> do
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y -= spread -- IMPROVE: use Constants.yaw instead of _y
+          dropRef <- GameItems.dropItem selfRef gItemRef
+          gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y += spread -- IMPROVE: use Constants.yaw instead of _y
+          modifyEdictT dropRef (\v -> v & eSpawnFlags .~ Constants.droppedPlayerItem)
+
+      when quad $ do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y += spread -- IMPROVE: use Constants.yaw instead of _y
+        Just quadRef <- GameItems.findItemByClassname "item_quad"
+        dropRef <- GameItems.dropItem selfRef quadRef
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y -= spread -- IMPROVE: use Constants.yaw instead of _y
+        modifyEdictT dropRef (\v -> v & eSpawnFlags %~ (.|. Constants.droppedPlayerItem)
+                                      & eTouch .~ Just GameItems.touchItem
+                                      & eNextThink .~ levelTime + ((gClient^.gcQuadFrameNum) - fromIntegral frameNum) * Constants.frameTime
+                                      & eThink .~ Just GameUtil.freeEdictA
+                                      )
 
 lookAtKiller :: EdictReference -> EdictReference -> EdictReference -> Quake ()
 lookAtKiller _ _ _ = do
