@@ -944,8 +944,39 @@ spectatorRespawn _ = do
     io (putStrLn "PlayerClient.spectatorRespawn") >> undefined -- TODO
 
 respawn :: EdictReference -> Quake ()
-respawn _ = do
-    io (putStrLn "PlayerClient.respawn") >> undefined -- TODO
+respawn selfRef = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+
+    if deathmatchValue /= 0 || coopValue /= 0
+      then do
+        self <- readEdictT selfRef
+
+        when ((self^.eMoveType) /= Constants.moveTypeNoClip) $
+          copyToBodyQue selfRef
+
+        modifyEdictT selfRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+        putClientInServer selfRef
+
+        -- add a teleportation effect
+        modifyEdictT selfRef (\v -> v & eEntityState.esEvent .~ Constants.evPlayerTeleport)
+
+        let Just (GClientReference gClientIdx) = self^.eClient
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        -- hold in place briefly
+        zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
+          gcPlayerState.psPMoveState.pmsPMFlags .= pmfTimeTeleport
+          gcPlayerState.psPMoveState.pmsPMTime .= 14
+          gcRespawnTime .= levelTime
+
+      else do
+        addCommandString <- use $ gameBaseGlobals.gbGameImport.giAddCommandString
+        addCommandString "menu_loadgame\n"
+
+copyToBodyQue :: EdictReference -> Quake ()
+copyToBodyQue _ = do
+    undefined -- TODO
 
 {-
 - This will be called once for each client frame, which will usually be a
