@@ -1440,4 +1440,136 @@ lookAtKiller selfRef inflictorRef attackerRef = do
 
 clientObituary :: EdictReference -> EdictReference -> EdictReference -> Quake ()
 clientObituary selfRef inflictorRef attackerRef = do
-    io (putStrLn "PlayerClient.clientObituary") >> undefined -- TODO
+    self <- readEdictT selfRef
+    attacker <- readEdictT attackerRef
+
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    coopValue <- liftM (^.cvValue) coopCVar
+
+    when (coopValue /= 0 && isJust (attacker^.eClient)) $
+      gameBaseGlobals.gbMeansOfDeath %= (.|. Constants.modFriendlyFire)
+
+    done <- if deathmatchValue /= 0 || coopValue /= 0
+              then do
+                meansOfDeath <- use $ gameBaseGlobals.gbMeansOfDeath
+                let ff = meansOfDeath .&. Constants.modFriendlyFire /= 0
+                    mod' = meansOfDeath .&. (complement Constants.modFriendlyFire)
+
+                let message = if | mod' == Constants.modSuicide -> Just "suicides"
+                                 | mod' == Constants.modFalling -> Just "cratered"
+                                 | mod' == Constants.modCrush -> Just "was squished"
+                                 | mod' == Constants.modWater -> Just "sank like a rock"
+                                 | mod' == Constants.modSlime -> Just "melted"
+                                 | mod' == Constants.modLava -> Just "does a back flip into the lava"
+                                 | mod' == Constants.modExplosive || mod' == Constants.modBarrel -> Just "blew up"
+                                 | mod' == Constants.modExit -> Just "found a way out"
+                                 | mod' == Constants.modTargetLaser -> Just "saw the light"
+                                 | mod' == Constants.modTargetBlaster -> Just "got blasted"
+                                 | mod' `elem` [ Constants.modBomb, Constants.modSplash, Constants.modTriggerHurt ] -> Just "was in the wrong place"
+                                 | otherwise -> Nothing
+
+                message' <- if attackerRef == selfRef
+                              then do
+                                neutral <- isNeutral selfRef
+                                female <- isFemale selfRef
+
+                                if | mod' == Constants.modHeldGrenade -> return (Just "tried to put the pin back in")
+                                   | mod' == Constants.modHgSplash || mod' == Constants.modGSplash ->
+                                       return $ Just $ if | neutral -> "tripped on its own grenade"
+                                                          | female -> "tripped on her own grenade"
+                                                          | otherwise -> "tripped on his own grenade"
+                                   | mod' == Constants.modRSplash ->
+                                       return $ Just $ if | neutral -> "blew itself up"
+                                                          | female -> "blew herself up"
+                                                          | otherwise -> "blew himself up"
+                                   | mod' == Constants.modBFGBlast -> return (Just "should have used a smaller gun")
+                                   | otherwise ->
+                                       return $ Just $ if | neutral -> "killed itself"
+                                                          | female -> "killed herself"
+                                                          | otherwise -> "killed himself"
+
+                              else
+                                return message
+
+                case message' of
+                  Just msg -> do
+                    let Just (GClientReference gClientIdx) = self^.eClient
+                    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+                    bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
+                    bprintf Constants.printMedium ((gClient^.gcPers.cpNetName) `B.append` " " `B.append` msg `B.append` ".\n")
+                    
+                    when (deathmatchValue /= 0) $
+                      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crScore -= 1
+
+                    modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
+                    return True
+
+                  Nothing -> do
+                    modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+
+                    case attacker^.eClient of
+                      Just _ -> do
+                        let (message'', message2) = if | mod' == Constants.modBlaster -> (Just "was blasted by", "")
+                                                       | mod' == Constants.modShotgun -> (Just "was gunned down by", "")
+                                                       | mod' == Constants.modSshotgun -> (Just "was blown away by", "'s super shotgun")
+                                                       | mod' == Constants.modMachinegun -> (Just "was machinegunned by", "")
+                                                       | mod' == Constants.modChaingun -> (Just "was cut in half by", "'s chaingun")
+                                                       | mod' == Constants.modGrenade -> (Just "was popped by", "'s grenade")
+                                                       | mod' == Constants.modGSplash -> (Just "was shredded by", "'s shrapnel")
+                                                       | mod' == Constants.modRocket -> (Just "ate", "'s rocket")
+                                                       | mod' == Constants.modRSplash -> (Just "almost dodged", "'s rocket")
+                                                       | mod' == Constants.modHyperblaster -> (Just "was melted by", "'s hyperblaster")
+                                                       | mod' == Constants.modRailgun -> (Just "was railed by", "")
+                                                       | mod' == Constants.modBFGLaser -> (Just "saw the pretty lights from", "'s BFG")
+                                                       | mod' == Constants.modBFGBlast -> (Just "was disintegrated by", "'s BFG blast")
+                                                       | mod' == Constants.modBFGEffect -> (Just "couldn't hide from", "'s BFG")
+                                                       | mod' == Constants.modHandgrenade -> (Just "caught", "'s handgrenade")
+                                                       | mod' == Constants.modHgSplash -> (Just "didn't see", "'s handgrenade")
+                                                       | mod' == Constants.modHeldGrenade -> (Just "feels", "'s pain")
+                                                       | mod' == Constants.modTelefrag -> (Just "tried to invade", "'s personal space")
+                                                       | otherwise -> (Nothing, "")
+
+                        case message'' of
+                          Nothing ->
+                            return False
+
+                          Just msg -> do
+                            let Just (GClientReference gClientIdx) = self^.eClient
+                            Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+                            let Just (GClientReference attackerClientIdx) = attacker^.eClient
+                            Just attackerClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix attackerClientIdx
+
+                            bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
+                            bprintf Constants.printMedium ((gClient^.gcPers.cpNetName) `B.append` " " `B.append` msg `B.append` " " `B.append` (attackerClient^.gcPers.cpNetName) `B.append` " " `B.append` message2 `B.append` "\n")
+
+                            when (deathmatchValue /= 0) $
+                              if ff
+                                then gameBaseGlobals.gbGame.glClients.ix attackerClientIdx.gcResp.crScore -= 1
+                                else gameBaseGlobals.gbGame.glClients.ix attackerClientIdx.gcResp.crScore += 1
+
+                            return True
+
+                      Nothing ->
+                        return False
+
+              else
+                return False
+
+    unless done $ do
+      let Just (GClientReference gClientIdx) = self^.eClient
+      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+
+      bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
+      bprintf Constants.printMedium ((gClient^.gcPers.cpNetName) `B.append` " died.\n")
+
+      when (deathmatchValue /= 0) $
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crScore -= 1
+
+isNeutral :: EdictReference -> Quake Bool
+isNeutral _ = do
+    io (putStrLn "PlayerClient.isNeutral") >> undefined -- TODO
+
+isFemale :: EdictReference -> Quake Bool
+isFemale _ = do
+    io (putStrLn "PlayerClient.isFemale") >> undefined -- TODO
