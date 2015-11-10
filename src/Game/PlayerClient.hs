@@ -1014,8 +1014,27 @@ copyToBodyQue edictRef = do
 
 bodyDie :: EntDie
 bodyDie =
-  GenericEntDie "body_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "PlayerClient.bodyDie") >> undefined -- TODO
+  GenericEntDie "body_die" $ \selfRef _ _ damage _ -> do
+    self <- readEdictT selfRef
+
+    when ((self^.eHealth) < -40) $ do
+      gameImport <- use $ gameBaseGlobals.gbGameImport
+      let sound = gameImport^.giSound
+          soundIndex = gameImport^.giSoundIndex
+
+      soundIdx <- soundIndex (Just "misc/udeath.wav")
+      sound (Just selfRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+
+      GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+      GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+      GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+      GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+
+      modifyEdictT selfRef (\v -> v & eEntityState.esOrigin._z -~ 48)
+
+      GameMisc.throwClientHead selfRef damage
+
+      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
 
 {-
 - This will be called once for each client frame, which will usually be a
