@@ -1508,7 +1508,7 @@ throwHead selfRef gibName damage gibType = do
     r' <- Lib.randomF
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT selfRef (\v -> v & eAVelocity._y .~ r * 600 -- TODO: use Constants.yaw instead of using _y directly
+    modifyEdictT selfRef (\v -> v & eAVelocity._y .~ r * 600 -- IMPROVE: use Constants.yaw instead of using _y directly
                                   & eThink .~ Just GameUtil.freeEdictA
                                   & eNextThink .~ levelTime + 10 + r' * 10)
 

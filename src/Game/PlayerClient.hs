@@ -1284,9 +1284,41 @@ tossClientWeapon selfRef = do
                                       & eThink .~ Just GameUtil.freeEdictA
                                       )
 
+-- Changes the camera view to look at the killer.
 lookAtKiller :: EdictReference -> EdictReference -> EdictReference -> Quake ()
-lookAtKiller _ _ _ = do
-    io (putStrLn "PlayerClient.lookAtKiller") >> undefined -- TODO
+lookAtKiller selfRef inflictorRef attackerRef = do
+    self <- readEdictT selfRef
+
+    let worldRef = newEdictReference 0
+        Just (GClientReference gClientIdx) = self^.eClient
+
+    -- TODO: jake2 checks attacker and inflictor for != null, do we need that?
+    mDir <- if | attackerRef /= worldRef && attackerRef /= selfRef -> do
+                   attacker <- readEdictT attackerRef
+                   return $ Just ((attacker^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
+
+               | inflictorRef /= worldRef && inflictorRef /= selfRef -> do
+                   inflictor <- readEdictT inflictorRef
+                   return $ Just ((inflictor^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
+
+               | otherwise -> do
+                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcKillerYaw .= (self^.eEntityState.esAngles._y) -- IMPROVE: use Constants.yaw instead of _y
+                   return Nothing
+
+    case mDir of
+      Nothing ->
+        return ()
+
+      Just dir -> do
+        let killerYaw = if (dir^._x) /= 0
+                          then 180 / pi * (atan2 (dir^._y) (dir^._x))
+                          else if | (dir^._y) > 0 -> 90
+                                  | (dir^._y) < 0 -> -90
+                                  | otherwise -> 0
+
+            killerYaw' = if killerYaw < 0 then killerYaw + 360 else killerYaw
+
+        gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcKillerYaw .= killerYaw'
 
 clientObituary :: EdictReference -> EdictReference -> EdictReference -> Quake ()
 clientObituary _ _ _ = do

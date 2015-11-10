@@ -322,8 +322,8 @@ aiRun =
                   marker <- readEdictT markerRef
 
                   modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ (marker^.eTimeStamp)
-                                                & eEntityState.esAngles._y .~ (marker^.eEntityState.esAngles._y) -- TODO: use Constants.yaw instead _y directly
-                                                & eIdealYaw .~ (marker^.eEntityState.esAngles._y)) -- TODO: use Constants.yaw instead _y directly
+                                                & eEntityState.esAngles._y .~ (marker^.eEntityState.esAngles._y) -- IMPROVE: use Constants.yaw instead _y directly
+                                                & eIdealYaw .~ (marker^.eEntityState.esAngles._y)) -- IMPROVE: use Constants.yaw instead _y directly
 
                   return True
             else
@@ -363,7 +363,7 @@ aiRun =
                   d2 = d1 * ((center + 1) / 2)
                   yaw = Math3D.vectorYaw v
 
-              modifyEdictT selfRef (\v -> v & eEntityState.esAngles._y .~ yaw -- use Constants.yaw instead of directly using _y
+              modifyEdictT selfRef (\v -> v & eEntityState.esAngles._y .~ yaw -- IMPROVE: use Constants.yaw instead of directly using _y
                                             & eIdealYaw .~ yaw)
 
               self' <- readEdictT selfRef
@@ -390,7 +390,7 @@ aiRun =
                      modifyEdictT selfRef (\v -> v & eMonsterInfo.miSavedGoal .~ (self'^.eMonsterInfo.miLastSighting)
                                                    & eMonsterInfo.miLastSighting .~ leftTarget'
                                                    & eMonsterInfo.miAIFlags %~ (.|. Constants.aiPursueTemp)
-                                                   & eEntityState.esAngles._y .~ Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)) -- TODO: use Constants.yaw instead of using _y directly
+                                                   & eEntityState.esAngles._y .~ Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)) -- IMPROVE: use Constants.yaw instead of using _y directly
                                                    & eIdealYaw .~ Math3D.vectorYaw (leftTarget' - (self'^.eEntityState.esOrigin)))
 
                      modifyEdictT goalEntityRef (\v -> v & eEntityState.esOrigin .~ leftTarget')
