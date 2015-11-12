@@ -36,10 +36,7 @@ writeCharF = writeByteF
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = do
     --io (print "WRITE BYTE")
-    let -- c' :: Word32 = fromIntegral c
-        c' :: Word8 = fromIntegral (c .&. 0xFF)
-        c'' :: Int8 = fromIntegral c'
-    -- io (print c'')
+    let c' :: Word8 = fromIntegral (c .&. 0xFF)
     SZ.write sizeBufLens (B.pack [c']) 1
 
 writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
@@ -51,11 +48,6 @@ writeShort sizeBufLens c = do
     let c' :: Word32 = fromIntegral c
         a :: Word8 = fromIntegral (c' .&. 0xFF)
         b :: Word8 = fromIntegral ((c' `shiftR` 8) .&. 0xFF)
-        a' :: Int8 = fromIntegral a
-        b' :: Int8 = fromIntegral b
-    -- io (print "WRITE SHORT")
-    -- io (print a')
-    -- io (print b')
     SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()

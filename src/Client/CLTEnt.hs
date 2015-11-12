@@ -1284,7 +1284,7 @@ parseBeam2 modelRef = do
 
               if (beam^.bEntity) == ent
                 then do
-                  undefined -- TODO
+                  io (print "CLTEnt.parseBeam2") >> undefined -- TODO
 
                   return True
 
@@ -1295,7 +1295,7 @@ parseBeam2 modelRef = do
         findFreeBeam ent start end offset idx maxIdx
           | idx >= maxIdx = return False
           | otherwise = do
-              undefined -- TODO
+              io (print "CLTEnt.parseBeam2") >> undefined -- TODO
 
 parseLightning :: IORef ModelT -> Quake Int
 parseLightning _ = do

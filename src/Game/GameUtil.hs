@@ -2,15 +2,14 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameUtil where
 
-import Control.Lens ((^.), use, (.=), ix, preuse, (+=), zoom, (%=), (&), (.~), (%~), (+~))
+import Control.Lens ((^.), use, (.=), (+=), zoom, (&), (.~), (%~), (+~))
 import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
-import Linear (V3(..), norm, normalize, dot, _z)
+import Linear (norm, normalize, dot, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
 import Quake
@@ -634,19 +633,19 @@ findTarget selfRef = do
                               return False
 
                             else do
-                              modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw temp)
+                              modifyEdictT selfRef (\v' -> v' & eIdealYaw .~ Math3D.vectorYaw temp)
                               M.changeYaw selfRef
 
                               -- hunt the sound for a bit; hopefully find
                               -- the real player
-                              modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiSoundTarget))
+                              modifyEdictT selfRef (\v' -> v' & eMonsterInfo.miAIFlags %~ (.|. Constants.aiSoundTarget))
 
                               if Just clientRef == (self^.eEnemy)
                                 then
                                   return True
 
                                 else do
-                                  modifyEdictT selfRef (\v -> v & eEnemy .~ Just clientRef)
+                                  modifyEdictT selfRef (\v' -> v' & eEnemy .~ Just clientRef)
                                   finishFindTarget
 
         finishFindTarget :: Quake Bool
@@ -735,7 +734,7 @@ attackFinished selfRef time = do
     modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + time)
 
 onSameTeam :: EdictReference -> EdictReference -> Quake Bool
-onSameTeam edictRef1 edictRef2 = do
+onSameTeam _ _ = do
     io (putStrLn "GameUtil.onSameTeam") >> undefined -- TODO
 
 megaHealthThink :: EntThink

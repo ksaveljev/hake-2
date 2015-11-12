@@ -540,7 +540,7 @@ fileLinkMatch name fileLink =
     in B.take len name == B.take len from
 
 developerSearchPath :: Int -> Quake Int
-developerSearchPath who = do
+developerSearchPath _ = do
     searchPaths <- use $ fsGlobals.fsSearchPaths
     return $ findPath searchPaths
 

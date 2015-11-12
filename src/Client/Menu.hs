@@ -172,7 +172,7 @@ draw = do
         menuGlobals.mgEnterSound .= False
 
 menuKeyDown :: Int -> Quake ()
-menuKeyDown key = do
+menuKeyDown _ = do
     io (putStrLn "Menu.menuKeyDown") >> undefined -- TODO
 
 forceMenuOff :: Quake ()

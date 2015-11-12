@@ -3,14 +3,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Math3D where
 
-import Control.Lens (preuse, ix, (^.), Const, (&), (%~))
+import Control.Lens ((^.), Const, (&), (%~))
 import Data.Bits ((.&.), (.|.))
 import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z, dot, normalize, cross)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
 import QuakeState
 import qualified Constants
 

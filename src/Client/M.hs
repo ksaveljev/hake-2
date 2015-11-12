@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.M where
 
-import Control.Lens (zoom, (.=), preuse, ix, (^.), use, (%=), (+=), (%~), (&), (.~), (+~), (-~))
+import Control.Lens ((^.), use, (+=), (%~), (&), (.~), (+~), (-~))
 import Control.Monad (unless, when, void)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isNothing, fromJust, isJust)

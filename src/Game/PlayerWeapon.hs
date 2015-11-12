@@ -341,7 +341,6 @@ machinegunFire =
             o1 <- Lib.crandom
             o2 <- Lib.crandom
             o3 <- Lib.crandom
-            a1 <- Lib.crandom
             a2 <- Lib.crandom
             a3 <- Lib.crandom
 

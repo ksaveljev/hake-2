@@ -18,7 +18,6 @@ import Quake
 import QuakeState
 import CVarVariables
 import Game.Adapters
-import Game.GItemArmorT
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import qualified Game.GameUtil as GameUtil

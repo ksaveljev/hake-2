@@ -14,7 +14,6 @@ import Control.Lens (makeLenses)
 import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as MV
 
 import Internal
 import Game.CVarT
