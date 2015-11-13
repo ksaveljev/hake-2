@@ -1,7 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Client.MenuFrameworkS ( MenuFrameworkS
-                             , MenuFrameworkSReference(..)
                              , module Client.MenuFrameworkS
                              , module Client.MenuItem
                              ) where
@@ -21,7 +20,7 @@ newMenuFrameworkS =
                  , _mfCursor     = 0
                  , _mfNItems     = 0
                  , _mfNSlots     = 0
-                 , _mfItems      = V.replicate 64 Nothing
+                 , _mfItems      = V.empty
                  , _mfStatusBar  = ""
                  , _mfCursorDraw = Nothing
                  }

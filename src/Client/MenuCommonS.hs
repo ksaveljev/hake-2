@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Client.MenuCommonS ( MenuCommonS
+module Client.MenuCommonS ( MenuCommonS(..)
                           , module Client.MenuCommonS
                           ) where
 

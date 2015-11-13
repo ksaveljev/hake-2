@@ -1734,7 +1734,7 @@ data MenuFrameworkS =
                  , _mfCursor     :: !Int
                  , _mfNItems     :: !Int
                  , _mfNSlots     :: !Int
-                 , _mfItems      :: V.Vector (Maybe MenuItemReference)
+                 , _mfItems      :: V.Vector MenuItemReference
                  , _mfStatusBar  :: B.ByteString
                  , _mfCursorDraw :: Maybe (Quake ())
                  }
@@ -1759,7 +1759,7 @@ data MenuCommonS =
 data MenuItem =
     MenuListS { _mlGeneric   :: MenuCommonS
               , _mlCurValue  :: !Int
-              , _mlItemNames :: Maybe (V.Vector B.ByteString)
+              , _mlItemNames :: V.Vector B.ByteString
               }
   | MenuSliderS { _msGeneric  :: MenuCommonS
                 , _msMinValue :: !Float

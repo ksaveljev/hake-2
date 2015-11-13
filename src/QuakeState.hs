@@ -60,6 +60,8 @@ module QuakeState ( QuakeState(..)
                   , GItemReference(..)
                   , UserCmdReference(..)
                   , GLPolyReference(..)
+                  , MenuFrameworkSReference
+                  , MenuItemReference
                   , CPlaneReference
                   , newCPlaneReference
                   , readCPlaneT
@@ -70,6 +72,12 @@ module QuakeState ( QuakeState(..)
                   , readCBrushT
                   , modifyCBrushT
                   , writeCBrushT
+                  , readMenuFrameworkSReference
+                  , modifyMenuFrameworkSReference
+                  , writeMenuFrameworkSReference
+                  , readMenuItemReference
+                  , modifyMenuItemReference
+                  , writeMenuItemReference
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -133,7 +141,7 @@ module QuakeState ( QuakeState(..)
                   , module QCommon.NetChannelGlobals
                   ) where
 
-import Control.Lens (use, makeLenses)
+import Control.Lens (use, makeLenses, ix, preuse, (%=), (.=))
 import Control.Monad.State.Strict (liftIO)
 import qualified Data.Vector.Mutable as MV
 
@@ -294,3 +302,29 @@ writeCBrushT (CBrushReference brushIdx) brush = do
 
 newCBrushReference :: Int -> CBrushReference
 newCBrushReference = CBrushReference
+
+readMenuFrameworkSReference :: MenuFrameworkSReference -> Quake MenuFrameworkS
+readMenuFrameworkSReference (MenuFrameworkSReference menuFrameworkIdx) = do
+    Just menu <- preuse $ menuGlobals.mgMenuFrameworks.ix menuFrameworkIdx
+    return menu
+
+modifyMenuFrameworkSReference :: MenuFrameworkSReference -> (MenuFrameworkS -> MenuFrameworkS) -> Quake ()
+modifyMenuFrameworkSReference (MenuFrameworkSReference menuFrameworkIdx) f =
+    menuGlobals.mgMenuFrameworks.ix menuFrameworkIdx %= f
+
+writeMenuFrameworkSReference :: MenuFrameworkSReference -> MenuFrameworkS -> Quake ()
+writeMenuFrameworkSReference (MenuFrameworkSReference menuFrameworkIdx) menu =
+    menuGlobals.mgMenuFrameworks.ix menuFrameworkIdx .= menu
+
+readMenuItemReference :: MenuItemReference -> Quake MenuItem
+readMenuItemReference (MenuItemReference menuItemIdx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuItems.ix menuItemIdx
+    return menuItem
+
+modifyMenuItemReference :: MenuItemReference -> (MenuItem -> MenuItem) -> Quake ()
+modifyMenuItemReference (MenuItemReference menuItemIdx) f =
+    menuGlobals.mgMenuItems.ix menuItemIdx %= f
+
+writeMenuItemReference :: MenuItemReference -> MenuItem -> Quake ()
+writeMenuItemReference (MenuItemReference menuItemIdx) menuItem =
+    menuGlobals.mgMenuItems.ix menuItemIdx .= menuItem

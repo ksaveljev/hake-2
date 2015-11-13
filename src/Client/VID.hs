@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.VID where
 
-import Control.Lens ((.=), ix, (^.), zoom, use, preuse, (-=))
+import Control.Lens ((.=), ix, (^.), zoom, use, preuse, (-=), (&), (.~))
 import Control.Monad (void, liftM, when, unless)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
@@ -18,7 +18,6 @@ import Render.VideoMode
 import qualified Constants
 import qualified Client.Console as Console
 import qualified Client.Menu as Menu
-import qualified Client.MenuConstants as MenuConstants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -246,14 +245,19 @@ menuInit = do
     setNonExistingCVar "gl_ext_palettedtexture" "1" Constants.cvarArchive
     setNonExistingCVar "gl_swapinterval" "0" Constants.cvarArchive
 
-    liftM (truncate . (^.cvValue)) glModeCVar >>= \v ->
-      menuGlobals.mgMenuItems.ix (MenuConstants.modeList).mlCurValue .= v
+    liftM (truncate . (^.cvValue)) glModeCVar >>= \n ->
+      modifyMenuItemReference modeListRef (\v -> v & mlCurValue .~ n)
 
     liftM (^.cvValue) vidFullScreenCVar >>= \fullscreenValue ->
       if fullscreenValue /= 0
         then do
           res <- use $ vidGlobals.vgFSResolutions
-          menuGlobals.mgMenuItems.ix (MenuConstants.modeList).mlItemNames .= Just res
+          modifyMenuItemReference modeListRef (\v -> v & mlItemNames .~ Just res)
+
+          menuItem <- readMenuItemReference modeListRef
+          let curValue = if (menuItem^.mlCurValue) >= V.length res - 1
+                           then 0
+                           else menuItem^.msCurValue
 
           preuse (menuGlobals.mgMenuItems.ix (MenuConstants.modeList).mlCurValue) >>= \(Just v) ->
             when (v >= V.length res - 1) $

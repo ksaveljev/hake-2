@@ -1,11 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.MenuItem ( MenuItem(..)
-                       , MenuItemReference(..)
                        , module Client.MenuItem
                        , module Client.MenuCommonS
                        ) where
 
 import Control.Lens (makeLenses)
+import qualified Data.Vector as V
 
 import Internal
 import Client.MenuCommonS
@@ -16,7 +16,7 @@ newMenuListS :: MenuItem
 newMenuListS =
   MenuListS { _mlGeneric   = newMenuCommonS
             , _mlCurValue  = 0
-            , _mlItemNames = Nothing
+            , _mlItemNames = V.empty
             }
 
 newMenuSliderS :: MenuItem

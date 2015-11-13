@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.Menu where
 
-import Control.Lens (use, preuse, ix, (.=), (+=), (^.))
+import Control.Lens (use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
 import Control.Monad (when)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
@@ -48,53 +48,57 @@ init = do
 
     menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
--- IMPROVE: instead of Int use "Reference" newtype ?
-addItem :: Int -> Int -> Quake ()
-addItem menuIdx menuItemIdx = do
-    Just nItems <- preuse $ menuGlobals.mgMenuFrameworks.ix menuIdx.mfNItems
+addItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
+addItem menuFrameworkRef menuItemRef = do
+    menu <- readMenuFrameworkSReference menuFrameworkRef
+    let nItems = menu^.mfNItems
 
     when (nItems == 0) $
-      menuGlobals.mgMenuFrameworks.ix menuIdx.mfNSlots .= 0
+      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNSlots .~ 0)
 
     when (nItems < Constants.maxMenuItems) $ do
-      menuGlobals.mgMenuFrameworks.ix menuIdx.mfItems.ix nItems .= Just (MenuItemReference menuItemIdx)
-      Just item <- preuse $ menuGlobals.mgMenuItems.ix menuItemIdx
-      case item of
-        MenuListS _ _ _ -> menuGlobals.mgMenuItems.ix menuItemIdx.mlGeneric.mcParent .= Just (MenuFrameworkSReference menuIdx)
-        MenuSliderS _ _ _ _ _ -> menuGlobals.mgMenuItems.ix menuItemIdx.msGeneric.mcParent .= Just (MenuFrameworkSReference menuIdx)
-        MenuActionS _ -> menuGlobals.mgMenuItems.ix menuItemIdx.maGeneric.mcParent .= Just (MenuFrameworkSReference menuIdx)
-      menuGlobals.mgMenuFrameworks.ix menuIdx.mfNItems += 1
+      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfItems %~ (`V.snoc` menuItemRef))
 
-    tallySlots menuIdx >>= \v ->
-      menuGlobals.mgMenuFrameworks.ix menuIdx.mfNSlots .= v
+      menuItem <- readMenuItemReference menuItemRef
 
--- IMPROVE: instead of Int use "Reference" newtype ?
-center :: Int -> Quake ()
-center menuIdx = do
-    Just height <- preuse $ menuGlobals.mgMenuFrameworks.ix menuIdx.mfY
+      case menuItem of
+        MenuListS{} -> modifyMenuItemReference menuItemRef (\v -> v & mlGeneric.mcParent .~ Just menuFrameworkRef)
+        MenuSliderS{} -> modifyMenuItemReference menuItemRef (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
+        MenuActionS{} -> modifyMenuItemReference menuItemRef (\v -> v & maGeneric.mcParent .~ Just menuFrameworkRef)
+
+      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNItems +~ 1)
+
+    tallySlots menuFrameworkRef >>= \n ->
+      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNSlots .~ n)
+
+center :: MenuFrameworkSReference -> Quake ()
+center menuFrameworkRef = do
+    menu <- readMenuFrameworkSReference menuFrameworkRef
+    let menuItemRef = V.last (menu^.mfItems)
+    menuItem <- readMenuItemReference menuItemRef
+    let height = case menuItem of
+                   MenuListS generic _ _ -> generic^.mcY
+                   MenuSliderS generic _ _ _ _ -> generic^.mcY
+                   MenuActionS generic -> generic^.mcY
     h <- use $ globals.vidDef.vdHeight
 
-    menuGlobals.mgMenuFrameworks.ix menuIdx.mfY .= (h - (height + 10)) `div` 2
+    modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
 
--- IMPROVE: instead of Int use "Reference" newtype ?
-tallySlots :: Int -> Quake Int
-tallySlots menuIdx = do
-    Just menu <- preuse $ menuGlobals.mgMenuFrameworks.ix menuIdx
+tallySlots :: MenuFrameworkSReference -> Quake Int
+tallySlots menuFrameworkRef = do
+    menu <- readMenuFrameworkSReference menuFrameworkRef
 
     itemsNum <- V.mapM numberOfItems (menu^.mfItems)
     return $ V.foldl' (+) 0 itemsNum
 
-  where numberOfItems :: Maybe MenuItemReference -> Quake Int
-        numberOfItems Nothing = return 0
-        numberOfItems (Just (MenuItemReference menuItemIdx)) = do
-          Just menuItem <- preuse $ menuGlobals.mgMenuItems.ix menuItemIdx
+  where numberOfItems :: MenuItemReference -> Quake Int
+        numberOfItems menuItemRef = do
+          menuItem <- readMenuItemReference menuItemRef
 
-          case menuItem of
-            MenuListS _ _ _ -> case menuItem^.mlItemNames of
-                                 Nothing -> return 0
-                                 _ -> return (V.length $ fromJust (menuItem^.mlItemNames))
-            MenuSliderS _ _ _ _ _ -> return 1
-            MenuActionS _ -> return 1
+          return $ case menuItem of
+                     MenuListS{} -> V.length $ menuItem^.mlItemNames
+                     MenuSliderS{} -> 1
+                     MenuActionS{} -> 1
 
 menuMainF :: XCommandT
 menuMainF = io (putStrLn "Menu.menuMainF") >> undefined -- TODO
