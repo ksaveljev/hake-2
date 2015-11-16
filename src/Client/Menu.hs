@@ -59,12 +59,15 @@ addItem menuFrameworkRef menuItemRef = do
     when (nItems < Constants.maxMenuItems) $ do
       modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfItems %~ (`V.snoc` menuItemRef))
 
-      menuItem <- readMenuItemReference menuItemRef
+      case menuItemRef of
+        MenuListRef ref ->
+          modifyMenuListSReference ref (\v -> v & mlGeneric.mcParent .~ Just menuFrameworkRef)
 
-      case menuItem of
-        MenuListS{} -> modifyMenuItemReference menuItemRef (\v -> v & mlGeneric.mcParent .~ Just menuFrameworkRef)
-        MenuSliderS{} -> modifyMenuItemReference menuItemRef (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
-        MenuActionS{} -> modifyMenuItemReference menuItemRef (\v -> v & maGeneric.mcParent .~ Just menuFrameworkRef)
+        MenuActionRef ref ->
+          modifyMenuActionSReference ref (\v -> v & maGeneric.mcParent .~ Just menuFrameworkRef)
+
+        MenuSliderRef ref ->
+          modifyMenuSliderSReference ref (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
 
       modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNItems +~ 1)
 
@@ -75,11 +78,18 @@ center :: MenuFrameworkSReference -> Quake ()
 center menuFrameworkRef = do
     menu <- readMenuFrameworkSReference menuFrameworkRef
     let menuItemRef = V.last (menu^.mfItems)
-    menuItem <- readMenuItemReference menuItemRef
-    let height = case menuItem of
-                   MenuListS generic _ _ -> generic^.mcY
-                   MenuSliderS generic _ _ _ _ -> generic^.mcY
-                   MenuActionS generic -> generic^.mcY
+    height <- case menuItemRef of
+                MenuListRef ref -> do
+                  menuItem <- readMenuListSReference ref
+                  return (menuItem^.mlGeneric.mcY)
+
+                MenuSliderRef ref -> do
+                  menuItem <- readMenuSliderSReference ref
+                  return (menuItem^.msGeneric.mcY)
+
+                MenuActionRef ref -> do
+                  menuItem <- readMenuActionSReference ref
+                  return (menuItem^.maGeneric.mcY)
     h <- use $ globals.vidDef.vdHeight
 
     modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
@@ -92,13 +102,11 @@ tallySlots menuFrameworkRef = do
     return $ V.foldl' (+) 0 itemsNum
 
   where numberOfItems :: MenuItemReference -> Quake Int
-        numberOfItems menuItemRef = do
-          menuItem <- readMenuItemReference menuItemRef
-
-          return $ case menuItem of
-                     MenuListS{} -> V.length $ menuItem^.mlItemNames
-                     MenuSliderS{} -> 1
-                     MenuActionS{} -> 1
+        numberOfItems (MenuListRef ref) = do
+          menuItem <- readMenuListSReference ref
+          return (V.length (menuItem^.mlItemNames))
+        numberOfItems _ =
+          return 1 -- MenuSliderRef and MenuActionRef
 
 menuMainF :: XCommandT
 menuMainF = io (putStrLn "Menu.menuMainF") >> undefined -- TODO

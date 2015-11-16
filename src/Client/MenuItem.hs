@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.MenuItem ( MenuItem(..)
+module Client.MenuItem ( MenuListS(..)
+                       , MenuActionS(..)
+                       , MenuSliderS(..)
                        , module Client.MenuItem
                        , module Client.MenuCommonS
                        ) where
@@ -10,16 +12,18 @@ import qualified Data.Vector as V
 import Internal
 import Client.MenuCommonS
 
-makeLenses ''MenuItem
+makeLenses ''MenuListS
+makeLenses ''MenuSliderS
+makeLenses ''MenuActionS
 
-newMenuListS :: MenuItem
+newMenuListS :: MenuListS
 newMenuListS =
   MenuListS { _mlGeneric   = newMenuCommonS
             , _mlCurValue  = 0
             , _mlItemNames = V.empty
             }
 
-newMenuSliderS :: MenuItem
+newMenuSliderS :: MenuSliderS
 newMenuSliderS =
   MenuSliderS { _msGeneric  = newMenuCommonS
               , _msMinValue = 0
@@ -28,7 +32,7 @@ newMenuSliderS =
               , _msRange    = 0
               }
 
-newMenuActionS :: MenuItem
+newMenuActionS :: MenuActionS
 newMenuActionS =
   MenuActionS { _maGeneric = newMenuCommonS
               }

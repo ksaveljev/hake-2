@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 module QuakeState ( QuakeState(..)
                   , initialQuakeState
                   , globals
@@ -61,7 +63,7 @@ module QuakeState ( QuakeState(..)
                   , UserCmdReference(..)
                   , GLPolyReference(..)
                   , MenuFrameworkSReference
-                  , MenuItemReference
+                  , MenuItemReference(..)
                   , CPlaneReference
                   , newCPlaneReference
                   , readCPlaneT
@@ -75,9 +77,15 @@ module QuakeState ( QuakeState(..)
                   , readMenuFrameworkSReference
                   , modifyMenuFrameworkSReference
                   , writeMenuFrameworkSReference
-                  , readMenuItemReference
-                  , modifyMenuItemReference
-                  , writeMenuItemReference
+                  , readMenuListSReference
+                  , modifyMenuListSReference
+                  , writeMenuListSReference
+                  , readMenuActionSReference
+                  , modifyMenuActionSReference
+                  , writeMenuActionSReference
+                  , readMenuSliderSReference
+                  , modifyMenuSliderSReference
+                  , writeMenuSliderSReference
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -316,15 +324,41 @@ writeMenuFrameworkSReference :: MenuFrameworkSReference -> MenuFrameworkS -> Qua
 writeMenuFrameworkSReference (MenuFrameworkSReference menuFrameworkIdx) menu =
     menuGlobals.mgMenuFrameworks.ix menuFrameworkIdx .= menu
 
-readMenuItemReference :: MenuItemReference -> Quake MenuItem
-readMenuItemReference (MenuItemReference menuItemIdx) = do
-    Just menuItem <- preuse $ menuGlobals.mgMenuItems.ix menuItemIdx
+readMenuListSReference :: MenuListSReference -> Quake MenuListS
+readMenuListSReference (MenuListSReference idx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuListSItems.ix idx
     return menuItem
 
-modifyMenuItemReference :: MenuItemReference -> (MenuItem -> MenuItem) -> Quake ()
-modifyMenuItemReference (MenuItemReference menuItemIdx) f =
-    menuGlobals.mgMenuItems.ix menuItemIdx %= f
+modifyMenuListSReference :: MenuListSReference -> (MenuListS -> MenuListS) -> Quake ()
+modifyMenuListSReference (MenuListSReference idx) f =
+    menuGlobals.mgMenuListSItems.ix idx %= f
 
-writeMenuItemReference :: MenuItemReference -> MenuItem -> Quake ()
-writeMenuItemReference (MenuItemReference menuItemIdx) menuItem =
-    menuGlobals.mgMenuItems.ix menuItemIdx .= menuItem
+writeMenuListSReference :: MenuListSReference -> MenuListS -> Quake ()
+writeMenuListSReference (MenuListSReference idx) menuItem =
+    menuGlobals.mgMenuListSItems.ix idx .= menuItem
+
+readMenuActionSReference :: MenuActionSReference -> Quake MenuActionS
+readMenuActionSReference (MenuActionSReference idx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuActionSItems.ix idx
+    return menuItem
+
+modifyMenuActionSReference :: MenuActionSReference -> (MenuActionS -> MenuActionS) -> Quake ()
+modifyMenuActionSReference (MenuActionSReference idx) f =
+    menuGlobals.mgMenuActionSItems.ix idx %= f
+
+writeMenuActionSReference :: MenuActionSReference -> MenuActionS -> Quake ()
+writeMenuActionSReference (MenuActionSReference idx) menuItem =
+    menuGlobals.mgMenuActionSItems.ix idx .= menuItem
+
+readMenuSliderSReference :: MenuSliderSReference -> Quake MenuSliderS
+readMenuSliderSReference (MenuSliderSReference idx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuSliderSItems.ix idx
+    return menuItem
+
+modifyMenuSliderSReference :: MenuSliderSReference -> (MenuSliderS -> MenuSliderS) -> Quake ()
+modifyMenuSliderSReference (MenuSliderSReference idx) f =
+    menuGlobals.mgMenuSliderSItems.ix idx %= f
+
+writeMenuSliderSReference :: MenuSliderSReference -> MenuSliderS -> Quake ()
+writeMenuSliderSReference (MenuSliderSReference idx) menuItem =
+    menuGlobals.mgMenuSliderSItems.ix idx .= menuItem

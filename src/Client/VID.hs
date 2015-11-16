@@ -246,15 +246,15 @@ menuInit = do
     setNonExistingCVar "gl_swapinterval" "0" Constants.cvarArchive
 
     liftM (truncate . (^.cvValue)) glModeCVar >>= \n ->
-      modifyMenuItemReference modeListRef (\v -> v & mlCurValue .~ n)
+      modifyMenuListSReference modeListRef (\v -> v & mlCurValue .~ n)
 
     liftM (^.cvValue) vidFullScreenCVar >>= \fullscreenValue ->
       if fullscreenValue /= 0
         then do
           res <- use $ vidGlobals.vgFSResolutions
-          modifyMenuItemReference modeListRef (\v -> v & mlItemNames .~ Just res)
+          modifyMenuListSReference modeListRef (\v -> v & mlItemNames .~ Just res)
 
-          menuItem <- readMenuItemReference modeListRef
+          menuItem <- readMenuListSReference modeListRef
           let curValue = if (menuItem^.mlCurValue) >= V.length res - 1
                            then 0
                            else menuItem^.msCurValue

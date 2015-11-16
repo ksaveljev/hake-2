@@ -33,59 +33,61 @@ makeLenses ''MenuGlobals
 openGLMenuRef :: MenuFrameworkSReference
 openGLMenuRef = MenuFrameworkSReference 0
 
-modeListRef :: MenuItemReference
-modeListRef = MenuItemReference 0
+modeListRef :: MenuListSReference
+modeListRef = MenuListSReference 0
 
-refListRef :: MenuItemReference
-refListRef = MenuItemReference 1
+refListRef :: MenuListSReference
+refListRef = MenuListSReference 1
 
-tqSliderRef :: MenuItemReference
-tqSliderRef = MenuItemReference 2
+tqSliderRef :: MenuSliderSReference
+tqSliderRef = MenuSliderSReference 0
 
-screenSizeSliderRef :: MenuItemReference
-screenSizeSliderRef = MenuItemReference 3
+screenSizeSliderRef :: MenuSliderSReference
+screenSizeSliderRef = MenuSliderSReference 1
 
-brightnessSliderRef :: MenuItemReference
-brightnessSliderRef = MenuItemReference 4
+brightnessSliderRef :: MenuSliderSReference
+brightnessSliderRef = MenuSliderSReference 2
 
-fsBoxRef :: MenuItemReference
-fsBoxRef = MenuItemReference 5
+fsBoxRef :: MenuListSReference
+fsBoxRef = MenuListSReference 2
 
-stippleBoxRef :: MenuItemReference
-stippleBoxRef = MenuItemReference 6
+stippleBoxRef :: MenuListSReference
+stippleBoxRef = MenuListSReference 3
 
-palettedTextureBoxRef :: MenuItemReference
-palettedTextureBoxRef = MenuItemReference 7
+palettedTextureBoxRef :: MenuListSReference
+palettedTextureBoxRef = MenuListSReference 4
 
-vSyncBoxRef :: MenuItemReference
-vSyncBoxRef = MenuItemReference 8
+vSyncBoxRef :: MenuListSReference
+vSyncBoxRef = MenuListSReference 5
 
-windowedMouseRef :: MenuItemReference
-windowedMouseRef = MenuItemReference 9
+windowedMouseRef :: MenuListSReference
+windowedMouseRef = MenuListSReference 6
 
-applyActionRef :: MenuItemReference
-applyActionRef = MenuItemReference 10
+applyActionRef :: MenuActionSReference
+applyActionRef = MenuActionSReference 0
 
-defaultsActionRef :: MenuItemReference
-defaultsActionRef = MenuItemReference 11
+defaultsActionRef :: MenuActionSReference
+defaultsActionRef = MenuActionSReference 1
 
 initialMenuGlobals :: MenuGlobals
 initialMenuGlobals =
-  MenuGlobals { _mgMenuFrameworks = V.replicate 13 newMenuFrameworkS
-              , _mgMenuItems      = V.fromList [ newMenuListS    -- modeList
-                                               , newMenuListS    -- refList
-                                               , newMenuSliderS  -- tqSlider
-                                               , newMenuSliderS  -- screenSizeSlider
-                                               , newMenuSliderS  -- brightnessSlider
-                                               , newMenuListS    -- fsBox
-                                               , newMenuListS    -- stippleBox
-                                               , newMenuListS    -- palettedTextureBox
-                                               , newMenuListS    -- vSyncBox
-                                               , newMenuListS    -- windowedMouse
-                                               , newMenuActionS  -- applyAction
-                                               , newMenuActionS  -- defaultsAction
-                                               ]
-              , _mgLayers         = V.empty
-              , _mgDrawFunc       = Nothing
-              , _mgEnterSound     = False
+  MenuGlobals { _mgMenuFrameworks   = V.replicate 13 newMenuFrameworkS
+              , _mgMenuListSItems   = V.fromList [ newMenuListS -- modeList
+                                                 , newMenuListS -- refList
+                                                 , newMenuListS -- fsBox
+                                                 , newMenuListS -- stippleBox
+                                                 , newMenuListS -- palettedTextureBox
+                                                 , newMenuListS -- vSyncBox
+                                                 , newMenuListS -- windowedMouse
+                                                 ]
+              , _mgMenuSliderSItems = V.fromList [ newMenuSliderS -- tqSlider
+                                                 , newMenuSliderS -- screenSizeSlider
+                                                 , newMenuSliderS -- brightnessSlider
+                                                 ]
+              , _mgMenuActionSItems = V.fromList [ newMenuActionS -- applyAction
+                                                 , newMenuActionS -- defaultsAction
+                                                 ]
+              , _mgLayers           = V.empty
+              , _mgDrawFunc         = Nothing
+              , _mgEnterSound       = False
               }

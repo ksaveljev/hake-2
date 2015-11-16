@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Client.MenuFrameworkS ( MenuFrameworkS
+module Client.MenuFrameworkS ( MenuFrameworkS(..)
                              , module Client.MenuFrameworkS
                              , module Client.MenuItem
                              ) where

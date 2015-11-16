@@ -123,8 +123,18 @@ newtype GItemReference = GItemReference Int deriving (Eq)
 -- reference to menuGlobals.mgMenuFrameworks
 newtype MenuFrameworkSReference = MenuFrameworkSReference Int
 
--- reference to menuGlobals.mgMenuItems
-newtype MenuItemReference = MenuItemReference Int
+-- reference to menuGlobals.mgMenuListSItems
+newtype MenuListSReference = MenuListSReference Int
+
+-- reference to menuGlobals.mgMenuActionSItems
+newtype MenuActionSReference = MenuActionSReference Int
+
+-- reference to menuGlobals.mgMenuSliderSItems
+newtype MenuSliderSReference = MenuSliderSReference Int
+
+data MenuItemReference = MenuListRef MenuListSReference
+                       | MenuActionRef MenuActionSReference
+                       | MenuSliderRef MenuSliderSReference
 
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
@@ -1756,26 +1766,32 @@ data MenuCommonS =
               , _mcCursorDraw    :: Maybe (Quake ())
               }
 
-data MenuItem =
-    MenuListS { _mlGeneric   :: MenuCommonS
-              , _mlCurValue  :: !Int
-              , _mlItemNames :: V.Vector B.ByteString
+data MenuListS =
+  MenuListS { _mlGeneric   :: MenuCommonS
+            , _mlCurValue  :: !Int
+            , _mlItemNames :: V.Vector B.ByteString
+            }
+
+data MenuSliderS =
+  MenuSliderS { _msGeneric  :: MenuCommonS
+              , _msMinValue :: !Float
+              , _msMaxValue :: !Float
+              , _msCurValue :: !Float
+              , _msRange    :: !Float
               }
-  | MenuSliderS { _msGeneric  :: MenuCommonS
-                , _msMinValue :: !Float
-                , _msMaxValue :: !Float
-                , _msCurValue :: !Float
-                , _msRange    :: !Float
-                }
-  | MenuActionS { _maGeneric :: MenuCommonS
-                }
+
+data MenuActionS =
+  MenuActionS { _maGeneric :: MenuCommonS
+              }
 
 data MenuGlobals =
-  MenuGlobals { _mgMenuFrameworks :: V.Vector MenuFrameworkS
-              , _mgMenuItems      :: V.Vector MenuItem
-              , _mgLayers         :: V.Vector MenuLayerT
-              , _mgDrawFunc       :: Maybe XCommandT
-              , _mgEnterSound     :: !Bool
+  MenuGlobals { _mgMenuFrameworks   :: V.Vector MenuFrameworkS
+              , _mgMenuListSItems   :: V.Vector MenuListS
+              , _mgMenuSliderSItems :: V.Vector MenuSliderS
+              , _mgMenuActionSItems :: V.Vector MenuActionS
+              , _mgLayers           :: V.Vector MenuLayerT
+              , _mgDrawFunc         :: Maybe XCommandT
+              , _mgEnterSound       :: !Bool
               }
 
 data MenuLayerT =
