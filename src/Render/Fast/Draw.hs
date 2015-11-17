@@ -196,3 +196,25 @@ drawPic x y pic = do
 
         when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
           GL.glEnable GL.gl_ALPHA_TEST
+
+fadeScreen :: Quake ()
+fadeScreen = do
+    vid <- use $ fastRenderAPIGlobals.frVid
+
+    let w = fromIntegral (vid^.vdWidth)
+        h = fromIntegral (vid^.vdHeight)
+
+    GL.glEnable GL.gl_BLEND
+    GL.glDisable GL.gl_TEXTURE_2D
+    GL.glColor4f 0 0 0 0.8
+    GL.glBegin GL.gl_QUADS
+
+    GL.glVertex2f 0 0
+    GL.glVertex2f w 0
+    GL.glVertex2f w h
+    GL.glVertex2f 0 h
+
+    GL.glEnd
+    GL.glColor4f 1 1 1 1
+    GL.glEnable GL.gl_TEXTURE_2D
+    GL.glDisable GL.gl_BLEND
