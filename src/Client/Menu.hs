@@ -2,9 +2,10 @@
 module Client.Menu where
 
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Quake
@@ -19,6 +20,9 @@ import qualified Sound.S as S
 
 maxMenuDepth :: Int
 maxMenuDepth = 8
+
+numCursorFrames :: Int
+numCursorFrames = 15
 
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
@@ -154,8 +158,52 @@ menuMainF = XCommandT "Menu.menuMainF" (pushMenu mainDrawF mainKeyF)
 mainDrawF :: XCommandT
 mainDrawF =
   XCommandT "Menu.mainDrawF" (do
-    io (putStrLn "Menu.mainDrawF") >> undefined -- TODO
+    let names = V.fromList [ "m_main_game"
+                           , "m_main_multiplayer"
+                           , "m_main_options"
+                           , "m_main_video"
+                           , "m_main_quit"
+                           ]
+    (widest, totalHeight) <- calcWidthHeight names (-1) 0 0 (V.length names)
+    vidDef' <- use $ globals.vidDef
+    mainCursor <- use $ menuGlobals.mgMainCursor
+    realTime <- use $ globals.cls.csRealTime
+
+    let yStart = (vidDef'^.vdHeight) `div` 2 - 110
+        xOffset = ((vidDef'^.vdWidth) - widest + 70) `div` 2
+
+    drawMenuPics names mainCursor yStart xOffset 0 (V.length names)
+
+    let litName = (names V.! mainCursor) `B.append` "_sel"
+
+    Just renderer <- use $ globals.re
+    (renderer^.rRefExport.reDrawPic) xOffset (yStart + mainCursor * 40 + 13) litName
+
+    drawCursor (xOffset - 25) (yStart + mainCursor * 40 + 11) ((realTime `div` 100) `mod` numCursorFrames)
+
+    Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) "m_main_plaque"
+    (renderer^.rRefExport.reDrawPic) (xOffset - 30 - w) yStart "m_main_plaque"
+    (renderer^.rRefExport.reDrawPic) (xOffset - 30 - w) (yStart + h + 5) "m_main_logo"
   )
+
+  where calcWidthHeight :: V.Vector B.ByteString -> Int -> Int -> Int -> Int -> Quake (Int, Int)
+        calcWidthHeight names widest totalHeight idx maxIdx
+          | idx >= maxIdx = return (widest, totalHeight)
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) (names V.! idx)
+              let widest' = if w > widest then w else widest
+              calcWidthHeight names widest' (totalHeight + (h + 12)) (idx + 1) maxIdx
+
+        drawMenuPics :: V.Vector B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
+        drawMenuPics names mainCursor yStart xOffset idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              when (idx /= mainCursor) $ do
+                Just renderer <- use $ globals.re
+                (renderer^.rRefExport.reDrawPic) xOffset (yStart + idx * 40 + 13) (names V.! idx)
+
+              drawMenuPics names mainCursor yStart xOffset (idx + 1) maxIdx
 
 mainKeyF :: KeyFuncT
 mainKeyF =
@@ -291,3 +339,31 @@ forceMenuOff = do
 addToServerList :: NetAdrT -> B.ByteString -> Quake ()
 addToServerList _ _ = do
     io (putStrLn "Menu.addToServerList") >> undefined -- TODO
+
+{-
+- ============= DrawCursor =============
+- 
+- Draws an animating cursor with the point at x,y. The pic will extend to
+- the left of x, and both above and below y.
+-}
+drawCursor :: Int -> Int -> Int -> Quake ()
+drawCursor x y f = do
+    when (f < 0) $
+      Com.comError Constants.errFatal "negative time and cursor bug"
+
+    cached <- use $ menuGlobals.mgCached
+
+    unless cached $ do
+      registerCursorPics 0 numCursorFrames
+      menuGlobals.mgCached .= True
+
+    Just renderer <- use $ globals.re
+    (renderer^.rRefExport.reDrawPic) x y ("m_cursor" `B.append` BC.pack (show f))
+
+  where registerCursorPics :: Int -> Int -> Quake ()
+        registerCursorPics idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              Just renderer <- use $ globals.re
+              (renderer^.rRefExport.reRegisterPic) ("m_cursor" `B.append` BC.pack (show idx))
+              registerCursorPics (idx + 1) maxIdx

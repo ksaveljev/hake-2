@@ -92,4 +92,6 @@ initialMenuGlobals =
               , _mgKeyFunc          = Nothing
               , _mgEnterSound       = False
               , _mgMenuDepth        = 0
+              , _mgMainCursor       = 0
+              , _mgCached           = False
               }

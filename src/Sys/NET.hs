@@ -92,11 +92,11 @@ socket ip port = do
         bindResult <- io $ handle (\(e :: IOException) -> return (Left e)) $ do
           if B.length ip == 0 || ip == "localhost"
             then if port == Constants.portAny
-                   then void $ S.bind s NS.iNADDR_ANY (NS.PortNum 0) -- TODO: actually check bind result code
-                   else void $ S.bind s NS.iNADDR_ANY (NS.PortNum (fromIntegral port)) -- TODO: actually check bind result code
+                   then void $ S.bind s NS.iNADDR_ANY 0 -- TODO: actually check bind result code
+                   else void $ S.bind s NS.iNADDR_ANY port -- TODO: actually check bind result code
             else do
               resolved <- NBSD.getHostByName (BC.unpack ip)
-              void $ S.bind s (head $ NBSD.hostAddresses resolved) (NS.PortNum (fromIntegral port)) -- this head is kinda bad, isn't it? TODO: actually check bind result code
+              void $ S.bind s (head $ NBSD.hostAddresses resolved) port -- this head is kinda bad, isn't it? TODO: actually check bind result code
           return $ Right () 
 
         case bindResult of
@@ -163,7 +163,7 @@ getPacket sock netFromLens netMessageLens = do
 
                  if isJust packet
                    then do
-                     let Just (buf, host, NS.PortNum port) = packet
+                     let Just (buf, host, port) = packet
 
                      netFromLens.naIP .= Just host
                      netFromLens.naPort .= fromIntegral port
@@ -256,7 +256,7 @@ sendPacket sock len buf adr =
                  let Just ss = s
 
                  -- TODO: check all data has been sent
-                 void $ io $ S.sendTo ss buf (fromJust $ adr^.naIP) (NS.PortNum (fromIntegral $ adr^.naPort))
+                 void $ io $ S.sendTo ss buf (fromJust $ adr^.naIP) (adr^.naPort)
 
 -- Sends a packet via internal loopback.
 sendLoopPacket :: Int -> Int -> B.ByteString -> Quake ()

@@ -22,8 +22,7 @@ update _ _ _ _ = return () -- IMPLEMENT ME!
 -- io (putStrLn "S.update") >> undefined -- TODO
 
 startLocalSound :: B.ByteString -> Quake ()
-startLocalSound _ = do
-    io (putStrLn "S.startLocalSound") >> undefined -- TODO
+startLocalSound _ = return () -- IMPLEMENT ME!
 
 disableStreaming :: Quake ()
 disableStreaming = io (putStrLn "S.disableStreaming") >> undefined -- TODO

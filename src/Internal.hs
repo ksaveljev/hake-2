@@ -1806,6 +1806,8 @@ data MenuGlobals =
               , _mgKeyFunc          :: Maybe KeyFuncT
               , _mgEnterSound       :: !Bool
               , _mgMenuDepth        :: !Int
+              , _mgMainCursor       :: !Int
+              , _mgCached           :: !Bool
               }
 
 data MenuLayerT =
