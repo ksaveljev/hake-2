@@ -149,9 +149,18 @@ pushMenu draw key = do
     globals.cls.csKeyDest .= Constants.keyMenu
 
 menuMainF :: XCommandT
-menuMainF =
-  XCommandT "Menu.menuMainF" (do
-    io (putStrLn "Menu.menuMainF") >> undefined -- TODO
+menuMainF = XCommandT "Menu.menuMainF" (pushMenu mainDrawF mainKeyF)
+
+mainDrawF :: XCommandT
+mainDrawF =
+  XCommandT "Menu.mainDrawF" (do
+    io (putStrLn "Menu.mainDrawF") >> undefined -- TODO
+  )
+
+mainKeyF :: KeyFuncT
+mainKeyF =
+  KeyFuncT "Menu.mainKeyF" (\key -> do
+    io (putStrLn "Menu.mainKeyF") >> undefined -- TODO
   )
 
 menuGame :: XCommandT
