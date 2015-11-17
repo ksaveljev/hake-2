@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.MenuLayerT ( MenuLayerT
+module Client.MenuLayerT ( MenuLayerT(..)
                          , module Client.MenuLayerT
                          , module Client.KeyFuncT
                          ) where

@@ -97,7 +97,16 @@ data XCommandT =
             , _xcCmd  :: Quake ()
             }
 
-type KeyFuncT = Int -> Quake B.ByteString
+instance Eq XCommandT where
+    x == y = _xcName x == _xcName y
+
+data KeyFuncT =
+  KeyFuncT { _kfName :: B.ByteString
+           , _kfFunc :: Int -> Quake B.ByteString
+           }
+
+instance Eq KeyFuncT where
+    x == y = _kfName x == _kfName y
 
 -- reference to gameBaseGlobals.gbGEdicts
 newtype EdictReference = EdictReference Int deriving (Eq, Show, Ord)
@@ -1794,6 +1803,7 @@ data MenuGlobals =
               , _mgMenuActionSItems :: V.Vector MenuActionS
               , _mgLayers           :: V.Vector MenuLayerT
               , _mgDrawFunc         :: Maybe XCommandT
+              , _mgKeyFunc          :: Maybe KeyFuncT
               , _mgEnterSound       :: !Bool
               , _mgMenuDepth        :: !Int
               }

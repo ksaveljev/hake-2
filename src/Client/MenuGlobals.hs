@@ -89,6 +89,7 @@ initialMenuGlobals =
                                                  ]
               , _mgLayers           = V.empty
               , _mgDrawFunc         = Nothing
+              , _mgKeyFunc          = Nothing
               , _mgEnterSound       = False
               , _mgMenuDepth        = 0
               }

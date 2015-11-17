@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Client.Menu where
 
-import Control.Lens (use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
+import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
 import Control.Monad (when, void)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
@@ -13,6 +13,7 @@ import QCommon.XCommandT
 import qualified Constants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sound.S as S
 
@@ -120,8 +121,32 @@ pushMenu draw key = do
     -- if this menu is already present, drop back to that level
     -- to avoid stacking menus by hotkeys
     menuDepth <- use $ menuGlobals.mgMenuDepth
+    layers <- use $ menuGlobals.mgLayers
 
-    io (putStrLn "Menu.pushMenu") >> undefined -- TODO
+    i <- case V.findIndex (\layer -> (layer^.mlDraw) == Just draw && (layer^.mlKey) == Just key) layers of
+           Nothing ->
+             return menuDepth
+           Just idx -> do
+             if idx >= menuDepth
+               then
+                 return menuDepth
+               else do
+                 menuGlobals.mgMenuDepth .= idx
+                 return idx
+
+    when (i == menuDepth) $ do
+      when (menuDepth == maxMenuDepth) $
+        Com.comError Constants.errFatal "PushMenu: MAX_MENU_DEPTH"
+
+      menuGlobals.mgLayers %= (`V.snoc` (MenuLayerT (Just draw) (Just key)))
+
+    zoom menuGlobals $ do
+      mgMenuDepth += 1
+      mgDrawFunc .= Just draw
+      mgKeyFunc .= Just key
+      mgEnterSound .= True
+    
+    globals.cls.csKeyDest .= Constants.keyMenu
 
 menuMainF :: XCommandT
 menuMainF =
