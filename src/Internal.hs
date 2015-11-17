@@ -102,7 +102,7 @@ instance Eq XCommandT where
 
 data KeyFuncT =
   KeyFuncT { _kfName :: B.ByteString
-           , _kfFunc :: Int -> Quake B.ByteString
+           , _kfFunc :: Int -> Quake (Maybe B.ByteString)
            }
 
 instance Eq KeyFuncT where

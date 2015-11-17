@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.Menu where
 
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
@@ -12,11 +13,15 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sound.S as S
+
+mainItems :: Int
+mainItems = 5
 
 maxMenuDepth :: Int
 maxMenuDepth = 8
@@ -36,21 +41,21 @@ menuOutSound = "misc/menu3.wav"
 init :: Quake ()
 init = do
     Cmd.addCommand "menu_main" (Just menuMainF)
-    Cmd.addCommand "menu_game" (Just menuGame)
-    Cmd.addCommand "menu_loadgame" (Just menuLoadGame)
-    Cmd.addCommand "menu_savegame" (Just menuSaveGame)
-    Cmd.addCommand "menu_joinserver" (Just menuJoinServer)
-    Cmd.addCommand "menu_addressbook" (Just menuAddressBook)
-    Cmd.addCommand "menu_startserver" (Just menuStartServer)
-    Cmd.addCommand "menu_dmoptions" (Just menuDMOptions)
-    Cmd.addCommand "menu_playerconfig" (Just menuPlayerConfig)
-    Cmd.addCommand "menu_downloadoptions" (Just menuDownloadOptions)
-    Cmd.addCommand "menu_credits" (Just menuCredits)
-    Cmd.addCommand "menu_multiplayer" (Just menuMultiplayer)
-    Cmd.addCommand "menu_video" (Just menuVideo)
-    Cmd.addCommand "menu_options" (Just menuOptions)
-    Cmd.addCommand "menu_keys" (Just menuKeys)
-    Cmd.addCommand "menu_quit" (Just menuQuit)
+    Cmd.addCommand "menu_game" (Just menuGameF)
+    Cmd.addCommand "menu_loadgame" (Just menuLoadGameF)
+    Cmd.addCommand "menu_savegame" (Just menuSaveGameF)
+    Cmd.addCommand "menu_joinserver" (Just menuJoinServerF)
+    Cmd.addCommand "menu_addressbook" (Just menuAddressBookF)
+    Cmd.addCommand "menu_startserver" (Just menuStartServerF)
+    Cmd.addCommand "menu_dmoptions" (Just menuDMOptionsF)
+    Cmd.addCommand "menu_playerconfig" (Just menuPlayerConfigF)
+    Cmd.addCommand "menu_downloadoptions" (Just menuDownloadOptionsF)
+    Cmd.addCommand "menu_credits" (Just menuCreditsF)
+    Cmd.addCommand "menu_multiplayer" (Just menuMultiplayerF)
+    Cmd.addCommand "menu_video" (Just menuVideoF)
+    Cmd.addCommand "menu_options" (Just menuOptionsF)
+    Cmd.addCommand "menu_keys" (Just menuKeysF)
+    Cmd.addCommand "menu_quit" (Just menuQuitF)
 
     menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
@@ -208,95 +213,119 @@ mainDrawF =
 mainKeyF :: KeyFuncT
 mainKeyF =
   KeyFuncT "Menu.mainKeyF" (\key -> do
-    io (putStrLn "Menu.mainKeyF") >> undefined -- TODO
+    if | key == KeyConstants.kEscape -> do
+           popMenu
+           return Nothing
+
+       | key `elem` [ KeyConstants.kKpDownArrow, KeyConstants.kDownArrow ] -> do
+           menuGlobals.mgMainCursor %= (\v -> if v + 1 >= mainItems then 0 else v + 1)
+           return (Just menuMoveSound)
+
+       | key `elem` [ KeyConstants.kKpUpArrow, KeyConstants.kUpArrow ] -> do
+           menuGlobals.mgMainCursor %= (\v -> if v - 1 < 0 then mainItems - 1 else v - 1)
+           return (Just menuMoveSound)
+
+       | key `elem` [ KeyConstants.kKpEnter, KeyConstants.kEnter ] -> do
+           menuGlobals.mgEnterSound .= True
+           mainCursor <- use $ menuGlobals.mgMainCursor
+
+           case mainCursor of
+             0 -> (menuGameF)^.xcCmd
+             1 -> (menuMultiplayerF)^.xcCmd
+             2 -> (menuOptionsF)^.xcCmd
+             3 -> (menuVideoF)^.xcCmd
+             4 -> (menuQuitF)^.xcCmd
+             _ -> return ()
+
+           return Nothing
   )
 
-menuGame :: XCommandT
-menuGame =
+menuGameF :: XCommandT
+menuGameF =
   XCommandT "Menu.menuGame" (do
     io (putStrLn "Menu.menuGame") >> undefined -- TODO
   )
 
-menuLoadGame :: XCommandT
-menuLoadGame =
+menuLoadGameF :: XCommandT
+menuLoadGameF =
   XCommandT "Menu.menuLoadGame" (do
     io (putStrLn "Menu.menuLoadGame") >> undefined -- TODO
   )
 
-menuSaveGame :: XCommandT
-menuSaveGame =
+menuSaveGameF :: XCommandT
+menuSaveGameF =
   XCommandT "Menu.menuSaveGame" (do
     io (putStrLn "Menu.menuSaveGame") >> undefined -- TODO
   )
 
-menuJoinServer :: XCommandT
-menuJoinServer =
+menuJoinServerF :: XCommandT
+menuJoinServerF =
   XCommandT "Menu.menuJoinServer" (do
     io (putStrLn "Menu.menuJoinServer") >> undefined -- TODO
   )
 
-menuAddressBook :: XCommandT
-menuAddressBook =
+menuAddressBookF :: XCommandT
+menuAddressBookF =
   XCommandT "Menu.menuAddressBook" (do
     io (putStrLn "Menu.menuAddressBook") >> undefined -- TODO
   )
 
-menuStartServer :: XCommandT
-menuStartServer =
+menuStartServerF :: XCommandT
+menuStartServerF =
   XCommandT "Menu.menuStartServer" (do
     io (putStrLn "Menu.menuStartServer") >> undefined -- TODO
   )
 
-menuDMOptions :: XCommandT
-menuDMOptions =
+menuDMOptionsF :: XCommandT
+menuDMOptionsF =
   XCommandT "Menu.menuDMOptions" (do
     io (putStrLn "Menu.menuDMOptions") >> undefined -- TODO
   )
 
-menuPlayerConfig :: XCommandT
-menuPlayerConfig =
+menuPlayerConfigF :: XCommandT
+menuPlayerConfigF =
   XCommandT "Menu.menuPlayerConfig" (do
     io (putStrLn "Menu.menuPlayerConfig") >> undefined -- TODO
   )
 
-menuDownloadOptions :: XCommandT
-menuDownloadOptions =
+menuDownloadOptionsF :: XCommandT
+menuDownloadOptionsF =
   XCommandT "Menu.menuDownloadOptions" (do
     io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
   )
 
-menuCredits :: XCommandT
-menuCredits =
+menuCreditsF :: XCommandT
+menuCreditsF =
   XCommandT "Menu.menuCredits" (do
     io (putStrLn "Menu.menuCredits") >> undefined -- TODO
   )
 
-menuMultiplayer :: XCommandT
-menuMultiplayer =
+menuMultiplayerF :: XCommandT
+menuMultiplayerF =
   XCommandT "Menu.menuMultiplayer" (do
     io (putStrLn "Menu.menuMultiplayer") >> undefined -- TODO
   )
 
-menuVideo :: XCommandT
-menuVideo =
+menuVideoF :: XCommandT
+menuVideoF =
   XCommandT "Menu.menuVideo" (do
     io (putStrLn "Menu.menuVideo") >> undefined -- TODO
   )
 
-menuOptions :: XCommandT
-menuOptions =
+menuOptionsF :: XCommandT
+menuOptionsF =
   XCommandT "Menu.menuOptions" (do
     io (putStrLn "Menu.menuOptions") >> undefined -- TODO
   )
 
-menuKeys :: XCommandT
-menuKeys =
+menuKeysF :: XCommandT
+menuKeysF =
   XCommandT "Menu.menuKeys" (do
     io (putStrLn "Menu.menuKeys") >> undefined -- TODO
   )
 
-menuQuit :: XCommandT
-menuQuit =
+menuQuitF :: XCommandT
+menuQuitF =
   XCommandT "Menu.menuQuit" (do
     io (putStrLn "Menu.menuQuit") >> undefined -- TODO
   )
@@ -329,8 +358,19 @@ draw = do
         menuGlobals.mgEnterSound .= False
 
 menuKeyDown :: Int -> Quake ()
-menuKeyDown _ = do
-    io (putStrLn "Menu.menuKeyDown") >> undefined -- TODO
+menuKeyDown key = do
+    keyFunc <- use $ menuGlobals.mgKeyFunc
+
+    case keyFunc of
+      Nothing ->
+        return ()
+
+      Just kf -> do
+        s <- (kf^.kfFunc) key
+
+        case s of
+          Nothing -> return ()
+          Just sound -> S.startLocalSound sound
 
 forceMenuOff :: Quake ()
 forceMenuOff = do
@@ -367,3 +407,7 @@ drawCursor x y f = do
               Just renderer <- use $ globals.re
               (renderer^.rRefExport.reRegisterPic) ("m_cursor" `B.append` BC.pack (show idx))
               registerCursorPics (idx + 1) maxIdx
+
+popMenu :: Quake ()
+popMenu = do
+    io (putStrLn "Menu.popMenu") >> undefined -- TODO
