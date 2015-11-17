@@ -92,7 +92,10 @@ type instance Zoomed (QuakeS s) = Focusing (ExceptT B.ByteString IO)
 instance Zoom (QuakeS s) (QuakeS t) s t where
     zoom l (Quake m) = Quake (zoom l m)
 
-type XCommandT = Quake ()
+data XCommandT =
+  XCommandT { _xcName :: B.ByteString
+            , _xcCmd  :: Quake ()
+            }
 
 type KeyFuncT = Int -> Quake B.ByteString
 
@@ -1602,7 +1605,7 @@ data RenderAPI =
             , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
             , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
             , _rBeginFrame        :: GLDriver -> Float -> Quake ()
-            , _glScreenShotF      :: GLDriver -> XCommandT
+            , _glScreenShotF      :: GLDriver -> Quake ()
             }
 
 data INGlobals =
@@ -1792,6 +1795,7 @@ data MenuGlobals =
               , _mgLayers           :: V.Vector MenuLayerT
               , _mgDrawFunc         :: Maybe XCommandT
               , _mgEnterSound       :: !Bool
+              , _mgMenuDepth        :: !Int
               }
 
 data MenuLayerT =

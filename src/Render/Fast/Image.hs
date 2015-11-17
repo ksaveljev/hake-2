@@ -178,7 +178,10 @@ loadPCX fileName returnPalette returnDimensions = do
           | otherwise = buildAcc (acc `mappend` byte) byte (idx - 1)
 
 glImageListF :: XCommandT
-glImageListF = io (putStrLn "Image.glImageListF") >> undefined -- TODO
+glImageListF =
+  XCommandT "Image.glImageListF" (do
+    io (putStrLn "Image.glImageListF") >> undefined -- TODO
+  )
 
 glInitImages :: Quake ()
 glInitImages = do

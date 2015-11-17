@@ -216,10 +216,16 @@ rSetMode glDriver = do
               else return True
 
 glStringsF :: XCommandT
-glStringsF = io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
+glStringsF =
+  XCommandT "FastRenderAPI.glStringsF" (do
+    io (putStrLn "FastRenderAPI.glStringsF") >> undefined -- TODO
+  )
 
 fastScreenShotF :: XCommandT
-fastScreenShotF = io (putStrLn "FastRenderAPI.fastScreenShotF") >> undefined -- TODO
+fastScreenShotF =
+  XCommandT "FastRenderAPI.fastScreenShotF" (do
+    io (putStrLn "FastRenderAPI.fastScreenShotF") >> undefined -- TODO
+  )
 
 fastInit2 :: GLDriver -> Quake Bool
 fastInit2 glDriver = do

@@ -105,28 +105,43 @@ checkResize = do
               fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i (j + 1) maxI maxJ
 
 toggleConsoleF :: XCommandT
-toggleConsoleF = io (putStrLn "Console.toggleConsoleF") >> undefined -- TODO
+toggleConsoleF =
+  XCommandT "Console.toggleConsoleF" (do
+    io (putStrLn "Console.toggleConsoleF") >> undefined -- TODO
+  )
 
 toggleChatF :: XCommandT
-toggleChatF = io (putStrLn "Console.toggleChatF") >> undefined -- TODO
+toggleChatF =
+  XCommandT "Console.toggleChatF" (do
+    io (putStrLn "Console.toggleChatF") >> undefined -- TODO
+  )
 
 messageModeF :: XCommandT
-messageModeF = do
+messageModeF =
+  XCommandT "Console.messageModeF" (do
     globals.chatTeam .= False
     globals.cls.csKeyDest .= Constants.keyMessage
+  )
 
 messageMode2F :: XCommandT
-messageMode2F = do
+messageMode2F =
+  XCommandT "Console.messageMode2F" (do
     globals.chatTeam .= True
     globals.cls.csKeyDest .= Constants.keyMessage
+  )
 
 clearF :: XCommandT
-clearF = do
+clearF =
+  XCommandT "Console.clearF" (do
     text <- io $ MSV.replicate Constants.conTextSize ' '
     globals.con.cText .= text
+  )
 
 dumpF :: XCommandT
-dumpF = io (putStrLn "Console.dumpF") >> undefined -- TODO
+dumpF =
+  XCommandT "Console.dumpF" (do
+    io (putStrLn "Console.dumpF") >> undefined -- TODO
+  )
 
 clearNotify :: Quake ()
 clearNotify = globals.con.cTimes .= UV.replicate Constants.numConTimes 0

@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Render.DummyRenderer (dummyRenderer) where
 
+import Control.Lens ((^.))
 import qualified Data.Vector as V
 
 import Client.RefExportT
+import QCommon.XCommandT
 import Render.RenderAPI
 import Render.Renderer
 
@@ -36,7 +38,7 @@ dummyRefExportT _ =
              , _reBeginFrame          = (\_ -> return ())
              , _reEndFrame            = return ()
              , _reAppActivate         = (\_ -> return ())
-             , _reUpdateScreen        = (\callback -> callback)
+             , _reUpdateScreen        = (\callback -> (callback^.xcCmd))
              , _reApiVersion          = 0
              , _reGetModeList         = return V.empty
              , _reGetKeyboardHandler  = dummyKBD

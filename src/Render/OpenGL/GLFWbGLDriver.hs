@@ -182,4 +182,4 @@ glDriverLogNewFrame :: Quake ()
 glDriverLogNewFrame = return () -- do nothing
 
 glDriverUpdateScreen :: XCommandT -> Quake ()
-glDriverUpdateScreen callback = callback
+glDriverUpdateScreen callback = callback^.xcCmd

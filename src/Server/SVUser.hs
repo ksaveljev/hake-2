@@ -196,7 +196,7 @@ executeUserCommand str = do
     let foundCmd = V.find (\c -> (c^.ucName) == v0) uCmds
 
     case foundCmd of
-      Just (UCmdT _ func) -> func
+      Just (UCmdT _ func) -> (func)^.xcCmd
       Nothing -> do
         state <- use $ svGlobals.svServer.sState
         when (state == Constants.ssGame) $
@@ -210,7 +210,8 @@ executeUserCommand str = do
 - ================
 -}
 newF :: XCommandT
-newF = do
+newF =
+  XCommandT "SVUser.newF" (do
     Just (ClientReference clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     state <- use $ svGlobals.svServer.sState
@@ -262,9 +263,11 @@ newF = do
              -- begin fetching configstrings
              MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
              MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` (BC.pack $ show spawnCount) `B.append` " 0\n") -- IMPROVE?
+  )
 
 configStringsF :: XCommandT
-configStringsF = do
+configStringsF =
+  XCommandT "SVUser.configStringsF" (do
     Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     Com.dprintf $ "Configstrings() from " `B.append` (client^.cName) `B.append` "\n"
@@ -278,7 +281,7 @@ configStringsF = do
         if Lib.atoi v1 /= spawnCount
           then do
             Com.printf "SV_Configstrings_f from different level\n"
-            newF
+            (newF)^.xcCmd
           else do
             v2 <- Cmd.argv 2
             let start = Lib.atoi v2
@@ -295,6 +298,7 @@ configStringsF = do
               else do
                 MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
                 MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
+  )
 
   where writeConfigStringsPacket :: V.Vector B.ByteString -> ClientReference -> Int -> Quake Int
         writeConfigStringsPacket configStrings clientRef@(ClientReference clientIdx) start = do
@@ -311,7 +315,8 @@ configStringsF = do
               return start
 
 baselinesF :: XCommandT
-baselinesF = do
+baselinesF =
+  XCommandT "SVUser.baselinesF" (do
     Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
@@ -327,7 +332,7 @@ baselinesF = do
         if Lib.atoi v1 /= spawnCount
           then do
             Com.printf "SV_Baselines_f from different level\n"
-            newF
+            (newF)^.xcCmd
           else do
             v2 <- Cmd.argv 2
             let start = Lib.atoi v2
@@ -344,6 +349,7 @@ baselinesF = do
               else do
                 MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
                 MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd baselines " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
+  )
 
   where writeBaselinePacket :: V.Vector EntityStateT -> ClientReference -> Int -> Quake Int
         writeBaselinePacket baselines clientRef@(ClientReference clientIdx) start = do
@@ -359,7 +365,8 @@ baselinesF = do
               return start
 
 beginF :: XCommandT
-beginF = do
+beginF =
+  XCommandT "SVUser.beginF" (do
     Just (ClientReference clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     Com.dprintf $ "Begin() from " `B.append` (client^.cName) `B.append` "\n"
@@ -371,7 +378,7 @@ beginF = do
     if Lib.atoi v1 /= spawnCount
       then do
         Com.printf "SV_Begin_f from different level\n"
-        newF
+        (newF)^.xcCmd
       else do
         svGlobals.svServerStatic.ssClients.ix clientIdx.cState .= Constants.csSpawned
 
@@ -380,9 +387,13 @@ beginF = do
         PlayerClient.clientBegin edictRef
 
         CBuf.insertFromDefer
+  )
 
 nextServerF :: XCommandT
-nextServerF = io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
+nextServerF =
+  XCommandT "SVUser.nextServerF" (do
+    io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
+  )
 
 {-
 - ================= SV_Disconnect_f =================
@@ -391,9 +402,11 @@ nextServerF = io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
 -
 -}
 disconnectF :: XCommandT
-disconnectF = do
+disconnectF =
+  XCommandT "SVUser.disconnectF" (do
     Just client <- use $ svGlobals.svClient
     SVMain.dropClient client
+  )
 
 {-
 - ================== SV_ShowServerinfo_f ==================
@@ -401,13 +414,19 @@ disconnectF = do
 - Dumps the serverinfo info string
 -}
 showServerInfoF :: XCommandT
-showServerInfoF = CVar.serverInfo >>= Info.print
+showServerInfoF = XCommandT "SVUser.showServerInfoF" (CVar.serverInfo >>= Info.print)
 
 beginDownloadF :: XCommandT
-beginDownloadF = io (putStrLn "SVUser.beginDownloadF") >> undefined -- TODO
+beginDownloadF =
+  XCommandT "SVUser.beginDownloadF" (do
+    io (putStrLn "SVUser.beginDownloadF") >> undefined -- TODO
+  )
 
 nextDownloadF :: XCommandT
-nextDownloadF = io (putStrLn "SVUser.nextDownloadF") >> undefined -- TODO
+nextDownloadF =
+  XCommandT "SVUser.nextDownloadF" (do
+    io (putStrLn "SVUser.nextDownloadF") >> undefined -- TODO
+  )
 
 beginDemoServer :: Quake ()
 beginDemoServer = io (putStrLn "SVUser.beginDemoServer") >> undefined -- TODO

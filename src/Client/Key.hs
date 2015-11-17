@@ -47,7 +47,8 @@ init = do
     Cmd.addCommand "bindlist" (Just bindListF)
 
 bindF :: XCommandT
-bindF = do
+bindF =
+  XCommandT "Key.bindF" (do
     c <- Cmd.argc
 
     if c < 2
@@ -65,9 +66,11 @@ bindF = do
            | otherwise -> do
                cmd <- liftM (B.intercalate " ") $ mapM Cmd.argv [2..c-1]
                setBinding b (Just cmd)
+  )
 
 unbindF :: XCommandT
-unbindF = do
+unbindF =
+  XCommandT "Key.unbindF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -79,14 +82,17 @@ unbindF = do
         if b == -1
           then Com.printf $ "\"" `B.append` v `B.append` "\" isn't a valid key\n"
           else setBinding b Nothing
+  )
 
 unbindAllF :: XCommandT
-unbindAllF = globals.keyBindings .= V.replicate 256 Nothing
+unbindAllF = XCommandT "Key.unbindAllF" (globals.keyBindings .= V.replicate 256 Nothing)
 
 bindListF :: XCommandT
-bindListF = do
+bindListF =
+  XCommandT "Key.bindListF" (do
     bindings <- use $ globals.keyBindings
     void $ V.sequence $ V.imap printBinding bindings
+  )
 
   where printBinding _ Nothing = return ()
         printBinding i (Just b) =
@@ -184,7 +190,7 @@ event key down time = do
                    if not down
                      then return True
                      else do
-                       Console.toggleConsoleF
+                       (Console.toggleConsoleF)^.xcCmd
                        return True
                  else
                    return False
@@ -212,7 +218,7 @@ event key down time = do
                          Menu.menuKeyDown key'
 
                      | (cls'^.csKeyDest) == Constants.keyGame || (cls'^.csKeyDest) == Constants.keyConsole ->
-                         Menu.menuMainF
+                         (Menu.menuMainF)^.xcCmd
 
                      | otherwise ->
                          Com.comError Constants.errFatal "Bad cls.key_dest"

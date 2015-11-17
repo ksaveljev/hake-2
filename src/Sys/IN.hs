@@ -45,8 +45,9 @@ realINInit = do
 
     inGlobals.inMouseAvail .= True
 
-toggleMouse :: Quake ()
-toggleMouse = do
+toggleMouse :: XCommandT
+toggleMouse =
+  XCommandT "IN.toggleMouse" (do
     mouseAvail <- use $ inGlobals.inMouseAvail
 
     if mouseAvail
@@ -56,17 +57,21 @@ toggleMouse = do
       else do
         inGlobals.inMouseAvail .= True
         activateMouse
+  )
 
-mLookDown :: Quake ()
-mLookDown = inGlobals.inMLooking .= True
+mLookDown :: XCommandT
+mLookDown = XCommandT "IN.mLookDown" (inGlobals.inMLooking .= True)
 
-mLookUp :: Quake ()
-mLookUp = do
+mLookUp :: XCommandT
+mLookUp =
+  XCommandT "IN.mLookUp" (do
     inGlobals.inMLooking .= False
-    centerView
+    (centerView)^.xcCmd
+  )
 
 forceCenterViewF :: XCommandT
-forceCenterViewF = do
+forceCenterViewF =
+  XCommandT "IN.forceCenterViewF" (do
     let access = case Constants.pitch of
                    0 -> _x
                    1 -> _y
@@ -74,6 +79,7 @@ forceCenterViewF = do
                    _ -> undefined -- shouldn't happen
 
     globals.cl.csViewAngles.(access) .= 0
+  )
 
 activateMouse :: Quake ()
 activateMouse = do
@@ -108,8 +114,9 @@ uninstallGrabs = do
     Just renderer <- use $ globals.re
     renderer^.rRefExport.reGetKeyboardHandler.kbdUninstallGrabs
 
-centerView :: Quake ()
-centerView = do
+centerView :: XCommandT
+centerView =
+  XCommandT "IN.centerView" (do
     let access = case Constants.pitch of
                    0 -> _x
                    1 -> _y
@@ -118,6 +125,7 @@ centerView = do
 
     Just angle <- preuse $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.(Math3D.v3Access Constants.pitch)
     globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle (fromIntegral angle)))
+  )
 
 frame :: Quake ()
 frame = do

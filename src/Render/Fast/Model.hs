@@ -53,7 +53,10 @@ import qualified Render.RenderAPIConstants as RenderAPIConstants
 import qualified Util.Lib as Lib
 
 modelListF :: XCommandT
-modelListF = io (putStrLn "Model.modelListF") >> undefined -- TODO
+modelListF =
+  XCommandT "Model.modelListF" (do
+    io (putStrLn "Model.modelListF") >> undefined -- TODO
+  )
 
 modInit :: Quake ()
 modInit = do

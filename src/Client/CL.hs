@@ -394,7 +394,7 @@ disconnect = do
       SCR.stopCinematic
 
       when (cls'^.csDemoRecording) $
-        stopF
+        (stopF)^.xcCmd
 
       -- send a disconnect message to the server
       let fin = B.pack [fromIntegral Constants.clcStringCmd] `B.append` "disconnect"
@@ -414,7 +414,8 @@ disconnect = do
       globals.cls.csState .= Constants.caDisconnected
 
 forwardToServerF :: XCommandT
-forwardToServerF = do
+forwardToServerF =
+  XCommandT "CL.forwardToServerF" (do
     state <- use $ globals.cls.csState
 
     if state /= Constants.caConnected && state /= Constants.caActive
@@ -428,9 +429,11 @@ forwardToServerF = do
           args <- Cmd.args
           MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
           SZ.print (globals.cls.csNetChan.ncMessage) args
+  )
 
 pauseF :: XCommandT
-pauseF = do
+pauseF =
+  XCommandT "CL.pauseF" (do
     maxClientsValue <- CVar.variableValue "maxclients"
     state <- use $ globals.serverState
 
@@ -440,9 +443,11 @@ pauseF = do
       else do
         pausedValue <- liftM (^.cvValue) clPausedCVar
         CVar.setValueF "paused" pausedValue
+  )
 
 pingServersF :: XCommandT
-pingServersF = do
+pingServersF =
+  XCommandT "CL.pingServersF" (do
     NET.config True -- allow remote
 
     -- send a broadcast packet
@@ -452,6 +457,7 @@ pingServersF = do
 
     -- send a packet to each address book entry
     pingAddressBook adr 0 16
+  )
 
   where checkNoUDP :: NetAdrT -> Quake NetAdrT
         checkNoUDP adr = do
@@ -520,11 +526,13 @@ pingServersF = do
 - Load or download any custom player skins and models.
 -}
 skinsF :: XCommandT
-skinsF = do
+skinsF =
+  XCommandT "CL.skinsF" (do
     configStrings <- use $ globals.cl.csConfigStrings
     loadOrDownload configStrings 0 Constants.maxClients
+  )
 
-  where loadOrDownload :: Vec.Vector B.ByteString -> Int -> Int -> XCommandT
+  where loadOrDownload :: Vec.Vector B.ByteString -> Int -> Int -> Quake ()
         loadOrDownload configStrings idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
@@ -538,10 +546,12 @@ skinsF = do
                   CLParse.parseClientInfo idx
 
 userInfoF :: XCommandT
-userInfoF = do
+userInfoF =
+  XCommandT "CL.userInfoF" (do
     Com.printf "User info settings:\n"
     userInfo <- CVar.userInfo
     Info.print userInfo
+  )
 
 {-
 - Snd_Restart_f
@@ -550,14 +560,17 @@ userInfoF = do
 - all sounds.
 -}
 sndRestartF :: XCommandT
-sndRestartF = do
+sndRestartF =
+  XCommandT "CL.sndRestartF" (do
     S.shutdown
     S.init
     CLParse.registerSounds
+  )
 
 -- Just sent as a hint to the client that they should drop to full console.
 changingF :: XCommandT
-changingF = do
+changingF =
+  XCommandT "CL.changingF" (do
     -- if we are downloading, we don't change!
     -- This is so we don't suddenly stop downloading a map
     download <- use $ globals.cls.csDownload
@@ -567,23 +580,33 @@ changingF = do
       globals.cls.csState .= Constants.caConnected -- not active anymore, but not disconnected
 
       Com.printf "\nChanging map...\n"
+  )
 
 disconnectF :: XCommandT
-disconnectF = Com.comError Constants.errDrop "Disconnected from server"
+disconnectF = XCommandT "CL.disconnectF" (Com.comError Constants.errDrop "Disconnected from server")
 
 recordF :: XCommandT
-recordF = io (putStrLn "CL.recordF") >> undefined -- TODO
+recordF =
+  XCommandT "CL.recordF" (do
+    io (putStrLn "CL.recordF") >> undefined -- TODO
+  )
 
 stopF :: XCommandT
-stopF = io (putStrLn "CL.stopF") >> undefined -- TODO
+stopF =
+  XCommandT "CL.stopF" (do
+    io (putStrLn "CL.stopF") >> undefined -- TODO
+  )
 
 quitF :: XCommandT
-quitF = do
+quitF =
+  XCommandT "CL.quitF" (do
     disconnect
     Com.quit
+  )
 
 connectF :: XCommandT
-connectF = do
+connectF =
+  XCommandT "CL.connectF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -608,10 +631,12 @@ connectF = do
           csConnectTime .= -99999
 
         -- CL_CheckForResend() will fire immediately
+  )
 
 -- The server is changing levels.
 reconnectF :: XCommandT
-reconnectF = do
+reconnectF =
+  XCommandT "CL.reconnectF" (do
     -- ZOID
     -- if we are downloading, we dont' change! This so we don't suddenly
     -- stop downloading a map
@@ -644,10 +669,12 @@ reconnectF = do
 
            | otherwise ->
                return ()
+  )
 
 -- Send the rest of the command line over as an unconnected command.
 rconF :: XCommandT
-rconF = do
+rconF =
+  XCommandT "CL.rconF" (do
     clientPassword <- liftM (^.cvString) rconClientPasswordCVar
 
     if B.null clientPassword
@@ -687,6 +714,7 @@ rconF = do
           Just to -> do
             let message'' = message' `B.append` "\0"
             NET.sendPacket Constants.nsClient (B.length message'') message'' to
+  )
 
   where buildMessage :: B.ByteString -> Int -> Int -> Quake B.ByteString
         buildMessage msg idx maxIdx
@@ -700,7 +728,8 @@ rconF = do
 - the server.
 -}
 precacheF :: XCommandT
-precacheF = do
+precacheF =
+  XCommandT "CL.precacheF" (do
     c <- Cmd.argc
 
     -- Yet another hack to let old demos work the old precache sequence
@@ -716,6 +745,7 @@ precacheF = do
       cgPrecacheModelSkin .= 0
 
     requestNextDownload
+  )
 
 remoteCommandHeader :: B.ByteString
 remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]

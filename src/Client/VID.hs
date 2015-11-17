@@ -77,7 +77,8 @@ cause the entire video mode and refresh DLL to be reset on the next frame.
 ============
 -}
 restartF :: XCommandT
-restartF = do
+restartF =
+  XCommandT "VID.restartF" (do
     vidWidthValue <- liftM (truncate . (^.cvValue)) vidWidthCVar
     vidHeightValue <- liftM (truncate . (^.cvValue)) vidHeightCVar
 
@@ -87,6 +88,7 @@ restartF = do
 
     vidRef <- vidRefCVar
     CVar.update vidRef { _cvModified = True }
+  )
 
 {-
 ============
@@ -156,7 +158,7 @@ checkChanges = do
             -- drop the console if we fail to load a refresh
             keyDest <- use $ globals.cls.csKeyDest
             when (keyDest /= Constants.keyConsole) $
-              Console.toggleConsoleF -- TODO: catch exception?
+              (Console.toggleConsoleF)^.xcCmd -- TODO: catch exception?
 
           globals.cls.csDisableScreen .= 0 -- False
 

@@ -151,7 +151,7 @@ glfwbAppActivate :: Bool -> Quake ()
 glfwbAppActivate _ = io (putStrLn "GLFWbRenderer.appActivate") >> undefined -- TODO
 
 glfwbUpdateScreen :: XCommandT -> Quake ()
-glfwbUpdateScreen callback = callback
+glfwbUpdateScreen callback = callback^.xcCmd
 
 glfwbKBDInit :: Quake ()
 glfwbKBDInit = do

@@ -226,7 +226,8 @@ setGameDir dir = do
                 Just e -> Com.dprintf (BC.pack $ show e)
 
 pathF :: XCommandT
-pathF = do
+pathF =
+  XCommandT "FS.pathF" (do
     Com.printf "Current search path:\n"
     searchPaths <- use $ fsGlobals.fsSearchPaths
 
@@ -236,6 +237,7 @@ pathF = do
     links <- use $ fsGlobals.fsLinks
 
     void $ traverse printLink links
+  )
 
   where printLink link =
           Com.printf $ (link^.flFrom) 
@@ -258,7 +260,8 @@ pathF = do
             else Com.printf $ (sp^.spFilename) `B.append` "\n"
 
 linkF :: XCommandT
-linkF = do
+linkF =
+  XCommandT "FS.linkF" (do
     c <- Cmd.argc
 
     if c /= 3
@@ -283,14 +286,17 @@ linkF = do
                fsGlobals.fsLinks %= (Seq.|> FileLinkT v1 (B.length v1) v2)
 
            | otherwise -> return ()
+  )
 
 dirF :: XCommandT
-dirF = do
+dirF =
+  XCommandT "FS.dirF" (do
     --c <- Cmd.argc
 
     --wildcard <- if c /= 1 then Cmd.argv 1 else return "*.*"
 
     io (putStrLn "FS.dirF") >> undefined -- TODO
+  )
 
 execAutoexec :: Quake ()
 execAutoexec = do

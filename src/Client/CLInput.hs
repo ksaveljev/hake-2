@@ -69,99 +69,101 @@ initInput = do
     void $ CVar.get "cl_nodelta" "0" 0
 
 upDown :: XCommandT
-upDown = inputKeyDown (clientGlobals.cgInUp)
+upDown = XCommandT "CLInput.upDown" (inputKeyDown (clientGlobals.cgInUp))
 
 upUp :: XCommandT
-upUp = inputKeyUp (clientGlobals.cgInUp)
+upUp = XCommandT "CLInput.upUp" (inputKeyUp (clientGlobals.cgInUp))
 
 downDown :: XCommandT
-downDown = inputKeyDown (clientGlobals.cgInDown)
+downDown = XCommandT "CLInput.downDown" (inputKeyDown (clientGlobals.cgInDown))
 
 downUp :: XCommandT
-downUp = inputKeyUp (clientGlobals.cgInDown)
+downUp = XCommandT "CLInput.downUp" (inputKeyUp (clientGlobals.cgInDown))
 
 leftDown :: XCommandT
-leftDown = inputKeyDown (clientGlobals.cgInLeft)
+leftDown = XCommandT "CLInput.leftDown" (inputKeyDown (clientGlobals.cgInLeft))
 
 leftUp :: XCommandT
-leftUp = inputKeyUp (clientGlobals.cgInLeft)
+leftUp = XCommandT "CLInput.leftUp" (inputKeyUp (clientGlobals.cgInLeft))
 
 rightDown :: XCommandT
-rightDown = inputKeyDown (clientGlobals.cgInRight)
+rightDown = XCommandT "CLInput.rightDown" (inputKeyDown (clientGlobals.cgInRight))
 
 rightUp :: XCommandT
-rightUp = inputKeyUp (clientGlobals.cgInRight)
+rightUp = XCommandT "CLInput.rightUp" (inputKeyUp (clientGlobals.cgInRight))
 
 forwardDown :: XCommandT
-forwardDown = inputKeyDown (clientGlobals.cgInForward)
+forwardDown = XCommandT "CLInput.forwardDown" (inputKeyDown (clientGlobals.cgInForward))
 
 forwardUp :: XCommandT
-forwardUp = inputKeyUp (clientGlobals.cgInForward)
+forwardUp = XCommandT "CLInput.forwardUp" (inputKeyUp (clientGlobals.cgInForward))
 
 backDown :: XCommandT
-backDown = inputKeyDown (clientGlobals.cgInBack)
+backDown = XCommandT "CLInput.backDown" (inputKeyDown (clientGlobals.cgInBack))
 
 backUp :: XCommandT
-backUp = inputKeyUp (clientGlobals.cgInBack)
+backUp = XCommandT "CLInput.backUp" (inputKeyUp (clientGlobals.cgInBack))
 
 lookUpDown :: XCommandT
-lookUpDown = inputKeyDown (clientGlobals.cgInLookUp)
+lookUpDown = XCommandT "CLInput.lookUpDown" (inputKeyDown (clientGlobals.cgInLookUp))
 
 lookUpUp :: XCommandT
-lookUpUp = inputKeyUp (clientGlobals.cgInLookUp)
+lookUpUp = XCommandT "CLInput.lookUpUp" (inputKeyUp (clientGlobals.cgInLookUp))
 
 lookDownDown :: XCommandT
-lookDownDown = inputKeyDown (clientGlobals.cgInLookDown)
+lookDownDown = XCommandT "CLInput.lookDownDown" (inputKeyDown (clientGlobals.cgInLookDown))
 
 lookDownUp :: XCommandT
-lookDownUp = inputKeyUp (clientGlobals.cgInLookDown)
+lookDownUp = XCommandT "CLInput.lookDownUp" (inputKeyUp (clientGlobals.cgInLookDown))
 
 strafeDown :: XCommandT
-strafeDown = inputKeyDown (clientGlobals.cgInStrafe)
+strafeDown = XCommandT "CLInput.strafeDown" (inputKeyDown (clientGlobals.cgInStrafe))
 
 strafeUp :: XCommandT
-strafeUp = inputKeyUp (clientGlobals.cgInStrafe)
+strafeUp = XCommandT "CLInput.strafeUp" (inputKeyUp (clientGlobals.cgInStrafe))
 
 moveLeftDown :: XCommandT
-moveLeftDown = inputKeyDown (clientGlobals.cgInMoveLeft)
+moveLeftDown = XCommandT "CLInput.moveLeftDown" (inputKeyDown (clientGlobals.cgInMoveLeft))
 
 moveLeftUp :: XCommandT
-moveLeftUp = inputKeyUp (clientGlobals.cgInMoveLeft)
+moveLeftUp = XCommandT "CLInput.moveLeftUp" (inputKeyUp (clientGlobals.cgInMoveLeft))
 
 moveRightDown :: XCommandT
-moveRightDown = inputKeyDown (clientGlobals.cgInMoveRight)
+moveRightDown = XCommandT "CLInput.moveRightDown" (inputKeyDown (clientGlobals.cgInMoveRight))
 
 moveRightUp :: XCommandT
-moveRightUp = inputKeyUp (clientGlobals.cgInMoveRight)
+moveRightUp = XCommandT "CLInput.moveRightUp" (inputKeyUp (clientGlobals.cgInMoveRight))
 
 speedDown :: XCommandT
-speedDown = inputKeyDown (clientGlobals.cgInSpeed)
+speedDown = XCommandT "CLInput.speedDown" (inputKeyDown (clientGlobals.cgInSpeed))
 
 speedUp :: XCommandT
-speedUp = inputKeyUp (clientGlobals.cgInSpeed)
+speedUp = XCommandT "CLInput.speedUp" (inputKeyUp (clientGlobals.cgInSpeed))
 
 attackDown :: XCommandT
-attackDown = inputKeyDown (clientGlobals.cgInAttack)
+attackDown = XCommandT "CLInput.attackDown" (inputKeyDown (clientGlobals.cgInAttack))
 
 attackUp :: XCommandT
-attackUp = inputKeyUp (clientGlobals.cgInAttack)
+attackUp = XCommandT "CLInput.attackUp" (inputKeyUp (clientGlobals.cgInAttack))
 
 useDown :: XCommandT
-useDown = inputKeyDown (clientGlobals.cgInUse)
+useDown = XCommandT "CLInput.useDown" (inputKeyDown (clientGlobals.cgInUse))
 
 useUp :: XCommandT
-useUp = inputKeyUp (clientGlobals.cgInUse)
+useUp = XCommandT "CLInput.useUp" (inputKeyUp (clientGlobals.cgInUse))
 
 impulse :: XCommandT
-impulse = do
+impulse =
+  XCommandT "CLInput.impulse" (do
     v1 <- Cmd.argv 1
     clientGlobals.cgInImpulse .= Lib.atoi v1
+  )
 
 kLookDown :: XCommandT
-kLookDown = inputKeyDown (clientGlobals.cgInKLook)
+kLookDown = XCommandT "CLInput.kLookDown" (inputKeyDown (clientGlobals.cgInKLook))
 
 kLookUp :: XCommandT
-kLookUp = inputKeyUp (clientGlobals.cgInKLook)
+kLookUp = XCommandT "CLInput.kLookUp" (inputKeyUp (clientGlobals.cgInKLook))
 
 sendCmd :: Quake ()
 sendCmd = do

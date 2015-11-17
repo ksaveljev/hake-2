@@ -180,7 +180,8 @@ set2 varName value force = do
 
 -- Set command, sets variables.
 setF :: XCommandT
-setF = do
+setF =
+  XCommandT "CVar.setF" (do
     c <- Cmd.argc
 
     if | (c /= 3) && (c /= 4) ->
@@ -196,15 +197,18 @@ setF = do
            v1 <- Cmd.argv 1
            v2 <- Cmd.argv 2
            void $ set v1 v2
+  )
 
 -- List command, lists all available commands
 listF :: XCommandT
-listF = do
+listF =
+  XCommandT "CVar.listF" (do
     vars <- use $ globals.cvarVars
 
     _ <- traverse printCVar vars
 
     Com.printf $ BC.pack (show (Map.size vars)) `B.append` " cvars\n" -- IMPROVE: maybe use binary package for Int to ByteString conversion?
+  )
 
   where printCVar var = do
           Com.printf $ if (var^.cvFlags .&. Constants.cvarArchive) /= 0 then "*" else " "

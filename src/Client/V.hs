@@ -28,19 +28,24 @@ import qualified Sys.Timer as Timer
 import qualified Util.Math3D as Math3D
 
 gunNextF :: XCommandT
-gunNextF = do
+gunNextF =
+  XCommandT "V.gunNextF" (do
     globals.gunFrame += 1
     gunFrame' <- use $ globals.gunFrame
     Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
+  )
 
 gunPrevF :: XCommandT
-gunPrevF = do
+gunPrevF =
+  XCommandT "V.gunPrevF" (do
     globals.gunFrame %= (\v -> if v - 1 < 0 then 0 else v - 1)
     gunFrame' <- use $ globals.gunFrame
     Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
+  )
 
 gunModelF :: XCommandT
-gunModelF = do
+gunModelF =
+  XCommandT "V.gunModelF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -55,12 +60,15 @@ gunModelF = do
             registerModel = renderer^.rRefExport.reRegisterModel
 
         registerModel name >>= (globals.gunModel .=)
+  )
 
 viewPosF :: XCommandT
-viewPosF = do
+viewPosF =
+  XCommandT "V.viewPosF" (do
     refDef <- use $ globals.cl.csRefDef
     let line = printf "(%i %i %i) : %i\n" (truncate $ refDef^.rdViewOrg._x :: Int) (truncate $ refDef^.rdViewOrg._y :: Int) (truncate $ refDef^.rdViewOrg._z :: Int) (truncate $ refDef^.rdViewAngles._y :: Int) -- IMPROVE: use yaw instead of _y
     Com.printf (BC.pack line)
+  )
 
 init :: Quake ()
 init = do

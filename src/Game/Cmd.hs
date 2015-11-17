@@ -64,7 +64,8 @@ addCommand cmdName f = do
             Nothing -> return False
 
 execF :: XCommandT
-execF = do
+execF =
+  XCommandT "Cmd.execF" (do
     c <- argc
 
     if c /= 2
@@ -78,21 +79,27 @@ execF = do
           Just contents -> do
             Com.printf $ "execing " `B.append` v1 `B.append` "\n"
             CBuf.insertText contents
+  )
 
 echoF :: XCommandT
-echoF = do
+echoF =
+  XCommandT "Cmd.echoF" (do
     v <- liftM (V.drop 1) (use $ cmdGlobals.cgCmdArgv)
     _ <- traverse (\arg -> Com.printf $ arg `B.append` " ") v
     Com.printf "'\n"
+  )
 
 listF :: XCommandT
-listF = do
+listF =
+  XCommandT "Cmd.listF" (do
     allCommands <- use $ cmdGlobals.cgCmdFunctions
     _ <- traverse (\cf -> Com.printf $ (cf^.cfName) `B.append` "\n") allCommands
     Com.printf $ BC.pack (show $ Seq.length allCommands) `B.append` " commands \n" -- IMPROVE: maybe use Data.Binary for Int to Bytestring conversion ?
+  )
 
 aliasF :: XCommandT
-aliasF = do
+aliasF =
+  XCommandT "Cmd.aliasF" (do
     c <- argc
 
     if c == 1
@@ -123,6 +130,7 @@ aliasF = do
             if existing
               then globals.cmdAlias %= fmap (\a -> if a == alias then updatedAlias else a)
               else globals.cmdAlias %= (updatedAlias Seq.<|)
+  )
 
   where restOfCommandLine :: Int -> Int -> B.ByteString -> Quake B.ByteString
         restOfCommandLine idx count accum
@@ -135,7 +143,7 @@ aliasF = do
               restOfCommandLine (idx + 1) count (accum `B.append` vi `B.append` " ")
 
 waitF :: XCommandT
-waitF = globals.cmdWait .= True
+waitF = XCommandT "Cmd.waitF" (globals.cmdWait .= True)
 
 argc :: Quake Int
 argc = use $ cmdGlobals.cgCmdArgc
@@ -170,8 +178,10 @@ executeString text = do
 
       case find (sameFunctionNameAs name) cmdFunctions of
         Just cmdFunction ->
-                    -- forward to server command
-          fromMaybe (executeString $ "cmd " `B.append` text) (cmdFunction^.cfFunction)
+          case cmdFunction^.cfFunction of
+            Nothing -> executeString $ "cmd " `B.append` text -- forward to server command
+            Just cmd -> cmd^.xcCmd
+
         Nothing -> do
           cmdAliases <- use $ globals.cmdAlias
           case find (sameAliasNameAs name) cmdAliases of

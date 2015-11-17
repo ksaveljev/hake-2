@@ -93,9 +93,11 @@ clearArgv idx = do
     unless (idx < 0 || idx >= c) $ comGlobals.cgComArgv %= (V.// [(idx, "")])
 
 errorF :: XCommandT
-errorF = do
+errorF =
+  XCommandT "Com.errorF" (do
     v1 <- argv 1
     comError Constants.errFatal v1
+  )
 
 parse :: B.ByteString -> Int -> Int -> Quake (Maybe B.ByteString, Int)
 parse txt len idx = do

@@ -131,7 +131,8 @@ endLoadingPlaque = do
     Console.clearNotify
 
 updateScreenF :: XCommandT
-updateScreenF = updateScreen2
+updateScreenF =
+  XCommandT "SCR.updateScreenF" updateScreen2
 
 updateScreen :: Quake ()
 updateScreen = do
@@ -273,7 +274,8 @@ updateScreen2 = do
                      drawLoading
 
 timeRefreshF :: XCommandT
-timeRefreshF = do
+timeRefreshF =
+  XCommandT "SCR.timeRefreshF" (do
     state <- use $ globals.cls.csState
 
     when (state == Constants.caActive) $ do
@@ -305,19 +307,24 @@ timeRefreshF = do
       let time = fromIntegral (stop - start) / 1000
 
       Com.printf (BC.pack (show time) `B.append` " seconds (" `B.append` BC.pack (show (128.0 / time)) `B.append` " fps)\n") -- IMPROVE?
+  )
 
 loadingF :: XCommandT
-loadingF = beginLoadingPlaque
+loadingF = XCommandT "SCR.loadingF" beginLoadingPlaque
 
 sizeUpF :: XCommandT
-sizeUpF = do
+sizeUpF =
+  XCommandT "SCR.sizeUpF" (do
     v <- liftM (^.cvValue) viewSizeCVar
     CVar.setValueF "viewsize" (v + 10)
+  )
 
 sizeDownF :: XCommandT
-sizeDownF = do
+sizeDownF =
+  XCommandT "SCR.sizeDownF" (do
     v <- liftM (^.cvValue) viewSizeCVar
     CVar.setValueF "viewsize" (v - 10)
+  )
 
 {-
 - ================= SCR_Sky_f
@@ -325,7 +332,8 @@ sizeDownF = do
 - Set a specific sky and rotation speed =================
 -}
 skyF :: XCommandT
-skyF = do
+skyF =
+  XCommandT "SCR.skyF" (do
     c <- Cmd.argc
 
     if c < 2
@@ -351,6 +359,7 @@ skyF = do
         v <- Cmd.argv 1
         Just renderer <- use $ globals.re
         (renderer^.rRefExport.reSetSky) v rotate axis
+  )
 
 runCinematic :: Quake ()
 runCinematic = do

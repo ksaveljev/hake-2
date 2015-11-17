@@ -56,7 +56,8 @@ Specify a list of master servers
 ====================
 -}
 setMasterF :: XCommandT
-setMasterF = do
+setMasterF =
+  XCommandT "SVConsoleCommands.setMasterF" (do
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     -- only dedicated servers send heartbeats
@@ -76,6 +77,7 @@ setMasterF = do
         svGlobals.svMasterAdr %= (V.// newMasters)
 
         svGlobals.svServerStatic.ssLastHeartbeat .= -9999999
+  )
 
   where collectMasters :: Int -> Int -> Int -> [(Int, NetAdrT)] -> Quake [(Int, NetAdrT)]
         collectMasters argc idx slot accum
@@ -322,9 +324,11 @@ Puts the server in demo mode on a specific map/cinematic
 ==================
 -}
 demoMapF :: XCommandT
-demoMapF = do
+demoMapF =
+  XCommandT "SVConsoleCommands.demoMapF" (do
     v1 <- Cmd.argv 1
     SVInit.svMap True v1 False
+  )
 
 {-
 ==================
@@ -345,7 +349,8 @@ goes to map jail.bsp.
 ==================
 -}
 gameMapF :: XCommandT
-gameMapF = do
+gameMapF =
+  XCommandT "SVConsoleCommands.gameMapF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -395,6 +400,7 @@ gameMapF = do
         when (dedicatedValue == 0) $ do
           writeServerFile True
           copySaveGame "current" "save0"
+  )
 
 {-
 ==================
@@ -405,7 +411,8 @@ For development work
 ==================
 -}
 mapF :: XCommandT
-mapF = do
+mapF =
+  XCommandT "SVConsoleCommands.mapF" (do
     mapName <- Cmd.argv 1
 
     fileLoaded <-
@@ -424,7 +431,8 @@ mapF = do
       svGlobals.svServer.sState .= Constants.ssDead
 
       wipeSaveGame "current"
-      gameMapF
+      (gameMapF)^.xcCmd
+  )
 
 {-
 =====================================================================
@@ -441,7 +449,8 @@ SV_Loadgame_f
 ==============
 -}
 loadGameF :: XCommandT
-loadGameF = do
+loadGameF =
+  XCommandT "SVConsoleCommands.loadGameF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -470,6 +479,7 @@ loadGameF = do
             mapCmd <- use $ svGlobals.svServerStatic.ssMapCmd
             SVInit.svMap False mapCmd True
           else Com.printf $ "No such savegame: " `B.append` name `B.append` "\n"
+  )
 
 {-
 ==============
@@ -478,7 +488,8 @@ SV_Savegame_f
 ==============
 -}
 saveGameF :: XCommandT
-saveGameF = do
+saveGameF =
+  XCommandT "SVConsoleCommands.saveGameF" (do
     state <- use $ svGlobals.svServer.sState
     c <- Cmd.argc
     deathmatchValue <- CVar.variableValue "deathmatch"
@@ -516,6 +527,7 @@ saveGameF = do
            -- copy it off
            copySaveGame "current" v1
            Com.printf "Done.\n"
+  )
 
 -- ===============================================================
 {-
@@ -526,7 +538,8 @@ Kick a user off of the server
 ==================
 -}
 kickF :: XCommandT
-kickF = do
+kickF =
+  XCommandT "SVConsoleCommands.kickF" (do
     initialized <- use $ svGlobals.svServerStatic.ssInitialized
     c <- Cmd.argc
 
@@ -547,6 +560,7 @@ kickF = do
              -- SV_INIT.svs.realtime
              realtime <- use $ svGlobals.svServerStatic.ssRealTime
              svGlobals.svServerStatic.ssClients.ix clientIdx.cLastMessage .= realtime -- min case there is a funny zombie
+  )
 
 {-
 ================
@@ -554,7 +568,10 @@ SV_Status_f
 ================
 -}
 statusF :: XCommandT
-statusF = io (putStrLn "SVConsoleCommands.statusF") >> undefined -- TODO
+statusF =
+  XCommandT "SVConsoleCommands.statusF" (do
+    io (putStrLn "SVConsoleCommands.statusF") >> undefined -- TODO
+  )
 
 {-
 ==================
@@ -562,7 +579,8 @@ SV_ConSay_f
 ==================
 -}
 conSayF :: XCommandT
-conSayF = do
+conSayF =
+  XCommandT "SVConsoleCommands.conSayF" (do
     c <- Cmd.argc
 
     when (c >= 2) $ do
@@ -576,6 +594,7 @@ conSayF = do
       clients <- liftM (V.take maxClientsValue) (use $ svGlobals.svServerStatic.ssClients)
 
       void $ traverse (sendMessage text) clients
+  )
 
   where sendMessage text client =
           when ((client^.cState) /= Constants.csSpawned) $
@@ -587,7 +606,7 @@ SV_Heartbeat_f
 ==================
 -}
 heartbeatF :: XCommandT
-heartbeatF = svGlobals.svServerStatic.ssLastHeartbeat .= -9999999
+heartbeatF = XCommandT "SVConsoleCommands.heartbeatF" (svGlobals.svServerStatic.ssLastHeartbeat .= -9999999)
 
 {-
 ===========
@@ -597,9 +616,11 @@ SV_Serverinfo_f
 ===========
 -}
 serverInfoF :: XCommandT
-serverInfoF = do
+serverInfoF =
+  XCommandT "SVConsoleCommands.serverInfoF" (do
     Com.printf "Server info settings:\n"
     CVar.serverInfo >>= Info.print
+  )
 
 {-
 ===========
@@ -609,7 +630,8 @@ Examine all a users info strings
 ===========
 -}
 dumpUserF :: XCommandT
-dumpUserF = do
+dumpUserF =
+  XCommandT "SVConsoleCommands.dumpUserF" (do
     c <- Cmd.argc
 
     if c /= 2
@@ -622,6 +644,7 @@ dumpUserF = do
           Just (ClientReference clientIdx) <- use $ svGlobals.svClient
           userInfo <- use $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
           Info.print userInfo
+  )
 
 {-
 ==============
@@ -632,7 +655,10 @@ recorded, but no playerinfo will be stored.  Primarily for demo merging.
 ==============
 -}
 serverRecordF :: XCommandT
-serverRecordF = io (putStrLn "SVConsoleCommands.serverRecordF") >> undefined -- TODO
+serverRecordF =
+  XCommandT "SVConsoleCommands.serverRecordF" (do
+    io (putStrLn "SVConsoleCommands.serverRecordF") >> undefined -- TODO
+  )
 
 {-
 ==============
@@ -642,7 +668,10 @@ Ends server demo recording
 ==============
 -}
 serverStopF :: XCommandT
-serverStopF = io (putStrLn "SVConsoleCommands.serverStopF") >> undefined -- TODO
+serverStopF =
+  XCommandT "SVConsoleCommands.serverStopF" (do
+    io (putStrLn "SVConsoleCommands.serverStopF") >> undefined -- TODO
+  )
 
 {-
 ===============
@@ -653,11 +682,13 @@ Kick everyone off, possibly in preparation for a new game
 ===============
 -}
 killServerF :: XCommandT
-killServerF = do
+killServerF =
+  XCommandT "SVConsoleCommands.killServerF" (do
     initialized <- use $ svGlobals.svServerStatic.ssInitialized
     when initialized $ do
       SVMain.shutdown "Server was killed.\n" False
       NET.config False -- close network sockets
+  )
 
 {-
 ===============
@@ -667,7 +698,7 @@ Let the game dll handle a command
 ===============
 -}
 serverCommandF :: XCommandT
-serverCommandF = GameSVCmds.serverCommand
+serverCommandF = XCommandT "SVConsoleCommands.serverCommandF" GameSVCmds.serverCommand
 -- ===========================================================
 
 {-

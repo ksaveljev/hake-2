@@ -51,7 +51,8 @@ svcStrings =
 
 -- Request a download from the server
 downloadF :: XCommandT
-downloadF = do
+downloadF =
+  XCommandT "CLParse.downloadF" (do
     c <- Com.argc
 
     if c /= 2
@@ -85,6 +86,7 @@ downloadF = do
                 MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName)
 
                 globals.cls.csDownloadNumber += 1
+  )
 
 showNet :: B.ByteString -> Quake ()
 showNet str = do

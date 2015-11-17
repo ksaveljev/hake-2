@@ -2,7 +2,7 @@
 module Client.Menu where
 
 import Control.Lens (use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
-import Control.Monad (when)
+import Control.Monad (when, void)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -13,6 +13,7 @@ import QCommon.XCommandT
 import qualified Constants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sound.S as S
 
 maxMenuDepth :: Int
@@ -108,53 +109,115 @@ tallySlots menuFrameworkRef = do
         numberOfItems _ =
           return 1 -- MenuSliderRef and MenuActionRef
 
+pushMenu :: XCommandT -> KeyFuncT -> Quake ()
+pushMenu draw key = do
+    maxClients <- CVar.variableValue "maxclients"
+    serverState <- use $ globals.serverState
+
+    when (maxClients == 1 && serverState /= 0) $
+      void $ CVar.set "paused" "1"
+
+    -- if this menu is already present, drop back to that level
+    -- to avoid stacking menus by hotkeys
+    menuDepth <- use $ menuGlobals.mgMenuDepth
+
+    io (putStrLn "Menu.pushMenu") >> undefined -- TODO
+
 menuMainF :: XCommandT
-menuMainF = io (putStrLn "Menu.menuMainF") >> undefined -- TODO
+menuMainF =
+  XCommandT "Menu.menuMainF" (do
+    io (putStrLn "Menu.menuMainF") >> undefined -- TODO
+  )
 
 menuGame :: XCommandT
-menuGame = io (putStrLn "Menu.menuGame") >> undefined -- TODO
+menuGame =
+  XCommandT "Menu.menuGame" (do
+    io (putStrLn "Menu.menuGame") >> undefined -- TODO
+  )
 
 menuLoadGame :: XCommandT
-menuLoadGame = io (putStrLn "Menu.menuLoadGame") >> undefined -- TODO
+menuLoadGame =
+  XCommandT "Menu.menuLoadGame" (do
+    io (putStrLn "Menu.menuLoadGame") >> undefined -- TODO
+  )
 
 menuSaveGame :: XCommandT
-menuSaveGame = io (putStrLn "Menu.menuSaveGame") >> undefined -- TODO
+menuSaveGame =
+  XCommandT "Menu.menuSaveGame" (do
+    io (putStrLn "Menu.menuSaveGame") >> undefined -- TODO
+  )
 
 menuJoinServer :: XCommandT
-menuJoinServer = io (putStrLn "Menu.menuJoinServer") >> undefined -- TODO
+menuJoinServer =
+  XCommandT "Menu.menuJoinServer" (do
+    io (putStrLn "Menu.menuJoinServer") >> undefined -- TODO
+  )
 
 menuAddressBook :: XCommandT
-menuAddressBook = io (putStrLn "Menu.menuAddressBook") >> undefined -- TODO
+menuAddressBook =
+  XCommandT "Menu.menuAddressBook" (do
+    io (putStrLn "Menu.menuAddressBook") >> undefined -- TODO
+  )
 
 menuStartServer :: XCommandT
-menuStartServer = io (putStrLn "Menu.menuStartServer") >> undefined -- TODO
+menuStartServer =
+  XCommandT "Menu.menuStartServer" (do
+    io (putStrLn "Menu.menuStartServer") >> undefined -- TODO
+  )
 
 menuDMOptions :: XCommandT
-menuDMOptions = io (putStrLn "Menu.menuDMOptions") >> undefined -- TODO
+menuDMOptions =
+  XCommandT "Menu.menuDMOptions" (do
+    io (putStrLn "Menu.menuDMOptions") >> undefined -- TODO
+  )
 
 menuPlayerConfig :: XCommandT
-menuPlayerConfig = io (putStrLn "Menu.menuPlayerConfig") >> undefined -- TODO
+menuPlayerConfig =
+  XCommandT "Menu.menuPlayerConfig" (do
+    io (putStrLn "Menu.menuPlayerConfig") >> undefined -- TODO
+  )
 
 menuDownloadOptions :: XCommandT
-menuDownloadOptions = io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
+menuDownloadOptions =
+  XCommandT "Menu.menuDownloadOptions" (do
+    io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
+  )
 
 menuCredits :: XCommandT
-menuCredits = io (putStrLn "Menu.menuCredits") >> undefined -- TODO
+menuCredits =
+  XCommandT "Menu.menuCredits" (do
+    io (putStrLn "Menu.menuCredits") >> undefined -- TODO
+  )
 
 menuMultiplayer :: XCommandT
-menuMultiplayer = io (putStrLn "Menu.menuMultiplayer") >> undefined -- TODO
+menuMultiplayer =
+  XCommandT "Menu.menuMultiplayer" (do
+    io (putStrLn "Menu.menuMultiplayer") >> undefined -- TODO
+  )
 
 menuVideo :: XCommandT
-menuVideo = io (putStrLn "Menu.menuVideo") >> undefined -- TODO
+menuVideo =
+  XCommandT "Menu.menuVideo" (do
+    io (putStrLn "Menu.menuVideo") >> undefined -- TODO
+  )
 
 menuOptions :: XCommandT
-menuOptions = io (putStrLn "Menu.menuOptions") >> undefined -- TODO
+menuOptions =
+  XCommandT "Menu.menuOptions" (do
+    io (putStrLn "Menu.menuOptions") >> undefined -- TODO
+  )
 
 menuKeys :: XCommandT
-menuKeys = io (putStrLn "Menu.menuKeys") >> undefined -- TODO
+menuKeys =
+  XCommandT "Menu.menuKeys" (do
+    io (putStrLn "Menu.menuKeys") >> undefined -- TODO
+  )
 
 menuQuit :: XCommandT
-menuQuit = io (putStrLn "Menu.menuQuit") >> undefined -- TODO
+menuQuit =
+  XCommandT "Menu.menuQuit" (do
+    io (putStrLn "Menu.menuQuit") >> undefined -- TODO
+  )
 
 draw :: Quake ()
 draw = do
@@ -174,7 +237,7 @@ draw = do
         else renderer^.rRefExport.reDrawFadeScreen
 
       Just drawFunc <- use $ menuGlobals.mgDrawFunc
-      drawFunc
+      drawFunc^.xcCmd
 
       -- delay playing the enter sound until after the menu has been drawn,
       -- to avoid delay while caching images
