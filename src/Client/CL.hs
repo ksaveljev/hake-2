@@ -31,7 +31,7 @@ import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
-import qualified Client.Menu as Menu
+import {-# SOURCE #-} qualified Client.Menu as Menu
 import qualified Client.SCR as SCR
 import qualified Client.V as V
 import qualified Client.VID as VID

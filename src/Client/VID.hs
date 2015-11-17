@@ -17,7 +17,7 @@ import QCommon.XCommandT
 import Render.VideoMode
 import qualified Constants
 import qualified Client.Console as Console
-import qualified Client.Menu as Menu
+import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar

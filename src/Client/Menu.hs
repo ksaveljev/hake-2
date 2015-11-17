@@ -4,6 +4,7 @@ module Client.Menu where
 
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=))
 import Control.Monad (when, void, unless)
+import Data.Char (ord)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -13,7 +14,8 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
-import {-# SOURCE #-} qualified Client.Key as Key
+import qualified Client.CL as CL
+import qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
@@ -327,8 +329,28 @@ menuKeysF =
 
 menuQuitF :: XCommandT
 menuQuitF =
-  XCommandT "Menu.menuQuit" (do
-    io (putStrLn "Menu.menuQuit") >> undefined -- TODO
+  XCommandT "Menu.menuQuit" (pushMenu quitDrawF quitKeyF)
+
+quitDrawF :: XCommandT
+quitDrawF =
+  XCommandT "Menu.quitDrawF" (do
+    io (putStrLn "Menu.quitDrawF") >> undefined -- TODO
+  )
+
+quitKeyF :: KeyFuncT
+quitKeyF =
+  KeyFuncT "Menu.quitKeyF" (\key -> do
+    if | key `elem` [ KeyConstants.kEscape, ord 'n', ord 'N' ] ->
+           popMenu
+
+       | key `elem` [ ord 'Y', ord 'y' ] -> do
+           globals.cls.csKeyDest .= Constants.keyConsole
+           (CL.quitF)^.xcCmd
+
+       | otherwise ->
+           return ()
+
+    return Nothing
   )
 
 draw :: Quake ()

@@ -27,7 +27,7 @@ import Util.Binary
 import qualified Constants
 import qualified Client.CLInv as CLInv
 import {-# SOURCE #-} qualified Client.Console as Console
-import qualified Client.Menu as Menu
+import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com

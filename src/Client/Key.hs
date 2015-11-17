@@ -17,7 +17,7 @@ import QuakeState
 import Client.KeyConstants
 import QCommon.XCommandT
 import qualified Constants
-import qualified Client.Menu as Menu
+import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
