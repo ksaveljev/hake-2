@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Menu where
 
-import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~))
+import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=))
 import Control.Monad (when, void, unless)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
@@ -13,6 +13,7 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import {-# SOURCE #-} qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
@@ -372,10 +373,6 @@ menuKeyDown key = do
           Nothing -> return ()
           Just sound -> S.startLocalSound sound
 
-forceMenuOff :: Quake ()
-forceMenuOff = do
-    io (putStrLn "Menu.forceMenuOff") >> undefined -- TODO
-
 addToServerList :: NetAdrT -> B.ByteString -> Quake ()
 addToServerList _ _ = do
     io (putStrLn "Menu.addToServerList") >> undefined -- TODO
@@ -410,4 +407,30 @@ drawCursor x y f = do
 
 popMenu :: Quake ()
 popMenu = do
-    io (putStrLn "Menu.popMenu") >> undefined -- TODO
+    S.startLocalSound menuOutSound
+    menuGlobals.mgMenuDepth -= 1
+
+    menuDepth <- use $ menuGlobals.mgMenuDepth
+
+    when (menuDepth < 0) $
+      Com.comError Constants.errFatal "PopMenu: depth < 0"
+
+    when (menuDepth > 0) $ do
+      layers <- use $ menuGlobals.mgLayers
+      zoom menuGlobals $ do
+        mgDrawFunc .= (layers V.! (menuDepth - 1))^.mlDraw
+        mgKeyFunc .= (layers V.! (menuDepth - 1))^.mlKey
+
+    when (menuDepth == 0) $
+      forceMenuOff
+
+forceMenuOff :: Quake ()
+forceMenuOff = do
+    zoom menuGlobals $ do
+      mgDrawFunc .= Nothing
+      mgKeyFunc .= Nothing
+      mgMenuDepth .= 0
+
+    globals.cls.csKeyDest .= Constants.keyGame
+    Key.clearStates
+    void $ CVar.set "paused" "0"

@@ -287,3 +287,23 @@ message key = do
 console :: Int -> Quake ()
 console key = do
     io (putStrLn "Key.console") >> undefined -- TODO
+
+clearStates :: Quake ()
+clearStates = do
+    keyGlobals.kgAnyKeyDown .= 0
+    keyDownEvents 0 256
+
+  where keyDownEvents :: Int -> Int -> Quake ()
+        keyDownEvents idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              keyDown' <- use $ globals.keyDown
+              keyRepeats <- use $ keyGlobals.kgKeyRepeats
+
+              when ((keyDown' UV.! idx) || (keyRepeats UV.! idx) /= 0) $
+                event idx False 0
+
+              globals.keyDown.ix idx .= False
+              keyGlobals.kgKeyRepeats.ix idx .= 0
+
+              keyDownEvents (idx + 1) maxIdx
