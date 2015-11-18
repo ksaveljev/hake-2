@@ -26,9 +26,6 @@ import qualified Sound.S as S
 mainItems :: Int
 mainItems = 5
 
-maxMenuDepth :: Int
-maxMenuDepth = 8
-
 numCursorFrames :: Int
 numCursorFrames = 15
 
@@ -124,7 +121,6 @@ tallySlots menuFrameworkRef = do
 
 pushMenu :: XCommandT -> KeyFuncT -> Quake ()
 pushMenu draw key = do
-    io (putStrLn "PUUUUUUUUUSHHH MENU!!!!")
     maxClients <- CVar.variableValue "maxclients"
     serverState <- use $ globals.serverState
 
@@ -147,18 +143,13 @@ pushMenu draw key = do
                  menuGlobals.mgMenuDepth .= idx
                  return idx
 
-    io (putStrLn ("menuDepth = " ++ show menuDepth))
-    io (putStrLn ("i = " ++ show i))
-
     when (i == menuDepth) $ do
       when (menuDepth == maxMenuDepth) $
         Com.comError Constants.errFatal "PushMenu: MAX_MENU_DEPTH"
 
-      menuGlobals.mgLayers %= (`V.snoc` (MenuLayerT (Just draw) (Just key)))
-      layers <- use $ menuGlobals.mgLayers
-      io (putStrLn ("layers lenght = " ++ show (V.length layers)))
-      let Just ddd = (layers V.! 0)^.mlDraw
-      return ()
+      zoom (menuGlobals.mgLayers.ix i) $ do
+        mlDraw .= Just draw
+        mlKey .= Just key
 
     zoom menuGlobals $ do
       mgMenuDepth += 1
@@ -440,26 +431,19 @@ drawCursor x y f = do
 
 popMenu :: Quake ()
 popMenu = do
-    io (putStrLn "PPOOOOOPP MENUUUU!!")
     S.startLocalSound menuOutSound
     menuGlobals.mgMenuDepth -= 1
 
     menuDepth <- use $ menuGlobals.mgMenuDepth
 
-    io (putStrLn ("menu depth " ++ show menuDepth))
-
     when (menuDepth < 0) $
       Com.comError Constants.errFatal "PopMenu: depth < 0"
 
     when (menuDepth > 0) $ do
-      io (putStrLn ("menu depth > 0"))
       layers <- use $ menuGlobals.mgLayers
       zoom menuGlobals $ do
-        mgDrawFunc .= (layers V.! (menuDepth - 1))^.mlDraw
-        mgKeyFunc .= (layers V.! (menuDepth - 1))^.mlKey
-
-      Just f <- use $ menuGlobals.mgDrawFunc
-      return ()
+        mgDrawFunc .= ((layers V.! (menuDepth - 1))^.mlDraw)
+        mgKeyFunc .= ((layers V.! (menuDepth - 1))^.mlKey)
 
     when (menuDepth == 0) $
       forceMenuOff

@@ -30,6 +30,9 @@ makeLenses ''MenuGlobals
   12 - PlayerConfigMenu
 -}
 
+maxMenuDepth :: Int
+maxMenuDepth = 8
+
 openGLMenuRef :: MenuFrameworkSReference
 openGLMenuRef = MenuFrameworkSReference 0
 
@@ -87,7 +90,7 @@ initialMenuGlobals =
               , _mgMenuActionSItems = V.fromList [ newMenuActionS -- applyAction
                                                  , newMenuActionS -- defaultsAction
                                                  ]
-              , _mgLayers           = V.empty
+              , _mgLayers           = V.replicate maxMenuDepth newMenuLayerT
               , _mgDrawFunc         = Nothing
               , _mgKeyFunc          = Nothing
               , _mgEnterSound       = False
