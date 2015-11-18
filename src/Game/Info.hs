@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 fillSpaces :: B.ByteString
 fillSpaces = "                     "

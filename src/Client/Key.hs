@@ -21,7 +21,7 @@ import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do

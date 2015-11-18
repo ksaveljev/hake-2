@@ -20,7 +20,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Sys.Socket as S
 import qualified Util.Lib as Lib

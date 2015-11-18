@@ -30,7 +30,7 @@ import {-# SOURCE #-} qualified Client.Console as Console
 import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Client.V as V
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG

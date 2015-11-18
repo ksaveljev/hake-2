@@ -18,8 +18,8 @@ import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Client.SCR as SCR
 import qualified QCommon.CM as CM
-import qualified QCommon.Com as Com
-import qualified Sys.Sys as Sys
+import {-# SOURCE #-} qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified Sys.Sys as Sys
 import qualified Util.Lib as Lib
 
 {-

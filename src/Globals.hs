@@ -84,6 +84,8 @@ initialGlobals =
           , _gunModel           = Nothing
           , _netFrom            = newNetAdrT
 
+          , _logFile            = Nothing
+
           , _vec3Origin         = V3 0 0 0
 
           , _rnd                = mkStdGen 0 -- must be changed in initialization code

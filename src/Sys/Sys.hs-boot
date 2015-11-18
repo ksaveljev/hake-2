@@ -9,3 +9,5 @@ sysError :: B.ByteString -> Quake ()
 sendKeyEvents :: Quake ()
 
 consoleOutput :: B.ByteString -> Quake ()
+
+quit :: Quake ()

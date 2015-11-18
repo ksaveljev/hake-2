@@ -23,7 +23,7 @@ import qualified Constants
 import {-# SOURCE #-} qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.V as ClientV
 import qualified Game.Monsters.MFlash as MFlash
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S
 import qualified Util.Lib as Lib

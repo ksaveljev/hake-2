@@ -17,7 +17,7 @@ import qualified Constants
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSave as GameSave
 import qualified QCommon.CM as CM
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified Server.SVInit as SVInit

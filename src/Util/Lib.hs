@@ -15,7 +15,7 @@ import qualified Data.ByteString.Char8 as BC
 
 import Quake
 import QuakeState
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 atof :: B.ByteString -> Float
 atof str = if B.length str == 0

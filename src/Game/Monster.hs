@@ -18,7 +18,7 @@ import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
 import qualified Game.GameWeapon as GameWeapon
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 

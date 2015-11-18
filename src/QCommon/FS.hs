@@ -33,7 +33,7 @@ import Util.Binary
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FSConstants as FSConstants
 

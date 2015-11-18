@@ -21,7 +21,7 @@ import QuakeState
 import CVarVariables
 import qualified Constants
 import qualified QCommon.CM as CM
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 

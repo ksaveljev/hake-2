@@ -19,7 +19,7 @@ import qualified Constants
 import qualified Client.Console as Console
 import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import {-# SOURCE #-} qualified Render.QRenderer as QRenderer
 import qualified Sound.S as S
@@ -483,3 +483,7 @@ newWindow width height =
     zoom (globals.vidDef) $ do
       vdNewWidth .= width
       vdNewHeight .= height
+
+shutdown :: Quake ()
+shutdown = do
+    io (putStrLn "VID.shutdown") >> undefined -- TODO

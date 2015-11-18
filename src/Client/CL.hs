@@ -39,7 +39,7 @@ import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified Game.Info as Info
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CM as CM
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
@@ -49,7 +49,7 @@ import qualified Server.SVMain as SVMain
 import qualified Sound.S as S
 import qualified Sys.IN as IN
 import qualified Sys.NET as NET
-import qualified Sys.Sys as Sys
+import {-# SOURCE #-} qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
@@ -1643,3 +1643,19 @@ requestNextDownload = do
 
           MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
           MSG.writeString (globals.cls.csNetChan.ncMessage) ("begin " `B.append` BC.pack (show precacheSpawnCount) `B.append` "\n") -- IMPROVE?
+
+shutdown :: Quake ()
+shutdown = do
+    isDown <- use $ clientGlobals.cgIsDown
+
+    if isDown
+      then
+        io $ putStrLn "recursive shutdown\n"
+
+      else do
+        clientGlobals.cgIsDown .= True
+        writeConfiguration
+
+        S.shutdown
+        IN.shutdown
+        VID.shutdown

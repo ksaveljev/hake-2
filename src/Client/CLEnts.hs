@@ -27,7 +27,7 @@ import qualified Client.CLPred as CLPred
 import qualified Client.CLTEnt as CLTEnt
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Client.V as ClientV
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified Util.Lib as Lib

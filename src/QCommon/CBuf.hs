@@ -11,7 +11,7 @@ import qualified Data.ByteString.Char8 as BC
 import Quake
 import QuakeState
 import qualified QCommon.SZ as SZ
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
 init :: Quake ()

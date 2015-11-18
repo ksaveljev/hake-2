@@ -22,7 +22,7 @@ import QCommon.XCommandT
 import qualified Constants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 
 init :: Quake ()

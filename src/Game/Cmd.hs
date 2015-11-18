@@ -20,7 +20,7 @@ import QCommon.XCommandT
 import QCommon.CmdFunctionT
 import qualified Constants
 import qualified QCommon.CBuf as CBuf
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ

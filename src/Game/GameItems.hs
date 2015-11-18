@@ -21,7 +21,7 @@ import Game.Adapters
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import qualified Game.GameUtil as GameUtil
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 

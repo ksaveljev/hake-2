@@ -16,7 +16,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified Sys.NET as NET

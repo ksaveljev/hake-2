@@ -22,7 +22,7 @@ import qualified Constants
 import qualified Client.CLEnts as CLEnts
 import qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Sys.Timer as Timer
 import qualified Util.Math3D as Math3D

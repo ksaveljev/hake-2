@@ -15,9 +15,12 @@ import Quake
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
+import qualified Client.CL as CL
 import {-# SOURCE #-} qualified Client.Console as Console
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import qualified Server.SVMain as SVMain
 import {-# SOURCE #-} qualified Sys.Sys as Sys
+import qualified Util.Lib as Lib
 
 -- checks the number of command line arguments and
 -- copies all arguments with valid length into comArgv
@@ -279,4 +282,15 @@ stripExtension str =
 
 quit :: Quake ()
 quit = do
-    io (putStrLn "Com.quit") >> undefined -- TODO
+    SVMain.shutdown "Server quit\n" False
+    CL.shutdown
+
+    logFile' <- use $ globals.logFile
+
+    case logFile' of
+      Nothing -> return ()
+      Just h -> Lib.fClose h
+
+    globals.logFile .= Nothing
+
+    Sys.quit

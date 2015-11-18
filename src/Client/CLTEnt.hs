@@ -17,7 +17,7 @@ import qualified Constants
 import qualified Client.CLFX as CLFX
 import qualified Client.CLNewFX as CLNewFX
 import {-# SOURCE #-} qualified Client.V as ClientV
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified Sound.S as S

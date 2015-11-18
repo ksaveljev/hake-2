@@ -37,7 +37,7 @@ import QCommon.TexInfoT
 import Util.Binary
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import qualified QCommon.MD4 as MD4

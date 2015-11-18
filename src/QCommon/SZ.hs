@@ -10,7 +10,7 @@ import qualified Data.ByteString.Char8 as BC
 import Quake
 import QuakeState
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 init :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 init bufLens bufData len =

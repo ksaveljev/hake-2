@@ -22,7 +22,7 @@ import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified Game.GameBase as GameBase
 import qualified Game.Info as Info
 import qualified Game.PlayerClient as PlayerClient
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel

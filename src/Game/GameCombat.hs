@@ -18,7 +18,7 @@ import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
 import qualified Game.Monster as Monster
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()

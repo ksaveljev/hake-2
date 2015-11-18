@@ -262,6 +262,8 @@ data Globals =
           , _gunModel           :: Maybe (IORef ModelT)
           , _netFrom            :: NetAdrT
 
+          , _logFile            :: Maybe Handle
+
           , _vec3Origin         :: V3 Float
 
           , _rnd                :: StdGen
@@ -1853,6 +1855,7 @@ data ClientGlobals =
                 , _cgNumCLWeaponModels  :: !Int
                 , _cgWeaponModels       :: V.Vector B.ByteString
                 , _cgPMPassEnt          :: Maybe EdictReference
+                , _cgIsDown             :: !Bool
                 }
 
 data VRectT =

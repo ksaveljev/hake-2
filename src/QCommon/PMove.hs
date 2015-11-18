@@ -14,7 +14,7 @@ import qualified Data.Vector.Unboxed as UV
 import Quake
 import QuakeState
 import qualified Constants
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified Util.Math3D as Math3D
 
 -- try all single bits first

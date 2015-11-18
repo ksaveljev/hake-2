@@ -22,7 +22,7 @@ import QuakeState
 import QCommon.XCommandT
 import qualified Game.CVarT as CVarT
 import qualified Game.Info as Info
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Constants
 import {-# SOURCE #-} qualified Util.Lib as Lib

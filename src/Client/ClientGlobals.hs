@@ -61,4 +61,5 @@ initialClientGlobals =
                 , _cgNumCLWeaponModels  = 0
                 , _cgWeaponModels       = V.replicate Constants.maxClientWeaponModels ""
                 , _cgPMPassEnt          = Nothing
+                , _cgIsDown             = False
                 }

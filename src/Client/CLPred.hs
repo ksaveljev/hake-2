@@ -12,7 +12,7 @@ import CVarVariables
 import qualified Constants
 import qualified Game.PMoveT as PMoveT
 import qualified QCommon.CM as CM
-import qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.PMove as PMove
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
