@@ -128,4 +128,5 @@ initialFastRenderAPIGlobals =
                        , _frPointColor           = V3 0 0 0
                        , _frLightSpot            = V3 0 0 0
                        , _frVertexArrayBuf       = unsafePerformIO $ MSV.new (Constants.maxVerts * 3)
+                       , _frRawPalette           = UV.replicate 0 256
                        }

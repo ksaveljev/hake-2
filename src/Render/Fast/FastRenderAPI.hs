@@ -6,7 +6,7 @@ module Render.Fast.FastRenderAPI where
 import Control.Exception (handle, IOException)
 import Control.Lens ((.=), (^.), use, zoom, (+=), preuse, ix)
 import Control.Monad (void, when, liftM, unless)
-import Data.Bits ((.|.), (.&.), shiftR)
+import Data.Bits ((.|.), (.&.), shiftR, shiftL)
 import Data.Char (toLower, toUpper)
 import Data.Int (Int8, Int32)
 import Data.IORef (IORef, readIORef, modifyIORef')
@@ -65,7 +65,7 @@ fastRenderAPI =
               , _rDrawFill          = \_ -> Draw.fill
               , _rDrawFadeScreen    = \_ -> Draw.fadeScreen
               , _rDrawStretchRaw    = DT.trace "FastRenderAPI.rDrawStretchRaw" undefined -- TODO
-              , _rSetPalette        = DT.trace "FastRenderAPI.rSetPalette" undefined -- TODO
+              , _rSetPalette        = \_ -> fastSetPalette
               , _rBeginFrame        = fastBeginFrame
               , _glScreenShotF      = DT.trace "FastRenderAPI.glScreenShotF" undefined -- TODO
               }
@@ -1235,3 +1235,30 @@ glDrawParticles numParticles = do
               GL.glVertex3f (realToFrac $ originX + (right^._x) * scale') (realToFrac $ originY + (right^._y) * scale') (realToFrac $ originZ + (right^._z) * scale')
 
               drawParticles sourceVertices sourceColors up right vpn origin (j + 3) (idx + 1) maxIdx
+
+fastSetPalette :: Maybe B.ByteString -> Quake ()
+fastSetPalette maybePalette = do
+    -- 256 RGB values (768 bytes)
+    -- or null
+    case maybePalette of
+      Nothing -> do
+        d8to24table <- use $ fastRenderAPIGlobals.frd8to24table
+        fastRenderAPIGlobals.frRawPalette .= UV.map (.|. 0xFF000000) d8to24table
+
+      Just palette ->
+        fastRenderAPIGlobals.frRawPalette .= UV.generate 256 (fromPalette palette)
+
+    rawPalette <- use $ fastRenderAPIGlobals.frRawPalette
+    Image.glSetTexturePalette rawPalette
+
+    GL.glClearColor 0 0 0 0
+    GL.glClear GL.gl_COLOR_BUFFER_BIT
+    GL.glClearColor 1.0 0.0 0.5 0.5
+
+  where fromPalette :: B.ByteString -> Int -> Int
+        fromPalette palette idx =
+          let j = idx * 3
+              a = (fromIntegral (palette `B.index` (j + 0)) .&. 0xFF) `shiftL` 0
+              b = (fromIntegral (palette `B.index` (j + 1)) .&. 0xFF) `shiftL` 8
+              c = (fromIntegral (palette `B.index` (j + 2)) .&. 0xFF) `shiftL` 16
+          in 0xFF000000 .|. a .|. b .|. c
