@@ -245,7 +245,25 @@ mainKeyF =
 menuGameF :: XCommandT
 menuGameF =
   XCommandT "Menu.menuGame" (do
-    io (putStrLn "Menu.menuGame") >> undefined -- TODO
+    gameMenuInit
+    pushMenu gameMenuDrawF gameMenuKeyF
+    menuGlobals.mgGameCursor .= 1
+  )
+
+gameMenuInit :: Quake ()
+gameMenuInit = do
+    io (putStrLn "Menu.gameMenuInit") >> undefined -- TODO
+
+gameMenuDrawF :: XCommandT
+gameMenuDrawF =
+  XCommandT "Menu.gameMenuDrawF" (do
+    io (putStrLn "Menu.gameMenuDrawF") >> undefined -- TODO
+  )
+
+gameMenuKeyF :: KeyFuncT
+gameMenuKeyF =
+  KeyFuncT "Menu.gameMenuKeyF" (\key -> do
+    io (putStrLn "Menu.gameMenuKeyF") >> undefined -- TODO
   )
 
 menuLoadGameF :: XCommandT

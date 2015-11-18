@@ -1811,6 +1811,7 @@ data MenuGlobals =
               , _mgMenuDepth        :: !Int
               , _mgMainCursor       :: !Int
               , _mgCached           :: !Bool
+              , _mgGameCursor       :: !Int
               }
 
 data MenuLayerT =
