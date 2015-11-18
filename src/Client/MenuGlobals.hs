@@ -36,6 +36,9 @@ maxMenuDepth = 8
 openGLMenuRef :: MenuFrameworkSReference
 openGLMenuRef = MenuFrameworkSReference 0
 
+gameMenuRef :: MenuFrameworkSReference
+gameMenuRef = MenuFrameworkSReference 4
+
 modeListRef :: MenuListSReference
 modeListRef = MenuListSReference 0
 

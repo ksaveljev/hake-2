@@ -257,7 +257,9 @@ gameMenuInit = do
 gameMenuDrawF :: XCommandT
 gameMenuDrawF =
   XCommandT "Menu.gameMenuDrawF" (do
-    io (putStrLn "Menu.gameMenuDrawF") >> undefined -- TODO
+    banner "m_banner_game"
+    adjustCursor gameMenuRef 1
+    menuDraw gameMenuRef
   )
 
 gameMenuKeyF :: KeyFuncT
@@ -476,3 +478,25 @@ forceMenuOff = do
     globals.cls.csKeyDest .= Constants.keyGame
     Key.clearStates
     void $ CVar.set "paused" "0"
+
+banner :: B.ByteString -> Quake ()
+banner name = do
+    Just renderer <- use $ globals.re
+    vidDef' <- use $ globals.vidDef
+    Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) name
+    (renderer^.rRefExport.reDrawPic) ((vidDef'^.vdWidth) `div` 2 - w `div` 2) ((vidDef'^.vdHeight) `div` 2 - 110) name
+
+{-
+- Menu_AdjustCursor
+-
+- This function takes the given menu, the direction, and attempts 
+- to adjust the menu's cursor so that it's at the next available 
+- slot.
+-}
+adjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
+adjustCursor _ _ = do
+    io (putStrLn "Menu.adjustCursor") >> undefined -- TODO
+
+menuDraw :: MenuFrameworkSReference -> Quake ()
+menuDraw _ = do
+    io (putStrLn "Menu.menuDraw") >> undefined -- TODO
