@@ -296,7 +296,12 @@ glTexEnv mode = do
         else fastRenderAPIGlobals.frLastModes._2 .= fromIntegral mode
 
 glSetTexturePalette :: UV.Vector Int -> Quake ()
-glSetTexturePalette _ = io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
+glSetTexturePalette palette = do
+    colorTable <- use $ fastRenderAPIGlobals.frColorTableEXT
+    palettedTextureValue <- liftM (^.cvValue) glExtPalettedTextureCVar
+
+    when (colorTable && palettedTextureValue /= 0) $ do
+      io (putStrLn "Image.glSetTexturePalette") >> undefined -- TODO
 
 glBind :: Int -> Quake ()
 glBind texNum = do
