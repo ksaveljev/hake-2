@@ -2,6 +2,7 @@ module Sound.S where
 
 import Data.IORef (IORef, newIORef)
 import Linear (V3)
+import System.IO (Handle)
 import qualified Data.ByteString as B
 
 import Quake
@@ -44,3 +45,7 @@ beginRegistration = do
 endRegistration :: Quake ()
 endRegistration = do
     io (putStrLn "IMPLEMENT ME! S.endRegistration") >> return () -- TODO
+
+rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
+rawSamples _ _ _ _ _ = do
+    io (putStrLn "IMPLEMENT ME!. S.rawSamples") >> return () -- TODO

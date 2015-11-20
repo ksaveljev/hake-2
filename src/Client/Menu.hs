@@ -290,7 +290,7 @@ gameMenuInit = do
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 40
                                                           & maGeneric.mcName .~ "load game"
-                                                          & maGeneric.mcCallback .~ Just loadGameFunc
+                                                          & maGeneric.mcCallback .~ Just (loadGameF^.xcCmd)
                                                           )
 
     modifyMenuActionSReference saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
@@ -298,7 +298,7 @@ gameMenuInit = do
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 50
                                                           & maGeneric.mcName .~ "save game"
-                                                          & maGeneric.mcCallback .~ Just saveGameFunc
+                                                          & maGeneric.mcCallback .~ Just (saveGameF^.xcCmd)
                                                           )
 
     modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
@@ -306,7 +306,7 @@ gameMenuInit = do
                                                          & maGeneric.mcX .~ 0
                                                          & maGeneric.mcY .~ 60
                                                          & maGeneric.mcName .~ "credits"
-                                                         & maGeneric.mcCallback .~ Just creditsFunc
+                                                         & maGeneric.mcCallback .~ Just (creditsF^.xcCmd)
                                                          )
 
     addItem gameMenuRef (MenuActionRef easyGameActionRef)
@@ -335,14 +335,23 @@ hardGameFunc = do
     CVar.forceSet "skill" "2"
     startGame
 
-loadGameFunc :: Quake ()
-loadGameFunc = io (putStrLn "Menu.loadGameFunc") >> undefined -- TODO
+loadGameF :: XCommandT
+loadGameF =
+  XCommandT "Menu.loadGameF" (do
+    io (putStrLn "Menu.loadGameF") >> undefined -- TODO
+  )
 
-saveGameFunc :: Quake ()
-saveGameFunc = io (putStrLn "Menu.saveGameFunc") >> undefined -- TODO
+saveGameF :: XCommandT
+saveGameF =
+  XCommandT "Menu.saveGameF" (do
+    io (putStrLn "Menu.saveGameF") >> undefined -- TODO
+  )
 
-creditsFunc :: Quake ()
-creditsFunc = io (putStrLn "Menu.creditsFunc") >> undefined -- TODO
+creditsF :: XCommandT
+creditsF =
+  XCommandT "Menu.creditsF" (do
+    io (putStrLn "Menu.creditsF") >> undefined -- TODO
+  )
 
 startGame :: Quake ()
 startGame = do

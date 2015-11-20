@@ -3,14 +3,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Client.SCR where
 
-import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=))
+import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=), (+=))
 import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.&.), complement, shiftR)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
 import Data.Monoid (mempty, (<>))
 import Linear (V3(..), _y)
-import System.IO (Handle)
+import System.IO (Handle, hGetPosn, hSeek, hTell, SeekMode(AbsoluteSeek))
 import Text.Printf (printf)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -1205,7 +1205,51 @@ drawCenterString = do
 
 readNextFrame :: Quake (Maybe B.ByteString)
 readNextFrame = do
-    io (putStrLn "SCR.readNextFrame") >> undefined -- TODO
+    Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
+
+    -- read the next frame
+    command <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+
+    if command == 2
+      then
+        -- last frame marker
+        return Nothing
+
+      else do
+        when (command == 1) $ do
+          -- read palette
+          io (B.hGet cinematicFileHandle 768) >>= (globals.cl.csCinematicPalette .=)
+          -- dubious... exposes an edge case
+          globals.cl.csCinematicPaletteActive .= False
+
+        -- decompress the next frame
+        size <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
+
+        when (size > 0x20000 || size < 1) $
+          Com.comError Constants.errDrop ("Bad compressed frame size:" `B.append` BC.pack (show size)) -- IMPROVE
+
+        compressed <- io $ B.hGet cinematicFileHandle size
+
+        -- read sound
+        cinematicFrame <- use $ globals.cl.csCinematicFrame
+        cin <- use $ scrGlobals.scrCin
+        let start = cinematicFrame * (cin^.cSRate) `div` 14
+            end = (cinematicFrame + 1) * (cin^.cSRate) `div` 14
+            count = end - start
+
+        position <- io $ hTell cinematicFileHandle
+        S.rawSamples count (cin^.cSRate) (cin^.cSWidth) (cin^.cSChannels) cinematicFileHandle
+        -- skip the sound samples
+        io $ hSeek cinematicFileHandle AbsoluteSeek (fromIntegral (fromIntegral position + count * (cin^.cSWidth) * (cin^.cSChannels)))
+        
+        pic <- huff1Decompress compressed size
+        globals.cl.csCinematicFrame += 1
+
+        return (Just pic)
+
+huff1Decompress :: B.ByteString -> Int -> Quake B.ByteString
+huff1Decompress _ _ = do
+    io (putStrLn "SCR.huff1Decompress") >> undefined -- TODO
 
 debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = return () -- IMPLEMENT ME!
