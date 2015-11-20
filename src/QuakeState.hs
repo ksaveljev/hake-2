@@ -86,6 +86,9 @@ module QuakeState ( QuakeState(..)
                   , readMenuSliderSReference
                   , modifyMenuSliderSReference
                   , writeMenuSliderSReference
+                  , readMenuSeparatorSReference
+                  , modifyMenuSeparatorSReference
+                  , writeMenuSeparatorSReference
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -362,3 +365,16 @@ modifyMenuSliderSReference (MenuSliderSReference idx) f =
 writeMenuSliderSReference :: MenuSliderSReference -> MenuSliderS -> Quake ()
 writeMenuSliderSReference (MenuSliderSReference idx) menuItem =
     menuGlobals.mgMenuSliderSItems.ix idx .= menuItem
+
+readMenuSeparatorSReference :: MenuSeparatorSReference -> Quake MenuSeparatorS
+readMenuSeparatorSReference (MenuSeparatorSReference idx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuSeparatorSItems.ix idx
+    return menuItem
+
+modifyMenuSeparatorSReference :: MenuSeparatorSReference -> (MenuSeparatorS -> MenuSeparatorS) -> Quake ()
+modifyMenuSeparatorSReference (MenuSeparatorSReference idx) f =
+    menuGlobals.mgMenuSeparatorSItems.ix idx %= f
+
+writeMenuSeparatorSReference :: MenuSeparatorSReference -> MenuSeparatorS -> Quake ()
+writeMenuSeparatorSReference (MenuSeparatorSReference idx) menuItem =
+    menuGlobals.mgMenuSeparatorSItems.ix idx .= menuItem

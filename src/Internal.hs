@@ -144,9 +144,13 @@ newtype MenuActionSReference = MenuActionSReference Int
 -- reference to menuGlobals.mgMenuSliderSItems
 newtype MenuSliderSReference = MenuSliderSReference Int
 
+-- reference to menuGlobals.mgMenuSeparatorSItems
+newtype MenuSeparatorSReference = MenuSeparatorSReference Int
+
 data MenuItemReference = MenuListRef MenuListSReference
                        | MenuActionRef MenuActionSReference
                        | MenuSliderRef MenuSliderSReference
+                       | MenuSeparatorRef MenuSeparatorSReference
 
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
@@ -1799,19 +1803,24 @@ data MenuActionS =
   MenuActionS { _maGeneric :: MenuCommonS
               }
 
+data MenuSeparatorS =
+  MenuSeparatorS { _mspGeneric :: MenuCommonS
+                 }
+
 data MenuGlobals =
-  MenuGlobals { _mgMenuFrameworks   :: V.Vector MenuFrameworkS
-              , _mgMenuListSItems   :: V.Vector MenuListS
-              , _mgMenuSliderSItems :: V.Vector MenuSliderS
-              , _mgMenuActionSItems :: V.Vector MenuActionS
-              , _mgLayers           :: V.Vector MenuLayerT
-              , _mgDrawFunc         :: Maybe XCommandT
-              , _mgKeyFunc          :: Maybe KeyFuncT
-              , _mgEnterSound       :: !Bool
-              , _mgMenuDepth        :: !Int
-              , _mgMainCursor       :: !Int
-              , _mgCached           :: !Bool
-              , _mgGameCursor       :: !Int
+  MenuGlobals { _mgMenuFrameworks      :: V.Vector MenuFrameworkS
+              , _mgMenuListSItems      :: V.Vector MenuListS
+              , _mgMenuSliderSItems    :: V.Vector MenuSliderS
+              , _mgMenuActionSItems    :: V.Vector MenuActionS
+              , _mgMenuSeparatorSItems :: V.Vector MenuSeparatorS
+              , _mgLayers              :: V.Vector MenuLayerT
+              , _mgDrawFunc            :: Maybe XCommandT
+              , _mgKeyFunc             :: Maybe KeyFuncT
+              , _mgEnterSound          :: !Bool
+              , _mgMenuDepth           :: !Int
+              , _mgMainCursor          :: !Int
+              , _mgCached              :: !Bool
+              , _mgGameCursor          :: !Int
               }
 
 data MenuLayerT =

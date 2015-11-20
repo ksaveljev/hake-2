@@ -19,6 +19,7 @@ import qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sound.S as S
@@ -252,7 +253,109 @@ menuGameF =
 
 gameMenuInit :: Quake ()
 gameMenuInit = do
-    io (putStrLn "Menu.gameMenuInit") >> undefined -- TODO
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference gameMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50)
+                                                       & mfNItems .~ 0
+                                                       )
+
+    modifyMenuActionSReference easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                          & maGeneric.mcX .~ 0
+                                                          & maGeneric.mcY .~ 0
+                                                          & maGeneric.mcName .~ "easy"
+                                                          & maGeneric.mcCallback .~ Just easyGameFunc
+                                                          )
+
+    modifyMenuActionSReference mediumGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 10
+                                                            & maGeneric.mcName .~ "medium"
+                                                            & maGeneric.mcCallback .~ Just mediumGameFunc
+                                                            )
+
+    modifyMenuActionSReference hardGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                          & maGeneric.mcX .~ 0
+                                                          & maGeneric.mcY .~ 20
+                                                          & maGeneric.mcName .~ "hard"
+                                                          & maGeneric.mcCallback .~ Just hardGameFunc
+                                                          )
+
+    modifyMenuSeparatorSReference blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
+
+    modifyMenuActionSReference loadGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                          & maGeneric.mcX .~ 0
+                                                          & maGeneric.mcY .~ 40
+                                                          & maGeneric.mcName .~ "load game"
+                                                          & maGeneric.mcCallback .~ Just loadGameFunc
+                                                          )
+
+    modifyMenuActionSReference saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                          & maGeneric.mcX .~ 0
+                                                          & maGeneric.mcY .~ 50
+                                                          & maGeneric.mcName .~ "save game"
+                                                          & maGeneric.mcCallback .~ Just saveGameFunc
+                                                          )
+
+    modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                         & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                         & maGeneric.mcX .~ 0
+                                                         & maGeneric.mcY .~ 60
+                                                         & maGeneric.mcName .~ "credits"
+                                                         & maGeneric.mcCallback .~ Just creditsFunc
+                                                         )
+
+    addItem gameMenuRef (MenuActionRef easyGameActionRef)
+    addItem gameMenuRef (MenuActionRef mediumGameActionRef)
+    addItem gameMenuRef (MenuActionRef hardGameActionRef)
+    addItem gameMenuRef (MenuSeparatorRef blankLineRef)
+    addItem gameMenuRef (MenuActionRef loadGameActionRef)
+    addItem gameMenuRef (MenuActionRef saveGameActionRef)
+    addItem gameMenuRef (MenuSeparatorRef blankLineRef)
+    addItem gameMenuRef (MenuActionRef creditsActionRef)
+
+    center gameMenuRef
+
+easyGameFunc :: Quake ()
+easyGameFunc = do
+    CVar.forceSet "skill" "0"
+    startGame
+
+mediumGameFunc :: Quake ()
+mediumGameFunc = do
+    CVar.forceSet "skill" "1"
+    startGame
+
+hardGameFunc :: Quake ()
+hardGameFunc = do
+    CVar.forceSet "skill" "2"
+    startGame
+
+loadGameFunc :: Quake ()
+loadGameFunc = io (putStrLn "Menu.loadGameFunc") >> undefined -- TODO
+
+saveGameFunc :: Quake ()
+saveGameFunc = io (putStrLn "Menu.saveGameFunc") >> undefined -- TODO
+
+creditsFunc :: Quake ()
+creditsFunc = io (putStrLn "Menu.creditsFunc") >> undefined -- TODO
+
+startGame :: Quake ()
+startGame = do
+    -- disable updates and start the cinematic going
+    globals.cl.csServerCount .= -1
+    forceMenuOff
+    CVar.setValueI "deathmatch" 0
+    CVar.setValueI "coop" 0
+
+    CVar.setValueI "gamerules" 0
+
+    CBuf.addText "loading ; killserver ; wait ; newgame\n"
+    globals.cls.csKeyDest .= Constants.keyGame
 
 gameMenuDrawF :: XCommandT
 gameMenuDrawF =
