@@ -1230,6 +1230,7 @@ readNextFrame = do
           Com.comError Constants.errDrop ("Bad compressed frame size:" `B.append` BC.pack (show size)) -- IMPROVE
 
         compressed <- io $ B.hGet cinematicFileHandle size
+        let compressed' = compressed `B.append` (B.replicate (0x20000 - size) 0)
 
         -- read sound
         cinematicFrame <- use $ globals.cl.csCinematicFrame
@@ -1243,7 +1244,7 @@ readNextFrame = do
         -- skip the sound samples
         io $ hSeek cinematicFileHandle AbsoluteSeek (fromIntegral (fromIntegral position + count * (cin^.cSWidth) * (cin^.cSChannels)))
         
-        pic <- huff1Decompress compressed size
+        pic <- huff1Decompress compressed' size
         globals.cl.csCinematicFrame += 1
 
         return (Just pic)
@@ -1286,7 +1287,7 @@ huff1Decompress frame size = do
               if nodeNum < 256
                 then
                   let index' = (-256) * 2 + (nodeNum `shiftL` 9)
-                      out' = out <> BB.word8 inByte
+                      out' = out <> BB.word8 (fromIntegral nodeNum)
                       count' = count - 1
                   in if count' == 0
                        then (out', index', count', nodeNum)
@@ -1462,6 +1463,7 @@ centerPrint str = do
 huff1TableInit :: Quake ()
 huff1TableInit = do
     Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
+    scrGlobals.scrCin.cHNodes1 .= Just (UV.replicate (256 * 256 * 2) 0)
     tableInit cinematicFileHandle 0 256
 
   where tableInit :: Handle -> Int -> Int -> Quake ()
@@ -1472,12 +1474,14 @@ huff1TableInit = do
               counts <- io $ B.hGet cinematicFileHandle 256
               let hCount = UV.generate 512 (\i -> if i < 256 then fromIntegral (counts `B.index` i) else 0)
 
+              Just hNodes <- use $ scrGlobals.scrCin.cHNodes1
+
               -- build the nodes
               let nodeBase = idx * 256 * 2
-                  (hNodes, hUsed, hCount', numHNodes) = initNodes (UV.replicate (256 * 256 * 2) 0) (UV.replicate 512 0) hCount nodeBase 256
+                  (hNodes', hUsed, hCount', numHNodes) = initNodes hNodes (UV.replicate 512 0) hCount nodeBase 256
 
               zoom (scrGlobals.scrCin) $ do
-                cHNodes1 .= Just hNodes
+                cHNodes1 .= Just hNodes'
                 cHUsed .= hUsed
                 cHCount .= hCount'
                 cNumHNodes1.ix idx .= numHNodes - 1
