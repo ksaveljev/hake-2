@@ -5,10 +5,11 @@ module Client.SCR where
 
 import Control.Lens ((.=), use, (^.), _1, _2, ix, preuse, zoom, (-=), (+=))
 import Control.Monad (liftM, when, void, unless)
-import Data.Bits ((.&.), complement, shiftR)
+import Data.Bits ((.&.), (.|.), complement, shiftR, shiftL)
 import Data.Char (ord)
 import Data.Maybe (isNothing, isJust)
 import Data.Monoid (mempty, (<>))
+import Data.Word (Word8)
 import Linear (V3(..), _y)
 import System.IO (Handle, hGetPosn, hSeek, hTell, SeekMode(AbsoluteSeek))
 import Text.Printf (printf)
@@ -1248,8 +1249,53 @@ readNextFrame = do
         return (Just pic)
 
 huff1Decompress :: B.ByteString -> Int -> Quake B.ByteString
-huff1Decompress _ _ = do
-    io (putStrLn "SCR.huff1Decompress") >> undefined -- TODO
+huff1Decompress frame size = do
+        -- get decompressed count
+    let a = fromIntegral (frame `B.index` 0) :: Int
+        b = (fromIntegral (frame `B.index` 1) :: Int) `shiftL` 8
+        c = (fromIntegral (frame `B.index` 2) :: Int) `shiftL` 16
+        d = (fromIntegral (frame `B.index` 3) :: Int) `shiftL` 24
+        count = a .|. b .|. c .|. d
+        -- used as index for input[]
+        input = 4 :: Int
+        out = mempty :: BB.Builder
+        index = (-256) * 2
+
+    Just hNodes <- use $ scrGlobals.scrCin.cHNodes1
+    numHNodes <- use $ scrGlobals.scrCin.cNumHNodes1
+
+    let nodeNum = numHNodes UV.! 0
+
+    decompress hNodes numHNodes nodeNum input out index count
+
+  where decompress :: UV.Vector Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> Int -> Int -> Quake B.ByteString
+        decompress hNodes numHNodes nodeNum input out index count
+          | count == 0 = do
+              when (input /= size && input /= (size + 1)) $
+                Com.printf ("Decompression overread by " `B.append` BC.pack (show (input - size)))
+              return $ BL.toStrict (BB.toLazyByteString out)
+          | otherwise = do
+              let inByte = frame `B.index` input
+                  (out', index', count', nodeNum') = processByte hNodes numHNodes nodeNum inByte out index count 0 8
+              decompress hNodes numHNodes nodeNum' (input + 1) out' index' count'
+
+        processByte :: UV.Vector Int -> UV.Vector Int -> Int -> Word8 -> BB.Builder -> Int -> Int -> Int -> Int -> (BB.Builder, Int, Int, Int)
+        processByte hNodes numHNodes nodeNum inByte out index count idx maxIdx
+          | idx >= maxIdx = (out, index, count, nodeNum)
+          | otherwise =
+              if nodeNum < 256
+                then
+                  let index' = (-256) * 2 + (nodeNum `shiftL` 9)
+                      out' = out <> BB.word8 inByte
+                      count' = count - 1
+                  in if count' == 0
+                       then (out', index', count', nodeNum)
+                       else let nodeNum' = numHNodes UV.! nodeNum
+                                nodeNum'' = hNodes UV.! (index' + nodeNum' * 2 + fromIntegral (inByte .&. 1))
+                            in processByte hNodes numHNodes nodeNum'' (inByte `shiftR` 1) out' index' count' (idx + 1) maxIdx
+                else
+                  let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
+                  in processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) out index count (idx + 1) maxIdx
 
 debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = return () -- IMPLEMENT ME!
