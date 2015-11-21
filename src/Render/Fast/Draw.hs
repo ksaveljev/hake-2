@@ -5,8 +5,12 @@ import Control.Lens (preuse, (^.), ix, use, (.=))
 import Control.Monad (when, unless)
 import Data.Bits ((.&.), shiftR)
 import Data.IORef (IORef, readIORef)
+import Data.Monoid (mempty, (<>))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.Rendering.OpenGL.Raw as GL
 
@@ -69,6 +73,84 @@ stretchPic x y w h pic = do
 
         when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0)) && not (image^.iHasAlpha)) $
           GL.glEnable GL.gl_ALPHA_TEST
+
+stretchRaw :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+stretchRaw x y w h cols rows buffer = do
+    Image.glBind 0
+    let (hScale, trows) = if rows <= 256
+                            then (1, rows)
+                            else ((fromIntegral rows) / 256.0, 256)
+        t = (fromIntegral rows) * hScale / 256 :: Float
+
+    colorTableExt <- use $ fastRenderAPIGlobals.frColorTableEXT
+
+    if colorTableExt
+      then do
+        io (putStrLn "Draw.stretchRaw") >> undefined -- TODO
+
+      else do
+        rawPalette <- use $ fastRenderAPIGlobals.frRawPalette
+        let image32 = BL.toStrict (BB.toLazyByteString (buildImage32 rawPalette hScale mempty 0 trows))
+
+        glTexSolidFormat <- use $ fastRenderAPIGlobals.frGLTexSolidFormat
+        io $ BU.unsafeUseAsCString image32 $ \ptr ->
+          GL.glTexImage2D GL.gl_TEXTURE_2D
+                          0
+                          (fromIntegral glTexSolidFormat)
+                          256
+                          256
+                          0
+                          GL.gl_RGBA
+                          GL.gl_UNSIGNED_BYTE
+                          ptr
+
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MIN_FILTER (fromIntegral GL.gl_LINEAR)
+    GL.glTexParameterf GL.gl_TEXTURE_2D GL.gl_TEXTURE_MAG_FILTER (fromIntegral GL.gl_LINEAR)
+
+    glConfig <- use $ fastRenderAPIGlobals.frGLConfig
+
+    when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0))) $
+      GL.glDisable GL.gl_ALPHA_TEST
+
+    let x' = fromIntegral x
+        y' = fromIntegral y
+        w' = fromIntegral w
+        h' = fromIntegral h
+        t' = realToFrac t
+
+    GL.glBegin GL.gl_QUADS
+    GL.glTexCoord2f 0 0
+    GL.glVertex2f x' y'
+    GL.glTexCoord2f 1 0
+    GL.glVertex2f (x' + w') y'
+    GL.glTexCoord2f 1 t'
+    GL.glVertex2f (x' + w') (y' + h')
+    GL.glTexCoord2f 0 t'
+    GL.glVertex2f x' (y' + h')
+    GL.glEnd
+
+    when ((((glConfig^.glcRenderer) == RenderAPIConstants.glRendererMCD) || ((glConfig^.glcRenderer) .&. RenderAPIConstants.glRendererRendition /= 0))) $
+      GL.glEnable GL.gl_ALPHA_TEST
+
+  where buildImage32 :: UV.Vector Int -> Float -> BB.Builder -> Int -> Int -> BB.Builder
+        buildImage32 rawPalette hScale builder idx maxIdx
+          | idx >= maxIdx = builder
+          | otherwise =
+              let row = truncate (fromIntegral idx * hScale)
+              in if row > rows
+                   then builder
+                   else let sourceIndex = cols * row
+                            fracStep = cols * 0x10000 `div` 256
+                            frac = fracStep `shiftR` 1
+                            builder' = buildRow32 rawPalette builder sourceIndex frac fracStep 0 256
+                        in buildImage32 rawPalette hScale builder' (idx + 1) maxIdx
+
+        buildRow32 :: UV.Vector Int -> BB.Builder -> Int -> Int -> Int -> Int -> Int -> BB.Builder
+        buildRow32 rawPalette builder sourceIndex frac fracStep idx maxIdx
+          | idx >= maxIdx = builder
+          | otherwise =
+              let v = rawPalette UV.! fromIntegral (buffer `B.index` (sourceIndex + (frac `shiftR` 16)))
+              in buildRow32 rawPalette (builder <> BB.int32LE (fromIntegral v)) sourceIndex (frac + fracStep) fracStep (idx + 1) maxIdx
 
 findPic :: B.ByteString -> Quake (Maybe (IORef ImageT))
 findPic name =
