@@ -18,6 +18,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
 import Quake
@@ -1269,7 +1270,7 @@ huff1Decompress frame size = do
 
     decompress hNodes numHNodes nodeNum input out index count
 
-  where decompress :: UV.Vector Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> Int -> Int -> Quake B.ByteString
+  where decompress :: MV.IOVector Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> Int -> Int -> Quake B.ByteString
         decompress hNodes numHNodes nodeNum input out index count
           | count == 0 = do
               when (input /= size && input /= (size + 1)) $
@@ -1277,26 +1278,28 @@ huff1Decompress frame size = do
               return $ BL.toStrict (BB.toLazyByteString out)
           | otherwise = do
               let inByte = frame `B.index` input
-                  (out', index', count', nodeNum') = processByte hNodes numHNodes nodeNum inByte out index count 0 8
+              (out', index', count', nodeNum') <- io $ processByte hNodes numHNodes nodeNum inByte out index count 0 8
               decompress hNodes numHNodes nodeNum' (input + 1) out' index' count'
 
-        processByte :: UV.Vector Int -> UV.Vector Int -> Int -> Word8 -> BB.Builder -> Int -> Int -> Int -> Int -> (BB.Builder, Int, Int, Int)
+        processByte :: MV.IOVector Int -> UV.Vector Int -> Int -> Word8 -> BB.Builder -> Int -> Int -> Int -> Int -> IO (BB.Builder, Int, Int, Int)
         processByte hNodes numHNodes nodeNum inByte out index count idx maxIdx
-          | idx >= maxIdx = (out, index, count, nodeNum)
+          | idx >= maxIdx = return (out, index, count, nodeNum)
           | otherwise =
               if nodeNum < 256
-                then
+                then do
                   let index' = (-256) * 2 + (nodeNum `shiftL` 9)
                       out' = out <> BB.word8 (fromIntegral nodeNum)
                       count' = count - 1
-                  in if count' == 0
-                       then (out', index', count', nodeNum)
-                       else let nodeNum' = numHNodes UV.! nodeNum
-                                nodeNum'' = hNodes UV.! (index' + nodeNum' * 2 + fromIntegral (inByte .&. 1))
-                            in processByte hNodes numHNodes nodeNum'' (inByte `shiftR` 1) out' index' count' (idx + 1) maxIdx
-                else
-                  let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
-                  in processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) out index count (idx + 1) maxIdx
+                  if count' == 0
+                    then
+                      return (out', index', count', nodeNum)
+                    else do
+                      let nodeNum' = numHNodes UV.! nodeNum
+                      nodeNum'' <- hNodes `MV.read` (index' + nodeNum' * 2 + fromIntegral (inByte .&. 1))
+                      processByte hNodes numHNodes nodeNum'' (inByte `shiftR` 1) out' index' count' (idx + 1) maxIdx
+                else do
+                  nodeNum' <- hNodes `MV.read` (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
+                  processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) out index count (idx + 1) maxIdx
 
 debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = return () -- IMPLEMENT ME!
@@ -1463,7 +1466,8 @@ centerPrint str = do
 huff1TableInit :: Quake ()
 huff1TableInit = do
     Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
-    scrGlobals.scrCin.cHNodes1 .= Just (UV.replicate (256 * 256 * 2) 0)
+    hNodes <- io $ MV.replicate (256 * 256 * 2) 0
+    scrGlobals.scrCin.cHNodes1 .= Just hNodes
     tableInit cinematicFileHandle 0 256
 
   where tableInit :: Handle -> Int -> Int -> Quake ()
@@ -1478,33 +1482,36 @@ huff1TableInit = do
 
               -- build the nodes
               let nodeBase = idx * 256 * 2
-                  (hNodes', hUsed, hCount', numHNodes) = initNodes hNodes (UV.replicate 512 0) hCount nodeBase 256
+              (hUsed, hCount', numHNodes) <- io $ initNodes hNodes (UV.replicate 512 0) hCount nodeBase 256
 
               zoom (scrGlobals.scrCin) $ do
-                cHNodes1 .= Just hNodes'
                 cHUsed .= hUsed
                 cHCount .= hCount'
                 cNumHNodes1.ix idx .= numHNodes - 1
               
               tableInit cinematicFileHandle (idx + 1) maxIdx
 
-        initNodes :: UV.Vector Int -> UV.Vector Int -> UV.Vector Int -> Int -> Int -> (UV.Vector Int, UV.Vector Int, UV.Vector Int, Int)
+        initNodes :: MV.IOVector Int -> UV.Vector Int -> UV.Vector Int -> Int -> Int -> IO (UV.Vector Int, UV.Vector Int, Int)
         initNodes hNodes hUsed hCount nodeBase numHNodes
-          | numHNodes >= 511 = (hNodes, hUsed, hCount, numHNodes)
-          | otherwise =
+          | numHNodes >= 511 = return (hUsed, hCount, numHNodes)
+          | otherwise = do
               let index = nodeBase + (numHNodes - 256) * 2
                   -- pick two lowest counts
                   b1 = smallestNode1 hUsed hCount numHNodes
-              in if b1 == -1
-                   then (hNodes UV.// [(index, b1)], hUsed, hCount, numHNodes)
-                   else let hNodes' = hNodes UV.// [(index, b1)]
-                            hUsed' = hUsed UV.// [(b1, 1)]
-                            b2 = smallestNode1 hUsed' hCount numHNodes
-                        in if b2 == -1
-                             then (hNodes' UV.// [(index + 1, b2)], hUsed', hCount, numHNodes)
-                             else let hNodes'' = hNodes' UV.// [(index + 1, b2)]
-                                      hUsed'' = hUsed' UV.// [(b2, 1)]
-                                  in initNodes hNodes'' hUsed'' (hCount UV.// [(numHNodes, (hCount UV.! b1) + (hCount UV.! b2))]) nodeBase (numHNodes + 1)
+              MV.write hNodes index b1
+              if b1 == -1
+                then
+                  return (hUsed, hCount, numHNodes)
+                else do
+                  let hUsed' = hUsed UV.// [(b1, 1)]
+                      b2 = smallestNode1 hUsed' hCount numHNodes
+                  MV.write hNodes (index + 1) b2
+                  if b2 == -1
+                    then do
+                      return (hUsed', hCount, numHNodes)
+                    else do
+                      let hUsed'' = hUsed' UV.// [(b2, 1)]
+                      initNodes hNodes hUsed'' (hCount UV.// [(numHNodes, (hCount UV.! b1) + (hCount UV.! b2))]) nodeBase (numHNodes + 1)
 
 smallestNode1 :: UV.Vector Int -> UV.Vector Int -> Int -> Int
 smallestNode1 hUsed hCount numHNodes =

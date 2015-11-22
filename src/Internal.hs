@@ -1908,7 +1908,7 @@ data CinematicsT =
               , _cHeight       :: !Int
               , _cPic          :: Maybe B.ByteString
               , _cPicPending   :: Maybe B.ByteString
-              , _cHNodes1      :: Maybe (UV.Vector Int)
+              , _cHNodes1      :: Maybe (MV.IOVector Int)
               , _cNumHNodes1   :: UV.Vector Int
               , _cHUsed        :: UV.Vector Int
               , _cHCount       :: UV.Vector Int
