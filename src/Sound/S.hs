@@ -26,7 +26,7 @@ startLocalSound :: B.ByteString -> Quake ()
 startLocalSound _ = return () -- IMPLEMENT ME!
 
 disableStreaming :: Quake ()
-disableStreaming = io (putStrLn "S.disableStreaming") >> undefined -- TODO
+disableStreaming = io (putStrLn "S.disableStreaming") >> return () -- TODO
 
 registerSound :: B.ByteString -> Quake (Maybe (IORef SfxT))
 registerSound _ = do

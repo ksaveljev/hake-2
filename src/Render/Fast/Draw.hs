@@ -91,9 +91,10 @@ stretchRaw x y w h cols rows buffer = do
       else do
         rawPalette <- use $ fastRenderAPIGlobals.frRawPalette
         let image32 = BL.toStrict (BB.toLazyByteString (buildImage32 rawPalette hScale mempty 0 trows))
+            image32' = image32 `B.append` (B.replicate ((256 * 256 * 8) - (B.length image32)) 0)
 
         glTexSolidFormat <- use $ fastRenderAPIGlobals.frGLTexSolidFormat
-        io $ BU.unsafeUseAsCString image32 $ \ptr ->
+        io $ BU.unsafeUseAsCString image32' $ \ptr ->
           GL.glTexImage2D GL.gl_TEXTURE_2D
                           0
                           (fromIntegral glTexSolidFormat)
