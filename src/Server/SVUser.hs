@@ -23,6 +23,7 @@ import qualified Game.Info as Info
 import qualified Game.PlayerClient as PlayerClient
 import qualified QCommon.CBuf as CBuf
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import qualified QCommon.Com as Com
 import qualified Server.SVMain as SVMain
@@ -463,4 +464,12 @@ nextDownloadF =
   )
 
 beginDemoServer :: Quake ()
-beginDemoServer = io (putStrLn "SVUser.beginDemoServer") >> undefined -- TODO
+beginDemoServer = do
+    name <- use $ svGlobals.svServer.sName
+    let name' = "demos/" `B.append` name
+
+    demoFile <- FS.fOpenFile name'
+
+    case demoFile of
+      Nothing -> Com.comError Constants.errDrop ("Couldn't open " `B.append` name' `B.append` "\n")
+      Just _ -> svGlobals.svServer.sDemoFile .= demoFile

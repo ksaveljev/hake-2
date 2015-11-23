@@ -733,18 +733,24 @@ precacheF =
     c <- Cmd.argc
 
     -- Yet another hack to let old demos work the old precache sequence
-    when (c < 2) $ do
-      io (putStrLn "CL.precacheF") >> undefined -- TODO
+    if c < 2
+      then do
+        Just name <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + 1)
+        void $ CM.loadMap name True [0]
 
-    v1 <- Cmd.argv 1
+        CLParse.registerSounds
+        CLView.prepRefresh
 
-    zoom clientGlobals $ do
-      cgPrecacheCheck .= Constants.csModels
-      cgPrecacheSpawnCount .= Lib.atoi v1
-      cgPrecacheModel .= Nothing
-      cgPrecacheModelSkin .= 0
+      else do
+        v1 <- Cmd.argv 1
 
-    requestNextDownload
+        zoom clientGlobals $ do
+          cgPrecacheCheck .= Constants.csModels
+          cgPrecacheSpawnCount .= Lib.atoi v1
+          cgPrecacheModel .= Nothing
+          cgPrecacheModelSkin .= 0
+
+        requestNextDownload
   )
 
 remoteCommandHeader :: B.ByteString
