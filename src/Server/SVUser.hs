@@ -389,10 +389,27 @@ beginF =
         CBuf.insertFromDefer
   )
 
+{-
+- ================== SV_Nextserver_f ==================
+- 
+- A cinematic has completed or been aborted by a client, so move to the
+- next server
+-}
 nextServerF :: XCommandT
 nextServerF =
   XCommandT "SVUser.nextServerF" (do
-    io (putStrLn "SVUser.nextServerF") >> undefined -- TODO
+    c <- Cmd.argv 1
+    spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
+    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just name <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cName
+
+    if Lib.atoi c /= spawnCount
+      then
+        Com.dprintf ("Nextserver() from wrong level, from " `B.append` name `B.append` "\n")
+        -- leftover from last server
+      else do
+        Com.dprintf ("Nextserver() from " `B.append` name `B.append` "\n")
+        nextServer
   )
 
 {-
