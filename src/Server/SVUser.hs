@@ -4,8 +4,8 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVUser where
 
-import Control.Lens ((.=), preuse, ix, use, (^.), zoom, (-=), (&), (.~))
-import Control.Monad (unless, when, liftM)
+import Control.Lens ((.=), preuse, ix, use, (^.), zoom, (-=), (+=), (&), (.~))
+import Control.Monad (unless, when, liftM, void)
 import Data.Bits ((.&.))
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
@@ -32,7 +32,24 @@ maxStringCmds :: Int
 maxStringCmds = 8
 
 nextServer :: Quake ()
-nextServer = io (putStrLn "SVUser.nextServer") >> undefined -- TODO
+nextServer = do
+    state <- use $ svGlobals.svServer.sState
+    coopValue <- CVar.variableValue "coop"
+
+    -- ZOID, ss_pic can be nextserver'd in coop mode
+    -- can't nextserver while playing a normal game
+    unless (state == Constants.ssGame || (state == Constants.ssPic && coopValue == 0)) $ do
+      svGlobals.svServerStatic.ssSpawnCount += 1 -- make sure another doesn't sneak in
+      v <- CVar.variableString "nextserver"
+
+      if B.length v == 0
+        then
+          CBuf.addText "killserver\n"
+        else do
+          CBuf.addText v
+          CBuf.addText "\n"
+
+      void $ CVar.set "nextserver" ""
 
 nullCmd :: UserCmdT
 nullCmd = newUserCmdT
