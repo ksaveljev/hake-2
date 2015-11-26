@@ -509,16 +509,15 @@ fOpenFile filename = do
                                      isOpen <- io $ hIsOpen h
                                      return $ not isOpen
 
-                  if needsUpdate
-                    then do
-                      h <- io $ openBinaryFile (BC.unpack $ pack^.pFilename) ReadMode
-                      let updatedSP = set spPack (Just $ pack { _pHandle = Just h }) searchPath
-                      fsGlobals.fsSearchPaths %= map (\sp -> if sp == searchPath then updatedSP else sp) -- IMPROVE: not nice, but how else would we do it?
-                      io $ hSeek h AbsoluteSeek (fromIntegral $ entry^.pfFilePos)
-                      return $ Just h
-                    else do
-                      io $ hSeek (fromJust $ pack^.pHandle) AbsoluteSeek (fromIntegral $ entry^.pfFilePos)
-                      return (pack^.pHandle)
+                  when needsUpdate $ do
+                    h <- io $ openBinaryFile (BC.unpack $ pack^.pFilename) ReadMode
+                    let updatedSP = set spPack (Just $ pack { _pHandle = Just h }) searchPath
+                    fsGlobals.fsSearchPaths %= map (\sp -> if sp == searchPath then updatedSP else sp) -- IMPROVE: not nice, but how else would we do it?
+
+                  -- open a new file on the pakfile
+                  h <- io $ openBinaryFile (BC.unpack $ pack^.pFilename) ReadMode
+                  io $ hSeek h AbsoluteSeek (fromIntegral $ entry^.pfFilePos)
+                  return $ Just h
 
                 Nothing -> searchPathMatch name xs
 

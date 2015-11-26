@@ -381,7 +381,7 @@ sendClientMessages :: Quake ()
 sendClientMessages = do
     state <- use $ svGlobals.svServer.sState
     demofile <- use $ svGlobals.svServer.sDemoFile
-    
+
     -- read the next demo message if needed
     msglen <- if state == Constants.ssDemo && isJust demofile
                 then do
