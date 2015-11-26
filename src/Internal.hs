@@ -1866,6 +1866,7 @@ data ClientGlobals =
                 , _cgWeaponModels       :: V.Vector B.ByteString
                 , _cgPMPassEnt          :: Maybe EdictReference
                 , _cgIsDown             :: !Bool
+                , _cgAVelocities        :: V.Vector (V3 Float)
                 }
 
 data VRectT =

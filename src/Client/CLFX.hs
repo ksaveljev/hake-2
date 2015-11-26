@@ -1703,9 +1703,51 @@ diminishingTrail start end oldIdx flags= do
                   globals.clEntities.ix oldIdx.ceTrailCount %= (\v -> if v - 5 < 100 then 100 else v - 5)
                   addDiminishingTrail (Just pRef) vec (move + vec) orgScale velScale (len - 0.5)
 
+-- TODO: entIdx should be CEntityReference
 flyEffect :: Int -> V3 Float -> Quake ()
-flyEffect _ _ = do
-    io (putStrLn "CLFX.flyEffect") >> undefined -- TODO
+flyEffect entIdx origin = do
+    Just ent <- preuse $ globals.clEntities.ix entIdx
+    time <- use $ globals.cl.csTime
+
+    let (startTime, flyStopTime) = if (ent^.ceFlyStopTime) < time
+                                     then (time, time + 60000)
+                                     else ((ent^.ceFlyStopTime) - 60000, ent^.ceFlyStopTime)
+        n = time - startTime
+        count = if n < 20000
+                  then (n * 162) `div` 20000
+                  else let n' = flyStopTime - time
+                       in if n' < 20000
+                            then (n' * 162) `div` 20000
+                            else 162
+
+    globals.clEntities.ix entIdx.ceFlyStopTime .= flyStopTime
+
+    flyParticles origin count
+
+flyParticles :: V3 Float -> Int -> Quake ()
+flyParticles origin count = do
+    let count' = if count > Constants.numVertexNormals
+                   then Constants.numVertexNormals
+                   else count
+
+    Just avelocity <- preuse $ clientGlobals.cgAVelocities.ix 0
+
+    when ((avelocity^._x) == 0) $ do
+      aVelocities <- V.replicateM Constants.numVertexNormals genAVelocity
+      clientGlobals.cgAVelocities .= aVelocities
+
+    time <- use $ globals.cl.csTime
+    let lTime  = fromIntegral time / 1000
+
+    io (putStrLn "CLFX.flyParticles") >> undefined -- TODO
+
+  where genAVelocity :: Quake (V3 Float)
+        genAVelocity = do
+          a1 <- Lib.rand
+          a2 <- Lib.rand
+          a3 <- Lib.rand
+          return (V3 (fromIntegral (a1 .&. 255) * 0.01) (fromIntegral (a2 .&. 255) * 0.01) (fromIntegral (a3 .&. 255) * 0.01))
+
 
 flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
 flagTrail start end color = do

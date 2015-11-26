@@ -10,6 +10,7 @@ module Client.ClientGlobals ( module Client.ClientGlobals
 
 import Control.Lens (makeLenses)
 import Data.IORef (newIORef)
+import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
@@ -62,4 +63,5 @@ initialClientGlobals =
                 , _cgWeaponModels       = V.replicate Constants.maxClientWeaponModels ""
                 , _cgPMPassEnt          = Nothing
                 , _cgIsDown             = False
+                , _cgAVelocities        = V.replicate Constants.numVertexNormals (V3 0 0 0)
                 }
