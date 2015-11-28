@@ -338,7 +338,24 @@ hardGameFunc = do
 loadGameF :: XCommandT
 loadGameF =
   XCommandT "Menu.loadGameF" (do
-    io (putStrLn "Menu.loadGameF") >> undefined -- TODO
+    loadGameMenuInit
+    pushMenu loadGameMenuDrawF loadGameMenuKeyF
+  )
+
+loadGameMenuInit :: Quake ()
+loadGameMenuInit = do
+    io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
+
+loadGameMenuDrawF :: XCommandT
+loadGameMenuDrawF =
+  XCommandT "Menu.loadGameMenuInit" (do
+    io (putStrLn "Menu.loadGameMenuDrawF") >> undefined -- TODO
+  )
+
+loadGameMenuKeyF :: KeyFuncT
+loadGameMenuKeyF =
+  KeyFuncT "Menu.loadGameMenuKeyF" (\key -> do
+    io (putStrLn "Menu.loadGameMenuKeyF") >> undefined -- TODO
   )
 
 saveGameF :: XCommandT

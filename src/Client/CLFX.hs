@@ -1739,7 +1739,8 @@ flyParticles origin count = do
     time <- use $ globals.cl.csTime
     let lTime  = fromIntegral time / 1000
 
-    io (putStrLn "CLFX.flyParticles") >> undefined -- TODO
+    freeParticles <- use $ clientGlobals.cgFreeParticles
+    addFlyParticles freeParticles lTime 0 count'
 
   where genAVelocity :: Quake (V3 Float)
         genAVelocity = do
@@ -1748,6 +1749,12 @@ flyParticles origin count = do
           a3 <- Lib.rand
           return (V3 (fromIntegral (a1 .&. 255) * 0.01) (fromIntegral (a2 .&. 255) * 0.01) (fromIntegral (a3 .&. 255) * 0.01))
 
+        addFlyParticles :: Maybe (IORef CParticleT) -> Float -> Int -> Int -> Quake ()
+        addFlyParticles Nothing _ _ _ = return ()
+        addFlyParticles (Just pRef) lTime idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              io (putStrLn "CLFX.flyParticles") >> undefined -- TODO
 
 flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
 flagTrail start end color = do
