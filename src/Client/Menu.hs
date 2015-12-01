@@ -30,6 +30,9 @@ mainItems = 5
 numCursorFrames :: Int
 numCursorFrames = 15
 
+maxSaveGames :: Int
+maxSaveGames = 15
+
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
 
@@ -344,6 +347,13 @@ loadGameF =
 
 loadGameMenuInit :: Quake ()
 loadGameMenuInit = do
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference loadGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
+                                                           & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
+                                                           & mfNItems .~ 0
+                                                           )
+
     io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
 
 loadGameMenuDrawF :: XCommandT
