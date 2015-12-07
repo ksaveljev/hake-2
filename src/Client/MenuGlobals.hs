@@ -10,8 +10,12 @@ import qualified Data.Vector as V
 import Internal
 import Client.MenuFrameworkS
 import Client.MenuLayerT
+import qualified Constants
 
 makeLenses ''MenuGlobals
+
+maxSaveGames :: Int
+maxSaveGames = 15
 
 {-
   _mgMenuFrameworks:
@@ -99,6 +103,35 @@ creditsActionRef = MenuActionSReference 7
 blankLineRef :: MenuSeparatorSReference
 blankLineRef = MenuSeparatorSReference 0
 
+menuActions :: [MenuActionS]
+menuActions = [ newMenuActionS -- applyAction
+              , newMenuActionS -- defaultsAction
+              , newMenuActionS -- easyGameAction
+              , newMenuActionS -- mediumGameAction
+              , newMenuActionS -- hardGameAction
+              , newMenuActionS -- loadGameAction
+              , newMenuActionS -- saveGameAction
+              , newMenuActionS -- creditsAction
+              ]
+
+loadGameActions :: V.Vector MenuActionSReference
+loadGameActions = V.generate maxSaveGames (\idx -> MenuActionSReference (idx + loadGameActionsOffset))
+
+saveGameActions :: V.Vector MenuActionSReference
+saveGameActions = V.generate maxSaveGames (\idx -> MenuActionSReference (idx + saveGameActionsOffset))
+
+joinServerActions :: V.Vector MenuActionSReference
+joinServerActions = V.generate Constants.maxLocalServers (\idx -> MenuActionSReference (idx + joinServerActionsOffset))
+
+loadGameActionsOffset :: Int
+loadGameActionsOffset = length menuActions
+
+saveGameActionsOffset :: Int
+saveGameActionsOffset = loadGameActionsOffset + maxSaveGames
+
+joinServerActionsOffset :: Int
+joinServerActionsOffset = saveGameActionsOffset + maxSaveGames
+
 initialMenuGlobals :: MenuGlobals
 initialMenuGlobals =
   MenuGlobals { _mgMenuFrameworks      = V.replicate 13 newMenuFrameworkS
@@ -114,15 +147,11 @@ initialMenuGlobals =
                                                     , newMenuSliderS -- screenSizeSlider
                                                     , newMenuSliderS -- brightnessSlider
                                                     ]
-              , _mgMenuActionSItems    = V.fromList [ newMenuActionS -- applyAction
-                                                    , newMenuActionS -- defaultsAction
-                                                    , newMenuActionS -- easyGameAction
-                                                    , newMenuActionS -- mediumGameAction
-                                                    , newMenuActionS -- hardGameAction
-                                                    , newMenuActionS -- loadGameAction
-                                                    , newMenuActionS -- saveGameAction
-                                                    , newMenuActionS -- creditsAction
-                                                    ]
+              , _mgMenuActionSItems    = V.fromList ( menuActions
+                                                      ++ replicate maxSaveGames newMenuActionS -- loadGameActions
+                                                      ++ replicate maxSaveGames newMenuActionS -- saveGameActions
+                                                      ++ replicate Constants.maxLocalServers newMenuActionS -- joinServerActions
+                                                    )
               , _mgMenuSeparatorSItems = V.fromList [ newMenuSeparatorS -- blankLine
                                                     ]
               , _mgLayers              = V.replicate maxMenuDepth newMenuLayerT
