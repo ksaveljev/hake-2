@@ -30,9 +30,6 @@ mainItems = 5
 numCursorFrames :: Int
 numCursorFrames = 15
 
-maxSaveGames :: Int
-maxSaveGames = 15
-
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
 
@@ -354,7 +351,16 @@ loadGameMenuInit = do
                                                            & mfNItems .~ 0
                                                            )
 
+    createSaveStrings 0 maxSaveGames
+
     io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
+
+-- Search the save dir for saved games and their names.
+createSaveStrings :: Int -> Int -> Quake ()
+createSaveStrings idx maxIdx
+  | idx >= maxIdx = return ()
+  | otherwise = do
+      io (putStrLn "Menu.createSaveStrings") >> undefined -- TODO
 
 loadGameMenuDrawF :: XCommandT
 loadGameMenuDrawF =
