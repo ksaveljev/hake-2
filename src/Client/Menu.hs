@@ -372,7 +372,11 @@ loadGameMenuDrawF =
 loadGameMenuKeyF :: KeyFuncT
 loadGameMenuKeyF =
   KeyFuncT "Menu.loadGameMenuKeyF" (\key -> do
-    io (putStrLn "Menu.loadGameMenuKeyF") >> undefined -- TODO
+    when (key == KeyConstants.kEscape || key == KeyConstants.kEnter) $ do
+      loadGameMenu <- readMenuFrameworkSReference loadGameMenuRef
+      modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfCursor .~ if (loadGameMenu^.mfCursor) - 1 < 0 then 0 else (loadGameMenu^.mfCursor) - 1)
+
+    defaultMenuKey loadGameMenuRef key
   )
 
 saveGameF :: XCommandT
@@ -646,3 +650,7 @@ adjustCursor _ _ = do
 menuDraw :: MenuFrameworkSReference -> Quake ()
 menuDraw _ = do
     io (putStrLn "Menu.menuDraw") >> undefined -- TODO
+
+defaultMenuKey :: MenuFrameworkSReference -> Int -> Quake (Maybe B.ByteString)
+defaultMenuKey _ _ = do
+    io (putStrLn "Menu.defaultMenuKey") >> undefined -- TODO

@@ -43,6 +43,9 @@ openGLMenuRef = MenuFrameworkSReference 0
 gameMenuRef :: MenuFrameworkSReference
 gameMenuRef = MenuFrameworkSReference 4
 
+saveGameMenuRef :: MenuFrameworkSReference
+saveGameMenuRef = MenuFrameworkSReference 5
+
 loadGameMenuRef :: MenuFrameworkSReference
 loadGameMenuRef = MenuFrameworkSReference 6
 
