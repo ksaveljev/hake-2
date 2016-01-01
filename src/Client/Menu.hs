@@ -365,7 +365,8 @@ createSaveStrings idx maxIdx
 loadGameMenuDrawF :: XCommandT
 loadGameMenuDrawF =
   XCommandT "Menu.loadGameMenuInit" (do
-    io (putStrLn "Menu.loadGameMenuDrawF") >> undefined -- TODO
+    banner "m_banner_load_game"
+    menuDraw loadGameMenuRef
   )
 
 loadGameMenuKeyF :: KeyFuncT
