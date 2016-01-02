@@ -414,8 +414,8 @@ gameMenuDrawF =
 
 gameMenuKeyF :: KeyFuncT
 gameMenuKeyF =
-  KeyFuncT "Menu.gameMenuKeyF" (\key -> do
-    io (putStrLn "Menu.gameMenuKeyF") >> undefined -- TODO
+  KeyFuncT "Menu.gameMenuKeyF" (\key ->
+    defaultMenuKey gameMenuRef key
   )
 
 menuLoadGameF :: XCommandT
