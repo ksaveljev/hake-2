@@ -384,20 +384,20 @@ menuInit = do
                                                        & maGeneric.mcCallback .~ Just applyChanges
                                                        )
 
-    Menu.addItem openGLMenuRef (MenuListRef refListRef)
-    Menu.addItem openGLMenuRef (MenuListRef modeListRef)
-    Menu.addItem openGLMenuRef (MenuSliderRef screenSizeSliderRef)
-    Menu.addItem openGLMenuRef (MenuSliderRef brightnessSliderRef)
-    Menu.addItem openGLMenuRef (MenuListRef fsBoxRef)
+    Menu.menuAddItem openGLMenuRef (MenuListRef refListRef)
+    Menu.menuAddItem openGLMenuRef (MenuListRef modeListRef)
+    Menu.menuAddItem openGLMenuRef (MenuSliderRef screenSizeSliderRef)
+    Menu.menuAddItem openGLMenuRef (MenuSliderRef brightnessSliderRef)
+    Menu.menuAddItem openGLMenuRef (MenuListRef fsBoxRef)
 
-    Menu.addItem openGLMenuRef (MenuSliderRef tqSliderRef)
-    Menu.addItem openGLMenuRef (MenuListRef palettedTextureBoxRef)
-    Menu.addItem openGLMenuRef (MenuListRef vSyncBoxRef)
+    Menu.menuAddItem openGLMenuRef (MenuSliderRef tqSliderRef)
+    Menu.menuAddItem openGLMenuRef (MenuListRef palettedTextureBoxRef)
+    Menu.menuAddItem openGLMenuRef (MenuListRef vSyncBoxRef)
 
-    Menu.addItem openGLMenuRef (MenuActionRef defaultsActionRef)
-    Menu.addItem openGLMenuRef (MenuActionRef applyActionRef)
+    Menu.menuAddItem openGLMenuRef (MenuActionRef defaultsActionRef)
+    Menu.menuAddItem openGLMenuRef (MenuActionRef applyActionRef)
 
-    Menu.center openGLMenuRef
+    Menu.menuCenter openGLMenuRef
     modifyMenuFrameworkSReference openGLMenuRef (\v -> v & mfX -~ 8)
 
   where setNonExistingCVar :: B.ByteString -> B.ByteString -> Int -> Quake ()

@@ -215,7 +215,7 @@ event key down time = do
                          message key'
 
                      | (cls'^.csKeyDest) == Constants.keyMenu ->
-                         Menu.menuKeyDown key'
+                         Menu.keyDown key'
 
                      | (cls'^.csKeyDest) == Constants.keyGame || (cls'^.csKeyDest) == Constants.keyConsole ->
                          (Menu.menuMainF)^.xcCmd
@@ -272,7 +272,7 @@ event key down time = do
                               message key'
 
                           | (cls'^.csKeyDest) == Constants.keyMenu ->
-                              Menu.menuKeyDown key'
+                              Menu.keyDown key'
 
                           | (cls'^.csKeyDest) == Constants.keyGame || (cls'^.csKeyDest) == Constants.keyConsole ->
                               console key'

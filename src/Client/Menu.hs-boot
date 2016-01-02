@@ -8,11 +8,11 @@ import QCommon.XCommandT
 
 init :: Quake ()
 
-addItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
+menuAddItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
 
-center :: MenuFrameworkSReference -> Quake ()
+menuCenter :: MenuFrameworkSReference -> Quake ()
 
-tallySlots :: MenuFrameworkSReference -> Quake Int
+menuTallySlots :: MenuFrameworkSReference -> Quake Int
 
 pushMenu :: XCommandT -> KeyFuncT -> Quake ()
 
@@ -58,7 +58,7 @@ quitKeyF :: KeyFuncT
 
 draw :: Quake ()
 
-menuKeyDown :: Int -> Quake ()
+keyDown :: Int -> Quake ()
 
 addToServerList :: NetAdrT -> B.ByteString -> Quake ()
 

@@ -60,8 +60,8 @@ init = do
 
     menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
-addItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
-addItem menuFrameworkRef menuItemRef = do
+menuAddItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
+menuAddItem menuFrameworkRef menuItemRef = do
     menu <- readMenuFrameworkSReference menuFrameworkRef
     let nItems = menu^.mfNItems
 
@@ -83,11 +83,11 @@ addItem menuFrameworkRef menuItemRef = do
 
       modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNItems +~ 1)
 
-    tallySlots menuFrameworkRef >>= \n ->
+    menuTallySlots menuFrameworkRef >>= \n ->
       modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNSlots .~ n)
 
-center :: MenuFrameworkSReference -> Quake ()
-center menuFrameworkRef = do
+menuCenter :: MenuFrameworkSReference -> Quake ()
+menuCenter menuFrameworkRef = do
     menu <- readMenuFrameworkSReference menuFrameworkRef
     let menuItemRef = V.last (menu^.mfItems)
     height <- case menuItemRef of
@@ -106,8 +106,8 @@ center menuFrameworkRef = do
 
     modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
 
-tallySlots :: MenuFrameworkSReference -> Quake Int
-tallySlots menuFrameworkRef = do
+menuTallySlots :: MenuFrameworkSReference -> Quake Int
+menuTallySlots menuFrameworkRef = do
     menu <- readMenuFrameworkSReference menuFrameworkRef
 
     itemsNum <- V.mapM numberOfItems (menu^.mfItems)
@@ -290,7 +290,7 @@ gameMenuInit = do
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 40
                                                           & maGeneric.mcName .~ "load game"
-                                                          & maGeneric.mcCallback .~ Just (loadGameF^.xcCmd)
+                                                          & maGeneric.mcCallback .~ Just (menuLoadGameF^.xcCmd)
                                                           )
 
     modifyMenuActionSReference saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
@@ -298,7 +298,7 @@ gameMenuInit = do
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 50
                                                           & maGeneric.mcName .~ "save game"
-                                                          & maGeneric.mcCallback .~ Just (saveGameF^.xcCmd)
+                                                          & maGeneric.mcCallback .~ Just (menuSaveGameF^.xcCmd)
                                                           )
 
     modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
@@ -306,19 +306,19 @@ gameMenuInit = do
                                                          & maGeneric.mcX .~ 0
                                                          & maGeneric.mcY .~ 60
                                                          & maGeneric.mcName .~ "credits"
-                                                         & maGeneric.mcCallback .~ Just (creditsF^.xcCmd)
+                                                         & maGeneric.mcCallback .~ Just (menuCreditsF^.xcCmd)
                                                          )
 
-    addItem gameMenuRef (MenuActionRef easyGameActionRef)
-    addItem gameMenuRef (MenuActionRef mediumGameActionRef)
-    addItem gameMenuRef (MenuActionRef hardGameActionRef)
-    addItem gameMenuRef (MenuSeparatorRef blankLineRef)
-    addItem gameMenuRef (MenuActionRef loadGameActionRef)
-    addItem gameMenuRef (MenuActionRef saveGameActionRef)
-    addItem gameMenuRef (MenuSeparatorRef blankLineRef)
-    addItem gameMenuRef (MenuActionRef creditsActionRef)
+    menuAddItem gameMenuRef (MenuActionRef easyGameActionRef)
+    menuAddItem gameMenuRef (MenuActionRef mediumGameActionRef)
+    menuAddItem gameMenuRef (MenuActionRef hardGameActionRef)
+    menuAddItem gameMenuRef (MenuSeparatorRef blankLineRef)
+    menuAddItem gameMenuRef (MenuActionRef loadGameActionRef)
+    menuAddItem gameMenuRef (MenuActionRef saveGameActionRef)
+    menuAddItem gameMenuRef (MenuSeparatorRef blankLineRef)
+    menuAddItem gameMenuRef (MenuActionRef creditsActionRef)
 
-    center gameMenuRef
+    menuCenter gameMenuRef
 
 easyGameFunc :: Quake ()
 easyGameFunc = do
@@ -335,8 +335,8 @@ hardGameFunc = do
     CVar.forceSet "skill" "2"
     startGame
 
-loadGameF :: XCommandT
-loadGameF =
+menuLoadGameF :: XCommandT
+menuLoadGameF =
   XCommandT "Menu.loadGameF" (do
     loadGameMenuInit
     pushMenu loadGameMenuDrawF loadGameMenuKeyF
@@ -379,14 +379,14 @@ loadGameMenuKeyF =
     defaultMenuKey loadGameMenuRef key
   )
 
-saveGameF :: XCommandT
-saveGameF =
+menuSaveGameF :: XCommandT
+menuSaveGameF =
   XCommandT "Menu.saveGameF" (do
     io (putStrLn "Menu.saveGameF") >> undefined -- TODO
   )
 
-creditsF :: XCommandT
-creditsF =
+menuCreditsF :: XCommandT
+menuCreditsF =
   XCommandT "Menu.creditsF" (do
     io (putStrLn "Menu.creditsF") >> undefined -- TODO
   )
@@ -414,20 +414,8 @@ gameMenuDrawF =
 
 gameMenuKeyF :: KeyFuncT
 gameMenuKeyF =
-  KeyFuncT "Menu.gameMenuKeyF" (\key ->
+  KeyFuncT "Menu.gameMenuKeyF" (\key -> do
     defaultMenuKey gameMenuRef key
-  )
-
-menuLoadGameF :: XCommandT
-menuLoadGameF =
-  XCommandT "Menu.menuLoadGame" (do
-    io (putStrLn "Menu.menuLoadGame") >> undefined -- TODO
-  )
-
-menuSaveGameF :: XCommandT
-menuSaveGameF =
-  XCommandT "Menu.menuSaveGame" (do
-    io (putStrLn "Menu.menuSaveGame") >> undefined -- TODO
   )
 
 menuJoinServerF :: XCommandT
@@ -464,12 +452,6 @@ menuDownloadOptionsF :: XCommandT
 menuDownloadOptionsF =
   XCommandT "Menu.menuDownloadOptions" (do
     io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
-  )
-
-menuCreditsF :: XCommandT
-menuCreditsF =
-  XCommandT "Menu.menuCredits" (do
-    io (putStrLn "Menu.menuCredits") >> undefined -- TODO
   )
 
 menuMultiplayerF :: XCommandT
@@ -552,8 +534,8 @@ draw = do
         S.startLocalSound menuInSound
         menuGlobals.mgEnterSound .= False
 
-menuKeyDown :: Int -> Quake ()
-menuKeyDown key = do
+keyDown :: Int -> Quake ()
+keyDown key = do
     keyFunc <- use $ menuGlobals.mgKeyFunc
 
     case keyFunc of
