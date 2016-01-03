@@ -49,6 +49,9 @@ saveGameMenuRef = MenuFrameworkSReference 5
 loadGameMenuRef :: MenuFrameworkSReference
 loadGameMenuRef = MenuFrameworkSReference 6
 
+joinServerMenuRef :: MenuFrameworkSReference
+joinServerMenuRef = MenuFrameworkSReference 7
+
 modeListRef :: MenuListSReference
 modeListRef = MenuListSReference 0
 

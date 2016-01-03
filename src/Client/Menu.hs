@@ -421,7 +421,61 @@ gameMenuKeyF =
 menuJoinServerF :: XCommandT
 menuJoinServerF =
   XCommandT "Menu.menuJoinServer" (do
-    io (putStrLn "Menu.menuJoinServer") >> undefined -- TODO
+    joinServerMenuInit
+    pushMenu joinServerMenuDrawF joinServerMenuKeyF
+  )
+
+joinServerMenuInit :: Quake ()
+joinServerMenuInit = do
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50 - 120)
+                                                             & mfNItems .~ 0
+                                                             )
+
+    modifyMenuActionSReference joinServerAddressBookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                       & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                                       & maGeneric.mcX .~ 0
+                                                                       & maGeneric.mcY .~ 0
+                                                                       & maGeneric.mcName .~ "easy"
+                                                                       & maGeneric.mcCallback .~ Just easyGameFunc
+                                                                       )
+
+{-
+
+    modifyMenuActionSReference easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                          & maGeneric.mcX .~ 0
+                                                          & maGeneric.mcY .~ 0
+                                                          & maGeneric.mcName .~ "easy"
+                                                          & maGeneric.mcCallback .~ Just easyGameFunc
+                                                          )
+
+    modifyMenuSeparatorSReference blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
+
+    modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                         & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                         & maGeneric.mcX .~ 0
+                                                         & maGeneric.mcY .~ 60
+                                                         & maGeneric.mcName .~ "credits"
+                                                         & maGeneric.mcCallback .~ Just (menuCreditsF^.xcCmd)
+                                                         )
+
+    menuAddItem gameMenuRef (MenuActionRef easyGameActionRef)
+
+    menuCenter gameMenuRef
+    -}
+
+joinServerMenuDrawF :: XCommandT
+joinServerMenuDrawF =
+  XCommandT "Menu.joinServerMenuDrawF" (do
+    io (putStrLn "Menu.joinServerMenuDrawF") >> undefined -- TODO
+  )
+
+joinServerMenuKeyF :: KeyFuncT
+joinServerMenuKeyF =
+  KeyFuncT "Menu.joinServerMenuKeyF" (\key -> do
+    io (putStrLn "Menu.joinServerMenuKeyF") >> undefined -- TODO
   )
 
 menuAddressBookF :: XCommandT
