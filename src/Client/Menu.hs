@@ -437,9 +437,20 @@ joinServerMenuInit = do
                                                                        & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                        & maGeneric.mcX .~ 0
                                                                        & maGeneric.mcY .~ 0
-                                                                       & maGeneric.mcName .~ "easy"
-                                                                       & maGeneric.mcCallback .~ Just easyGameFunc
+                                                                       & maGeneric.mcName .~ "address book"
+                                                                       & maGeneric.mcCallback .~ Just (menuAddressBookF^.xcCmd)
                                                                        )
+
+    modifyMenuActionSReference joinServerSearchActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                  & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                                  & maGeneric.mcX .~ 0
+                                                                  & maGeneric.mcY .~ 10
+                                                                  & maGeneric.mcName .~ "refresh server list"
+                                                                  & maGeneric.mcCallback .~ Just searchLocalGames
+                                                                  & maGeneric.mcStatusBar .~ "search for servers"
+                                                                  )
+
+    undefined -- TODO
 
 {-
 
@@ -690,3 +701,7 @@ menuDraw _ = do
 defaultMenuKey :: MenuFrameworkSReference -> Int -> Quake (Maybe B.ByteString)
 defaultMenuKey _ _ = do
     io (putStrLn "Menu.defaultMenuKey") >> undefined -- TODO
+
+searchLocalGames :: Quake ()
+searchLocalGames = do
+    io (putStrLn "Menu.searchLocalGames") >> undefined -- TODO
