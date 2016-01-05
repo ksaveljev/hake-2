@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Client.MenuGlobals ( module Client.MenuGlobals
                           , module Client.MenuFrameworkS
                           , module Client.MenuLayerT
@@ -211,6 +212,9 @@ playerDownloadActionRef = MenuActionSReference 41
 blankLineRef :: MenuSeparatorSReference
 blankLineRef = MenuSeparatorSReference 0
 
+joinServerServerTitleRef :: MenuSeparatorSReference
+joinServerServerTitleRef = MenuSeparatorSReference 1
+
 menuActions :: [MenuActionS]
 menuActions = [ newMenuActionS --  0 applyAction
               , newMenuActionS --  1 defaultsAction
@@ -295,6 +299,7 @@ initialMenuGlobals =
                                                       ++ replicate Constants.maxLocalServers newMenuActionS -- joinServerActions
                                                     )
               , _mgMenuSeparatorSItems = V.fromList [ newMenuSeparatorS -- blankLine
+                                                    , newMenuSeparatorS -- joinServerServerTitle
                                                     ]
               , _mgLayers              = V.replicate maxMenuDepth newMenuLayerT
               , _mgDrawFunc            = Nothing
@@ -304,4 +309,5 @@ initialMenuGlobals =
               , _mgMainCursor          = 0
               , _mgCached              = False
               , _mgGameCursor          = 0
+              , _mgLocalServerNames    = V.replicate Constants.maxLocalServers ""
               }

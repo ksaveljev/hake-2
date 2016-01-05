@@ -450,32 +450,46 @@ joinServerMenuInit = do
                                                                   & maGeneric.mcStatusBar .~ "search for servers"
                                                                   )
 
-    undefined -- TODO
+    modifyMenuSeparatorSReference joinServerServerTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
+                                                                    & mspGeneric.mcName .~ "connect to..."
+                                                                    & mspGeneric.mcX .~ 80
+                                                                    & mspGeneric.mcY .~ 30
+                                                                    )
 
-{-
+    setupJoinServerActions 0 Constants.maxLocalServers
 
-    modifyMenuActionSReference easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
-                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
-                                                          & maGeneric.mcX .~ 0
-                                                          & maGeneric.mcY .~ 0
-                                                          & maGeneric.mcName .~ "easy"
-                                                          & maGeneric.mcCallback .~ Just easyGameFunc
-                                                          )
+    menuAddItem joinServerMenuRef (MenuActionRef joinServerAddressBookActionRef)
+    menuAddItem joinServerMenuRef (MenuSeparatorRef joinServerServerTitleRef)
+    menuAddItem joinServerMenuRef (MenuActionRef joinServerSearchActionRef)
 
-    modifyMenuSeparatorSReference blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
+    addJoinServerActions 0 Constants.maxLocalServers
 
-    modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
-                                                         & maGeneric.mcFlags .~ Constants.qmfLeftJustify
-                                                         & maGeneric.mcX .~ 0
-                                                         & maGeneric.mcY .~ 60
-                                                         & maGeneric.mcName .~ "credits"
-                                                         & maGeneric.mcCallback .~ Just (menuCreditsF^.xcCmd)
-                                                         )
+    menuCenter joinServerMenuRef
 
-    menuAddItem gameMenuRef (MenuActionRef easyGameActionRef)
+    searchLocalGames
 
-    menuCenter gameMenuRef
-    -}
+  where setupJoinServerActions :: Int -> Int -> Quake ()
+        setupJoinServerActions idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let actionRef = joinServerActions V.! idx
+              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 40 + idx * 10
+                                                            & maGeneric.mcName .~ Constants.noServerString
+                                                            & maGeneric.mcCallback .~ Just (joinServerFunc actionRef)
+                                                            & maGeneric.mcStatusBar .~ "press ENTER to connect"
+                                                            )
+              menuGlobals.mgLocalServerNames.ix idx .= Constants.noServerString
+              setupJoinServerActions (idx + 1) maxIdx
+
+        addJoinServerActions :: Int -> Int -> Quake ()
+        addJoinServerActions idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              menuAddItem joinServerMenuRef (MenuActionRef (joinServerActions V.! idx))
+              addJoinServerActions (idx + 1) maxIdx
 
 joinServerMenuDrawF :: XCommandT
 joinServerMenuDrawF =
@@ -705,3 +719,21 @@ defaultMenuKey _ _ = do
 searchLocalGames :: Quake ()
 searchLocalGames = do
     io (putStrLn "Menu.searchLocalGames") >> undefined -- TODO
+
+joinServerFunc :: MenuActionSReference -> Quake ()
+joinServerFunc _ = do
+    io (putStrLn "Menu.joinServerFunc") >> undefined -- TODO
+
+-- TODO: make sure to initialize this
+{-
+//	   user readable information
+    //	   network address
+    static {
+        for (int n = 0; n < MAX_LOCAL_SERVERS; n++) {
+            local_server_netadr[n] = new netadr_t();
+            local_server_names[n] = "";
+            s_joinserver_server_actions[n] = new menuaction_s();
+            s_joinserver_server_actions[n].n = n;
+        }
+    }
+    -}
