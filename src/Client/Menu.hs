@@ -499,8 +499,8 @@ joinServerMenuDrawF =
 
 joinServerMenuKeyF :: KeyFuncT
 joinServerMenuKeyF =
-  KeyFuncT "Menu.joinServerMenuKeyF" (\key -> do
-    io (putStrLn "Menu.joinServerMenuKeyF") >> undefined -- TODO
+  KeyFuncT "Menu.joinServerMenuKeyF" (\key ->
+    defaultMenuKey joinServerMenuRef key
   )
 
 menuAddressBookF :: XCommandT
