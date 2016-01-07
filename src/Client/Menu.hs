@@ -494,7 +494,8 @@ joinServerMenuInit = do
 joinServerMenuDrawF :: XCommandT
 joinServerMenuDrawF =
   XCommandT "Menu.joinServerMenuDrawF" (do
-    io (putStrLn "Menu.joinServerMenuDrawF") >> undefined -- TODO
+    banner "m_banner_join_server"
+    menuDraw joinServerMenuRef
   )
 
 joinServerMenuKeyF :: KeyFuncT
