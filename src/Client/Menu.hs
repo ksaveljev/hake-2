@@ -514,7 +514,8 @@ menuAddressBookF =
 menuStartServerF :: XCommandT
 menuStartServerF =
   XCommandT "Menu.menuStartServer" (do
-    io (putStrLn "Menu.menuStartServer") >> undefined -- TODO
+    startServerMenuInit
+    pushMenu startServerMenuDraw startServerMenuKey
   )
 
 menuDMOptionsF :: XCommandT
@@ -754,4 +755,20 @@ addressBookMenuKeyF :: KeyFuncT
 addressBookMenuKeyF =
   KeyFuncT "addressBookMenuKeyF" (\key -> do
     io (putStrLn "Menu.addressBookMenuKeyF") >> undefined -- TODO
+  )
+
+startServerMenuInit :: Quake ()
+startServerMenuInit = do
+    io (putStrLn "Menu.startServerMenuInit") >> undefined -- TODO
+
+startServerMenuDraw :: XCommandT
+startServerMenuDraw =
+  XCommandT "startServerMenuDraw" (do
+    io (putStrLn "Menu.startServerMenuDraw") >> undefined -- TODO
+  )
+
+startServerMenuKey :: KeyFuncT
+startServerMenuKey =
+  KeyFuncT "startServerMenuKey" (\key -> do
+    io (putStrLn "Menu.startServerMenuKey") >> undefined -- TODO
   )
