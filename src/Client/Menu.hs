@@ -507,7 +507,8 @@ joinServerMenuKeyF =
 menuAddressBookF :: XCommandT
 menuAddressBookF =
   XCommandT "Menu.menuAddressBook" (do
-    io (putStrLn "Menu.menuAddressBook") >> undefined -- TODO
+    addressBookMenuInit
+    pushMenu addressBookMenuDrawF addressBookMenuKeyF
   )
 
 menuStartServerF :: XCommandT
@@ -738,3 +739,19 @@ joinServerFunc _ = do
         }
     }
     -}
+
+addressBookMenuInit :: Quake ()
+addressBookMenuInit = do
+    io (putStrLn "Menu.addressBookMenuInit") >> undefined -- TODO
+
+addressBookMenuDrawF :: XCommandT
+addressBookMenuDrawF =
+  XCommandT "addressBookMenuDrawF" (do
+    io (putStrLn "Menu.addressBookMenuDrawF") >> undefined
+  )
+
+addressBookMenuKeyF :: KeyFuncT
+addressBookMenuKeyF =
+  KeyFuncT "addressBookMenuKeyF" (\key -> do
+    io (putStrLn "Menu.addressBookMenuKeyF") >> undefined -- TODO
+  )
