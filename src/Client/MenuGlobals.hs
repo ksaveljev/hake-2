@@ -41,6 +41,15 @@ maxMenuDepth = 8
 openGLMenuRef :: MenuFrameworkSReference
 openGLMenuRef = MenuFrameworkSReference 0
 
+multiplayerMenuRef :: MenuFrameworkSReference
+multiplayerMenuRef = MenuFrameworkSReference 1
+
+keysMenuRef :: MenuFrameworkSReference
+keysMenuRef = MenuFrameworkSReference 2
+
+optionsMenuRef :: MenuFrameworkSReference
+optionsMenuRef = MenuFrameworkSReference 3
+
 gameMenuRef :: MenuFrameworkSReference
 gameMenuRef = MenuFrameworkSReference 4
 
@@ -52,6 +61,21 @@ loadGameMenuRef = MenuFrameworkSReference 6
 
 joinServerMenuRef :: MenuFrameworkSReference
 joinServerMenuRef = MenuFrameworkSReference 7
+
+startServerMenuRef :: MenuFrameworkSReference
+startServerMenuRef = MenuFrameworkSReference 8
+
+dmOptionsMenuRef :: MenuFrameworkSReference
+dmOptionsMenuRef = MenuFrameworkSReference 9
+
+downloadOptionsMenuRef :: MenuFrameworkSReference
+downloadOptionsMenuRef = MenuFrameworkSReference 10
+
+addressBookMenuRef :: MenuFrameworkSReference
+addressBookMenuRef = MenuFrameworkSReference 11
+
+playerConfigMenuRef :: MenuFrameworkSReference
+playerConfigMenuRef = MenuFrameworkSReference 12
 
 modeListRef :: MenuListSReference
 modeListRef = MenuListSReference 0

@@ -18,6 +18,7 @@ import qualified Client.CL as CL
 import qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
+import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
@@ -382,7 +383,11 @@ loadGameMenuKeyF =
 menuSaveGameF :: XCommandT
 menuSaveGameF =
   XCommandT "Menu.saveGameF" (do
-    io (putStrLn "Menu.saveGameF") >> undefined -- TODO
+    serverState' <- use $ globals.serverState
+    
+    unless (serverState' == 0) $ do -- only when playing a game
+      saveGameMenuInit
+      pushMenu saveGameMenuDraw saveGameMenuKey
   )
 
 menuCreditsF :: XCommandT
@@ -408,7 +413,7 @@ gameMenuDrawF :: XCommandT
 gameMenuDrawF =
   XCommandT "Menu.gameMenuDrawF" (do
     banner "m_banner_game"
-    adjustCursor gameMenuRef 1
+    menuAdjustCursor gameMenuRef 1
     menuDraw gameMenuRef
   )
 
@@ -527,37 +532,49 @@ menuDMOptionsF =
 menuPlayerConfigF :: XCommandT
 menuPlayerConfigF =
   XCommandT "Menu.menuPlayerConfig" (do
-    io (putStrLn "Menu.menuPlayerConfig") >> undefined -- TODO
+    ok <- playerConfigMenuInit
+    
+    if not ok
+      then
+        menuSetStatusBar multiplayerMenuRef (Just "No valid player models found")
+      else do
+        menuSetStatusBar multiplayerMenuRef Nothing
+        pushMenu playerConfigMenuDraw playerConfigMenuKey
   )
 
 menuDownloadOptionsF :: XCommandT
 menuDownloadOptionsF =
   XCommandT "Menu.menuDownloadOptions" (do
-    io (putStrLn "Menu.menuDownloadOptions") >> undefined -- TODO
+    downloadOptionsMenuInit
+    pushMenu downloadOptionsMenuDraw downloadOptionsMenuKey
   )
 
 menuMultiplayerF :: XCommandT
 menuMultiplayerF =
   XCommandT "Menu.menuMultiplayer" (do
-    io (putStrLn "Menu.menuMultiplayer") >> undefined -- TODO
+    multiplayerMenuInit
+    pushMenu multiplayerMenuDraw multiplayerMenuKey
   )
 
 menuVideoF :: XCommandT
 menuVideoF =
   XCommandT "Menu.menuVideo" (do
-    io (putStrLn "Menu.menuVideo") >> undefined -- TODO
+    VID.menuInit
+    pushMenu VID.menuDraw VID.menuKey
   )
 
 menuOptionsF :: XCommandT
 menuOptionsF =
   XCommandT "Menu.menuOptions" (do
-    io (putStrLn "Menu.menuOptions") >> undefined -- TODO
+    optionsMenuInit
+    pushMenu optionsMenuDraw optionsMenuKey
   )
 
 menuKeysF :: XCommandT
 menuKeysF =
   XCommandT "Menu.menuKeys" (do
-    io (putStrLn "Menu.menuKeys") >> undefined -- TODO
+    keysMenuInit
+    pushMenu keysMenuDrawF keysMenuKeyF
   )
 
 menuQuitF :: XCommandT
@@ -707,9 +724,43 @@ banner name = do
 - to adjust the menu's cursor so that it's at the next available 
 - slot.
 -}
-adjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
-adjustCursor _ _ = do
-    io (putStrLn "Menu.adjustCursor") >> undefined -- TODO
+menuAdjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
+menuAdjustCursor menuRef dir = do
+    menuItemRef <- menuItemAtCursor menuRef
+    
+    case menuItemRef of
+      -- it's not in a valid spot, so crawl in the direction indicated
+      -- until we find a valid spot
+      Nothing -> findValidSpot
+      Just (MenuSeparatorRef _) -> findValidSpot
+      -- it is in a valid spot
+      _ -> return ()
+  
+  where findValidSpot :: Quake ()
+        findValidSpot = do
+          menuItemRef <- menuItemAtCursor menuRef
+          
+          case menuItemRef of
+            Nothing -> updateCursor
+            Just (MenuSeparatorRef _) -> updateCursor
+            _ -> return ()
+            
+        updateCursor :: Quake ()
+        updateCursor = do
+          menu <- readMenuFrameworkSReference menuRef
+          let cursor = (menu^.mfCursor) + dir
+              newCursor = if dir == 1
+                            then if cursor >= (menu^.mfNItems) then 0 else cursor
+                            else if cursor < 0 then (menu^.mfNItems) - 1 else cursor
+          modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor .~ newCursor)
+    
+menuItemAtCursor :: MenuFrameworkSReference -> Quake (Maybe MenuItemReference)
+menuItemAtCursor menuRef = do
+    menu <- readMenuFrameworkSReference menuRef
+    
+    return $ if (menu^.mfCursor) < 0 || (menu^.mfCursor) >= (menu^.mfNItems)
+               then Nothing
+               else Just ((menu^.mfItems) V.! (menu^.mfCursor))
 
 menuDraw :: MenuFrameworkSReference -> Quake ()
 menuDraw _ = do
@@ -747,13 +798,13 @@ addressBookMenuInit = do
 
 addressBookMenuDrawF :: XCommandT
 addressBookMenuDrawF =
-  XCommandT "addressBookMenuDrawF" (do
+  XCommandT "Menu.addressBookMenuDrawF" (do
     io (putStrLn "Menu.addressBookMenuDrawF") >> undefined
   )
 
 addressBookMenuKeyF :: KeyFuncT
 addressBookMenuKeyF =
-  KeyFuncT "addressBookMenuKeyF" (\key -> do
+  KeyFuncT "Menu.addressBookMenuKeyF" (\key -> do
     io (putStrLn "Menu.addressBookMenuKeyF") >> undefined -- TODO
   )
 
@@ -763,12 +814,111 @@ startServerMenuInit = do
 
 startServerMenuDraw :: XCommandT
 startServerMenuDraw =
-  XCommandT "startServerMenuDraw" (do
+  XCommandT "Menu.startServerMenuDraw" (do
     io (putStrLn "Menu.startServerMenuDraw") >> undefined -- TODO
   )
 
 startServerMenuKey :: KeyFuncT
 startServerMenuKey =
-  KeyFuncT "startServerMenuKey" (\key -> do
+  KeyFuncT "Menu.startServerMenuKey" (\key -> do
     io (putStrLn "Menu.startServerMenuKey") >> undefined -- TODO
+  )
+
+saveGameMenuInit :: Quake ()
+saveGameMenuInit = do
+    io (putStrLn "Menu.saveGameMenuInit") >> undefined -- TODO
+  
+saveGameMenuDraw :: XCommandT
+saveGameMenuDraw =
+  XCommandT "Menu.saveGameMenuDraw" (do
+    io (putStrLn "Menu.saveGameMenuDraw") >> undefined -- TODO
+  )
+
+saveGameMenuKey :: KeyFuncT
+saveGameMenuKey =
+  KeyFuncT "Menu.saveGameMenuKey" (\key -> do
+    io (putStrLn "Menu.saveGameMenuKey") >> undefined -- TODO
+  )
+  
+playerConfigMenuInit :: Quake Bool
+playerConfigMenuInit = do
+    io (putStrLn "Menu.playerConfigMenuInit") >> undefined -- TODO
+  
+menuSetStatusBar :: MenuFrameworkSReference -> Maybe B.ByteString -> Quake ()
+menuSetStatusBar menuRef str = modifyMenuFrameworkSReference menuRef (\v -> v & mfStatusBar .~ str)
+  
+playerConfigMenuDraw :: XCommandT
+playerConfigMenuDraw =
+  XCommandT "Menu.playerConfigMenuDraw" (do
+    io (putStrLn "Menu.playerConfigMenuDraw") >> undefined -- TODO
+  )
+  
+playerConfigMenuKey :: KeyFuncT
+playerConfigMenuKey =
+  KeyFuncT "Menu.playerConfigMenuKey" (\key -> do
+    io (putStrLn "Menu.playerConfigMenuKey") >> undefined -- TODO
+  )
+  
+downloadOptionsMenuInit :: Quake ()
+downloadOptionsMenuInit = do
+    io (putStrLn "Menu.downloadOptionsMenuInit") >> undefined -- TODO
+  
+downloadOptionsMenuDraw :: XCommandT
+downloadOptionsMenuDraw =
+  XCommandT "Menu.downloadOptionsMenuDraw" (do
+    io (putStrLn "Menu.downloadOptionsMenuDraw") >> undefined -- TODO
+  )
+  
+downloadOptionsMenuKey :: KeyFuncT
+downloadOptionsMenuKey =
+  KeyFuncT "Menu.downloadOptionsMenuKey" (\key -> do
+    io (putStrLn "Menu.downloadOptionsMenuKey") >> undefined -- TODO
+  )
+
+multiplayerMenuInit :: Quake ()
+multiplayerMenuInit = do
+    io (putStrLn "Menu.multiplayerMenuInit") >> undefined -- TODO
+  
+multiplayerMenuDraw :: XCommandT
+multiplayerMenuDraw =
+  XCommandT "Menu.multiplayerMenuDraw" (do
+    io (putStrLn "Menu.multiplayerMenuDraw") >> undefined -- TODO
+  )
+
+multiplayerMenuKey :: KeyFuncT
+multiplayerMenuKey =
+  KeyFuncT "Menu.multiplayerMenuDraw" (\key -> do
+    io (putStrLn "Menu.multiplayerMenuKey") >> undefined -- TODO
+  )
+  
+optionsMenuInit :: Quake ()
+optionsMenuInit = do
+    io (putStrLn "Menu.optionsMenuInit") >> undefined -- TODO
+
+optionsMenuDraw :: XCommandT
+optionsMenuDraw =
+  XCommandT "Menu.optionsMenuDraw" (do
+    io (putStrLn "Menu.optionsMenuDraw") >> undefined
+  )
+
+optionsMenuKey :: KeyFuncT
+optionsMenuKey =
+  KeyFuncT "Menu.optionsMenuKey" (\key -> do
+    io (putStrLn "Menu.optionsMenuKey") >> undefined -- TODO
+  )
+  
+keysMenuInit :: Quake ()
+keysMenuInit = do
+    io (putStrLn "Menu.keysMenuInit") >> undefined -- TODO
+
+keysMenuDrawF :: XCommandT
+keysMenuDrawF =
+  XCommandT "Menu.keysMenuDrawF" (do
+    io (putStrLn "Menu.keysMenuDrawF") >> undefined -- TODO
+  )
+
+keysMenuKeyF :: KeyFuncT
+keysMenuKeyF =
+  KeyFuncT "Menu.keysMenuKeyF" (\key -> do
+    io (putStrLn "Menu.keysMenuKeyF") >> undefined -- TODO
   )

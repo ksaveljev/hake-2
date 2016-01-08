@@ -1764,7 +1764,7 @@ data MenuFrameworkS =
                  , _mfNItems     :: !Int
                  , _mfNSlots     :: !Int
                  , _mfItems      :: V.Vector MenuItemReference
-                 , _mfStatusBar  :: B.ByteString
+                 , _mfStatusBar  :: Maybe B.ByteString
                  , _mfCursorDraw :: Maybe (Quake ())
                  }
 

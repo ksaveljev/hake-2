@@ -487,3 +487,15 @@ newWindow width height =
 shutdown :: Quake ()
 shutdown = do
     io (putStrLn "VID.shutdown") >> undefined -- TODO
+
+menuDraw :: XCommandT
+menuDraw =
+  XCommandT "VID.menuDraw" (do
+    io (putStrLn "VID.menuDraw") >> undefined -- TODO
+  )
+
+menuKey :: KeyFuncT
+menuKey =
+  KeyFuncT "VID.menuKey" (\key -> do
+    io (putStrLn "VID.menuKey") >> undefined -- TODO
+  )

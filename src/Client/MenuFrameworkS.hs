@@ -21,6 +21,6 @@ newMenuFrameworkS =
                  , _mfNItems     = 0
                  , _mfNSlots     = 0
                  , _mfItems      = V.empty
-                 , _mfStatusBar  = ""
+                 , _mfStatusBar  = Nothing
                  , _mfCursorDraw = Nothing
                  }
