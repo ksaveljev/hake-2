@@ -799,14 +799,25 @@ addressBookMenuInit = do
 addressBookMenuDrawF :: XCommandT
 addressBookMenuDrawF =
   XCommandT "Menu.addressBookMenuDrawF" (do
-    io (putStrLn "Menu.addressBookMenuDrawF") >> undefined
+    banner "m_banner_addressbook"
+    menuDraw addressBookMenuRef
   )
 
 addressBookMenuKeyF :: KeyFuncT
 addressBookMenuKeyF =
   KeyFuncT "Menu.addressBookMenuKeyF" (\key -> do
-    io (putStrLn "Menu.addressBookMenuKeyF") >> undefined -- TODO
+    when (key == KeyConstants.kEscape) $
+      setAddressBookCVars 0 Constants.numAddressBookEntries
+
+    defaultMenuKey addressBookMenuRef key
   )
+
+  where setAddressBookCVars :: Int -> Int -> Quake ()
+        setAddressBookCVars idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              CVar.set undefined undefined -- TODO
+              setAddressBookCVars (idx + 1) maxIdx
 
 startServerMenuInit :: Quake ()
 startServerMenuInit = do
@@ -814,9 +825,7 @@ startServerMenuInit = do
 
 startServerMenuDraw :: XCommandT
 startServerMenuDraw =
-  XCommandT "Menu.startServerMenuDraw" (do
-    io (putStrLn "Menu.startServerMenuDraw") >> undefined -- TODO
-  )
+  XCommandT "Menu.startServerMenuDraw" (menuDraw startServerMenuRef)
 
 startServerMenuKey :: KeyFuncT
 startServerMenuKey =
