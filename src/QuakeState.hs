@@ -90,6 +90,9 @@ module QuakeState ( QuakeState(..)
                   , readMenuSeparatorSReference
                   , modifyMenuSeparatorSReference
                   , writeMenuSeparatorSReference
+                  , readMenuFieldSReference
+                  , modifyMenuFieldSReference
+                  , writeMenuFieldSReference
                   , MTexInfoReference(..)
                   , MNodeReference(..)
                   , SfxReference(..)
@@ -379,3 +382,16 @@ modifyMenuSeparatorSReference (MenuSeparatorSReference idx) f =
 writeMenuSeparatorSReference :: MenuSeparatorSReference -> MenuSeparatorS -> Quake ()
 writeMenuSeparatorSReference (MenuSeparatorSReference idx) menuItem =
     menuGlobals.mgMenuSeparatorSItems.ix idx .= menuItem
+
+readMenuFieldSReference :: MenuFieldSReference -> Quake MenuFieldS
+readMenuFieldSReference (MenuFieldSReference idx) = do
+    Just menuItem <- preuse $ menuGlobals.mgMenuFieldSItems.ix idx
+    return menuItem
+
+modifyMenuFieldSReference :: MenuFieldSReference -> (MenuFieldS -> MenuFieldS) -> Quake ()
+modifyMenuFieldSReference (MenuFieldSReference idx) f =
+    menuGlobals.mgMenuFieldSItems.ix idx %= f
+
+writeMenuFieldSReference :: MenuFieldSReference -> MenuFieldS -> Quake ()
+writeMenuFieldSReference (MenuFieldSReference idx) menuItem =
+    menuGlobals.mgMenuFieldSItems.ix idx .= menuItem

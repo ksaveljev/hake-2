@@ -147,10 +147,14 @@ newtype MenuSliderSReference = MenuSliderSReference Int
 -- reference to menuGlobals.mgMenuSeparatorSItems
 newtype MenuSeparatorSReference = MenuSeparatorSReference Int
 
+-- reference to menuGlobals.mgMenuFieldSItems
+newtype MenuFieldSReference = MenuFieldSReference Int
+
 data MenuItemReference = MenuListRef MenuListSReference
                        | MenuActionRef MenuActionSReference
                        | MenuSliderRef MenuSliderSReference
                        | MenuSeparatorRef MenuSeparatorSReference
+                       | MenuFieldRef MenuFieldSReference
 
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int
@@ -1807,12 +1811,22 @@ data MenuSeparatorS =
   MenuSeparatorS { _mspGeneric :: MenuCommonS
                  }
 
+data MenuFieldS =
+  MenuFieldS { _mflGeneric       :: MenuCommonS
+             , _mflBuffer        :: Maybe B.ByteString
+             , _mflCursor        :: Int
+             , _mflLength        :: Int
+             , _mflVisibleLength :: Int
+             , _mflVisibleOffset :: Int
+             }
+
 data MenuGlobals =
   MenuGlobals { _mgMenuFrameworks      :: V.Vector MenuFrameworkS
               , _mgMenuListSItems      :: V.Vector MenuListS
               , _mgMenuSliderSItems    :: V.Vector MenuSliderS
               , _mgMenuActionSItems    :: V.Vector MenuActionS
               , _mgMenuSeparatorSItems :: V.Vector MenuSeparatorS
+              , _mgMenuFieldSItems     :: V.Vector MenuFieldS
               , _mgLayers              :: V.Vector MenuLayerT
               , _mgDrawFunc            :: Maybe XCommandT
               , _mgKeyFunc             :: Maybe KeyFuncT
@@ -1821,6 +1835,7 @@ data MenuGlobals =
               , _mgMainCursor          :: !Int
               , _mgCached              :: !Bool
               , _mgGameCursor          :: !Int
+              , _mgSaveStrings         :: V.Vector B.ByteString
               , _mgLocalServerNames    :: V.Vector B.ByteString
               }
 

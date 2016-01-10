@@ -6,6 +6,7 @@ import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (
 import Control.Monad (when, void, unless)
 import Data.Char (ord)
 import Data.Maybe (fromJust)
+import Linear (V4(..))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -352,16 +353,22 @@ loadGameMenuInit = do
                                                            & mfNItems .~ 0
                                                            )
 
-    createSaveStrings 0 maxSaveGames
+    createSaveStrings
+    
+    setupLoadGameMenuActions 0 maxSaveGames
 
     io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
 
+  where setupLoadGameMenuActions :: Int -> Int -> Quake ()
+        setupLoadGameMenuActions idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
+
 -- Search the save dir for saved games and their names.
-createSaveStrings :: Int -> Int -> Quake ()
-createSaveStrings idx maxIdx
-  | idx >= maxIdx = return ()
-  | otherwise = do
-      io (putStrLn "Menu.createSaveStrings") >> undefined -- TODO
+createSaveStrings :: Quake ()
+createSaveStrings = do
+    io (putStrLn "Menu.createSaveStrings") >> undefined -- TODO
 
 loadGameMenuDrawF :: XCommandT
 loadGameMenuDrawF =
@@ -434,7 +441,7 @@ joinServerMenuInit :: Quake ()
 joinServerMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50 - 120)
+    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50) - 120
                                                              & mfNItems .~ 0
                                                              )
 
@@ -763,8 +770,68 @@ menuItemAtCursor menuRef = do
                else Just ((menu^.mfItems) V.! (menu^.mfCursor))
 
 menuDraw :: MenuFrameworkSReference -> Quake ()
-menuDraw _ = do
+menuDraw menuRef = do
+    menu <- readMenuFrameworkSReference menuRef
+
+    drawContents menu 0 (menu^.mfNItems)
+
+    itemRef <- menuItemAtCursor menuRef
     io (putStrLn "Menu.menuDraw") >> undefined -- TODO
+
+  where drawContents :: MenuFrameworkS -> Int -> Int -> Quake ()
+        drawContents menu idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let itemRef = (menu^.mfItems) V.! idx
+              menuCommon <- menuItemCommon itemRef
+
+              if | (menuCommon^.mcType) == Constants.mtypeField -> do
+                     let MenuFieldRef menuItemRef = itemRef
+                     menuItem <- readMenuFieldSReference menuItemRef
+                     fieldDraw menuItem
+
+                 | (menuCommon^.mcType) == Constants.mtypeSlider -> do
+                     let MenuSliderRef menuItemRef = itemRef
+                     menuItem <- readMenuSliderSReference menuItemRef
+                     sliderDraw menuItem
+
+                 | (menuCommon^.mcType) == Constants.mtypeList -> do
+                     let MenuListRef menuItemRef = itemRef
+                     menuItem <- readMenuListSReference menuItemRef
+                     menuListDraw menuItem
+
+                 | (menuCommon^.mcType) == Constants.mtypeSpinControl -> do
+                     let MenuListRef menuItemRef = itemRef
+                     menuItem <- readMenuListSReference menuItemRef
+                     spinControlDraw menuItem
+
+                 | (menuCommon^.mcType) == Constants.mtypeAction -> do
+                     let MenuActionRef menuItemRef = itemRef
+                     menuItem <- readMenuActionSReference menuItemRef
+                     actionDraw menuItem
+
+                 | (menuCommon^.mcType) == Constants.mtypeSeparator -> do
+                     let MenuSeparatorRef menuItemRef = itemRef
+                     menuItem <- readMenuSeparatorSReference menuItemRef
+                     separatorDraw menuItem
+
+              drawContents menu (idx + 1) maxIdx
+
+menuItemCommon :: MenuItemReference -> Quake MenuCommonS
+menuItemCommon menuItemRef = do
+    case menuItemRef of
+      MenuListRef itemRef -> do
+        menuItem <- readMenuListSReference itemRef
+        return (menuItem^.mlGeneric)
+      MenuActionRef itemRef -> do
+        menuItem <- readMenuActionSReference itemRef
+        return (menuItem^.maGeneric)
+      MenuSliderRef itemRef -> do
+        menuItem <- readMenuSliderSReference itemRef
+        return (menuItem^.msGeneric)
+      MenuSeparatorRef itemRef -> do
+        menuItem <- readMenuSeparatorSReference itemRef
+        return (menuItem^.mspGeneric)
 
 defaultMenuKey :: MenuFrameworkSReference -> Int -> Quake (Maybe B.ByteString)
 defaultMenuKey _ _ = do
@@ -835,7 +902,35 @@ startServerMenuKey =
 
 saveGameMenuInit :: Quake ()
 saveGameMenuInit = do
-    io (putStrLn "Menu.saveGameMenuInit") >> undefined -- TODO
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50) - 120
+                                                           & mfY .~ truncate (fromIntegral (vidDef'^.vdHeight) * 0.50) - 58
+                                                           & mfNItems .~ 0
+                                                          )
+
+    createSaveStrings
+
+    -- don't include the autosave slot
+    saveStrings <- use $ menuGlobals.mgSaveStrings
+    setupSaveGameMenuActions saveStrings 0 maxSaveGames
+
+  where setupSaveGameMenuActions :: V.Vector B.ByteString -> Int -> Int -> Quake ()
+        setupSaveGameMenuActions saveStrings idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let actionRef = saveGameActions V.! idx
+              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ (saveStrings V.! (idx + 1))
+                                                            & maGeneric.mcLocalData .~ V4 (idx + 1) 0 0 0
+                                                            & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                            & maGeneric.mcCallback .~ Just (saveGameCallback actionRef)
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ idx * 10
+                                                            & maGeneric.mcType .~ Constants.mtypeAction
+                                                            )
+
+              menuAddItem saveGameMenuRef (MenuActionRef actionRef)
+              setupSaveGameMenuActions saveStrings (idx + 1) maxIdx
   
 saveGameMenuDraw :: XCommandT
 saveGameMenuDraw =
@@ -931,3 +1026,31 @@ keysMenuKeyF =
   KeyFuncT "Menu.keysMenuKeyF" (\key -> do
     io (putStrLn "Menu.keysMenuKeyF") >> undefined -- TODO
   )
+
+saveGameCallback :: MenuActionSReference -> Quake ()
+saveGameCallback _ = do
+    io (putStrLn "Menu.saveGameCallback") >> undefined -- TODO
+
+fieldDraw :: MenuFieldS -> Quake ()
+fieldDraw _ = do
+    io (putStrLn "Menu.fieldDraw") >> undefined -- TODO
+
+sliderDraw :: MenuSliderS -> Quake ()
+sliderDraw _ = do
+    io (putStrLn "Menu.sliderDraw") >> undefined -- TODO
+
+menuListDraw :: MenuListS -> Quake ()
+menuListDraw _ = do
+    io (putStrLn "Menu.menuListDraw") >> undefined -- TODO
+
+spinControlDraw :: MenuListS -> Quake ()
+spinControlDraw _ = do
+    io (putStrLn "Menu.spinControlDraw") >> undefined -- TODO
+
+actionDraw :: MenuActionS -> Quake ()
+actionDraw _ = do
+    io (putStrLn "Menu.actionDraw") >> undefined -- TODO
+
+separatorDraw :: MenuSeparatorS -> Quake ()
+separatorDraw _ = do
+    io (putStrLn "Menu.separatorDraw") >> undefined -- TODO

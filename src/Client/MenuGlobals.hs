@@ -325,6 +325,7 @@ initialMenuGlobals =
               , _mgMenuSeparatorSItems = V.fromList [ newMenuSeparatorS -- blankLine
                                                     , newMenuSeparatorS -- joinServerServerTitle
                                                     ]
+              , _mgMenuFieldSItems     = V.empty
               , _mgLayers              = V.replicate maxMenuDepth newMenuLayerT
               , _mgDrawFunc            = Nothing
               , _mgKeyFunc             = Nothing
@@ -333,5 +334,6 @@ initialMenuGlobals =
               , _mgMainCursor          = 0
               , _mgCached              = False
               , _mgGameCursor          = 0
+              , _mgSaveStrings         = V.replicate maxSaveGames ""
               , _mgLocalServerNames    = V.replicate Constants.maxLocalServers ""
               }

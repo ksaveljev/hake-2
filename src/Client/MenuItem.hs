@@ -3,6 +3,7 @@ module Client.MenuItem ( MenuListS(..)
                        , MenuActionS(..)
                        , MenuSliderS(..)
                        , MenuSeparatorS(..)
+                       , MenuFieldS(..)
                        , module Client.MenuItem
                        , module Client.MenuCommonS
                        ) where
@@ -43,3 +44,13 @@ newMenuSeparatorS :: MenuSeparatorS
 newMenuSeparatorS =
   MenuSeparatorS { _mspGeneric = newMenuCommonS
                  }
+
+newMenuFieldS :: MenuFieldS
+newMenuFieldS =
+  MenuFieldS { _mflGeneric       = newMenuCommonS
+             , _mflBuffer        = Nothing
+             , _mflCursor        = 0
+             , _mflLength        = 0
+             , _mflVisibleLength = 0
+             , _mflVisibleOffset = 0
+             }
