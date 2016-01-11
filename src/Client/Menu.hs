@@ -34,6 +34,9 @@ mainItems = 5
 numCursorFrames :: Int
 numCursorFrames = 15
 
+yesNoNames :: V.Vector B.ByteString
+yesNoNames = V.fromList ["no", "yes"]
+
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
 
@@ -1014,28 +1017,128 @@ downloadOptionsMenuInit = do
                                                                   & mfNItems .~ 0
                                                                   )
 
-    modifyMenuSeparatorSReference downloadTitleRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSeparator
-                                                            & msGeneric.mcName .~ "Download Options"
-                                                            & msGeneric.mcX .~ 48
-                                                            & msGeneric.mcY .~ 0
+    modifyMenuSeparatorSReference downloadTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
+                                                            & mspGeneric.mcName .~ "Download Options"
+                                                            & mspGeneric.mcX .~ 48
+                                                            & mspGeneric.mcY .~ 0
                                                             )
-    io (putStrLn "Menu.downloadOptionsMenuInit") >> undefined -- TODO
+
+    allowDownload <- CVar.variableValue "allow_download"
+
+    modifyMenuListSReference allowDownloadBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                          & mlGeneric.mcX .~ 0
+                                                          & mlGeneric.mcY .~ 20
+                                                          & mlGeneric.mcName .~ "allow downloading"
+                                                          & mlGeneric.mcCallback .~ Just (downloadCallback allowDownloadBoxRef)
+                                                          & mlItemNames .~ yesNoNames
+                                                          & mlCurValue .~ if allowDownload /= 0 then 1 else 0
+                                                          )
+
+    allowDownloadMaps <- CVar.variableValue "allow_download_maps"
+
+    modifyMenuListSReference allowDownloadMapsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                              & mlGeneric.mcX .~ 0
+                                                              & mlGeneric.mcY .~ 40
+                                                              & mlGeneric.mcName .~ "maps"
+                                                              & mlGeneric.mcCallback .~ Just (downloadCallback allowDownloadMapsBoxRef)
+                                                              & mlItemNames .~ yesNoNames
+                                                              & mlCurValue .~ if allowDownloadMaps /= 0 then 1 else 0
+                                                              )
+
+    allowDownloadPlayers <- CVar.variableValue "allow_download_players"
+
+    modifyMenuListSReference allowDownloadPlayersBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                                 & mlGeneric.mcX .~ 0
+                                                                 & mlGeneric.mcY .~ 50
+                                                                 & mlGeneric.mcName .~ "player models/skins"
+                                                                 & mlGeneric.mcCallback .~ Just (downloadCallback allowDownloadPlayersBoxRef)
+                                                                 & mlItemNames .~ yesNoNames
+                                                                 & mlCurValue .~ if allowDownloadPlayers /= 0 then 1 else 0
+                                                                 )
+
+    allowDownloadModels <- CVar.variableValue "allow_download_models"
+
+    modifyMenuListSReference allowDownloadModelsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                                & mlGeneric.mcX .~ 0
+                                                                & mlGeneric.mcY .~ 60
+                                                                & mlGeneric.mcName .~ "models"
+                                                                & mlGeneric.mcCallback .~ Just (downloadCallback allowDownloadModelsBoxRef)
+                                                                & mlItemNames .~ yesNoNames
+                                                                & mlCurValue .~ if allowDownloadModels /= 0 then 1 else 0
+                                                                )
+
+    allowDownloadSounds <- CVar.variableValue "allow_download_sounds"
+
+    modifyMenuListSReference allowDownloadSoundsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                                & mlGeneric.mcX .~ 0
+                                                                & mlGeneric.mcY .~ 70
+                                                                & mlGeneric.mcName .~ "sounds"
+                                                                & mlGeneric.mcCallback .~ Just (downloadCallback allowDownloadSoundsBoxRef)
+                                                                & mlItemNames .~ yesNoNames
+                                                                & mlCurValue .~ if allowDownloadSounds /= 0 then 1 else 0
+                                                                )
+
+    menuAddItem downloadOptionsMenuRef (MenuSeparatorRef downloadTitleRef)
+    menuAddItem downloadOptionsMenuRef (MenuListRef allowDownloadBoxRef)
+    menuAddItem downloadOptionsMenuRef (MenuListRef allowDownloadMapsBoxRef)
+    menuAddItem downloadOptionsMenuRef (MenuListRef allowDownloadPlayersBoxRef)
+    menuAddItem downloadOptionsMenuRef (MenuListRef allowDownloadModelsBoxRef)
+    menuAddItem downloadOptionsMenuRef (MenuListRef allowDownloadSoundsBoxRef)
+
+    menuCenter downloadOptionsMenuRef
+
+    -- skip over title
+    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfCursor %~ (\c -> if c == 0 then 1 else c))
   
 downloadOptionsMenuDraw :: XCommandT
 downloadOptionsMenuDraw =
-  XCommandT "Menu.downloadOptionsMenuDraw" (do
-    io (putStrLn "Menu.downloadOptionsMenuDraw") >> undefined -- TODO
-  )
+  XCommandT "Menu.downloadOptionsMenuDraw" (menuDraw downloadOptionsMenuRef)
   
 downloadOptionsMenuKey :: KeyFuncT
 downloadOptionsMenuKey =
-  KeyFuncT "Menu.downloadOptionsMenuKey" (\key -> do
-    io (putStrLn "Menu.downloadOptionsMenuKey") >> undefined -- TODO
+  KeyFuncT "Menu.downloadOptionsMenuKey" (\key ->
+    defaultMenuKey downloadOptionsMenuRef key
   )
 
 multiplayerMenuInit :: Quake ()
 multiplayerMenuInit = do
-    io (putStrLn "Menu.multiplayerMenuInit") >> undefined -- TODO
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference multiplayerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50 - 64)
+                                                              & mfNItems .~ 0
+                                                              )
+
+    modifyMenuActionSReference joinNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                   & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                                   & maGeneric.mcX .~ 0
+                                                                   & maGeneric.mcY .~ 0
+                                                                   & maGeneric.mcName .~ " join network server"
+                                                                   & maGeneric.mcCallback .~ Just (menuJoinServerF^.xcCmd)
+                                                                   )
+
+    modifyMenuActionSReference startNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                    & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                                    & maGeneric.mcX .~ 0
+                                                                    & maGeneric.mcY .~ 10
+                                                                    & maGeneric.mcName .~ " start network server"
+                                                                    & maGeneric.mcCallback .~ Just (menuStartServerF^.xcCmd)
+                                                                    )
+
+    modifyMenuActionSReference playerSetupActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                             & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                             & maGeneric.mcX .~ 0
+                                                             & maGeneric.mcY .~ 20
+                                                             & maGeneric.mcName .~ " player setup"
+                                                             & maGeneric.mcCallback .~ Just (menuPlayerConfigF^.xcCmd)
+                                                             )
+
+    menuAddItem multiplayerMenuRef (MenuActionRef joinNetworkServerActionRef)
+    menuAddItem multiplayerMenuRef (MenuActionRef startNetworkServerActionRef)
+    menuAddItem multiplayerMenuRef (MenuActionRef playerSetupActionRef)
+
+    menuSetStatusBar multiplayerMenuRef Nothing
+
+    menuCenter multiplayerMenuRef
   
 multiplayerMenuDraw :: XCommandT
 multiplayerMenuDraw =
@@ -1108,3 +1211,7 @@ actionDraw _ = do
 separatorDraw :: MenuSeparatorS -> Quake ()
 separatorDraw _ = do
     io (putStrLn "Menu.separatorDraw") >> undefined -- TODO
+
+downloadCallback :: MenuListSReference -> Quake ()
+downloadCallback _ = do
+    io (putStrLn "Menu.downloadCallback") >> undefined -- TODO

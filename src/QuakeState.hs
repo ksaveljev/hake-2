@@ -64,6 +64,7 @@ module QuakeState ( QuakeState(..)
                   , GLPolyReference(..)
                   , MenuFrameworkSReference
                   , MenuActionSReference
+                  , MenuListSReference
                   , MenuItemReference(..)
                   , CPlaneReference
                   , newCPlaneReference
