@@ -1771,7 +1771,7 @@ data MenuFrameworkS =
                  , _mfStatusBar  :: Maybe B.ByteString
                  , _mfCursorDraw :: Maybe (Quake ())
                  }
-
+                 
 data MenuCommonS =
   MenuCommonS { _mcType          :: !Int
               , _mcName          :: B.ByteString

@@ -77,12 +77,6 @@ addressBookMenuRef = MenuFrameworkSReference 11
 playerConfigMenuRef :: MenuFrameworkSReference
 playerConfigMenuRef = MenuFrameworkSReference 12
 
-modeListRef :: MenuListSReference
-modeListRef = MenuListSReference 0
-
-refListRef :: MenuListSReference
-refListRef = MenuListSReference 1
-
 tqSliderRef :: MenuSliderSReference
 tqSliderRef = MenuSliderSReference 0
 
@@ -91,6 +85,12 @@ screenSizeSliderRef = MenuSliderSReference 1
 
 brightnessSliderRef :: MenuSliderSReference
 brightnessSliderRef = MenuSliderSReference 2
+
+modeListRef :: MenuListSReference
+modeListRef = MenuListSReference 0
+
+refListRef :: MenuListSReference
+refListRef = MenuListSReference 1
 
 fsBoxRef :: MenuListSReference
 fsBoxRef = MenuListSReference 2
@@ -106,6 +106,126 @@ vSyncBoxRef = MenuListSReference 5
 
 windowedMouseRef :: MenuListSReference
 windowedMouseRef = MenuListSReference 6
+
+optionsFreeLookBoxRef :: MenuListSReference
+optionsFreeLookBoxRef = MenuListSReference 7
+
+optionsNoAltTabBoxRef :: MenuListSReference
+optionsNoAltTabBoxRef = MenuListSReference 8
+
+optionsAlwaysRunBoxRef :: MenuListSReference
+optionsAlwaysRunBoxRef = MenuListSReference 9
+
+optionsInvertMouseBoxRef :: MenuListSReference
+optionsInvertMouseBoxRef = MenuListSReference 10
+
+optionsLookSpringBoxRef :: MenuListSReference
+optionsLookSpringBoxRef = MenuListSReference 11
+
+optionsLookStrafeBoxRef :: MenuListSReference
+optionsLookStrafeBoxRef = MenuListSReference 12
+
+optionsCrosshairBoxRef :: MenuListSReference
+optionsCrosshairBoxRef = MenuListSReference 13
+
+optionsJoystickBoxRef :: MenuListSReference
+optionsJoystickBoxRef = MenuListSReference 14
+
+optionsCdVolumeBoxRef :: MenuListSReference
+optionsCdVolumeBoxRef = MenuListSReference 15
+
+optionsQualityListRef :: MenuListSReference
+optionsQualityListRef = MenuListSReference 16
+
+startMapListRef :: MenuListSReference
+startMapListRef = MenuListSReference 17
+
+rulesBoxRef :: MenuListSReference
+rulesBoxRef = MenuListSReference 18
+
+friendlyFireBoxRef :: MenuListSReference
+friendlyFireBoxRef = MenuListSReference 19
+
+fallsBoxRef :: MenuListSReference
+fallsBoxRef = MenuListSReference 20
+
+weaponsStayBoxRef :: MenuListSReference
+weaponsStayBoxRef = MenuListSReference 21
+
+instantPowerUpsBoxRef :: MenuListSReference
+instantPowerUpsBoxRef = MenuListSReference 22
+
+powerUpsBoxRef :: MenuListSReference
+powerUpsBoxRef = MenuListSReference 23
+
+healthBoxRef :: MenuListSReference
+healthBoxRef = MenuListSReference 24
+
+spawnFarthestBoxRef :: MenuListSReference
+spawnFarthestBoxRef = MenuListSReference 25
+
+teamPlayBoxRef :: MenuListSReference
+teamPlayBoxRef = MenuListSReference 26
+
+sameLevelBoxRef :: MenuListSReference
+sameLevelBoxRef = MenuListSReference 27
+
+forceRespawnBoxRef :: MenuListSReference
+forceRespawnBoxRef = MenuListSReference 28
+
+armorBoxRef :: MenuListSReference
+armorBoxRef = MenuListSReference 29
+
+allowExitBoxRef :: MenuListSReference
+allowExitBoxRef = MenuListSReference 30
+
+infiniteAmmoBoxRef :: MenuListSReference
+infiniteAmmoBoxRef = MenuListSReference 31
+
+fixedFovBoxRef :: MenuListSReference
+fixedFovBoxRef = MenuListSReference 32
+
+quadDropBoxRef :: MenuListSReference
+quadDropBoxRef = MenuListSReference 33
+
+noMinesBoxRef :: MenuListSReference
+noMinesBoxRef = MenuListSReference 34
+
+noNukesBoxRef :: MenuListSReference
+noNukesBoxRef = MenuListSReference 35
+
+stackDoubleBoxRef :: MenuListSReference
+stackDoubleBoxRef = MenuListSReference 36
+
+noSpheresBoxRef :: MenuListSReference
+noSpheresBoxRef = MenuListSReference 37
+
+allowDownloadBoxRef :: MenuListSReference
+allowDownloadBoxRef = MenuListSReference 38
+
+allowDownloadMapsBoxRef :: MenuListSReference
+allowDownloadMapsBoxRef = MenuListSReference 39
+
+allowDownloadModelsBoxRef :: MenuListSReference
+allowDownloadModelsBoxRef = MenuListSReference 40
+
+allowDownloadPlayersBoxRef :: MenuListSReference
+allowDownloadPlayersBoxRef = MenuListSReference 41
+
+allowDownloadSoundsBoxRef :: MenuListSReference
+allowDownloadSoundsBoxRef = MenuListSReference 42
+
+playerModelBoxRef :: MenuListSReference
+playerModelBoxRef = MenuListSReference 43
+
+playerSkinBoxRef :: MenuListSReference
+playerSkinBoxRef = MenuListSReference 44
+
+playerHandednessBoxRef :: MenuListSReference
+playerHandednessBoxRef = MenuListSReference 45
+
+playerRateBoxRef :: MenuListSReference
+playerRateBoxRef = MenuListSReference 46
 
 applyActionRef :: MenuActionSReference
 applyActionRef = MenuActionSReference 0
@@ -239,6 +359,21 @@ blankLineRef = MenuSeparatorSReference 0
 joinServerServerTitleRef :: MenuSeparatorSReference
 joinServerServerTitleRef = MenuSeparatorSReference 1
 
+downloadTitleRef :: MenuSeparatorSReference
+downloadTitleRef = MenuSeparatorSReference 2
+
+playerSkinTitleRef :: MenuSeparatorSReference
+playerSkinTitleRef = MenuSeparatorSReference 3
+
+playerModelTitleRef :: MenuSeparatorSReference
+playerModelTitleRef = MenuSeparatorSReference 4
+
+playerHandTitleRef :: MenuSeparatorSReference
+playerHandTitleRef = MenuSeparatorSReference 5
+
+playerRateTitleRef :: MenuSeparatorSReference
+playerRateTitleRef = MenuSeparatorSReference 6
+
 menuActions :: [MenuActionS]
 menuActions = [ newMenuActionS --  0 applyAction
               , newMenuActionS --  1 defaultsAction
@@ -305,13 +440,53 @@ joinServerActionsOffset = saveGameActionsOffset + maxSaveGames
 initialMenuGlobals :: MenuGlobals
 initialMenuGlobals =
   MenuGlobals { _mgMenuFrameworks      = V.replicate 13 newMenuFrameworkS
-              , _mgMenuListSItems      = V.fromList [ newMenuListS -- modeList
-                                                    , newMenuListS -- refList
-                                                    , newMenuListS -- fsBox
-                                                    , newMenuListS -- stippleBox
-                                                    , newMenuListS -- palettedTextureBox
-                                                    , newMenuListS -- vSyncBox
-                                                    , newMenuListS -- windowedMouse
+              , _mgMenuListSItems      = V.fromList [ newMenuListS --  0 modeList
+                                                    , newMenuListS --  1 refList
+                                                    , newMenuListS --  2 fsBox
+                                                    , newMenuListS --  3 stippleBox
+                                                    , newMenuListS --  4 palettedTextureBox
+                                                    , newMenuListS --  5 vSyncBox
+                                                    , newMenuListS --  6 windowedMouse
+                                                    , newMenuListS --  7 optionsFreeLookBox
+                                                    , newMenuListS --  8 optionsNoAltTabBox
+                                                    , newMenuListS --  9 optionsAlwaysRunBox
+                                                    , newMenuListS -- 10 optionsInvertMouseBox
+                                                    , newMenuListS -- 11 optionsLookSpringBox
+                                                    , newMenuListS -- 12 optionsLookStrafeBox
+                                                    , newMenuListS -- 13 optionsCrosshairBox
+                                                    , newMenuListS -- 14 optionsJoystickBox
+                                                    , newMenuListS -- 15 optionsCdVolumeBox
+                                                    , newMenuListS -- 16 optionsQualityList
+                                                    , newMenuListS -- 17 startMapList
+                                                    , newMenuListS -- 18 rulesBox
+                                                    , newMenuListS -- 19 friendlyFireBox
+                                                    , newMenuListS -- 20 fallsBox
+                                                    , newMenuListS -- 21 weaponsStayBox
+                                                    , newMenuListS -- 22 instantPowerUpsBox
+                                                    , newMenuListS -- 23 powerUpsBox
+                                                    , newMenuListS -- 24 healthBox
+                                                    , newMenuListS -- 25 spawnFarthestBox
+                                                    , newMenuListS -- 26 teamPlayBox
+                                                    , newMenuListS -- 27 sameLevelBox
+                                                    , newMenuListS -- 28 forceRespawnBox
+                                                    , newMenuListS -- 29 armorBox
+                                                    , newMenuListS -- 30 allowExitBox
+                                                    , newMenuListS -- 31 infiniteAmmoBox
+                                                    , newMenuListS -- 32 fixedFovBox
+                                                    , newMenuListS -- 33 quadDropBox
+                                                    , newMenuListS -- 34 noMinesBox
+                                                    , newMenuListS -- 35 noNukesBox
+                                                    , newMenuListS -- 36 stackDoubleBox
+                                                    , newMenuListS -- 37 noSpheresBox
+                                                    , newMenuListS -- 38 allowDownloadBox
+                                                    , newMenuListS -- 39 allowDownloadMapsBox
+                                                    , newMenuListS -- 40 allowDownloadModelsBox
+                                                    , newMenuListS -- 41 allowDownloadPlayersBox
+                                                    , newMenuListS -- 42 allowDownloadSoundsBox
+                                                    , newMenuListS -- 43 playerModelBox
+                                                    , newMenuListS -- 44 playerSkinBox
+                                                    , newMenuListS -- 45 playerHandednessBox
+                                                    , newMenuListS -- 46 playerRateBox
                                                     ]
               , _mgMenuSliderSItems    = V.fromList [ newMenuSliderS -- tqSlider
                                                     , newMenuSliderS -- screenSizeSlider
@@ -324,6 +499,11 @@ initialMenuGlobals =
                                                     )
               , _mgMenuSeparatorSItems = V.fromList [ newMenuSeparatorS -- blankLine
                                                     , newMenuSeparatorS -- joinServerServerTitle
+                                                    , newMenuSeparatorS -- downloadTitle
+                                                    , newMenuSeparatorS -- playerSkinTitle
+                                                    , newMenuSeparatorS -- playerModelTitle
+                                                    , newMenuSeparatorS -- playerHandTitle
+                                                    , newMenuSeparatorS -- playerRateTitle
                                                     ]
               , _mgMenuFieldSItems     = V.empty
               , _mgLayers              = V.replicate maxMenuDepth newMenuLayerT

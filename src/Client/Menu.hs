@@ -4,6 +4,7 @@ module Client.Menu where
 
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=))
 import Control.Monad (when, void, unless)
+import Data.Bits ((.&.))
 import Data.Char (ord)
 import Data.Maybe (fromJust)
 import Linear (V4(..))
@@ -25,6 +26,7 @@ import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
 import qualified Sound.S as S
+import qualified Sys.Timer as Timer
 
 mainItems :: Int
 mainItems = 5
@@ -774,9 +776,44 @@ menuDraw menuRef = do
     menu <- readMenuFrameworkSReference menuRef
 
     drawContents menu 0 (menu^.mfNItems)
+    
+    menuItemRef <- menuItemAtCursor menuRef
 
-    itemRef <- menuItemAtCursor menuRef
-    io (putStrLn "Menu.menuDraw") >> undefined -- TODO
+    mItem <- case menuItemRef of
+               Nothing -> return Nothing
+               Just itemRef -> menuItemCommon itemRef >>= return . Just
+    
+    case mItem of
+      Nothing -> case menu^.mfCursorDraw of
+                   Nothing -> return ()
+                   Just f -> f 
+      
+      Just item -> case item^.mcCursorDraw of
+                     Just f -> f
+                     Nothing ->
+                       case menu^.mfCursorDraw of
+                         Just f -> f
+                         Nothing ->
+                           when ((item^.mcType) /= Constants.mtypeField) $ do
+                             Just renderer <- use $ globals.re
+                             ms <- Timer.milliseconds
+                             
+                             if (item^.mcFlags) .&. Constants.qmfLeftJustify /= 0
+                               then
+                                 (renderer^.rRefExport.reDrawChar) ((menu^.mfX) + (item^.mcX) - 24 + (item^.mcCursorOffset))
+                                                                   ((menu^.mfY) + (item^.mcY))
+                                                                   (12 + ((ms `div` 250) .&. 1))
+                               else
+                                 (renderer^.rRefExport.reDrawChar) ((menu^.mfX) + (item^.mcCursorOffset))
+                                                                   ((menu^.mfY) + (item^.mcY))
+                                                                   (12 + ((ms `div` 250) .&. 1))
+    
+    case mItem of
+      Nothing -> do
+        undefined -- TODO
+      
+      Just item ->
+        undefined -- TODO
 
   where drawContents :: MenuFrameworkS -> Int -> Int -> Quake ()
         drawContents menu idx maxIdx
@@ -935,13 +972,19 @@ saveGameMenuInit = do
 saveGameMenuDraw :: XCommandT
 saveGameMenuDraw =
   XCommandT "Menu.saveGameMenuDraw" (do
-    io (putStrLn "Menu.saveGameMenuDraw") >> undefined -- TODO
+    banner "m_banner_save_game"
+    menuAdjustCursor saveGameMenuRef 1
+    menuDraw saveGameMenuRef
   )
 
 saveGameMenuKey :: KeyFuncT
 saveGameMenuKey =
   KeyFuncT "Menu.saveGameMenuKey" (\key -> do
-    io (putStrLn "Menu.saveGameMenuKey") >> undefined -- TODO
+    when (key == KeyConstants.kEnter || key == KeyConstants.kEscape) $ do
+      saveGameMenu <- readMenuFrameworkSReference saveGameMenuRef
+      modifyMenuFrameworkSReference loadGameMenuRef (\v -> v & mfCursor .~ if (saveGameMenu^.mfCursor) - 1 < 0 then 0 else (saveGameMenu^.mfCursor) - 1)
+      
+    defaultMenuKey saveGameMenuRef key
   )
   
 playerConfigMenuInit :: Quake Bool
@@ -965,6 +1008,17 @@ playerConfigMenuKey =
   
 downloadOptionsMenuInit :: Quake ()
 downloadOptionsMenuInit = do
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50)
+                                                                  & mfNItems .~ 0
+                                                                  )
+
+    modifyMenuSeparatorSReference downloadTitleRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSeparator
+                                                            & msGeneric.mcName .~ "Download Options"
+                                                            & msGeneric.mcX .~ 48
+                                                            & msGeneric.mcY .~ 0
+                                                            )
     io (putStrLn "Menu.downloadOptionsMenuInit") >> undefined -- TODO
   
 downloadOptionsMenuDraw :: XCommandT
@@ -1002,7 +1056,7 @@ optionsMenuInit = do
 optionsMenuDraw :: XCommandT
 optionsMenuDraw =
   XCommandT "Menu.optionsMenuDraw" (do
-    io (putStrLn "Menu.optionsMenuDraw") >> undefined
+    io (putStrLn "Menu.optionsMenuDraw") >> undefined -- TODO
   )
 
 optionsMenuKey :: KeyFuncT
