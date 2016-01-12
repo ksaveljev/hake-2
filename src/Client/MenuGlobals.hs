@@ -86,6 +86,12 @@ screenSizeSliderRef = MenuSliderSReference 1
 brightnessSliderRef :: MenuSliderSReference
 brightnessSliderRef = MenuSliderSReference 2
 
+optionsSensitivitySliderRef :: MenuSliderSReference
+optionsSensitivitySliderRef = MenuSliderSReference 3
+
+optionsSfxVolumeSliderRef :: MenuSliderSReference
+optionsSfxVolumeSliderRef = MenuSliderSReference 4
+
 modeListRef :: MenuListSReference
 modeListRef = MenuListSReference 0
 
@@ -491,6 +497,8 @@ initialMenuGlobals =
               , _mgMenuSliderSItems    = V.fromList [ newMenuSliderS -- tqSlider
                                                     , newMenuSliderS -- screenSizeSlider
                                                     , newMenuSliderS -- brightnessSlider
+                                                    , newMenuSliderS -- optionsSensitivitySlider
+                                                    , newMenuSliderS -- optionsSfxVolumeSlider
                                                     ]
               , _mgMenuActionSItems    = V.fromList ( menuActions
                                                       ++ replicate maxSaveGames newMenuActionS -- loadGameActions

@@ -1143,13 +1143,15 @@ multiplayerMenuInit = do
 multiplayerMenuDraw :: XCommandT
 multiplayerMenuDraw =
   XCommandT "Menu.multiplayerMenuDraw" (do
-    io (putStrLn "Menu.multiplayerMenuDraw") >> undefined -- TODO
+    banner "m_banner_multiplayer"
+    menuAdjustCursor multiplayerMenuRef 1
+    menuDraw multiplayerMenuRef
   )
 
 multiplayerMenuKey :: KeyFuncT
 multiplayerMenuKey =
-  KeyFuncT "Menu.multiplayerMenuDraw" (\key -> do
-    io (putStrLn "Menu.multiplayerMenuKey") >> undefined -- TODO
+  KeyFuncT "Menu.multiplayerMenuDraw" (\key ->
+    defaultMenuKey multiplayerMenuRef key
   )
   
 optionsMenuInit :: Quake ()
