@@ -1156,6 +1156,19 @@ multiplayerMenuKey =
   
 optionsMenuInit :: Quake ()
 optionsMenuInit = do
+    drivers <- S.getDriverNames
+    let labels = fmap (\driverName -> if driverName == "dummy" then "off" else driverName) drivers
+    
+    winNoAltTab <- CVar.get "win_noalttab" "0" Constants.cvarArchive
+    
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference optionsMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) / 2)
+                                                          & mfY .~ truncate (fromIntegral (vidDef'^.vdHeight) / 2 - 58)
+                                                          & mfNItems .~ 0
+                                                          )
+    
+    modifyMenuSliderSReference optionsSfxVolumeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider)
     io (putStrLn "Menu.optionsMenuInit") >> undefined -- TODO
 
 optionsMenuDraw :: XCommandT
