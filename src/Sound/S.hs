@@ -4,6 +4,7 @@ import Data.IORef (IORef, newIORef)
 import Linear (V3)
 import System.IO (Handle)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 import Quake
 import QuakeState
@@ -49,3 +50,7 @@ endRegistration = do
 rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
 rawSamples _ _ _ _ _ = do
     io (putStrLn "IMPLEMENT ME!. S.rawSamples") >> return () -- TODO
+
+getDriverNames :: Quake (V.Vector B.ByteString)
+getDriverNames = do
+    io (putStrLn "S.getDriverNames") >> undefined -- TODO

@@ -2,12 +2,12 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Menu where
 
-import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=))
-import Control.Monad (when, void, unless)
+import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _2)
+import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.))
 import Data.Char (ord)
 import Data.Maybe (fromJust)
-import Linear (V4(..))
+import Linear (V4(..), _x)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -37,6 +37,9 @@ numCursorFrames = 15
 yesNoNames :: V.Vector B.ByteString
 yesNoNames = V.fromList ["no", "yes"]
 
+cdMusicItems :: V.Vector B.ByteString
+cdMusicItems = V.fromList ["disabled", "enabled"]
+
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
 
@@ -45,6 +48,32 @@ menuMoveSound = "misc/menu2.wav"
 
 menuOutSound :: B.ByteString
 menuOutSound = "misc/menu3.wav"
+
+bindNames :: V.Vector (B.ByteString, B.ByteString)
+bindNames = V.fromList [ ("+attack", "attack")
+                       , ("weapnext", "next weapon")
+                       , ("+forward", "walk forward")
+                       , ("+back", "backpedal")
+                       , ("+left", "turn left")
+                       , ("+right", "turn right")
+                       , ("+speed", "run")
+                       , ("+moveleft", "step left")
+                       , ("+moveright", "step right")
+                       , ("+strafe", "sidestep")
+                       , ("+lookup", "look up")
+                       , ("+lookdown", "look down")
+                       , ("centerview", "center view")
+                       , ("+mlook", "mouse look")
+                       , ("+klook", "keyboard look")
+                       , ("+moveup", "up / jump")
+                       , ("+movedown", "down / crouch")
+                       , ("inven", "inventory")
+                       , ("invuse", "use item")
+                       , ("invdrop", "drop item")
+                       , ("invprev", "prev item")
+                       , ("invnext", "next item")
+                       , ("cmd help", "help computer")
+                       ]
 
 init :: Quake ()
 init = do
@@ -262,7 +291,7 @@ gameMenuInit :: Quake ()
 gameMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference gameMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50)
+    modifyMenuFrameworkSReference gameMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                        & mfNItems .~ 0
                                                        )
 
@@ -446,7 +475,7 @@ joinServerMenuInit :: Quake ()
 joinServerMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50) - 120
+    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                              & mfNItems .~ 0
                                                              )
 
@@ -944,8 +973,8 @@ saveGameMenuInit :: Quake ()
 saveGameMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50) - 120
-                                                           & mfY .~ truncate (fromIntegral (vidDef'^.vdHeight) * 0.50) - 58
+    modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
+                                                           & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                            & mfNItems .~ 0
                                                           )
 
@@ -1013,7 +1042,7 @@ downloadOptionsMenuInit :: Quake ()
 downloadOptionsMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50)
+    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2)
                                                                   & mfNItems .~ 0
                                                                   )
 
@@ -1104,7 +1133,7 @@ multiplayerMenuInit :: Quake ()
 multiplayerMenuInit = do
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference multiplayerMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) * 0.50 - 64)
+    modifyMenuFrameworkSReference multiplayerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 64
                                                               & mfNItems .~ 0
                                                               )
 
@@ -1163,34 +1192,407 @@ optionsMenuInit = do
     
     vidDef' <- use $ globals.vidDef
 
-    modifyMenuFrameworkSReference optionsMenuRef (\v -> v & mfX .~ truncate (fromIntegral (vidDef'^.vdWidth) / 2)
-                                                          & mfY .~ truncate (fromIntegral (vidDef'^.vdHeight) / 2 - 58)
+    modifyMenuFrameworkSReference optionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+                                                          & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                           & mfNItems .~ 0
                                                           )
     
-    modifyMenuSliderSReference optionsSfxVolumeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider)
-    io (putStrLn "Menu.optionsMenuInit") >> undefined -- TODO
+    volumeValue <- liftM (* 10) (CVar.variableValue "s_volume")
+    
+    modifyMenuSliderSReference optionsSfxVolumeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+                                                                  & msGeneric.mcX .~ 0
+                                                                  & msGeneric.mcY .~ 0
+                                                                  & msGeneric.mcName .~ "effects volume"
+                                                                  & msGeneric.mcCallback .~ Just updateVolumeFunc
+                                                                  & msMinValue .~ 0
+                                                                  & msMaxValue .~ 10
+                                                                  & msCurValue .~ volumeValue
+                                                                  )
+    
+    cdnocd <- CVar.variableValue "cd_nocd"
+    
+    modifyMenuListSReference optionsCdVolumeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                            & mlGeneric.mcX .~ 0
+                                                            & mlGeneric.mcY .~ 10
+                                                            & mlGeneric.mcName .~ "CD music"
+                                                            & mlGeneric.mcCallback .~ Just updateCdVolumeFunc
+                                                            & mlItemNames .~ cdMusicItems
+                                                            & mlCurValue .~ 1 - truncate cdnocd
+                                                            )
+                                                            
+    modifyMenuListSReference optionsQualityListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                            & mlGeneric.mcX .~ 0
+                                                            & mlGeneric.mcY .~ 20
+                                                            & mlGeneric.mcName .~ "sound"
+                                                            & mlGeneric.mcCallback .~ Just updateSoundQualityFunc
+                                                            & mlItemNames .~ labels
+                                                            )
+                                                         
+    modifyMenuSliderSReference optionsSensitivitySliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+                                                                    & msGeneric.mcX .~ 0
+                                                                    & msGeneric.mcY .~ 50
+                                                                    & msGeneric.mcName .~ "mouse speed"
+                                                                    & msGeneric.mcCallback .~ Just mouseSpeedFunc
+                                                                    & msMinValue .~ 2
+                                                                    & msMaxValue .~ 22
+                                                                    )
+                                                                    
+    modifyMenuListSReference optionsAlwaysRunBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                             & mlGeneric.mcX .~ 0
+                                                             & mlGeneric.mcY .~ 60
+                                                             & mlGeneric.mcName .~ "always run"
+                                                             & mlGeneric.mcCallback .~ Just alwaysRunFunc
+                                                             & mlItemNames .~ yesNoNames
+                                                             )
+                                                             
+    modifyMenuListSReference optionsInvertMouseBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                               & mlGeneric.mcX .~ 0
+                                                               & mlGeneric.mcY .~ 70
+                                                               & mlGeneric.mcName .~ "invert mouse"
+                                                               & mlGeneric.mcCallback .~ Just invertMouseFunc
+                                                               & mlItemNames .~ yesNoNames
+                                                               )
+                                                               
+    modifyMenuListSReference optionsLookSpringBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                             & mlGeneric.mcX .~ 0
+                                                             & mlGeneric.mcY .~ 80
+                                                             & mlGeneric.mcName .~ "lookspring"
+                                                             & mlGeneric.mcCallback .~ Just lookSpringFunc
+                                                             & mlItemNames .~ yesNoNames
+                                                             )
+                                                             
+    modifyMenuListSReference optionsLookStrafeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                              & mlGeneric.mcX .~ 0
+                                                              & mlGeneric.mcY .~ 90
+                                                              & mlGeneric.mcName .~ "lookstrafe"
+                                                              & mlGeneric.mcCallback .~ Just lookStrafeFunc
+                                                              & mlItemNames .~ yesNoNames
+                                                              )
+                                                              
+    modifyMenuListSReference optionsFreeLookBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                            & mlGeneric.mcX .~ 0
+                                                            & mlGeneric.mcY .~ 100
+                                                            & mlGeneric.mcName .~ "free look"
+                                                            & mlGeneric.mcCallback .~ Just freeLookFunc
+                                                            & mlItemNames .~ yesNoNames
+                                                            )
+                                                            
+    modifyMenuListSReference optionsCrosshairBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                             & mlGeneric.mcX .~ 0
+                                                             & mlGeneric.mcY .~ 110
+                                                             & mlGeneric.mcName .~ "crosshair"
+                                                             & mlGeneric.mcCallback .~ Just crosshairFunc
+                                                             & mlItemNames .~ yesNoNames
+                                                             )
+                                                             
+    modifyMenuListSReference optionsJoystickBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                            & mlGeneric.mcX .~ 0
+                                                            & mlGeneric.mcY .~ 120
+                                                            & mlGeneric.mcName .~ "use joystick"
+                                                            & mlGeneric.mcCallback .~ Just joystickFunc
+                                                            & mlItemNames .~ yesNoNames
+                                                            )
+                                                            
+    modifyMenuActionSReference optionsCustomizeOptionsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                         & maGeneric.mcX .~ 0
+                                                                         & maGeneric.mcY .~ 140
+                                                                         & maGeneric.mcName .~ "customize controls"
+                                                                         & maGeneric.mcCallback .~ Just customizeControlsFunc
+                                                                         )
+                                                                         
+    modifyMenuActionSReference optionsDefaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                 & maGeneric.mcX .~ 0
+                                                                 & maGeneric.mcY .~ 150
+                                                                 & maGeneric.mcName .~ "reset defaults"
+                                                                 & maGeneric.mcCallback .~ Just controlsResetDefaultsFunc
+                                                                 )
+                                                                 
+    modifyMenuActionSReference optionsConsoleActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                & maGeneric.mcX .~ 0
+                                                                & maGeneric.mcY .~ 160
+                                                                & maGeneric.mcName .~ "go to console"
+                                                                & maGeneric.mcCallback .~ Just consoleFunc
+                                                                )
+    
+    controlsSetMenuItemValues
+    
+    menuAddItem optionsMenuRef (MenuSliderRef optionsSfxVolumeSliderRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsCdVolumeBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsQualityListRef)
+    menuAddItem optionsMenuRef (MenuSliderRef optionsSensitivitySliderRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsAlwaysRunBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsInvertMouseBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsLookSpringBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsLookStrafeBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsFreeLookBoxRef)
+    menuAddItem optionsMenuRef (MenuListRef optionsCrosshairBoxRef)
+    -- menuAddItem optionsMenuRef (MenuListRef optionsJoystickBoxRef)
+    menuAddItem optionsMenuRef (MenuActionRef optionsCustomizeOptionsActionRef)
+    menuAddItem optionsMenuRef (MenuActionRef optionsDefaultsActionRef)
+    menuAddItem optionsMenuRef (MenuActionRef optionsConsoleActionRef)
 
 optionsMenuDraw :: XCommandT
 optionsMenuDraw =
   XCommandT "Menu.optionsMenuDraw" (do
-    io (putStrLn "Menu.optionsMenuDraw") >> undefined -- TODO
+    banner "m_banner_options"
+    menuAdjustCursor optionsMenuRef 1
+    menuDraw optionsMenuRef
   )
 
 optionsMenuKey :: KeyFuncT
 optionsMenuKey =
-  KeyFuncT "Menu.optionsMenuKey" (\key -> do
-    io (putStrLn "Menu.optionsMenuKey") >> undefined -- TODO
+  KeyFuncT "Menu.optionsMenuKey" (\key ->
+    defaultMenuKey optionsMenuRef key
   )
   
 keysMenuInit :: Quake ()
 keysMenuInit = do
-    io (putStrLn "Menu.keysMenuInit") >> undefined -- TODO
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference keysMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+                                                       & mfNItems .~ 0
+                                                       & mfCursorDraw .~ Just (keyCursorDrawFunc keysMenuRef)
+                                                       )
+    
+    modifyMenuActionSReference keysAttackActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 0
+                                                            & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysAttackActionRef)
+                                                            & maGeneric.mcLocalData._x .~ 0
+                                                            & maGeneric.mcName .~ (bindNames V.! 0)^._2
+                                                            )
+                                                            
+    modifyMenuActionSReference keysChangeWeaponActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                  & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                                  & maGeneric.mcX .~ 0
+                                                                  & maGeneric.mcY .~ 9
+                                                                  & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysChangeWeaponActionRef)
+                                                                  & maGeneric.mcLocalData._x .~ 1
+                                                                  & maGeneric.mcName .~ (bindNames V.! 1)^._2
+                                                                  )
+                                                                  
+    modifyMenuActionSReference keysWalkForwardActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                 & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                                 & maGeneric.mcX .~ 0
+                                                                 & maGeneric.mcY .~ 18
+                                                                 & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysWalkForwardActionRef)
+                                                                 & maGeneric.mcLocalData._x .~ 2
+                                                                 & maGeneric.mcName .~ (bindNames V.! 2)^._2
+                                                                 )
+                                                                 
+    modifyMenuActionSReference keysBackpedalActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                               & maGeneric.mcX .~ 0
+                                                               & maGeneric.mcY .~ 27
+                                                               & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysBackpedalActionRef)
+                                                               & maGeneric.mcLocalData._x .~ 3
+                                                               & maGeneric.mcName .~ (bindNames V.! 3)^._2
+                                                               )
+                                                               
+    modifyMenuActionSReference keysTurnLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                              & maGeneric.mcX .~ 0
+                                                              & maGeneric.mcY .~ 36 
+                                                              & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysTurnLeftActionRef)
+                                                              & maGeneric.mcLocalData._x .~ 4
+                                                              & maGeneric.mcName .~ (bindNames V.! 4)^._2
+                                                              )
+                                                              
+    modifyMenuActionSReference keysTurnRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                               & maGeneric.mcX .~ 0
+                                                               & maGeneric.mcY .~ 45 
+                                                               & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysTurnRightActionRef)
+                                                               & maGeneric.mcLocalData._x .~ 5
+                                                               & maGeneric.mcName .~ (bindNames V.! 5)^._2
+                                                               )
+                                                               
+    modifyMenuActionSReference keysRunActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                         & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                         & maGeneric.mcX .~ 0
+                                                         & maGeneric.mcY .~ 54 
+                                                         & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysRunActionRef)
+                                                         & maGeneric.mcLocalData._x .~ 6
+                                                         & maGeneric.mcName .~ (bindNames V.! 6)^._2
+                                                         )
+                                                         
+    modifyMenuActionSReference keysStepLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                              & maGeneric.mcX .~ 0
+                                                              & maGeneric.mcY .~ 63 
+                                                              & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysStepLeftActionRef)
+                                                              & maGeneric.mcLocalData._x .~ 7
+                                                              & maGeneric.mcName .~ (bindNames V.! 7)^._2
+                                                              )
+                                                              
+    modifyMenuActionSReference keysStepRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                               & maGeneric.mcX .~ 0
+                                                               & maGeneric.mcY .~ 72 
+                                                               & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysStepRightActionRef)
+                                                               & maGeneric.mcLocalData._x .~ 8
+                                                               & maGeneric.mcName .~ (bindNames V.! 8)^._2
+                                                               )
+                                                               
+    modifyMenuActionSReference keysSidestepActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                              & maGeneric.mcX .~ 0
+                                                              & maGeneric.mcY .~ 81 
+                                                              & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysSidestepActionRef)
+                                                              & maGeneric.mcLocalData._x .~ 9
+                                                              & maGeneric.mcName .~ (bindNames V.! 9)^._2
+                                                              )
+                                                              
+    modifyMenuActionSReference keysLookUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 90 
+                                                            & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysLookUpActionRef)
+                                                            & maGeneric.mcLocalData._x .~ 10
+                                                            & maGeneric.mcName .~ (bindNames V.! 10)^._2
+                                                            )
+                                                            
+    modifyMenuActionSReference keysLookDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                              & maGeneric.mcX .~ 0
+                                                              & maGeneric.mcY .~ 99 
+                                                              & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysLookDownActionRef)
+                                                              & maGeneric.mcLocalData._x .~ 11
+                                                              & maGeneric.mcName .~ (bindNames V.! 11)^._2
+                                                              )
+                                                              
+    modifyMenuActionSReference keysCenterViewActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                                & maGeneric.mcX .~ 0
+                                                                & maGeneric.mcY .~ 108 
+                                                                & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysCenterViewActionRef)
+                                                                & maGeneric.mcLocalData._x .~ 12
+                                                                & maGeneric.mcName .~ (bindNames V.! 12)^._2
+                                                                )
+                                                              
+    modifyMenuActionSReference keysMouseLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                               & maGeneric.mcX .~ 0
+                                                               & maGeneric.mcY .~ 117
+                                                               & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysMouseLookActionRef)
+                                                               & maGeneric.mcLocalData._x .~ 13
+                                                               & maGeneric.mcName .~ (bindNames V.! 13)^._2
+                                                               )
+                                                               
+    modifyMenuActionSReference keysKeyboardLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                  & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                                  & maGeneric.mcX .~ 0
+                                                                  & maGeneric.mcY .~ 126
+                                                                  & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysKeyboardLookActionRef)
+                                                                  & maGeneric.mcLocalData._x .~ 14
+                                                                  & maGeneric.mcName .~ (bindNames V.! 14)^._2
+                                                                  )
+                                                                  
+    modifyMenuActionSReference keysMoveUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 135
+                                                            & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysMoveUpActionRef)
+                                                            & maGeneric.mcLocalData._x .~ 15
+                                                            & maGeneric.mcName .~ (bindNames V.! 15)^._2
+                                                            )
+                                                            
+    modifyMenuActionSReference keysMoveDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                              & maGeneric.mcX .~ 0
+                                                              & maGeneric.mcY .~ 144
+                                                              & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysMoveDownActionRef)
+                                                              & maGeneric.mcLocalData._x .~ 16
+                                                              & maGeneric.mcName .~ (bindNames V.! 16)^._2
+                                                              )
+                                                              
+    modifyMenuActionSReference keysInventoryActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                               & maGeneric.mcX .~ 0
+                                                               & maGeneric.mcY .~ 153
+                                                               & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysInventoryActionRef)
+                                                               & maGeneric.mcLocalData._x .~ 17
+                                                               & maGeneric.mcName .~ (bindNames V.! 17)^._2
+                                                               )
+                                                               
+    modifyMenuActionSReference keysInvUseActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                            & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ 162
+                                                            & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysInvUseActionRef)
+                                                            & maGeneric.mcLocalData._x .~ 18
+                                                            & maGeneric.mcName .~ (bindNames V.! 18)^._2
+                                                            )
+                                                            
+    modifyMenuActionSReference keysInvDropActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                             & maGeneric.mcX .~ 0
+                                                             & maGeneric.mcY .~ 171
+                                                             & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysInvDropActionRef)
+                                                             & maGeneric.mcLocalData._x .~ 19
+                                                             & maGeneric.mcName .~ (bindNames V.! 19)^._2
+                                                             )
+                                                             
+    modifyMenuActionSReference keysInvPrevActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                             & maGeneric.mcX .~ 0
+                                                             & maGeneric.mcY .~ 180
+                                                             & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysInvPrevActionRef)
+                                                             & maGeneric.mcLocalData._x .~ 20
+                                                             & maGeneric.mcName .~ (bindNames V.! 20)^._2
+                                                             )
+                                                             
+    modifyMenuActionSReference keysInvNextActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                             & maGeneric.mcX .~ 0
+                                                             & maGeneric.mcY .~ 189
+                                                             & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysInvNextActionRef)
+                                                             & maGeneric.mcLocalData._x .~ 21
+                                                             & maGeneric.mcName .~ (bindNames V.! 21)^._2
+                                                             )
+                                                             
+    modifyMenuActionSReference keysHelpComputerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                                                  & maGeneric.mcFlags .~ Constants.qmfGrayed
+                                                                  & maGeneric.mcX .~ 0
+                                                                  & maGeneric.mcY .~ 198
+                                                                  & maGeneric.mcOwnerDraw .~ Just (drawKeyBindingFunc keysHelpComputerActionRef)
+                                                                  & maGeneric.mcLocalData._x .~ 22
+                                                                  & maGeneric.mcName .~ (bindNames V.! 22)^._2
+                                                                  )
+
+    menuAddItem keysMenuRef (MenuActionRef keysAttackActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysChangeWeaponActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysWalkForwardActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysBackpedalActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysTurnLeftActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysTurnRightActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysRunActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysStepLeftActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysStepRightActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysSidestepActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysLookUpActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysLookDownActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysCenterViewActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysMouseLookActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysKeyboardLookActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysMoveUpActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysMoveDownActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysInventoryActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysInvUseActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysInvDropActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysInvPrevActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysInvNextActionRef)
+    menuAddItem keysMenuRef (MenuActionRef keysHelpComputerActionRef)
+    
+    menuSetStatusBar keysMenuRef (Just "enter to change, backspace to clear")
+    menuCenter keysMenuRef
 
 keysMenuDrawF :: XCommandT
 keysMenuDrawF =
   XCommandT "Menu.keysMenuDrawF" (do
-    io (putStrLn "Menu.keysMenuDrawF") >> undefined -- TODO
+    menuAdjustCursor keysMenuRef 1
+    menuDraw keysMenuRef
   )
 
 keysMenuKeyF :: KeyFuncT
@@ -1230,3 +1632,71 @@ separatorDraw _ = do
 downloadCallback :: MenuListSReference -> Quake ()
 downloadCallback _ = do
     io (putStrLn "Menu.downloadCallback") >> undefined -- TODO
+
+updateVolumeFunc :: Quake ()
+updateVolumeFunc = do
+  io (putStrLn "Menu.updateVolumeFunc") >> undefined -- TODO
+
+updateCdVolumeFunc :: Quake ()
+updateCdVolumeFunc = do
+  io (putStrLn "Menu.updateCdVolumeFunc") >> undefined -- TODO
+
+updateSoundQualityFunc :: Quake ()
+updateSoundQualityFunc = do
+  io (putStrLn "Menu.updateSoundQualityFunc") >> undefined -- TODO
+
+mouseSpeedFunc :: Quake ()
+mouseSpeedFunc = do
+  io (putStrLn "Menu.mouseSpeedFunc") >> undefined -- TODO
+
+alwaysRunFunc :: Quake ()
+alwaysRunFunc = do
+  io (putStrLn "Menu.alwaysRunFunc") >> undefined -- TODO
+
+invertMouseFunc :: Quake ()
+invertMouseFunc = do
+  io (putStrLn "Menu.invertMouseFunc") >> undefined -- TODO
+
+lookSpringFunc :: Quake ()
+lookSpringFunc = do
+  io (putStrLn "Menu.lookSpringFunc") >> undefined -- TODO
+  
+lookStrafeFunc :: Quake ()
+lookStrafeFunc = do
+  io (putStrLn "Menu.lookStrafeFunc") >> undefined -- TODO
+
+freeLookFunc :: Quake ()
+freeLookFunc = do
+  io (putStrLn "Menu.freeLookFunc") >> undefined -- TODO
+
+crosshairFunc :: Quake ()
+crosshairFunc = do
+  io (putStrLn "Menu.crosshairFunc") >> undefined -- TODO
+
+joystickFunc :: Quake ()
+joystickFunc = do
+  io (putStrLn "Menu.joystickFunc") >> undefined -- TODO
+  
+customizeControlsFunc :: Quake ()
+customizeControlsFunc = do
+  io (putStrLn "Menu.customizeControlsFunc") >> undefined -- TODO
+
+controlsResetDefaultsFunc :: Quake ()
+controlsResetDefaultsFunc = do
+  io (putStrLn "Menu.controlsResetDefaultsFunc") >> undefined -- TODO
+
+consoleFunc :: Quake ()
+consoleFunc = do
+  io (putStrLn "Menu.consoleFunc") >> undefined -- TODO
+
+controlsSetMenuItemValues :: Quake ()
+controlsSetMenuItemValues = do
+  io (putStrLn "Menu.controlsSetMenuItemValues") >> undefined -- TODO
+
+keyCursorDrawFunc :: MenuFrameworkSReference -> Quake ()
+keyCursorDrawFunc _ = do
+  io (putStrLn "Menu.keyCursorDrawFunc") >> undefined -- TODO
+
+drawKeyBindingFunc :: MenuActionSReference -> Quake ()
+drawKeyBindingFunc _ = do
+  io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
