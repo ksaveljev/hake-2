@@ -1836,7 +1836,12 @@ data MenuGlobals =
               , _mgCached              :: !Bool
               , _mgGameCursor          :: !Int
               , _mgSaveStrings         :: V.Vector B.ByteString
+              , _mgSaveValid           :: V.Vector Bool
               , _mgLocalServerNames    :: V.Vector B.ByteString
+              , _mgLocalServerNetAdr   :: V.Vector NetAdrT
+              , _mgCreditsStartTime    :: !Int
+              , _mgCredits             :: V.Vector B.ByteString
+              , _mgNumServers          :: !Int
               }
 
 data MenuLayerT =

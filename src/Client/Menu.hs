@@ -8,6 +8,7 @@ import Data.Bits ((.&.))
 import Data.Char (ord)
 import Data.Maybe (fromJust)
 import Linear (V4(..), _x)
+import System.Directory (doesFileExist, readable, getPermissions)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
@@ -25,6 +26,7 @@ import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.CVar as CVar
+import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 
@@ -391,18 +393,54 @@ loadGameMenuInit = do
     
     setupLoadGameMenuActions 0 maxSaveGames
 
-    io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
-
   where setupLoadGameMenuActions :: Int -> Int -> Quake ()
         setupLoadGameMenuActions idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              io (putStrLn "Menu.loadGameMenuInit") >> undefined -- TODO
+              let actionRef = loadGameActions V.! idx
+              
+              saveStrings <- use $ menuGlobals.mgSaveStrings
+              
+              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ saveStrings V.! idx
+                                                            & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                                            & maGeneric.mcLocalData._x .~ idx
+                                                            & maGeneric.mcCallback .~ Just (loadGameCallback actionRef)
+                                                            & maGeneric.mcX .~ 0
+                                                            & maGeneric.mcY .~ (if idx > 0 then idx * 10 + 10 else idx * 10)
+                                                            & maGeneric.mcType .~ Constants.mtypeAction
+                                                            )
+              
+              menuAddItem loadGameMenuRef (MenuActionRef actionRef)
+              setupLoadGameMenuActions (idx + 1) maxIdx
 
 -- Search the save dir for saved games and their names.
 createSaveStrings :: Quake ()
 createSaveStrings = do
-    io (putStrLn "Menu.createSaveStrings") >> undefined -- TODO
+    gameDir <- FS.gameDir
+    findSaveGames gameDir 0 maxSaveGames
+    
+  where findSaveGames :: B.ByteString -> Int -> Int -> Quake ()
+        findSaveGames gameDir idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let name = gameDir `B.append` "/save/save" `B.append` (BC.pack (show idx)) `B.append` "/server.ssv" -- IMPROVE
+                  nameUnpacked = BC.unpack name
+              
+              fileExists <- io $ doesFileExist nameUnpacked
+              canRead <- if fileExists
+                           then io $ liftM readable (getPermissions nameUnpacked)
+                           else return False
+              if canRead
+                then
+                  zoom menuGlobals $ do
+                    mgSaveStrings.ix idx .= name
+                    mgSaveValid.ix idx .= True
+                else
+                  zoom menuGlobals $ do
+                    mgSaveStrings.ix idx .= "<EMPTY>"
+                    mgSaveValid.ix idx .= False
+              
+              findSaveGames gameDir (idx + 1) maxIdx
 
 loadGameMenuDrawF :: XCommandT
 loadGameMenuDrawF =
@@ -434,8 +472,32 @@ menuSaveGameF =
 menuCreditsF :: XCommandT
 menuCreditsF =
   XCommandT "Menu.creditsF" (do
-    io (putStrLn "Menu.creditsF") >> undefined -- TODO
+    b <- FS.loadFile "credits"
+    
+    credits <- case b of
+                 Nothing -> do
+                   isDeveloper <- FS.developerSearchPath 1
+                   
+                   return $ case isDeveloper of
+                              1 -> xatCredits
+                              2 -> rogueCredits
+                              _ -> idCredits
+                              
+                 Just contents ->
+                   return (V.fromList (tokenise "\r\n" contents))
+                   
+    realTime <- use $ globals.cls.csRealTime
+    
+    zoom menuGlobals $ do
+      mgCreditsStartTime .= realTime
+      mgCredits .= credits
+    
+    pushMenu creditsMenuDraw creditsKey
   )
+  
+  where tokenise :: B.ByteString -> B.ByteString -> [B.ByteString]
+        tokenise x y = let (h, t) = B.breakSubstring x y
+                       in h : if B.null t then [] else tokenise x (B.drop (B.length x) t)
 
 startGame :: Quake ()
 startGame = do
@@ -567,7 +629,8 @@ menuStartServerF =
 menuDMOptionsF :: XCommandT
 menuDMOptionsF =
   XCommandT "Menu.menuDMOptions" (do
-    io (putStrLn "Menu.menuDMOptions") >> undefined -- TODO
+    dmOptionsMenuInit
+    pushMenu dmOptionsMenuDraw dmOptionsMenuKey
   )
 
 menuPlayerConfigF :: XCommandT
@@ -690,8 +753,31 @@ keyDown key = do
           Just sound -> S.startLocalSound sound
 
 addToServerList :: NetAdrT -> B.ByteString -> Quake ()
-addToServerList _ _ = do
-    io (putStrLn "Menu.addToServerList") >> undefined -- TODO
+addToServerList adr info = do
+    numServers <- use $ menuGlobals.mgNumServers
+    
+    unless (numServers == Constants.maxLocalServers) $ do
+      let info' = trim info
+      localServerNames <- use $ menuGlobals.mgLocalServerNames
+      
+      -- ignore if duplicated
+      unless (info' `V.elem` localServerNames) $ do
+        let actionRef = joinServerActions V.! numServers
+        modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ info')
+        
+        zoom menuGlobals $ do
+          mgLocalServerNetAdr.ix numServers .= adr
+          mgLocalServerNames.ix numServers .= info'
+          mgNumServers += 1
+
+  where trim :: B.ByteString -> B.ByteString
+        trim = lstrip . rstrip
+        
+        lstrip :: B.ByteString -> B.ByteString
+        lstrip = BC.dropWhile (`BC.elem` " \t")
+        
+        rstrip :: B.ByteString -> B.ByteString
+        rstrip = BC.reverse . lstrip . BC.reverse
 
 {-
 - ============= DrawCursor =============
@@ -930,7 +1016,21 @@ joinServerFunc _ = do
 
 addressBookMenuInit :: Quake ()
 addressBookMenuInit = do
-    io (putStrLn "Menu.addressBookMenuInit") >> undefined -- TODO
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference addressBookMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 142
+                                                              & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
+                                                              & mfNItems .~ 0
+                                                              )
+                                                              
+    setupAddressBookMenuActions 0 Constants.numAddressBookEntries
+    
+  where setupAddressBookMenuActions :: Int -> Int -> Quake ()
+        setupAddressBookMenuActions idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              adr <- CVar.get ("adr" `B.append` (BC.pack (show idx))) "" Constants.cvarArchive
+              io (putStrLn "Menu.addressBookMenuInit") >> undefined -- TODO
 
 addressBookMenuDrawF :: XCommandT
 addressBookMenuDrawF =
@@ -1600,6 +1700,10 @@ keysMenuKeyF =
   KeyFuncT "Menu.keysMenuKeyF" (\key -> do
     io (putStrLn "Menu.keysMenuKeyF") >> undefined -- TODO
   )
+  
+dmOptionsMenuInit :: Quake ()
+dmOptionsMenuInit = do
+  io (putStrLn "Menu.dmOptionsMenuInit") >> undefined -- TODO
 
 saveGameCallback :: MenuActionSReference -> Quake ()
 saveGameCallback _ = do
@@ -1700,3 +1804,31 @@ keyCursorDrawFunc _ = do
 drawKeyBindingFunc :: MenuActionSReference -> Quake ()
 drawKeyBindingFunc _ = do
   io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
+
+loadGameCallback :: MenuActionSReference -> Quake ()
+loadGameCallback _ = do
+  io (putStrLn "Menu.loadGameCallback") >> undefined -- TODO
+  
+creditsMenuDraw :: XCommandT
+creditsMenuDraw =
+  XCommandT "Menu.creditsMenuDraw" (do
+    io (putStrLn "Menu.creditsMenuDraw") >> undefined -- TODO
+  )
+  
+creditsKey :: KeyFuncT
+creditsKey =
+  KeyFuncT "Menu.creditsKey" (\key -> do
+    io (putStrLn "Menu.creditsKey") >> undefined -- TODO
+  )
+  
+dmOptionsMenuDraw :: XCommandT
+dmOptionsMenuDraw =
+  XCommandT "Menu.dmOptionsMenuDraw" (do
+    io (putStrLn "Menu.dmOptionsMenuDraw") >> undefined -- TODO
+  )
+  
+dmOptionsMenuKey :: KeyFuncT
+dmOptionsMenuKey =
+  KeyFuncT "Menu.dmOptionsMenuKey" (\key -> do
+    io (putStrLn "Menu.dmOptionsMenuKey") >> undefined -- TODO
+  )
