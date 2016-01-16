@@ -699,4 +699,5 @@ initialMenuGlobals =
               , _mgCreditsStartTime    = 0
               , _mgCredits             = idCredits
               , _mgNumServers          = 0
+              , _mgBindGrab            = False
               }

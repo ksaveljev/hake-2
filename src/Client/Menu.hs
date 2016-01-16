@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Menu where
 
-import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _2)
+import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _1, _2)
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.))
 import Data.Char (ord)
@@ -1698,7 +1698,35 @@ keysMenuDrawF =
 keysMenuKeyF :: KeyFuncT
 keysMenuKeyF =
   KeyFuncT "Menu.keysMenuKeyF" (\key -> do
-    io (putStrLn "Menu.keysMenuKeyF") >> undefined -- TODO
+    Just (MenuActionRef actionItemRef) <- menuItemAtCursor keysMenuRef
+    item <- readMenuActionSReference actionItemRef
+    bindGrab <- use $ menuGlobals.mgBindGrab
+
+    if bindGrab
+      then do
+        when (key /= KeyConstants.kEscape && key /= ord '`') $ do
+          keyName <- Key.keynumToString key
+          let cmd = "bind \"" `B.append` keyName
+                              `B.append` "\" \""
+                              `B.append` ((bindNames V.! (item^.maGeneric.mcLocalData._x))^._1)
+                              `B.append` "\""
+          CBuf.insertText cmd
+
+        menuSetStatusBar keysMenuRef (Just "enter to change, backspace to clear")
+        menuGlobals.mgBindGrab .= False
+        return (Just menuOutSound)
+
+      else do
+        if | key `elem` [KeyConstants.kKpEnter, KeyConstants.kEnter] -> do
+               keyBindingFunc actionItemRef
+               return (Just menuInSound)
+
+           | key `elem` [KeyConstants.kBackspace, KeyConstants.kDel, KeyConstants.kKpDel] -> do
+               unbindCommand ((bindNames V.! (item^.maGeneric.mcLocalData._x))^._1)
+               return (Just menuOutSound)
+
+           | otherwise ->
+               defaultMenuKey keysMenuRef key
   )
   
 dmOptionsMenuInit :: Quake ()
@@ -1832,3 +1860,11 @@ dmOptionsMenuKey =
   KeyFuncT "Menu.dmOptionsMenuKey" (\key -> do
     io (putStrLn "Menu.dmOptionsMenuKey") >> undefined -- TODO
   )
+
+keyBindingFunc :: MenuActionSReference -> Quake ()
+keyBindingFunc _ = do
+    io (putStrLn "Menu.keyBindingFunc") >> undefined -- TODO
+
+unbindCommand :: B.ByteString -> Quake ()
+unbindCommand _ = do
+    io (putStrLn "Menu.unbindCommand") >> undefined -- TODO

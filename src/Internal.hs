@@ -1842,6 +1842,7 @@ data MenuGlobals =
               , _mgCreditsStartTime    :: !Int
               , _mgCredits             :: V.Vector B.ByteString
               , _mgNumServers          :: !Int
+              , _mgBindGrab            :: !Bool
               }
 
 data MenuLayerT =
