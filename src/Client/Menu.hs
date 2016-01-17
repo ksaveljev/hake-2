@@ -1945,8 +1945,10 @@ dmOptionsMenuInit = do
     menuSetStatusBar dmOptionsMenuRef dmOptionsStatusBar
 
 saveGameCallback :: MenuActionSReference -> Quake ()
-saveGameCallback _ = do
-    io (putStrLn "Menu.saveGameCallback") >> undefined -- TODO
+saveGameCallback menuActionRef = do
+    action <- readMenuActionSReference menuActionRef
+    CBuf.addText ("save save" `B.append` BC.pack (show (action^.maGeneric.mcLocalData._x)) `B.append` "\n")
+    forceMenuOff
 
 fieldDraw :: MenuFieldS -> Quake ()
 fieldDraw _ = do
