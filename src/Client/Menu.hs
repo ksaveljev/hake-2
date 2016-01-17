@@ -1998,77 +1998,77 @@ downloadCallback menuListRef = do
 
 updateVolumeFunc :: Quake ()
 updateVolumeFunc = do
-  slider <- readMenuSliderSReference optionsSfxVolumeSliderRef
-  CVar.setValueF "s_volume" ((slider^.msCurValue) / 10)
-  io (putStrLn "Menu.updateVolumeFunc") >> undefined -- TODO
+    slider <- readMenuSliderSReference optionsSfxVolumeSliderRef
+    CVar.setValueF "s_volume" ((slider^.msCurValue) / 10)
 
 updateCdVolumeFunc :: Quake ()
 updateCdVolumeFunc = do
-  io (putStrLn "Menu.updateCdVolumeFunc") >> undefined -- TODO
+    slider <- readMenuListSReference optionsCdVolumeBoxRef
+    CVar.setValueI "cd_nocd" (1 - (slider^.mlCurValue))
 
 updateSoundQualityFunc :: Quake ()
 updateSoundQualityFunc = do
-  io (putStrLn "Menu.updateSoundQualityFunc") >> undefined -- TODO
+    io (putStrLn "Menu.updateSoundQualityFunc") >> undefined -- TODO
 
 mouseSpeedFunc :: Quake ()
 mouseSpeedFunc = do
-  io (putStrLn "Menu.mouseSpeedFunc") >> undefined -- TODO
+    io (putStrLn "Menu.mouseSpeedFunc") >> undefined -- TODO
 
 alwaysRunFunc :: Quake ()
 alwaysRunFunc = do
-  io (putStrLn "Menu.alwaysRunFunc") >> undefined -- TODO
+    io (putStrLn "Menu.alwaysRunFunc") >> undefined -- TODO
 
 invertMouseFunc :: Quake ()
 invertMouseFunc = do
-  io (putStrLn "Menu.invertMouseFunc") >> undefined -- TODO
+    io (putStrLn "Menu.invertMouseFunc") >> undefined -- TODO
 
 lookSpringFunc :: Quake ()
 lookSpringFunc = do
-  io (putStrLn "Menu.lookSpringFunc") >> undefined -- TODO
+    io (putStrLn "Menu.lookSpringFunc") >> undefined -- TODO
   
 lookStrafeFunc :: Quake ()
 lookStrafeFunc = do
-  io (putStrLn "Menu.lookStrafeFunc") >> undefined -- TODO
+    io (putStrLn "Menu.lookStrafeFunc") >> undefined -- TODO
 
 freeLookFunc :: Quake ()
 freeLookFunc = do
-  io (putStrLn "Menu.freeLookFunc") >> undefined -- TODO
+    io (putStrLn "Menu.freeLookFunc") >> undefined -- TODO
 
 crosshairFunc :: Quake ()
 crosshairFunc = do
-  io (putStrLn "Menu.crosshairFunc") >> undefined -- TODO
+    io (putStrLn "Menu.crosshairFunc") >> undefined -- TODO
 
 joystickFunc :: Quake ()
 joystickFunc = do
-  io (putStrLn "Menu.joystickFunc") >> undefined -- TODO
+    io (putStrLn "Menu.joystickFunc") >> undefined -- TODO
   
 customizeControlsFunc :: Quake ()
 customizeControlsFunc = do
-  io (putStrLn "Menu.customizeControlsFunc") >> undefined -- TODO
+    io (putStrLn "Menu.customizeControlsFunc") >> undefined -- TODO
 
 controlsResetDefaultsFunc :: Quake ()
 controlsResetDefaultsFunc = do
-  io (putStrLn "Menu.controlsResetDefaultsFunc") >> undefined -- TODO
+    io (putStrLn "Menu.controlsResetDefaultsFunc") >> undefined -- TODO
 
 consoleFunc :: Quake ()
 consoleFunc = do
-  io (putStrLn "Menu.consoleFunc") >> undefined -- TODO
+    io (putStrLn "Menu.consoleFunc") >> undefined -- TODO
 
 controlsSetMenuItemValues :: Quake ()
 controlsSetMenuItemValues = do
-  io (putStrLn "Menu.controlsSetMenuItemValues") >> undefined -- TODO
+    io (putStrLn "Menu.controlsSetMenuItemValues") >> undefined -- TODO
 
 keyCursorDrawFunc :: MenuFrameworkSReference -> Quake ()
 keyCursorDrawFunc _ = do
-  io (putStrLn "Menu.keyCursorDrawFunc") >> undefined -- TODO
+    io (putStrLn "Menu.keyCursorDrawFunc") >> undefined -- TODO
 
 drawKeyBindingFunc :: MenuActionSReference -> Quake ()
 drawKeyBindingFunc _ = do
-  io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
+    io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
 
 loadGameCallback :: MenuActionSReference -> Quake ()
 loadGameCallback _ = do
-  io (putStrLn "Menu.loadGameCallback") >> undefined -- TODO
+    io (putStrLn "Menu.loadGameCallback") >> undefined -- TODO
   
 creditsMenuDraw :: XCommandT
 creditsMenuDraw =
