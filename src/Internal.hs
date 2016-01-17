@@ -1843,6 +1843,7 @@ data MenuGlobals =
               , _mgCredits             :: V.Vector B.ByteString
               , _mgNumServers          :: !Int
               , _mgBindGrab            :: !Bool
+              , _mgDmOptionsStatusBar  :: Maybe B.ByteString
               }
 
 data MenuLayerT =

@@ -700,4 +700,5 @@ initialMenuGlobals =
               , _mgCredits             = idCredits
               , _mgNumServers          = 0
               , _mgBindGrab            = False
+              , _mgDmOptionsStatusBar  = Nothing
               }

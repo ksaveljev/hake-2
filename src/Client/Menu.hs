@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CL as CL
@@ -41,6 +42,9 @@ yesNoNames = V.fromList ["no", "yes"]
 
 cdMusicItems :: V.Vector B.ByteString
 cdMusicItems = V.fromList ["disabled", "enabled"]
+
+teamPlayNames :: V.Vector B.ByteString
+teamPlayNames = V.fromList ["disabled", "by skin", "by model"]
 
 menuInSound :: B.ByteString
 menuInSound = "misc/menu1.wav"
@@ -1731,7 +1735,214 @@ keysMenuKeyF =
   
 dmOptionsMenuInit :: Quake ()
 dmOptionsMenuInit = do
-  io (putStrLn "Menu.dmOptionsMenuInit") >> undefined -- TODO
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    vidDef' <- use $ globals.vidDef
+
+    modifyMenuFrameworkSReference dmOptionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+                                                            & mfNItems .~ 0
+                                                            )
+
+    modifyMenuListSReference fallsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                  & mlGeneric.mcX .~ 0
+                                                  & mlGeneric.mcY .~ 0
+                                                  & mlGeneric.mcName .~ "falling damage"
+                                                  & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just fallsBoxRef))
+                                                  & mlItemNames .~ yesNoNames
+                                                  & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoFalling == 0 then 1 else 0)
+                                                  )
+
+    modifyMenuListSReference weaponsStayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                        & mlGeneric.mcX .~ 0
+                                                        & mlGeneric.mcY .~ 10
+                                                        & mlGeneric.mcName .~ "weapons stay"
+                                                        & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just weaponsStayBoxRef))
+                                                        & mlItemNames .~ yesNoNames
+                                                        & mlCurValue .~ (if dmFlagsValue .&. Constants.dfWeaponsStay /= 0 then 1 else 0)
+                                                        )
+
+    modifyMenuListSReference instantPowerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                            & mlGeneric.mcX .~ 0
+                                                            & mlGeneric.mcY .~ 20
+                                                            & mlGeneric.mcName .~ "instant powerups"
+                                                            & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just instantPowerUpsBoxRef))
+                                                            & mlItemNames .~ yesNoNames
+                                                            & mlCurValue .~ (if dmFlagsValue .&. Constants.dfInstantItems /= 0 then 1 else 0)
+                                                            )
+
+    modifyMenuListSReference powerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                     & mlGeneric.mcX .~ 0
+                                                     & mlGeneric.mcY .~ 30
+                                                     & mlGeneric.mcName .~ "allow powerups"
+                                                     & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just powerUpsBoxRef))
+                                                     & mlItemNames .~ yesNoNames
+                                                     & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoItems == 0 then 1 else 0)
+                                                     )
+
+    modifyMenuListSReference healthBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                   & mlGeneric.mcX .~ 0
+                                                   & mlGeneric.mcY .~ 40
+                                                   & mlGeneric.mcName .~ "allow health"
+                                                   & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just healthBoxRef))
+                                                   & mlItemNames .~ yesNoNames
+                                                   & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoHealth == 0 then 1 else 0)
+                                                   )
+
+    modifyMenuListSReference armorBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                  & mlGeneric.mcX .~ 0
+                                                  & mlGeneric.mcY .~ 50
+                                                  & mlGeneric.mcName .~ "allow armor"
+                                                  & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just armorBoxRef))
+                                                  & mlItemNames .~ yesNoNames
+                                                  & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoArmor == 0 then 1 else 0)
+                                                  )
+
+    modifyMenuListSReference spawnFarthestBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                          & mlGeneric.mcX .~ 0
+                                                          & mlGeneric.mcY .~ 60
+                                                          & mlGeneric.mcName .~ "spawn farthest"
+                                                          & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just spawnFarthestBoxRef))
+                                                          & mlItemNames .~ yesNoNames
+                                                          & mlCurValue .~ (if dmFlagsValue .&. Constants.dfSpawnFarthest /= 0 then 1 else 0)
+                                                          )
+
+    modifyMenuListSReference sameLevelBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                      & mlGeneric.mcX .~ 0
+                                                      & mlGeneric.mcY .~ 70
+                                                      & mlGeneric.mcName .~ "same map"
+                                                      & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just sameLevelBoxRef))
+                                                      & mlItemNames .~ yesNoNames
+                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfSameLevel /= 0 then 1 else 0)
+                                                      )
+
+    modifyMenuListSReference forceRespawnBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                         & mlGeneric.mcX .~ 0
+                                                         & mlGeneric.mcY .~ 80
+                                                         & mlGeneric.mcName .~ "force respawn"
+                                                         & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just forceRespawnBoxRef))
+                                                         & mlItemNames .~ yesNoNames
+                                                         & mlCurValue .~ (if dmFlagsValue .&. Constants.dfForceRespawn /= 0 then 1 else 0)
+                                                         )
+
+    modifyMenuListSReference teamPlayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                     & mlGeneric.mcX .~ 0
+                                                     & mlGeneric.mcY .~ 90
+                                                     & mlGeneric.mcName .~ "teamplay"
+                                                     & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just teamPlayBoxRef))
+                                                     & mlItemNames .~ teamPlayNames
+                                                     )
+
+    modifyMenuListSReference allowExitBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                      & mlGeneric.mcX .~ 0
+                                                      & mlGeneric.mcY .~ 90
+                                                      & mlGeneric.mcName .~ "allow exit"
+                                                      & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just allowExitBoxRef))
+                                                      & mlItemNames .~ yesNoNames
+                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfAllowExit /= 0 then 1 else 0)
+                                                      )
+
+    modifyMenuListSReference infiniteAmmoBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                         & mlGeneric.mcX .~ 0
+                                                         & mlGeneric.mcY .~ 100
+                                                         & mlGeneric.mcName .~ "infinite ammo"
+                                                         & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just infiniteAmmoBoxRef))
+                                                         & mlItemNames .~ yesNoNames
+                                                         & mlCurValue .~ (if dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0 then 1 else 0)
+                                                         )
+
+    modifyMenuListSReference fixedFovBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                     & mlGeneric.mcX .~ 0
+                                                     & mlGeneric.mcY .~ 110
+                                                     & mlGeneric.mcName .~ "fixed FOV"
+                                                     & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just fixedFovBoxRef))
+                                                     & mlItemNames .~ yesNoNames
+                                                     & mlCurValue .~ (if dmFlagsValue .&. Constants.dfFixedFov /= 0 then 1 else 0)
+                                                     )
+
+    modifyMenuListSReference quadDropBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                     & mlGeneric.mcX .~ 0
+                                                     & mlGeneric.mcY .~ 120
+                                                     & mlGeneric.mcName .~ "quad drop"
+                                                     & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just quadDropBoxRef))
+                                                     & mlItemNames .~ yesNoNames
+                                                     & mlCurValue .~ (if dmFlagsValue .&. Constants.dfQuadDrop /= 0 then 1 else 0)
+                                                     )
+
+    modifyMenuListSReference friendlyFireBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                         & mlGeneric.mcX .~ 0
+                                                         & mlGeneric.mcY .~ 130
+                                                         & mlGeneric.mcName .~ "friendly fire"
+                                                         & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just friendlyFireBoxRef))
+                                                         & mlItemNames .~ yesNoNames
+                                                         & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoFriendlyFire == 0 then 1 else 0)
+                                                         )
+
+    dev <- FS.developerSearchPath 2
+
+    when (dev == 2) $ do
+      modifyMenuListSReference noMinesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                      & mlGeneric.mcX .~ 0
+                                                      & mlGeneric.mcY .~ 140
+                                                      & mlGeneric.mcName .~ "remove mines"
+                                                      & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just noMinesBoxRef))
+                                                      & mlItemNames .~ yesNoNames
+                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoMines /= 0 then 1 else 0)
+                                                      )
+
+      modifyMenuListSReference noNukesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                      & mlGeneric.mcX .~ 0
+                                                      & mlGeneric.mcY .~ 150
+                                                      & mlGeneric.mcName .~ "remove nukes"
+                                                      & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just noNukesBoxRef))
+                                                      & mlItemNames .~ yesNoNames
+                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoNukes /= 0 then 1 else 0)
+                                                      )
+
+      modifyMenuListSReference stackDoubleBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                          & mlGeneric.mcX .~ 0
+                                                          & mlGeneric.mcY .~ 160
+                                                          & mlGeneric.mcName .~ "2x/4x stacking off"
+                                                          & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just stackDoubleBoxRef))
+                                                          & mlItemNames .~ yesNoNames
+                                                          & mlCurValue .~ (dmFlagsValue .&. Constants.dfNoStackDouble)
+                                                          )
+
+      modifyMenuListSReference noSpheresBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                                        & mlGeneric.mcX .~ 0
+                                                        & mlGeneric.mcY .~ 170
+                                                        & mlGeneric.mcName .~ "remove spheres"
+                                                        & mlGeneric.mcCallback .~ Just (dmFlagCallback (Just noSpheresBoxRef))
+                                                        & mlItemNames .~ yesNoNames
+                                                        & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoSpheres /= 0 then 1 else 0)
+                                                        )
+
+    menuAddItem dmOptionsMenuRef (MenuListRef fallsBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef weaponsStayBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef instantPowerUpsBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef powerUpsBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef healthBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef armorBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef spawnFarthestBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef sameLevelBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef forceRespawnBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef teamPlayBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef allowExitBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef infiniteAmmoBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef fixedFovBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef quadDropBoxRef)
+    menuAddItem dmOptionsMenuRef (MenuListRef friendlyFireBoxRef)
+
+    when (dev == 2) $ do
+      menuAddItem dmOptionsMenuRef (MenuListRef noMinesBoxRef)
+      menuAddItem dmOptionsMenuRef (MenuListRef noNukesBoxRef)
+      menuAddItem dmOptionsMenuRef (MenuListRef stackDoubleBoxRef)
+      menuAddItem dmOptionsMenuRef (MenuListRef noSpheresBoxRef)
+
+    menuCenter dmOptionsMenuRef
+
+    -- set the original dmflags statusbar
+    dmFlagCallback Nothing
+    dmOptionsStatusBar <- use $ menuGlobals.mgDmOptionsStatusBar
+    menuSetStatusBar dmOptionsMenuRef dmOptionsStatusBar
 
 saveGameCallback :: MenuActionSReference -> Quake ()
 saveGameCallback _ = do
@@ -1868,3 +2079,7 @@ keyBindingFunc _ = do
 unbindCommand :: B.ByteString -> Quake ()
 unbindCommand _ = do
     io (putStrLn "Menu.unbindCommand") >> undefined -- TODO
+
+dmFlagCallback :: Maybe MenuListSReference -> Quake ()
+dmFlagCallback _ = do
+    io (putStrLn "Menu.dmFlagCallback") >> undefined -- TODO
