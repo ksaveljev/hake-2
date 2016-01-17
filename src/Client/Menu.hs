@@ -1975,8 +1975,26 @@ separatorDraw _ = do
     io (putStrLn "Menu.separatorDraw") >> undefined -- TODO
 
 downloadCallback :: MenuListSReference -> Quake ()
-downloadCallback _ = do
-    io (putStrLn "Menu.downloadCallback") >> undefined -- TODO
+downloadCallback menuListRef = do
+    item <- readMenuListSReference menuListRef
+
+    if | menuListRef == allowDownloadBoxRef ->
+           CVar.setValueI "allow_download" (item^.mlCurValue)
+
+       | menuListRef == allowDownloadMapsBoxRef ->
+           CVar.setValueI "allow_download_maps" (item^.mlCurValue)
+
+       | menuListRef == allowDownloadModelsBoxRef ->
+           CVar.setValueI "allow_download_models" (item^.mlCurValue)
+
+       | menuListRef == allowDownloadPlayersBoxRef ->
+           CVar.setValueI "allow_download_players" (item^.mlCurValue)
+
+       | menuListRef == allowDownloadSoundsBoxRef ->
+           CVar.setValueI "allow_download_sounds" (item^.mlCurValue)
+
+       | otherwise ->
+           return () -- IMPROVE: or throw error?
 
 updateVolumeFunc :: Quake ()
 updateVolumeFunc = do

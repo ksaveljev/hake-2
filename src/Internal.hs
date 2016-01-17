@@ -112,43 +112,43 @@ instance Eq KeyFuncT where
 newtype EdictReference = EdictReference Int deriving (Eq, Show, Ord)
 
 -- reference to svGlobals.svServerStatic.ssClients
-newtype ClientReference = ClientReference Int
+newtype ClientReference = ClientReference Int deriving Eq
 
 -- reference to gameBaseGlobals.gbGame.glClients
-newtype GClientReference = GClientReference Int
+newtype GClientReference = GClientReference Int deriving Eq
 
 -- reference to cmGlobals.cmMapCModels
-newtype CModelReference = CModelReference Int
+newtype CModelReference = CModelReference Int deriving Eq
 
 -- reference to cmGlobals.cmMapPlanes
-newtype CPlaneReference = CPlaneReference Int
+newtype CPlaneReference = CPlaneReference Int deriving Eq
 
 -- reference to cmGlobals.cmMapBrushes
-newtype CBrushReference = CBrushReference Int
+newtype CBrushReference = CBrushReference Int deriving Eq
 
 -- reference to svGlobals.svLinks
-newtype LinkReference = LinkReference Int
+newtype LinkReference = LinkReference Int deriving Eq
 
 -- reference to gameBaseGlobals.gbItemList
-newtype GItemReference = GItemReference Int deriving (Eq)
+newtype GItemReference = GItemReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuFrameworks
-newtype MenuFrameworkSReference = MenuFrameworkSReference Int
+newtype MenuFrameworkSReference = MenuFrameworkSReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuListSItems
-newtype MenuListSReference = MenuListSReference Int
+newtype MenuListSReference = MenuListSReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuActionSItems
-newtype MenuActionSReference = MenuActionSReference Int
+newtype MenuActionSReference = MenuActionSReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuSliderSItems
-newtype MenuSliderSReference = MenuSliderSReference Int
+newtype MenuSliderSReference = MenuSliderSReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuSeparatorSItems
-newtype MenuSeparatorSReference = MenuSeparatorSReference Int
+newtype MenuSeparatorSReference = MenuSeparatorSReference Int deriving Eq
 
 -- reference to menuGlobals.mgMenuFieldSItems
-newtype MenuFieldSReference = MenuFieldSReference Int
+newtype MenuFieldSReference = MenuFieldSReference Int deriving Eq
 
 data MenuItemReference = MenuListRef MenuListSReference
                        | MenuActionRef MenuActionSReference
@@ -157,15 +157,15 @@ data MenuItemReference = MenuListRef MenuListSReference
                        | MenuFieldRef MenuFieldSReference
 
 -- reference to globals.cl.cmds
-newtype UserCmdReference = UserCmdReference Int
+newtype UserCmdReference = UserCmdReference Int deriving Eq
 
-newtype MTexInfoReference = MTexInfoReference Int
+newtype MTexInfoReference = MTexInfoReference Int deriving Eq
 
-newtype GLPolyReference = GLPolyReference Int
+newtype GLPolyReference = GLPolyReference Int deriving Eq
 
-newtype MNodeReference = MNodeReference Int
+newtype MNodeReference = MNodeReference Int deriving Eq
 
-newtype SfxReference = SfxReference Int
+newtype SfxReference = SfxReference Int deriving Eq
 
 data MNodeChild = MNodeChildReference (IORef MNodeT) | MLeafChildReference (IORef MLeafT)
 
