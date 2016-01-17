@@ -1998,6 +1998,8 @@ downloadCallback menuListRef = do
 
 updateVolumeFunc :: Quake ()
 updateVolumeFunc = do
+  slider <- readMenuSliderSReference optionsSfxVolumeSliderRef
+  CVar.setValueF "s_volume" ((slider^.msCurValue) / 10)
   io (putStrLn "Menu.updateVolumeFunc") >> undefined -- TODO
 
 updateCdVolumeFunc :: Quake ()
