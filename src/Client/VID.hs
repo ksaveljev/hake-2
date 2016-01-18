@@ -299,7 +299,7 @@ menuInit = do
 
     use (vidGlobals.vgRefs) >>= \refs -> do
       modifyMenuListSReference refListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
-                                                   & mlGeneric.mcName .~ "driver"
+                                                   & mlGeneric.mcName .~ Just "driver"
                                                    & mlGeneric.mcX .~ 0
                                                    & mlGeneric.mcY .~ 0
                                                    & mlGeneric.mcCallback .~ Just (vidGlobals.vgCurrentMenu .= Just openGLMenuRef)
@@ -307,7 +307,7 @@ menuInit = do
                                                    )
 
     modifyMenuListSReference modeListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
-                                                  & mlGeneric.mcName .~ "video mode"
+                                                  & mlGeneric.mcName .~ Just "video mode"
                                                   & mlGeneric.mcX .~ 0
                                                   & mlGeneric.mcY .~ 10
                                                   )
@@ -315,7 +315,7 @@ menuInit = do
     modifyMenuSliderSReference screenSizeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                             & msGeneric.mcX .~ 0
                                                             & msGeneric.mcY .~ 20
-                                                            & msGeneric.mcName .~ "screen size"
+                                                            & msGeneric.mcName .~ Just "screen size"
                                                             & msMinValue .~ 3
                                                             & msMaxValue .~ 12
                                                             & msGeneric.mcCallback .~ Just screenSizeCallback
@@ -325,7 +325,7 @@ menuInit = do
       modifyMenuSliderSReference brightnessSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                               & msGeneric.mcX .~ 0
                                                               & msGeneric.mcY .~ 30
-                                                              & msGeneric.mcName .~ "brightness"
+                                                              & msGeneric.mcName .~ Just "brightness"
                                                               & msMinValue .~ 5
                                                               & msMaxValue .~ 13
                                                               & msCurValue .~ (1.3 - gammaValue + 0.5) * 10
@@ -336,7 +336,7 @@ menuInit = do
       modifyMenuListSReference fsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                  & mlGeneric.mcX .~ 0
                                                  & mlGeneric.mcY .~ 40
-                                                 & mlGeneric.mcName .~ "fullscreen"
+                                                 & mlGeneric.mcName .~ Just "fullscreen"
                                                  & mlItemNames .~ yesNoNames
                                                  & mlCurValue .~ fullscreenValue
                                                  & mlGeneric.mcCallback .~ Just fsBoxCallback
@@ -346,7 +346,7 @@ menuInit = do
       modifyMenuSliderSReference tqSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                       & msGeneric.mcX .~ 0
                                                       & msGeneric.mcY .~ 60
-                                                      & msGeneric.mcName .~ "texture quality"
+                                                      & msGeneric.mcName .~ Just "texture quality"
                                                       & msMinValue .~ 0
                                                       & msMaxValue .~ 3
                                                       & msCurValue .~ 3 - picmipValue
@@ -356,7 +356,7 @@ menuInit = do
       modifyMenuListSReference palettedTextureBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                               & mlGeneric.mcX .~ 0
                                                               & mlGeneric.mcY .~ 70
-                                                              & mlGeneric.mcName .~ "8-bit textures"
+                                                              & mlGeneric.mcName .~ Just "8-bit textures"
                                                               & mlItemNames .~ yesNoNames
                                                               & mlCurValue .~ palettedTextureValue
                                                               )
@@ -365,20 +365,20 @@ menuInit = do
       modifyMenuListSReference vSyncBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                     & mlGeneric.mcX .~ 0
                                                     & mlGeneric.mcY .~ 80
-                                                    & mlGeneric.mcName .~ "sync every frame"
+                                                    & mlGeneric.mcName .~ Just "sync every frame"
                                                     & mlItemNames .~ yesNoNames
                                                     & mlCurValue .~ swapIntervalValue
                                                     )
 
     modifyMenuActionSReference defaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
-                                                          & maGeneric.mcName .~ "reset to default"
+                                                          & maGeneric.mcName .~ Just "reset to default"
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 100
                                                           & maGeneric.mcCallback .~ Just menuInit
                                                           )
 
     modifyMenuActionSReference applyActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
-                                                       & maGeneric.mcName .~ "apply"
+                                                       & maGeneric.mcName .~ Just "apply"
                                                        & maGeneric.mcX .~ 0
                                                        & maGeneric.mcY .~ 110
                                                        & maGeneric.mcCallback .~ Just applyChanges

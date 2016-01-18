@@ -1774,7 +1774,7 @@ data MenuFrameworkS =
                  
 data MenuCommonS =
   MenuCommonS { _mcType          :: !Int
-              , _mcName          :: B.ByteString
+              , _mcName          :: Maybe B.ByteString
               , _mcX             :: !Int
               , _mcY             :: !Int
               , _mcParent        :: Maybe MenuFrameworkSReference
@@ -1782,7 +1782,7 @@ data MenuCommonS =
               , _mcLocalData     :: V4 Int
               , _mcFlags         :: !Int
               , _mcN             :: !Int
-              , _mcStatusBar     :: B.ByteString
+              , _mcStatusBar     :: Maybe B.ByteString
               , _mcCallback      :: Maybe (Quake ())
               , _mcStatusBarFunc :: Maybe (Quake ())
               , _mcOwnerDraw     :: Maybe (Quake ())
@@ -1844,6 +1844,7 @@ data MenuGlobals =
               , _mgNumServers          :: !Int
               , _mgBindGrab            :: !Bool
               , _mgDmOptionsStatusBar  :: Maybe B.ByteString
+              , _mgMapNames            :: Maybe (V.Vector B.ByteString)
               }
 
 data MenuLayerT =

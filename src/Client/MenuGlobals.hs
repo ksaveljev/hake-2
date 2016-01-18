@@ -701,4 +701,5 @@ initialMenuGlobals =
               , _mgNumServers          = 0
               , _mgBindGrab            = False
               , _mgDmOptionsStatusBar  = Nothing
+              , _mgMapNames            = Nothing
               }

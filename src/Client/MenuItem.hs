@@ -18,6 +18,7 @@ makeLenses ''MenuListS
 makeLenses ''MenuSliderS
 makeLenses ''MenuActionS
 makeLenses ''MenuSeparatorS
+makeLenses ''MenuFieldS
 
 newMenuListS :: MenuListS
 newMenuListS =

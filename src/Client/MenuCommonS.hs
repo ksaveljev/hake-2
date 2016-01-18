@@ -14,7 +14,7 @@ makeLenses ''MenuCommonS
 newMenuCommonS :: MenuCommonS
 newMenuCommonS =
   MenuCommonS { _mcType          = 0
-              , _mcName          = ""
+              , _mcName          = Just ""
               , _mcX             = 0
               , _mcY             = 0
               , _mcParent        = Nothing
@@ -22,7 +22,7 @@ newMenuCommonS =
               , _mcLocalData     = V4 0 0 0 0
               , _mcFlags         = 0
               , _mcN             = 0
-              , _mcStatusBar     = ""
+              , _mcStatusBar     = Nothing
               , _mcCallback      = Nothing
               , _mcStatusBarFunc = Nothing
               , _mcOwnerDraw     = Nothing
