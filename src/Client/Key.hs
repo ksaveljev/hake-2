@@ -320,6 +320,7 @@ message key = do
            unless (B.length chatBuffer' > Constants.maxCmdLine) $
              globals.chatBuffer %= (\v -> v `B.append` BC.pack (show key)) -- IMPROVE?
 
+-- Interactive line editing and console scrollback
 console :: Int -> Quake ()
 console key = do
     io (putStrLn "Key.console") >> undefined -- TODO
@@ -346,4 +347,6 @@ clearStates = do
 
 clearTyping :: Quake ()
 clearTyping = do
-    io (putStrLn "Key.clearTyping") >> undefined -- TODO
+    editLine' <- use $ globals.editLine
+    globals.keyLines.ix editLine' .= B.pack [93, 0] -- clear any typing
+    globals.keyLinePos .= 1
