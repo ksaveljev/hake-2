@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Key where
 
-import Control.Lens ((.=), (%=), use, ix, (+=), (^.), (-=), preuse)
+import Control.Lens ((.=), (%=), use, ix, (+=), (^.), (-=), preuse, zoom)
 import Control.Monad.State (liftM, unless, when, void)
 import Data.Char (ord, toUpper, chr)
 import Data.Maybe (isJust, fromJust, isNothing)
@@ -282,7 +282,43 @@ event key down time = do
 
 message :: Int -> Quake ()
 message key = do
-    io (putStrLn "Key.message") >> undefined -- TODO
+    if | key `elem` [kEnter, kKpEnter] -> do
+           chatTeam' <- use $ globals.chatTeam
+           if chatTeam'
+             then CBuf.addText "say_team \""
+             else CBuf.addText "say \""
+
+           chatBuffer' <- use $ globals.chatBuffer
+
+           CBuf.addText chatBuffer'
+           CBuf.addText "\"\n"
+
+           zoom globals $ do
+             cls.csKeyDest .= Constants.keyGame
+             chatBuffer .= ""
+
+       | key == kEscape ->
+           zoom globals $ do
+             cls.csKeyDest .= Constants.keyGame
+             chatBuffer .= ""
+
+       | key < 32 || key > 127 ->
+           return () -- non printable
+
+       | key == kBackspace -> do
+           chatBuffer' <- use $ globals.chatBuffer
+
+           if B.length chatBuffer' > 2
+             then
+               globals.chatBuffer .= B.init chatBuffer'
+             else
+               globals.chatBuffer .= ""
+
+       | otherwise -> do
+           chatBuffer' <- use $ globals.chatBuffer
+
+           unless (B.length chatBuffer' > Constants.maxCmdLine) $
+             globals.chatBuffer %= (\v -> v `B.append` BC.pack (show key)) -- IMPROVE?
 
 console :: Int -> Quake ()
 console key = do
