@@ -307,3 +307,7 @@ clearStates = do
               keyGlobals.kgKeyRepeats.ix idx .= 0
 
               keyDownEvents (idx + 1) maxIdx
+
+clearTyping :: Quake ()
+clearTyping = do
+    io (putStrLn "Key.clearTyping") >> undefined -- TODO

@@ -5,7 +5,7 @@ module Client.Menu where
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _1, _2)
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.))
-import Data.Char (ord)
+import Data.Char (ord, chr)
 import Data.Maybe (fromJust)
 import Linear (V4(..), _x)
 import System.Directory (doesFileExist, readable, getPermissions)
@@ -20,6 +20,7 @@ import CVarVariables
 import QCommon.XCommandT
 import qualified Constants
 import qualified Client.CL as CL
+import {-# SOURCE #-} qualified Client.Console as Console
 import qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.SCR as SCR
@@ -1001,8 +1002,62 @@ menuItemCommon menuItemRef = do
         return (menuItem^.mspGeneric)
 
 defaultMenuKey :: MenuFrameworkSReference -> Int -> Quake (Maybe B.ByteString)
-defaultMenuKey _ _ = do
-    io (putStrLn "Menu.defaultMenuKey") >> undefined -- TODO
+defaultMenuKey menuRef key = do
+    done <- checkFieldKey
+    
+    if done
+      then
+        return Nothing
+        
+      else do
+        io (putStrLn "Menu.defaultMenuKey") >> undefined -- TODO
+    
+  where checkFieldKey :: Quake Bool
+        checkFieldKey = do
+          menuItemRef <- menuItemAtCursor menuRef
+
+          mItem <- case menuItemRef of
+                     Nothing -> return Nothing
+                     Just itemRef -> menuItemCommon itemRef >>= return . Just
+          
+          case mItem of
+            Nothing ->
+              return False
+            
+            Just item -> do
+              if (item^.mcType) == Constants.mtypeField
+                then do
+                  let Just (MenuFieldRef fieldRef) = menuItemRef
+                  fieldKey fieldRef key
+                  
+                else
+                  return False
+
+fieldKey :: MenuFieldSReference -> Int -> Quake Bool
+fieldKey fieldRef key = do
+    let k = if | key == KeyConstants.kKpSlash -> '/'
+               | key == KeyConstants.kKpMinus -> '-'
+               | key == KeyConstants.kKpPlus -> '+'
+               | key == KeyConstants.kKpHome -> '7'
+               | key == KeyConstants.kKpUpArrow -> '8'
+               | key == KeyConstants.kKpPgUp -> '9'
+               | key == KeyConstants.kKpLeftArrow -> '4'
+               | key == KeyConstants.kKp5 -> '5'
+               | key == KeyConstants.kKpRightArrow -> '6'
+               | key == KeyConstants.kKpEnd -> '1'
+               | key == KeyConstants.kKpDownArrow -> '2'
+               | key == KeyConstants.kKpPgDn -> '3'
+               | key == KeyConstants.kKpIns -> '0'
+               | key == KeyConstants.kKpDel -> '.'
+               | otherwise -> chr key
+    
+    if ord k > 127
+      then
+        return False
+        
+      else do
+        -- support pasting from the clipboard
+        io (putStrLn "Menu.fieldKey") >> undefined -- TODO
 
 searchLocalGames :: Quake ()
 searchLocalGames = do
@@ -2220,15 +2275,18 @@ alwaysRunFunc = do
 
 invertMouseFunc :: Quake ()
 invertMouseFunc = do
-    io (putStrLn "Menu.invertMouseFunc") >> undefined -- TODO
+    pitchValue <- liftM (^.cvValue) mPitchCVar
+    CVar.setValueF "m_pitch" (negate pitchValue)
 
 lookSpringFunc :: Quake ()
 lookSpringFunc = do
-    io (putStrLn "Menu.lookSpringFunc") >> undefined -- TODO
+    lookSpringValue <- liftM (^.cvValue) lookSpringCVar
+    CVar.setValueF "lookspring" (1 - lookSpringValue)
   
 lookStrafeFunc :: Quake ()
 lookStrafeFunc = do
-    io (putStrLn "Menu.lookStrafeFunc") >> undefined -- TODO
+    lookStrafeValue <- liftM (^.cvValue) lookStrafeCVar
+    CVar.setValueF "lookstrafe" (1 - lookStrafeValue)
 
 freeLookFunc :: Quake ()
 freeLookFunc = do
@@ -2242,19 +2300,35 @@ crosshairFunc = do
 
 joystickFunc :: Quake ()
 joystickFunc = do
-    io (putStrLn "Menu.joystickFunc") >> undefined -- TODO
+    box <- readMenuListSReference optionsJoystickBoxRef
+    CVar.setValueI "in_joystick" (box^.mlCurValue)
   
 customizeControlsFunc :: Quake ()
-customizeControlsFunc = do
-    io (putStrLn "Menu.customizeControlsFunc") >> undefined -- TODO
+customizeControlsFunc = menuKeysF^.xcCmd
 
 controlsResetDefaultsFunc :: Quake ()
 controlsResetDefaultsFunc = do
-    io (putStrLn "Menu.controlsResetDefaultsFunc") >> undefined -- TODO
+    CBuf.addText "exec default.cfg\n"
+    CBuf.execute
+    
+    controlsSetMenuItemValues
 
 consoleFunc :: Quake ()
 consoleFunc = do
-    io (putStrLn "Menu.consoleFunc") >> undefined -- TODO
+    -- the proper way to do this is probably to have ToggleConsole_f
+    -- accept a parameter
+    attractLoop <- use $ globals.cl.csAttractLoop
+    
+    if attractLoop
+      then
+        CBuf.addText "killserver\n"
+        
+      else do
+        Key.clearTyping
+        Console.clearNotify
+        
+        forceMenuOff
+        globals.cls.csKeyDest .= Constants.keyConsole
 
 controlsSetMenuItemValues :: Quake ()
 controlsSetMenuItemValues = do
@@ -2281,28 +2355,62 @@ creditsMenuDraw =
 creditsKey :: KeyFuncT
 creditsKey =
   KeyFuncT "Menu.creditsKey" (\key -> do
-    io (putStrLn "Menu.creditsKey") >> undefined -- TODO
+    when (key == KeyConstants.kEscape) popMenu
+    return (Just menuOutSound)
   )
   
 dmOptionsMenuDraw :: XCommandT
 dmOptionsMenuDraw =
-  XCommandT "Menu.dmOptionsMenuDraw" (do
-    io (putStrLn "Menu.dmOptionsMenuDraw") >> undefined -- TODO
-  )
+  XCommandT "Menu.dmOptionsMenuDraw" (menuDraw dmOptionsMenuRef)
   
 dmOptionsMenuKey :: KeyFuncT
 dmOptionsMenuKey =
-  KeyFuncT "Menu.dmOptionsMenuKey" (\key -> do
-    io (putStrLn "Menu.dmOptionsMenuKey") >> undefined -- TODO
+  KeyFuncT "Menu.dmOptionsMenuKey" (\key ->
+    defaultMenuKey dmOptionsMenuRef key
   )
 
 keyBindingFunc :: MenuActionSReference -> Quake ()
-keyBindingFunc _ = do
-    io (putStrLn "Menu.keyBindingFunc") >> undefined -- TODO
+keyBindingFunc actionRef = do
+    action <- readMenuActionSReference actionRef
+    let command = (bindNames V.! (action^.maGeneric.mcLocalData._x))^._1
+    (_, key) <- findKeysForCommand command
+    
+    when (key /= -1) $
+      unbindCommand command
+    
+    menuGlobals.mgBindGrab .= True
+    
+    menuSetStatusBar keysMenuRef (Just "press a key or button for this action")
+
+findKeysForCommand :: B.ByteString -> Quake (Int, Int)
+findKeysForCommand command = do
+    kb <- use $ globals.keyBindings
+    return $ findKeyBindings kb (-1) 0 256
+    
+  where findKeyBindings :: V.Vector (Maybe B.ByteString) -> Int -> Int -> Int -> (Int, Int)
+        findKeyBindings kb key1 idx maxIdx
+          | idx >= maxIdx = (key1, -1)
+          | otherwise = if (kb V.! idx) == Just command
+                          then
+                            if key1 == -1
+                              then findKeyBindings kb idx (idx + 1) maxIdx
+                              else (key1, idx)
+                          else
+                            findKeyBindings kb key1 (idx + 1) maxIdx
 
 unbindCommand :: B.ByteString -> Quake ()
-unbindCommand _ = do
-    io (putStrLn "Menu.unbindCommand") >> undefined -- TODO
+unbindCommand command = do
+    kb <- use $ globals.keyBindings
+    unbind kb 0 256
+    
+  where unbind :: V.Vector (Maybe B.ByteString) -> Int -> Int -> Quake ()
+        unbind kb idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              when ((kb V.! idx) == Just command) $
+                Key.setBinding idx (Just "")
+                
+              unbind kb (idx + 1) maxIdx
 
 dmFlagCallback :: Maybe MenuListSReference -> Quake ()
 dmFlagCallback _ = do
