@@ -25,7 +25,7 @@ import {-# SOURCE #-} qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do
-    let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']', 0 is NUL
+    let kl = V.replicate 32 $ B.pack [93] -- 93 is ']'
     globals.keyLines .= kl
     globals.keyLinePos .= 1
 
@@ -322,8 +322,59 @@ message key = do
 
 -- Interactive line editing and console scrollback
 console :: Int -> Quake ()
-console key = do
-    io (putStrLn "Key.console") >> undefined -- TODO
+console k = do
+    let key = if | k == kKpSlash -> '/'
+                 | k == kKpMinus -> '-'
+                 | k == kKpPlus -> '+'
+                 | k == kKpHome -> '7'
+                 | k == kKpUpArrow -> '8'
+                 | k == kKpPgUp -> '9'
+                 | k == kKpLeftArrow -> '4'
+                 | k == kKp5 -> '5'
+                 | k == kKpRightArrow -> '6'
+                 | k == kKpEnd -> '1'
+                 | k == kKpDownArrow -> '2'
+                 | k == kKpPgDn -> '3'
+                 | k == kKpIns -> '0'
+                 | k == kKpDel -> '.'
+
+    keyDown' <- use $ globals.keyDown
+
+    if | key == 'l' && (keyDown' UV.! kCtrl) ->
+           CBuf.addText "clear\n"
+
+       | k `elem` [kEnter, kKpEnter] ->
+           undefined -- TODO
+
+       | k == kTab ->
+           completeCommand -- command completion
+
+       | k `elem` [kBackspace, kLeftArrow, kKpLeftArrow] || (key == 'h' && (keyDown' UV.! kCtrl)) -> do
+           undefined -- TODO
+
+       | k `elem` [kUpArrow, kKpUpArrow] || (key == 'p' && (keyDown' UV.! kCtrl)) -> do
+           undefined -- TODO
+
+       | k `elem` [kDownArrow, kKpDownArrow] || (key == 'n' && (keyDown' UV.! kCtrl)) -> do
+           undefined -- TODO
+
+       | k `elem` [kPgUp, kKpPgUp] ->
+           globals.con.cDisplay -= 2
+
+       | k `elem` [kPgDn, kKpPgDn] -> do
+           undefined -- TODO
+
+       | k `elem` [kHome, kKpHome] -> do
+           undefined -- TODO
+
+       | k `elem` [kEnd, kKpEnd] -> do
+           undefined -- TODO
+
+       | k < 32 || k > 127 ->
+           return () -- non printable
+
+       | otherwise -> do
+           io (putStrLn "Key.console") >> undefined -- TODO
 
 clearStates :: Quake ()
 clearStates = do
@@ -348,5 +399,9 @@ clearStates = do
 clearTyping :: Quake ()
 clearTyping = do
     editLine' <- use $ globals.editLine
-    globals.keyLines.ix editLine' .= B.pack [93, 0] -- clear any typing
+    globals.keyLines.ix editLine' .= B.pack [93] -- clear any typing
     globals.keyLinePos .= 1
+
+completeCommand :: Quake ()
+completeCommand = do
+    io (putStrLn "Key.completeCommand") >> undefined -- TODO
