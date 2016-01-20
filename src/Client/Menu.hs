@@ -2222,7 +2222,7 @@ fieldDraw fieldRef = do
     
     drawVisible renderer menu field 0 (field^.mflVisibleLength)
     
-    menuDrawString ((field^.mflGeneric.mcX) + (menu^.mfX) + 24) ((field^.mflGeneric.mcY) + (menu^.mfY)) tempBuffer
+    menuDrawString ((field^.mflGeneric.mcX) + (menu^.mfX) + 24) ((field^.mflGeneric.mcY) + (menu^.mfY)) (Just tempBuffer)
     
     menuItemRef <- menuItemAtCursor menuRef
     
@@ -2247,15 +2247,18 @@ fieldDraw fieldRef = do
               (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 24 + 8 * idx) ((field^.mflGeneric.mcY) + (menu^.mfY) + 4) 25
               drawVisible renderer menu field (idx + 1) maxIdx
 
-menuDrawString :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawString :: Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawString _ _ Nothing = return ()
 menuDrawString _ _ _ = do
     io (putStrLn "Menu.menuDrawString") >> undefined -- TODO
 
-menuDrawStringDark :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawStringDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringDark _ _ Nothing = return ()
 menuDrawStringDark _ _ _ = do
     io (putStrLn "Menu.menuDrawStringDark") >> undefined -- TODO
 
-menuDrawStringR2L :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawStringR2L :: Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringR2L _ _ Nothing = return ()
 menuDrawStringR2L _ _ _ = do
     io (putStrLn "Menu.menuDrawStringR2L") >> undefined -- TODO
 
@@ -2321,8 +2324,27 @@ menuListDraw menuListRef = do
           menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + y + 10) (Just name)
 
 spinControlDraw :: MenuListSReference -> Quake ()
-spinControlDraw _ = do
-    io (putStrLn "Menu.spinControlDraw") >> undefined -- TODO
+spinControlDraw menuListRef = do
+    menuList <- readMenuListSReference menuListRef
+    let Just menuRef = menuList^.mlGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+
+    menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (menuList^.mlGeneric.mcName)
+
+    let name = (menuList^.mlItemNames) V.! (menuList^.mlCurValue)
+
+    if '\n' `BC.elem` name
+      then
+        menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (Just name)
+      else do
+        let line1 = Lib.leftFrom name '\n'
+            line2 = Lib.rightFrom name '\n'
+            line2' = case '\n' `BC.elemIndex` line2 of
+                       Nothing -> line2
+                       Just pos -> B.take pos line2
+
+        menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (Just line1)
+        menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + 10) (Just line2')
 
 actionDraw :: MenuActionSReference -> Quake ()
 actionDraw _ = do

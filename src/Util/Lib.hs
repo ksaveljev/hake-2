@@ -81,3 +81,17 @@ crandom :: Quake Float
 crandom = do
     f <- randomF
     return $ (f - 0.5) * 2
+
+-- Returns the left part of the string from the last occurence of ch
+leftFrom :: B.ByteString -> Char -> B.ByteString
+leftFrom str ch =
+    case ch `BC.elemIndexEnd` str of
+      Nothing -> ""
+      Just pos -> B.take pos str
+
+-- Returns the right part of the string from the last occurence of ch
+rightFrom :: B.ByteString -> Char -> B.ByteString
+rightFrom str ch =
+    case ch `BC.elemIndexEnd` str of
+      Nothing -> ""
+      Just pos -> B.drop (pos + 1) str

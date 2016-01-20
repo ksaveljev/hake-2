@@ -26,3 +26,7 @@ rand :: Quake Int16
 randomF :: Quake Float
 
 crandom :: Quake Float
+
+leftFrom :: B.ByteString -> Char -> B.ByteString
+
+rightFrom :: B.ByteString -> Char -> B.ByteString
