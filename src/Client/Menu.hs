@@ -2303,8 +2303,22 @@ sliderDraw sliderRef = do
               drawSliderRange renderer menu slider (idx + 1) maxIdx
 
 menuListDraw :: MenuListSReference -> Quake ()
-menuListDraw _ = do
-    io (putStrLn "Menu.menuListDraw") >> undefined -- TODO
+menuListDraw menuListRef = do
+    menuList <- readMenuListSReference menuListRef
+    let Just menuRef = menuList^.mlGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+
+    menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (menuList^.mlGeneric.mcName)
+
+    Just renderer <- use $ globals.re
+    (renderer^.rRefExport.reDrawFill) ((menuList^.mlGeneric.mcX) - 112 + (menu^.mfX)) ((menu^.mfY) + (menuList^.mlGeneric.mcY) + 10 * (menuList^.mlCurValue) + 10) 128 10 16
+
+    V.imapM_ (drawListItem menu menuList) (menuList^.mlItemNames)
+
+  where drawListItem :: MenuFrameworkS -> MenuListS -> Int -> B.ByteString -> Quake ()
+        drawListItem menu menuList idx name = do
+          let y = idx * 10
+          menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + y + 10) (Just name)
 
 spinControlDraw :: MenuListSReference -> Quake ()
 spinControlDraw _ = do
