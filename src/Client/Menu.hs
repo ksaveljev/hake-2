@@ -40,6 +40,9 @@ mainItems = 5
 numCursorFrames :: Int
 numCursorFrames = 15
 
+sliderRange :: Int
+sliderRange = 10
+
 yesNoNames :: V.Vector B.ByteString
 yesNoNames = V.fromList ["no", "yes"]
 
@@ -2207,9 +2210,7 @@ fieldDraw fieldRef = do
     let Just menuRef = field^.mflGeneric.mcParent
     menu <- readMenuFrameworkSReference menuRef
     
-    case field^.mflGeneric.mcName of
-      Nothing -> return ()
-      Just name -> menuDrawStringR2LDark ((field^.mflGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((field^.mflGeneric.mcY) + (menu^.mfY)) name
+    menuDrawStringR2LDark ((field^.mflGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((field^.mflGeneric.mcY) + (menu^.mfY)) (field^.mflGeneric.mcName)
         
     let tempBuffer = B.drop (field^.mflVisibleOffset) (field^.mflBuffer)
     
@@ -2258,8 +2259,9 @@ menuDrawStringR2L :: Int -> Int -> B.ByteString -> Quake ()
 menuDrawStringR2L _ _ _ = do
     io (putStrLn "Menu.menuDrawStringR2L") >> undefined -- TODO
 
-menuDrawStringR2LDark :: Int -> Int -> B.ByteString -> Quake ()
-menuDrawStringR2LDark x y str = do
+menuDrawStringR2LDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringR2LDark _ _ Nothing = return ()
+menuDrawStringR2LDark x y (Just str) = do
     Just renderer <- use $ globals.re
     drawString renderer 0 (B.length str)
     
@@ -2272,8 +2274,33 @@ menuDrawStringR2LDark x y str = do
               drawString renderer (idx + 1) maxIdx
 
 sliderDraw :: MenuSliderSReference -> Quake ()
-sliderDraw _ = do
-    io (putStrLn "Menu.sliderDraw") >> undefined -- TODO
+sliderDraw sliderRef = do
+    slider <- readMenuSliderSReference sliderRef
+    let Just menuRef = slider^.msGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+
+    menuDrawStringR2LDark ((slider^.msGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((slider^.msGeneric.mcY) + (menu^.mfY)) (slider^.msGeneric.mcName)
+
+    let r = ((slider^.msCurValue) - (slider^.msMinValue)) / ((slider^.msMaxValue) - (slider^.msMinValue))
+        range = if | r < 0 -> 0
+                   | r > 1 -> 1
+                   | otherwise -> r
+
+    Just renderer <- use $ globals.re
+
+    (renderer^.rRefExport.reDrawChar) ((slider^.msGeneric.mcX) + (menu^.mfX) + Constants.rColumnOffset) ((slider^.msGeneric.mcY) + (menu^.mfY)) 128
+
+    drawSliderRange renderer menu slider 0 sliderRange
+
+    (renderer^.rRefExport.reDrawChar) (Constants.rColumnOffset + (slider^.msGeneric.mcX) + sliderRange * 8 + (menu^.mfX) + 8) ((slider^.msGeneric.mcY) + (menu^.mfY)) 130
+    (renderer^.rRefExport.reDrawChar) (8 + Constants.rColumnOffset + (menu^.mfX) + (slider^.msGeneric.mcX) + truncate (fromIntegral (sliderRange - 1) * 8 * range)) ((slider^.msGeneric.mcY) + (menu^.mfY)) 131
+
+  where drawSliderRange :: Renderer -> MenuFrameworkS -> MenuSliderS -> Int -> Int -> Quake ()
+        drawSliderRange renderer menu slider idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              (renderer^.rRefExport.reDrawChar) (Constants.rColumnOffset + (slider^.msGeneric.mcX) + idx * 8 + (menu^.mfX) + 8) ((slider^.msGeneric.mcY) + (menu^.mfY)) 129
+              drawSliderRange renderer menu slider (idx + 1) maxIdx
 
 menuListDraw :: MenuListSReference -> Quake ()
 menuListDraw _ = do
