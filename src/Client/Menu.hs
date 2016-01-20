@@ -956,32 +956,32 @@ menuDraw menuRef = do
               if | (menuCommon^.mcType) == Constants.mtypeField -> do
                      let MenuFieldRef menuItemRef = itemRef
                      menuItem <- readMenuFieldSReference menuItemRef
-                     fieldDraw menuItem
+                     fieldDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSlider -> do
                      let MenuSliderRef menuItemRef = itemRef
                      menuItem <- readMenuSliderSReference menuItemRef
-                     sliderDraw menuItem
+                     sliderDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeList -> do
                      let MenuListRef menuItemRef = itemRef
                      menuItem <- readMenuListSReference menuItemRef
-                     menuListDraw menuItem
+                     menuListDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSpinControl -> do
                      let MenuListRef menuItemRef = itemRef
                      menuItem <- readMenuListSReference menuItemRef
-                     spinControlDraw menuItem
+                     spinControlDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeAction -> do
                      let MenuActionRef menuItemRef = itemRef
                      menuItem <- readMenuActionSReference menuItemRef
-                     actionDraw menuItem
+                     actionDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSeparator -> do
                      let MenuSeparatorRef menuItemRef = itemRef
                      menuItem <- readMenuSeparatorSReference menuItemRef
-                     separatorDraw menuItem
+                     separatorDraw menuItemRef
 
               drawContents menu (idx + 1) maxIdx
 
@@ -1109,7 +1109,7 @@ addressBookMenuInit = do
                                                           & mflCursor .~ B.length (adr^.cvString)
                                                           & mflLength .~ 60
                                                           & mflVisibleLength .~ 30
-                                                          & mflBuffer .~ Just (adr^.cvString)
+                                                          & mflBuffer .~ (adr^.cvString)
                                                           )
               
               menuAddItem addressBookMenuRef (MenuFieldRef fieldRef)
@@ -1137,10 +1137,7 @@ addressBookMenuKeyF =
           | otherwise = do
               let fieldRef = addressBookFields V.! idx
               field <- readMenuFieldSReference fieldRef
-              let buffer = case field^.mflBuffer of
-                             Nothing -> ""
-                             Just str -> str
-              CVar.set ("adr" `B.append` BC.pack (show idx)) buffer
+              CVar.set ("adr" `B.append` BC.pack (show idx)) (field^.mflBuffer)
               setAddressBookCVars (idx + 1) maxIdx
 
 startServerMenuInit :: Quake ()
@@ -1218,7 +1215,7 @@ startServerMenuInit = do
                                                              & mflGeneric.mcStatusBar .~ Just "0 = no limit"
                                                              & mflLength .~ 3
                                                              & mflVisibleLength .~ 3
-                                                             & mflBuffer .~ Just timeLimitStr
+                                                             & mflBuffer .~ timeLimitStr
                                                              )
         
         fragLimitStr <- CVar.variableString "fraglimit"
@@ -1231,7 +1228,7 @@ startServerMenuInit = do
                                                              & mflGeneric.mcStatusBar .~ Just "0 = no limit"
                                                              & mflLength .~ 3
                                                              & mflVisibleLength .~ 3
-                                                             & mflBuffer .~ Just fragLimitStr
+                                                             & mflBuffer .~ fragLimitStr
                                                              )
                                                           
         -- maxclients determines the maximum number of players that can join
@@ -1249,7 +1246,7 @@ startServerMenuInit = do
                                                               & mflGeneric.mcStatusBar .~ Nothing
                                                               & mflLength .~ 3
                                                               & mflVisibleLength .~ 3
-                                                              & mflBuffer .~ Just (if maxClientsValue == 1 then "8" else maxClientsStr)
+                                                              & mflBuffer .~ (if maxClientsValue == 1 then "8" else maxClientsStr)
                                                               )
                                                               
         hostnameStr <- CVar.variableString "hostname"
@@ -1262,7 +1259,7 @@ startServerMenuInit = do
                                                             & mflGeneric.mcStatusBar .~ Nothing
                                                             & mflLength .~ 12
                                                             & mflVisibleLength .~ 12
-                                                            & mflBuffer .~ Just hostnameStr
+                                                            & mflBuffer .~ hostnameStr
                                                             & mflCursor .~ B.length hostnameStr
                                                             )
                                                             
@@ -2203,27 +2200,94 @@ saveGameCallback menuActionRef = do
     CBuf.addText ("save save" `B.append` BC.pack (show (action^.maGeneric.mcLocalData._x)) `B.append` "\n")
     forceMenuOff
 
-fieldDraw :: MenuFieldS -> Quake ()
-fieldDraw _ = do
-    io (putStrLn "Menu.fieldDraw") >> undefined -- TODO
+fieldDraw :: MenuFieldSReference -> Quake ()
+fieldDraw fieldRef = do
+    Just renderer <- use $ globals.re
+    field <- readMenuFieldSReference fieldRef
+    let Just menuRef = field^.mflGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+    
+    case field^.mflGeneric.mcName of
+      Nothing -> return ()
+      Just name -> menuDrawStringR2LDark ((field^.mflGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((field^.mflGeneric.mcY) + (menu^.mfY)) name
+        
+    let tempBuffer = B.drop (field^.mflVisibleOffset) (field^.mflBuffer)
+    
+    (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 16) ((field^.mflGeneric.mcY) + (menu^.mfY) - 4) 18
+    (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 16) ((field^.mflGeneric.mcY) + (menu^.mfY) + 4) 24
+    
+    (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 24 + 8 * (field^.mflVisibleLength)) ((field^.mflGeneric.mcY) + (menu^.mfY) - 4) 20
+    (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 24 + 8 * (field^.mflVisibleLength)) ((field^.mflGeneric.mcY) + (menu^.mfY) + 4) 26
+    
+    drawVisible renderer menu field 0 (field^.mflVisibleLength)
+    
+    menuDrawString ((field^.mflGeneric.mcX) + (menu^.mfX) + 24) ((field^.mflGeneric.mcY) + (menu^.mfY)) tempBuffer
+    
+    menuItemRef <- menuItemAtCursor menuRef
+    
+    when (menuItemRef == Just (MenuFieldRef fieldRef)) $ do
+      let offset = if (field^.mflVisibleOffset) /= 0
+                     then field^.mflVisibleLength
+                     else field^.mflCursor
+      
+      ms <- Timer.milliseconds
+      
+      let ch = if (ms `div` 250) .&. 1 /= 0
+                 then 11
+                 else ord ' '
+                 
+      (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 8 * (offset + 2) + 8) ((field^.mflGeneric.mcY) + (menu^.mfY)) ch
+    
+  where drawVisible :: Renderer -> MenuFrameworkS -> MenuFieldS -> Int -> Int -> Quake ()
+        drawVisible renderer menu field idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 24 + 8 * idx) ((field^.mflGeneric.mcY) + (menu^.mfY) - 4) 19
+              (renderer^.rRefExport.reDrawChar) ((field^.mflGeneric.mcX) + (menu^.mfX) + 24 + 8 * idx) ((field^.mflGeneric.mcY) + (menu^.mfY) + 4) 25
+              drawVisible renderer menu field (idx + 1) maxIdx
 
-sliderDraw :: MenuSliderS -> Quake ()
+menuDrawString :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawString _ _ _ = do
+    io (putStrLn "Menu.menuDrawString") >> undefined -- TODO
+
+menuDrawStringDark :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawStringDark _ _ _ = do
+    io (putStrLn "Menu.menuDrawStringDark") >> undefined -- TODO
+
+menuDrawStringR2L :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawStringR2L _ _ _ = do
+    io (putStrLn "Menu.menuDrawStringR2L") >> undefined -- TODO
+
+menuDrawStringR2LDark :: Int -> Int -> B.ByteString -> Quake ()
+menuDrawStringR2LDark x y str = do
+    Just renderer <- use $ globals.re
+    drawString renderer 0 (B.length str)
+    
+  where drawString :: Renderer -> Int -> Int -> Quake ()
+        drawString renderer idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ch = ord (BC.index str (maxIdx - idx - 1)) + 128
+              (renderer^.rRefExport.reDrawChar) (x - idx * 8) y ch
+              drawString renderer (idx + 1) maxIdx
+
+sliderDraw :: MenuSliderSReference -> Quake ()
 sliderDraw _ = do
     io (putStrLn "Menu.sliderDraw") >> undefined -- TODO
 
-menuListDraw :: MenuListS -> Quake ()
+menuListDraw :: MenuListSReference -> Quake ()
 menuListDraw _ = do
     io (putStrLn "Menu.menuListDraw") >> undefined -- TODO
 
-spinControlDraw :: MenuListS -> Quake ()
+spinControlDraw :: MenuListSReference -> Quake ()
 spinControlDraw _ = do
     io (putStrLn "Menu.spinControlDraw") >> undefined -- TODO
 
-actionDraw :: MenuActionS -> Quake ()
+actionDraw :: MenuActionSReference -> Quake ()
 actionDraw _ = do
     io (putStrLn "Menu.actionDraw") >> undefined -- TODO
 
-separatorDraw :: MenuSeparatorS -> Quake ()
+separatorDraw :: MenuSeparatorSReference -> Quake ()
 separatorDraw _ = do
     io (putStrLn "Menu.separatorDraw") >> undefined -- TODO
 
@@ -2335,8 +2399,19 @@ controlsSetMenuItemValues = do
     io (putStrLn "Menu.controlsSetMenuItemValues") >> undefined -- TODO
 
 keyCursorDrawFunc :: MenuFrameworkSReference -> Quake ()
-keyCursorDrawFunc _ = do
-    io (putStrLn "Menu.keyCursorDrawFunc") >> undefined -- TODO
+keyCursorDrawFunc menuRef = do
+    menu <- readMenuFrameworkSReference menuRef
+    bindGrab <- use $ menuGlobals.mgBindGrab
+    
+    ch <- if bindGrab
+            then
+              return (ord '=')
+            else do
+              ms <- Timer.milliseconds
+              return (12 + ((ms `div` 250) .&. 1))
+    
+    Just renderer <- use $ globals.re
+    (renderer^.rRefExport.reDrawChar) (menu^.mfX) ((menu^.mfY) + 9 * (menu^.mfCursor)) ch
 
 drawKeyBindingFunc :: MenuActionSReference -> Quake ()
 drawKeyBindingFunc _ = do

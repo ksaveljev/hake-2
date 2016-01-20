@@ -155,6 +155,7 @@ data MenuItemReference = MenuListRef MenuListSReference
                        | MenuSliderRef MenuSliderSReference
                        | MenuSeparatorRef MenuSeparatorSReference
                        | MenuFieldRef MenuFieldSReference
+                       deriving Eq
 
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int deriving Eq
@@ -1813,7 +1814,7 @@ data MenuSeparatorS =
 
 data MenuFieldS =
   MenuFieldS { _mflGeneric       :: MenuCommonS
-             , _mflBuffer        :: Maybe B.ByteString
+             , _mflBuffer        :: B.ByteString
              , _mflCursor        :: Int
              , _mflLength        :: Int
              , _mflVisibleLength :: Int

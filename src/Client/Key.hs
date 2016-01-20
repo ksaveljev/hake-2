@@ -343,7 +343,10 @@ console k = do
     if | key == 'l' && (keyDown' UV.! kCtrl) ->
            CBuf.addText "clear\n"
 
-       | k `elem` [kEnter, kKpEnter] ->
+       | k `elem` [kEnter, kKpEnter] -> do
+           -- backslash text are commands, else chat
+           editLine' <- use $ globals.editLine
+           Just keyLine <- preuse $ globals.keyLines.ix editLine'
            undefined -- TODO
 
        | k == kTab ->

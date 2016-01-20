@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Client.MenuItem ( MenuListS(..)
                        , MenuActionS(..)
                        , MenuSliderS(..)
@@ -49,7 +50,7 @@ newMenuSeparatorS =
 newMenuFieldS :: MenuFieldS
 newMenuFieldS =
   MenuFieldS { _mflGeneric       = newMenuCommonS
-             , _mflBuffer        = Nothing
+             , _mflBuffer        = ""
              , _mflCursor        = 0
              , _mflLength        = 0
              , _mflVisibleLength = 0

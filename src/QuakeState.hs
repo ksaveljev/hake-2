@@ -66,6 +66,8 @@ module QuakeState ( QuakeState(..)
                   , MenuActionSReference
                   , MenuListSReference
                   , MenuFieldSReference
+                  , MenuSliderSReference
+                  , MenuSeparatorSReference
                   , MenuItemReference(..)
                   , CPlaneReference
                   , newCPlaneReference
