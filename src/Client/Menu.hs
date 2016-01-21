@@ -2347,12 +2347,32 @@ spinControlDraw menuListRef = do
         menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + 10) (Just line2')
 
 actionDraw :: MenuActionSReference -> Quake ()
-actionDraw _ = do
-    io (putStrLn "Menu.actionDraw") >> undefined -- TODO
+actionDraw actionRef = do
+    action <- readMenuActionSReference actionRef
+    let Just menuRef = action^.maGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+    
+    let drawingFunc = if (action^.maGeneric.mcFlags) .&. Constants.qmfLeftJustify /= 0
+                        then if (action^.maGeneric.mcFlags) .&. Constants.qmfGrayed /= 0
+                               then menuDrawStringDark
+                               else menuDrawString
+                        else if (action^.maGeneric.mcFlags) .&. Constants.qmfGrayed /= 0
+                               then menuDrawStringR2LDark
+                               else menuDrawStringR2L
+    
+    drawingFunc ((action^.maGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((action^.maGeneric.mcY) + (menu^.mfY)) (action^.maGeneric.mcName)
+    
+    case action^.maGeneric.mcOwnerDraw of
+      Nothing -> return ()
+      Just ownerDraw -> ownerDraw
 
 separatorDraw :: MenuSeparatorSReference -> Quake ()
-separatorDraw _ = do
-    io (putStrLn "Menu.separatorDraw") >> undefined -- TODO
+separatorDraw separatorRef = do
+    separator <- readMenuSeparatorSReference separatorRef
+    let Just menuRef = separator^.mspGeneric.mcParent
+    menu <- readMenuFrameworkSReference menuRef
+    
+    menuDrawStringR2LDark ((separator^.mspGeneric.mcX) + (menu^.mfX)) ((separator^.mspGeneric.mcY) + (menu^.mfY)) (separator^.mspGeneric.mcName)
 
 downloadCallback :: MenuListSReference -> Quake ()
 downloadCallback menuListRef = do
@@ -2388,7 +2408,28 @@ updateCdVolumeFunc = do
 
 updateSoundQualityFunc :: Quake ()
 updateSoundQualityFunc = do
-    io (putStrLn "Menu.updateSoundQualityFunc") >> undefined -- TODO
+    drivers <- S.getDriverNames
+    qualityList <- readMenuListSReference optionsQualityListRef
+    let selectedDriver = drivers V.! (qualityList^.mlCurValue)
+    currentDriver <- S.getDriverName
+    Just renderer <- use $ globals.re
+    
+    if selectedDriver == currentDriver
+      then
+        renderer^.rRefExport.reEndFrame
+      
+      else do
+        CVar.set "s_impl" selectedDriver
+        
+        drawTextBox 8 (120 - 48) 36 3
+        menuPrint (16 + 16) (120 - 48 + 8) "Restarting the sound system. This"
+        menuPrint (16 + 16) (120 - 48 + 16) "could take up to a minute, so"
+        menuPrint (16 + 16) (120 - 48 + 24) "please be patient."
+        
+        -- the text box won't show up unless we do a buffer swap
+        renderer^.rRefExport.reEndFrame
+        
+        CL.sndRestartF^.xcCmd
 
 mouseSpeedFunc :: Quake ()
 mouseSpeedFunc = do
@@ -2565,3 +2606,11 @@ dmOptionsFunc = do
 startServerActionFunc :: Quake ()
 startServerActionFunc = do
     io (putStrLn "Menu.startServerActionFunc") >> undefined -- TODO
+
+drawTextBox :: Int -> Int -> Int -> Int -> Quake ()
+drawTextBox _ _ _ _ = do
+    io (putStrLn "Menu.drawTextBox") >> undefined -- TODO
+
+menuPrint :: Int -> Int -> B.ByteString -> Quake ()
+menuPrint _ _ _ = do
+    io (putStrLn "Menu.menuPrint") >> undefined -- TODO

@@ -54,3 +54,7 @@ rawSamples _ _ _ _ _ = do
 getDriverNames :: Quake (V.Vector B.ByteString)
 getDriverNames = do
     io (putStrLn "S.getDriverNames") >> undefined -- TODO
+
+getDriverName :: Quake B.ByteString
+getDriverName = do
+    io (putStrLn "S.getDriverName") >> undefined -- TODO
