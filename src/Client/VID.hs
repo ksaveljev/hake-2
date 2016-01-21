@@ -491,7 +491,19 @@ shutdown = do
 menuDraw :: XCommandT
 menuDraw =
   XCommandT "VID.menuDraw" (do
-    io (putStrLn "VID.menuDraw") >> undefined -- TODO
+    vidGlobals.vgCurrentMenu .= Just openGLMenuRef
+
+    -- draw the banner
+    Just renderer <- use $ globals.re
+    vidDef' <- use $ globals.vidDef
+    Just (width, _) <- (renderer^.rRefExport.reDrawGetPicSize) "m_banner_video"
+    (renderer^.rRefExport.reDrawPic) ((vidDef'^.vdWidth) `div` 2 - width `div` 2) ((vidDef'^.vdHeight) `div` 2 - 110) "m_banner_video"
+
+    -- move cursor to a reasonable starting position
+    Menu.menuAdjustCursor openGLMenuRef 1
+
+    -- draw the menu
+    Menu.menuDraw openGLMenuRef
   )
 
 menuKey :: KeyFuncT

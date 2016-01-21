@@ -67,3 +67,7 @@ drawCursor :: Int -> Int -> Int -> Quake ()
 popMenu :: Quake ()
 
 forceMenuOff :: Quake ()
+
+menuAdjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
+
+menuDraw :: MenuFrameworkSReference -> Quake ()

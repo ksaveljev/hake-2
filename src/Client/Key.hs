@@ -25,7 +25,7 @@ import {-# SOURCE #-} qualified QCommon.Com as Com
 
 init :: Quake ()
 init = do
-    let kl = V.replicate 32 $ B.pack [93] -- 93 is ']'
+    let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']'
     globals.keyLines .= kl
     globals.keyLinePos .= 1
 
@@ -402,7 +402,7 @@ clearStates = do
 clearTyping :: Quake ()
 clearTyping = do
     editLine' <- use $ globals.editLine
-    globals.keyLines.ix editLine' .= B.pack [93] -- clear any typing
+    globals.keyLines.ix editLine' .= B.pack [93, 0] -- clear any typing
     globals.keyLinePos .= 1
 
 completeCommand :: Quake ()
