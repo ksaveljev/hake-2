@@ -71,3 +71,7 @@ forceMenuOff :: Quake ()
 menuAdjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
 
 menuDraw :: MenuFrameworkSReference -> Quake ()
+
+menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
+
+menuSelectItem :: MenuFrameworkSReference -> Quake Bool

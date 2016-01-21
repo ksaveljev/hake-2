@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 module Client.VID where
 
-import Control.Lens ((.=), ix, (^.), zoom, use, preuse, (-=), (&), (.~), (-~))
+import Control.Lens ((.=), ix, (^.), zoom, use, preuse, (-=), (&), (.~), (-~), (+~))
 import Control.Monad (void, liftM, when, unless)
 import Data.Char (toLower)
 import Data.Maybe (isJust, isNothing, fromJust)
@@ -17,6 +18,7 @@ import QCommon.XCommandT
 import Render.VideoMode
 import qualified Constants
 import qualified Client.Console as Console
+import qualified Client.KeyConstants as KeyConstants
 import {-# SOURCE #-} qualified Client.Menu as Menu
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 import {-# SOURCE #-} qualified QCommon.Com as Com
@@ -509,5 +511,35 @@ menuDraw =
 menuKey :: KeyFuncT
 menuKey =
   KeyFuncT "VID.menuKey" (\key -> do
-    io (putStrLn "VID.menuKey") >> undefined -- TODO
+    Just menuRef <- use $ vidGlobals.vgCurrentMenu
+    let sound = Just "misc/menu1.wav"
+
+    if | key == KeyConstants.kEscape -> do
+           Menu.popMenu
+           return Nothing
+
+       | key == KeyConstants.kUpArrow -> do
+           modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor -~ 1)
+           Menu.menuAdjustCursor menuRef (-1)
+           return sound
+
+       | key == KeyConstants.kDownArrow -> do
+           modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+           Menu.menuAdjustCursor menuRef 1
+           return sound
+
+       | key == KeyConstants.kLeftArrow -> do
+           Menu.menuSlideItem menuRef (-1)
+           return sound
+
+       | key == KeyConstants.kRightArrow -> do
+           Menu.menuSlideItem menuRef 1
+           return sound
+
+       | key == KeyConstants.kEnter -> do
+           Menu.menuSelectItem menuRef
+           return sound
+
+       | otherwise ->
+           return sound
   )

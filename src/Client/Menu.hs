@@ -135,6 +135,12 @@ menuAddItem menuFrameworkRef menuItemRef = do
         MenuSliderRef ref ->
           modifyMenuSliderSReference ref (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
 
+        MenuSeparatorRef ref ->
+          modifyMenuSeparatorSReference ref (\v -> v & mspGeneric.mcParent .~ Just menuFrameworkRef)
+
+        MenuFieldRef ref ->
+          modifyMenuFieldSReference ref (\v -> v & mflGeneric.mcParent .~ Just menuFrameworkRef)
+
       modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNItems +~ 1)
 
     menuTallySlots menuFrameworkRef >>= \n ->
@@ -943,11 +949,16 @@ menuDraw menuRef = do
                                                                    (12 + ((ms `div` 250) .&. 1))
     
     case mItem of
-      Nothing -> do
-        undefined -- TODO
+      Nothing ->
+        menuDrawStatusBar (menu^.mfStatusBar)
       
       Just item ->
-        undefined -- TODO
+        case item^.mcStatusBarFunc of
+          Just f -> f
+          Nothing ->
+            case item^.mcStatusBar of
+              Just _ -> menuDrawStatusBar (item^.mcStatusBar)
+              Nothing -> menuDrawStatusBar (menu^.mfStatusBar)
 
   where drawContents :: MenuFrameworkS -> Int -> Int -> Quake ()
         drawContents menu idx maxIdx
@@ -2249,18 +2260,45 @@ fieldDraw fieldRef = do
 
 menuDrawString :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawString _ _ Nothing = return ()
-menuDrawString _ _ _ = do
-    io (putStrLn "Menu.menuDrawString") >> undefined -- TODO
+menuDrawString x y (Just str) = do
+    Just renderer <- use $ globals.re
+    drawString renderer 0 (B.length str)
+
+  where drawString :: Renderer -> Int -> Int -> Quake ()
+        drawString renderer idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ch = ord (BC.index str idx)
+              (renderer^.rRefExport.reDrawChar) (x + idx * 8) y ch
+              drawString renderer (idx + 1) maxIdx
 
 menuDrawStringDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringDark _ _ Nothing = return ()
-menuDrawStringDark _ _ _ = do
-    io (putStrLn "Menu.menuDrawStringDark") >> undefined -- TODO
+menuDrawStringDark x y (Just str) = do
+    Just renderer <- use $ globals.re
+    drawString renderer 0 (B.length str)
+
+  where drawString :: Renderer -> Int -> Int -> Quake ()
+        drawString renderer idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ch = ord (BC.index str idx) + 128
+              (renderer^.rRefExport.reDrawChar) (x + idx * 8) y ch
+              drawString renderer (idx + 1) maxIdx
 
 menuDrawStringR2L :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringR2L _ _ Nothing = return ()
-menuDrawStringR2L _ _ _ = do
-    io (putStrLn "Menu.menuDrawStringR2L") >> undefined -- TODO
+menuDrawStringR2L x y (Just str) = do
+    Just renderer <- use $ globals.re
+    drawString renderer 0 (B.length str)
+
+  where drawString :: Renderer -> Int -> Int -> Quake ()
+        drawString renderer idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let ch = ord (BC.index str (maxIdx - idx - 1))
+              (renderer^.rRefExport.reDrawChar) (x - idx * 8) y ch
+              drawString renderer (idx + 1) maxIdx
 
 menuDrawStringR2LDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringR2LDark _ _ Nothing = return ()
@@ -2614,3 +2652,29 @@ drawTextBox _ _ _ _ = do
 menuPrint :: Int -> Int -> B.ByteString -> Quake ()
 menuPrint _ _ _ = do
     io (putStrLn "Menu.menuPrint") >> undefined -- TODO
+
+menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
+menuSlideItem _ _ = do
+    io (putStrLn "Menu.menuSlideItem") >> undefined -- TODO
+
+menuSelectItem :: MenuFrameworkSReference -> Quake Bool
+menuSelectItem _ = do
+    io (putStrLn "Menu.menuSlideItem") >> undefined -- TODO
+
+menuDrawStatusBar :: Maybe B.ByteString -> Quake ()
+menuDrawStatusBar mStatusBar = do
+    Just renderer <- use $ globals.re
+    vidDef' <- use $ globals.vidDef
+
+    case mStatusBar of
+      Just statusBar -> do
+        let len = B.length statusBar
+            maxRow = (vidDef'^.vdHeight) `div` 8
+            maxCol = (vidDef'^.vdWidth) `div` 8
+            col = maxCol `div` 2 - len `div` 2
+
+        (renderer^.rRefExport.reDrawFill) 0 ((vidDef'^.vdHeight) - 8) (vidDef'^.vdWidth) 8 4
+        menuDrawString (col * 8) ((vidDef'^.vdHeight) - 8) mStatusBar
+
+      Nothing ->
+        (renderer^.rRefExport.reDrawFill) 0 ((vidDef'^.vdHeight) - 8) (vidDef'^.vdWidth) 8 0

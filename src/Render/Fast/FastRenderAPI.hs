@@ -22,6 +22,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Debug.Trace as DT
+import qualified Graphics.Rendering.OpenGL.Raw as GL
+import qualified Graphics.UI.GLFW as GLFW
 
 import Quake
 import QuakeState
@@ -31,7 +33,6 @@ import Render.OpenGL.GLDriver
 import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
-import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified Render.Fast.Draw as Draw
