@@ -120,7 +120,13 @@ finalMessage _ _ = io (putStrLn "SVMain.finalMessage") >> undefined -- TODO
 
 -- Master_Shutdown, Informs all masters that this server is going down.
 masterShutdown :: Quake ()
-masterShutdown = io (putStrLn "SVMain.masterShutdown") >> undefined -- TODO
+masterShutdown = do
+    dedicatedValue <- liftM (^.cvValue) dedicatedCVar
+    publicServerValue <- liftM (^.cvValue) publicServerCVar
+
+    unless (dedicatedValue == 0 || publicServerValue == 0) $ do
+      -- send to group master
+      io (putStrLn "SVMain.masterShutdown") >> undefined -- TODO
 
 {-
 - Called when the player is totally leaving the server, either willingly or

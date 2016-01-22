@@ -249,8 +249,26 @@ variableValue varName = do
       Nothing -> return 0
       Just cvar -> return $ Lib.atof (cvar^.cvString)
 
+-- Handles variable inspection and changing from the console.
 command :: Quake Bool
-command = io (putStrLn "CVar.command") >> undefined -- TODO
+command = do
+    -- check variables
+    v <- Cmd.argv 0
+    var <- findVar v
+
+    case var of
+      Nothing ->
+        return False
+
+      Just cvar -> do
+        c <- Cmd.argc
+
+        -- perform a variable print or set
+        if c == 1
+          then Com.printf ("\"" `B.append` (cvar^.cvName) `B.append` "\" is \"" `B.append` (cvar^.cvString) `B.append` "\"\n")
+          else Cmd.argv 1 >>= void . (set (cvar^.cvName))
+
+        return True
 
 bitInfo :: Int -> Quake B.ByteString
 bitInfo bit = do
