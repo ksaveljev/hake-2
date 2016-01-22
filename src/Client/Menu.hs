@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 module Client.Menu where
 
-import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _1, _2)
+import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _1, _2, (-~))
 import Control.Monad (when, void, unless, liftM)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (ord, chr)
@@ -1024,7 +1024,41 @@ defaultMenuKey menuRef key = do
         return Nothing
         
       else do
-        io (putStrLn "Menu.defaultMenuKey") >> undefined -- TODO
+        if | key == KeyConstants.kEscape -> do
+               popMenu
+               return (Just menuOutSound)
+
+           | key `elem` [KeyConstants.kKpUpArrow, KeyConstants.kUpArrow] -> do
+               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor -~ 1)
+               menuAdjustCursor menuRef (-1)
+               return (Just menuMoveSound)
+
+           | key == KeyConstants.kTab -> do
+               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+               menuAdjustCursor menuRef 1
+               return (Just menuMoveSound)
+
+           | key `elem` [KeyConstants.kKpDownArrow, KeyConstants.kDownArrow] -> do
+               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+               menuAdjustCursor menuRef 1
+               return (Just menuMoveSound)
+
+           | key `elem` [KeyConstants.kKpLeftArrow, KeyConstants.kLeftArrow] -> do
+               menuSlideItem menuRef (-1)
+               return (Just menuMoveSound)
+
+           | key `elem` [KeyConstants.kKpRightArrow, KeyConstants.kRightArrow] -> do
+               menuSlideItem menuRef 1
+               return (Just menuMoveSound)
+
+           | key `elem` [KeyConstants.kMouse1, KeyConstants.kMouse2, KeyConstants.kMouse3
+                        , KeyConstants.kJoy1, KeyConstants.kJoy2, KeyConstants.kJoy3
+                        , KeyConstants.kJoy4, KeyConstants.kKpEnter, KeyConstants.kEnter] -> do
+               menuSelectItem menuRef
+               return (Just menuMoveSound)
+
+           | otherwise ->
+               return Nothing
     
   where checkFieldKey :: Quake Bool
         checkFieldKey = do
