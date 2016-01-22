@@ -548,8 +548,45 @@ svcStatus = do
 svcInfo :: Quake ()
 svcInfo = io (putStrLn "SVMain.svcInfo") >> undefined -- TODO
 
+{-
+- Returns a challenge number that can be used in a subsequent
+- client_connect command. We do this to prevent denial of service attacks
+- that flood the server with invalid connection IPs. With a challenge, they
+- must give a valid IP address.
+-}
 svcGetChallenge :: Quake ()
-svcGetChallenge = io (putStrLn "SVMain.svcGetChallenge") >> undefined -- TODO
+svcGetChallenge = do
+    -- see if we already have a challenge for this ip
+    adr <- use $ globals.netFrom
+    challenges <- use $ svGlobals.svServerStatic.ssChallenges
+    (i, oldest) <- challengeExists adr challenges 0 0x7FFFFFFF 0 Constants.maxChallenges
+
+    if i == Constants.maxChallenges
+      then do
+        -- overwrite the oldest
+        r <- Lib.rand
+        curTime' <- use $ globals.curtime
+        svGlobals.svServerStatic.ssChallenges.ix oldest .= ChallengeT adr (fromIntegral r .&. 0x7FFFF) curTime'
+
+        -- send it back
+        NetChannel.outOfBandPrint Constants.nsServer adr ("challenge " `B.append` BC.pack (show ((challenges V.! oldest)^.chChallenge))) -- IMPROVE
+
+      else
+        -- send it back
+        NetChannel.outOfBandPrint Constants.nsServer adr ("challenge " `B.append` BC.pack (show ((challenges V.! i)^.chChallenge))) -- IMPROVE
+
+  where challengeExists :: NetAdrT -> V.Vector ChallengeT -> Int -> Int -> Int -> Int -> Quake (Int, Int)
+        challengeExists adr challenges oldest oldestTime idx maxIdx
+          | idx >= maxIdx = return (idx, oldest)
+          | otherwise = do
+              let challenge = challenges V.! idx
+              if NET.compareBaseAdr adr (challenge^.chAdr)
+                then
+                  return (idx, oldest)
+                else 
+                  if (challenge^.chTime) < oldestTime
+                    then challengeExists adr challenges idx (challenge^.chTime) (idx + 1) maxIdx
+                    else challengeExists adr challenges oldest oldestTime (idx + 1) maxIdx
 
 -- A connection request that did not come from the master.
 svcDirectConnect :: Quake ()
