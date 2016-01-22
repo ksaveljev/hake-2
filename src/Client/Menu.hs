@@ -4,7 +4,7 @@ module Client.Menu where
 
 import Control.Lens (zoom, use, preuse, ix, (.=), (+=), (^.), (%=), (&), (.~), (%~), (+~), (-=), _1, _2)
 import Control.Monad (when, void, unless, liftM)
-import Data.Bits ((.&.))
+import Data.Bits ((.&.), shiftR)
 import Data.Char (ord, chr)
 import Data.Maybe (fromJust)
 import Linear (V4(..), _x)
@@ -2650,16 +2650,114 @@ drawTextBox _ _ _ _ = do
     io (putStrLn "Menu.drawTextBox") >> undefined -- TODO
 
 menuPrint :: Int -> Int -> B.ByteString -> Quake ()
-menuPrint _ _ _ = do
-    io (putStrLn "Menu.menuPrint") >> undefined -- TODO
+menuPrint cx cy str =
+    drawString 0 (B.length str)
+    
+  where drawString :: Int -> Int -> Quake ()
+        drawString idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              drawCharacter (cx + 8 * idx) cy (ord (BC.index str idx) + 128)
+              drawString (idx + 1) maxIdx
+
+{- ================ DrawCharacter ================
+- 
+- Draws one solid graphics character cx and cy are in 320*240 coordinates,
+- and will be centered on higher res screens.
+-}
+drawCharacter :: Int -> Int -> Int -> Quake ()
+drawCharacter cx cy num = do
+    Just renderer <- use $ globals.re
+    vidDef' <- use $ globals.vidDef
+    (renderer^.rRefExport.reDrawChar) (cx + (((vidDef'^.vdWidth) - 320) `shiftR` 1)) (cy + (((vidDef'^.vdHeight) - 240) `shiftR` 1)) num
 
 menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
-menuSlideItem _ _ = do
-    io (putStrLn "Menu.menuSlideItem") >> undefined -- TODO
+menuSlideItem menuRef dir = do
+    menuItemRef <- menuItemAtCursor menuRef
+    
+    mItem <- case menuItemRef of
+               Nothing -> return Nothing
+               Just itemRef -> menuItemCommon itemRef >>= return . Just
+               
+    case mItem of
+      Nothing ->
+        return ()
+      
+      Just item -> do
+        let Just itemRef = menuItemRef
+        
+        if | (item^.mcType) == Constants.mtypeSlider -> do
+               let MenuSliderRef sliderRef = itemRef
+               sliderDoSlide sliderRef dir
+            
+           | (item^.mcType) == Constants.mtypeSpinControl -> do
+               let MenuListRef listRef = itemRef
+               spinControlDoSlide listRef dir
+            
+           | otherwise ->
+               return ()
+
+sliderDoSlide :: MenuSliderSReference -> Int -> Quake ()
+sliderDoSlide _ _ = do
+    io (putStrLn "Menu.sliderDoSlide") >> undefined -- TODO
+
+spinControlDoSlide :: MenuListSReference -> Int -> Quake ()
+spinControlDoSlide menuListRef dir = do
+    menuList <- readMenuListSReference menuListRef
+    modifyMenuListSReference menuListRef (\v -> v & mlCurValue %~ (updateCurValue menuList))
+    
+    case menuList^.mlGeneric.mcCallback of
+      Nothing -> return ()
+      Just callback -> callback
+    
+  where updateCurValue :: MenuListS -> Int -> Int
+        updateCurValue menuList curValue =
+          let newValue = curValue + dir
+          in if | newValue < 0 -> 0
+                | newValue >= V.length (menuList^.mlItemNames) -> curValue
+                | otherwise -> newValue
 
 menuSelectItem :: MenuFrameworkSReference -> Quake Bool
-menuSelectItem _ = do
-    io (putStrLn "Menu.menuSlideItem") >> undefined -- TODO
+menuSelectItem menuRef = do
+    menuItemRef <- menuItemAtCursor menuRef
+    
+    mItem <- case menuItemRef of
+               Nothing -> return Nothing
+               Just itemRef -> menuItemCommon itemRef >>= return . Just
+    
+    case mItem of
+      Nothing ->
+        return False
+      
+      Just item -> do
+        let Just itemRef = menuItemRef
+        
+        if | (item^.mcType) == Constants.mtypeField -> do
+               let MenuFieldRef fieldRef = itemRef
+               fieldDoEnter fieldRef
+               
+           | (item^.mcType) == Constants.mtypeAction -> do
+               let MenuActionRef actionRef = itemRef
+               actionDoEnter actionRef >> return True
+               
+           | otherwise -> 
+               return False
+
+fieldDoEnter :: MenuFieldSReference -> Quake Bool
+fieldDoEnter fieldRef = do
+    field <- readMenuFieldSReference fieldRef
+    
+    case field^.mflGeneric.mcCallback of
+      Nothing -> return False
+      Just callback -> callback >> return True
+    
+actionDoEnter :: MenuActionSReference -> Quake ()
+actionDoEnter actionRef = do
+    action <- readMenuActionSReference actionRef
+    
+    case action^.maGeneric.mcCallback of
+      Nothing -> return ()
+      Just callback -> callback
 
 menuDrawStatusBar :: Maybe B.ByteString -> Quake ()
 menuDrawStatusBar mStatusBar = do
