@@ -2680,7 +2680,10 @@ rulesChangeFunc = do
 
 dmOptionsFunc :: Quake ()
 dmOptionsFunc = do
-    io (putStrLn "Menu.dmOptionsFunc") >> undefined -- TODO
+    rulesBox <- readMenuListSReference rulesBoxRef
+
+    unless ((rulesBox^.mlCurValue) == 1) $
+      menuDMOptionsF^.xcCmd
     
 startServerActionFunc :: Quake ()
 startServerActionFunc = do
@@ -2739,8 +2742,20 @@ menuSlideItem menuRef dir = do
                return ()
 
 sliderDoSlide :: MenuSliderSReference -> Int -> Quake ()
-sliderDoSlide _ _ = do
-    io (putStrLn "Menu.sliderDoSlide") >> undefined -- TODO
+sliderDoSlide menuSliderRef dir = do
+    slider <- readMenuSliderSReference menuSliderRef
+    modifyMenuSliderSReference menuSliderRef (\v -> v & msCurValue %~ (updateCurValue slider))
+
+    case slider^.msGeneric.mcCallback of
+      Nothing -> return ()
+      Just callback -> callback
+
+  where updateCurValue :: MenuSliderS -> Float -> Float
+        updateCurValue slider curValue =
+          let newValue = curValue + fromIntegral dir
+              in if | newValue > (slider^.msMaxValue) -> slider^.msMaxValue
+                    | newValue < (slider^.msMinValue) -> slider^.msMinValue
+                    | otherwise -> newValue
 
 spinControlDoSlide :: MenuListSReference -> Int -> Quake ()
 spinControlDoSlide menuListRef dir = do
