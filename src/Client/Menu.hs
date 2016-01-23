@@ -2594,8 +2594,15 @@ drawKeyBindingFunc _ = do
     io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
 
 loadGameCallback :: MenuActionSReference -> Quake ()
-loadGameCallback _ = do
-    io (putStrLn "Menu.loadGameCallback") >> undefined -- TODO
+loadGameCallback actionRef = do
+    action <- readMenuActionSReference actionRef
+
+    saveValid <- use $ menuGlobals.mgSaveValid
+
+    when (saveValid V.! (action^.maGeneric.mcLocalData._x)) $
+      CBuf.addText ("load save" `B.append` BC.pack (show (action^.maGeneric.mcLocalData._x)) `B.append` "\n") -- IMPROVE
+
+    forceMenuOff
   
 creditsMenuDraw :: XCommandT
 creditsMenuDraw =
