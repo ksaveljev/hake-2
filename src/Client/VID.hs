@@ -488,7 +488,16 @@ newWindow width height =
 
 shutdown :: Quake ()
 shutdown = do
-    io (putStrLn "VID.shutdown") >> undefined -- TODO
+    refLibActive <- use $ vidGlobals.vgRefLibActive
+
+    when refLibActive $ do
+      Just renderer <- use $ globals.re
+
+      renderer^.rRefExport.reGetKeyboardHandler.kbdClose
+      IN.shutdown
+
+      renderer^.rRefExport.reShutDown
+      freeRefLib
 
 menuDraw :: XCommandT
 menuDraw =
