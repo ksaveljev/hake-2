@@ -340,5 +340,5 @@ helpF _ = do
     io (putStrLn "Cmd.helpF") >> undefined -- TODO
 
 removeCommand :: B.ByteString -> Quake ()
-removeCommand _ = do
-    io (putStrLn "Cmd.removeCommand") >> undefined -- TODO
+removeCommand cmdName =
+    cmdGlobals.cgCmdFunctions %= Seq.filter (\cmd -> (cmd^.cfName) /= cmdName)
