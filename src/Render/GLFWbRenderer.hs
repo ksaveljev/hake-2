@@ -68,7 +68,7 @@ glfwbKBD :: KBD
 glfwbKBD =
   KBD { _kbdInit           = glfwbKBDInit
       , _kbdUpdate         = glfwbKBDUpdate
-      , _kbdClose          = io (putStrLn "glfwbKBD.kbdClose") >> undefined -- TODO
+      , _kbdClose          = return () -- TODO: make sure this is correct
       , _kbdDoKeyEvent     = (\_ _ -> io (putStrLn "glfwbKBD.kbdDoKeyEvent") >> undefined) -- TODO
       , _kbdInstallGrabs   = glfwbKBDInstallGrabs
       , _kbdUninstallGrabs = glfwbKBDUninstallGrabs
