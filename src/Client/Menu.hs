@@ -301,6 +301,9 @@ mainKeyF =
              _ -> return ()
 
            return Nothing
+
+       | otherwise ->
+           return Nothing
   )
 
 menuGameF :: XCommandT
