@@ -994,4 +994,20 @@ decompressVis maybeModelVisibility offset model =
 
 freeAll :: Quake ()
 freeAll = do
-    io (putStrLn "Model.freeAll") >> undefined -- TODO
+    modNumKnown <- use $ fastRenderAPIGlobals.frModNumKnown
+    modKnown <- use $ fastRenderAPIGlobals.frModKnown
+    freeModels modKnown 0 modNumKnown
+
+  where freeModels :: V.Vector (IORef ModelT) -> Int -> Int -> Quake ()
+        freeModels modKnown idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let modelRef = modKnown V.! idx
+              model <- io $ readIORef modelRef
+
+              case model^.mExtraData of
+                Nothing ->
+                  freeModels modKnown (idx + 1) maxIdx
+                Just _ -> do
+                  modFree modelRef
+                  freeModels modKnown (idx + 1) maxIdx
