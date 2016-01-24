@@ -17,3 +17,5 @@ executeString :: B.ByteString -> Quake ()
 clientCommand :: EdictReference -> Quake ()
 
 helpF :: EdictReference -> Quake ()
+
+removeCommand :: B.ByteString -> Quake ()

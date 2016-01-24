@@ -1034,3 +1034,7 @@ glMBind target texNum = do
 
     unless done $
       glBind texNum
+
+glShutdownImages :: Quake ()
+glShutdownImages = do
+    io (putStrLn "Image.glShutdownImages") >> undefined -- TODO

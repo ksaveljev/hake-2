@@ -50,7 +50,7 @@ fastRenderAPI :: RenderAPI
 fastRenderAPI =
     RenderAPI { _rInit              = fastInit
               , _rInit2             = fastInit2
-              , _rShutdown          = DT.trace "FastRenderAPI.rShutdown" undefined -- TODO
+              , _rShutdown          = fastShutdown
               , _rBeginRegistration = \_ -> Model.rBeginRegistration
               , _rRegisterModel     = \_ -> Model.rRegisterModel
               , _rRegisterSkin      = \_ -> Image.rRegisterSkin
@@ -1263,3 +1263,17 @@ fastSetPalette maybePalette = do
               b = (fromIntegral (palette `B.index` (j + 1)) .&. 0xFF) `shiftL` 8
               c = (fromIntegral (palette `B.index` (j + 2)) .&. 0xFF) `shiftL` 16
           in 0xFF000000 .|. a .|. b .|. c
+
+fastShutdown :: GLDriver -> Quake ()
+fastShutdown glDriver = do
+    Cmd.removeCommand "modellist"
+    Cmd.removeCommand "screenshot"
+    Cmd.removeCommand "imagelist"
+    Cmd.removeCommand "gl_strings"
+
+    Model.freeAll
+
+    Image.glShutdownImages
+
+    -- shut down OS specific OpenGL stuff like contexts, etc
+    glDriver^.gldShutdown

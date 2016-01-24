@@ -991,3 +991,7 @@ decompressVis maybeModelVisibility offset model =
         buildEmpty builder c
           | c <= 0 = builder
           | otherwise = buildEmpty (builder <> (BB.word8 0)) (c - 1)
+
+freeAll :: Quake ()
+freeAll = do
+    io (putStrLn "Model.freeAll") >> undefined -- TODO

@@ -338,3 +338,7 @@ clientCommand _ = do
 helpF :: EdictReference -> Quake ()
 helpF _ = do
     io (putStrLn "Cmd.helpF") >> undefined -- TODO
+
+removeCommand :: B.ByteString -> Quake ()
+removeCommand _ = do
+    io (putStrLn "Cmd.removeCommand") >> undefined -- TODO
