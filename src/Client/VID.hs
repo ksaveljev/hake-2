@@ -426,7 +426,44 @@ menuInit = do
           io (putStrLn "VID.vgFSBox callback") >> undefined -- TODO
 
 applyChanges :: Quake ()
-applyChanges = io (putStrLn "VID.applyChanges") >> undefined -- TODO
+applyChanges = do
+    brightnessSlider <- readMenuSliderSReference brightnessSliderRef
+    tqSlider <- readMenuSliderSReference tqSliderRef
+    fsBox <- readMenuListSReference fsBoxRef
+    vSyncBox <- readMenuListSReference vSyncBoxRef
+    palettedTextureBox <- readMenuListSReference palettedTextureBoxRef
+    modeList <- readMenuListSReference modeListRef
+    refList <- readMenuListSReference refListRef
+
+    -- invert sense so greater = brighter, and scale to a range of 0.5 to 1.3
+    --
+    -- the original was modified, because on CRTs it was too dark.
+    -- the slider range is [5; 13]
+        -- gamma: [1.1; 0.7]
+    let gamma = 0.4 - ((brightnessSlider^.msCurValue) / 20.0 - 0.25) + 0.7
+        -- modulate: [1.0; 2.6]
+        modulate = (brightnessSlider^.msCurValue) * 0.2
+
+    CVar.setValueF "vid_gamma" gamma
+    CVar.setValueF "gl_modulate" modulate
+    CVar.setValueF "gl_picmip" (3 - (tqSlider^.msCurValue))
+    CVar.setValueI "vid_fullscreen" (fsBox^.mlCurValue)
+    CVar.setValueI "gl_swapinterval" (vSyncBox^.mlCurValue)
+    -- set always true because of vid_ref or mode changes
+    glSwapIntervalCVar >>= \cvar -> CVar.update cvar { _cvModified = True }
+    CVar.setValueI "gl_ext_palettedtexture" (palettedTextureBox^.mlCurValue)
+    CVar.setValueI "gl_mode" (modeList^.mlCurValue)
+
+    drivers <- use $ vidGlobals.vgDrivers
+
+    CVar.set "vid_ref" (drivers V.! (refList^.mlCurValue))
+    CVar.set "gl_driver" (drivers V.! (refList^.mlCurValue))
+
+    glDriverModified <- liftM (^.cvModified) glDriverCVar
+    when glDriverModified $ do
+      vidRefCVar >>= \cvar -> CVar.update cvar { _cvModified = True }
+
+    Menu.forceMenuOff
 
 initRefs :: Quake ()
 initRefs = do
