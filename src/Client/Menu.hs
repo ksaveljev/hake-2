@@ -488,7 +488,7 @@ menuSaveGameF :: XCommandT
 menuSaveGameF =
   XCommandT "Menu.saveGameF" (do
     serverState' <- use $ globals.serverState
-    
+
     unless (serverState' == 0) $ do -- only when playing a game
       saveGameMenuInit
       pushMenu saveGameMenuDraw saveGameMenuKey
@@ -1387,7 +1387,7 @@ saveGameMenuInit = do
 
     -- don't include the autosave slot
     saveStrings <- use $ menuGlobals.mgSaveStrings
-    setupSaveGameMenuActions saveStrings 0 maxSaveGames
+    setupSaveGameMenuActions saveStrings 0 (maxSaveGames - 1)
 
   where setupSaveGameMenuActions :: V.Vector B.ByteString -> Int -> Int -> Quake ()
         setupSaveGameMenuActions saveStrings idx maxIdx
