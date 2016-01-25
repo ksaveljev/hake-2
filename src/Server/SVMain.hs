@@ -510,11 +510,8 @@ connectionlessPacket = do
     Cmd.tokenizeString s False
 
     c <- Cmd.argv 0
-
-    -- for debugging purposes
-    -- TODO: REMOVE ME!!
+    
     from <- use $ globals.netFrom
-    Com.printf $ "REMOVE ME! DEBUG! Packet " `B.append` NET.adrToString from `B.append` " : " `B.append` c `B.append` "\n"
 
     case c of
       "ping" -> svcPing

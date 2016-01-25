@@ -3,7 +3,7 @@
 module Game.Monsters.MBoss31 where
 
 import Control.Lens (use, ix, (.=), zoom, preuse, (^.), (&), (.~), (%~))
-import Control.Monad (void)
+import Control.Monad (void, when, unless)
 import Data.Bits ((.&.))
 import qualified Data.Vector as V
 
@@ -178,8 +178,28 @@ jorgAttack1 =
 
 jorgPain :: EntPain
 jorgPain =
-  GenericEntPain "jorg_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MBoss31.jorgPain") >> undefined -- TODO
+  GenericEntPain "jorg_pain" $ \selfRef _ _ damage -> do
+    self <- readEdictT selfRef
+    
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      
+    modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+    
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    unless (levelTime < (self^.ePainDebounceTime)) $ do
+      -- Lessen the chance of him going into his pain frames if he takes
+      -- little damage
+      done <- if damage <= 40
+                then do
+                  r <- Lib.randomF
+                  return (r <= 0.6)
+                else
+                  return False
+                  
+      unless done $ do
+        io (putStrLn "MBoss31.jorgPain") >> undefined -- TODO
 
 jorgBFG :: EntThink
 jorgBFG =
