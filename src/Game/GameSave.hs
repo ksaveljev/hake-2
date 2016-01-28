@@ -140,3 +140,7 @@ createEdicts = do
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
     edicts <- io $ V.thaw $ V.generate (maxEntities + 1) newEdictT -- one extra for "dummy edict"
     gameBaseGlobals.gbGEdicts .= edicts
+
+writeGame :: B.ByteString -> Bool -> Quake ()
+writeGame fileName autosave = do
+    io (putStrLn "GameSave.writeGame") >> undefined -- TODO

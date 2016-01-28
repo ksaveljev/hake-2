@@ -7,6 +7,7 @@ import Control.Lens (use, preuse, (.=), (^.), (%=), (&), (.~))
 import Control.Lens.At (ix)
 import Control.Monad (when, void, liftM)
 import Control.Exception (handle, IOException)
+import Data.Bits ((.&.))
 import Data.Char (isDigit)
 import Data.Maybe (isJust)
 import Data.Traversable (traverse)
@@ -22,6 +23,7 @@ import Quake
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
+import Util.QuakeFile (QuakeFile)
 import qualified Constants
 import qualified Server.SVInit as SVInit
 import qualified Server.SVMain as SVMain
@@ -308,6 +310,7 @@ writeServerFile autosave = do
     
     gameDir <- FS.gameDir
     
+    -- IMPROVE: catch exception for the whole function block
     let fileName = gameDir `B.append` "/save/current/server.ssv"
     qf <- io $ QuakeFile.open fileName
     configStrings <- use $ svGlobals.svServer.sConfigStrings
@@ -318,9 +321,37 @@ writeServerFile autosave = do
                  
                  else do
                    return ("TODO " `B.append` (configStrings V.! Constants.csName)) -- TODO: add date/time stuff
-    
-    io (putStrLn "SKIPPED SVConsoleCommands.writeServerFile! IMPLEMENT ME!") >> return ()
-    --io (putStrLn "SVConsoleCommands.writeServerFile") >> undefined -- TODO
+
+    mapCmd <- use $ svGlobals.svServerStatic.ssMapCmd
+
+    io $ do
+      QuakeFile.writeString qf (Just comment)
+      QuakeFile.writeString qf (Just mapCmd)
+
+    vars <- use $ globals.cvarVars
+
+    void $ traverse (writeCVar qf) vars
+
+    io $ do
+      QuakeFile.writeString qf Nothing
+      QuakeFile.close qf
+
+    let fileName' = gameDir `B.append` "/save/current/game.ssv"
+    GameSave.writeGame fileName' autosave
+
+  where writeCVar :: QuakeFile -> CVarT -> Quake ()
+        writeCVar qf var = do
+          if | (var^.cvFlags) .&. Constants.cvarLatch == 0 ->
+                 return ()
+
+             | B.length (var^.cvName) >= Constants.maxOsPath || B.length (var^.cvString) >= 128 - 1 -> do
+                 Com.printf ("Cvar too long: " `B.append` (var^.cvName) `B.append` " = " `B.append` (var^.cvString) `B.append` "\n")
+
+             | otherwise -> do
+                 -- IMPROVE: catch exception
+                 io $ do
+                   QuakeFile.writeString qf (Just $ var^.cvName)
+                   QuakeFile.writeString qf (Just $ var^.cvString)
 
 {-
 ==============
