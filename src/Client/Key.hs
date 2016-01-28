@@ -347,37 +347,43 @@ console k = do
            -- backslash text are commands, else chat
            editLine' <- use $ globals.editLine
            Just keyLine <- preuse $ globals.keyLines.ix editLine'
-           undefined -- TODO
+           io (putStrLn "Key.console # enter") >> undefined -- TODO
 
        | k == kTab ->
            completeCommand -- command completion
 
-       | k `elem` [kBackspace, kLeftArrow, kKpLeftArrow] || (key == 'h' && (keyDown' UV.! kCtrl)) -> do
-           undefined -- TODO
+       | k `elem` [kBackspace, kLeftArrow, kKpLeftArrow] || (key == 'h' && (keyDown' UV.! kCtrl)) ->
+           globals.keyLinePos %= (\v -> if v > 1 then v - 1 else v)
 
        | k `elem` [kUpArrow, kKpUpArrow] || (key == 'p' && (keyDown' UV.! kCtrl)) -> do
-           undefined -- TODO
+           io (putStrLn "Key.console # up arrow") >> undefined -- TODO
 
        | k `elem` [kDownArrow, kKpDownArrow] || (key == 'n' && (keyDown' UV.! kCtrl)) -> do
-           undefined -- TODO
+           io (putStrLn "Key.console # down arrow") >> undefined -- TODO
 
        | k `elem` [kPgUp, kKpPgUp] ->
            globals.con.cDisplay -= 2
 
        | k `elem` [kPgDn, kKpPgDn] -> do
-           undefined -- TODO
+           console <- use $ globals.con
+           globals.con.cDisplay %= (\v -> if (v + 2) > (console^.cCurrent) then console^.cCurrent else v + 2)
 
        | k `elem` [kHome, kKpHome] -> do
-           undefined -- TODO
+           console <- use $ globals.con
+           globals.con.cDisplay .= (console^.cCurrent) - (console^.cTotalLines) + 10
 
        | k `elem` [kEnd, kKpEnd] -> do
-           undefined -- TODO
+           console <- use $ globals.con
+           globals.con.cDisplay .= (console^.cCurrent)
 
        | k < 32 || k > 127 ->
            return () -- non printable
 
        | otherwise -> do
-           io (putStrLn "Key.console") >> undefined -- TODO
+           keyLinePos' <- use $ globals.keyLinePos
+           
+           when (keyLinePos' > Constants.maxCmdLine - 1) $ do
+             io (putStrLn "Key.console") >> undefined -- TODO
 
 clearStates :: Quake ()
 clearStates = do

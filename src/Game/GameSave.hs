@@ -3,18 +3,48 @@ module Game.GameSave where
 
 import Data.Bits ((.|.))
 import Control.Lens (use, (^.), (.=))
-import Control.Monad (void, liftM)
+import Control.Monad (void, liftM, when)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 
 import Quake
 import QuakeState
 import CVarVariables
+import Util.QuakeFile (QuakeFile)
 import qualified Constants
 import qualified Game.GameItems as GameItems
+import qualified Util.QuakeFile as QuakeFile
 
 writeLevel :: B.ByteString -> Quake ()
-writeLevel _ = io (putStrLn "GameSave.writeLevel") >> undefined -- TODO
+writeLevel fileName = do
+    qf <- io $ QuakeFile.open fileName -- IMPROVE: catch exception
+    -- if (f == null)
+    --     GameBase.gi.error("Couldn't open for writing: " + filename);
+    
+    level <- use $ gameBaseGlobals.gbLevel
+    numEdicts <- use $ gameBaseGlobals.gbNumEdicts
+    edicts <- use $ gameBaseGlobals.gbGEdicts
+    
+    io $ do
+        -- write out level_locals_t
+        QuakeFile.writeLevelLocals qf level
+        -- write out all the entities
+        writeEdicts qf edicts 0 numEdicts
+        QuakeFile.writeInt qf (-1)
+        QuakeFile.close qf
+    
+  where writeEdicts :: QuakeFile -> MV.IOVector EdictT -> Int -> Int -> IO ()
+        writeEdicts qf edicts idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              edict <- MV.read edicts idx
+              
+              when (edict^.eInUse) $ do
+                QuakeFile.writeInt qf idx
+                QuakeFile.writeEdict qf edict
+            
+              writeEdicts qf edicts (idx + 1) maxIdx
 
 readLevel :: B.ByteString -> Quake ()
 readLevel _ = io (putStrLn "GameSave.readLevel") >> undefined -- TODO

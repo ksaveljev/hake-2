@@ -382,7 +382,7 @@ worldEffects edictRef = do
           when ((edict^.eHealth) > 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-            -- TODO: refactor, too much same stuff here
+            -- IMPROVE: refactor, too much same stuff here
             if (edict^.eFlags) .&. Constants.flSwim == 0
               then if | (edict^.eWaterLevel) < 3 ->
                           modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 12)

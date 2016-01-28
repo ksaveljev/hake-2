@@ -43,6 +43,7 @@ import qualified QCommon.FS as FS
 import qualified QCommon.MD4 as MD4
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+import qualified Util.QuakeFile as QuakeFile
 
 -- 1/32 epsilon to keep floating point happy
 distEpsilon :: Float
@@ -760,11 +761,25 @@ entityString = use $ cmGlobals.cmMapEntityString
 
 -- CM_WritePortalState writes the portal state to a savegame file.
 writePortalState :: QuakeFile -> Quake ()
-writePortalState _ = io (putStrLn "CM.writePortalState") >> undefined -- TODO
+writePortalState saveFile = do
+    portalOpen <- use $ cmGlobals.cmPortalOpen
+    io $ UV.mapM_ writePortal portalOpen -- IMPROVE: catch exception?
+    
+  where writePortal :: Bool -> IO ()
+        writePortal True = QuakeFile.writeInt saveFile 1
+        writePortal False = QuakeFile.writeInt saveFile 0
 
 -- CM_ReadPortalState reads the portal state from a savegame file and recalculates the area connections.
 readPortalState :: QuakeFile -> Quake ()
-readPortalState _ = io (putStrLn "CM.readPortalState") >> undefined -- TODO
+readPortalState saveFile = do
+    portalOpen <- use $ cmGlobals.cmPortalOpen
+    portalOpen' <- io $ UV.mapM readPortal portalOpen -- IMPROVE: catch exception?
+    cmGlobals.cmPortalOpen .= portalOpen'
+  
+  where readPortal :: Bool -> IO Bool
+        readPortal _ = do
+          portalState <- QuakeFile.readInt saveFile
+          return (portalState == 1)
 
 setAreaPortalState :: Int -> Bool -> Quake ()
 setAreaPortalState portalNum open = do

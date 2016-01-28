@@ -252,10 +252,10 @@ writeLevelFile = do
     --     e.printStackTrace();
     -- }
     --
-    qf <- io $ QuakeFile.open sv2name
-
     configStrings <- liftM (V.take Constants.maxConfigStrings) (use $ svGlobals.svServer.sConfigStrings)
-    io $ void $ traverse (QuakeFile.writeString qf) configStrings
+    
+    qf <- io $ QuakeFile.open sv2name
+    io $ void $ traverse (QuakeFile.writeString qf . Just) configStrings
 
     CM.writePortalState qf
 
@@ -303,7 +303,22 @@ SV_WriteServerFile
 ==============
 -}
 writeServerFile :: Bool -> Quake ()
-writeServerFile _ = do
+writeServerFile autosave = do
+    Com.dprintf ("SV_WriteServerFile(" `B.append` (if autosave then "true" else "false") `B.append` ")\n")
+    
+    gameDir <- FS.gameDir
+    
+    let fileName = gameDir `B.append` "/save/current/server.ssv"
+    qf <- io $ QuakeFile.open fileName
+    configStrings <- use $ svGlobals.svServer.sConfigStrings
+    
+    comment <- if autosave
+                 then
+                   return ("ENTERING " `B.append` (configStrings V.! Constants.csName))
+                 
+                 else do
+                   return ("TODO " `B.append` (configStrings V.! Constants.csName)) -- TODO: add date/time stuff
+    
     io (putStrLn "SKIPPED SVConsoleCommands.writeServerFile! IMPLEMENT ME!") >> return ()
     --io (putStrLn "SVConsoleCommands.writeServerFile") >> undefined -- TODO
 

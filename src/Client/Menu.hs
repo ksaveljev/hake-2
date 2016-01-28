@@ -1208,7 +1208,7 @@ startServerMenuInit = do
                       Just buf -> return (Right buf)
       
                   Just fp -> do
-                    -- TODO: exception handing
+                    -- IMPROVE: exception handing
                     -- } catch (Exception e) {
                     --     Com.Error(ERR_DROP, "couldn't load maps.lst\n");
                     -- }

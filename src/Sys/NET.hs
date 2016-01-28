@@ -158,7 +158,7 @@ getPacket sock netFromLens netMessageLens = do
           if | done -> return True
              | isNothing s -> return False
              | otherwise -> do
-                 -- TODO: catch exception?
+                 -- IMPROVE: catch exception?
                  packet <- io $ S.recvFrom (fromJust s) 2048
 
                  if isJust packet

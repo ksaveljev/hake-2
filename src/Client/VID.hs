@@ -160,7 +160,7 @@ checkChanges = do
             -- drop the console if we fail to load a refresh
             keyDest <- use $ globals.cls.csKeyDest
             when (keyDest /= Constants.keyConsole) $
-              (Console.toggleConsoleF)^.xcCmd -- TODO: catch exception?
+              (Console.toggleConsoleF)^.xcCmd -- IMPROVE: catch exception?
 
           globals.cls.csDisableScreen .= 0 -- False
 

@@ -5,7 +5,8 @@ module Util.Binary ( module Util.Binary
                    ) where
 
 import Data.Binary.Get
-import Data.Binary.IEEE754 (getFloat32le)
+import Data.Binary.Put
+import Data.Binary.IEEE754
 import Data.Functor ((<$>))
 import Data.Int
 import Data.Word (Word16)
@@ -15,6 +16,23 @@ import Linear (V3(..), V4(..))
 getInt :: Get Int
 getInt = let x :: Get Int32 = fromIntegral <$> getWord32le
          in fromIntegral <$> x
+
+putInt :: Int -> Put
+putInt = putWord32le <$> fromIntegral
+
+getFloat :: Get Float
+getFloat = getFloat32le
+
+putFloat :: Float -> Put
+putFloat = putFloat32le
+
+getBool :: Get Bool
+getBool = let x = getWord8
+          in (\v -> if v == 1 then True else False) <$> x
+
+putBool :: Bool -> Put
+putBool True = putWord8 1
+putBool False = putWord8 0
 
 getInt8 :: Get Int8
 getInt8 = fromIntegral <$> getWord8
