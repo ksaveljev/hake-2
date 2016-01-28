@@ -426,5 +426,19 @@ writeGClient _ _ = do
     io (putStrLn "QuakeFile.writeGClient") >> undefined -- TODO
 
 writeGameLocals :: QuakeFile -> GameLocalsT -> IO ()
-writeGameLocals _ _ = do
-    io (putStrLn "QuakeFile.writeGameLocals") >> undefined -- TODO
+writeGameLocals saveFile gameLocals = do
+    -- f.writeString(new Date().toString()); -- TODO: what for ?
+
+    writeString saveFile (Just $ gameLocals^.glHelpMessage1)
+    writeString saveFile (Just $ gameLocals^.glHelpMessage2)
+
+    writeInt    saveFile (gameLocals^.glHelpChanged)
+
+    writeString saveFile (Just $ gameLocals^.glSpawnPoint)
+    writeInt    saveFile (gameLocals^.glMaxClients)
+    writeInt    saveFile (gameLocals^.glMaxEntities)
+    writeInt    saveFile (gameLocals^.glServerFlags)
+    writeInt    saveFile (gameLocals^.glNumItems)
+    writeInt    saveFile (if gameLocals^.glAutosaved then 1 else 0)
+    -- rst's checker :-)
+    writeInt    saveFile 1928
