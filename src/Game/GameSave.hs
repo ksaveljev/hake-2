@@ -2,8 +2,8 @@
 module Game.GameSave where
 
 import Data.Bits ((.|.))
-import Control.Lens (use, (^.), (.=))
-import Control.Monad (void, liftM, when)
+import Control.Lens (use, (^.), (.=), (&), (.~))
+import Control.Monad (void, liftM, when, unless)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
@@ -14,6 +14,7 @@ import CVarVariables
 import Util.QuakeFile (QuakeFile)
 import qualified Constants
 import qualified Game.GameItems as GameItems
+import qualified Game.PlayerClient as PlayerClient
 import qualified Util.QuakeFile as QuakeFile
 
 writeLevel :: B.ByteString -> Quake ()
@@ -141,6 +142,31 @@ createEdicts = do
     edicts <- io $ V.thaw $ V.generate (maxEntities + 1) newEdictT -- one extra for "dummy edict"
     gameBaseGlobals.gbGEdicts .= edicts
 
+{-
+- WriteGame
+- 
+- This will be called whenever the game goes to a new level, and when the
+- user explicitly saves the game.
+- 
+- Game information include cross level data, like multi level triggers,
+- help computer info, and all client states.
+- 
+- A single player death will automatically restore from the last save
+- position.
+-}
 writeGame :: B.ByteString -> Bool -> Quake ()
 writeGame fileName autosave = do
-    io (putStrLn "GameSave.writeGame") >> undefined -- TODO
+    unless autosave $
+      PlayerClient.saveClientData
+
+    -- IMPROVE: catch exception
+    qf <- io $ QuakeFile.open fileName
+
+    gameLocals <- use $ gameBaseGlobals.gbGame
+    io $ QuakeFile.writeGameLocals qf (gameLocals & glAutosaved .~ autosave)
+    gameBaseGlobals.gbGame.glAutosaved .= False
+
+    clients <- use $ gameBaseGlobals.gbGame.glClients
+    io $ V.mapM_ (QuakeFile.writeGClient qf) clients
+
+    io $ QuakeFile.close qf

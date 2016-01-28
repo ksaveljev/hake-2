@@ -8,6 +8,8 @@ module Util.QuakeFile ( QuakeFile
                       , readInt
                       , writeEdict
                       , writeLevelLocals
+                      , writeGClient
+                      , writeGameLocals
                       ) where
 
 import Control.Lens ((^.))
@@ -418,3 +420,11 @@ writeMFrame saveFile frame = do
     writeAdapter saveFile (frame^.mfAI)
     writeFloat   saveFile (frame^.mfDist)
     writeAdapter saveFile (frame^.mfThink)
+
+writeGClient :: QuakeFile -> GClientT -> IO ()
+writeGClient _ _ = do
+    io (putStrLn "QuakeFile.writeGClient") >> undefined -- TODO
+
+writeGameLocals :: QuakeFile -> GameLocalsT -> IO ()
+writeGameLocals _ _ = do
+    io (putStrLn "QuakeFile.writeGameLocals") >> undefined -- TODO
