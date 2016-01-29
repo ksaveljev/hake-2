@@ -2,17 +2,28 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss32 where
 
-import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (+=), (&), (.~), (%~), (+~))
+import Control.Lens (use, preuse, ix, (^.), (.=), (%=), zoom, (+=), (&), (.~), (%~), (+~), (-~))
+import Control.Monad (when, unless, liftM, void)
 import Data.Bits ((.|.), (.&.))
-import Linear (V3(..), norm)
+import Data.Maybe (isJust)
+import Linear (V3(..), norm, normalize, _x, _y, _z)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
+import qualified Game.GameMisc as GameMisc
+import qualified Game.Monster as Monster
+import qualified Game.Monsters.MFlash as MFlash
+import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
+
+modelScale :: Float
+modelScale = 1.0
 
 frameActive01 :: Int
 frameActive01 = 188
@@ -28,6 +39,15 @@ frameAttack308 = 208
 
 frameAttack401 :: Int
 frameAttack401 = 209
+
+frameAttack405 :: Int
+frameAttack405 = 213
+
+frameAttack413 :: Int
+frameAttack413 = 221
+
+frameAttack421 :: Int
+frameAttack421 = 229
 
 frameAttack426 :: Int
 frameAttack426 = 234
@@ -511,7 +531,27 @@ makronMoveSight = MMoveT "makronMoveSight" frameActive01 frameActive13 makronFra
 makronBFG :: EntThink
 makronBFG =
   GenericEntThink "makronBFG" $ \selfRef -> do
-    io (putStrLn "MBoss32.makronBFG") >> undefined -- TODO
+    self <- readEdictT selfRef
+    
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MakronBfg) forward right
+        Just enemyRef = self^.eEnemy
+        
+    enemy <- readEdictT enemyRef
+    
+    let V3 a b c = enemy^.eEntityState.esOrigin
+        vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
+        dir = normalize (vec - start)
+        
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let sound = gameImport^.giSound
+    
+    soundAttackBfg <- use $ mBoss32Globals.mb32SoundAttackBfg
+    sound (Just selfRef) Constants.chanVoice soundAttackBfg 1 Constants.attnNorm 0
+    Monster.monsterFireBFG selfRef start dir 50 300 100 300 Constants.mz2MakronBfg
+    
+    return True
 
 makronSaveLoc :: EntThink
 makronSaveLoc =
@@ -530,18 +570,108 @@ makronSaveLoc =
 makronRailGun :: EntThink
 makronRailGun =
   GenericEntThink "MakronRailgun" $ \selfRef -> do
-    io (putStrLn "MBoss32.makronRailGun") >> undefined -- TODO
+    self <- readEdictT selfRef
+    
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MakronRailgun1) forward right
+        dir = normalize ((self^.ePos1) - start)
+    
+    Monster.monsterFireRailgun selfRef start dir 50 100 Constants.mz2MakronRailgun1
+    
+    return True
 
 -- FIXME: This is all wrong. He's not firing at the proper angles.
 makronHyperBlaster :: EntThink
 makronHyperBlaster =
   GenericEntThink "MakronHyperblaster" $ \selfRef -> do
-    io (putStrLn "MBoss32.makronHyperBlaster") >> undefined -- TODO
+    self <- readEdictT selfRef
+    
+    let flashNumber = Constants.mz2MakronBlaster1 + (self^.eEntityState.esFrame) - frameAttack405
+        (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
+    
+    a <- case self^.eEnemy of
+           Nothing ->
+             return 0
+           
+           Just enemyRef -> do
+             enemy <- readEdictT enemyRef
+             let V3 a b c = enemy^.eEntityState.esOrigin
+                 vec = (V3 a b (c + fromIntegral (enemy^.eViewHeight))) - start
+                 vec' = Math3D.vectorAngles vec
+             return (vec'^._x)
+    
+    let b = if (self^.eEntityState.esFrame) <= frameAttack413
+              then (self^.eEntityState.esAngles._y) - 10 * fromIntegral ((self^.eEntityState.esFrame) - frameAttack413)
+              else (self^.eEntityState.esAngles._y) + 10 * fromIntegral ((self^.eEntityState.esFrame) - frameAttack421)
+              
+        dir = V3 a b 0
+        (Just forward', _, _) = Math3D.angleVectors dir True False False
+    
+    Monster.monsterFireBlaster selfRef start forward' 15 1000 Constants.mz2MakronBlaster1 Constants.efBlaster
+    
+    return True
 
 makronPain :: EntPain
 makronPain =
-  GenericEntPain "makron_pain" $ \_ _ _ _ -> do
-    io (putStrLn "MBoss32.makronPain") >> undefined -- TODO
+  GenericEntPain "makron_pain" $ \selfRef _ _ damage -> do
+    self <- readEdictT selfRef
+    
+    when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
+      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+    
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    --Lessen the chance of him going into his pain frames
+    skipPainFrames <- if damage <= 25
+                        then do
+                          r <- Lib.randomF
+                          return (r < 0.2)
+                        else
+                          return False
+    
+    unless (levelTime < (self^.ePainDebounceTime) || skipPainFrames) $ do
+      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      skillValue <- liftM (^.cvValue) skillCVar
+      
+      -- no pain anims in nightmare
+      unless (skillValue == 3) $ do
+        soundMove <- if | damage <= 40 -> do
+                            soundPain <- use $ mBoss32Globals.mb32SoundPain4
+                            return $ Just (soundPain, makronMovePain4)
+                            
+                        | damage <= 110 -> do
+                            soundPain <- use $ mBoss32Globals.mb32SoundPain5
+                            return $ Just (soundPain, makronMovePain5)
+                            
+                        | damage <= 150 -> do
+                            r <- Lib.randomF
+                            
+                            if r <= 0.45
+                              then do
+                                soundPain <- use $ mBoss32Globals.mb32SoundPain6
+                                return $ Just (soundPain, makronMovePain6)
+                              else
+                                return Nothing
+                                
+                            
+                        | otherwise -> do
+                            r <- Lib.randomF
+                            
+                            if r <= 0.35
+                              then do
+                                soundPain <- use $ mBoss32Globals.mb32SoundPain6
+                                return $ Just (soundPain, makronMovePain6)
+                              else
+                                return Nothing
+                                
+        case soundMove of
+          Nothing ->
+            return ()
+            
+          Just (soundPain, currentMove) -> do
+            sound <- use $ gameBaseGlobals.gbGameImport.giSound
+            sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNone 0
+            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 makronSight :: EntInteract
 makronSight =
@@ -612,13 +742,138 @@ makronTorso =
 
 makronDie :: EntDie
 makronDie =
-  GenericEntDie "makron_die" $ \_ _ _ _ _ -> do
-    io (putStrLn "MBoss32.makronDie") >> undefined -- TODO
+  GenericEntDie "makron_die" $ \selfRef _ _ damage _ -> do
+    modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+    
+    self <- readEdictT selfRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+    
+    if | (self^.eHealth) <= (self^.eGibHealth) -> do
+           soundIdx <- soundIndex (Just "misc/udeath.wav")
+           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+           
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
+           
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" damage Constants.gibMetallic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" damage Constants.gibMetallic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" damage Constants.gibMetallic
+           GameMisc.throwGib selfRef "models/objects/gibs/sm_metal/tris.md2" damage Constants.gibMetallic
+           
+           GameMisc.throwHead selfRef "models/objects/gibs/gear/tris.md2" damage Constants.gibMetallic
+           
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+        
+       | (self^.eDeadFlag) == Constants.deadDead ->
+           return ()
+           
+       | otherwise -> do
+           -- regular death
+           soundDeath <- use $ mBoss32Globals.mb32SoundDeath
+           sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
+           
+           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+                                         & eTakeDamage .~ Constants.damageYes
+                                         )
+            
+           tempEntRef <- GameUtil.spawn
+           
+           modifyEdictT tempEntRef (\v -> v & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
+                                            & eEntityState.esAngles .~ (self^.eEntityState.esAngles)
+                                            & eEntityState.esOrigin._y -~ 84
+                                            )
+                                            
+           void $ think makronTorso tempEntRef
+           
+           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveDeath2)
 
 makronCheckAttack :: EntThink
 makronCheckAttack =
-  GenericEntThink "Makron_CheckAttack" $ \_ -> do
-    io (putStrLn "MBoss32.makronCheckAttack") >> undefined -- TODO
+  GenericEntThink "Makron_CheckAttack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    done <- if (enemy^.eHealth) > 0
+              then do
+                let spot1 = (self^.eEntityState.esOrigin) & _z +~ fromIntegral (self^.eViewHeight)
+                    spot2 = (enemy^.eEntityState.esOrigin) & _z +~ fromIntegral (enemy^.eViewHeight)
+                
+                trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+                traceT <- trace spot1 Nothing Nothing spot2 (Just selfRef) (Constants.contentsSolid .|. Constants.contentsMonster .|. Constants.contentsSlime .|. Constants.contentsLava)
+                
+                -- do we have a clear shot?
+                if (traceT^.tEnt) == (self^.eEnemy)
+                  then return False
+                  else return True
+              
+              else
+                return False
+    
+    if done
+      then
+        return False
+      
+      else do
+        let enemyRange = GameUtil.range self enemy
+            temp = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+            enemyYaw = Math3D.vectorYaw temp
+        
+        modifyEdictT selfRef (\v -> v & eIdealYaw .~ enemyYaw)
+        
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        
+             -- melee attack
+        if | enemyRange == Constants.rangeMelee -> do
+               let attackState = case self^.eMonsterInfo.miMelee of
+                                   Nothing -> Constants.asMissile
+                                   Just _ -> Constants.asMelee
+               modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+               return True
+                
+             -- missile attack
+           | isJust (self^.eMonsterInfo.miAttack) ->
+               return False
+          
+           | levelTime < (self^.eMonsterInfo.miAttackFinished) ->
+               return False
+          
+           | enemyRange == Constants.rangeFar ->
+               return False
+               
+           | otherwise -> do
+               let mChance = if | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0 -> Just 0.4
+                                | enemyRange == Constants.rangeMelee -> Just 0.8
+                                | enemyRange == Constants.rangeNear -> Just 0.4
+                                | enemyRange == Constants.rangeMid -> Just 0.2
+                                | otherwise -> Nothing
+                
+               case mChance of
+                 Nothing ->
+                   return False
+                
+                 Just chance -> do
+                   r <- Lib.randomF
+                   
+                   if r < chance
+                     then do
+                       r' <- Lib.randomF
+                       modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile
+                                                     & eMonsterInfo.miAttackFinished .~ levelTime + 2 * r'
+                                                     )
+                       return True
+                       
+                     else do
+                       when ((self^.eFlags) .&. Constants.flFly /= 0) $ do
+                         r' <- Lib.randomF
+                         let attackState = if r' < 0.3
+                                             then Constants.asSliding
+                                             else Constants.asStraight
+                         modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+                      
+                       return False
 
 makronFramesAttack3 :: V.Vector MFrameT
 makronFramesAttack3 =
@@ -694,22 +949,117 @@ makronMoveAttack5 = MMoveT "makronMoveAttack5" frameAttack501 frameAttack516 mak
 
 makronSpawn :: EntThink
 makronSpawn =
-  GenericEntThink "MakronSpawn" $ \_ -> do
-    io (putStrLn "MBoss32.makronSpawn") >> undefined -- TODO
+  GenericEntThink "MakronSpawn" $ \selfRef -> do
+    spMonsterMakron selfRef
+    
+    -- jump at player
+    sightClient <- use $ gameBaseGlobals.gbLevel.llSightClient
+    
+    case sightClient of
+      Nothing ->
+        return True
+        
+      Just playerRef -> do
+        self <- readEdictT selfRef
+        player <- readEdictT playerRef
+        v3o <- use $ globals.vec3Origin
+        
+        let vec = (player^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+            vec' = normalize vec
+        
+        modifyEdictT selfRef (\v -> v & eEntityState.esAngles._y .~ Math3D.vectorYaw vec -- IMPROVE: use Constants.yaw instead of using _y directly
+                                      & eVelocity .~ ((v3o + fmap (* 400) vec') & _z .~ 200)
+                                      & eGroundEntity .~ Nothing
+                                      )
+        
+        return True
 
 makronToss :: EntThink
 makronToss =
-  GenericEntThink "MakronToss" $ \_ -> do
-    io (putStrLn "MBoss32.makronToss") >> undefined -- TODO
+  GenericEntThink "MakronToss" $ \selfRef -> do
+    self <- readEdictT selfRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    entRef <- GameUtil.spawn
+    
+    modifyEdictT entRef (\v -> v & eNextThink .~ levelTime + 0.8
+                                 & eThink .~ Just makronSpawn
+                                 & eTarget .~ (self^.eTarget)
+                                 & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
+                                 )
+    
+    return True
 
 makronPrecache :: Quake ()
 makronPrecache = do
-    io (putStrLn "MBoss32.makronPrecache") >> undefined -- TODO
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let soundIndex = gameImport^.giSoundIndex
+        modelIndex = gameImport^.giModelIndex
+        
+    soundIndex (Just "makron/pain3.wav") >>= (mBoss32Globals.mb32SoundPain4 .=)
+    soundIndex (Just "makron/pain2.wav") >>= (mBoss32Globals.mb32SoundPain5 .=)
+    soundIndex (Just "makron/pain1.wav") >>= (mBoss32Globals.mb32SoundPain6 .=)
+    soundIndex (Just "makron/death.wav") >>= (mBoss32Globals.mb32SoundDeath .=)
+    soundIndex (Just "makron/step1.wav") >>= (mBoss32Globals.mb32SoundStepLeft .=)
+    soundIndex (Just "makron/step2.wav") >>= (mBoss32Globals.mb32SoundStepRight .=)
+    soundIndex (Just "makron/bfg_fire.wav") >>= (mBoss32Globals.mb32SoundAttackBfg .=)
+    soundIndex (Just "makron/brain1.wav") >>= (mBoss32Globals.mb32SoundBrainSplorch .=)
+    soundIndex (Just "makron/rail_up.wav") >>= (mBoss32Globals.mb32SoundPreRailGun .=)
+    soundIndex (Just "makron/popup.wav") >>= (mBoss32Globals.mb32SoundPopUp .=)
+    soundIndex (Just "makron/voice4.wav") >>= (mBoss32Globals.mb32SoundTaunt1 .=)
+    soundIndex (Just "makron/voice3.wav") >>= (mBoss32Globals.mb32SoundTaunt2 .=)
+    soundIndex (Just "makron/voice.wav") >>= (mBoss32Globals.mb32SoundTaunt3 .=)
+    soundIndex (Just "makron/bhit.wav") >>= (mBoss32Globals.mb32SoundHit .=)
+    
+    void $ modelIndex (Just "models/monsters/boss3/rider/tris.md2")
 
 {-
 - QUAKED monster_makron (1 .5 0) (-30 -30 0) (30 30 90) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterMakron :: Quake ()
-spMonsterMakron = do
-    io (putStrLn "MBoss32.spMonsterMakron") >> undefined -- TODO
+spMonsterMakron :: EdictReference -> Quake ()
+spMonsterMakron selfRef = do
+    deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+    
+    if deathmatchValue /= 0
+      then do
+        GameUtil.freeEdict selfRef
+        
+      else do
+        makronPrecache
+        
+        gameImport <- use $ gameBaseGlobals.gbGameImport
+        
+        let modelIndex = gameImport^.giModelIndex
+            linkEntity = gameImport^.giLinkEntity
+        
+        modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
+        
+        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+                                      & eSolid .~ Constants.solidBbox
+                                      & eEntityState.esModelIndex .~ modelIdx
+                                      & eMins .~ V3 (-30) (-30) 0
+                                      & eMaxs .~ V3 30 30 90
+                                      & eHealth .~ 3000
+                                      & eGibHealth .~ (-2000)
+                                      & eMass .~ 500
+                                      & ePain .~ Just makronPain
+                                      & eDie .~ Just makronDie
+                                      & eMonsterInfo.miStand .~ Just makronStand
+                                      & eMonsterInfo.miWalk .~ Just makronWalk
+                                      & eMonsterInfo.miRun .~ Just makronRun
+                                      & eMonsterInfo.miDodge .~ Nothing
+                                      & eMonsterInfo.miAttack .~ Just makronAttack
+                                      & eMonsterInfo.miMelee .~ Nothing
+                                      & eMonsterInfo.miSight .~ Just makronSight
+                                      & eMonsterInfo.miCheckAttack .~ Just makronCheckAttack
+                                      )
+        
+        linkEntity selfRef
+        
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight
+                                      & eMonsterInfo.miScale .~ modelScale
+                                      )
+        
+        void $ think GameAI.walkMonsterStart selfRef

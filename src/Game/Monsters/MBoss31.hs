@@ -2,20 +2,25 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.Monsters.MBoss31 where
 
-import Control.Lens (use, ix, (.=), zoom, preuse, (^.), (&), (.~), (%~))
-import Control.Monad (void, when, unless)
+import Control.Lens (use, ix, (.=), zoom, preuse, (^.), (&), (.~), (%~), (+~))
+import Control.Monad (void, when, unless, liftM)
 import Data.Bits ((.&.))
+import Linear (norm, normalize, _z)
 import qualified Data.Vector as V
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameAI as GameAI
 import qualified Game.GameUtil as GameUtil
+import qualified Game.Monster as Monster
 import qualified Game.Monsters.MBoss32 as MBoss32
+import qualified Game.Monsters.MFlash as MFlash
 import qualified Game.Monsters.MSuperTank as MSuperTank
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 frameAttack101 :: Int
 frameAttack101 = 0
@@ -37,6 +42,9 @@ frameAttack118 = 17
 
 frameAttack201 :: Int
 frameAttack201 = 18
+
+frameAttack208 :: Int
+frameAttack208 = 25
 
 frameAttack213 :: Int
 frameAttack213 = 30
@@ -187,34 +195,116 @@ jorgPain =
     modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
     
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    
-    unless (levelTime < (self^.ePainDebounceTime)) $ do
-      -- Lessen the chance of him going into his pain frames if he takes
-      -- little damage
-      done <- if damage <= 40
-                then do
-                  r <- Lib.randomF
-                  return (r <= 0.6)
-                else
-                  return False
-                  
+    -- Lessen the chance of him going into his pain frames if he takes
+    -- little damage
+    skipPainFrames <- if damage <= 40
+                        then do
+                          r <- Lib.randomF
+                          return (r <= 0.6)
+                        else
+                          return False
+                          
+    unless (levelTime < (self^.ePainDebounceTime) || skipPainFrames) $ do
+      -- If he's entering his attack1 or using attack1, lessen the chance
+      -- of him going into pain
+      done <- checkAttackFrames self
+      
       unless done $ do
-        io (putStrLn "MBoss31.jorgPain") >> undefined -- TODO
+        modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+        
+        skillValue <- liftM (^.cvValue) skillCVar
+        
+        -- no pain anims in nightmare
+        unless (skillValue == 3) $ do
+          soundMove <- if | damage <= 50 -> do
+                              soundPain <- use $ mBoss31Globals.mb31SoundPain1
+                              return $ Just (soundPain, jorgMovePain1)
+                          | damage <= 100 -> do
+                              soundPain <- use $ mBoss31Globals.mb31SoundPain2
+                              return $ Just (soundPain, jorgMovePain2)
+                          | otherwise -> do
+                              r <- Lib.randomF
+                              if r <= 0.3
+                                then do
+                                  soundPain <- use $ mBoss31Globals.mb31SoundPain3
+                                  return $ Just (soundPain, jorgMovePain3)
+                                else
+                                  return Nothing
+          
+          case soundMove of
+            Nothing ->
+              return ()
+            
+            Just (soundPain, currentMove) -> do
+              sound <- use $ gameBaseGlobals.gbGameImport.giSound
+              sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
+              modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+  
+  where checkAttackFrames :: EdictT -> Quake Bool
+        checkAttackFrames self = do
+          if | (self^.eEntityState.esFrame) >= frameAttack101 && (self^.eEntityState.esFrame) <= frameAttack108 -> do
+                 r <- Lib.randomF
+                 return (r <= 0.005)
+                 
+             | (self^.eEntityState.esFrame) >= frameAttack109 && (self^.eEntityState.esFrame) <= frameAttack114 -> do
+                 r <- Lib.randomF
+                 return (r <= 0.00005)
+                 
+             | (self^.eEntityState.esFrame) >= frameAttack201 && (self^.eEntityState.esFrame) <= frameAttack208 -> do
+                 r <- Lib.randomF
+                 return (r <= 0.005)
+                 
+             | otherwise ->
+                 return False
 
 jorgBFG :: EntThink
 jorgBFG =
-  GenericEntThink "jorgBFG" $ \_ -> do
-    io (putStrLn "MBoss31.jorgBFG") >> undefined -- TODO
+  GenericEntThink "jorgBFG" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgBfg1) forward right
+        vec = (enemy^.eEntityState.esOrigin) & _z +~ fromIntegral (enemy^.eViewHeight)
+        dir = normalize (vec - start)
+    
+    sound <- use $ gameBaseGlobals.gbGameImport.giSound
+    soundAttack <- use $ mBoss31Globals.mb31SoundAttack2
+    
+    sound (Just selfRef) Constants.chanVoice soundAttack 1 Constants.attnNorm 0
+    Monster.monsterFireBFG selfRef start dir 50 300 100 200 Constants.mz2JorgBfg1
+    return True
 
 jorgFireBulletRight :: EntThink
 jorgFireBulletRight =
-  GenericEntThink "jorg_firebullet_right" $ \_ -> do
-    io (putStrLn "MBoss31.jorgFireBulletRight") >> undefined -- TODO
+  GenericEntThink "jorg_firebullet_right" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgMachinegunR1) forward right
+        target = ((enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)) & _z +~ fromIntegral (enemy^.eViewHeight)
+        forward' = normalize (target - start)
+        
+    Monster.monsterFireBullet selfRef start forward' 6 4 Constants.defaultBulletHspread Constants.defaultBulletVspread Constants.mz2JorgMachinegunR1
+    return True
 
 jorgFireBulletLeft :: EntThink
 jorgFireBulletLeft =
-  GenericEntThink "jorg_firebullet_left" $ \_ -> do
-    io (putStrLn "MBoss31.jorgFireBulletLeft") >> undefined -- TODO
+  GenericEntThink "jorg_firebullet_left" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
+        start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgMachinegunL1) forward right
+        target = ((enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)) & _z +~ fromIntegral (enemy^.eViewHeight)
+        forward' = normalize (target - start)
+    
+    Monster.monsterFireBullet selfRef start forward' 6 4 Constants.defaultBulletHspread Constants.defaultBulletVspread Constants.mz2JorgMachinegunL1
+    return True
 
 jorgFireBullet :: EntThink
 jorgFireBullet =
@@ -225,8 +315,34 @@ jorgFireBullet =
 
 jorgAttack :: EntThink
 jorgAttack =
-  GenericEntThink "jorg_attack" $ \_ -> do
-    io (putStrLn "MBoss31.jorgAttack") >> undefined -- TODO
+  GenericEntThink "jorg_attack" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+        range = norm vec
+        
+    r <- Lib.randomF
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let sound = gameImport^.giSound
+        soundIndex = gameImport^.giSoundIndex
+    
+    if r <= 0.75
+      then do
+        soundAttack <- use $ mBoss31Globals.mb31SoundAttack1
+        sound (Just selfRef) Constants.chanVoice soundAttack 1 Constants.attnNorm 0
+        soundIdx <- soundIndex (Just "boss3/w_loop.wav")
+        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+                                      & eMonsterInfo.miCurrentMove .~ Just jorgMoveStartAttack1
+                                      )
+      else do
+        soundAttack <- use $ mBoss31Globals.mb31SoundAttack2
+        sound (Just selfRef) Constants.chanVoice soundAttack 1 Constants.attnNorm 0
+        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack2)
+    
+    return True
 
 jorgDead :: EntThink
 jorgDead =

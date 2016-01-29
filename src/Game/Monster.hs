@@ -326,3 +326,19 @@ monsterFireRailgun _ _ _ _ _ _ = do
 monsterFireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
 monsterFireGrenade _ _ _ _ _ _ = do
     io (putStrLn "Monster.monsterFireGrenade") >> undefined -- TODO
+
+monsterFireBFG :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Float -> Int -> Quake ()
+monsterFireBFG selfRef start aimDir damage speed kick damageRadius flashType = do
+    GameWeapon.fireBFG selfRef start aimDir damage speed damageRadius
+    
+    self <- readEdictT selfRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let writeByte = gameImport^.giWriteByte
+        writeShort = gameImport^.giWriteShort
+        multicast = gameImport^.giMulticast
+    
+    writeByte Constants.svcMuzzleFlash2
+    writeShort (self^.eIndex)
+    writeByte flashType
+    multicast start Constants.multicastPvs
