@@ -13,10 +13,11 @@ module Util.QuakeFile ( QuakeFile
                       ) where
 
 import Control.Lens ((^.))
-import Data.Functor ((<$>))
 import Data.Binary.Get
 import Data.Binary.Put
-import Linear (V3(..))
+import Data.Functor ((<$>))
+import Data.Int (Int8, Int16)
+import Linear (V3(..), V4(..))
 import System.IO (openFile, IOMode(ReadWriteMode), Handle, hClose)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -61,6 +62,24 @@ readInt :: QuakeFile -> IO Int
 readInt (QuakeFile h) = do
     num <- BL.hGet h 4
     return (runGet getInt num)
+
+writeShort :: QuakeFile -> Int16 -> IO ()
+writeShort (QuakeFile h) num =
+    BL.hPut h $ runPut $ putInt16 num
+
+readShort :: QuakeFile -> IO Int16
+readShort (QuakeFile h) = do
+    num <- BL.hGet h 2
+    return (runGet getInt16 num)
+
+writeByte :: QuakeFile -> Int8 -> IO ()
+writeByte (QuakeFile h) num =
+    BL.hPut h $ runPut $ putWord8 (fromIntegral num)
+
+readByte :: QuakeFile -> IO Int8
+readByte (QuakeFile h) = do
+    num <- BL.hGet h 1
+    return (fromIntegral $ runGet getWord8 num)
 
 writeFloat :: QuakeFile -> Float -> IO ()
 writeFloat (QuakeFile h) num =
@@ -107,6 +126,19 @@ readVector saveFile = do
     a <- readFloat saveFile
     b <- readFloat saveFile
     c <- readFloat saveFile
+    return (V3 a b c)
+
+writeVectorShort :: QuakeFile -> V3 Int16 -> IO ()
+writeVectorShort saveFile (V3 a b c) = do
+    writeShort saveFile a
+    writeShort saveFile b
+    writeShort saveFile c
+
+readVectorShort :: QuakeFile -> IO (V3 Int16)
+readVectorShort saveFile = do
+    a <- readShort saveFile
+    b <- readShort saveFile
+    c <- readShort saveFile
     return (V3 a b c)
 
 writeLevelLocals :: QuakeFile -> LevelLocalsT -> IO ()
@@ -422,8 +454,87 @@ writeMFrame saveFile frame = do
     writeAdapter saveFile (frame^.mfThink)
 
 writeGClient :: QuakeFile -> GClientT -> IO ()
-writeGClient _ _ = do
-    io (putStrLn "QuakeFile.writeGClient") >> undefined -- TODO
+writeGClient saveFile gClient = do
+    writePlayerState      saveFile (gClient^.gcPlayerState)
+
+    writeInt              saveFile (gClient^.gcPing)
+
+    writeClientPersistant saveFile (gClient^.gcPers)
+    writeClientRespawn    saveFile (gClient^.gcResp)
+
+    writePMoveState       saveFile (gClient^.gcOldPMove)
+
+    writeInt              saveFile (if gClient^.gcShowScores then 1 else 0)
+    writeInt              saveFile (if gClient^.gcShowInventory then 1 else 0)
+    writeInt              saveFile (if gClient^.gcShowHelp then 1 else 0)
+    writeInt              saveFile (if gClient^.gcShowHelpIcon then 1 else 0)
+    writeInt              saveFile (gClient^.gcAmmoIndex)
+
+    writeInt              saveFile (gClient^.gcButtons)
+    writeInt              saveFile (gClient^.gcOldButtons)
+    writeInt              saveFile (gClient^.gcLatchedButtons)
+
+    writeInt              saveFile (if gClient^.gcWeaponThunk then 1 else 0)
+    writeItemRef          saveFile (gClient^.gcNewWeapon)
+
+    writeInt              saveFile (gClient^.gcDamageArmor)
+    writeInt              saveFile (gClient^.gcDamagePArmor)
+    writeInt              saveFile (gClient^.gcDamageBlood)
+    writeInt              saveFile (gClient^.gcDamageKnockback)
+
+    writeVector           saveFile (gClient^.gcDamageFrom)
+
+    writeFloat            saveFile (gClient^.gcKillerYaw)
+
+    writeInt              saveFile (gClient^.gcWeaponState)
+
+    writeVector           saveFile (gClient^.gcKickAngles)
+    writeVector           saveFile (gClient^.gcKickOrigin)
+
+    writeFloat            saveFile (gClient^.gcVDmgRoll)
+    writeFloat            saveFile (gClient^.gcVDmgPitch)
+    writeFloat            saveFile (gClient^.gcVDmgTime)
+    writeFloat            saveFile (gClient^.gcFallTime)
+    writeFloat            saveFile (gClient^.gcFallValue)
+    writeFloat            saveFile (gClient^.gcDamageAlpha)
+    writeFloat            saveFile (gClient^.gcBonusAlpha)
+
+    writeVector           saveFile (gClient^.gcDamageBlend)
+    writeVector           saveFile (gClient^.gcVAngle)
+
+    writeFloat            saveFile (gClient^.gcBobTime)
+
+    writeVector           saveFile (gClient^.gcOldViewAngles)
+    writeVector           saveFile (gClient^.gcOldVelocity)
+
+    writeFloat            saveFile (gClient^.gcNextDrownTime)
+
+    writeInt              saveFile (gClient^.gcOldWaterLevel)
+    writeInt              saveFile (gClient^.gcBreatherSound)
+    writeInt              saveFile (gClient^.gcMachinegunShots)
+    writeInt              saveFile (gClient^.gcAnimEnd)
+    writeInt              saveFile (gClient^.gcAnimPriority)
+    writeInt              saveFile (if gClient^.gcAnimDuck then 1 else 0)
+    writeInt              saveFile (if gClient^.gcAnimRun then 1 else 0)
+
+    writeFloat            saveFile (gClient^.gcQuadFrameNum)
+    writeFloat            saveFile (gClient^.gcInvincibleFrameNum)
+    writeFloat            saveFile (gClient^.gcBreatherFrameNum)
+    writeFloat            saveFile (gClient^.gcEnviroFrameNum)
+
+    writeInt              saveFile (if gClient^.gcGrenadeBlewUp then 1 else 0)
+    writeFloat            saveFile (gClient^.gcGrenadeTime)
+    writeInt              saveFile (gClient^.gcSilencerShots)
+    writeInt              saveFile (gClient^.gcWeaponSound)
+    writeFloat            saveFile (gClient^.gcPickupMsgTime)
+    writeFloat            saveFile (gClient^.gcFloodLockTill)
+    UV.mapM_ (writeFloat saveFile) (gClient^.gcFloodWhen)
+    writeInt              saveFile (gClient^.gcFloodWhenHead)
+    writeFloat            saveFile (gClient^.gcRespawnTime)
+    writeEdictRef         saveFile (gClient^.gcChaseTarget)
+    writeInt              saveFile (if gClient^.gcUpdateChase then 1 else 0)
+
+    writeInt              saveFile 8765
 
 writeGameLocals :: QuakeFile -> GameLocalsT -> IO ()
 writeGameLocals saveFile gameLocals = do
@@ -442,3 +553,83 @@ writeGameLocals saveFile gameLocals = do
     writeInt    saveFile (if gameLocals^.glAutosaved then 1 else 0)
     -- rst's checker :-)
     writeInt    saveFile 1928
+
+writePlayerState :: QuakeFile -> PlayerStateT -> IO ()
+writePlayerState saveFile playerState = do
+    writePMoveState saveFile (playerState^.psPMoveState)
+
+    writeVector     saveFile (playerState^.psViewAngles)
+    writeVector     saveFile (playerState^.psViewOffset)
+    writeVector     saveFile (playerState^.psKickAngles)
+    writeVector     saveFile (playerState^.psGunAngles)
+    writeVector     saveFile (playerState^.psGunOffset)
+
+    writeInt        saveFile (playerState^.psGunIndex)
+    writeInt        saveFile (playerState^.psGunFrame)
+
+    let V4 a b c d = playerState^.psBlend
+    writeFloat      saveFile a
+    writeFloat      saveFile b
+    writeFloat      saveFile c
+    writeFloat      saveFile d
+
+    writeFloat      saveFile (playerState^.psFOV)
+
+    writeInt        saveFile (playerState^.psRDFlags)
+
+    UV.mapM_ (writeShort saveFile) (playerState^.psStats)
+
+writeClientPersistant :: QuakeFile -> ClientPersistantT -> IO ()
+writeClientPersistant saveFile clientPersistant = do
+    writeString saveFile (Just $ clientPersistant^.cpUserInfo)
+    writeString saveFile (Just $ clientPersistant^.cpNetName)
+
+    writeInt    saveFile (clientPersistant^.cpHand)
+
+    writeInt    saveFile (if clientPersistant^.cpConnected then 1 else 0)
+    writeInt    saveFile (clientPersistant^.cpHealth)
+
+    writeInt    saveFile (clientPersistant^.cpMaxHealth)
+    writeInt    saveFile (clientPersistant^.cpSavedFlags)
+    writeInt    saveFile (clientPersistant^.cpSelectedItem)
+
+    UV.mapM_ (writeInt saveFile) (clientPersistant^.cpInventory)
+
+    writeInt    saveFile (clientPersistant^.cpMaxBullets)
+    writeInt    saveFile (clientPersistant^.cpMaxShells)
+    writeInt    saveFile (clientPersistant^.cpMaxRockets)
+    writeInt    saveFile (clientPersistant^.cpMaxGrenades)
+    writeInt    saveFile (clientPersistant^.cpMaxCells)
+    writeInt    saveFile (clientPersistant^.cpMaxSlugs)
+
+    writeItemRef saveFile (clientPersistant^.cpWeapon)
+    writeItemRef saveFile (clientPersistant^.cpLastWeapon)
+    writeInt     saveFile (clientPersistant^.cpPowerCubes)
+    writeInt     saveFile (clientPersistant^.cpScore)
+
+    writeInt     saveFile (clientPersistant^.cpGameHelpChanged)
+    writeInt     saveFile (clientPersistant^.cpHelpChanged)
+    writeInt     saveFile (if clientPersistant^.cpSpectator then 1 else 0)
+
+writeClientRespawn :: QuakeFile -> ClientRespawnT -> IO ()
+writeClientRespawn saveFile clientRespawn = do
+    writeClientPersistant saveFile (clientRespawn^.crCoopRespawn)
+    writeInt              saveFile (clientRespawn^.crEnterFrame)
+    writeInt              saveFile (clientRespawn^.crScore)
+    writeVector           saveFile (clientRespawn^.crCmdAngles)
+    writeInt              saveFile (if clientRespawn^.crSpectator then 1 else 0)
+
+writePMoveState :: QuakeFile -> PMoveStateT -> IO ()
+writePMoveState saveFile pMoveState = do
+    writeInt saveFile (pMoveState^.pmsPMType)
+
+    writeVectorShort saveFile (pMoveState^.pmsOrigin)
+    writeVectorShort saveFile (pMoveState^.pmsVelocity)
+
+    writeByte        saveFile (pMoveState^.pmsPMFlags)
+    writeByte        saveFile (pMoveState^.pmsPMTime)
+    writeShort       saveFile (pMoveState^.pmsGravity)
+
+    writeShort       saveFile 0
+
+    writeVectorShort saveFile (pMoveState^.pmsDeltaAngles)

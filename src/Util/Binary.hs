@@ -40,6 +40,9 @@ getInt8 = fromIntegral <$> getWord8
 getInt16 :: Get Int16
 getInt16 = fromIntegral <$> getWord16le
 
+putInt16 :: Int16 -> Put
+putInt16 = putWord16le <$> fromIntegral
+
 getV3Int16 :: Get (V3 Int16)
 getV3Int16 = V3 <$> getInt16
                 <*> getInt16

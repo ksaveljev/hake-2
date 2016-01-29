@@ -70,19 +70,18 @@ initFileSystem = do
 
 createPath :: B.ByteString -> Quake ()
 createPath path = do
-    -- IMPROVE: int index = path.lastIndexOf('/')
-    --          // -1 if not found and 0 means write to root
-    --          if (index > 0) ... then we create a directory
+    case '/' `BC.elemIndexEnd` path of
+      Nothing ->
+        return ()
 
-    done <- io (catchAny (createDirectoryIfMissing True (BC.unpack path) >> return (Right ())) $ \_ ->
-      return $ Left ()) -- IMPROVE: maybe somehow include exception message?
+      Just idx -> do
+        let filePath = BC.unpack (B.take idx path)
 
-    case done of
-      Left _ -> Com.printf $ "can't create path \"" `B.append` path `B.append` "\"\n"
-      Right _ -> return ()
+        io $ createDirectoryIfMissing True filePath -- IMPROVE: catch exception?
+        exists <- io $ doesDirectoryExist filePath
 
-  where catchAny :: IO a -> (SomeException -> IO a) -> IO a
-        catchAny = Control.Exception.catch
+        unless exists $
+          Com.printf ("can't create path \"" `B.append` path `B.append` "\n")
 
 -- AddGameDirectory
 --

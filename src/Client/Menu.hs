@@ -33,6 +33,7 @@ import {-# SOURCE #-} qualified QCommon.FS as FS
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 import {-# SOURCE #-} qualified Util.Lib as Lib
+import qualified Util.QuakeFile as QuakeFile
 
 mainItems :: Int
 mainItems = 5
@@ -456,9 +457,13 @@ createSaveStrings = do
                            then io $ liftM readable (getPermissions nameUnpacked)
                            else return False
               if canRead
-                then
+                then do
+                  qf <- io $ QuakeFile.open name
+                  saveName <- io $ QuakeFile.readString qf
+                  io $ QuakeFile.close qf
+
                   zoom menuGlobals $ do
-                    mgSaveStrings.ix idx .= name
+                    mgSaveStrings.ix idx .= saveName
                     mgSaveValid.ix idx .= True
                 else
                   zoom menuGlobals $ do
