@@ -459,12 +459,19 @@ createSaveStrings = do
               if canRead
                 then do
                   qf <- io $ QuakeFile.open name
-                  saveName <- io $ QuakeFile.readString qf
+                  mSaveName <- io $ QuakeFile.readString qf
                   io $ QuakeFile.close qf
 
-                  zoom menuGlobals $ do
-                    mgSaveStrings.ix idx .= saveName
-                    mgSaveValid.ix idx .= True
+                  case mSaveName of
+                    Nothing ->
+                      zoom menuGlobals $ do
+                        mgSaveStrings.ix idx .= "<EMPTY>"
+                        mgSaveValid.ix idx .= False
+
+                    Just saveName ->
+                      zoom menuGlobals $ do
+                        mgSaveStrings.ix idx .= saveName
+                        mgSaveValid.ix idx .= True
                 else
                   zoom menuGlobals $ do
                     mgSaveStrings.ix idx .= "<EMPTY>"

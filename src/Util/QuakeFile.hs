@@ -1,4 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Util.QuakeFile ( QuakeFile
                       , open
                       , close
@@ -9,10 +11,13 @@ module Util.QuakeFile ( QuakeFile
                       , writeEdict
                       , writeLevelLocals
                       , writeGClient
+                      , readGClient
                       , writeGameLocals
+                      , readGameLocals
                       ) where
 
 import Control.Lens ((^.))
+import Control.Monad (void)
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Functor ((<$>))
@@ -48,11 +53,24 @@ writeString (QuakeFile h) (Just str) =
       putInt (B.length str)
       putByteString str
 
-readString :: QuakeFile -> IO B.ByteString
+readString :: QuakeFile -> IO (Maybe B.ByteString)
 readString (QuakeFile h) = do
     stringSize <- BL.hGet h 4
-    let len :: Int = runGet getInt stringSize
-    B.hGet h len
+    if BL.length stringSize /= 4
+      then
+        return Nothing
+      else do
+        let len :: Int = runGet getInt stringSize
+        putStrLn ("len = " ++ show len)
+        if | len == -1 ->
+               return Nothing
+           | len == 0 ->
+               return (Just "")
+           | otherwise -> do
+               str <- B.hGet h len
+               return $ if B.length str /= len
+                          then Nothing
+                          else Just str
 
 writeInt :: QuakeFile -> Int -> IO ()
 writeInt (QuakeFile h) num =
@@ -367,6 +385,14 @@ writeItemRef :: QuakeFile -> Maybe GItemReference -> IO ()
 writeItemRef saveFile Nothing = writeInt saveFile (-1)
 writeItemRef saveFile (Just (GItemReference idx)) = writeInt saveFile idx
 
+readItemRef :: QuakeFile -> IO (Maybe GItemReference)
+readItemRef saveFile = do
+    idx <- readInt saveFile
+
+    return $ if idx == -1
+               then Nothing
+               else Just (GItemReference idx)
+
 writeMoveInfo :: QuakeFile -> MoveInfoT -> IO ()
 writeMoveInfo saveFile moveInfo = do
     writeVector saveFile  (moveInfo^.miStartOrigin)
@@ -536,10 +562,159 @@ writeGClient saveFile gClient = do
 
     writeInt              saveFile 8765
 
+readGClient :: QuakeFile -> Int -> IO (GClientT)
+readGClient saveFile idx = do
+    playerState <- readPlayerState saveFile
+
+    ping <- readInt saveFile
+
+    pers <- readClientPersistant saveFile
+    resp <- readClientRespawn saveFile
+
+    oldPMove <- readPMoveState saveFile
+
+    showScores <- readBool saveFile
+    showInventory <- readBool saveFile
+    showHelp <- readBool saveFile
+    showHelpIcon <- readBool saveFile
+    ammoIndex <- readInt saveFile
+
+    buttons <- readInt saveFile
+    oldButtons <- readInt saveFile
+    latchedButtons <- readInt saveFile
+
+    weaponThunk <- readBool saveFile
+
+    newWeapon <- readItemRef saveFile
+
+    damageArmor <- readInt saveFile
+    damagePArmor <- readInt saveFile
+    damageBlood <- readInt saveFile
+    damageKnockback <- readInt saveFile
+
+    damageFrom <- readVector saveFile
+    killerYaw <- readFloat saveFile
+    weaponState <- readInt saveFile
+
+    kickAngles <- readVector saveFile
+    kickOrigin <- readVector saveFile
+
+    vDmgRoll <- readFloat saveFile
+    vDmgPitch <- readFloat saveFile
+    vDmgTime <- readFloat saveFile
+    fallTime <- readFloat saveFile
+    fallValue <- readFloat saveFile
+    damageAlpha <- readFloat saveFile
+    bonusAlpha <- readFloat saveFile
+
+    damageBlend <- readVector saveFile
+    vAngle <- readVector saveFile
+
+    bobTime <- readFloat saveFile
+
+    oldViewAngles <- readVector saveFile
+    oldVelocity <- readVector saveFile
+
+    nextDrownTime <- readFloat saveFile
+
+    oldWaterLevel <- readInt saveFile
+    breatherSound <- readInt saveFile
+    machinegunShots <- readInt saveFile
+    animEnd <- readInt saveFile
+    animPriority <- readInt saveFile
+    animDuck <- readBool saveFile
+    animRun <- readBool saveFile
+
+    quadFrameNum <- readFloat saveFile
+    invincibleFrameNum <- readFloat saveFile
+    breatherFrameNum <- readFloat saveFile
+    enviroFrameNum <- readFloat saveFile
+
+    grenadeBlewUp <- readBool saveFile
+    grenadeTime <- readFloat saveFile
+    silencerShots <- readInt saveFile
+    weaponSound <- readInt saveFile
+    pickupMsgTime <- readFloat saveFile
+    floodLockTill <- readFloat saveFile
+
+    floodWhen <- mapM (const $ readFloat saveFile) [0..9]
+
+    floodWhenHead <- readInt saveFile
+    respawnTime <- readFloat saveFile
+    chaseTarget <- readEdictRef saveFile
+    updateChase <- readBool saveFile
+
+    check <- readInt saveFile
+
+    return GClientT { _gcPlayerState        = playerState
+                    , _gcPing               = ping
+                    , _gcPers               = pers
+                    , _gcResp               = resp
+                    , _gcOldPMove           = oldPMove
+                    , _gcShowScores         = showScores
+                    , _gcShowInventory      = showInventory
+                    , _gcShowHelp           = showHelp
+                    , _gcShowHelpIcon       = showHelpIcon
+                    , _gcAmmoIndex          = ammoIndex
+                    , _gcButtons            = buttons
+                    , _gcOldButtons         = oldButtons
+                    , _gcLatchedButtons     = latchedButtons
+                    , _gcWeaponThunk        = weaponThunk
+                    , _gcNewWeapon          = newWeapon
+                    , _gcDamageArmor        = damageArmor
+                    , _gcDamagePArmor       = damagePArmor
+                    , _gcDamageBlood        = damageBlood
+                    , _gcDamageKnockback    = damageKnockback
+                    , _gcDamageFrom         = damageFrom
+                    , _gcKillerYaw          = killerYaw
+                    , _gcWeaponState        = weaponState
+                    , _gcKickAngles         = kickAngles
+                    , _gcKickOrigin         = kickOrigin
+                    , _gcVDmgRoll           = vDmgRoll
+                    , _gcVDmgPitch          = vDmgPitch
+                    , _gcVDmgTime           = vDmgTime
+                    , _gcFallTime           = fallTime
+                    , _gcFallValue          = fallValue
+                    , _gcDamageAlpha        = damageAlpha
+                    , _gcBonusAlpha         = bonusAlpha
+                    , _gcDamageBlend        = damageBlend
+                    , _gcVAngle             = vAngle
+                    , _gcBobTime            = bobTime
+                    , _gcOldViewAngles      = oldViewAngles
+                    , _gcOldVelocity        = oldVelocity
+                    , _gcNextDrownTime      = nextDrownTime
+                    , _gcOldWaterLevel      = oldWaterLevel
+                    , _gcBreatherSound      = breatherSound
+                    , _gcMachinegunShots    = machinegunShots
+                    , _gcAnimEnd            = animEnd
+                    , _gcAnimPriority       = animPriority
+                    , _gcAnimDuck           = animDuck
+                    , _gcAnimRun            = animRun
+                    , _gcQuadFrameNum       = quadFrameNum
+                    , _gcInvincibleFrameNum = invincibleFrameNum
+                    , _gcBreatherFrameNum   = breatherFrameNum
+                    , _gcEnviroFrameNum     = enviroFrameNum
+                    , _gcGrenadeBlewUp      = grenadeBlewUp
+                    , _gcGrenadeTime        = grenadeTime
+                    , _gcSilencerShots      = silencerShots
+                    , _gcWeaponSound        = weaponSound
+                    , _gcPickupMsgTime      = pickupMsgTime
+                    , _gcFloodLockTill      = floodLockTill
+                    , _gcFloodWhen          = UV.fromList floodWhen
+                    , _gcFloodWhenHead      = floodWhenHead
+                    , _gcRespawnTime        = respawnTime
+                    , _gcChaseTarget        = chaseTarget
+                    , _gcUpdateChase        = updateChase
+                    , _gcIndex              = idx
+                    }
+
+{- TODO: how do we do it?
+    when (check /= 8765) $
+      Com.dprintf "game client load failed for num=" + index
+      -}
+
 writeGameLocals :: QuakeFile -> GameLocalsT -> IO ()
 writeGameLocals saveFile gameLocals = do
-    -- f.writeString(new Date().toString()); -- TODO: what for ?
-
     writeString saveFile (Just $ gameLocals^.glHelpMessage1)
     writeString saveFile (Just $ gameLocals^.glHelpMessage2)
 
@@ -553,6 +728,38 @@ writeGameLocals saveFile gameLocals = do
     writeInt    saveFile (if gameLocals^.glAutosaved then 1 else 0)
     -- rst's checker :-)
     writeInt    saveFile 1928
+
+readGameLocals :: QuakeFile -> IO (GameLocalsT)
+readGameLocals saveFile = do
+    Just helpMessage1 <- readString saveFile
+    Just helpMessage2 <- readString saveFile
+
+    helpChanged <- readInt saveFile
+
+    Just spawnPoint <- readString saveFile
+    maxClients <- readInt saveFile
+    maxEntities <- readInt saveFile
+    serverFlags <- readInt saveFile
+    numItems <- readInt saveFile
+    autoSaved <- readBool saveFile
+
+    check <- readInt saveFile
+
+    return newGameLocalsT { _glHelpMessage1 = helpMessage1
+                          , _glHelpMessage2 = helpMessage2
+                          , _glHelpChanged  = helpChanged
+                          , _glSpawnPoint   = spawnPoint
+                          , _glMaxClients   = maxClients
+                          , _glMaxEntities  = maxEntities
+                          , _glServerFlags  = serverFlags
+                          , _glNumItems     = numItems
+                          , _glAutosaved    = autoSaved
+                          }
+    
+{- TODO: how do we do it?
+    when (check /= 1928) $
+      Com.dprintf "error in loading game_locals, 1928\n"
+      -}
 
 writePlayerState :: QuakeFile -> PlayerStateT -> IO ()
 writePlayerState saveFile playerState = do
@@ -578,6 +785,43 @@ writePlayerState saveFile playerState = do
     writeInt        saveFile (playerState^.psRDFlags)
 
     UV.mapM_ (writeShort saveFile) (playerState^.psStats)
+
+readPlayerState :: QuakeFile -> IO (PlayerStateT)
+readPlayerState saveFile = do
+    pMoveState <- readPMoveState saveFile
+
+    viewAngles <- readVector saveFile
+    viewOffset <- readVector saveFile
+    kickAngles <- readVector saveFile
+    gunAngles <- readVector saveFile
+    gunOffset <- readVector saveFile
+
+    gunIndex <- readInt saveFile
+    gunFrame <- readInt saveFile
+
+    a <- readFloat saveFile
+    b <- readFloat saveFile
+    c <- readFloat saveFile
+    d <- readFloat saveFile
+
+    fov <- readFloat saveFile
+    rdFlags <- readInt saveFile
+    
+    stats <- mapM (const $ readShort saveFile) [0..Constants.maxStats]
+
+    return PlayerStateT { _psPMoveState = pMoveState
+                        , _psViewAngles = viewAngles
+                        , _psViewOffset = viewOffset
+                        , _psKickAngles = kickAngles
+                        , _psGunAngles  = gunAngles
+                        , _psGunOffset  = gunOffset
+                        , _psGunIndex   = gunIndex
+                        , _psGunFrame   = gunFrame
+                        , _psBlend      = V4 a b c d
+                        , _psFOV        = fov
+                        , _psRDFlags    = rdFlags
+                        , _psStats      = UV.fromList stats
+                        }
 
 writeClientPersistant :: QuakeFile -> ClientPersistantT -> IO ()
 writeClientPersistant saveFile clientPersistant = do
@@ -611,6 +855,62 @@ writeClientPersistant saveFile clientPersistant = do
     writeInt     saveFile (clientPersistant^.cpHelpChanged)
     writeInt     saveFile (if clientPersistant^.cpSpectator then 1 else 0)
 
+readClientPersistant :: QuakeFile -> IO (ClientPersistantT)
+readClientPersistant saveFile = do
+    Just userInfo <- readString saveFile
+    Just netName <- readString saveFile
+
+    hand <- readInt saveFile
+
+    connected <- readBool saveFile
+    health <- readInt saveFile
+
+    maxHealth <- readInt saveFile
+    savedFlags <- readInt saveFile
+    selectedItem <- readInt saveFile
+
+    inventory <- mapM (const $ readInt saveFile) [0..Constants.maxItems]
+
+    maxBullets <- readInt saveFile
+    maxShells <- readInt saveFile
+    maxRockets <- readInt saveFile
+    maxGrenades <- readInt saveFile
+    maxCells <- readInt saveFile
+    maxSlugs <- readInt saveFile
+
+    weapon <- readItemRef saveFile
+    lastWeapon <- readItemRef saveFile
+    powerCubes <- readInt saveFile
+    score <- readInt saveFile
+
+    gameHelpChanged <- readInt saveFile
+    helpChanged <- readInt saveFile
+    spectator <- readBool saveFile
+
+    return ClientPersistantT { _cpUserInfo        = userInfo
+                             , _cpNetName         = netName
+                             , _cpHand            = hand
+                             , _cpConnected       = connected
+                             , _cpHealth          = health
+                             , _cpMaxHealth       = maxHealth
+                             , _cpSavedFlags      = savedFlags
+                             , _cpSelectedItem    = selectedItem
+                             , _cpInventory       = UV.fromList inventory
+                             , _cpMaxBullets      = maxBullets
+                             , _cpMaxShells       = maxShells
+                             , _cpMaxRockets      = maxRockets
+                             , _cpMaxGrenades     = maxGrenades
+                             , _cpMaxCells        = maxCells
+                             , _cpMaxSlugs        = maxSlugs
+                             , _cpWeapon          = weapon
+                             , _cpLastWeapon      = lastWeapon
+                             , _cpPowerCubes      = powerCubes
+                             , _cpScore           = score
+                             , _cpGameHelpChanged = gameHelpChanged
+                             , _cpHelpChanged     = helpChanged
+                             , _cpSpectator       = spectator
+                             }
+
 writeClientRespawn :: QuakeFile -> ClientRespawnT -> IO ()
 writeClientRespawn saveFile clientRespawn = do
     writeClientPersistant saveFile (clientRespawn^.crCoopRespawn)
@@ -618,6 +918,21 @@ writeClientRespawn saveFile clientRespawn = do
     writeInt              saveFile (clientRespawn^.crScore)
     writeVector           saveFile (clientRespawn^.crCmdAngles)
     writeInt              saveFile (if clientRespawn^.crSpectator then 1 else 0)
+
+readClientRespawn :: QuakeFile -> IO (ClientRespawnT)
+readClientRespawn saveFile = do
+    coopRespawn <- readClientPersistant saveFile
+    enterFrame <- readInt saveFile
+    score <- readInt saveFile
+    cmdAngles <- readVector saveFile
+    spectator <- readBool saveFile
+
+    return ClientRespawnT { _crCoopRespawn = coopRespawn
+                          , _crEnterFrame  = enterFrame
+                          , _crScore       = score
+                          , _crCmdAngles   = cmdAngles
+                          , _crSpectator   = spectator
+                          }
 
 writePMoveState :: QuakeFile -> PMoveStateT -> IO ()
 writePMoveState saveFile pMoveState = do
@@ -633,3 +948,25 @@ writePMoveState saveFile pMoveState = do
     writeShort       saveFile 0
 
     writeVectorShort saveFile (pMoveState^.pmsDeltaAngles)
+
+readPMoveState :: QuakeFile -> IO (PMoveStateT)
+readPMoveState saveFile = do
+    pmType <- readInt saveFile
+    origin <- readVectorShort saveFile
+    velocity <- readVectorShort saveFile
+    pmFlags <- readByte saveFile
+    pmTime <- readByte saveFile
+    gravity <- readShort saveFile
+
+    void $ readShort saveFile
+
+    deltaAngles <- readVectorShort saveFile
+
+    return PMoveStateT { _pmsPMType      = pmType
+                       , _pmsOrigin      = origin
+                       , _pmsVelocity    = velocity
+                       , _pmsPMFlags     = pmFlags
+                       , _pmsPMTime      = pmTime
+                       , _pmsGravity     = gravity
+                       , _pmsDeltaAngles = deltaAngles
+                       }

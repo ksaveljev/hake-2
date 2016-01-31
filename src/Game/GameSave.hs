@@ -2,7 +2,7 @@
 module Game.GameSave where
 
 import Data.Bits ((.|.))
-import Control.Lens (use, (^.), (.=), (&), (.~))
+import Control.Lens (use, (^.), (.=), (&), (.~), ix)
 import Control.Monad (void, liftM, when, unless)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -170,3 +170,25 @@ writeGame fileName autosave = do
     io $ V.mapM_ (QuakeFile.writeGClient qf) clients
 
     io $ QuakeFile.close qf
+
+readGame :: B.ByteString -> Quake ()
+readGame fileName = do
+    -- IMPROVE: catch exceptions
+    qf <- io $ QuakeFile.open fileName
+
+    createEdicts
+    gameLocals <- io $ QuakeFile.readGameLocals qf
+
+    gameBaseGlobals.gbGame .= gameLocals
+
+    readGClients qf 0 (gameLocals^.glMaxClients)
+
+    io $ QuakeFile.close qf
+
+  where readGClients :: QuakeFile -> Int -> Int -> Quake ()
+        readGClients qf idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              client <- io $ QuakeFile.readGClient qf idx
+              gameBaseGlobals.gbGame.glClients.ix idx .= (client & gcIndex .~ idx)
+              readGClients qf (idx + 1) maxIdx

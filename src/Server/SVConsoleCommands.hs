@@ -288,7 +288,7 @@ readLevelFile = do
     --
     qf <- io $ QuakeFile.open sv2name
 
-    configStrings <- io $ liftM V.fromList (mapM (const $ QuakeFile.readString qf) [0..Constants.maxConfigStrings-1])
+    configStrings <- io $ liftM V.fromList (mapM (readConfigString qf) [0..Constants.maxConfigStrings-1])
     svGlobals.svServer.sConfigStrings .= configStrings
 
     CM.readPortalState qf
@@ -297,6 +297,13 @@ readLevelFile = do
 
     let name = gamedir `B.append` "/save/current/" `B.append` serverName `B.append` ".sav"
     GameSave.readLevel name
+
+  where readConfigString :: QuakeFile -> Int -> IO B.ByteString
+        readConfigString qf _ = do
+          mStr <- QuakeFile.readString qf
+          case mStr of
+            Nothing -> return ""
+            Just str -> return str
 
 {-
 ==============
@@ -360,7 +367,54 @@ SV_ReadServerFile
 ==============
 -}
 readServerFile :: Quake ()
-readServerFile = io (putStrLn "SVConsoleCommands.readServerFile") >> undefined -- TODO
+readServerFile = do
+    Com.dprintf "SV_ReadServerFile()\n"
+
+    gameDir <- FS.gameDir
+    let fileName = gameDir `B.append` "/save/current/server.ssv"
+
+    qf <- io $ QuakeFile.open fileName
+
+    -- read the comment field but ignore
+    void $ io $ QuakeFile.readString qf
+
+    -- read the mapcmd
+    mMapCmd <- io $ QuakeFile.readString qf
+    let mapCmd = case mMapCmd of
+                   Nothing -> ""
+                   Just mapCmd -> mapCmd
+
+    -- read all CVAR_LATCH cvars
+    -- these will be things like coop, skill, deathmatch, etc
+    readCVars qf
+
+    io $ QuakeFile.close qf
+
+    -- start a new game fresh with new cvars
+    SVInit.initGame
+
+    svGlobals.svServerStatic.ssMapCmd .= mapCmd
+
+    let fileName' = gameDir `B.append` "/save/current/game.ssv"
+    GameSave.readGame fileName'
+
+  where readCVars :: QuakeFile -> Quake ()
+        readCVars qf = do
+          mName <- io $ QuakeFile.readString qf
+
+          case mName of
+            Nothing ->
+              return ()
+
+            Just name -> do
+              mStr <- io $ QuakeFile.readString qf
+              let str = case mStr of
+                          Nothing -> ""
+                          Just str -> str
+
+              Com.dprintf ("Set " `B.append` name `B.append` " = " `B.append` str `B.append` "\n")
+              void $ CVar.forceSet name str
+              readCVars qf
 
 {-
 ==================
