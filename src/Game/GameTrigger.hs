@@ -2,21 +2,30 @@
 {-# LANGUAGE MultiWayIf #-}
 module Game.GameTrigger where
 
-import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom, (&), (.~), (%~))
-import Control.Monad (when, unless)
-import Data.Bits ((.&.), (.|.), complement)
-import Data.Maybe (isJust)
-import Linear (dot)
+import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom, (&), (.~), (%~), (-~), (-=))
+import Control.Monad (when, unless, void, liftM)
+import Data.Bits ((.&.), (.|.), complement, shiftL)
+import Data.Maybe (isJust, fromJust, isNothing)
+import Linear (dot, _y, _z)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
+import CVarVariables
 import Game.Adapters
 import qualified Constants
 import qualified Game.GameBase as GameBase
+import {-# SOURCE #-} Game.GameCombat as GameCombat
+import qualified Game.GameItems as GameItems
 import qualified Game.GameUtil as GameUtil
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
+
+pushOnce :: Int
+pushOnce = 1
 
 spTriggerMultiple :: EdictReference -> Quake ()
 spTriggerMultiple edictRef = do
@@ -93,10 +102,42 @@ spTriggerRelay edictRef =
     modifyEdictT edictRef (\v -> v & eUse .~ Just triggerRelayUse)
 
 spTriggerKey :: EdictReference -> Quake ()
-spTriggerKey _ = io (putStrLn "GameTrigger.spTriggerKey") >> undefined -- TODO
+spTriggerKey selfRef = do
+    self <- readEdictT selfRef
+    mItem <- use $ gameBaseGlobals.gbSpawnTemp.stItem
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    
+    let dprintf = gameImport^.giDprintf
+        soundIndex = gameImport^.giSoundIndex
+    
+    case mItem of
+      Nothing ->
+        dprintf ("no key item for trigger_key at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+      
+      Just item -> do
+        foundItemRef <- GameItems.findItemByClassname item
+        modifyEdictT selfRef (\v -> v & eItem .~ foundItemRef)
+        
+        case foundItemRef of
+          Nothing ->
+            dprintf ("item " `B.append` item `B.append` " not found for trigger_key at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+          
+          Just _ ->
+            case self^.eTarget of
+              Nothing ->
+                dprintf ((self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` " has no target\n")
+              
+              Just _ -> do
+                void $ soundIndex (Just "misc/keytry.wav")
+                void $ soundIndex (Just "misc/keyuse.wav")
+                modifyEdictT selfRef (\v -> v & eUse .~ Just triggerKeyUse)
 
 spTriggerCounter :: EdictReference -> Quake ()
-spTriggerCounter _ = io (putStrLn "GameTrigger.spTriggerCounter") >> undefined -- TODO
+spTriggerCounter selfRef = do
+    modifyEdictT selfRef (\v -> v & eWait -~ 1
+                                  & eCount %~ (\a -> if a == 0 then 2 else a)
+                                  & eUse .~ Just triggerCounterUse
+                                  )
 
 spTriggerAlways :: EdictReference -> Quake ()
 spTriggerAlways edictRef = do
@@ -107,17 +148,86 @@ spTriggerAlways edictRef = do
 
     GameUtil.useTargets edictRef (Just edictRef)
 
+{-
+- QUAKED trigger_push (.5 .5 .5) ? PUSH_ONCE Pushes the player "speed"
+- defaults to 1000
+-}
 spTriggerPush :: EdictReference -> Quake ()
-spTriggerPush _ = io (putStrLn "GameTrigger.spTriggerPush") >> undefined -- TODO
+spTriggerPush selfRef = do
+    initTrigger selfRef
+    
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+    
+    windSound <- soundIndex (Just "misc/windfly.wav")
+    gameBaseGlobals.gbWindSound .= windSound
+    
+    modifyEdictT selfRef (\v -> v & eTouch .~ Just triggerPushTouch
+                                  & eSpeed %~ (\a -> if a == 0 then 1000 else a)
+                                  )
+                                  
+    linkEntity selfRef
 
 spTriggerHurt :: EdictReference -> Quake ()
-spTriggerHurt _ = io (putStrLn "GameTrigger.spTriggerHurt") >> undefined -- TODO
+spTriggerHurt selfRef = do
+    initTrigger selfRef
+    
+    self <- readEdictT selfRef
+    
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+        
+    soundIdx <- soundIndex (Just "world/electro.wav")
+    
+    let solid = if (self^.eSpawnFlags) .&. 1 /= 0
+                  then Constants.solidNot
+                  else Constants.solidTrigger
+        selfUse = if (self^.eSpawnFlags) .&. 2 /= 0
+                    then Just hurtUse
+                    else self^.eUse
+    
+    modifyEdictT selfRef (\v -> v & eNoiseIndex .~ soundIdx
+                                  & eTouch .~ Just hurtTouch
+                                  & eDmg %~ (\a -> if a == 0 then 5 else a)
+                                  & eSolid .~ solid
+                                  & eUse .~ selfUse
+                                  )
+    
+    linkEntity selfRef
 
 spTriggerGravity :: EdictReference -> Quake ()
-spTriggerGravity _ = io (putStrLn "GameTrigger.spTriggerGravity") >> undefined -- TODO
+spTriggerGravity selfRef = do
+    mGravity <- use $ gameBaseGlobals.gbSpawnTemp.stGravity
+    
+    case mGravity of
+      Nothing -> do
+        self <- readEdictT selfRef
+        dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+        dprintf ("trigger_gravity without gravity set at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+        GameUtil.freeEdict selfRef
+      
+      Just gravity -> do
+        initTrigger selfRef
+        modifyEdictT selfRef (\v -> v & eGravity .~ fromIntegral (Lib.atoi gravity)
+                                      & eTouch .~ Just triggerGravityTouch
+                                      )
 
 spTriggerMonsterJump :: EdictReference -> Quake ()
-spTriggerMonsterJump _ = io (putStrLn "GameTrigger.spTriggerMonsterJump") >> undefined -- TODO
+spTriggerMonsterJump selfRef = do
+    modifyEdictT selfRef (\v -> v & eSpeed %~ (\a -> if a == 0 then 200 else a)
+                                  & eEntityState.esAngles._y %~ (\a -> if a == 0 then 360 else a) -- IMPROVE: use Constants.yaw instead of using _y directly
+                                  )
+    
+    gameBaseGlobals.gbSpawnTemp.stHeight %= (\v -> if v == 0 then 200 else v)
+    height <- use $ gameBaseGlobals.gbSpawnTemp.stHeight
+    
+    initTrigger selfRef
+    
+    modifyEdictT selfRef (\v -> v & eTouch .~ Just triggerMonsterJumpTouch
+                                  & eMoveDir._z .~ fromIntegral height
+                                  )
 
 {-
 - QUAKED trigger_relay (.5 .5 .5) (-8 -8 -8) (8 8 8) This fixed size
@@ -160,15 +270,28 @@ touchMulti =
              | (other^.eSvFlags) .&. Constants.svfMonster /= 0 -> return $ if spawnFlags .&. 1 == 0 then True else False
              | otherwise -> return True
 
+{-
+- QUAKED trigger_multiple (.5 .5 .5) ? MONSTER NOT_PLAYER TRIGGERED
+- Variable sized repeatable trigger. Must be targeted at one or more
+- entities. If "delay" is set, the trigger waits some time after activating
+- before firing. "wait" : Seconds between triggerings. (.2 default) sounds
+- 1) secret 2) beep beep 3) large switch 4) set "message" to text string
+-}
 triggerEnable :: EntUse
 triggerEnable =
-  GenericEntUse "trigger_enable" $ \_ _ _ -> do
-    io (putStrLn "GameTrigger.triggerEnable") >> undefined -- TODO
+  GenericEntUse "trigger_enable" $ \selfRef _ _ -> do
+    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidTrigger
+                                  & eUse .~ Just useMulti
+                                  )
+    
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
 
 useMulti :: EntUse
 useMulti =
-  GenericEntUse "Use_Multi" $ \_ _ _ -> do
-    io (putStrLn "GameTrigger.useMulti") >> undefined -- TODO
+  GenericEntUse "Use_Multi" $ \edictRef _ activatorRef -> do
+    modifyEdictT edictRef (\v -> v & eActivator .~ activatorRef)
+    multiTrigger edictRef
 
 -- the trigger was just activated
 -- ent.activator should be set to the activator so it can be held through a
@@ -189,8 +312,7 @@ multiTrigger edictRef = do
                                          & eNextThink .~ levelTime + (edict'^.eWait))
         else
           -- we can't just remove (self) here, because this is a touch
-          -- function
-          -- called while looping through area links...
+          -- function called while looping through area links...
           modifyEdictT edictRef (\v -> v & eTouch .~ Nothing
                                          & eNextThink .~ levelTime + (Constants.frameTime)
                                          & eThink .~ Just GameUtil.freeEdictA)
@@ -215,3 +337,272 @@ multiWait =
   GenericEntThink "multi_wait" $ \edictRef -> do
     modifyEdictT edictRef (\v -> v & eNextThink .~ 0)
     return True
+
+{-
+- QUAKED trigger_key (.5 .5 .5) (-8 -8 -8) (8 8 8) A relay trigger that
+- only fires it's targets if player has the proper key. Use "item" to
+- specify the required key, for example "key_data_cd"
+-}
+triggerKeyUse :: EntUse
+triggerKeyUse =
+  GenericEntUse "trigger_key_use" $ \selfRef _ mActivatorRef -> do
+    self <- readEdictT selfRef
+    proceed <- shouldProceed self mActivatorRef
+    
+    when proceed $ do
+      let Just activatorRef = mActivatorRef
+      activator <- readEdictT activatorRef
+      
+      let Just (GClientReference gClientIdx) = activator^.eClient
+      Just activatorClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    
+      let Just (GItemReference gItemIdx) = self^.eItem
+      Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
+      
+      gameImport <- use $ gameBaseGlobals.gbGameImport
+      let sound = gameImport^.giSound
+          soundIndex = gameImport^.giSoundIndex
+          centerPrintf = gameImport^.giCenterPrintf
+      
+      if (activatorClient^.gcPers.cpInventory) UV.! (gItem^.giIndex) == 0
+        then do
+          levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+          
+          unless (levelTime < (self^.eTouchDebounceTime)) $ do
+            modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 5.0)
+            centerPrintf activatorRef ("You need the " `B.append` fromJust (gItem^.giPickupName))
+            soundIdx <- soundIndex (Just "misc/keytry.wav")
+            sound mActivatorRef Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+          
+        else do
+          soundIdx <- soundIndex (Just "misc/keyuse.wav")
+          sound mActivatorRef Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+          
+          coopValue <- liftM (^.cvValue) coopCVar
+          
+          if coopValue /= 0
+            then do
+              edicts <- use $ gameBaseGlobals.gbGEdicts
+              maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
+              
+              if (gItem^.giClassName) == "key_power_cube"
+                then do
+                  let cube = findCube activatorClient 0 8
+                  updatePlayers edicts (gItem^.giIndex) cube 1 maxClients
+                  
+                else do
+                  updatePlayers2 edicts (gItem^.giIndex) 1 maxClients
+            
+            else
+              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
+              
+          GameUtil.useTargets selfRef mActivatorRef
+          
+          modifyEdictT selfRef (\v -> v & eUse .~ Nothing)
+  
+  where shouldProceed :: EdictT -> Maybe EdictReference -> Quake Bool
+        shouldProceed self mActivatorRef =
+          case self^.eItem of
+            Nothing -> return False
+            Just _ ->
+              case mActivatorRef of
+                Nothing -> return False
+                Just activatorRef -> do
+                  activator <- readEdictT activatorRef
+                  case activator^.eClient of
+                    Nothing -> return False
+                    _ -> return True
+                    
+        findCube :: GClientT -> Int -> Int -> Int
+        findCube gClient idx maxIdx
+          | idx >= maxIdx = maxIdx
+          | otherwise =
+              if (gClient^.gcPers.cpPowerCubes) .&. (1 `shiftL` idx) /= 0
+                then idx
+                else findCube gClient (idx + 1) maxIdx
+        
+        updatePlayers :: MV.IOVector EdictT -> Int -> Int -> Int -> Int -> Quake ()
+        updatePlayers edicts itemIndex cube idx maxIdx
+          | idx > maxIdx = return ()
+          | otherwise = do
+              edict <- io $ MV.read edicts idx
+              if | not (edict^.eInUse) -> updatePlayers edicts itemIndex cube (idx + 1) maxIdx
+                 | isNothing (edict^.eClient) -> updatePlayers edicts itemIndex cube (idx + 1) maxIdx
+                 | otherwise -> do
+                     let Just (GClientReference gClientIdx) = edict^.eClient
+                     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+                     
+                     when ((gClient^.gcPers.cpPowerCubes) .&. (1 `shiftL` cube) /= 0) $ do
+                       zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers) $ do
+                         cpInventory.ix itemIndex -= 1
+                         cpPowerCubes %= (\v -> v .&. (complement (1 `shiftL` cube)))
+                      
+                     updatePlayers edicts itemIndex cube (idx + 1) maxIdx
+                     
+        updatePlayers2 :: MV.IOVector EdictT -> Int -> Int -> Int -> Quake ()
+        updatePlayers2 edicts itemIndex idx maxIdx
+          | idx > maxIdx = return ()
+          | otherwise = do
+              edict <- io $ MV.read edicts idx
+              if | not (edict^.eInUse) -> updatePlayers2 edicts itemIndex (idx + 1) maxIdx
+                 | isNothing (edict^.eClient) -> updatePlayers2 edicts itemIndex (idx + 1) maxIdx
+                 | otherwise -> do
+                     let Just (GClientReference gClientIdx) = edict^.eClient
+                     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix itemIndex .= 0
+                     updatePlayers2 edicts itemIndex (idx + 1) maxIdx
+
+{-
+- QUAKED trigger_counter (.5 .5 .5) ? nomessage Acts as an intermediary for
+- an action that takes multiple inputs.
+- 
+- If nomessage is not set, t will print "1 more.. " etc when triggered and
+- "sequence complete" when finished.
+- 
+- After the counter has been triggered "count" times (default 2), it will
+- fire all of it's targets and remove itself.
+-}
+triggerCounterUse :: EntUse
+triggerCounterUse =
+  GenericEntUse "trigger_counter_use" $ \selfRef _ mActivatorRef -> do
+    self <- readEdictT selfRef
+    let Just activatorRef = mActivatorRef
+    
+    unless ((self^.eCount) == 0) $ do
+      let count = (self^.eCount) - 1
+      modifyEdictT selfRef (\v -> v & eCount .~ count)
+      
+      gameImport <- use $ gameBaseGlobals.gbGameImport
+      let sound = gameImport^.giSound
+          soundIndex = gameImport^.giSoundIndex
+          centerPrintf = gameImport^.giCenterPrintf
+      
+      if count > 0
+        then
+          when ((self^.eSpawnFlags) .&. 1 == 0) $ do
+            centerPrintf activatorRef (BC.pack (show count) `B.append` " more to go...") -- IMPROVE
+            soundIdx <- soundIndex (Just "misc/talk1.wav")
+            sound mActivatorRef Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+            
+        else do
+          when ((self^.eSpawnFlags) .&. 1 == 0) $ do
+            centerPrintf activatorRef "Sequence completed!"
+            soundIdx <- soundIndex (Just "misc/talk1.wav")
+            sound mActivatorRef Constants.chanAuto soundIdx 1 Constants.attnNorm 0
+          
+          modifyEdictT selfRef (\v -> v & eActivator .~ mActivatorRef)
+          multiTrigger selfRef
+
+{-
+- QUAKED trigger_hurt (.5 .5 .5) ? START_OFF TOGGLE SILENT NO_PROTECTION
+- SLOW Any entity that touches this will be hurt.
+- 
+- It does dmg points of damage each server frame
+- 
+- SILENT supresses playing the sound SLOW changes the damage rate to once
+- per second NO_PROTECTION *nothing* stops the damage
+- 
+- "dmg" default 5 (whole numbers only)
+-  
+-}
+hurtUse :: EntUse
+hurtUse =
+  GenericEntUse "hurt_use" $ \selfRef _ _ -> do
+    self <- readEdictT selfRef
+    
+    let solid = if (self^.eSolid) == Constants.solidNot
+                  then Constants.solidTrigger
+                  else Constants.solidNot
+                  
+    modifyEdictT selfRef (\v -> v & eSolid .~ solid)
+    
+    linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
+    linkEntity selfRef
+    
+    self' <- readEdictT selfRef
+    when ((self'^.eSpawnFlags) .&. 2 == 0) $
+      modifyEdictT selfRef (\v -> v & eUse .~ Nothing)
+
+hurtTouch :: EntTouch
+hurtTouch =
+  GenericEntTouch "hurt_touch" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    let proceed = shouldProceed self other levelTime
+    
+    when proceed $ do
+      let timeStamp = if (self^.eSpawnFlags) .&. 16 /= 0
+                        then levelTime + 1
+                        else levelTime + Constants.frameTime
+      
+      modifyEdictT selfRef (\v -> v & eTimeStamp .~ timeStamp)
+      
+      frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
+      
+      when ((self^.eSpawnFlags) .&. 4 == 0 && frameNum `mod` 10 == 0) $ do
+        sound <- use $ gameBaseGlobals.gbGameImport.giSound
+        sound (Just otherRef) Constants.chanAuto (self^.eNoiseIndex) 1 Constants.attnNorm 0
+      
+      let dFlags = if (self^.eSpawnFlags) .&. 8 /= 0
+                     then Constants.damageNoProtection
+                     else 0
+      
+      v3o <- use $ globals.vec3Origin
+      
+      GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) (self^.eDmg) dFlags Constants.modTriggerHurt
+      
+  where shouldProceed :: EdictT -> EdictT -> Float -> Bool
+        shouldProceed self other levelTime =
+          if (other^.eTakeDamage) == 0
+            then False
+            else if (self^.eTimeStamp) > levelTime then False else True
+
+triggerPushTouch :: EntTouch
+triggerPushTouch =
+  GenericEntTouch "trigger_push_touch" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    
+    if | (other^.eClassName) == "grenade" ->
+           modifyEdictT otherRef (\v -> v & eVelocity .~ fmap (* (10 * (self^.eSpeed))) (self^.eMoveDir))
+           
+       | (other^.eHealth) > 0 -> do
+           modifyEdictT otherRef (\v -> v & eVelocity .~ fmap (* (10 * (self^.eSpeed))) (self^.eMoveDir))
+           
+           case other^.eClient of
+             Nothing -> return ()
+             Just (GClientReference gClientIdx) -> do
+               -- don't take falling damage immediately from this
+               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcOldVelocity .= (other^.eVelocity)
+               
+               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+               
+               when ((other^.eFlySoundDebounceTime) < levelTime) $ do
+                 modifyEdictT otherRef (\v -> v & eFlySoundDebounceTime .~ levelTime + 1.5)
+                 windSound <- use $ gameBaseGlobals.gbWindSound
+                 sound <- use $ gameBaseGlobals.gbGameImport.giSound
+                 sound (Just otherRef) Constants.chanAuto windSound 1 Constants.attnNorm 0
+           
+       | otherwise ->
+           return ()
+           
+    when ((self^.eSpawnFlags) .&. pushOnce /= 0) $
+      GameUtil.freeEdict selfRef
+
+triggerGravityTouch :: EntTouch
+triggerGravityTouch =
+  GenericEntTouch "trigger_gravity_touch" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+    modifyEdictT otherRef (\v -> v & eGravity .~ (self^.eGravity))
+
+{-
+- QUAKED trigger_monsterjump (.5 .5 .5) ? Walking monsters that touch this
+- will jump in the direction of the trigger's angle "speed" default to 200,
+- the speed thrown forward "height" default to 200, the speed thrown
+- upwards
+-}
+triggerMonsterJumpTouch :: EntTouch
+triggerMonsterJumpTouch =
+  GenericEntTouch "trigger_monsterjump_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameTrigger.triggerMonsterJumpTouch") >> undefined -- TODO

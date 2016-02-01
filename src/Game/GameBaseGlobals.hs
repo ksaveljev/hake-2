@@ -66,4 +66,5 @@ initialGameBaseGlobals =
                   , _gbEnemyRange        = 0
                   , _gbEnemyYaw          = 0
                   , _gbPlayerDieIdx      = 0
+                  , _gbWindSound         = 0
                   }

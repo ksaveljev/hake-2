@@ -263,8 +263,8 @@ setSpawnTempField st key value =
       "height"    -> (st { _stHeight    = Lib.atoi         value }, True)
       "noise"     -> (st { _stNoise     = Just $ newString value }, True)
       "pausetime" -> (st { _stPauseTime = Lib.atof         value }, True)
-      "item"      -> (st { _stItem      = newString        value }, True)
-      "gravity"   -> (st { _stGravity   = newString        value }, True)
+      "item"      -> (st { _stItem      = Just $ newString value }, True)
+      "gravity"   -> (st { _stGravity   = Just $ newString value }, True)
       "sky"       -> (st { _stSky       = newString        value }, True)
       "skyrotate" -> (st { _stSkyRotate = Lib.atof         value }, True)
       "skyaxis"   -> (st { _stSkyAxis   = Lib.atov         value }, True)
@@ -678,9 +678,12 @@ spWorldSpawn =
     void $ imageIndex (Just "help")
     void $ imageIndex (Just "field_3")
 
-    if (spawnTemp^.stGravity) == ""
-      then void $ cvarSet "sv_gravity" "800"
-      else void $ cvarSet "sv_gravity" (spawnTemp^.stGravity)
+    void $ case spawnTemp^.stGravity of
+             Nothing -> cvarSet "sv_gravity" "800"
+             Just gravity ->
+               if gravity == ""
+                 then cvarSet "sv_gravity" "800"
+                 else cvarSet "sv_gravity" gravity
 
     soundIndex (Just "player/fry.wav") >>= (gameBaseGlobals.gbSndFry .=)
 

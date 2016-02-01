@@ -111,18 +111,23 @@ monsterStart edictRef = do
 
         setItem :: Quake ()
         setItem = do
-          item <- use $ gameBaseGlobals.gbSpawnTemp.stItem
-
-          when (B.length item > 0) $ do
-            foundItem <- GameItems.findItemByClassname item
-            modifyEdictT edictRef (\v -> v & eItem .~ foundItem)
-
-            when (isNothing foundItem) $ do
-              edict <- readEdictT edictRef
-              dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
-              dprintf $ "monster_start:" `B.append` (edict^.eClassName) `B.append`
-                        " at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append`
-                        " has bad item: " `B.append` item `B.append` "\n"
+          mItem <- use $ gameBaseGlobals.gbSpawnTemp.stItem
+          
+          case mItem of
+            Nothing ->
+              return ()
+              
+            Just item -> do
+              when (B.length item > 0) $ do
+                foundItem <- GameItems.findItemByClassname item
+                modifyEdictT edictRef (\v -> v & eItem .~ foundItem)
+    
+                when (isNothing foundItem) $ do
+                  edict <- readEdictT edictRef
+                  dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+                  dprintf $ "monster_start:" `B.append` (edict^.eClassName) `B.append`
+                            " at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append`
+                            " has bad item: " `B.append` item `B.append` "\n"
 
         randomizeStartFrame :: Quake ()
         randomizeStartFrame = do

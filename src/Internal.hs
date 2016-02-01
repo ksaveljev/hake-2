@@ -848,6 +848,7 @@ data GameBaseGlobals =
                   , _gbEnemyRange        :: !Int
                   , _gbEnemyYaw          :: !Float
                   , _gbPlayerDieIdx      :: !Int
+                  , _gbWindSound         :: !Int
                   }
 
 data PMoveGlobals =

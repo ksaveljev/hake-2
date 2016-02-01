@@ -16,8 +16,8 @@ data SpawnTempT =
              , _stHeight    :: Int
              , _stNoise     :: Maybe B.ByteString
              , _stPauseTime :: Float
-             , _stItem      :: B.ByteString
-             , _stGravity   :: B.ByteString
+             , _stItem      :: Maybe B.ByteString
+             , _stGravity   :: Maybe B.ByteString
              , _stMinYaw    :: Float
              , _stMaxYaw    :: Float
              , _stMinPitch  :: Float
@@ -37,8 +37,8 @@ newSpawnTempT =
              , _stHeight    = 0
              , _stNoise     = Just ""
              , _stPauseTime = 0
-             , _stItem      = ""
-             , _stGravity   = ""
+             , _stItem      = Just ""
+             , _stGravity   = Just ""
              , _stMinYaw    = 0
              , _stMaxYaw    = 0
              , _stMinPitch  = 0
