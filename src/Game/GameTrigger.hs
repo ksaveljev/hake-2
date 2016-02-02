@@ -1,12 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
-module Game.GameTrigger where
+module Game.GameTrigger ( spTriggerAlways
+                        , spTriggerOnce
+                        , spTriggerMultiple
+                        , spTriggerRelay
+                        , spTriggerPush
+                        , spTriggerHurt
+                        , spTriggerKey
+                        , spTriggerCounter
+                        , spTriggerGravity
+                        , spTriggerMonsterJump
+                        ) where
 
 import Control.Lens ((.=), ix, preuse, use, (^.), (%=), zoom, (&), (.~), (%~), (-~), (-=))
 import Control.Monad (when, unless, void, liftM)
 import Data.Bits ((.&.), (.|.), complement, shiftL)
 import Data.Maybe (isJust, fromJust, isNothing)
-import Linear (dot, _y, _z)
+import Linear (dot, _x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Mutable as MV
@@ -604,5 +614,25 @@ triggerGravityTouch =
 -}
 triggerMonsterJumpTouch :: EntTouch
 triggerMonsterJumpTouch =
-  GenericEntTouch "trigger_monsterjump_touch" $ \_ _ _ _ -> do
-    io (putStrLn "GameTrigger.triggerMonsterJumpTouch") >> undefined -- TODO
+  GenericEntTouch "trigger_monsterjump_touch" $ \selfRef otherRef _ _ -> do
+    self <- readEdictT selfRef
+    other <- readEdictT otherRef
+    
+    let proceed = shouldProceed other
+    
+    when proceed $ do
+      -- set XY even if not on ground, so the jump will clear lips
+      modifyEdictT otherRef (\v -> v & eVelocity._x .~ (self^.eMoveDir._x) * (self^.eSpeed)
+                                     & eVelocity._y .~ (self^.eMoveDir._y) * (self^.eSpeed)
+                                     )
+      
+      case other^.eGroundEntity of
+        Just _ -> return ()
+        Nothing -> modifyEdictT otherRef (\v -> v & eVelocity._z .~ (self^.eMoveDir._z))
+  
+  where shouldProceed :: EdictT -> Bool
+        shouldProceed other =
+          if | (other^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) /= 0 -> False
+             | (other^.eSvFlags) .&. Constants.svfDeadMonster /= 0 -> False
+             | (other^.eSvFlags) .&. Constants.svfMonster == 0 -> False
+             | otherwise -> True

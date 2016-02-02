@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
-module Game.GameCombat where
+module Game.GameCombat ( damage
+                       , radiusDamage
+                       ) where
 
 import Control.Lens (use, preuse, (^.), ix, (.=), (+=), (%=), zoom, (-=), (&), (.~), (%~), (+~), (-~))
 import Control.Monad (when, unless, liftM)
@@ -483,27 +485,53 @@ reactToDamage targRef attackerRef = do
 
       -- if attacker is a client, get mad at them because he's good and we're not
       case attacker^.eClient of
-        Just (GClientReference gClientIdx) -> do
+        Just _ -> do
           modifyEdictT targRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
 
           -- this can only happen in coop (both new and old enemies are clients)
           -- only switch if can't see the current enemy
-          targEnemyClient <- case targ^.eEnemy of
-                               Nothing -> return Nothing
-                               Just enemyRef -> do
-                                 enemy <- readEdictT enemyRef
-                                 return (enemy^.eClient)
-
-          when (isJust targEnemyClient) $ do
-            io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
-
-          modifyEdictT targRef (\v -> v & eEnemy .~ Just attackerRef)
-
-          when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $
-            GameUtil.foundTarget targRef
+          done <- case targ^.eEnemy of
+                    Nothing -> return False
+                    Just enemyRef -> do
+                      enemy <- readEdictT enemyRef
+                      case enemy^.eClient of
+                        Nothing -> return False
+                        Just _ -> do
+                          visible <- GameUtil.visible targRef enemyRef
+                          if visible
+                            then do
+                              modifyEdictT targRef (\v -> v & eOldEnemy .~ Just attackerRef)
+                              return True
+                            else do
+                              modifyEdictT targRef (\v -> v & eOldEnemy .~ Just enemyRef)
+                              return False
+          
+          unless done $ do
+            modifyEdictT targRef (\v -> v & eEnemy .~ Just attackerRef)
+            
+            when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $
+              GameUtil.foundTarget targRef
 
         Nothing -> do
-          io (putStrLn "GameCombat.reactToDamage") >> undefined -- TODO
+               -- it's the same base (walk/swim/fly) type and a different classname and
+               -- it's not a tank
+               -- (they spray too much), get mad at them
+          if | (targ^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == (attacker^.eFlags) .&. (Constants.flFly .|. Constants.flSwim)
+               && (targ^.eClassName) /= (attacker^.eClassName)
+               && not ((attacker^.eClassName) `elem` ["monster_tank", "monster_supertank", "monster_makron", "monster_jorg"]) ->
+                 updateTargetEnemy targ (Just attackerRef)
+                 
+               -- if they *meant* to shoot us, then shoot back
+             | (attacker^.eEnemy) == Just targRef ->
+                 updateTargetEnemy targ (Just attackerRef)
+                 
+               -- otherwise get mad at whoever they are mad at (help our buddy) unless
+               -- it is us!
+             | isJust (attacker^.eEnemy) && (attacker^.eEnemy) /= Just targRef ->
+                 updateTargetEnemy targ (attacker^.eEnemy)
+                 
+             | otherwise ->
+                 return ()
   
   where shouldSkip :: Quake Bool
         shouldSkip = do
@@ -520,3 +548,18 @@ reactToDamage targRef attackerRef = do
                  return True
              | otherwise ->
                  return False
+                 
+        updateTargetEnemy :: EdictT -> Maybe EdictReference -> Quake ()
+        updateTargetEnemy targ targAttackerRef = do
+          case targ^.eEnemy of
+            Nothing -> return ()
+            Just enemyRef -> do
+              enemy <- readEdictT enemyRef
+              case enemy^.eClient of
+                Nothing -> return ()
+                Just _ -> modifyEdictT targRef (\v -> v & eOldEnemy .~ (targ^.eEnemy))
+          
+          modifyEdictT targRef (\v -> v & eEnemy .~ targAttackerRef)
+          
+          when ((targ^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $
+            GameUtil.foundTarget targRef

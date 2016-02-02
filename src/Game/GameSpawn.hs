@@ -97,7 +97,7 @@ spawnEntities mapName entities spawnPoint = do
 
   where parseEntities :: Bool -> Int -> Int -> Quake Int
         parseEntities initial idx inhibited
-          | idx >= B.length entities = return inhibited -- TODO: make sure this is correct? is this present in jake2?
+          | idx >= B.length entities = return inhibited -- RESEARCH: make sure this is correct? is this present in jake2?
           | otherwise = do
               (comToken, newIdx) <- Com.parse entities (B.length entities) idx
 

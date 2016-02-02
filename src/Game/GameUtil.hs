@@ -1,8 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
-module Game.GameUtil where
+module Game.GameUtil ( spawn
+                     , initEdict
+                     , clearEdict
+                     , freeEdict
+                     , range
+                     , useTargets
+                     , freeEdictA
+                     , monsterUse
+                     , mCheckAttack
+                     , killBox
+                     , visible
+                     , findTarget
+                     , inFront
+                     , foundTarget
+                     , attackFinished
+                     , onSameTeam
+                     , megaHealthThink
+                     , validateSelectedItem
+                     ) where
 
-import Control.Lens ((^.), use, (.=), (+=), zoom, (&), (.~), (%~), (+~))
+import Control.Lens ((^.), use, (.=), (+=), zoom, (&), (.~), (%~), (+~), (-~), preuse, ix)
 import Control.Monad (liftM, when, unless, void)
 import Data.Bits ((.&.), (.|.), complement)
 import Data.Char (toLower)
@@ -11,6 +29,7 @@ import Linear (norm, normalize, dot, _z)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 
 import Quake
 import QuakeState
@@ -21,6 +40,8 @@ import qualified Client.M as M
 import {-# SOURCE #-} qualified Game.GameAI as GameAI
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import {-# SOURCE #-} qualified Game.GameCombat as GameCombat
+import qualified Game.GameItems as GameItems
+import qualified Game.Info as Info
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -656,7 +677,7 @@ findTarget selfRef = do
           self <- readEdictT selfRef
 
           when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget == 0 && isJust (self^.eMonsterInfo.miSight)) $
-            void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEnemy) -- TODO: are we sure eEnemy is Just ?
+            void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEnemy) -- RESEARCH: are we sure eEnemy is Just ?
 
           return True
 
@@ -733,15 +754,76 @@ attackFinished selfRef time = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + time)
 
+-- Returns true, if two edicts are on the same team.
 onSameTeam :: EdictReference -> EdictReference -> Quake Bool
-onSameTeam _ _ = do
-    io (putStrLn "GameUtil.onSameTeam") >> undefined -- TODO
+onSameTeam edictRef otherRef = do
+    dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+    
+    if dmFlagsValue .&. (Constants.dfModelTeams .|. Constants.dfSkinTeams) == 0
+      then return False
+      else do
+        edictTeam <- clientTeam edictRef
+        otherTeam <- clientTeam otherRef
+        
+        return (edictTeam == otherTeam)
+
+-- Returns the team string of an entity 
+-- with respect to rteam_by_model and team_by_skin. 
+clientTeam :: EdictReference -> Quake B.ByteString
+clientTeam edictRef = do
+    edict <- readEdictT edictRef
+    
+    case edict^.eClient of
+      Nothing ->
+        return ""
+      
+      Just (GClientReference gClientIdx) -> do
+        Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+        value <- Info.valueForKey (gClient^.gcPers.cpUserInfo) "skin"
+        
+        case '/' `BC.elemIndex` value of
+          Nothing ->
+            return value
+          
+          Just idx -> do
+            dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+            
+            return $ if dmFlagsValue .&. Constants.dfModelTeams /= 0
+                       then B.take idx value
+                       else B.drop (idx + 1) value
 
 megaHealthThink :: EntThink
 megaHealthThink =
-  GenericEntThink "MegaHealth_think" $ \_ -> do
-    io (putStrLn "GameUtil.megaHealthThink") >> undefined -- TODO
+  GenericEntThink "MegaHealth_think" $ \selfRef -> do
+    self <- readEdictT selfRef
+    let Just ownerRef = self^.eOwner
+    owner <- readEdictT ownerRef
+    
+    if (owner^.eHealth) > (owner^.eMaxHealth)
+      then do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1)
+        modifyEdictT ownerRef (\v -> v & eHealth -~ 1)
+        return False
+        
+      else do
+        deathmatchValue <- liftM (^.cvValue) deathmatchCVar
+        
+        if not ((self^.eSpawnFlags) .&. Constants.droppedItem /= 0) && deathmatchValue /= 0
+          then
+            GameItems.setRespawn selfRef 20
+          else
+            freeEdict selfRef
+        
+        return False
 
 validateSelectedItem :: EdictReference -> Quake ()
-validateSelectedItem _ = do
-    io (putStrLn "GameUtil.validateSelectedItem") >> undefined -- TODO
+validateSelectedItem edictRef = do
+    edict <- readEdictT edictRef
+    
+    let Just (GClientReference gClientIdx) = edict^.eClient
+    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
+    
+    if (gClient^.gcPers.cpInventory) UV.! (gClient^.gcPers.cpSelectedItem) /= 0
+      then return () -- valid
+      else GameItems.selectNextItem edictRef (-1)

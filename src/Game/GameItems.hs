@@ -20,14 +20,14 @@ import CVarVariables
 import Game.Adapters
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
-import qualified Game.GameUtil as GameUtil
+import {-# SOURCE #-} qualified Game.GameUtil as GameUtil
 import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 initItems :: Quake ()
 initItems = do
-    gameBaseGlobals.gbGame.glNumItems .= V.length GameItemList.itemList -- TODO: jake2 has -1 here...
+    gameBaseGlobals.gbGame.glNumItems .= V.length GameItemList.itemList -- RESEARCH: jake2 has -1 here...
 
 {-
 - ============ SpawnItem
@@ -450,7 +450,7 @@ dropAmmo =
 
       else do
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= (dropped^.eCount)
-        GameUtil.validateSelectedItem edictRef -- TODO: why does jake2 has same validate method in Cmd (which is used here)
+        GameUtil.validateSelectedItem edictRef -- RESEARCH: why does jake2 has same validate method in Cmd (which is used here)
 
 useQuad :: ItemUse
 useQuad =
@@ -1390,3 +1390,7 @@ addAmmo edictRef (GItemReference gItemIdx) count = do
               else do
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) %= (\v -> if v + count > max' then max' else v + count)
                 return True
+
+selectNextItem :: EdictReference -> Int -> Quake ()
+selectNextItem _ _ = do
+    io (putStrLn "GameItems.selectNextItem") >> undefined -- TODO
