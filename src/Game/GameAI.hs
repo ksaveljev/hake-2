@@ -1,6 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
-module Game.GameAI where
+module Game.GameAI ( aiSetSightClient
+                   , huntTarget
+                   , aiStand
+                   , aiWalk
+                   , aiRun
+                   , aiCharge
+                   , aiMove
+                   , aiTurn
+                   , walkMonsterStart
+                   , swimMonsterStart
+                   , flyMonsterStart
+                   ) where
 
 import Control.Lens (use, (^.), ix, preuse, (.=), (%=), zoom, (&), (.~), (%~))
 import Control.Monad (void, when, unless, liftM)
@@ -777,10 +788,57 @@ aiRunSlide selfRef distance = do
 
 flyMonsterStart :: EntThink
 flyMonsterStart =
-  GenericEntThink "flymonster_start" $ \_ -> do
-    io (putStrLn "GameAI.flyMonsterStart") >> undefined -- TODO
+  GenericEntThink "flymonster_start" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eFlags %~ (\a -> a .|. Constants.flFly)
+                                  & eThink .~ Just flyMonsterStartGo
+                                  )
+    Monster.monsterStart selfRef
+    return True
+
+flyMonsterStartGo :: EntThink
+flyMonsterStartGo =
+  GenericEntThink "flymonster_start_go" $ \selfRef -> do
+    ok <- M.walkMove selfRef 0 0
+    
+    unless ok $ do
+      self <- readEdictT selfRef
+      dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
+      dprintf ((self^.eClassName) `B.append` " in solid at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
+    
+    modifyEdictT selfRef (\v -> v & eYawSpeed %~ (\a -> if a == 0 then 20 else a)
+                                  & eViewHeight .~ 25
+                                  )
+    
+    Monster.monsterStartGo selfRef
+    
+    self <- readEdictT selfRef
+    
+    when ((self^.eSpawnFlags) .&. 2 /= 0) $
+      void $ think Monster.monsterTriggeredStart selfRef
+    
+    return True
 
 swimMonsterStart :: EntThink
 swimMonsterStart =
-  GenericEntThink "swimmonster_start" $ \_ -> do
-    io (putStrLn "GameAI.swimMonsterStart") >> undefined -- TODO
+  GenericEntThink "swimmonster_start" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eFlags %~ (\a -> a .|. Constants.flSwim)
+                                  & eThink .~ Just swimMonsterStartGo
+                                  )
+    Monster.monsterStart selfRef
+    return True
+
+swimMonsterStartGo :: EntThink
+swimMonsterStartGo =
+  GenericEntThink "swimmonster_start_go" $ \selfRef -> do
+    modifyEdictT selfRef (\v -> v & eYawSpeed %~ (\a -> if a == 0 then 20 else a)
+                                  & eViewHeight .~ 10
+                                  )
+    
+    Monster.monsterStartGo selfRef
+    
+    self <- readEdictT selfRef
+    
+    when ((self^.eSpawnFlags) .&. 2 /= 0) $
+      void $ think Monster.monsterTriggeredStart selfRef
+    
+    return True

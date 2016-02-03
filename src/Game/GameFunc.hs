@@ -1,7 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf #-}
-module Game.GameFunc where
+module Game.GameFunc ( spFuncButton
+                     , spFuncDoor
+                     , spFuncDoorSecret
+                     , spFuncDoorRotating
+                     , spFuncRotating
+                     , spFuncConveyor
+                     , spFuncKillBox
+                     , spTriggerElevator
+                     , spFuncPlat
+                     , spFuncWater
+                     , spFuncTrain
+                     , spFuncTimer
+                     , funcTrainFind
+                     , trainUse
+                     ) where
 
 import Control.Lens (use, preuse, (.=), (^.), ix, zoom, (%=), (-=), (&), (.~), (%~), (-~))
 import Control.Monad (when, liftM, void, unless)
@@ -383,7 +396,7 @@ doorSecretBlocked =
            -- give it a chance to go away on it's own terms (like gibs)
            GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
            -- if it's still there, nuke it
-           -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+           -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
            other' <- readEdictT otherRef
            when (other'^.eInUse) $
              GameMisc.becomeExplosion1 otherRef
@@ -849,7 +862,7 @@ platBlocked =
         GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
 
         -- if it's still there, nuke it
-        -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+        -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
         other' <- readEdictT otherRef
         when (other'^.eInUse) $
           GameMisc.becomeExplosion1 otherRef
@@ -977,7 +990,7 @@ touchPlatCenter =
 
     unless (isNothing (other^.eClient) || (other^.eHealth) <= 0) $ do
       -- now point at the plat, not the trigger
-      -- TODO: make sure this is what the jake2 code does
+      -- RESEARCH: make sure this is what the jake2 code does
       let Just enemyRef = edict^.eEnemy
       enemy <- readEdictT enemyRef
 
@@ -1212,7 +1225,7 @@ trainBlocked =
            GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
 
            -- if it's still there, nuke it
-           -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+           -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
            other' <- readEdictT otherRef
            when (other'^.eInUse) $
              GameMisc.becomeExplosion1 otherRef
@@ -1330,7 +1343,7 @@ doorBlocked =
         GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
 
         -- if it's still there, nuke it
-        -- TODO: are we sure it is the correct way? (jake2 has different stuff here)
+        -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
         other' <- readEdictT otherRef
         when (other'^.eInUse) $
           GameMisc.becomeExplosion1 otherRef
@@ -1941,8 +1954,8 @@ moveBegin =
 
       else do
         let velocity = fmap (* (moveInfo^.miSpeed)) (moveInfo^.miDir)
-            frames :: Int = floor $ ((moveInfo^.miRemainingDistance) / (moveInfo^.miSpeed)) / Constants.frameTime
-            framesF :: Float = fromIntegral frames
+            frames = floor $ ((moveInfo^.miRemainingDistance) / (moveInfo^.miSpeed)) / Constants.frameTime :: Int
+            framesF = fromIntegral frames :: Float
 
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 

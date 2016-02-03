@@ -3,10 +3,10 @@
 module Game.GameWeapon where
 
 import Control.Lens (use, preuse, ix, (.=), (^.), zoom, (%=), (&), (.~), (%~))
-import Control.Monad (when, liftM, unless)
+import Control.Monad (when, liftM, unless, void)
 import Data.Bits ((.|.), (.&.), complement)
-import Data.Maybe (isJust, fromJust)
-import Linear (V3(..), normalize, norm, _x)
+import Data.Maybe (isJust, isNothing, fromJust)
+import Linear (V3(..), normalize, norm, _x, _y, _z)
 
 import Quake
 import QuakeState
@@ -63,9 +63,89 @@ blasterTouch =
 
           GameUtil.freeEdict selfRef
 
+{-
+- ================= 
+- fire_hit
+- 
+- Used for all impact (hit/punch/slash) attacks 
+- =================
+-}
 fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool
-fireHit _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireHit") >> undefined -- TODO
+fireHit selfRef aim damage kick = do
+    -- see if enemy is in range
+    self <- readEdictT selfRef
+    let Just enemyRef = self^.eEnemy
+    enemy <- readEdictT enemyRef
+    
+    let dir = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+        range = norm dir
+    
+    if range > (aim^._x)
+      then
+        return False
+      else do
+        let (range', aim') = if (aim^._y) > (self^.eMins._x) && (aim^._y) < (self^.eMaxs._x)
+                               -- the hit is straight on so back the range up to the edge of their bbox
+                               then (range - (enemy^.eMaxs._x), aim)
+                               -- this is a side hit so adjust the "right" value out to the edge of their bbox
+                               else if (aim^._y) < 0
+                                      then (range, aim & _y .~ (enemy^.eMins._x))
+                                      else (range, aim & _y .~ (enemy^.eMaxs._x))
+        
+            point = (self^.eEntityState.esOrigin) + fmap (* range') dir
+        
+        trace <- use $ gameBaseGlobals.gbGameImport.giTrace
+        traceT <- trace (self^.eEntityState.esOrigin) Nothing Nothing point (Just selfRef) Constants.maskShot
+        
+        mTraceT <- if (traceT^.tFraction) < 1
+                     then do
+                       let Just traceEntRef = traceT^.tEnt
+                       traceEnt <- readEdictT traceEntRef
+                       
+                       if (traceEnt^.eTakeDamage) == 0
+                         then
+                           return Nothing -- we are done
+                         else
+                           -- if it will hit any client/monster then hit the one we wanted to hit
+                           if (traceEnt^.eSvFlags) .&. Constants.svfMonster /= 0 || isJust (traceEnt^.eClient)
+                             then return (Just (traceT & tEnt .~ (self^.eEnemy)))
+                             else return (Just traceT)
+                     else
+                       return (Just traceT)
+        
+        case mTraceT of
+          Nothing ->
+            return False
+          
+          Just traceT' -> do
+            let (Just forward, Just right, Just up) = Math3D.angleVectors (self^.eEntityState.esAngles) True True True
+                point' = (self^.eEntityState.esOrigin) + fmap (* range') forward
+                                                       + fmap (* (aim'^._y)) right
+                                                       + fmap (* (aim'^._z)) up
+                dir' = point' - enemy^.eEntityState.esOrigin
+            
+            -- do the damage
+            v3o <- use $ globals.vec3Origin
+            let Just traceEntRef = traceT'^.tEnt
+            GameCombat.damage traceEntRef selfRef selfRef dir' point' v3o damage (kick `div` 2) Constants.damageNoKnockback Constants.modHit
+            
+            traceEnt <- readEdictT traceEntRef
+            if (traceEnt^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (traceEnt^.eClient)
+              then
+                return False
+              
+              else do
+                -- do our special form of knockback here
+                let a = (enemy^.eAbsMin) + fmap (* 0.5) (enemy^.eSize)
+                    a' = normalize (a - point')
+                    velocity = (enemy^.eVelocity) + fmap (* (fromIntegral kick)) a'
+                  
+                modifyEdictT enemyRef (\v -> v & eVelocity .~ velocity)
+                
+                when ((velocity^._z) > 0) $
+                  modifyEdictT enemyRef (\v -> v & eGroundEntity .~ Nothing)
+                
+                return True
 
 {-
 - ================= 
@@ -336,27 +416,241 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
               waterBubbleTrail traceT' waterStart water
 
 {-
-- ================= fire_bullet
+- ================= fire_bullet =================
 - 
 - Fires a single round. Used for machinegun and chaingun. Would be fine for
-- pistols, rifles, etc.... =================
+- pistols, rifles, etc....
 -}
 fireBullet :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireBullet selfRef start aimDir damage kick hspread vspread mod =
     fireLead selfRef start aimDir damage kick Constants.teGunshot hspread vspread mod
 
 fireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Quake ()
-fireGrenade _ _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireGrenade") >> undefined -- TODO
+fireGrenade selfRef start aimDir damage speed timer damageRadius = do
+    let dir = Math3D.vectorAngles aimDir
+        (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
+    
+    grenadeRef <- GameUtil.spawn
+    c1 <- Lib.crandom
+    c2 <- Lib.crandom
+    let velocity = fmap (* (fromIntegral speed)) aimDir + fmap (* (200 + c1 * 10)) up + fmap (* (c2 * 10)) right
+    
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+    
+    modelIdx <- modelIndex (Just "models/objects/grenade/tris.md2")
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    modifyEdictT grenadeRef (\v -> v & eEntityState.esOrigin .~ start
+                                     & eVelocity .~ velocity
+                                     & eAVelocity .~ V3 300 300 300
+                                     & eMoveType .~ Constants.moveTypeBounce
+                                     & eClipMask .~ Constants.maskShot
+                                     & eSolid .~ Constants.solidBbox
+                                     & eEntityState.esEffects %~ (\a -> a .|. Constants.efGrenade)
+                                     & eMins .~ V3 0 0 0
+                                     & eMaxs .~ V3 0 0 0
+                                     & eEntityState.esModelIndex .~ modelIdx
+                                     & eOwner .~ Just selfRef
+                                     & eTouch .~ Just grenadeTouch
+                                     & eNextThink .~ levelTime + timer
+                                     & eThink .~ Just grenadeExplode
+                                     & eDmg .~ damage
+                                     & eDmgRadius .~ damageRadius
+                                     & eClassName .~ "grenade"
+                                     )
+    
+    linkEntity grenadeRef
 
 fireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
-fireRocket _ _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireRocket") >> undefined -- TODO
+fireRocket selfRef start dir damage speed damageRadius radiusDamage = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+    
+    rocketRef <- GameUtil.spawn
+    modelIdx <- modelIndex (Just "models/objects/rocket/tris.md2")
+    soundIdx <- soundIndex (Just "weapons/rockfly.wav")
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    modifyEdictT rocketRef (\v -> v & eEntityState.esOrigin .~ start
+                                    & eMoveDir .~ dir
+                                    & eEntityState.esAngles .~ dir
+                                    & eVelocity .~ fmap (* (fromIntegral speed)) dir
+                                    & eMoveType .~ Constants.moveTypeFlyMissile
+                                    & eClipMask .~ Constants.maskShot
+                                    & eSolid .~ Constants.solidBbox
+                                    & eEntityState.esEffects %~ (\a -> a .|. Constants.efRocket)
+                                    & eMins .~ V3 0 0 0
+                                    & eMaxs .~ V3 0 0 0
+                                    & eEntityState.esModelIndex .~ modelIdx
+                                    & eOwner .~ Just selfRef
+                                    & eTouch .~ Just rocketTouch
+                                    & eNextThink .~ levelTime + 8000 / (fromIntegral speed)
+                                    & eThink .~ Just GameUtil.freeEdictA
+                                    & eDmg .~ damage
+                                    & eRadiusDmg .~ radiusDamage
+                                    & eDmgRadius .~ damageRadius
+                                    & eEntityState.esSound .~ soundIdx
+                                    & eClassName .~ "rocket"
+                                    )
+    
+    self <- readEdictT selfRef
+    case self^.eClient of
+      Nothing -> return ()
+      Just _ -> checkDodge selfRef start dir speed
+    
+    linkEntity rocketRef
 
 fireBFG :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Quake ()
-fireBFG _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireBFG") >> undefined -- TODO
+fireBFG selfRef start dir damage speed damageRadius = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+    
+    bfgRef <- GameUtil.spawn
+    modelIdx <- modelIndex (Just "sprites/s_bfg1.sp2")
+    soundIdx <- soundIndex (Just "weapons/bfg__l1a.wav")
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    modifyEdictT bfgRef (\v -> v & eEntityState.esOrigin .~ start
+                                 & eMoveDir .~ dir
+                                 & eEntityState.esAngles .~ Math3D.vectorAngles dir
+                                 & eVelocity .~ fmap (* (fromIntegral speed)) dir
+                                 & eMoveType .~ Constants.moveTypeFlyMissile
+                                 & eClipMask .~ Constants.maskShot
+                                 & eSolid .~ Constants.solidBbox
+                                 & eEntityState.esEffects %~ (\a -> a .|. Constants.efBFG .|. Constants.efAnimAllFast)
+                                 & eMins .~ V3 0 0 0
+                                 & eMaxs .~ V3 0 0 0
+                                 & eEntityState.esModelIndex .~ modelIdx
+                                 & eOwner .~ Just selfRef
+                                 & eTouch .~ Just bfgTouch
+                                 & eNextThink .~ levelTime + Constants.frameTime
+                                 & eThink .~ Just bfgThink
+                                 & eRadiusDmg .~ damage
+                                 & eDmgRadius .~ damageRadius
+                                 & eClassName .~ "bfg blast"
+                                 & eEntityState.esSound .~ soundIdx
+                                 & eTeamMaster .~ Just bfgRef
+                                 & eTeamChain .~ Nothing
+                                 )
+                                 
+    
+    self <- readEdictT selfRef
+    case self^.eClient of
+      Nothing -> return ()
+      Just _ -> checkDodge selfRef start dir speed
+    
+    linkEntity bfgRef
 
 fireGrenade2 :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Bool -> Quake ()
-fireGrenade2 _ _ _ _ _ _ _ _ = do
-    io (putStrLn "GameWeapon.fireGrenade2") >> undefined -- TODO
+fireGrenade2 selfRef start aimDir damage speed timer damageRadius held = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    let modelIndex = gameImport^.giModelIndex
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+        sound = gameImport^.giSound
+    
+    grenadeRef <- GameUtil.spawn
+    c1 <- Lib.crandom
+    c2 <- Lib.crandom
+    modelIdx <- modelIndex (Just "models/objects/grenade2/tris.md2")
+    soundIdx <- soundIndex (Just "weapons/hgrenc1b.wav")
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    
+    let dir = Math3D.vectorAngles aimDir
+        (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
+        velocity = fmap (* (fromIntegral speed)) aimDir + fmap (* (200 + c1 * 10)) up + fmap (* (c2 * 10)) right
+    
+    modifyEdictT grenadeRef (\v -> v & eEntityState.esOrigin .~ start
+                                     & eVelocity .~ velocity
+                                     & eAVelocity .~ V3 300 300 300
+                                     & eMoveType .~ Constants.moveTypeBounce
+                                     & eClipMask .~ Constants.maskShot
+                                     & eSolid .~ Constants.solidBbox
+                                     & eEntityState.esEffects %~ (\a -> a .|. Constants.efGrenade)
+                                     & eMins .~ V3 0 0 0
+                                     & eMaxs .~ V3 0 0 0
+                                     & eEntityState.esModelIndex .~ modelIdx
+                                     & eOwner .~ Just selfRef
+                                     & eTouch .~ Just grenadeTouch
+                                     & eNextThink .~ levelTime + timer
+                                     & eThink .~ Just grenadeExplode
+                                     & eDmg .~ damage
+                                     & eDmgRadius .~ damageRadius
+                                     & eClassName .~ "hgrenade"
+                                     & eSpawnFlags .~ (if held then 3 else 1)
+                                     & eEntityState.esSound .~ soundIdx
+                                     )
+    
+    if timer <= 0
+      then
+        void $ think grenadeExplode grenadeRef
+      else do
+        soundIdx' <- soundIndex (Just "weapons/hgrent1a.wav")
+        sound (Just selfRef) Constants.chanWeapon soundIdx' 1 Constants.attnNorm 0
+        linkEntity grenadeRef
+
+grenadeTouch :: EntTouch
+grenadeTouch =
+  GenericEntTouch "grenade_touch" $ \edictRef otherRef _ mSurf -> do
+    edict <- readEdictT edictRef
+    
+    unless ((edict^.eOwner) == Just otherRef) $ do
+      let done = checkSurf mSurf
+      
+      if done
+        then
+          GameUtil.freeEdict edictRef
+        
+        else do
+          other <- readEdictT otherRef
+          
+          if (other^.eTakeDamage) == 0
+            then do
+              gameImport <- use $ gameBaseGlobals.gbGameImport
+              let sound = gameImport^.giSound
+                  soundIndex = gameImport^.giSoundIndex
+              
+              soundIdx <- if (edict^.eSpawnFlags) .&. 1 /= 0
+                            then do
+                              r <- Lib.randomF
+                              if r > 0.5
+                                then soundIndex (Just "weapons/hgrenb1a.wav")
+                                else soundIndex (Just "weapons/hgrenb2a.wav")
+                            else
+                              soundIndex (Just "weapons/grenlb1b.wav")
+                              
+              sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+            
+            else do
+              modifyEdictT edictRef (\v -> v & eEnemy .~ Just otherRef)
+              void $ think grenadeExplode edictRef
+              
+  where checkSurf :: Maybe CSurfaceT -> Bool
+        checkSurf Nothing = False
+        checkSurf (Just surf) = (surf^.csFlags) .&. Constants.surfSky /= 0
+
+grenadeExplode :: EntThink
+grenadeExplode =
+  GenericEntThink "grenade_explode" $ \_ -> do
+    io (putStrLn "GameWeapon.grenadeExplode") >> undefined -- TODO
+
+rocketTouch :: EntTouch
+rocketTouch =
+  GenericEntTouch "rocket_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameWeapon.rocketTouch") >> undefined -- TODO
+
+bfgTouch :: EntTouch
+bfgTouch =
+  GenericEntTouch "bfg_touch" $ \_ _ _ _ -> do
+    io (putStrLn "GameWeapon.bfgTouch") >> undefined -- TODO
+
+bfgThink :: EntThink
+bfgThink =
+  GenericEntThink "bfg_think" $ \_ -> do
+    io (putStrLn "GameWeapon.bfgThink") >> undefined -- TODO

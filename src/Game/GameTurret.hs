@@ -4,8 +4,8 @@ module Game.GameTurret ( spTurretBreach
                        , spTurretDriver
                        ) where
 
-import Control.Lens (use, (^.), (&), (.~), (%~), (%=), zoom, (+=))
-import Control.Monad (liftM, when, void)
+import Control.Lens (use, (^.), (&), (.~), (%~), (%=), zoom, (+=), (+~))
+import Control.Monad (liftM, when, void, unless)
 import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (fromJust)
 import Linear (V3(..), _x, _y, _z, norm)
@@ -291,5 +291,84 @@ anglesNormalize (V3 a b c) = V3 a'' b'' c
 
 turretDriverThink :: EntThink
 turretDriverThink =
-  GenericEntThink "turret_driver_think" $ \_ -> do
-    io (putStrLn "GameTurret.turretDriverThink") >> undefined -- TODO
+  GenericEntThink "turret_driver_think" $ \selfRef -> do
+    levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    
+    updateSelfEnemy selfRef
+    
+    self <- readEdictT selfRef
+    
+    done <- case self^.eEnemy of
+              Nothing -> do
+                foundTarget <- GameUtil.findTarget selfRef
+                if not foundTarget
+                  then 
+                    return True
+                  else do
+                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
+                                                  & eMonsterInfo.miAIFlags %~ (\a -> a .&. (complement Constants.aiLostSight))
+                                                  )
+                    return False
+              
+              Just enemyRef -> do
+                visible <- GameUtil.visible selfRef enemyRef
+                
+                if visible
+                  then do
+                    when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiLostSight /= 0) $
+                      modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
+                                                    & eMonsterInfo.miAIFlags %~ (\a -> a .&. (complement Constants.aiLostSight))
+                                                    )
+                    return False
+                  
+                  else do
+                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (\a -> a .|. Constants.aiLostSight))
+                    return True
+        
+    if done
+      then
+        return True
+      
+      else do
+        self' <- readEdictT selfRef
+        -- let the turret know where we want it to aim
+        let Just enemyRef = self'^.eEnemy
+        enemy <- readEdictT enemyRef
+        let Just targetEntRef = self'^.eTargetEnt
+        targetEnt <- readEdictT targetEntRef
+        
+        let target = (enemy^.eEntityState.esOrigin) & _z +~ fromIntegral (enemy^.eViewHeight)
+            dir = target - (targetEnt^.eEntityState.esOrigin)
+            moveAngles = Math3D.vectorAngles dir
+        
+        modifyEdictT targetEntRef (\v -> v & eMoveAngles .~ moveAngles)
+        
+        -- decide if we should shoot
+        if levelTime < (self'^.eMonsterInfo.miAttackFinished)
+          then
+            return True
+            
+          else do
+            skillValue <- liftM (^.cvValue) skillCVar
+            let reactionTime = (3 - skillValue) * 1.0
+            
+            if levelTime - (self'^.eMonsterInfo.miTrailTime) < reactionTime
+              then
+                return True
+              
+              else do
+                modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + reactionTime + 1.0)
+                -- FIXME how do we really want to pass this along?
+                modifyEdictT targetEntRef (\v -> v & eSpawnFlags %~ (\a -> a .|. 65536))
+                return True
+                
+  where updateSelfEnemy :: EdictReference -> Quake ()
+        updateSelfEnemy selfRef = do
+          self <- readEdictT selfRef
+          case self^.eEnemy of
+            Nothing -> return ()
+            Just enemyRef -> do
+              enemy <- readEdictT enemyRef
+              when (not (enemy^.eInUse) || (enemy^.eHealth) <= 0) $
+                modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
