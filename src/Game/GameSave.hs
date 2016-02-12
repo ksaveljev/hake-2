@@ -47,8 +47,39 @@ writeLevel fileName = do
             
               writeEdicts qf edicts (idx + 1) maxIdx
 
+{-
+- ReadLevel
+- 
+- SpawnEntities will allready have been called on the level the same way it
+- was when the level was saved.
+- 
+- That is necessary to get the baselines set up identically.
+- 
+- The server will have cleared all of the world links before calling
+- ReadLevel.
+- 
+- No clients are connected yet.
+-}
 readLevel :: B.ByteString -> Quake ()
-readLevel _ = io (putStrLn "GameSave.readLevel") >> undefined -- TODO
+readLevel fileName = do
+    -- IMPROVE: catch exceptions
+    qf <- io $ QuakeFile.open fileName
+
+    -- if (f == null)
+    --     GameBase.gi.error("Couldn't read level file " + filename);
+
+    -- wipe all the entries
+    createEdicts
+
+    maxClientsValue <- liftM (^.cvValue) maxClientsCVar
+    gameBaseGlobals.gbNumEdicts .= truncate maxClientsValue
+
+    -- load the level locals
+    level <- io $ QuakeFile.readLevelLocals qf
+    gameBaseGlobals.gbLevel .= level
+
+    -- load all the entities
+    io (putStrLn "GameSave.readLevel") >> undefined -- TODO
 
 {-
 - InitGame

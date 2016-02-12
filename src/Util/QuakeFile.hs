@@ -10,6 +10,7 @@ module Util.QuakeFile ( QuakeFile
                       , readInt
                       , writeEdict
                       , writeLevelLocals
+                      , readLevelLocals
                       , writeGClient
                       , readGClient
                       , writeGameLocals
@@ -47,8 +48,11 @@ close :: QuakeFile -> IO ()
 close (QuakeFile h) = hClose h -- IMPROVE: catch exception?
 
 writeString :: QuakeFile -> Maybe B.ByteString -> IO ()
-writeString (QuakeFile h) Nothing = BL.hPut h $ runPut $ putInt (-1)
-writeString (QuakeFile h) (Just str) =
+writeString (QuakeFile h) Nothing = do
+    print "writeString = Nothing"
+    BL.hPut h $ runPut $ putInt (-1)
+writeString (QuakeFile h) (Just str) = do
+    print ("writeString = " `B.append` str)
     BL.hPut h $ runPut $ do
       putInt (B.length str)
       putByteString str
@@ -57,64 +61,80 @@ readString :: QuakeFile -> IO (Maybe B.ByteString)
 readString (QuakeFile h) = do
     stringSize <- BL.hGet h 4
     if BL.length stringSize /= 4
-      then
+      then do
+        print "readString FAILURE"
         return Nothing
       else do
         let len :: Int = runGet getInt stringSize
-        putStrLn ("len = " ++ show len)
-        if | len == -1 ->
+        if | len == -1 -> do
+               print "readString = Nothing"
                return Nothing
-           | len == 0 ->
+           | len == 0 -> do
+               print "readString = \"\""
                return (Just "")
            | otherwise -> do
                str <- B.hGet h len
-               return $ if B.length str /= len
-                          then Nothing
-                          else Just str
+               if B.length str /= len
+                 then do
+                   print "readString = FAILURE"
+                   return Nothing
+                 else do
+                   print ("readString = " `B.append` str)
+                   return $ Just str
 
 writeInt :: QuakeFile -> Int -> IO ()
-writeInt (QuakeFile h) num =
+writeInt (QuakeFile h) num = do
+    print ("writeInt = " ++ show num)
     BL.hPut h $ runPut $ putInt num
 
 readInt :: QuakeFile -> IO Int
 readInt (QuakeFile h) = do
     num <- BL.hGet h 4
+    print ("readInt = " ++ show (runGet getInt num))
     return (runGet getInt num)
 
 writeShort :: QuakeFile -> Int16 -> IO ()
-writeShort (QuakeFile h) num =
+writeShort (QuakeFile h) num = do
+    print ("writeShort = " ++ show num)
     BL.hPut h $ runPut $ putInt16 num
 
 readShort :: QuakeFile -> IO Int16
 readShort (QuakeFile h) = do
     num <- BL.hGet h 2
+    print ("readShort = " ++ show (runGet getInt16 num))
     return (runGet getInt16 num)
 
 writeByte :: QuakeFile -> Int8 -> IO ()
-writeByte (QuakeFile h) num =
+writeByte (QuakeFile h) num = do
+    print ("writeByte = " ++ show num)
     BL.hPut h $ runPut $ putWord8 (fromIntegral num)
 
 readByte :: QuakeFile -> IO Int8
 readByte (QuakeFile h) = do
     num <- BL.hGet h 1
+    print ("readByte = " ++ show (runGet getWord8 num))
     return (fromIntegral $ runGet getWord8 num)
 
 writeFloat :: QuakeFile -> Float -> IO ()
-writeFloat (QuakeFile h) num =
+writeFloat (QuakeFile h) num = do
+    print ("writeFloat = " ++ show num)
     BL.hPut h $ runPut $ putFloat num
     
 readFloat :: QuakeFile -> IO Float
 readFloat (QuakeFile h) = do
     num <- BL.hGet h 4
+    print ("readFloat = " ++ show (runGet getFloat num))
     return (runGet getFloat num)
 
 writeBool :: QuakeFile -> Bool -> IO ()
-writeBool (QuakeFile h) p =
+writeBool (QuakeFile h) p = do
+    print ("writeBool = " ++ show p)
     BL.hPut h $ runPut $ putBool p
 
 readBool :: QuakeFile -> IO Bool
 readBool (QuakeFile h) = do
     p <- BL.hGet h 1
+    print ("readBool = " ++ show (runGet getBool p))
     return (runGet getBool p)
 
 writeEdictRef :: QuakeFile -> Maybe EdictReference -> IO ()
@@ -161,6 +181,7 @@ readVectorShort saveFile = do
 
 writeLevelLocals :: QuakeFile -> LevelLocalsT -> IO ()
 writeLevelLocals saveFile level = do
+    print "writeLevelLocals"
     writeInt      saveFile (level^.llFrameNum)
     writeFloat    saveFile (level^.llTime)
     writeString   saveFile (Just $ level^.llLevelName)
@@ -198,8 +219,13 @@ writeLevelLocals saveFile level = do
     -- rst's checker :-)
     writeInt      saveFile 4711
 
+readLevelLocals :: QuakeFile -> IO (LevelLocalsT)
+readLevelLocals saveFile = do
+    putStrLn "QuakeFile.readLevelLocals" >> undefined -- TODO
+
 writeEdict :: QuakeFile -> EdictT -> IO ()
 writeEdict saveFile edict = do
+    print "writeEdict"
     writeEntityState saveFile (edict^.eEntityState)
     writeBool        saveFile (edict^.eInUse)
     writeInt         saveFile (edict^.eLinkCount)
@@ -352,6 +378,7 @@ writeEdict saveFile edict = do
 
 writeEntityState :: QuakeFile -> EntityStateT -> IO ()
 writeEntityState saveFile entityState = do
+    print "writeEntityState"
     writeEdictRef saveFile (entityState^.esSurroundingEnt)
     writeVector   saveFile (entityState^.esOrigin)
     writeVector   saveFile (entityState^.esAngles)
@@ -375,6 +402,7 @@ writeEntityState saveFile entityState = do
 
 writeAdapter :: SuperAdapter a => QuakeFile -> Maybe a -> IO ()
 writeAdapter saveFile mAdapter = do
+    print "writeAdapter"
     writeInt saveFile 3988
     
     case mAdapter of
@@ -395,6 +423,7 @@ readItemRef saveFile = do
 
 writeMoveInfo :: QuakeFile -> MoveInfoT -> IO ()
 writeMoveInfo saveFile moveInfo = do
+    print "writeMoveInfo"
     writeVector saveFile  (moveInfo^.miStartOrigin)
     writeVector saveFile  (moveInfo^.miStartAngles)
     writeVector saveFile  (moveInfo^.miEndOrigin)
@@ -423,6 +452,7 @@ writeMoveInfo saveFile moveInfo = do
 
 writeMonsterInfo :: QuakeFile -> MonsterInfoT -> IO ()
 writeMonsterInfo saveFile monsterInfo = do
+    print "writeMonsterInfo"
     case monsterInfo^.miCurrentMove of
       Nothing -> writeBool saveFile False
       Just move -> writeBool saveFile True >> writeMMove saveFile move
@@ -466,6 +496,7 @@ writeMonsterInfo saveFile monsterInfo = do
 
 writeMMove :: QuakeFile -> MMoveT -> IO ()
 writeMMove saveFile move = do
+    print "writeMMove"
     writeString  saveFile (Just $ move^.mmId)
     writeInt     saveFile (move^.mmFirstFrame)
     writeInt     saveFile (move^.mmLastFrame)
@@ -475,12 +506,14 @@ writeMMove saveFile move = do
 
 writeMFrame :: QuakeFile -> MFrameT -> IO ()
 writeMFrame saveFile frame = do
+    print "writeMFrame"
     writeAdapter saveFile (frame^.mfAI)
     writeFloat   saveFile (frame^.mfDist)
     writeAdapter saveFile (frame^.mfThink)
 
 writeGClient :: QuakeFile -> GClientT -> IO ()
 writeGClient saveFile gClient = do
+    print "writeGClient"
     writePlayerState      saveFile (gClient^.gcPlayerState)
 
     writeInt              saveFile (gClient^.gcPing)
@@ -490,17 +523,17 @@ writeGClient saveFile gClient = do
 
     writePMoveState       saveFile (gClient^.gcOldPMove)
 
-    writeInt              saveFile (if gClient^.gcShowScores then 1 else 0)
-    writeInt              saveFile (if gClient^.gcShowInventory then 1 else 0)
-    writeInt              saveFile (if gClient^.gcShowHelp then 1 else 0)
-    writeInt              saveFile (if gClient^.gcShowHelpIcon then 1 else 0)
+    writeBool             saveFile (gClient^.gcShowScores)
+    writeBool             saveFile (gClient^.gcShowInventory)
+    writeBool             saveFile (gClient^.gcShowHelp)
+    writeBool             saveFile (gClient^.gcShowHelpIcon)
     writeInt              saveFile (gClient^.gcAmmoIndex)
 
     writeInt              saveFile (gClient^.gcButtons)
     writeInt              saveFile (gClient^.gcOldButtons)
     writeInt              saveFile (gClient^.gcLatchedButtons)
 
-    writeInt              saveFile (if gClient^.gcWeaponThunk then 1 else 0)
+    writeBool             saveFile (gClient^.gcWeaponThunk)
     writeItemRef          saveFile (gClient^.gcNewWeapon)
 
     writeInt              saveFile (gClient^.gcDamageArmor)
@@ -540,15 +573,15 @@ writeGClient saveFile gClient = do
     writeInt              saveFile (gClient^.gcMachinegunShots)
     writeInt              saveFile (gClient^.gcAnimEnd)
     writeInt              saveFile (gClient^.gcAnimPriority)
-    writeInt              saveFile (if gClient^.gcAnimDuck then 1 else 0)
-    writeInt              saveFile (if gClient^.gcAnimRun then 1 else 0)
+    writeBool             saveFile (gClient^.gcAnimDuck)
+    writeBool             saveFile (gClient^.gcAnimRun)
 
     writeFloat            saveFile (gClient^.gcQuadFrameNum)
     writeFloat            saveFile (gClient^.gcInvincibleFrameNum)
     writeFloat            saveFile (gClient^.gcBreatherFrameNum)
     writeFloat            saveFile (gClient^.gcEnviroFrameNum)
 
-    writeInt              saveFile (if gClient^.gcGrenadeBlewUp then 1 else 0)
+    writeBool             saveFile (gClient^.gcGrenadeBlewUp)
     writeFloat            saveFile (gClient^.gcGrenadeTime)
     writeInt              saveFile (gClient^.gcSilencerShots)
     writeInt              saveFile (gClient^.gcWeaponSound)
@@ -558,12 +591,13 @@ writeGClient saveFile gClient = do
     writeInt              saveFile (gClient^.gcFloodWhenHead)
     writeFloat            saveFile (gClient^.gcRespawnTime)
     writeEdictRef         saveFile (gClient^.gcChaseTarget)
-    writeInt              saveFile (if gClient^.gcUpdateChase then 1 else 0)
+    writeBool             saveFile (gClient^.gcUpdateChase)
 
     writeInt              saveFile 8765
 
 readGClient :: QuakeFile -> Int -> IO (GClientT)
 readGClient saveFile idx = do
+    print "readGClient"
     playerState <- readPlayerState saveFile
 
     ping <- readInt saveFile
@@ -715,6 +749,7 @@ readGClient saveFile idx = do
 
 writeGameLocals :: QuakeFile -> GameLocalsT -> IO ()
 writeGameLocals saveFile gameLocals = do
+    print "writeGameLocals"
     writeString saveFile (Just $ gameLocals^.glHelpMessage1)
     writeString saveFile (Just $ gameLocals^.glHelpMessage2)
 
@@ -725,12 +760,13 @@ writeGameLocals saveFile gameLocals = do
     writeInt    saveFile (gameLocals^.glMaxEntities)
     writeInt    saveFile (gameLocals^.glServerFlags)
     writeInt    saveFile (gameLocals^.glNumItems)
-    writeInt    saveFile (if gameLocals^.glAutosaved then 1 else 0)
+    writeBool   saveFile (gameLocals^.glAutosaved)
     -- rst's checker :-)
     writeInt    saveFile 1928
 
 readGameLocals :: QuakeFile -> IO (GameLocalsT)
 readGameLocals saveFile = do
+    print "readGameLocals"
     Just helpMessage1 <- readString saveFile
     Just helpMessage2 <- readString saveFile
 
@@ -763,6 +799,7 @@ readGameLocals saveFile = do
 
 writePlayerState :: QuakeFile -> PlayerStateT -> IO ()
 writePlayerState saveFile playerState = do
+    print "writePlayerState"
     writePMoveState saveFile (playerState^.psPMoveState)
 
     writeVector     saveFile (playerState^.psViewAngles)
@@ -788,6 +825,7 @@ writePlayerState saveFile playerState = do
 
 readPlayerState :: QuakeFile -> IO (PlayerStateT)
 readPlayerState saveFile = do
+    print "readPlayerState"
     pMoveState <- readPMoveState saveFile
 
     viewAngles <- readVector saveFile
@@ -807,7 +845,7 @@ readPlayerState saveFile = do
     fov <- readFloat saveFile
     rdFlags <- readInt saveFile
     
-    stats <- mapM (const $ readShort saveFile) [0..Constants.maxStats]
+    stats <- mapM (const $ readShort saveFile) [0..Constants.maxStats-1]
 
     return PlayerStateT { _psPMoveState = pMoveState
                         , _psViewAngles = viewAngles
@@ -825,12 +863,13 @@ readPlayerState saveFile = do
 
 writeClientPersistant :: QuakeFile -> ClientPersistantT -> IO ()
 writeClientPersistant saveFile clientPersistant = do
+    print "writeClientPersistant"
     writeString saveFile (Just $ clientPersistant^.cpUserInfo)
     writeString saveFile (Just $ clientPersistant^.cpNetName)
 
     writeInt    saveFile (clientPersistant^.cpHand)
 
-    writeInt    saveFile (if clientPersistant^.cpConnected then 1 else 0)
+    writeBool   saveFile (clientPersistant^.cpConnected)
     writeInt    saveFile (clientPersistant^.cpHealth)
 
     writeInt    saveFile (clientPersistant^.cpMaxHealth)
@@ -853,10 +892,11 @@ writeClientPersistant saveFile clientPersistant = do
 
     writeInt     saveFile (clientPersistant^.cpGameHelpChanged)
     writeInt     saveFile (clientPersistant^.cpHelpChanged)
-    writeInt     saveFile (if clientPersistant^.cpSpectator then 1 else 0)
+    writeBool    saveFile (clientPersistant^.cpSpectator)
 
 readClientPersistant :: QuakeFile -> IO (ClientPersistantT)
 readClientPersistant saveFile = do
+    print "readClientPersistant"
     Just userInfo <- readString saveFile
     Just netName <- readString saveFile
 
@@ -869,7 +909,7 @@ readClientPersistant saveFile = do
     savedFlags <- readInt saveFile
     selectedItem <- readInt saveFile
 
-    inventory <- mapM (const $ readInt saveFile) [0..Constants.maxItems]
+    inventory <- mapM (const $ readInt saveFile) [0..Constants.maxItems-1]
 
     maxBullets <- readInt saveFile
     maxShells <- readInt saveFile
@@ -913,14 +953,16 @@ readClientPersistant saveFile = do
 
 writeClientRespawn :: QuakeFile -> ClientRespawnT -> IO ()
 writeClientRespawn saveFile clientRespawn = do
+    print "writeClientRespawn"
     writeClientPersistant saveFile (clientRespawn^.crCoopRespawn)
     writeInt              saveFile (clientRespawn^.crEnterFrame)
     writeInt              saveFile (clientRespawn^.crScore)
     writeVector           saveFile (clientRespawn^.crCmdAngles)
-    writeInt              saveFile (if clientRespawn^.crSpectator then 1 else 0)
+    writeBool             saveFile (clientRespawn^.crSpectator)
 
 readClientRespawn :: QuakeFile -> IO (ClientRespawnT)
 readClientRespawn saveFile = do
+    print "readClientRespawn"
     coopRespawn <- readClientPersistant saveFile
     enterFrame <- readInt saveFile
     score <- readInt saveFile
@@ -936,6 +978,7 @@ readClientRespawn saveFile = do
 
 writePMoveState :: QuakeFile -> PMoveStateT -> IO ()
 writePMoveState saveFile pMoveState = do
+    print "writePMoveState"
     writeInt saveFile (pMoveState^.pmsPMType)
 
     writeVectorShort saveFile (pMoveState^.pmsOrigin)
@@ -951,6 +994,7 @@ writePMoveState saveFile pMoveState = do
 
 readPMoveState :: QuakeFile -> IO (PMoveStateT)
 readPMoveState saveFile = do
+    print "readPMoveState"
     pmType <- readInt saveFile
     origin <- readVectorShort saveFile
     velocity <- readVectorShort saveFile
