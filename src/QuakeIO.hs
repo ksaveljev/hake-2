@@ -13,7 +13,8 @@ import Control.Monad.State (runState, runStateT)
 import System.Random (StdGen)
 
 runQuake :: [String] -> StdGen -> IO ()
-runQuake args stdGen = run (quake args stdGen) initialQuakeState (unQuakeIO quakeIO) initialQuakeIOState
+runQuake args stdGen =
+  run (quake args stdGen) initialQuakeState (unQuakeIO quakeIO) initialQuakeIOState
   where run q state qIO stateIO =
           do let (request, state') = runState (resume q) state
              case request of

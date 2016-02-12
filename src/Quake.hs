@@ -9,11 +9,11 @@ import qualified QCommon.QCommon as QCommon
 import           QuakeState
 import           Types
 
-import Control.Lens ((.=),(&),(.~))
-import Control.Monad (when,void)
-import Control.Monad.Trans (lift)
-import Control.Monad.Coroutine.SuspensionFunctors (request)
-import System.Random (StdGen)
+import           Control.Lens ((.=),(&),(.~))
+import           Control.Monad (when,void)
+import           Control.Monad.Trans (lift)
+import           Control.Monad.Coroutine.SuspensionFunctors (request)
+import           System.Random (StdGen)
 
 quake :: [String] -> StdGen -> Quake Int
 quake args stdGen =
