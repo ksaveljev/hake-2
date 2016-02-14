@@ -22,9 +22,10 @@ executable hake2
                      , mtl
                      , monad-coroutine
                      , random
+                     , time
                      , vector
   default-extensions:  OverloadedStrings
-  ghc-options:         -O0 -rtsopts
+  ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Quake
                      , QuakeIO
                      , Types

@@ -7,17 +7,17 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.QCommon as QCommon
 import           QuakeState
+import qualified Sys.Timer as Timer
 import           Types
 
 import           Control.Lens ((.=),(&),(.~))
 import           Control.Monad (when,void)
-import           Control.Monad.Trans (lift)
-import           Control.Monad.Coroutine.SuspensionFunctors (request)
-import           System.Random (StdGen)
+import           System.Environment (getArgs)
 
-quake :: [String] -> StdGen -> Quake Int
-quake args stdGen =
-  do globals .= 3 -- TODO
+quake :: Quake Int
+quake =
+  do args <- request (io getArgs)
+     globals .= 3 -- TODO
      let dedicatedFlag = isDedicatedCmdArg args
          -- in C the first arg is the filename
          updatedArgs = "hake2" : args
@@ -25,11 +25,12 @@ quake args stdGen =
      when dedicatedFlag
           (do Com.printf "Starting in dedicated mode.\n"
               CVar.update (dedicated & cvValue .~ 1.0))
+     QCommon.initialize updatedArgs
      void (CVar.get "nostdout" "0" 0)
-     startTime <- request 3 -- TODO
+     startTime <- Timer.milliseconds
      mainLoop startTime
   where mainLoop oldTime =
-          do newTime <- request 3 -- TODO
+          do newTime <- Timer.milliseconds
              let time = newTime - oldTime
              when (time > 0) (QCommon.frame time)
              mainLoop newTime

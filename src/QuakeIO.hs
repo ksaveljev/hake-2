@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 module QuakeIO
   (runQuake)
   where
@@ -8,20 +9,16 @@ import QuakeState
 import Types
 
 import Control.Monad.Coroutine (resume)
-import Control.Monad.Coroutine.SuspensionFunctors (Request(..))
-import Control.Monad.State (runState, runStateT)
-import System.Random (StdGen)
+import Control.Monad.State (runState, evalStateT)
 
-runQuake :: [String] -> StdGen -> IO ()
-runQuake args stdGen =
-  run (quake args stdGen) initialQuakeState (unQuakeIO quakeIO) initialQuakeIOState
-  where run q state qIO stateIO =
-          do let (request, state') = runState (resume q) state
-             case request of
-               Left (Request cmd q') ->
-                 do (response, stateIO') <- runStateT qIO stateIO
-                    run (q' response) state' qIO stateIO'
-               Right v -> return ()
+runQuake :: IO ()
+runQuake = evalStateT (quakeIO quake initialQuakeState) initialQuakeIOState
 
-quakeIO :: QuakeIO Int
-quakeIO = undefined
+quakeIO :: Quake a -> QuakeState -> QuakeIO ()
+quakeIO q state =
+  do let (req, state') = runState (resume q) state
+     case req of
+       Left (RunIO cmd q') -> do
+         result <- cmd
+         quakeIO (q' result) state'
+       Right _ -> return ()
