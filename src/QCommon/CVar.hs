@@ -3,6 +3,7 @@ module QCommon.CVar
   (get
   ,getExisting
   ,initialize
+  ,set
   ,update)
   where
 
@@ -59,3 +60,9 @@ initialize = error "CVar.initialize" -- TODO
 
 update :: CVarT -> Quake ()
 update = error "CVar.update" -- TODO
+
+set :: B.ByteString -> B.ByteString -> Quake CVarT
+set name value = set2 name value False
+
+set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
+set2 = error "CVar.set2" -- TODO

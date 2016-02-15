@@ -6,6 +6,7 @@ module QCommon.QCommon
 import qualified Client.CL as CL
 import qualified Client.Key as Key
 import qualified Client.SCR as SCR
+import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
 import qualified QCommon.CBuf as CBuf
@@ -19,6 +20,10 @@ import qualified Sys.NET as NET
 import           Types
 
 import           Control.Lens ((^.))
+import           Control.Monad (unless,void)
+import           Data.Bits ((.|.))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 
 frame :: Int -> Quake ()
 frame = error "QCommon.frame" -- TODO
@@ -40,7 +45,7 @@ initialize args =
      reconfigure False
      FS.setCDDir -- use cddir from config.cfg
      FS.markBaseSearchPaths -- mark the default search paths
-     initializeCommandsAndVars
+     initializeCVars
      NET.initialize
      NetChannel.initialize
      SVMain.initialize
@@ -50,10 +55,41 @@ initialize args =
      CL.writeConfiguration
      
 reconfigure :: Bool -> Quake ()
-reconfigure = error "QCommon.reconfigure" -- TODO
+reconfigure clear =
+  do cdDirCVar <- CVar.get "cddir" "" Constants.cvarArchive
+     maybe (return ()) proceed cdDirCVar
+  where proceed cdDir =
+          do CBuf.addText "exec default.cfg\n\
+                          \bind MWHEELUP weapnext\n\
+                          \bind MWHEELDOWN weapprev\n\
+                          \bind w +forward\n\
+                          \bind s +back\n\
+                          \bind a +moveleft\n\
+                          \bind d +moveright\n"
+             CBuf.execute
+             void (CVar.set "vid_fullscreen" "0")
+             CBuf.addText "exec config.cfg\n"
+             CBuf.addEarlyCommands clear
+             CBuf.execute
+             unless (B.null (cdDir^.cvString))
+               (void (CVar.set "cddir" (cdDir^.cvString)))
 
-initializeCommandsAndVars :: Quake ()
-initializeCommandsAndVars = error "QCommon.initializeCommandsAndVars" -- TODO
+initialCVars :: [(B.ByteString, B.ByteString, Int)]
+initialCVars = [("host_speeds","0",0)
+               ,("log_stats","0",0)
+               ,("developer","0",Constants.cvarArchive)
+               ,("timescale","0",0)
+               ,("fixedtime","0",0)
+               ,("logfile","0",0)
+               ,("showtrace","0",0)
+               ,("dedicated","0",Constants.cvarNoSet)
+               ,version]
+  where version = ("version",v,Constants.cvarServerInfo .|. Constants.cvarNoSet)
+        v = BC.pack (show Constants.version) `B.append` " " `B.append` Constants.__date__ -- IMPROVE?
+
+initializeCVars :: Quake ()
+initializeCVars =
+  mapM_ (\(name, val, flags) -> CVar.get name val flags) initialCVars
 
 processUserCommands :: Quake ()
 processUserCommands =
