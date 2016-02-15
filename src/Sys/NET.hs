@@ -5,4 +5,4 @@ module Sys.NET
 import Types
 
 initialize :: Quake ()
-initialize = undefined -- TODO
+initialize = error "NET.initialize" -- TODO

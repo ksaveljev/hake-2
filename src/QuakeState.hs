@@ -1,11 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QuakeState
-  (module QuakeState
-  ,module Game.CVarT
-  ,QuakeState)
+  (QuakeState
+  ,module QuakeState
+  ,module X)
   where
 
-import Game.CVarT
+import Game.CVarT as X
+import Globals as X
+import QCommon.ComGlobals as X
+import QCommon.SizeBufT as X
 import Types
 
 import Control.Lens (makeLenses)
@@ -13,4 +16,7 @@ import Control.Lens (makeLenses)
 makeLenses ''QuakeState
 
 initialQuakeState :: QuakeState
-initialQuakeState = undefined
+initialQuakeState =
+  QuakeState { _globals    = initialGlobals
+             , _comGlobals = initialComGlobals
+             }

@@ -5,4 +5,4 @@ module Client.Key
 import Types
 
 initialize :: Quake ()
-initialize = undefined -- TODO
+initialize = error "Key.initialize" -- TODO

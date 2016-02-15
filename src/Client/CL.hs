@@ -1,8 +1,12 @@
 module Client.CL
-  (initialize)
+  (initialize
+  ,writeConfiguration)
   where
 
 import Types
 
 initialize :: Quake ()
-initialize = undefined -- TODO
+initialize = error "CL.initialize" -- TODO
+
+writeConfiguration :: Quake ()
+writeConfiguration = error "CL.writeConfiguration" -- TODO

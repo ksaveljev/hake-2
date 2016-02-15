@@ -9,5 +9,5 @@ import Data.Time.Clock.POSIX (getPOSIXTime)
 milliseconds :: Quake Int
 milliseconds =
   do t <- request (io (round . (* 1000) <$> getPOSIXTime))
-     globals .= 1 -- TODO
+     globals.gCurTime .= t
      return t

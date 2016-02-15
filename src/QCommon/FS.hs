@@ -7,10 +7,10 @@ module QCommon.FS
 import Types
 
 initializeFileSystem :: Quake ()
-initializeFileSystem = undefined -- TODO
+initializeFileSystem = error "FS.initializeFileSystem" -- TODO
 
 setCDDir :: Quake ()
-setCDDir = undefined -- TODO
+setCDDir = error "FS.setCDDir" -- TODO
 
 markBaseSearchPaths :: Quake ()
-markBaseSearchPaths = undefined -- TODO
+markBaseSearchPaths = error "FS.markBaseSearchPaths" -- TODO

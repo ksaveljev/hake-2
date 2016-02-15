@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.CVarT
-  (module Game.CVarT)
+module QCommon.SizeBufT
+  (module QCommon.SizeBufT)
   where
 
 import Types
 
 import Control.Lens (makeLenses)
 
-makeLenses ''CVarT
+makeLenses ''SizeBufT

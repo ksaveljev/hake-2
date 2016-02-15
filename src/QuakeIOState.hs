@@ -3,4 +3,4 @@ module QuakeIOState where
 import Types
 
 initialQuakeIOState :: QuakeIOState
-initialQuakeIOState = undefined
+initialQuakeIOState = error "QuakeIOState.initialQuakeIOState" -- TODO

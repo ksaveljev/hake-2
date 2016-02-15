@@ -5,4 +5,4 @@ module QCommon.NetChannel
 import Types
 
 initialize :: Quake ()
-initialize = undefined -- TODO
+initialize = error "NetChannel.initialize" -- TODO

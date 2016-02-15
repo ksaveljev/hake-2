@@ -5,4 +5,4 @@ module Server.SVMain
 import Types
 
 initialize :: Quake ()
-initialize = undefined -- TODO
+initialize = error "SVMain.initialize" -- TODO
