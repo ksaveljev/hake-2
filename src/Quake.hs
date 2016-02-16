@@ -36,11 +36,11 @@ quake =
 checkDedicatedMode :: Bool -> Quake ()
 checkDedicatedMode dedicatedFlag =
   do dedicated <- CVar.get "dedicated" "0" Constants.cvarNoSet
-     when dedicatedFlag
-       (maybe (Com.comError Constants.errFatal "dedicated cvar not set")
-              (\cvar -> do Com.printf "Starting in dedicated mode.\n"
-                           CVar.update (cvar & cvValue .~ 1.0))
-              dedicated)
+     when dedicatedFlag $
+       maybe (Com.fatalError "dedicated cvar not set")
+             (\cvar -> do Com.printf "Starting in dedicated mode.\n"
+                          CVar.update (cvar & cvValue .~ 1.0))
+             dedicated
 
 isDedicatedCmdArg :: [String] -> Bool
 isDedicatedCmdArg ("+set":"dedicated":"1":_) = True

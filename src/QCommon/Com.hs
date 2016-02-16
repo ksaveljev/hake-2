@@ -1,9 +1,10 @@
 module QCommon.Com
-  (argv
-  ,clearArgv
-  ,comError
-  ,initializeArgv
-  ,printf)
+  ( argv
+  , clearArgv
+  , comError
+  , fatalError
+  , initializeArgv
+  , printf )
   where
 
 import qualified Constants
@@ -19,8 +20,8 @@ import qualified Data.Vector as V
 
 initializeArgv :: [String] -> Quake ()
 initializeArgv args =
-  do when (len > Constants.maxNumArgvs)
-       (comError Constants.errFatal "argc > MAX_NUM_ARGVS")
+  do when (len > Constants.maxNumArgvs) $
+       fatalError "argc > MAX_NUM_ARGVS"
      comGlobals.cgComArgc .= len
      comGlobals.cgComArgv .= V.fromList (fmap (BC.pack . stripLongArg) args)
   where len = length args 
@@ -31,6 +32,9 @@ printf = error "Com.printf" -- TODO
 
 comError :: Int -> B.ByteString -> Quake ()
 comError = error "Com.comError" -- TODO
+
+fatalError :: B.ByteString -> Quake ()
+fatalError = comError Constants.errFatal
 
 argv :: Int -> Quake B.ByteString
 argv idx = do

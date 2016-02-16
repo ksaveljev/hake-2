@@ -57,7 +57,7 @@ initialize args =
 reconfigure :: Bool -> Quake ()
 reconfigure clear =
   do cdDirCVar <- CVar.get "cddir" "" Constants.cvarArchive
-     maybe (Com.comError Constants.errFatal "cddir cvar not set") proceed cdDirCVar
+     maybe (Com.fatalError "cddir cvar not set") proceed cdDirCVar
   where proceed cdDir =
           do CBuf.addText "exec default.cfg\n\
                           \bind MWHEELUP weapnext\n\
