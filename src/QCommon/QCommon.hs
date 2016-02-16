@@ -23,7 +23,7 @@ import           Control.Lens ((^.))
 import           Control.Monad (unless,void)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
+import           Data.Serialize (encode)
 
 frame :: Int -> Quake ()
 frame = error "QCommon.frame" -- TODO
@@ -57,7 +57,7 @@ initialize args =
 reconfigure :: Bool -> Quake ()
 reconfigure clear =
   do cdDirCVar <- CVar.get "cddir" "" Constants.cvarArchive
-     maybe (return ()) proceed cdDirCVar
+     maybe (Com.comError Constants.errFatal "cddir cvar not set") proceed cdDirCVar
   where proceed cdDir =
           do CBuf.addText "exec default.cfg\n\
                           \bind MWHEELUP weapnext\n\
@@ -85,7 +85,7 @@ initialCVars = [("host_speeds","0",0)
                ,("dedicated","0",Constants.cvarNoSet)
                ,version]
   where version = ("version",v,Constants.cvarServerInfo .|. Constants.cvarNoSet)
-        v = BC.pack (show Constants.version) `B.append` " " `B.append` Constants.__date__ -- IMPROVE?
+        v = encode Constants.version `B.append` " " `B.append` Constants.__date__
 
 initializeCVars :: Quake ()
 initializeCVars =

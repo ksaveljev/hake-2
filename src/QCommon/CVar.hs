@@ -1,19 +1,21 @@
-{-# LANGUAGE MultiWayIf #-}
 module QCommon.CVar 
   (get
   ,getExisting
   ,initialize
   ,set
-  ,update)
+  ,update
+  ,variableString)
   where
 
 import qualified Constants
+import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
+import           QCommon.CVarShared
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
 
-import           Control.Lens ((%=), (&), (%~), use)
+import           Control.Lens ((%=), (&), (%~))
 import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -50,13 +52,10 @@ infoValidate s = not ('\\' `BC.elem` s || '"' `BC.elem` s || ';' `BC.elem` s)
 getExisting :: B.ByteString -> Quake CVarT
 getExisting = fmap (fromMaybe (error "CVar.getExisting returned Nothing")) . findVar
 
-findVar :: B.ByteString -> Quake (Maybe CVarT)
-findVar name =
-  do vars <- use (globals.gCVars)
-     return (HM.lookup name vars)
-
 initialize :: Quake ()
-initialize = error "CVar.initialize" -- TODO
+initialize =
+  do Cmd.addCommand "set" (Just setF)
+     Cmd.addCommand "cvarlist" (Just listF)
 
 update :: CVarT -> Quake ()
 update = error "CVar.update" -- TODO
@@ -66,3 +65,9 @@ set name value = set2 name value False
 
 set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
 set2 = error "CVar.set2" -- TODO
+
+setF :: XCommandT
+setF = error "CVar.setF" -- TODO
+
+listF :: XCommandT
+listF = error "CVar.listF" -- TODO
