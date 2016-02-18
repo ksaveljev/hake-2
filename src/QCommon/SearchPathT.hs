@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.SearchPathT
-  (module QCommon.SearchPathT)
-  where
+  ( module QCommon.SearchPathT
+  ) where
 
 import Types
 

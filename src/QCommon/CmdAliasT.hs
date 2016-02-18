@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.SizeBufT
-  ( module QCommon.SizeBufT
+module QCommon.CmdAliasT
+  ( module QCommon.CmdAliasT
   ) where
 
 import Types
 
 import Control.Lens (makeLenses)
 
-makeLenses ''SizeBufT
+makeLenses ''CmdAliasT

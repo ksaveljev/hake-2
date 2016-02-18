@@ -1,10 +1,10 @@
 module QCommon.CBuf
-  (addEarlyCommands
-  ,addLateCommands
-  ,addText
-  ,execute
-  ,initialize)
-  where
+  ( addEarlyCommands
+  , addLateCommands
+  , addText
+  , execute
+  , initialize
+  ) where
 
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com

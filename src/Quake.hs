@@ -1,6 +1,6 @@
 module Quake
-  (quake)
-  where
+  ( quake
+  ) where
 
 import qualified Constants
 import qualified QCommon.Com as Com

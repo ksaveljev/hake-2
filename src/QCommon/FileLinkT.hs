@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.FileLinkT
-  (module QCommon.FileLinkT)
-  where
+  ( module QCommon.FileLinkT
+  ) where
 
 import Types
 

@@ -1,7 +1,7 @@
 module Client.CL
-  (initialize
-  ,writeConfiguration)
-  where
+  ( initialize
+  , writeConfiguration
+  ) where
 
 import Types
 

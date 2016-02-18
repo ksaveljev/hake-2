@@ -1,14 +1,19 @@
 module Client.Key
-  (initialize)
-  where
+  ( initialize
+  ) where
 
 import           Client.KeyConstants
 import qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
 
-import           Control.Lens ((.=), (%=))
+import           Control.Lens (use, (.=), (%=))
+import           Control.Monad (unless)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (ord, toUpper)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -38,7 +43,41 @@ initialize =
      mapM_ (\(name,cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
 
 bindF :: XCommandT
-bindF = error "Key.bindF" -- TODO
+bindF = XCommandT "Key.bindF" $
+  do c <- Cmd.argc
+     checkArgs c
+  where checkArgs c | c < 2 = Com.printf "bind <key> [command] : attach a command to a key\n"
+                    | otherwise =
+                        do arg <- Cmd.argv 1
+                           key <- stringToKeynum arg
+                           bind arg key c
+
+bind :: B.ByteString -> Int -> Int -> Quake ()
+bind arg key c | key == -1 = Com.printf ("\"" `B.append` arg `B.append` "\" isn't a valid key\n")
+               | c == 2 = bindInfo arg key
+               | otherwise =
+                   do cmd <- fmap (B.intercalate " ") (mapM Cmd.argv [2..c-1])
+                      setBinding key (Just cmd)
+
+bindInfo :: B.ByteString -> Int -> Quake ()
+bindInfo arg key =
+  do keyBindings <- use (globals.gKeyBindings)
+     maybe notBound printBindInfo (keyBindings V.! key)
+  where notBound = Com.printf ("\"" `B.append` arg `B.append` "\" is not bound\n")
+        printBindInfo binding = Com.printf ("\"" `B.append` arg `B.append` "\" = \"" `B.append` binding `B.append` "\"\n")
+
+setBinding :: Int -> Maybe B.ByteString -> Quake ()
+setBinding keyNum binding =
+    unless (keyNum == -1) $
+      globals.gKeyBindings %= (V.// [(keyNum, binding)])
+
+stringToKeynum :: B.ByteString -> Quake Int
+stringToKeynum str
+  | B.length str == 1 = return (ord (BC.index str 0))
+  | otherwise =
+      do keyNames <- use (keyGlobals.kgKeyNames)
+         return (fromMaybe (-1) (V.findIndex (== Just upperStr) keyNames))
+  where upperStr = BC.map toUpper str
 
 unbindF :: XCommandT
 unbindF = error "Key.unbindF" -- TODO

@@ -1,6 +1,6 @@
 module QuakeIO
-  (runQuake)
-  where
+  ( runQuake
+  ) where
 
 import Quake
 import QuakeIOState

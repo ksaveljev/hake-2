@@ -1,8 +1,24 @@
 module QCommon.NetChannel
-  (initialize)
-  where
+  ( initialize
+  ) where
 
-import Types
+import qualified Constants
+import qualified QCommon.CVar as CVar
+import qualified Sys.Timer as Timer
+import           Types
+
+import           Control.Monad (void)
+import           Data.Bits ((.&.))
+import qualified Data.ByteString as B
+import           Data.Serialize (encode)
 
 initialize :: Quake ()
-initialize = error "NetChannel.initialize" -- TODO
+initialize =
+  do msec <- Timer.milliseconds
+     CVar.initializeCVars initialCVars
+     void (CVar.get "qport" (encode (msec .&. 0xFFFF)) Constants.cvarNoSet)
+
+initialCVars :: [(B.ByteString, B.ByteString, Int)]
+initialCVars = [ ("showpackets", "0", 0)
+               , ("showdrop", "0", 0)
+               ]

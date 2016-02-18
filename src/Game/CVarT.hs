@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.CVarT
-  (module Game.CVarT)
-  where
+  ( module Game.CVarT
+  ) where
 
 import Types
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.ComGlobals
-  (module QCommon.ComGlobals)
-  where
+  ( module QCommon.ComGlobals
+  ) where
 
 import Types
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.KeyGlobals
-  (module Client.KeyGlobals)
-  where
+  ( module Client.KeyGlobals
+  ) where
 
 import           Client.KeyConstants
 import           Types

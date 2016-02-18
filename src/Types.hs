@@ -44,23 +44,20 @@ instance Functor IORequest where
 request :: Monad m => QuakeIO a -> Coroutine IORequest m a
 request x = suspend (RunIO x return)
 
-data XCommandT = XCommandT
-  { _xcName :: B.ByteString
-  , _xcCmd  :: Quake ()
-  }
-
-instance Eq XCommandT where
-  x == y = _xcName x == _xcName y
-
 data Globals = Globals
-  { _gCurTime    :: Int
-  , _gCmdWait    :: Bool
-  , _gAliasCount :: Int
-  , _gCmdText    :: SizeBufT
-  , _gCVars      :: HM.HashMap B.ByteString CVarT
-  , _gKeyLines   :: V.Vector B.ByteString
-  , _gKeyLinePos :: Int
-  , _gRnd        :: StdGen
+  { _gCurTime          :: Int
+  , _gCmdWait          :: Bool
+  , _gAliasCount       :: Int
+  , _gServerState      :: Int
+  , _gNetMessage       :: SizeBufT
+  , _gCmdText          :: SizeBufT
+  , _gCmdAlias         :: Seq CmdAliasT
+  , _gUserInfoModified :: Bool
+  , _gCVars            :: HM.HashMap B.ByteString CVarT
+  , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
+  , _gKeyLines         :: V.Vector B.ByteString
+  , _gKeyLinePos       :: Int
+  , _gRnd              :: StdGen
   }
 
 data ComGlobals = ComGlobals
@@ -118,6 +115,11 @@ data CmdFunctionT = CmdFunctionT
   , _cfFunction :: Maybe XCommandT
   }
 
+data CmdAliasT = CmdAliasT
+  { _caName  :: B.ByteString
+  , _caValue :: B.ByteString
+  } deriving (Eq)
+
 data SearchPathT = SearchPathT
   { _spFilename :: B.ByteString
   , _spPack     :: Maybe PackT
@@ -142,3 +144,11 @@ data FileLinkT = FileLinkT
   , _flFromLength :: Int
   , _flTo         :: B.ByteString
   }
+  
+data XCommandT = XCommandT
+  { _xcName :: B.ByteString
+  , _xcCmd  :: Quake ()
+  }
+
+instance Eq XCommandT where
+  x == y = _xcName x == _xcName y

@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.FSGlobals
-  (module QCommon.FSGlobals)
-  where
+  ( module QCommon.FSGlobals
+  ) where
 
 import           Types
 

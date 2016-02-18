@@ -1,7 +1,7 @@
 module QCommon.QCommon
-  (frame
-  ,initialize)
-  where
+  ( frame
+  , initialize
+  ) where
 
 import qualified Client.CL as CL
 import qualified Client.Key as Key
@@ -45,7 +45,7 @@ initialize args =
      reconfigure False
      FS.setCDDir -- use cddir from config.cfg
      FS.markBaseSearchPaths -- mark the default search paths
-     initializeCVars
+     CVar.initializeCVars initialCVars
      NET.initialize
      NetChannel.initialize
      SVMain.initialize
@@ -75,21 +75,18 @@ reconfigure clear =
                (void (CVar.set "cddir" (cdDir^.cvString)))
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
-initialCVars = [("host_speeds","0",0)
-               ,("log_stats","0",0)
-               ,("developer","0",Constants.cvarArchive)
-               ,("timescale","0",0)
-               ,("fixedtime","0",0)
-               ,("logfile","0",0)
-               ,("showtrace","0",0)
-               ,("dedicated","0",Constants.cvarNoSet)
-               ,version]
+initialCVars = [ ("host_speeds", "0", 0)
+               , ("log_stats", "0", 0)
+               , ("developer", "0", Constants.cvarArchive)
+               , ("timescale", "0", 0)
+               , ("fixedtime", "0", 0)
+               , ("logfile", "0", 0)
+               , ("showtrace", "0", 0)
+               , ("dedicated", "0", Constants.cvarNoSet)
+               , version
+               ]
   where version = ("version",v,Constants.cvarServerInfo .|. Constants.cvarNoSet)
         v = encode Constants.version `B.append` " " `B.append` Constants.__date__
-
-initializeCVars :: Quake ()
-initializeCVars =
-  mapM_ (\(name, val, flags) -> CVar.get name val flags) initialCVars
 
 processUserCommands :: Quake ()
 processUserCommands =

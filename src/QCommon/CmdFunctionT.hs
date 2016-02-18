@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.CmdFunctionT
-  (module QCommon.CmdFunctionT)
-  where
+  ( module QCommon.CmdFunctionT
+  ) where
 
 import Types
 

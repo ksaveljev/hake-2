@@ -1,6 +1,6 @@
 module Client.SCR
-  (endLoadingPlaque)
-  where
+  ( endLoadingPlaque
+  ) where
 
 import Types
 

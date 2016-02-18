@@ -1,8 +1,8 @@
 module Sys.NET
-  (initialize)
-  where
+  ( initialize
+  ) where
 
 import Types
 
 initialize :: Quake ()
-initialize = error "NET.initialize" -- TODO
+initialize = return () -- nothing to do

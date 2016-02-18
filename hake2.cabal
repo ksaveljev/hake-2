@@ -27,6 +27,7 @@ executable hake2
                      , random
                      , time
                      , vector
+                     , unix-compat
                      , unordered-containers
   default-extensions:  OverloadedStrings
                      , MultiWayIf
@@ -43,6 +44,7 @@ executable hake2
                      , Globals
                      , QCommon.CBuf
                      , QCommon.CBufShared
+                     , QCommon.CmdAliasT
                      , QCommon.CmdFunctionT
                      , QCommon.ComGlobals
                      , QCommon.CVar
@@ -60,10 +62,12 @@ executable hake2
                      , QCommon.SearchPathT
                      , QCommon.SizeBufT
                      , QCommon.SZ
+                     , QCommon.XCommandT
                      , Quake
                      , QuakeIO
                      , QuakeIOState
                      , QuakeState
+                     , Server.SVConsoleCommands
                      , Server.SVMain
                      , Sys.NET
                      , Sys.Timer

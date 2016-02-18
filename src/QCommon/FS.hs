@@ -1,14 +1,16 @@
 module QCommon.FS
-  ( initializeFileSystem
+  ( execAutoexec
+  , initializeFileSystem
   , loadFile
   , setCDDir
-  , markBaseSearchPaths )
-  where
+  , setGameDir
+  , markBaseSearchPaths
+  ) where
 
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
-import qualified QCommon.CVar as CVar
+import qualified QCommon.CVarShared as CVar
 import           QCommon.FSShared
 import           QuakeState
 import           Types
@@ -122,8 +124,5 @@ addPackFiles dir idx =
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
 loadPackFile = error "FS.loadPackFile" -- TODO
 
-canRead :: String -> IO Bool
-canRead file =
-  do exists <- doesFileExist file
-     if exists then isReadable else return False
-  where isReadable = fmap readable (getPermissions file)
+execAutoexec :: Quake ()
+execAutoexec = error "FS.execAutoexec" -- TODO

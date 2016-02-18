@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.PackFileT
-  (module QCommon.PackFileT)
-  where
+  ( module QCommon.PackFileT
+  ) where
 
 import Types
 

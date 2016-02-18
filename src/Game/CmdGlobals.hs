@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.CmdGlobals
-  (module Game.CmdGlobals)
-  where
+  ( module Game.CmdGlobals
+  ) where
 
 import qualified Constants
 import           Types
