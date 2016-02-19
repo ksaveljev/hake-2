@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.CmdAliasT
-  ( module QCommon.CmdAliasT
+module Game.CSurfaceT
+  ( module Game.CSurfaceT
   ) where
 
 import Types
 
 import Control.Lens (makeLenses)
 
-makeLenses ''CmdAliasT
+makeLenses ''CSurfaceT

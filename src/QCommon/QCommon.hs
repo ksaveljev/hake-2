@@ -85,8 +85,8 @@ initialCVars = [ ("host_speeds", "0", 0)
                , ("dedicated", "0", Constants.cvarNoSet)
                , version
                ]
-  where version = ("version",v,Constants.cvarServerInfo .|. Constants.cvarNoSet)
-        v = encode Constants.version `B.append` " " `B.append` Constants.__date__
+  where version = ("version", v, Constants.cvarServerInfo .|. Constants.cvarNoSet)
+        v = B.concat [encode Constants.version, " ", Constants.__date__]
 
 processUserCommands :: Quake ()
 processUserCommands =

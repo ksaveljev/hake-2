@@ -33,7 +33,7 @@ addEarlyCommands shouldClear =
         addCommand idx =
           do name <- Com.argv (idx + 1)
              value <- Com.argv (idx + 2)
-             addText ("set " `B.append` name `B.append` " " `B.append` value `B.append` "\n")
+             addText (B.concat ["set ", name, " ", value, "\n"])
         clearArgs idx = mapM_ Com.clearArgv [idx, idx + 1, idx + 2]
 
 addLateCommands :: Quake Bool
@@ -52,7 +52,7 @@ addLateCommands =
           | idx >= B.length text = accum
           | text `BC.index` idx == '+' =
               let command = BC.takeWhile (\ch -> ch /= '+' && ch /= '-') (B.drop (idx + 1) text)
-              in findCommands text (idx + B.length command) (accum `B.append` command `B.append` "\n")
+              in findCommands text (idx + B.length command) (B.concat [accum, command, "\n"])
           | otherwise = findCommands text (idx + 1) accum
 
 addText :: B.ByteString -> Quake ()

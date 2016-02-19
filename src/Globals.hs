@@ -3,6 +3,8 @@ module Globals
   ( module Globals
   ) where
 
+import           Client.ClientStaticT (newClientStaticT)
+import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
 import           Control.Lens (makeLenses)
@@ -19,9 +21,10 @@ initialGlobals =
           , _gCmdWait          = False
           , _gAliasCount       = 0
           , _gServerState      = 0
-          , _gNetMessage       = SizeBufT False False "" 0 0 0
-          , _gCmdText          = SizeBufT False False "" 0 0 0
+          , _gNetMessage       = newSizeBufT
+          , _gCmdText          = newSizeBufT
           , _gCmdAlias         = Seq.empty
+          , _gCls              = newClientStaticT
           , _gUserInfoModified = False
           , _gCVars            = HM.empty
           , _gKeyBindings      = V.replicate 256 Nothing

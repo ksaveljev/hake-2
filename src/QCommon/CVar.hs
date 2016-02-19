@@ -3,6 +3,7 @@ module QCommon.CVar
   , getExisting
   , initialize
   , initializeCVars
+  , serverInfo
   , set
   , update
   , variableString
@@ -133,10 +134,10 @@ listF = XCommandT "CVar.listF" $
 
 printCVar :: CVarT -> Quake ()
 printCVar v =
-  Com.printf (B.concat [archive, userInfo, serverInfo, varFlag, varInfo])
+  Com.printf (B.concat [archive, user, server, varFlag, varInfo])
   where archive = info "*"
-        userInfo = info "U"
-        serverInfo = info "S"
+        user = info "U"
+        server = info "S"
         info str | (v^.cvFlags) .&. Constants.cvarServerInfo /= 0 = str
                  | otherwise = " "
         varFlag | (v^.cvFlags) .&. Constants.cvarNoSet /= 0 = "-"
@@ -173,3 +174,9 @@ createFailedError =
      
 initializeCVars :: [(B.ByteString, B.ByteString, Int)] -> Quake ()
 initializeCVars = mapM_ (\(name, val, flags) -> get name val flags)
+
+serverInfo :: Quake B.ByteString
+serverInfo = bitInfo Constants.cvarServerInfo
+
+bitInfo :: Int -> Quake B.ByteString
+bitInfo = error "CVar.bitInfo" -- TODO

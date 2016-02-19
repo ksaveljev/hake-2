@@ -11,16 +11,21 @@ import qualified QCommon.CBufShared as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVarShared as CVar
 import qualified QCommon.FSShared as FS
+import qualified QCommon.MSG as MSG
+import qualified QCommon.SZ as SZ
 import           QuakeState
 import           Types
 
-import           Control.Lens (use, (^.), (%=), (.=), (+=))
+import           Control.Lens (Lens', use, (^.), (%=), (.=), (+=), (&), (.~))
 import           Control.Monad (when, unless)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import           Data.Char (toUpper, chr)
 import           Data.Foldable (find)
 import           Data.Maybe (fromMaybe)
+import           Data.Monoid ((<>))
 import           Data.Serialize (encode)
 import           Data.Sequence ((<|))
 import qualified Data.Sequence as Seq
@@ -41,9 +46,9 @@ addCommand name cmd =
   do variable <- CVar.variableString name
      exists <- commandExists name
      if | not (B.null variable) -> -- fail if the command is a variable name
-            Com.printf $ "Cmd.addCommand: " `B.append` name `B.append` " already defined as a var\n"
+            Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined as a var\n"])
         | exists -> -- fail if the command already exists
-            Com.printf $ "Cmd.addCommand: " `B.append` name `B.append` " already defined\n"
+            Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined\n"])
         | otherwise -> -- add new command otherwise
             cmdGlobals.cgCmdFunctions %= (CmdFunctionT name cmd <|)
 
@@ -63,9 +68,9 @@ execF = XCommandT "Cmd.execF" $
              script <- FS.loadFile fileName
              maybe (failedToExec fileName) (execScript fileName) script
         failedToExec fileName =
-             Com.printf ("couldn't exec " `B.append` fileName `B.append` "\n")
+             Com.printf (B.concat ["couldn't exec ", fileName, "\n"])
         execScript fileName contents =
-          do Com.printf ("execing " `B.append` fileName `B.append` "\n")
+          do Com.printf (B.concat ["execing ", fileName, "\n"])
              CBuf.insertText contents
 
 echoF :: XCommandT
@@ -82,13 +87,68 @@ listF = XCommandT "Cmd.listF" $
   
 
 aliasF :: XCommandT
-aliasF = error "Cmd.aliasF" -- TODO
+aliasF = XCommandT "Cmd.aliasF" $
+  do c <- argc
+     checkArgs c
+  where checkArgs 1 = listAliases
+        checkArgs c =
+          do arg <- argv 1
+             aliasCmd arg c
+
+listAliases :: Quake ()
+listAliases =
+  do Com.printf "Current alias commands:\n"
+     aliases <- use (globals.gCmdAlias)
+     mapM_ printAlias aliases
+
+printAlias :: CmdAliasT -> Quake ()
+printAlias alias = Com.printf aliasInfo
+  where aliasInfo = B.concat [alias^.caName, " : ", alias^.caValue]
+
+aliasCmd :: B.ByteString -> Int -> Quake ()
+aliasCmd arg c
+  | tooLongAlias = tooLongError
+  | otherwise =
+      do existingAliasIdx <- findExistingAlias
+         cmd <- fmap (`B.append` "\n") (restOfCommandLine 2 c mempty)
+         maybe (newAlias arg cmd) (updateExistingAlias arg cmd) existingAliasIdx
+  where tooLongAlias = B.length arg > Constants.maxAliasName
+        tooLongError = Com.printf "Alias name is too long\n"
+        findExistingAlias =
+          do aliases <- use (globals.gCmdAlias)
+             return (aliasIndex aliases)
+        aliasIndex = Seq.findIndexL (sameAliasNameAs name)
+        name = BC.map toUpper arg
+
+newAlias :: B.ByteString -> B.ByteString -> Quake ()
+newAlias name cmd = globals.gCmdAlias %= (newlyCreatedAlias <|)
+  where newlyCreatedAlias = newCmdAliasT & caName .~ name
+                                         & caValue .~ cmd
+
+updateExistingAlias :: B.ByteString -> B.ByteString -> Int -> Quake ()
+updateExistingAlias name cmd idx =
+  globals.gCmdAlias %= Seq.adjust updateF idx
+  where updateF x = x & caName .~ name
+                      & caValue .~ cmd
+
+restOfCommandLine :: Int -> Int -> BB.Builder -> Quake B.ByteString
+restOfCommandLine idx count accum
+  | idx >= count = return (BL.toStrict (BB.toLazyByteString accum))
+  | otherwise =
+      do arg <- argv idx
+         restOfCommandLine (idx + 1) count (updateAccum arg)
+  where updateAccum arg | idx == count - 1 = accum <> BB.byteString arg
+                        | otherwise = accum <> BB.byteString arg <> space
+        space = BB.byteString " "
 
 waitF :: XCommandT
 waitF = XCommandT "Cmd.waitF" (globals.gCmdWait .= True)
 
 argc :: Quake Int
 argc = use (cmdGlobals.cgCmdArgc)
+
+args :: Quake B.ByteString
+args = use (cmdGlobals.cgCmdArgs)
 
 argv :: Int -> Quake B.ByteString
 argv idx =
@@ -140,7 +200,8 @@ sameFunctionNameAs :: B.ByteString -> CmdFunctionT -> Bool
 sameFunctionNameAs expected fn = sameNameAs expected (fn^.cfName)
 
 sameAliasNameAs :: B.ByteString -> CmdAliasT -> Bool
-sameAliasNameAs expected alias = sameNameAs expected (alias^.caName)
+sameAliasNameAs expected alias = sameNameAs expected aliasName
+  where aliasName = BC.map toUpper (alias^.caName)
 
 tokenizeString :: B.ByteString -> Bool -> Quake ()
 tokenizeString text macroExpand =
@@ -184,7 +245,7 @@ macroExpandString text len
   | otherwise = expand text False len 0 0
   where lengthExceeded = len >= Constants.maxStringChars
         lineExceededError =
-          do Com.printf ("Line exceeded " `B.append` encode Constants.maxStringChars `B.append` " chars, discarded.\n")
+          do Com.printf (B.concat ["Line exceeded ", encode Constants.maxStringChars, " chars, discarded.\n"])
              return Nothing
 
 expand :: B.ByteString -> Bool -> Int -> Int -> Int -> Quake (Maybe B.ByteString)
@@ -210,11 +271,11 @@ processParsedVar text newInQuote newLen count idx newIdx var =
      if | lineExceeded token -> lineExceededError
         | loopDetected -> loopDetectedError
         | otherwise ->
-            do let newText = B.take idx text `B.append` token `B.append` B.drop newIdx text
+            do let newText = B.concat [B.take idx text, token, B.drop newIdx text]
                expand newText newInQuote (B.length newText) (count + 1) idx
   where lineExceeded token = newLen + B.length token >= Constants.maxStringChars
         lineExceededError =
-          do Com.printf ("Expanded line exceeded " `B.append` encode Constants.maxStringChars `B.append` " chars, discarded.\n")
+          do Com.printf (B.concat ["Expanded line exceeded ", encode Constants.maxStringChars, " chars, discarded.\n"])
              return Nothing
         loopDetected = count + 1 == 100
         loopDetectedError =
@@ -222,4 +283,25 @@ processParsedVar text newInQuote newLen count idx newIdx var =
              return Nothing
 
 forwardToServer :: Quake ()
-forwardToServer = error "Cmd.forwardToServer" -- TODO
+forwardToServer =
+  do cmd <- argv 0
+     cls <- use (globals.gCls)
+     forward cmd cls (BC.head cmd)
+  where forward cmd cls c
+          | (cls^.csState) <= Constants.caConnected || c == '-' || c == '+' =
+              Com.printf (B.concat ["Unknown command \"", cmd, "\"\n"])
+          | otherwise = writeMessage cmd
+
+writeMessage :: B.ByteString -> Quake ()
+writeMessage cmd =
+  do MSG.writeByteI message stringCmd
+     SZ.printSB message cmd
+     c <- argc
+     when (c > 1) addArgs
+  where stringCmd = fromIntegral Constants.clcStringCmd
+        message :: Lens' QuakeState SizeBufT
+        message = globals.gCls.csNetChan.ncMessage
+        addArgs =
+          do cmdArgs <- args
+             SZ.printSB message " "
+             SZ.printSB message cmdArgs

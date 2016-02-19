@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.SZ
   ( initialize
+  , printSB
   , write
   ) where
 
@@ -8,14 +9,16 @@ import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
 
-import           Control.Lens (ASetter', Traversal', preuse, (.=), (%=), (^.), (+=))
+import           Control.Lens (ASetter', Lens', Traversal', preuse, (.=), (%=), (^.), (+=), (&), (.~))
 import           Control.Monad (when, unless)
 import qualified Data.ByteString as B
 import           Data.Serialize (encode)
 
 initialize :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 initialize bufLens bufData maxLen =
-  bufLens .= SizeBufT False False bufData maxLen 0 0
+  bufLens .= sizeBuf
+  where sizeBuf = newSizeBufT & sbData .~ bufData
+                              & sbMaxSize .~ maxLen
 
 write :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 write bufLens bufData len =
@@ -45,10 +48,13 @@ getSpace bufLens len =
             Com.fatalError "SZ_GetSpace: overflow without allowoverflow set"
         checkLen buf =
           when (len > buf^.sbMaxSize) $
-            Com.fatalError ("SZ_GetSpace: " `B.append` encode len `B.append` " is > full buffer size")
+            Com.fatalError (B.concat ["SZ_GetSpace: ", encode len, " is > full buffer size"])
 
 clear :: ASetter' QuakeState SizeBufT -> Quake ()
 clear bufLens = do
     bufLens.sbCurSize .= 0
     bufLens.sbData .= ""
     bufLens.sbOverflowed .= False
+
+printSB :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()
+printSB = error "SZ.print" -- TODO

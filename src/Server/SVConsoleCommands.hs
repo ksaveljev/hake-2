@@ -3,20 +3,19 @@ module Server.SVConsoleCommands
   ) where
 
 import qualified Game.Cmd as Cmd
+import qualified Game.Info as Info
+import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import           QuakeState
+import qualified Server.SVInit as SVInit
+import qualified Server.SVMainShared as SVMain
+import qualified Sys.NET as NET
 import           Types
 
-import           Control.Lens ((^.))
+import           Control.Lens (use, (^.), (.=))
 import           Control.Monad (when)
 import qualified Data.ByteString as B
-
-initOperatorCommands :: Quake ()
-initOperatorCommands =
-  do mapM_ (\(name, cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
-     dedicatedValue <- fmap (^.cvValue) dedicatedCVar
-     when (dedicatedValue /= 0) $
-       Cmd.addCommand "say" (Just conSayF)
 
 initialCommands :: [(B.ByteString, XCommandT)]
 initialCommands = [ ("heartbeat", heartbeatF)
@@ -36,10 +35,16 @@ initialCommands = [ ("heartbeat", heartbeatF)
                   , ("sv", serverCommandF)
                   ]
 
+initOperatorCommands :: Quake ()
+initOperatorCommands =
+  do mapM_ (\(name, cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
+     dedicatedValue <- fmap (^.cvValue) dedicatedCVar
+     when (dedicatedValue /= 0) $
+       Cmd.addCommand "say" (Just conSayF)
 
 heartbeatF :: XCommandT
 heartbeatF = XCommandT "SVConsoleCommands.heartbeatF" $
-  error "SVConsoleCommands.heartbeatF" -- TODO
+  svGlobals.svServerStatic.ssLastHeartbeat .= -9999999
 
 kickF :: XCommandT
 kickF = XCommandT "SVConsoleCommands.kickF" $
@@ -51,7 +56,9 @@ statusF = XCommandT "SVConsoleCommands.statusF" $
 
 serverInfoF :: XCommandT
 serverInfoF = XCommandT "SVConsoleCommands.serverInfoF" $
-  error "SVConsoleCommands.serverInfoF" -- TODO
+  do Com.printf "Server info settings:\n"
+     serverInfo <- CVar.serverInfo
+     Info.printServerInfo serverInfo
 
 dumpUserF :: XCommandT
 dumpUserF = XCommandT "SVConsoleCommands.dumpUserF" $
@@ -63,7 +70,8 @@ mapF = XCommandT "SVConsoleCommands.mapF" $
 
 demoMapF :: XCommandT
 demoMapF = XCommandT "SVConsoleCommands.demoMapF" $
-  error "SVConsoleCommands.demoMapF" -- TODO
+  do arg <- Cmd.argv 1
+     SVInit.svMap True arg False
 
 gameMapF :: XCommandT
 gameMapF = XCommandT "SVConsoleCommands.gameMapF" $
@@ -91,7 +99,11 @@ loadGameF = XCommandT "SVConsoleCommands.loadGameF" $
 
 killServerF :: XCommandT
 killServerF = XCommandT "SVConsoleCommands.killServerF" $
-  error "SVConsoleCommands.killServerF" -- TODO
+  do initialized <- use (svGlobals.svServerStatic.ssInitialized)
+     when initialized shutdown
+  where shutdown =
+          do SVMain.shutdown "Server was killed.\n" False
+             NET.config False -- close network sockets
 
 serverCommandF :: XCommandT
 serverCommandF = XCommandT "SVConsoleCommands.serverCommandF" $

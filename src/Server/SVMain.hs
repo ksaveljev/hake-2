@@ -1,11 +1,13 @@
 module Server.SVMain
   ( initialize
+  , shutdown
   ) where
 
 import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified QCommon.SZ as SZ
 import           QuakeState
+import           Server.SVMainShared
 import qualified Server.SVConsoleCommands as SVConsoleCommands
 import           Types
 

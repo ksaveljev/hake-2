@@ -49,7 +49,7 @@ initializeFileSystem =
 
 startWithBaseq2 :: CVarT -> Quake ()
 startWithBaseq2 baseDir =
-  do addGameDirectory ((baseDir^.cvString) `B.append` "/" `B.append` Constants.baseDirName)
+  do addGameDirectory (B.concat [baseDir^.cvString, "/", Constants.baseDirName])
      markBaseSearchPaths
      gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
      maybe (Com.fatalError "game cvar not set") updateGameDir gameDirVar
@@ -87,7 +87,7 @@ createPath path =
           do let filePath = BC.unpack (B.take idx path)
              exists <- request (io (createDir filePath))
              unless exists $
-               Com.printf ("can't create path \"" `B.append` path `B.append` "\n")
+               Com.printf (B.concat ["can't create path \"", path, "\n"])
         createDir filePath =
           do createDirectoryIfMissing True filePath
              doesDirectoryExist filePath
@@ -112,7 +112,7 @@ addPackFiles :: B.ByteString -> Int -> Quake ()
 addPackFiles dir idx =
   do havePermissions <- request (io (canRead pakFileStr))
      when havePermissions proceedLoading
-  where pakFile = dir `B.append` "/pak" `B.append` encode idx `B.append` ".pak"
+  where pakFile = B.concat [dir, "/pak", encode idx, ".pak"]
         pakFileStr = BC.unpack pakFile
         proceedLoading =
           do pak <- loadPackFile pakFile

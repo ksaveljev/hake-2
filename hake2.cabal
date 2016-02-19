@@ -24,6 +24,7 @@ executable hake2
                      , linear
                      , mtl
                      , monad-coroutine
+                     , network
                      , random
                      , time
                      , vector
@@ -33,18 +34,40 @@ executable hake2
                      , MultiWayIf
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CL
+                     , Client.ClientStaticT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
                      , Client.SCR
                      , Constants
-                     , Game.CVarT
+                     , Game.ClientPersistantT
+                     , Game.ClientRespawnT
                      , Game.Cmd
+                     , Game.CmdAliasT
                      , Game.CmdGlobals
+                     , Game.CModelT
+                     , Game.CPlaneT
+                     , Game.CSurfaceT
+                     , Game.CVarT
+                     , Game.EdictT
+                     , Game.EntityStateT
+                     , Game.GClientT
+                     , Game.GItemArmorT
+                     , Game.GItemT
+                     , Game.Info
+                     , Game.LinkT
+                     , Game.MFrameT
+                     , Game.MMoveT
+                     , Game.MonsterInfoT
+                     , Game.MoveInfoT
+                     , Game.PlayerStateT
+                     , Game.PMoveStateT
+                     , Game.PMoveT
+                     , Game.TraceT
+                     , Game.UserCmdT
                      , Globals
                      , QCommon.CBuf
                      , QCommon.CBufShared
-                     , QCommon.CmdAliasT
                      , QCommon.CmdFunctionT
                      , QCommon.ComGlobals
                      , QCommon.CVar
@@ -55,7 +78,10 @@ executable hake2
                      , QCommon.FS
                      , QCommon.FSGlobals
                      , QCommon.FSShared
+                     , QCommon.MSG
+                     , QCommon.NetAdrT
                      , QCommon.NetChannel
+                     , QCommon.NetChanT
                      , QCommon.PackFileT
                      , QCommon.PackT
                      , QCommon.QCommon
@@ -66,9 +92,18 @@ executable hake2
                      , Quake
                      , QuakeIO
                      , QuakeIOState
+                     , QuakeRef
                      , QuakeState
+                     , Server.AreaNodeT
+                     , Server.ChallengeT
+                     , Server.ClientFrameT
+                     , Server.ServerStaticT
+                     , Server.ServerT
                      , Server.SVConsoleCommands
+                     , Server.SVGlobals
+                     , Server.SVInit
                      , Server.SVMain
+                     , Server.SVMainShared
                      , Sys.NET
                      , Sys.Timer
                      , Types

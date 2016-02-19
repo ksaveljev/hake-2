@@ -12,8 +12,9 @@ import           Control.Lens (use, (.=), (%=))
 import           Control.Monad (unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.Char (ord, toUpper)
+import           Data.Char (ord, toUpper, chr)
 import           Data.Maybe (fromMaybe)
+import           Data.Serialize (encode)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
@@ -46,25 +47,27 @@ bindF :: XCommandT
 bindF = XCommandT "Key.bindF" $
   do c <- Cmd.argc
      checkArgs c
-  where checkArgs c | c < 2 = Com.printf "bind <key> [command] : attach a command to a key\n"
-                    | otherwise =
-                        do arg <- Cmd.argv 1
-                           key <- stringToKeynum arg
-                           bind arg key c
+  where checkArgs c
+          | c < 2 = Com.printf "bind <key> [command] : attach a command to a key\n"
+          | otherwise =
+              do arg <- Cmd.argv 1
+                 key <- stringToKeynum arg
+                 bind arg key c
 
 bind :: B.ByteString -> Int -> Int -> Quake ()
-bind arg key c | key == -1 = Com.printf ("\"" `B.append` arg `B.append` "\" isn't a valid key\n")
-               | c == 2 = bindInfo arg key
-               | otherwise =
-                   do cmd <- fmap (B.intercalate " ") (mapM Cmd.argv [2..c-1])
-                      setBinding key (Just cmd)
+bind arg key c
+  | key == -1 = Com.printf (B.concat ["\"", arg, "\" isn't a valid key\n"])
+  | c == 2 = bindInfo arg key
+  | otherwise =
+      do cmd <- fmap (B.intercalate " ") (mapM Cmd.argv [2..c-1])
+         setBinding key (Just cmd)
 
 bindInfo :: B.ByteString -> Int -> Quake ()
 bindInfo arg key =
   do keyBindings <- use (globals.gKeyBindings)
      maybe notBound printBindInfo (keyBindings V.! key)
-  where notBound = Com.printf ("\"" `B.append` arg `B.append` "\" is not bound\n")
-        printBindInfo binding = Com.printf ("\"" `B.append` arg `B.append` "\" = \"" `B.append` binding `B.append` "\"\n")
+  where notBound = Com.printf (B.concat ["\"", arg, "\" is not bound\n"])
+        printBindInfo binding = Com.printf (B.concat ["\"", arg, "\" = \"", binding, "\"\n"])
 
 setBinding :: Int -> Maybe B.ByteString -> Quake ()
 setBinding keyNum binding =
@@ -80,10 +83,44 @@ stringToKeynum str
   where upperStr = BC.map toUpper str
 
 unbindF :: XCommandT
-unbindF = error "Key.unbindF" -- TODO
+unbindF = XCommandT "Key.unbindF" $
+  do c <- Cmd.argc
+     checkArgs c
+  where checkArgs c
+          | c /= 2 = Com.printf "unbind <key> : remove commands from a key\n"
+          | otherwise = unbind
+
+unbind :: Quake ()
+unbind =
+  do arg <- Cmd.argv 1
+     keynum <- stringToKeynum arg
+     clearBinding arg keynum
+  where clearBinding arg keynum
+          | keynum == -1 = Com.printf (B.concat ["\"", arg, "\" isn't a valid key\n"])
+          | otherwise = setBinding keynum Nothing
 
 unbindAllF :: XCommandT
 unbindAllF = error "Key.unbindAllF" -- TODO
 
 bindListF :: XCommandT
-bindListF = error "Key.bindListF" -- TODO
+bindListF = XCommandT "Key.bindListF" $
+  do bindings <- use (globals.gKeyBindings)
+     V.imapM_ printBinding bindings
+
+printBinding :: Int -> Maybe B.ByteString -> Quake ()
+printBinding _ Nothing = return ()
+printBinding idx (Just binding)
+  | B.null binding = return ()
+  | otherwise =
+      do strKeynum <- keynumToString idx
+         Com.printf (bindingInfo strKeynum)
+  where bindingInfo strKeynum = B.concat [strKeynum, " \"", binding, "\"\n"]
+
+keynumToString :: Int -> Quake B.ByteString
+keynumToString keynum =
+  do keyNames <- use (keyGlobals.kgKeyNames)
+     return (convertKeyNum keyNames)
+  where convertKeyNum keyNames
+          | keynum < 0 || keynum > 255 = "<KEY NOT FOUND>"
+          | keynum > 32 && keynum < 127 = encode (chr keynum)
+          | otherwise = fromMaybe "<UNKNOWN KEYNUM>" (keyNames V.! keynum)
