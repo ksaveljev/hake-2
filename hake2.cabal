@@ -35,10 +35,14 @@ executable hake2
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CL
                      , Client.ClientStaticT
+                     , Client.Console
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
+                     , Client.Menu
                      , Client.SCR
+                     , Client.V
+                     , Client.VID
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT
@@ -104,6 +108,8 @@ executable hake2
                      , Server.SVInit
                      , Server.SVMain
                      , Server.SVMainShared
+                     , Sound.S
+                     , Sys.IN
                      , Sys.NET
                      , Sys.Timer
                      , Types
