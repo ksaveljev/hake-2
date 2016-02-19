@@ -84,7 +84,7 @@ parseRegularWord text skipWhitesIdx
         newIdx = skipWhitesIdx + B.length str
         lengthExceeded = B.length str >= Constants.maxTokenChars
         lengthExceededError =
-          do printf ("Token exceeded " `B.append` encode Constants.maxTokenChars `B.append` " chars, discarded.\n")
+          do printf (B.concat["Token exceeded ", encode Constants.maxTokenChars, " chars, discarded.\n"])
              return (Just "", newIdx)
 
 skipWhites :: B.ByteString -> Int -> Int

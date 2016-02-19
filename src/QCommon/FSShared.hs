@@ -56,7 +56,7 @@ fileLinkNotFound fileName =
      foundFileLen <- searchPathMatch fileName searchPaths
      maybe fileNotFound return foundFileLen
   where fileNotFound =
-          do Com.dprintf ("FindFile: can't find " `B.append` fileName `B.append` "\n")
+          do Com.dprintf (B.concat ["FindFile: can't find ", fileName, "\n"])
              return (-1)
 
 fileLinkFound :: B.ByteString -> FileLinkT -> Quake Int
@@ -66,7 +66,7 @@ fileLinkFound fileName fileLink =
   where netPath = (fileLink^.flTo) `B.append` B.take (fileLink^.flFromLength) fileName
         netPathStr = BC.unpack netPath
         getFileSize True =
-          do Com.dprintf ("link file: " `B.append` netPath `B.append` "\n")
+          do Com.dprintf (B.concat ["link file: ", netPath, "\n"])
              size <- request (io (fmap fileSize (getFileStatus netPathStr)))
              return (fromIntegral size)
         getFileSize False = return (-1)
@@ -100,10 +100,10 @@ checkDirectoryTree _ [] =
 checkDirectoryTree name (searchPath:xs) =
   do havePermissions <- request (io (canRead netPathStr))
      getFileSize havePermissions
-  where netPath = (searchPath^.spFilename) `B.append` "/" `B.append` name
+  where netPath = B.concat [searchPath^.spFilename, "/", name]
         netPathStr = BC.unpack netPath
         getFileSize True =
-          do Com.dprintf ("FindFile: " `B.append` netPath `B.append` "\n")
+          do Com.dprintf (B.concat ["FindFile: ", netPath, "\n"])
              size <- request (io (fmap fileSize (getFileStatus netPathStr)))
              return (Just (fromIntegral size))
         getFileSize False = searchPathMatch name xs
@@ -118,7 +118,7 @@ processPackFile name searchPaths pack =
 packFileFound :: B.ByteString -> PackT -> PackFileT -> Quake (Maybe Int)
 packFileFound fileName pack entry =
   do fsGlobals.fsFileFromPak .= 1
-     Com.dprintf ("PackFile: " `B.append` (pack^.pFilename) `B.append` " : " `B.append` fileName `B.append` "\n")
+     Com.dprintf (B.concat ["PackFile: ", pack^.pFilename, " : ", fileName, "\n"])
      havePermissions <- request (io (canRead (BC.unpack (pack^.pFilename))))
      getFileSize havePermissions
   where getFileSize True = return (Just (entry^.pfFileLen))
