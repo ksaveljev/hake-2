@@ -31,9 +31,11 @@ consoleKeys = [32..127] ++ keyboardButtons
 menuBoundKeys :: [Int]
 menuBoundKeys = [kF1, kF2, kF3, kF4, kF5, kF6, kF7, kF8, kF9, kF10, kF11, kF12, kEscape]
 
-initialCommands :: [(B.ByteString,XCommandT)]
+initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
-  [("bind",bindF), ("unbind",unbindF), ("unbindall",unbindAllF), ("bindlist",bindListF)] 
+  [ ("bind", Just bindF), ("unbind", Just unbindF)
+  , ("unbindall", Just unbindAllF), ("bindlist", Just bindListF)
+  ] 
 
 initialize :: Quake ()
 initialize =
@@ -41,7 +43,7 @@ initialize =
      globals.gKeyLinePos .= 1
      keyGlobals.kgConsoleKeys %= (UV.// ((consoleKeys `zip` repeat True) ++ [(96, False), (126, False)])) -- 96 is '`', 126 is '~'
      keyGlobals.kgMenuBound %= (UV.// (menuBoundKeys `zip` repeat True))
-     mapM_ (\(name,cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
+     Cmd.addInitialCommands initialCommands
 
 bindF :: XCommandT
 bindF = XCommandT "Key.bindF" $

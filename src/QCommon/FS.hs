@@ -23,16 +23,12 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           System.Directory
 
-initialCommands :: [(B.ByteString,XCommandT)]
-initialCommands =
-  [("path",pathF),("link",linkF),("dir",dirF)] 
+initialCommands :: [(B.ByteString, Maybe XCommandT)]
+initialCommands = [("path", Just pathF), ("link", Just linkF), ("dir", Just dirF)] 
   
-initializeCommands :: Quake ()
-initializeCommands = mapM_ (\(name,cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
-
 initializeFileSystem :: Quake ()
 initializeFileSystem =
-  do initializeCommands
+  do Cmd.addInitialCommands initialCommands
      homeDir <- request (io getHomeDirectory)
      let initialFsUserDir = BC.pack homeDir `B.append` "/.hake2"
      fsGlobals.fsUserDir .= initialFsUserDir

@@ -34,6 +34,8 @@ executable hake2
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CL
                      , Client.ClientStaticT
+                     , Client.CLInput
+                     , Client.CLParse
                      , Client.Console
                      , Client.Key
                      , Client.KeyConstants
@@ -112,4 +114,5 @@ executable hake2
                      , Sys.NET
                      , Sys.Timer
                      , Types
+                     , Util.Binary
                      , Util.Lib

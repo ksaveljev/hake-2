@@ -17,27 +17,21 @@ import           Control.Lens (use, (^.), (.=))
 import           Control.Monad (when)
 import qualified Data.ByteString as B
 
-initialCommands :: [(B.ByteString, XCommandT)]
-initialCommands = [ ("heartbeat", heartbeatF)
-                  , ("kick", kickF)
-                  , ("status", statusF)
-                  , ("serverinfo", serverInfoF)
-                  , ("dumpuser", dumpUserF)
-                  , ("map", mapF)
-                  , ("demomap", demoMapF)
-                  , ("gamemap", gameMapF)
-                  , ("setmaster", setMasterF)
-                  , ("serverrecord", serverRecordF)
-                  , ("serverstop", serverStopF)
-                  , ("save", saveGameF)
-                  , ("load", loadGameF)
-                  , ("killserver", killServerF)
-                  , ("sv", serverCommandF)
-                  ]
+initialCommands :: [(B.ByteString, Maybe XCommandT)]
+initialCommands =
+  [ ("heartbeat", Just heartbeatF) , ("kick", Just kickF)
+  , ("status", Just statusF), ("serverinfo", Just serverInfoF)
+  , ("dumpuser", Just dumpUserF), ("map", Just mapF)
+  , ("demomap", Just demoMapF), ("gamemap", Just gameMapF)
+  , ("setmaster", Just setMasterF), ("serverrecord", Just serverRecordF)
+  , ("serverstop", Just serverStopF), ("save", Just saveGameF)
+  , ("load", Just loadGameF) , ("killserver", Just killServerF)
+  , ("sv", Just serverCommandF)
+  ]
 
 initOperatorCommands :: Quake ()
 initOperatorCommands =
-  do mapM_ (\(name, cmd) -> Cmd.addCommand name (Just cmd)) initialCommands
+  do Cmd.addInitialCommands initialCommands
      dedicatedValue <- fmap (^.cvValue) dedicatedCVar
      when (dedicatedValue /= 0) $
        Cmd.addCommand "say" (Just conSayF)

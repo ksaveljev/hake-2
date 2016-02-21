@@ -1,5 +1,6 @@
 module Game.Cmd
   ( addCommand
+  , addInitialCommands
   , argc
   , argv
   , executeString
@@ -34,12 +35,16 @@ import qualified Data.Vector as V
 aliasLoopCount :: Int
 aliasLoopCount = 16
 
-initialCommands :: [(B.ByteString,XCommandT)]
+initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
-  [("exec",execF),("echo",echoF),("cmdlist",listF),("alias",aliasF),("wait",waitF)] 
+  [ ("exec", Just execF), ("echo", Just echoF), ("cmdlist", Just listF)
+  , ("alias", Just aliasF), ("wait", Just waitF) ]
+
+addInitialCommands :: [(B.ByteString, Maybe XCommandT)] -> Quake ()
+addInitialCommands = mapM_ (uncurry addCommand)
   
 initialize :: Quake ()
-initialize = mapM_ (\(name,cmd) -> addCommand name (Just cmd)) initialCommands
+initialize = addInitialCommands initialCommands
 
 addCommand :: B.ByteString -> Maybe XCommandT -> Quake ()
 addCommand name cmd =
