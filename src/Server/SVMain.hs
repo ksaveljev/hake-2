@@ -10,10 +10,10 @@ import           QuakeState
 import           Server.SVMainShared
 import qualified Server.SVConsoleCommands as SVConsoleCommands
 import           Types
+import           Util.Binary (encode)
 
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
-import           Data.Serialize (encode)
 
 initialize :: Quake ()
 initialize =

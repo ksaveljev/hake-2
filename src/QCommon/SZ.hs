@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.SZ
-  ( initialize
+  ( clear
+  , initialize
   , printSB
   , write
   ) where
@@ -8,11 +9,11 @@ module QCommon.SZ
 import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens (ASetter', Lens', Traversal', preuse, (.=), (%=), (^.), (+=), (&), (.~))
 import           Control.Monad (when, unless)
 import qualified Data.ByteString as B
-import           Data.Serialize (encode)
 
 initialize :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 initialize bufLens bufData maxLen =

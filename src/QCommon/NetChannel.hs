@@ -6,11 +6,11 @@ import qualified Constants
 import qualified QCommon.CVar as CVar
 import qualified Sys.Timer as Timer
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Monad (void)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
-import           Data.Serialize (encode)
 
 initialize :: Quake ()
 initialize =

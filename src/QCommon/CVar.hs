@@ -17,6 +17,7 @@ import qualified QCommon.FS as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
+import           Util.Binary (encode)
 
 import           Control.Lens (use, (.=), (^.), (&), (.~))
 import           Control.Monad (when, void)
@@ -24,7 +25,6 @@ import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
 import           Data.Maybe (isJust, isNothing, fromMaybe)
-import           Data.Serialize (encode)
 
 getExisting :: B.ByteString -> Quake CVarT
 getExisting = fmap (fromMaybe (error "CVar.getExisting returned Nothing")) . findVar

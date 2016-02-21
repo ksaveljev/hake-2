@@ -14,13 +14,13 @@ import qualified QCommon.CVarShared as CVar
 import           QCommon.FSShared
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens (use, (.=), (^.), (%=))
 import           Control.Monad (when, unless)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.Serialize (encode)
 import           System.Directory
 
 initialCommands :: [(B.ByteString,XCommandT)]

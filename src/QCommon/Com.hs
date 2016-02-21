@@ -12,6 +12,7 @@ module QCommon.Com
 import qualified Constants
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens (use, (.=), (%=))
 import           Control.Monad (when)
@@ -19,7 +20,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (chr)
 import           Data.Maybe (fromMaybe)
-import           Data.Serialize (encode)
 import qualified Data.Vector as V
 
 initializeArgv :: [String] -> Quake ()

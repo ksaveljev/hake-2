@@ -18,12 +18,12 @@ import qualified QCommon.NetChannel as NetChannel
 import qualified Server.SVMain as SVMain
 import qualified Sys.NET as NET
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens ((^.))
 import           Control.Monad (unless,void)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
-import           Data.Serialize (encode)
 
 frame :: Int -> Quake ()
 frame = error "QCommon.frame" -- TODO

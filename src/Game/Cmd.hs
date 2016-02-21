@@ -15,6 +15,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.SZ as SZ
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens (Lens', use, (^.), (%=), (.=), (+=), (&), (.~))
 import           Control.Monad (when, unless)
@@ -26,7 +27,6 @@ import           Data.Char (toUpper, chr)
 import           Data.Foldable (find)
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
-import           Data.Serialize (encode)
 import           Data.Sequence ((<|))
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V

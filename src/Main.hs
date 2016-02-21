@@ -2,7 +2,7 @@ module Main where
 
 import QuakeIO (runQuake)
 
-import System.IO (hSetBuffering,stdout,BufferMode(NoBuffering))
+import System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
 
 main :: IO ()
 main =

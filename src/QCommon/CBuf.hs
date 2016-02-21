@@ -7,6 +7,7 @@ module QCommon.CBuf
   ) where
 
 import qualified Game.Cmd as Cmd
+import           QCommon.CBufShared
 import qualified QCommon.Com as Com
 import qualified QCommon.SZ as SZ
 import           QuakeState
@@ -54,14 +55,6 @@ addLateCommands =
               let command = BC.takeWhile (\ch -> ch /= '+' && ch /= '-') (B.drop (idx + 1) text)
               in findCommands text (idx + B.length command) (B.concat [accum, command, "\n"])
           | otherwise = findCommands text (idx + 1) accum
-
-addText :: B.ByteString -> Quake ()
-addText text =
-  do cmdText <- use (globals.gCmdText)
-     if (cmdText^.sbCurSize) + len >= (cmdText^.sbMaxSize)
-       then Com.printf "Cbuf.addText: overflow\n"
-       else SZ.write (globals.gCmdText) text len
-  where len = B.length text
 
 execute :: Quake ()
 execute =

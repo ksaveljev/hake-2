@@ -7,6 +7,7 @@ import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Lens (use, (.=), (%=))
 import           Control.Monad (unless)
@@ -14,7 +15,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (ord, toUpper, chr)
 import           Data.Maybe (fromMaybe)
-import           Data.Serialize (encode)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
