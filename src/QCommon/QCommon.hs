@@ -91,11 +91,9 @@ initialCVars = [ ("host_speeds", "0", 0)
 processUserCommands :: Quake ()
 processUserCommands =
   do added <- CBuf.addLateCommands -- add + commands from command line
-     if added
-       -- the user asked for something explicit so drop the loading plaque
-       then SCR.endLoadingPlaque
-       -- the user didn't give any commands, run default action
-       else runDefault
+     process added
+  where process True = SCR.endLoadingPlaque -- the user asked for something explicit so drop the loading plaque
+        process False = runDefault -- the user didn't give any commands, run default action
 
 runDefault :: Quake ()
 runDefault =

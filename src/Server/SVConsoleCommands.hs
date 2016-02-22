@@ -7,13 +7,14 @@ import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
+import           QuakeRef
 import           QuakeState
 import qualified Server.SVInit as SVInit
 import qualified Server.SVMainShared as SVMain
 import qualified Sys.NET as NET
 import           Types
 
-import           Control.Lens (use, (^.), (.=))
+import           Control.Lens (use, (^.), (.=), (&), (.~))
 import           Control.Monad (when)
 import qualified Data.ByteString as B
 
@@ -42,7 +43,44 @@ heartbeatF = XCommandT "SVConsoleCommands.heartbeatF" $
 
 kickF :: XCommandT
 kickF = XCommandT "SVConsoleCommands.kickF" $
-  error "SVConsoleCommands.kickF" -- TODO
+  do initialized <- use (svGlobals.svServerStatic.ssInitialized)
+     c <- Cmd.argc
+     tryToKick initialized c
+  where tryToKick initialized c
+          | not initialized = Com.printf "No server running.\n"
+          | c /= 2 = Com.printf "Usage: kick <userid>\n"
+          | otherwise =
+              do ok <- setPlayer
+                 kick ok
+
+kick :: Bool -> Quake ()
+kick False = return ()
+kick True =
+  do clientRef <- use (svGlobals.svClient)
+     maybe kickError proceedKicking clientRef
+  where kickError = Com.fatalError "svGlobals.svClient is Nothing"
+
+proceedKicking :: ClientRef -> Quake ()
+proceedKicking clientRef
+  = do client <- readRef clientRef
+       SVSend.broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " was kicked\n")
+       -- print directly, because the dropped client won't get the SV_BroadcastPrintf message
+       SVSend.clientPring client Constants.printHigh "You were kicked from the game\n"
+       SVMain.dropClient clientRef
+       realTime <- use (svGlobals.svServerStatic.ssRealTime)
+       modifyRef clientRef (\v -> v & cLastMessage .~ realTime) -- min case there is a funny zombie
+{-
+             Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+             Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
+             let playerName = client^.cName
+             SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
+             -- print directly, because the dropped client won't get the
+             -- SV_BroadcastPrintf message
+             SVSend.clientPrintf client Constants.printHigh "You were kicked from the game\n"
+             SVMain.dropClient clientRef
+             -- SV_INIT.svs.realtime
+             realtime <- use $ svGlobals.svServerStatic.ssRealTime
+             svGlobals.svServerStatic.ssClients.ix clientIdx.cLastMessage .= realtime -- min case there is a funny zombie-}
 
 statusF :: XCommandT
 statusF = XCommandT "SVConsoleCommands.statusF" $
@@ -106,3 +144,6 @@ serverCommandF = XCommandT "SVConsoleCommands.serverCommandF" $
 conSayF :: XCommandT
 conSayF = XCommandT "SVConsoleCommands.conSayF" $
   error "SVConsoleCommands.conSayF" -- TODO
+
+setPlayer :: Quake Bool
+setPlayer = error "SVConsoleCommands.setPlayer" -- TODO

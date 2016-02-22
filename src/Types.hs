@@ -1,8 +1,10 @@
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ExistentialQuantification #-}
 module Types where
 
+import           Control.Lens (Lens')
 import           Control.Monad.State (State,StateT,MonadState,MonadIO,lift,get,put,liftIO)
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
@@ -31,12 +33,13 @@ io :: MonadIO m => IO a -> m a
 io = liftIO
 
 data QuakeState = QuakeState
-  { _globals    :: Globals
-  , _comGlobals :: ComGlobals
-  , _cmdGlobals :: CmdGlobals
-  , _keyGlobals :: KeyGlobals
-  , _fsGlobals  :: FSGlobals
-  , _svGlobals  :: SVGlobals
+  { _globals         :: Globals
+  , _comGlobals      :: ComGlobals
+  , _cmdGlobals      :: CmdGlobals
+  , _keyGlobals      :: KeyGlobals
+  , _fsGlobals       :: FSGlobals
+  , _svGlobals       :: SVGlobals
+  , _gameBaseGlobals :: GameBaseGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -132,6 +135,43 @@ data SVGlobals = SVGlobals
   , _svMsg          :: SizeBufT
   , _svLeafsTmp     :: UV.Vector Int
   , _svFatPVS       :: UV.Vector Word8
+  }
+
+data GameBaseGlobals = GameBaseGlobals
+  { _gbDummyPlane    :: CPlaneT
+  , _gbGame          :: GameLocalsT
+  , _gbLevel         :: LevelLocalsT
+  , _gbGameImport    :: GameImportT
+  , _gbSpawnTemp     :: SpawnTempT
+  , _gbSmMeatIndex   :: Int
+  , _gbSndFry        :: Int
+  , _gbMeansOfDeath  :: Int
+  , _gbNumEdicts     :: Int
+  , _gbItemList      :: V.Vector GItemT
+  , _gbPushed        :: V.Vector PushedT
+  , _gbPushedP       :: Int
+  , _gbObstacle      :: Maybe EdictRef
+  , _gbCYes          :: Int
+  , _gbCNo           :: Int
+  , _gbTouch         :: V.Vector EdictRef
+  , _gbIsQuad        :: Bool
+  , _gbIsSilenced    :: Int
+  , _gbCurrentPlayer :: Maybe EdictRef
+  , _gbCurrentClient :: Maybe GClientRef
+  , _gbForward       :: V3 Float
+  , _gbRight         :: V3 Float
+  , _gbUp            :: V3 Float
+  , _gbXYSpeed       :: Float
+  , _gbBobMove       :: Float
+  , _gbBobCycle      :: Int
+  , _gbBobFracSin    :: Float
+  , _gbXxxi          :: Int
+  , _gbEnemyVis      :: Bool
+  , _gbEnemyInFront  :: Bool
+  , _gbEnemyRange    :: Int
+  , _gbEnemyYaw      :: Float
+  , _gbPlayerDieIdx  :: Int
+  , _gbWindSound     :: Int
   }
   
 data CVarT = CVarT
@@ -740,6 +780,113 @@ data ClientStaticT = ClientStaticT
   , _csDemoRecording      :: Bool
   , _csDemoWaiting        :: Bool
   , _csDemoFile           :: Maybe Handle
+  }
+  
+data GameLocalsT = GameLocalsT
+  { _glHelpMessage1 :: B.ByteString
+  , _glHelpMessage2 :: B.ByteString
+  , _glHelpChanged  :: Int
+  , _glClients      :: V.Vector GClientT
+  , _glSpawnPoint   :: B.ByteString
+  , _glMaxClients   :: Int
+  , _glMaxEntities  :: Int
+  , _glServerFlags  :: Int
+  , _glNumItems     :: Int
+  , _glAutosaved    :: Bool
+  }
+
+data LevelLocalsT = LevelLocalsT
+  { _llFrameNum             :: Int
+  , _llTime                 :: Float
+  , _llLevelName            :: B.ByteString
+  , _llMapName              :: B.ByteString
+  , _llNextMap              :: B.ByteString
+  , _llIntermissionTime     :: Float
+  , _llChangeMap            :: B.ByteString
+  , _llExitIntermission     :: Bool
+  , _llIntermissionOrigin   :: V3 Float
+  , _llIntermissionAngle    :: V3 Float
+  , _llSightClient          :: Maybe EdictRef
+  , _llSightEntity          :: Maybe EdictRef
+  , _llSightEntityFrameNum  :: Int
+  , _llSoundEntity          :: Maybe EdictRef
+  , _llSoundEntityFrameNum  :: Int
+  , _llSound2Entity         :: Maybe EdictRef
+  , _llSound2EntityFrameNum :: Int
+  , _llPicHealth            :: Int
+  , _llTotalSecrets         :: Int
+  , _llFoundSecrets         :: Int
+  , _llTotalGoals           :: Int
+  , _llFoundGoals           :: Int
+  , _llTotalMonsters        :: Int
+  , _llKilledMonsters       :: Int
+  , _llCurrentEntity        :: Maybe EdictRef
+  , _llBodyQue              :: Int
+  , _llPowerCubes           :: Int
+  }
+
+data GameImportT = GameImportT
+  { _giBprintf            :: Int -> B.ByteString -> Quake ()
+  , _giDprintf            :: B.ByteString -> Quake ()
+  , _giCprintf            :: Maybe EdictRef -> Int -> B.ByteString -> Quake ()
+  , _giCenterPrintf       :: EdictRef -> B.ByteString -> Quake ()
+  , _giSound              :: Maybe EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
+  , _giPositionedSound    :: Maybe (V3 Float) -> EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
+  , _giConfigString       :: Int -> B.ByteString -> Quake ()
+  , _giError              :: B.ByteString -> Quake ()
+  , _giError2             :: Int -> B.ByteString -> Quake ()
+  , _giModelIndex         :: Maybe B.ByteString -> Quake Int
+  , _giSoundIndex         :: Maybe B.ByteString -> Quake Int
+  , _giImageIndex         :: Maybe B.ByteString -> Quake Int
+  , _giSetModel           :: EdictRef -> Maybe B.ByteString -> Quake ()
+  , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictRef -> Int -> Quake TraceT
+  , _giPointContents      :: V3 Float -> Quake Int
+  , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
+  , _giSetAreaPortalState :: Int -> Bool -> Quake ()
+  , _giAreasConnected     :: Int -> Int -> Quake Bool
+  , _giLinkEntity         :: EdictRef -> Quake ()
+  , _giUnlinkEntity       :: EdictRef -> Quake ()
+  , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictRef) -> Int -> Int -> Quake Int
+  , _giPMove              :: PMoveT -> Quake PMoveT
+  , _giMulticast          :: V3 Float -> Int -> Quake ()
+  , _giUnicast            :: EdictRef -> Bool -> Quake ()
+  , _giWriteByte          :: Int -> Quake ()
+  , _giWriteShort         :: Int -> Quake ()
+  , _giWriteString        :: B.ByteString -> Quake ()
+  , _giWritePosition      :: V3 Float -> Quake ()
+  , _giWriteDir           :: V3 Float -> Quake ()
+  , _giCVar               :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
+  , _giCVarSet            :: B.ByteString -> B.ByteString -> Quake CVarT
+  , _giCVarForceSet       :: B.ByteString -> B.ByteString -> Quake CVarT
+  , _giArgc               :: Quake Int
+  , _giArgv               :: Int -> Quake B.ByteString
+  , _giArgs               :: Quake B.ByteString
+  , _giAddCommandString   :: B.ByteString -> Quake ()
+  }
+
+data SpawnTempT = SpawnTempT
+  { _stSky       :: B.ByteString
+  , _stSkyRotate :: Float
+  , _stSkyAxis   :: V3 Float
+  , _stNextMap   :: B.ByteString
+  , _stLip       :: Int
+  , _stDistance  :: Int
+  , _stHeight    :: Int
+  , _stNoise     :: Maybe B.ByteString
+  , _stPauseTime :: Float
+  , _stItem      :: Maybe B.ByteString
+  , _stGravity   :: Maybe B.ByteString
+  , _stMinYaw    :: Float
+  , _stMaxYaw    :: Float
+  , _stMinPitch  :: Float
+  , _stMaxPitch  :: Float
+  }
+
+data PushedT = PushedT
+  { _pEnt      :: Maybe EdictRef
+  , _pOrigin   :: V3 Float
+  , _pAngles   :: V3 Float
+  , _pDeltaYaw :: Float
   }
 
 data AI = AI

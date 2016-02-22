@@ -6,6 +6,6 @@ import           Data.Maybe (fromMaybe)
 import           Text.Read (readMaybe)
 
 atof :: B.ByteString -> Float
-atof str = if B.length str == 0
-             then 0.0
-             else fromMaybe 0.0 (readMaybe (BC.unpack str)) -- IMPROVE?
+atof str
+  | B.null str = 0.0
+  | otherwise = fromMaybe 0.0 (readMaybe (BC.unpack str)) -- IMPROVE?

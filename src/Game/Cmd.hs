@@ -2,6 +2,7 @@ module Game.Cmd
   ( addCommand
   , addInitialCommands
   , argc
+  , args
   , argv
   , executeString
   , initialize
@@ -48,27 +49,30 @@ initialize = addInitialCommands initialCommands
 
 addCommand :: B.ByteString -> Maybe XCommandT -> Quake ()
 addCommand name cmd =
-  do variable <- CVar.variableString name
+  do varStr <- CVar.variableString name
      exists <- commandExists name
-     if | not (B.null variable) -> -- fail if the command is a variable name
-            Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined as a var\n"])
-        | exists -> -- fail if the command already exists
-            Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined\n"])
-        | otherwise -> -- add new command otherwise
-            cmdGlobals.cgCmdFunctions %= (CmdFunctionT name cmd <|)
+     tryAddCommand varStr exists
+  where tryAddCommand varStr exists
+          | not (B.null varStr) = -- fail if the command is a variable name
+              Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined as a var\n"])
+          | exists = -- fail if the command already exists
+              Com.printf (B.concat ["Cmd.addCommand: ", name, " already defined\n"])
+          | otherwise = -- add new command otherwise
+              cmdGlobals.cgCmdFunctions %= (CmdFunctionT name cmd <|)
 
 commandExists :: B.ByteString -> Quake Bool
 commandExists name =
-  do allCommands <- use $ cmdGlobals.cgCmdFunctions
+  do allCommands <- use (cmdGlobals.cgCmdFunctions)
      return (any (\cmd -> cmd^.cfName == name) allCommands)
 
 execF :: XCommandT
 execF = XCommandT "Cmd.execF" $
   do c <- argc
-     if c /= 2
-       then Com.printf "exec <filename> : execute a script file\n"
-       else loadAndExec
-  where loadAndExec =
+     exec c
+  where exec c
+          | c /= 2 = Com.printf "exec <filename> : execute a script file\n"
+          | otherwise = loadAndExec
+        loadAndExec =
           do fileName <- argv 1
              script <- FS.loadFile fileName
              maybe (failedToExec fileName) (execScript fileName) script
@@ -89,7 +93,6 @@ listF = XCommandT "Cmd.listF" $
   do allCommands <- use (cmdGlobals.cgCmdFunctions)
      mapM_ (\cmd -> Com.printf ((cmd^.cfName) `B.append` "\n")) allCommands
      Com.printf (encode (Seq.length allCommands) `B.append` " commands \n")
-  
 
 aliasF :: XCommandT
 aliasF = XCommandT "Cmd.aliasF" $
@@ -192,9 +195,10 @@ handleExistingAlias :: CmdAliasT -> Quake ()
 handleExistingAlias alias =
   do globals.gAliasCount += 1
      count <- use (globals.gAliasCount)
-     if count + 1 >= aliasLoopCount
-       then Com.printf "ALIAS_LOOP_COUNT\n"
-       else CBuf.insertText (alias^.caValue)
+     handle count
+  where handle count
+          | count + 1 >= aliasLoopCount = Com.printf "ALIAS_LOOP_COUNT\n"
+          | otherwise = CBuf.insertText (alias^.caValue)
 
 sameNameAs :: B.ByteString -> B.ByteString -> Bool
 sameNameAs expected given =
@@ -211,21 +215,23 @@ sameAliasNameAs expected alias = sameNameAs expected aliasName
 tokenizeString :: B.ByteString -> Bool -> Quake ()
 tokenizeString text macroExpand =
   do clearArgs
-     expandedText <- if macroExpand
-                       then macroExpandString text (B.length text)
-                       else return (Just text)
+     expandedText <- expandText
      maybe (return ()) (`tokenize` 0) expandedText
   where clearArgs =
           do cmdGlobals.cgCmdArgc .= 0
              cmdGlobals.cgCmdArgs .= ""
+        expandText
+          | macroExpand = macroExpandString text (B.length text)
+          | otherwise = return (Just text)
 
 tokenize :: B.ByteString -> Int -> Quake ()
-tokenize text idx =
-  unless (newIdx == textLen || text `BC.index` newIdx == '\n') $
-    do cmdArgc <- use (cmdGlobals.cgCmdArgc)
-       when (cmdArgc == 1) setArgsAfterFirst
-       (var, updatedIdx) <- Com.parse text textLen newIdx
-       maybe (return ()) (processVar text cmdArgc updatedIdx) var
+tokenize text idx
+  | newIdx == textLen || text `BC.index` newIdx == '\n' = return ()
+  | otherwise =
+      do cmdArgc <- use (cmdGlobals.cgCmdArgc)
+         when (cmdArgc == 1) setArgsAfterFirst
+         (var, updatedIdx) <- Com.parse text textLen newIdx
+         maybe (return ()) (processVar text cmdArgc updatedIdx) var
   where newIdx = skipWhitesToEOL text idx
         textLen = B.length text
         skipWhitesToEOL str startIdx =
@@ -273,12 +279,14 @@ expand text inQuote newLen count idx
 processParsedVar :: B.ByteString -> Bool -> Int -> Int -> Int -> Int -> B.ByteString -> Quake (Maybe B.ByteString)
 processParsedVar text newInQuote newLen count idx newIdx var =
   do token <- CVar.variableString var
-     if | lineExceeded token -> lineExceededError
-        | loopDetected -> loopDetectedError
-        | otherwise ->
-            do let newText = B.concat [B.take idx text, token, B.drop newIdx text]
-               expand newText newInQuote (B.length newText) (count + 1) idx
-  where lineExceeded token = newLen + B.length token >= Constants.maxStringChars
+     tryToExpand token
+  where tryToExpand token
+          | lineExceeded token = lineExceededError
+          | loopDetected = loopDetectedError
+          | otherwise = 
+              do let newText = B.concat [B.take idx text, token, B.drop newIdx text]
+                 expand newText newInQuote (B.length newText) (count + 1) idx
+        lineExceeded token = newLen + B.length token >= Constants.maxStringChars
         lineExceededError =
           do Com.printf (B.concat ["Expanded line exceeded ", encode Constants.maxStringChars, " chars, discarded.\n"])
              return Nothing

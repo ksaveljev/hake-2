@@ -30,7 +30,6 @@ executable hake2
                      , unix-compat
                      , unordered-containers
   default-extensions:  OverloadedStrings
-                     , MultiWayIf
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CL
                      , Client.ClientStaticT

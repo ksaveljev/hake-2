@@ -25,12 +25,11 @@ addEarlyCommands shouldClear =
      addCommands args 0
   where addCommands args idx
           | idx >= V.length args = return ()
-          | otherwise =
-              if (args V.! idx) == "+set"
-                then do addCommand idx
-                        when shouldClear (clearArgs idx)
-                        addCommands args (idx + 3)
-                else addCommands args (idx + 1)
+          | args V.! idx == "+set" =
+              do addCommand idx
+                 when shouldClear (clearArgs idx)
+                 addCommands args (idx + 3)
+          | otherwise = addCommands args (idx + 1)
         addCommand idx =
           do name <- Com.argv (idx + 1)
              value <- Com.argv (idx + 2)
@@ -40,10 +39,11 @@ addEarlyCommands shouldClear =
 addLateCommands :: Quake Bool
 addLateCommands =
   do args <- fmap (V.drop 1) (use (comGlobals.cgComArgv))
-     if any (not . B.null) args
-       then checkArgumentCommands args
-       else return False
-  where checkArgumentCommands args =
+     addCommands args
+  where addCommands args
+          | any (not . B.null) args = checkArgumentCommands args
+          | otherwise = return False
+        checkArgumentCommands args =
           do let text = B.intercalate " " (V.toList args)
                  commands = findCommands text 0 ""
                  result = B.length commands /= 0

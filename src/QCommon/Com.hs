@@ -29,7 +29,9 @@ initializeArgv args =
      comGlobals.cgComArgc .= len
      comGlobals.cgComArgv .= V.fromList (fmap (BC.pack . stripLongArg) args)
   where len = length args 
-        stripLongArg s = if length s > Constants.maxTokenChars then "" else s 
+        stripLongArg s
+          | length s > Constants.maxTokenChars = ""
+          | otherwise = s 
 
 printf :: B.ByteString -> Quake ()
 printf str =
