@@ -22,16 +22,16 @@ import qualified Data.HashMap.Lazy as HM
 get :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
 get name value flags =
   do existingVar <- findVar name
-     case existingVar of
-       Nothing ->
-         if | isUserOrServerInfo && not isValidName -> invalidCVar "invalid info cvar name\n"
-            | isUserOrServerInfo && not isValidValue -> invalidCVar "invalid info cvar value\n"
-            | otherwise -> createNewCVar
-       Just var -> do
-         let updatedVar = var & cvFlags %~ (.|. flags)
-         update updatedVar
-         return (Just updatedVar)
-  where isUserOrServerInfo = (flags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)) /= 0
+     maybe tryCreatingNewCVar updateExistingVar existingVar
+  where tryCreatingNewCVar
+          | isUserOrServerInfo && not isValidName = invalidCVar "invalid info cvar name\n"
+          | isUserOrServerInfo && not isValidValue = invalidCVar "invalid info cvar value\n"
+          | otherwise = createNewCVar
+        updateExistingVar var =
+          do let updatedVar = var & cvFlags %~ (.|. flags)
+             update updatedVar
+             return (Just updatedVar)
+        isUserOrServerInfo = (flags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)) /= 0
         isValidName = infoValidate name
         isValidValue = infoValidate value
         invalidCVar msg =

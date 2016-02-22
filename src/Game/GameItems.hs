@@ -3,7 +3,6 @@ module Game.GameItems
   ) where
 
 import qualified Constants
-import           Game.GItemT
 import qualified Game.PlayerWeapon as PlayerWeapon
 import           Types
 

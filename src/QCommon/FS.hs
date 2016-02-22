@@ -16,11 +16,13 @@ import           QuakeState
 import           Types
 import           Util.Binary (encode)
 
-import           Control.Lens (use, (.=), (^.), (%=))
+import           Control.Lens (use, (.=), (^.), (%=), (&), (.~))
 import           Control.Monad (when, unless)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Sequence ((|>), (><))
+import qualified Data.Sequence as Seq
 import           System.Directory
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
@@ -68,10 +70,54 @@ markBaseSearchPaths =
      fsGlobals.fsBaseSearchPaths .= searchPaths
 
 pathF :: XCommandT
-pathF = error "FS.pathF" -- TODO
+pathF = XCommandT "FS.pathF" $
+  do printSearchPaths
+     printLinks
+
+printSearchPaths :: Quake ()
+printSearchPaths =
+  do Com.printf "Current search path:\n"
+     searchPaths <- use (fsGlobals.fsSearchPaths)
+     mapM_ printSearchPath searchPaths
+  where printSearchPath searchPath =
+          maybe (printFilename searchPath) printPackInfo (searchPath^.spPack)
+        printFilename searchPath = Com.printf ((searchPath^.spFilename) `B.append` "\n")
+        printPackInfo pack =
+          Com.printf (B.concat [pack^.pFilename, " (", encode (pack^.pNumFiles), " files)\n"])
+
+printLinks :: Quake ()
+printLinks =
+  do Com.printf "\nLinks:\n"
+     links <- use (fsGlobals.fsLinks)
+     mapM_ printLink links
+  where printLink link = Com.printf (B.concat [link^.flFrom, " : ", link^.flTo, "\n"])
 
 linkF :: XCommandT
-linkF = error "FS.linkF" -- TODO
+linkF = XCommandT "FS.linkF" $
+  do c <- Cmd.argc
+     link c
+  where link c
+          | c /= 3 = Com.printf "USAGE: link <from> <to>\n"
+          | otherwise =
+              do arg1 <- Com.argv 1
+                 arg2 <- Com.argv 2
+                 links <- use (fsGlobals.fsLinks)
+                 maybe (createNewLink arg1 arg2)
+                       (updateExistingLink arg2)
+                       (findLink arg1 links)
+        findLink from = Seq.findIndexL ((== from) . (^.flFrom))
+
+createNewLink :: B.ByteString -> B.ByteString -> Quake ()
+createNewLink from to
+  | B.null to = return ()
+  | otherwise = fsGlobals.fsLinks %= (|> FileLinkT from (B.length from) to)
+
+updateExistingLink :: B.ByteString -> Int -> Quake ()
+updateExistingLink to idx
+  | B.null to = -- delete it
+      fsGlobals.fsLinks %= (\links -> Seq.take idx links >< Seq.drop (idx + 1) links)
+  | otherwise =
+      fsGlobals.fsLinks %= Seq.adjust (\x -> x & flTo .~ to) idx
 
 dirF :: XCommandT
 dirF = error "FS.dirF" -- TODO
