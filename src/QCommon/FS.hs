@@ -1,5 +1,6 @@
 module QCommon.FS
   ( execAutoexec
+  , gameDir
   , initializeFileSystem
   , loadFile
   , setCDDir
@@ -12,6 +13,7 @@ import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import qualified QCommon.CVarShared as CVar
 import           QCommon.FSShared
+import           QCommon.Shared
 import           QuakeState
 import           Types
 import           Util.Binary (encode)
@@ -51,18 +53,15 @@ startWithBaseq2 baseDir =
      markBaseSearchPaths
      gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
      maybe (Com.fatalError "game cvar not set") updateGameDir gameDirVar
-  where updateGameDir gameDir =
-          when (B.length (gameDir^.cvString) > 0) $
-            setGameDir (gameDir^.cvString)
+  where updateGameDir dir =
+          when (B.length (dir^.cvString) > 0) $
+            setGameDir (dir^.cvString)
 
 setCDDir :: Quake ()
 setCDDir =
   do cdDir <- CVar.get "cddir" "" Constants.cvarArchive
      maybe (Com.fatalError "cddir cvar not set") addDir cdDir
   where addDir cdDir = unless (B.null (cdDir^.cvString)) (addGameDirectory (cdDir^.cvString))
-
-setGameDir :: B.ByteString -> Quake ()
-setGameDir = error "FS.setGameDir" -- TODO
 
 markBaseSearchPaths :: Quake ()
 markBaseSearchPaths =
@@ -165,6 +164,3 @@ addPackFiles dir idx =
 
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
 loadPackFile = error "FS.loadPackFile" -- TODO
-
-execAutoexec :: Quake ()
-execAutoexec = error "FS.execAutoexec" -- TODO

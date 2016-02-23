@@ -5,7 +5,7 @@
 module Types where
 
 import           Control.Lens (Lens')
-import           Control.Monad.State (State,StateT,MonadState,MonadIO,lift,get,put,liftIO)
+import           Control.Monad.State (State, StateT, MonadState, MonadIO, lift, get, put, liftIO)
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
@@ -14,8 +14,9 @@ import           Data.Sequence (Seq)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
-import           Data.Word (Word8)
+import           Data.Word (Word8, Word16)
 import           Linear (V3, V4)
 import           Network.Socket (HostAddress)
 import           System.IO (Handle)
@@ -40,10 +41,14 @@ data QuakeState = QuakeState
   , _fsGlobals       :: FSGlobals
   , _svGlobals       :: SVGlobals
   , _gameBaseGlobals :: GameBaseGlobals
+  , _cmGlobals       :: CMGlobals
   }
 
 data QuakeIOState = QuakeIOState
-  { _ioGEdicts :: MV.IOVector EdictT
+  { _ioGEdicts    :: MV.IOVector EdictT
+  , _ioMapPlanes  :: MV.IOVector CPlaneT
+  , _ioMapBrushes :: MV.IOVector CBrushT
+  , _ioText       :: MSV.IOVector Char
   }
 
 data IORequest x
@@ -61,6 +66,8 @@ newtype GClientRef = GClientRef Int deriving Eq
 newtype CModelRef = CModelRef Int deriving Eq
 newtype LinkRef = LinkRef Int deriving Eq
 newtype GItemRef = GItemRef Int deriving Eq
+newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
+newtype CPlaneRef = CPlaneRef Int deriving Eq
 
 data Globals = Globals
   { _gCurTime          :: Int
@@ -73,6 +80,7 @@ data Globals = Globals
   , _gCls              :: ClientStaticT
   , _gUserInfoModified :: Bool
   , _gCVars            :: HM.HashMap B.ByteString CVarT
+  , _gCon              :: ConsoleT
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
@@ -172,6 +180,58 @@ data GameBaseGlobals = GameBaseGlobals
   , _gbEnemyYaw      :: Float
   , _gbPlayerDieIdx  :: Int
   , _gbWindSound     :: Int
+  }
+
+data CMGlobals = CMGlobals
+  { _cmCheckCount      :: Int
+  , _cmMapName         :: B.ByteString
+  , _cmNumBrushSides   :: Int
+  , _cmMapBrushSides   :: V.Vector CBrushSideT
+  , _cmNumTexInfo      :: Int
+  , _cmMapSurfaces     :: V.Vector MapSurfaceT
+  , _cmNumPlanes       :: Int
+  , _cmNumNodes        :: Int
+  , _cmMapNodes        :: V.Vector CNodeT
+  , _cmNumLeafs        :: Int
+  , _cmMapLeafs        :: V.Vector CLeafT
+  , _cmEmptyLeaf       :: Int
+  , _cmSolidLeaf       :: Int
+  , _cmNumLeafBrushes  :: Int
+  , _cmMapLeafBrushes  :: UV.Vector Word16
+  , _cmNumCModels      :: Int
+  , _cmMapCModels      :: V.Vector CModelT
+  , _cmNumBrushes      :: Int
+  , _cmNumVisibility   :: Int
+  , _cmMapVisibility   :: B.ByteString
+  , _cmMapVis          :: DVisT
+  , _cmNumEntityChars  :: Int
+  , _cmMapEntityString :: B.ByteString
+  , _cmNumAreas        :: Int
+  , _cmMapAreas        :: V.Vector CAreaT
+  , _cmNumAreaPortals  :: Int
+  , _cmMapAreaPortals  :: V.Vector DAreaPortalT
+  , _cmNumClusters     :: Int
+  , _cmFloodValid      :: Int
+  , _cmPortalOpen      :: UV.Vector Bool
+  , _cmCModBase        :: Maybe B.ByteString
+  , _cmChecksum        :: Int
+  , _cmLastChecksum    :: Int
+  , _cmDebugLoadMap    :: Bool
+  , _cmBoxHeadNode     :: Int
+  , _cmLeafCount       :: Int
+  , _cmLeafMaxCount    :: Int
+  , _cmLeafMins        :: V3 Float
+  , _cmLeafMaxs        :: V3 Float
+  , _cmLeafTopNode     :: Int
+  , _cmTraceStart      :: V3 Float
+  , _cmTraceEnd        :: V3 Float
+  , _cmTraceMins       :: V3 Float
+  , _cmTraceMaxs       :: V3 Float
+  , _cmTraceExtents    :: V3 Float
+  , _cmTraceTrace      :: TraceT
+  , _cmTraceContents   :: Int
+  , _cmTraceIsPoint    :: Bool
+  , _cmLeafs           :: UV.Vector Int -- tmp for CM.boxTrace
   }
   
 data CVarT = CVarT
@@ -887,6 +947,66 @@ data PushedT = PushedT
   , _pOrigin   :: V3 Float
   , _pAngles   :: V3 Float
   , _pDeltaYaw :: Float
+  }
+
+data CBrushT = CBrushT
+  { _cbContents       :: Int
+  , _cbNumSides       :: Int
+  , _cbFirstBrushSide :: Int
+  , _cbCheckCount     :: Int
+  }
+
+data CBrushSideT = CBrushSideT
+  { _cbsPlane   :: Maybe CPlaneRef
+  , _cbsSurface :: Maybe MapSurfaceRef -- Nothing means nullsurface (from jake2)
+  }
+
+data MapSurfaceT = MapSurfaceT
+  { _msCSurface :: CSurfaceT
+  , _msRName    :: Maybe B.ByteString
+  }
+
+data CNodeT = CNodeT
+  { _cnPlane    :: Maybe CPlaneRef
+  , _cnChildren :: (Int, Int)
+  }
+
+data CLeafT = CLeafT
+  { _clContents       :: Int
+  , _clCluster        :: Int
+  , _clArea           :: Int
+  , _clFirstLeafBrush :: Word16
+  , _clNumLeafBrushes :: Word16
+  }
+
+data CAreaT = CAreaT
+  { _caNumAreaPortals  :: Int
+  , _caFirstAreaPortal :: Int
+  , _caFloodNum        :: Int
+  , _caFloodValid      :: Int
+  }
+
+data DAreaPortalT = DAreaPortalT
+  { _dapPortalNum :: Int
+  , _dapOtherArea :: Int
+  }
+
+data DVisT = DVisT
+  { _dvNumClusters :: Int
+  , _dvBitOfs      :: V.Vector (Int, Int)
+  }
+
+data ConsoleT = ConsoleT
+  { _cInitialized :: Bool
+  , _cCurrent     :: Int
+  , _cX           :: Int
+  , _cDisplay     :: Int
+  , _cOrMask      :: Int
+  , _cLineWidth   :: Int
+  , _cTotalLines  :: Int
+  , _cCursorSpeed :: Float
+  , _cVisLines    :: Int
+  , _cTimes       :: UV.Vector Float
   }
 
 data AI = AI

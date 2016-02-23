@@ -36,6 +36,7 @@ executable hake2
                      , Client.CLInput
                      , Client.CLParse
                      , Client.Console
+                     , Client.ConsoleT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
@@ -55,24 +56,40 @@ executable hake2
                      , Game.CVarT
                      , Game.EdictT
                      , Game.EntityStateT
+                     , Game.GameBaseGlobals
+                     , Game.GameImportT
+                     , Game.GameItems
+                     , Game.GameLocalsT
+                     , Game.GameSVCmds
                      , Game.GClientT
                      , Game.GItemArmorT
                      , Game.GItemT
                      , Game.Info
+                     , Game.LevelLocalsT
                      , Game.LinkT
+                     , Game.MapSurfaceT
                      , Game.MFrameT
                      , Game.MMoveT
                      , Game.MonsterInfoT
                      , Game.MoveInfoT
                      , Game.PlayerStateT
+                     , Game.PlayerWeapon
                      , Game.PMoveStateT
                      , Game.PMoveT
+                     , Game.PushedT
+                     , Game.SpawnTempT
                      , Game.TraceT
                      , Game.UserCmdT
                      , Globals
+                     , QCommon.CAreaT
+                     , QCommon.CBrushSideT
+                     , QCommon.CBrushT
                      , QCommon.CBuf
                      , QCommon.CBufShared
+                     , QCommon.CLeafT
                      , QCommon.CmdFunctionT
+                     , QCommon.CMGlobals
+                     , QCommon.CNodeT
                      , QCommon.ComGlobals
                      , QCommon.CVar
                      , QCommon.CVarShared
@@ -89,7 +106,10 @@ executable hake2
                      , QCommon.PackFileT
                      , QCommon.PackT
                      , QCommon.QCommon
+                     , QCommon.QFiles.BSP.DAreaPortalT
+                     , QCommon.QFiles.BSP.DVisT
                      , QCommon.SearchPathT
+                     , QCommon.Shared
                      , QCommon.SizeBufT
                      , QCommon.SZ
                      , QCommon.XCommandT
@@ -101,6 +121,7 @@ executable hake2
                      , Server.AreaNodeT
                      , Server.ChallengeT
                      , Server.ClientFrameT
+                     , Server.ClientT
                      , Server.ServerStaticT
                      , Server.ServerT
                      , Server.SVConsoleCommands
@@ -108,6 +129,7 @@ executable hake2
                      , Server.SVInit
                      , Server.SVMain
                      , Server.SVMainShared
+                     , Server.SVSend
                      , Sound.S
                      , Sys.IN
                      , Sys.NET

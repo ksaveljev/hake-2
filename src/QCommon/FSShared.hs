@@ -1,6 +1,8 @@
 module QCommon.FSShared
-  ( loadFile
-  , canRead
+  ( canRead
+  , gameDir
+  , fileLength
+  , loadFile
   ) where
 
 import qualified Constants
@@ -181,3 +183,9 @@ packFileFound fileName pack fromPackFile entry =
      Com.dprintf (B.concat ["PackFile: ", pack^.pFilename, " : ", fileName, "\n"])
      havePermissions <- request (io (canRead (BC.unpack (pack^.pFilename))))
      fromPackFile pack entry havePermissions
+
+gameDir :: Quake B.ByteString
+gameDir =
+  do userDir <- use (fsGlobals.fsUserDir)
+     -- IMPROVE: decide if fsUserDir should be Maybe B.ByteString...
+     return (if userDir /= "" then userDir else Constants.baseDirName)

@@ -2,8 +2,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 module Game.GameImportT
-  ( newGameImportT
-  , module Game.GameImportTShared
+  ( module Game.GameImportT
   ) where
 
 import qualified Game.Cmd as Cmd
@@ -38,7 +37,7 @@ newGameImportT =
               , _giImageIndex         = SVInit.imageIndex
               , _giSetModel           = SVGame.setModel
               , _giTrace              = SVWorld.trace
-              , _giPointContents      = (\_ -> return 0) 
+              , _giPointContents      = const (return 0)
               , _giInPHS              = SVGame.inPHS
               , _giSetAreaPortalState = CM.setAreaPortalState
               , _giAreasConnected     = CM.areasConnected

@@ -5,12 +5,12 @@ module Game.GameBaseGlobals
 
 import qualified Constants
 import           Game.CPlaneT (newCPlaneT)
+import           {-# SOURCE #-} Game.GameImportT (newGameImportT)
 import qualified Game.GameItems as GameItems
 import           Game.GameLocalsT (newGameLocalsT)
 import           Game.LevelLocalsT (newLevelLocalsT)
 import           Game.PushedT (newPushedT)
 import           Game.SpawnTempT (newSpawnTempT)
-import           {-# SOURCE #-} Game.GameImportT (newGameImportT)
 import           Types
 
 import           Control.Lens (makeLenses)

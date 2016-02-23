@@ -1,10 +1,10 @@
 module Game.Info
-  ( printServerInfo
+  ( printInfo
   ) where
 
 import           Types
 
 import qualified Data.ByteString as B
 
-printServerInfo :: B.ByteString -> Quake ()
-printServerInfo = error "Info.printServerInfo" -- TODO
+printInfo :: B.ByteString -> Quake ()
+printInfo = error "Info.printInfo" -- TODO

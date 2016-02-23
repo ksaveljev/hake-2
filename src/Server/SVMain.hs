@@ -1,5 +1,6 @@
 module Server.SVMain
-  ( initialize
+  ( dropClient
+  , initialize
   , shutdown
   ) where
 

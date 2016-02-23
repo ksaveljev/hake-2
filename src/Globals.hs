@@ -4,6 +4,7 @@ module Globals
   ) where
 
 import           Client.ClientStaticT (newClientStaticT)
+import           Client.ConsoleT (newConsoleT)
 import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
@@ -27,6 +28,7 @@ initialGlobals =
           , _gCls              = newClientStaticT
           , _gUserInfoModified = False
           , _gCVars            = HM.empty
+          , _gCon              = newConsoleT
           , _gKeyBindings      = V.replicate 256 Nothing
           , _gKeyLines         = V.replicate 32 ""
           , _gKeyLinePos       = 0

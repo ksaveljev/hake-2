@@ -1,5 +1,6 @@
 module QCommon.CVar 
-  ( get
+  ( forceSet
+  , get
   , getExisting
   , initialize
   , initializeCVars
@@ -13,18 +14,17 @@ import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import           QCommon.CVarShared
-import qualified QCommon.FS as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
 import           Util.Binary (encode)
 
-import           Control.Lens (use, (.=), (^.), (&), (.~))
-import           Control.Monad (when, void)
-import           Data.Bits ((.&.), (.|.))
+import           Control.Lens (use, (^.), (&), (.~))
+import           Control.Monad (void)
+import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
-import           Data.Maybe (isJust, isNothing, fromMaybe)
+import           Data.Maybe (fromMaybe)
 
 getExisting :: B.ByteString -> Quake CVarT
 getExisting = fmap (fromMaybe (error "CVar.getExisting returned Nothing")) . findVar
@@ -33,79 +33,6 @@ initialize :: Quake ()
 initialize =
   do Cmd.addCommand "set" (Just setF)
      Cmd.addCommand "cvarlist" (Just listF)
-
-set :: B.ByteString -> B.ByteString -> Quake CVarT
-set name value = set2 name value False
-
-set2 :: B.ByteString -> B.ByteString -> Bool -> Quake CVarT
-set2 name value force =
-  do var <- findVar name
-     maybe createNewCVar (proceedSet2 name value force) var
-  where createNewCVar =
-          do var <- get name value 0
-             maybe createFailedError return var
-
-proceedSet2 :: B.ByteString -> B.ByteString -> Bool -> CVarT -> Quake CVarT
-proceedSet2 name value force var
-  | hasUserServerFlag && invalidValue =
-      do Com.printf "invalid info cvar value\n"
-         return var
-  | not force && writeProtected =
-      do Com.printf (name `B.append` " is write protected.\n")
-         return var
-  | not force && hasLatchFlag = updateLatchedVar var name value
-  | otherwise = updateVar var value force
-  where hasUserServerFlag = userServerFlag /= 0
-        writeProtected = noSetFlag /= 0
-        hasLatchFlag = latchFlag /= 0
-        latchFlag = flags .&. Constants.cvarLatch
-        noSetFlag = flags .&. Constants.cvarNoSet
-        userServerFlag = flags .&. (Constants.cvarUserInfo .|. Constants.cvarServerInfo)
-        flags = var^.cvFlags
-        invalidValue = not (infoValidate value)
-
-updateLatchedVar :: CVarT -> B.ByteString -> B.ByteString -> Quake CVarT
-updateLatchedVar var name value =
-  do state <- use (globals.gServerState)
-     if | Just value == latchedString -> return var
-        | isNothing latchedString && value == (var^.cvString) -> return var
-        | state /= 0 -> delayedVarUpdate var name value
-        | otherwise -> normalVarUpdate var name value
-  where latchedString = var^.cvLatchedString
-
-delayedVarUpdate :: CVarT -> B.ByteString -> B.ByteString -> Quake CVarT
-delayedVarUpdate var name value =
-  do Com.printf (name `B.append` " will be changed for next game.\n")
-     update updatedCVar
-     return updatedCVar
-  where updatedCVar = var & cvLatchedString .~ Just value
-
-normalVarUpdate :: CVarT -> B.ByteString -> B.ByteString -> Quake CVarT
-normalVarUpdate var name value =
-  do update updatedCVar
-     handleGameCVar
-     return updatedCVar
-  where updatedCVar = var & cvLatchedString .~ Nothing
-                          & cvString .~ value
-                          & cvValue .~ Lib.atof value
-        handleGameCVar =
-          when (name == "game") $
-            do FS.setGameDir value
-               FS.execAutoexec
-
-updateVar :: CVarT -> B.ByteString -> Bool -> Quake CVarT
-updateVar var value force
-  | value == updatedCVar^.cvString = return updatedCVar
-  | otherwise =
-      do checkUserInfoModified updatedCVar
-         update finalCVar
-         return finalCVar
-  where updatedCVar
-          | force && isJust (var^.cvLatchedString) = var & cvLatchedString .~ Nothing
-          | otherwise = var
-        finalCVar = updatedCVar & cvModified .~ True
-                                & cvString .~ value
-                                & cvValue .~ Lib.atof value
 
 setF :: XCommandT
 setF = XCommandT "CVar.setF" $
@@ -162,16 +89,6 @@ fullSet name value flags =
                                & cvValue .~ Lib.atof value
                                & cvFlags .~ flags
 
-checkUserInfoModified :: CVarT -> Quake () -- make compiler happy
-checkUserInfoModified var =
-  when ((var^.cvFlags) .&. Constants.cvarUserInfo /= 0) $
-    globals.gUserInfoModified .= True
-
-createFailedError :: Quake CVarT
-createFailedError =
-  do Com.fatalError "Failed to create cvar"
-     return (CVarT "" "" Nothing 0 False 0)
-     
 initializeCVars :: [(B.ByteString, B.ByteString, Int)] -> Quake ()
 initializeCVars = mapM_ (\(name, val, flags) -> get name val flags)
 

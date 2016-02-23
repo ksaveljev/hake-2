@@ -1,7 +1,6 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ImpredicativeTypes #-}
-module Game.GameImportT ( GameImportT(..)
-                        , newGameImportT
+module Game.GameImportT ( newGameImportT
                         , giBprintf
                         , giDprintf
                         , giCprintf

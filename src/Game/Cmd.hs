@@ -184,7 +184,7 @@ functionNotFound name =
 
 handleExistingFunction :: B.ByteString -> CmdFunctionT -> Quake ()
 handleExistingFunction text function =
-  maybe (executeString ("cmd" `B.append` text)) (^.xcCmd) (function^.cfFunction)
+  maybe (executeString ("cmd" `B.append` text)) runXCommandT (function^.cfFunction)
 
 aliasNotFound :: Quake ()
 aliasNotFound =

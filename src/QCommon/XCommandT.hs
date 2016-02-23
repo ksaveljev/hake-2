@@ -8,3 +8,6 @@ import Types
 import Control.Lens (makeLenses)
 
 makeLenses ''XCommandT
+
+runXCommandT :: XCommandT -> Quake ()
+runXCommandT = _xcCmd
