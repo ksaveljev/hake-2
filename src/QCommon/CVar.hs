@@ -104,11 +104,3 @@ bitInfo bit =
         collectInfo (var:vars) info =
           do info' <- Info.setValueForKey info (var^.cvName) (var^.cvString)
              collectInfo vars info'
-{-
-- cvars <- liftM (filter (\e -> (e^.cvFlags) .&. bit /= 0) . Map.elems) (use $ globals.cvarVars)
-    collectInfo cvars ""
-
-  where collectInfo :: [CVarT] -> B.ByteString -> Quake B.ByteString
-        collectInfo [] info = return info
-        collectInfo (x:xs) info = do
-          Info.setValueForKey info (x^.cvName) (x^.cvString) >>= collectInfo xs-}
