@@ -12,6 +12,7 @@ module QCommon.CVar
 
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import           QCommon.CVarShared
 import           QuakeState
@@ -96,4 +97,18 @@ serverInfo :: Quake B.ByteString
 serverInfo = bitInfo Constants.cvarServerInfo
 
 bitInfo :: Int -> Quake B.ByteString
-bitInfo = error "CVar.bitInfo" -- TODO
+bitInfo bit =
+  do vars <- fmap (filter (\v -> (v^.cvFlags) .&. bit /= 0) . HM.elems) (use (globals.gCVars))
+     collectInfo vars B.empty
+  where collectInfo [] info = return info
+        collectInfo (var:vars) info =
+          do info' <- Info.setValueForKey info (var^.cvName) (var^.cvString)
+             collectInfo vars info'
+{-
+- cvars <- liftM (filter (\e -> (e^.cvFlags) .&. bit /= 0) . Map.elems) (use $ globals.cvarVars)
+    collectInfo cvars ""
+
+  where collectInfo :: [CVarT] -> B.ByteString -> Quake B.ByteString
+        collectInfo [] info = return info
+        collectInfo (x:xs) info = do
+          Info.setValueForKey info (x^.cvName) (x^.cvString) >>= collectInfo xs-}
