@@ -6,7 +6,7 @@ module Game.GameBaseGlobals
 import qualified Constants
 import           Game.CPlaneT (newCPlaneT)
 import           {-# SOURCE #-} Game.GameImportT (newGameImportT)
-import qualified Game.GameItems as GameItems
+import           {-# SOURCE #-} Game.GameItemsList (itemList)
 import           Game.GameLocalsT (newGameLocalsT)
 import           Game.LevelLocalsT (newLevelLocalsT)
 import           Game.PushedT (newPushedT)
@@ -30,7 +30,7 @@ initialGameBaseGlobals =
                   , _gbSndFry        = 0
                   , _gbMeansOfDeath  = 0
                   , _gbNumEdicts     = 0
-                  , _gbItemList      = GameItems.itemList
+                  , _gbItemList      = itemList
                   , _gbPushed        = V.replicate Constants.maxEdicts newPushedT
                   , _gbPushedP       = 0
                   , _gbObstacle      = Nothing

@@ -21,7 +21,7 @@ import qualified Util.Lib as Lib
 import           Util.Binary (encode)
 
 import           Control.Lens (use, (^.), (&), (.~))
-import           Control.Monad (void)
+import           Control.Monad (void, foldM)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
@@ -99,8 +99,5 @@ serverInfo = bitInfo Constants.cvarServerInfo
 bitInfo :: Int -> Quake B.ByteString
 bitInfo bit =
   do vars <- fmap (filter (\v -> (v^.cvFlags) .&. bit /= 0) . HM.elems) (use (globals.gCVars))
-     collectInfo vars B.empty
-  where collectInfo [] info = return info
-        collectInfo (var:vars) info =
-          do info' <- Info.setValueForKey info (var^.cvName) (var^.cvString)
-             collectInfo vars info'
+     collectInfo B.empty vars
+  where collectInfo = foldM (\info var -> Info.setValueForKey info (var^.cvName) (var^.cvString))

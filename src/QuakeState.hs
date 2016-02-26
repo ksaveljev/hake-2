@@ -16,6 +16,7 @@ import Game.CModelT as X
 import Game.CPlaneT as X
 import Game.CSurfaceT as X
 import Game.CVarT as X
+import Game.EdictT as X
 import Game.EntityStateT as X
 import Game.GameBaseGlobals as X
 import {-# SOURCE #-} Game.GameImportT as X

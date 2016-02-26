@@ -15,10 +15,22 @@ module Game.PlayerWeapon
   , weaponSuperShotgun
   ) where
 
-import Types
+import qualified Constants
+import qualified Game.GameItems as GameItems
+import qualified QCommon.Com as Com
+import           QCommon.CVarVariables
+import           QuakeRef
+import           QuakeState
+import           Types
+
+import           Control.Lens (use, (^.), (&), (.~))
+import           Data.Bits ((.&.))
 
 useWeapon :: ItemUse
-useWeapon = error "PlayerWeapon.useWeapon" -- TODO
+useWeapon = ItemUse "PlayerWeapon.useWeapon" useWeaponF
+
+useWeaponF :: EdictRef -> GItemRef -> Quake ()
+useWeaponF = error "PlayerWeapon.useWeaponF"
 
 pickupWeapon :: EntInteract
 pickupWeapon = error "PlayerWeapon.pickupWeapon" -- TODO
