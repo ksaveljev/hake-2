@@ -41,4 +41,20 @@ buildInfoString str strippedStr key value
       return (B.concat [strippedStr, "\\", key, "\\", value])
 
 removeKey :: B.ByteString -> B.ByteString -> Quake B.ByteString
-removeKey = error "Info.removeKey" -- TODO
+removeKey str key
+  | '\\' `BC.elem` key =
+      do Com.printf "Can't use a key with a \\\n"
+         return str
+  | otherwise = composeTokens str key tokens "" -- TODO: use B.Builder instaed of B.ByteString
+  where splitStr = BC.split '\\' str
+        tokens | null splitStr = splitStr
+               | otherwise = tail splitStr -- ugly hack for BC.split because BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+
+composeTokens :: B.ByteString -> B.ByteString -> [B.ByteString] -> B.ByteString -> Quake B.ByteString
+composeTokens _ _ [] acc = return acc
+composeTokens str key (k:v:xs) acc
+  | k == key = composeTokens str key xs acc
+  | otherwise = composeTokens str key xs (B.concat [acc, "\\", k, "\\", v])
+composeTokens str _ _ _ =
+  do Com.printf "MISSING VALUE\n"
+     return str
