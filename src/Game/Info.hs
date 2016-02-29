@@ -8,10 +8,34 @@ import qualified QCommon.Com as Com
 import           Types
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import           Data.Monoid ((<>))
 
 printInfo :: B.ByteString -> Quake ()
-printInfo = error "Info.printInfo" -- TODO
+printInfo str =
+  composePrintString tokens mempty >>= printString
+  where splitStr = BC.split '\\' str
+        tokens | null splitStr = splitStr
+               | otherwise = tail splitStr -- ugly hack for BC.split because BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+        printString Nothing = return ()
+        printString (Just s) = Com.printf s
+
+composePrintString :: [B.ByteString] -> BB.Builder -> Quake (Maybe B.ByteString)
+composePrintString [] acc = return (Just (BL.toStrict (BB.toLazyByteString acc)))
+composePrintString (k:v:xs) acc = composePrintString xs acc'
+  where acc' = acc <> bs k <> bs spaces <> "=" <> bs v <> bs "\n"
+        bs = BB.byteString
+        spaces | klen < 20 = B.drop klen fillSpaces
+               | otherwise = ""
+        klen = B.length k
+composePrintString _ _ =
+  do Com.printf "MISSING VALUE\n"
+     return Nothing
+
+fillSpaces :: B.ByteString
+fillSpaces = "                     "
 
 setValueForKey :: B.ByteString -> B.ByteString -> B.ByteString -> Quake B.ByteString
 setValueForKey str key value
@@ -45,16 +69,18 @@ removeKey str key
   | '\\' `BC.elem` key =
       do Com.printf "Can't use a key with a \\\n"
          return str
-  | otherwise = composeTokens str key tokens "" -- TODO: use B.Builder instaed of B.ByteString
+  | otherwise = composeTokens str key tokens mempty
   where splitStr = BC.split '\\' str
         tokens | null splitStr = splitStr
                | otherwise = tail splitStr -- ugly hack for BC.split because BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
 
-composeTokens :: B.ByteString -> B.ByteString -> [B.ByteString] -> B.ByteString -> Quake B.ByteString
-composeTokens _ _ [] acc = return acc
+composeTokens :: B.ByteString -> B.ByteString -> [B.ByteString] -> BB.Builder -> Quake B.ByteString
+composeTokens _ _ [] acc = return (BL.toStrict (BB.toLazyByteString acc))
 composeTokens str key (k:v:xs) acc
   | k == key = composeTokens str key xs acc
-  | otherwise = composeTokens str key xs (B.concat [acc, "\\", k, "\\", v])
+  | otherwise = composeTokens str key xs (acc <> bslash <> bs k <> bslash <> bs v)
+  where bs = BB.byteString
+        bslash = bs "\\"
 composeTokens str _ _ _ =
   do Com.printf "MISSING VALUE\n"
      return str
