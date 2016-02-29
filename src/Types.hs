@@ -73,6 +73,9 @@ data Globals = Globals
   { _gCurTime          :: Int
   , _gCmdWait          :: Bool
   , _gAliasCount       :: Int
+  , _gCTraces          :: Int
+  , _gCBrushTraces     :: Int
+  , _gCPointContents   :: Int
   , _gServerState      :: Int
   , _gNetMessage       :: SizeBufT
   , _gCmdText          :: SizeBufT
@@ -88,8 +91,13 @@ data Globals = Globals
   }
 
 data ComGlobals = ComGlobals
-  { _cgComArgc :: Int
-  , _cgComArgv :: V.Vector B.ByteString
+  { _cgComArgc       :: Int
+  , _cgComArgv       :: V.Vector B.ByteString
+  , _cgRecursive     :: Bool
+  , _cgMsg           :: B.ByteString
+  , _cgDebugContext  :: B.ByteString
+  , _cgDebugContext2 :: B.ByteString
+  , _cgRdTarget      :: Int
   }
 
 data CmdGlobals = CmdGlobals

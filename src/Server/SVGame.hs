@@ -15,13 +15,14 @@ module Server.SVGame
   , writeString
   ) where
 
+import qualified QCommon.Com as Com
 import           Types
 
 import qualified Data.ByteString as B
 import           Linear (V3)
 
 dprintf :: B.ByteString -> Quake ()
-dprintf = error "SVGame.dprintf" -- TODO
+dprintf = Com.printf
 
 cprintf :: Maybe EdictRef -> Int -> B.ByteString -> Quake ()
 cprintf = error "SVGame.cprintf" -- TODO

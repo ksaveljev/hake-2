@@ -12,6 +12,11 @@ makeLenses ''ComGlobals
 
 initialComGlobals :: ComGlobals
 initialComGlobals =
-  ComGlobals { _cgComArgc = 0
-             , _cgComArgv = V.empty
+  ComGlobals { _cgComArgc       = 0
+             , _cgComArgv       = V.empty
+             , _cgRecursive     = False
+             , _cgMsg           = ""
+             , _cgDebugContext  = ""
+             , _cgDebugContext2 = ""
+             , _cgRdTarget      = 0
              }

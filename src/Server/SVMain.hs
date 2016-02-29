@@ -1,5 +1,6 @@
 module Server.SVMain
   ( dropClient
+  , frame
   , initialize
   , shutdown
   ) where
@@ -51,3 +52,6 @@ initialCVars =
   , ("public", "0", 0)
   , ("sv_reconnect_limit", "3", Constants.cvarArchive)
   ]
+
+frame :: Int -> Quake ()
+frame = error "SVMain.frame" -- TODO

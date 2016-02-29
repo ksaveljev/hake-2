@@ -67,8 +67,7 @@ commandExists name =
 
 execF :: XCommandT
 execF = XCommandT "Cmd.execF" $
-  do c <- argc
-     exec c
+  argc >>= exec
   where exec c
           | c /= 2 = Com.printf "exec <filename> : execute a script file\n"
           | otherwise = loadAndExec
@@ -96,8 +95,7 @@ listF = XCommandT "Cmd.listF" $
 
 aliasF :: XCommandT
 aliasF = XCommandT "Cmd.aliasF" $
-  do c <- argc
-     checkArgs c
+  argc >>= checkArgs
   where checkArgs 1 = listAliases
         checkArgs c =
           do arg <- argv 1
@@ -215,8 +213,7 @@ sameAliasNameAs expected alias = sameNameAs expected aliasName
 tokenizeString :: B.ByteString -> Bool -> Quake ()
 tokenizeString text macroExpand =
   do clearArgs
-     expandedText <- expandText
-     maybe (return ()) (`tokenize` 0) expandedText
+     expandText >>= maybe (return ()) (`tokenize` 0)
   where clearArgs =
           do cmdGlobals.cgCmdArgc .= 0
              cmdGlobals.cgCmdArgs .= ""
@@ -278,8 +275,7 @@ expand text inQuote newLen count idx
 
 processParsedVar :: B.ByteString -> Bool -> Int -> Int -> Int -> Int -> B.ByteString -> Quake (Maybe B.ByteString)
 processParsedVar text newInQuote newLen count idx newIdx var =
-  do token <- CVar.variableString var
-     tryToExpand token
+  CVar.variableString var >>= tryToExpand
   where tryToExpand token
           | lineExceeded token = lineExceededError
           | loopDetected = loopDetectedError

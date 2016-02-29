@@ -15,18 +15,97 @@ import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.FS as FS
 import qualified QCommon.NetChannel as NetChannel
+import           QuakeState
 import qualified Server.SVMain as SVMain
 import qualified Sys.NET as NET
 import           Types
 import           Util.Binary (encode)
+import qualified Sys.Timer as Timer
 
-import           Control.Lens ((^.))
-import           Control.Monad (unless,void)
+import           Control.Lens (use, (^.), (.=), (&), (.~))
+import           Control.Monad (when, unless, void)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
+import           System.IO (Handle)
 
 frame :: Int -> Quake ()
-frame = error "QCommon.frame" -- TODO
+frame msec =
+  do logStatsCVar >>= handleLogStats
+     updatedMsec <- calcMsec msec
+     showTrace
+     CBuf.execute
+     timeBefore <- getCurrentTime
+     serverFrame updatedMsec
+     timeBetween <- getCurrentTime
+     clientFrame updatedMsec
+     timeAfter <- getCurrentTime
+     printTimeStats timeBefore timeBetween timeAfter
+  where getCurrentTime =
+          do hsv <- fmap (^.cvValue) hostSpeedsCVar
+             if hsv /= 0.0 then Timer.milliseconds else return 0
+        serverFrame updatedMsec =
+          do comGlobals.cgDebugContext .= "SV:"
+             SVMain.frame updatedMsec
+        clientFrame updatedMsec =
+          do comGlobals.cgDebugContext .= "CL:"
+             CL.frame updatedMsec
+
+handleLogStats :: CVarT -> Quake ()
+handleLogStats logStats
+  | not (logStats^.cvModified) = return ()
+  | otherwise =
+      do CVar.update (logStats & cvModified .~ False)
+         closeLogStatsFile
+         when ((logStats^.cvValue) /= 0) $
+           openLogStatsFile "stats.log" >>= addLogStatsHeader
+
+openLogStatsFile :: B.ByteString -> Quake (Maybe Handle)
+openLogStatsFile = error "QCommon.openLogStatsFile" -- TODO
+
+closeLogStatsFile :: Quake ()
+closeLogStatsFile = error "QCommon.closeLogStatsFile" -- TODO
+
+addLogStatsHeader :: Maybe Handle -> Quake ()
+addLogStatsHeader Nothing = return ()
+addLogStatsHeader (Just h) =
+  request (io (B.hPut h "entities,dlights,parts,frame time\n")) -- IMPROVE: catch exception ?
+  
+calcMsec :: Int -> Quake Int
+calcMsec msec =
+  do ftv <- fmap (^.cvValue) fixedTimeCVar
+     tsv <- fmap (^.cvValue) timeScaleCVar
+     return (updateMsec ftv tsv)
+  where updateMsec ftv tsv
+          | ftv /= 0 = truncate ftv
+          | tsv /= 0 = let tmp = fromIntegral msec * tsv
+                       in if tmp < 1.0 then 1 else truncate tmp
+          | otherwise = msec
+
+showTrace :: Quake ()
+showTrace =
+  do stv <- fmap (^.cvValue) showTraceCVar
+     when (stv /= 0) $
+       do ct <- use (globals.gCTraces)
+          cpc <- use (globals.gCPointContents)
+          Com.printf (B.concat [encode ct, " traces ", encode cpc, " points\n"])
+          globals.gCTraces .= 0
+          globals.gCBrushTraces .= 0
+          globals.gCPointContents .= 0
+
+printTimeStats :: Int -> Int -> Int -> Quake ()
+printTimeStats timeBefore timeBetween timeAfter =
+  do hsv <- fmap (^.cvValue) hostSpeedsCVar
+     when (hsv /= 0) $
+       error "QCommon.printTimeStats" -- TODO
+       {- let timeAll = timeAfter - timeBefore
+              timeSV = timeBetween - timeBefore
+              timeCL = timeAfter - timeBetween
+              {-
+              int gm= Globals.time_after_game - Globals.time_before_game;
+              int rf= Globals.time_after_ref - Globals.time_before_ref;
+              sv -= gm;
+              cl -= rf; -}
+              -}
 
 initialize :: [String] -> Quake ()
 initialize args =
@@ -89,9 +168,7 @@ initialCVars = [ ("host_speeds", "0", 0)
         v = B.concat [encode Constants.version, " ", Constants.__date__]
 
 processUserCommands :: Quake ()
-processUserCommands =
-  do added <- CBuf.addLateCommands -- add + commands from command line
-     process added
+processUserCommands = CBuf.addLateCommands >>= process -- add + commands from command line
   where process True = SCR.endLoadingPlaque -- the user asked for something explicit so drop the loading plaque
         process False = runDefault -- the user didn't give any commands, run default action
 

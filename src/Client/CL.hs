@@ -1,5 +1,6 @@
 module Client.CL
-  ( initialize
+  ( frame
+  , initialize
   , writeConfiguration
   ) where
 
@@ -160,3 +161,6 @@ rconF = error "CL.rconF" -- TODO
 
 precacheF :: XCommandT
 precacheF = error "CL.precacheF" -- TODO
+
+frame :: Int -> Quake ()
+frame = error "CL.frame" -- TODO
