@@ -20,13 +20,14 @@ import qualified Server.SVMain as SVMain
 import qualified Sys.NET as NET
 import           Types
 import           Util.Binary (encode)
+import qualified Util.Lib as Lib
 import qualified Sys.Timer as Timer
 
 import           Control.Lens (use, (^.), (.=), (&), (.~))
 import           Control.Monad (when, unless, void)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
-import           System.IO (Handle)
+import           System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek), IOMode(WriteMode))
 
 frame :: Int -> Quake ()
 frame msec =
@@ -60,10 +61,23 @@ handleLogStats logStats
            openLogStatsFile "stats.log" >>= addLogStatsHeader
 
 openLogStatsFile :: B.ByteString -> Quake (Maybe Handle)
-openLogStatsFile = error "QCommon.openLogStatsFile" -- TODO
+openLogStatsFile name =
+  Lib.fOpen name WriteMode >>= maybe (return Nothing) (fmap Just . prepareLogStatsFile)
+  
+prepareLogStatsFile :: Handle -> Quake Handle
+prepareLogStatsFile h = -- IMPROVE: handle exceptions
+  do request (io (do hSeek h AbsoluteSeek 0
+                     hSetFileSize h 0))
+     globals.gLogStatsFile .= Just h
+     return h
 
 closeLogStatsFile :: Quake ()
-closeLogStatsFile = error "QCommon.closeLogStatsFile" -- TODO
+closeLogStatsFile =
+  do statsFile <- use (globals.gLogStatsFile)
+     maybe (return ()) closeFile statsFile
+  where closeFile h =
+          do Lib.fClose h
+             globals.gLogStatsFile .= Nothing
 
 addLogStatsHeader :: Maybe Handle -> Quake ()
 addLogStatsHeader Nothing = return ()
@@ -71,11 +85,10 @@ addLogStatsHeader (Just h) =
   request (io (B.hPut h "entities,dlights,parts,frame time\n")) -- IMPROVE: catch exception ?
   
 calcMsec :: Int -> Quake Int
-calcMsec msec =
-  do ftv <- fmap (^.cvValue) fixedTimeCVar
-     tsv <- fmap (^.cvValue) timeScaleCVar
-     return (updateMsec ftv tsv)
-  where updateMsec ftv tsv
+calcMsec msec = updateMsec <$> ft <*> ts
+  where ft = fmap (^.cvValue) fixedTimeCVar
+        ts = fmap (^.cvValue) timeScaleCVar
+        updateMsec ftv tsv
           | ftv /= 0 = truncate ftv
           | tsv /= 0 = let tmp = fromIntegral msec * tsv
                        in if tmp < 1.0 then 1 else truncate tmp
@@ -93,7 +106,8 @@ showTrace =
           globals.gCPointContents .= 0
 
 printTimeStats :: Int -> Int -> Int -> Quake ()
-printTimeStats timeBefore timeBetween timeAfter =
+printTimeStats _ _ _ = -- to avoid unused var warning
+-- printTimeStats timeBefore timeBetween timeAfter =
   do hsv <- fmap (^.cvValue) hostSpeedsCVar
      when (hsv /= 0) $
        error "QCommon.printTimeStats" -- TODO
@@ -173,7 +187,8 @@ processUserCommands = CBuf.addLateCommands >>= process -- add + commands from co
         process False = runDefault -- the user didn't give any commands, run default action
 
 runDefault :: Quake ()
-runDefault =
-  do dedicatedValue <- fmap (^.cvValue) dedicatedCVar
-     CBuf.addText (if dedicatedValue == 0 then "d1\n" else "dedicated_start\n")
-     CBuf.execute
+runDefault = getDefaultCommand >>= CBuf.addText >> CBuf.execute
+  where dedicatedValue = fmap (^.cvValue) dedicatedCVar
+        getDefaultCommand = fmap defaultCommand dedicatedValue
+        defaultCommand v | v == 0 = "d1\n"
+                         | otherwise = "dedicated_start\n"

@@ -20,6 +20,7 @@ import Game.EdictT as X
 import Game.EntityStateT as X
 import Game.GameBaseGlobals as X
 import {-# SOURCE #-} Game.GameImportT as X
+import Game.GameItemsGlobals as X
 import Game.GameLocalsT as X
 import Game.GClientT as X
 import Game.GItemArmorT as X
@@ -73,12 +74,13 @@ makeLenses ''QuakeState
 
 initialQuakeState :: QuakeState
 initialQuakeState =
-  QuakeState { _globals         = initialGlobals
-             , _comGlobals      = initialComGlobals
-             , _cmdGlobals      = initialCmdGlobals
-             , _keyGlobals      = initialKeyGlobals
-             , _fsGlobals       = initialFSGlobals
-             , _svGlobals       = initialSVGlobals
-             , _gameBaseGlobals = initialGameBaseGlobals
-             , _cmGlobals       = initialCMGlobals
+  QuakeState { _globals          = initialGlobals
+             , _comGlobals       = initialComGlobals
+             , _cmdGlobals       = initialCmdGlobals
+             , _keyGlobals       = initialKeyGlobals
+             , _fsGlobals        = initialFSGlobals
+             , _svGlobals        = initialSVGlobals
+             , _gameBaseGlobals  = initialGameBaseGlobals
+             , _cmGlobals        = initialCMGlobals
+             , _gameItemsGlobals = initialGameItemsGlobals
              }

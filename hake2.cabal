@@ -59,6 +59,8 @@ executable hake2
                      , Game.GameBaseGlobals
                      , Game.GameImportT
                      , Game.GameItems
+                     , Game.GameItemsGlobals
+                     , Game.GameItemsList
                      , Game.GameLocalsT
                      , Game.GameSVCmds
                      , Game.GClientT

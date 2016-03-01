@@ -28,6 +28,7 @@ initialGlobals =
           , _gNetMessage       = newSizeBufT
           , _gCmdText          = newSizeBufT
           , _gCmdAlias         = Seq.empty
+          , _gLogStatsFile     = Nothing
           , _gCls              = newClientStaticT
           , _gUserInfoModified = False
           , _gCVars            = HM.empty

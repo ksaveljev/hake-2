@@ -34,14 +34,15 @@ io :: MonadIO m => IO a -> m a
 io = liftIO
 
 data QuakeState = QuakeState
-  { _globals         :: Globals
-  , _comGlobals      :: ComGlobals
-  , _cmdGlobals      :: CmdGlobals
-  , _keyGlobals      :: KeyGlobals
-  , _fsGlobals       :: FSGlobals
-  , _svGlobals       :: SVGlobals
-  , _gameBaseGlobals :: GameBaseGlobals
-  , _cmGlobals       :: CMGlobals
+  { _globals          :: Globals
+  , _comGlobals       :: ComGlobals
+  , _cmdGlobals       :: CmdGlobals
+  , _keyGlobals       :: KeyGlobals
+  , _fsGlobals        :: FSGlobals
+  , _svGlobals        :: SVGlobals
+  , _gameBaseGlobals  :: GameBaseGlobals
+  , _cmGlobals        :: CMGlobals
+  , _gameItemsGlobals :: GameItemsGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -69,6 +70,12 @@ newtype GItemRef = GItemRef Int deriving Eq
 newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
 newtype CPlaneRef = CPlaneRef Int deriving Eq
 
+dummyGClientRef :: GClientRef
+dummyGClientRef = GClientRef (-1)
+
+dummyGItemRef :: GItemRef
+dummyGItemRef = GItemRef (-1)
+
 data Globals = Globals
   { _gCurTime          :: Int
   , _gCmdWait          :: Bool
@@ -80,6 +87,7 @@ data Globals = Globals
   , _gNetMessage       :: SizeBufT
   , _gCmdText          :: SizeBufT
   , _gCmdAlias         :: Seq CmdAliasT
+  , _gLogStatsFile     :: Maybe Handle
   , _gCls              :: ClientStaticT
   , _gUserInfoModified :: Bool
   , _gCVars            :: HM.HashMap B.ByteString CVarT
@@ -240,6 +248,18 @@ data CMGlobals = CMGlobals
   , _cmTraceContents   :: Int
   , _cmTraceIsPoint    :: Bool
   , _cmLeafs           :: UV.Vector Int -- tmp for CM.boxTrace
+  }
+
+data GameItemsGlobals = GameItemsGlobals
+  { _giJacketArmorInfo      :: GItemArmorT
+  , _giCombatArmorInfo      :: GItemArmorT
+  , _giBodyArmorInfo        :: GItemArmorT
+  , _giQuakeDropTimeoutHack :: Int
+  , _giJacketArmorIndex     :: GItemRef
+  , _giCombatArmorIndex     :: GItemRef
+  , _giBodyArmorIndex       :: GItemRef
+  , _giPowerScreenIndex     :: GItemRef
+  , _giPowerShieldIndex     :: GItemRef
   }
   
 data CVarT = CVarT
@@ -1023,51 +1043,51 @@ data AI = AI
   }
 
 data EntInteract = EntInteract
-  { _eiId       :: B.ByteString
-  , _eiInteract :: EdictRef -> EdictRef -> Quake Bool
+  { entInteractId       :: B.ByteString
+  , entInteract :: EdictRef -> EdictRef -> Quake Bool
   }
 
 data EntThink = EntThink
-  { _ethId    :: B.ByteString
-  , _ethThink :: EdictRef -> Quake Bool
+  { entThinkId    :: B.ByteString
+  , entThink :: EdictRef -> Quake Bool
   }
 
 data EntBlocked = EntBlocked
-  { _ebId      :: B.ByteString
-  , _ebBlocked :: EdictRef -> EdictRef -> Quake ()
+  { entBlockedId      :: B.ByteString
+  , entBlocked :: EdictRef -> EdictRef -> Quake ()
   }
 
 data EntDodge = EntDodge
-  { _edoId    :: B.ByteString
-  , _edoDodge :: EdictRef -> EdictRef -> Float -> Quake ()
+  { entDodgeId    :: B.ByteString
+  , entDodge :: EdictRef -> EdictRef -> Float -> Quake ()
   }
 
 data EntTouch = EntTouch
-  { _etId    :: B.ByteString
-  , _etTouch :: EdictRef -> EdictRef -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+  { entTouchId    :: B.ByteString
+  , entTouch :: EdictRef -> EdictRef -> CPlaneT -> Maybe CSurfaceT -> Quake ()
   }
 
 data EntUse = EntUse
-  { _euId  :: B.ByteString
-  , _euUse :: EdictRef -> Maybe EdictRef -> Maybe EdictRef -> Quake ()
+  { entUseId  :: B.ByteString
+  , entUse :: EdictRef -> Maybe EdictRef -> Maybe EdictRef -> Quake ()
   }
 
 data EntPain = EntPain
-  { _epId   :: B.ByteString
-  , _epPain :: EdictRef -> EdictRef -> Float -> Int -> Quake ()
+  { entPainId   :: B.ByteString
+  , entPain :: EdictRef -> EdictRef -> Float -> Int -> Quake ()
   }
 
 data EntDie = EntDie
-  { _edId  :: B.ByteString
-  , _edDie :: EdictRef -> EdictRef -> EdictRef -> Int -> V3 Float -> Quake ()
+  { entDieId  :: B.ByteString
+  , entDie :: EdictRef -> EdictRef -> EdictRef -> Int -> V3 Float -> Quake ()
   }
 
 data ItemUse = ItemUse
-  { _iuId  :: B.ByteString
-  , _iuUse :: EdictRef -> GItemRef -> Quake ()
+  { itemUseId  :: B.ByteString
+  , itemUse :: EdictRef -> GItemRef -> Quake ()
   }
 
 data ItemDrop = ItemDrop
-  { _idId   :: B.ByteString
-  , _idDrop :: EdictRef -> GItemRef -> Quake ()
+  { itemDropId   :: B.ByteString
+  , itemDrop :: EdictRef -> GItemRef -> Quake ()
   }
