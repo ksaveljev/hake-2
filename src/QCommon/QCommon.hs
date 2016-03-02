@@ -31,7 +31,7 @@ import           System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek),
 
 frame :: Int -> Quake ()
 frame msec =
-  do logStatsCVar >>= handleLogStats
+  do handleLogStats =<< logStatsCVar
      updatedMsec <- calcMsec msec
      showTrace
      CBuf.execute

@@ -67,7 +67,7 @@ commandExists name =
 
 execF :: XCommandT
 execF = XCommandT "Cmd.execF" $
-  argc >>= exec
+  exec =<< argc
   where exec c
           | c /= 2 = Com.printf "exec <filename> : execute a script file\n"
           | otherwise = loadAndExec
@@ -95,7 +95,7 @@ listF = XCommandT "Cmd.listF" $
 
 aliasF :: XCommandT
 aliasF = XCommandT "Cmd.aliasF" $
-  argc >>= checkArgs
+  checkArgs =<< argc
   where checkArgs 1 = listAliases
         checkArgs c =
           do arg <- argv 1
