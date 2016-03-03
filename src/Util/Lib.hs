@@ -4,15 +4,20 @@ module Util.Lib
   , fOpen
   , fOpenBinary
   , fClose
+  , rand
   ) where
 
+import           QuakeState
 import           Types
 
 import           Control.Exception (handle, IOException)
+import           Control.Lens (use, (.=))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Int (Int16)
 import           Data.Maybe (fromMaybe)
 import           System.IO (Handle, IOMode, openFile, hClose, openBinaryFile)
+import           System.Random (random)
 import           Text.Read (readMaybe)
 
 atof :: B.ByteString -> Float
@@ -37,3 +42,10 @@ fOpenBinary = fOpenCommon openBinaryFile
 
 fClose :: Handle -> Quake ()
 fClose h = request (io (handle (\(_ :: IOException) -> return ()) (hClose h)))
+
+rand :: Quake Int16
+rand =
+  do g <- use (globals.gRnd)
+     let (result, newG) = random g
+     globals.gRnd .= newG
+     return (abs result)

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Game.GameItems
   ( bodyArmorInfo
   , combatArmorInfo
@@ -31,12 +32,19 @@ import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 import           Control.Lens (use, ix, (^.), (.=), (&), (.~), (+~), (-~), (%~))
-import           Control.Monad (when, void)
-import           Data.Bits (complement, (.&.), (.|.))
+import           Control.Monad (when, unless, void)
+import           Data.Bits (complement, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower)
+import           Data.Maybe (fromMaybe)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import           Linear (V3(..), _z)
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo =
@@ -309,7 +317,6 @@ calcAndDropAmmo edictRef gItem droppedEdictRef gClientRef gClient =
         finishDropAmmo droppedEdict =
           do modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) -~ (droppedEdict^.eCount))
              GameUtil.validateSelectedItem edictRef -- RESEARCH: why does jake2 has same validate method in Cmd (which is used here)
-        checkIfCanDropWeapon :: EdictT -> GItemRef -> Quake ()
         checkIfCanDropWeapon droppedEdict weaponRef =
           do weapon <- readRef weaponRef
              dropWeaponOrAmmo droppedEdict weapon
@@ -399,7 +406,6 @@ verifyAndPickupPowerup edictRef edict otherRef gClientRef gClient gItemRef gItem
              return (dmFlagsValue .&. Constants.dfInstantItems /= 0)
         isQuadItem Nothing = False
         isQuadItem (Just gItemUse) = itemUseId gItemUse == "useQuad" && (edict^.eSpawnFlags) .&. Constants.droppedPlayerItem /= 0
-        applyInstantItem :: Bool -> Quake ()
         applyInstantItem False = return ()
         applyInstantItem True =
           do when (isQuadItem (gItem^.giUse)) $ do
@@ -497,53 +503,391 @@ pickupAncientHead = EntInteract "pickupAncientHead" pickupAncientHeadF
 pickupAncientHeadF :: EdictRef -> EdictRef -> Quake Bool
 pickupAncientHeadF edictRef otherRef =
   do modifyRef otherRef (\v -> v & eMaxHealth +~ 2)
-     edict <- readRef edictRef
-     applyDeathmatchActions edict =<< deathmatchValue
+     commonDeathmatchActions gItemError edictRef =<< deathmatchValue
      return True
   where deathmatchValue = fmap (^.cvValue) deathmatchCVar
-        applyDeathmatchActions edict dmv
-          | (edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && dmv /= 0 =
-              respawnItem (edict^.eItem)
-          | otherwise = return ()
-        respawnItem :: Maybe GItemRef -> Quake ()
-        respawnItem Nothing = Com.fatalError "GameItems.pickupAncientHead edict^.eItem is Nothing"
-        respawnItem (Just gItemRef) =
-          do gItem <- readRef gItemRef
-             setRespawn edictRef (fromIntegral (gItem^.giQuantity))
+        gItemError = "GameItems.pickupAncientHead GItemRef is Nothing"
 
 pickupAdrenaline :: EntInteract
-pickupAdrenaline = error "GameItems.pickupAdrenaline" -- TODO
+pickupAdrenaline = EntInteract "pickupAdrenaline" pickupAdrenalineF
+
+pickupAdrenalineF :: EdictRef -> EdictRef -> Quake Bool
+pickupAdrenalineF edictRef otherRef =
+  do dmv <- fmap (^.cvValue) deathmatchCVar
+     updateMaxHealth dmv
+     updateHealth =<< readRef otherRef
+     commonDeathmatchActions gItemError edictRef dmv
+     return True
+  where updateMaxHealth dmv
+          | dmv == 0 = modifyRef otherRef (\v -> v & eMaxHealth +~ 1)
+          | otherwise = return ()
+        updateHealth other
+          | (other^.eHealth) < (other^.eMaxHealth) =
+              modifyRef otherRef (\v -> v & eHealth .~ (other^.eMaxHealth))
+          | otherwise = return ()
+        gItemError = "GameItems.pickupAdrenaline GItemRef is Nothing"
 
 pickupBandolier :: EntInteract
-pickupBandolier = error "GameItems.pickupBandolier" -- TODO
+pickupBandolier = EntInteract "pickupBandolier" pickupBandolierF
+
+pickupBandolierF :: EdictRef -> EdictRef -> Quake Bool
+pickupBandolierF = pickupGeneric gItemError checkAmmoAndStuff
+  where gClientError = "GameItems.pickupBandolier GClientRef is Nothing"
+        gItemError = "GameItems.pickupBandolier GItemRef is Nothing"
+        checkAmmoAndStuff Nothing = Com.fatalError gClientError
+        checkAmmoAndStuff (Just gClientRef) =
+          checkCommonAmmoAndStuff checkMaxAmmo gClientRef
+        checkMaxAmmo gClientRef =
+          modifyRef gClientRef (\v -> v & gcPers.cpMaxBullets %~ setLimit 250
+                                        & gcPers.cpMaxShells %~ setLimit 150
+                                        & gcPers.cpMaxCells %~ setLimit 250
+                                        & gcPers.cpMaxSlugs %~ setLimit 75)
 
 pickupPack :: EntInteract
-pickupPack = error "GameItems.pickupPack" -- TODO
+pickupPack = EntInteract "pickupPack" pickupPackF
+
+pickupPackF :: EdictRef -> EdictRef -> Quake Bool
+pickupPackF = pickupGeneric gItemError checkAmmoAndStuff
+  where gClientError = "GameItems.pickupPack GClientRef is Nothing"
+        gItemError = "GameItems.pickupPack GItemRef is Nothing"
+        checkAmmoAndStuff Nothing = Com.fatalError gClientError
+        checkAmmoAndStuff (Just gClientRef) =
+          do checkCommonAmmoAndStuff checkMaxAmmo gClientRef
+             checkCells gClientRef
+             checkGrenades gClientRef
+             checkRockets gClientRef
+             checkSlugs gClientRef
+        checkMaxAmmo gClientRef =
+          modifyRef gClientRef (\v -> v & gcPers.cpMaxBullets %~ setLimit 300
+                                        & gcPers.cpMaxShells %~ setLimit 200
+                                        & gcPers.cpMaxRockets %~ setLimit 100
+                                        & gcPers.cpMaxGrenades %~ setLimit 100
+                                        & gcPers.cpMaxCells %~ setLimit 300
+                                        & gcPers.cpMaxSlugs %~ setLimit 100)
+
+pickupGeneric :: B.ByteString -> (Maybe GClientRef -> Quake ()) -> EdictRef -> EdictRef -> Quake Bool
+pickupGeneric gItemError checkAmmoAndStuff edictRef otherRef =
+  do other <- readRef otherRef
+     checkAmmoAndStuff (other^.eClient)
+     commonDeathmatchActions gItemError edictRef =<< deathmatchValue
+     return True
+  where deathmatchValue = fmap (^.cvValue) deathmatchCVar
+
+setLimit :: Int -> Int -> Int
+setLimit limit v | v < limit = limit
+                 | otherwise = v
+
+checkCommonAmmoAndStuff :: (GClientRef -> Quake ()) -> GClientRef -> Quake ()
+checkCommonAmmoAndStuff checkMaxAmmo gClientRef =
+  do checkMaxAmmo gClientRef
+     checkBullets gClientRef
+     checkShells gClientRef
+
+commonDeathmatchActions :: B.ByteString -> EdictRef -> Float -> Quake ()
+commonDeathmatchActions gItemError edictRef dmv
+  | dmv == 0 = return ()
+  | otherwise = applyActions =<< readRef edictRef
+  where applyActions edict
+          | (edict^.eSpawnFlags) .&. Constants.droppedItem == 0 =
+              respawnItem gItemError edictRef (edict^.eItem)
+          | otherwise = return ()
 
 pickupKey :: EntInteract
-pickupKey = error "GameItems.pickupKey" -- TODO
+pickupKey = EntInteract "pickupKey" pickupKeyF
+
+pickupKeyF :: EdictRef -> EdictRef -> Quake Bool
+pickupKeyF edictRef otherRef =
+  do edict <- readRef edictRef
+     other <- readRef otherRef
+     proceedPickupKey edict (other^.eClient) (edict^.eItem) =<< coopValue
+  where coopValue = fmap (^.cvValue) coopCVar
+
+proceedPickupKey :: EdictT -> Maybe GClientRef -> Maybe GItemRef -> Float -> Quake Bool
+proceedPickupKey  _ Nothing _ _ = pickupError "GameItems.pickupKey GClientRef is Nothing"
+proceedPickupKey  _ _ Nothing _ = pickupError "GameItems.pickupKey GItemRef is Nothing"
+proceedPickupKey edict (Just gClientRef) (Just gItemRef) coopValue
+  | coopValue /= 0 =
+      do gItem <- readRef gItemRef
+         gClient <- readRef gClientRef
+         pickupKeyCoop edict gClientRef gClient gItem
+  | otherwise =
+      do gItem <- readRef gItemRef
+         modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) .~ 1)
+         return True
+
+pickupKeyCoop :: EdictT -> GClientRef -> GClientT -> GItemT -> Quake Bool
+pickupKeyCoop edict gClientRef gClient gItem
+  | isPowerCubeKey && possessIt = return False
+  | isPowerCubeKey =
+      do modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) +~ 1
+                                       & gcPers.cpPowerCubes %~ (.|. (((edict^.eSpawnFlags) .&. 0xFF00) `shiftR` 8)))
+         return True
+  | haveThatKey = return False
+  | otherwise =
+      do modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) .~ 1)
+         return True
+  where isPowerCubeKey = (edict^.eClassName) == "key_power_cube"
+        possessIt = (gClient^.gcPers.cpPowerCubes) .&. (((edict^.eSpawnFlags) .&. 0xFF00) `shiftR` 8) /= 0
+        haveThatKey = (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex) /= 0
 
 pickupHealth :: EntInteract
-pickupHealth = error "GameItems.pickupHealth" -- TODO
+pickupHealth = EntInteract "pickupHealth" pickupHealthF
+
+pickupHealthF :: EdictRef -> EdictRef -> Quake Bool
+pickupHealthF edictRef otherRef =
+  do edict <- readRef edictRef
+     other <- readRef otherRef
+     proceedPickupHealth edictRef edict otherRef other
+
+proceedPickupHealth :: EdictRef -> EdictT -> EdictRef -> EdictT -> Quake Bool
+proceedPickupHealth edictRef edict otherRef other
+  | noNeedInHealth = return False
+  | otherwise =
+      do modifyRef otherRef (\v -> v & eHealth +~ (edict^.eCount))
+         when noHealthIgnoreMax $
+           modifyRef otherRef (\v -> v & eHealth %~ resetToMaxHealth)
+         checkTimedHealth
+         return True
+  where noNeedInHealth = noHealthIgnoreMax && alreadyAtFull
+        noHealthIgnoreMax = (edict^.eStyle) .&. Constants.healthIgnoreMax == 0
+        alreadyAtFull = (other^.eHealth) >= (other^.eMaxHealth)
+        resetToMaxHealth v | v > (other^.eMaxHealth) = other^.eMaxHealth
+                           | otherwise = v
+        checkTimedHealth
+          | (edict^.eStyle) .&. Constants.healthTimed /= 0 =
+              do levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+                 modifyRef edictRef (\v -> v & eThink .~ Just GameUtil.megaHealthThink
+                                             & eNextThink .~ levelTime + 5
+                                             & eOwner .~ Just otherRef
+                                             & eFlags %~ (.|. Constants.flRespawn)
+                                             & eSvFlags %~ (.|. Constants.svfNoClient)
+                                             & eSolid .~ Constants.solidNot)
+          | otherwise =
+              applyDeathmatchActions =<< deathmatchValue
+        deathmatchValue = fmap (^.cvValue) deathmatchCVar
+        applyDeathmatchActions dmv
+          | (edict^.eSpawnFlags) .&. Constants.droppedItem /= 0 && dmv /= 0 =
+              setRespawn edictRef 30
+          | otherwise = return ()
 
 findItem :: B.ByteString -> Quake (Maybe GItemRef)
-findItem = error "GameItems.findItem" -- TODO
+findItem pickupName =
+  do items <- use (gameBaseGlobals.gbItemList)
+     case search items of
+       Nothing ->
+         do Com.printf (B.concat ["Item not found:", pickupName, "\n"])
+            return Nothing
+       Just idx -> return (Just (GItemRef idx))
+  where search items = V.findIndex searchByName (V.drop 1 items)
+        name = BC.map toLower pickupName
+        searchByName gItem
+          | name == BC.map toLower (fromMaybe "" (gItem^.giPickupName)) = True
+          | otherwise = False
 
 setRespawn :: EdictRef -> Float -> Quake ()
-setRespawn = error "GameItems.setRespawn" -- TODO
+setRespawn edictRef delay =
+  do levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+     modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn)
+                                 & eSvFlags %~ (.|. Constants.svfNoClient)
+                                 & eSolid .~ Constants.solidNot
+                                 & eNextThink .~ levelTime + delay
+                                 & eThink .~ Just doRespawn)
+     linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+     linkEntity edictRef
 
 armorIndex :: EdictRef -> Quake Int
-armorIndex = error "GameItems.armorIndex" -- TODO
+armorIndex edictRef =
+  do edict <- readRef edictRef
+     getArmorIndex (edict^.eClient)
+  where getArmorIndex Nothing = return 0
+        getArmorIndex (Just gClientRef) =
+          do gClient <- readRef gClientRef
+             jacketArmor <- readRef =<< use (gameItemsGlobals.giJacketArmorIndex)
+             combatArmor <- readRef =<< use (gameItemsGlobals.giCombatArmorIndex)
+             bodyArmor <- readRef =<< use (gameItemsGlobals.giBodyArmorIndex)
+             return (pickArmorIndex gClient jacketArmor combatArmor bodyArmor)
+
+pickArmorIndex :: GClientT -> GItemT -> GItemT -> GItemT -> Int
+pickArmorIndex gClient jacketArmor combatArmor bodyArmor
+  | inventory UV.! (jacketArmor^.giIndex) > 0 = jacketArmor^.giIndex
+  | inventory UV.! (combatArmor^.giIndex) > 0 = combatArmor^.giIndex
+  | inventory UV.! (bodyArmor^.giIndex) > 0 = bodyArmor^.giIndex
+  | otherwise = 0
+  where inventory = gClient^.gcPers.cpInventory
 
 addAmmo :: EdictRef -> GItemRef -> Int -> Quake Bool
-addAmmo = error "GameItems.addAmmo" -- TODO
+addAmmo edictRef gItemRef count =
+  do edict <- readRef edictRef
+     addPlayerAmmo (edict^.eClient)
+  where addPlayerAmmo Nothing = return False
+        addPlayerAmmo (Just gClientRef) =
+          do gClient <- readRef gClientRef
+             gItem <- readRef gItemRef
+             maybe (return False) (applyPlayerAmmo gClientRef gClient gItem) (chooseMaximum gClient gItem)
+        chooseMaximum gClient gItem
+          | (gItem^.giTag) == Constants.ammoBullets = Just (gClient^.gcPers.cpMaxBullets)
+          | (gItem^.giTag) == Constants.ammoShells = Just (gClient^.gcPers.cpMaxShells)
+          | (gItem^.giTag) == Constants.ammoRockets = Just (gClient^.gcPers.cpMaxRockets)
+          | (gItem^.giTag) == Constants.ammoGrenades = Just (gClient^.gcPers.cpMaxGrenades)
+          | (gItem^.giTag) == Constants.ammoCells = Just (gClient^.gcPers.cpMaxCells)
+          | (gItem^.giTag) == Constants.ammoSlugs = Just (gClient^.gcPers.cpMaxSlugs)
+          | otherwise = Nothing
+        applyPlayerAmmo gClientRef gClient gItem maxAmmo
+          | (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex) == maxAmmo = return False
+          | otherwise =
+              do modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) %~ updateAmmo maxAmmo)
+                 return True
+        updateAmmo maxAmmo v = min (v + count) maxAmmo
 
 dropItem :: EdictRef -> GItemRef -> Quake EdictRef
-dropItem = error "GameItems.dropItem" -- TODO
-          
+dropItem edictRef gItemRef =
+  do droppedRef <- GameUtil.spawn
+     edict <- readRef edictRef
+     gItem <- readRef gItemRef
+     modifyRef droppedRef (\v -> v & eClassName .~ (gItem^.giClassName)
+                                   & eItem .~ Just gItemRef
+                                   & eSpawnFlags .~ Constants.droppedItem
+                                   & eEntityState.esEffects .~ (gItem^.giWorldModelFlags)
+                                   & eEntityState.esRenderFx .~ Constants.rfGlow
+                                   & eMins .~ V3 (-15) (-15) (-15)
+                                   & eMaxs .~ V3 15 15 15
+                                   & eSolid .~ Constants.solidTrigger
+                                   & eMoveType .~ Constants.moveTypeToss
+                                   & eTouch .~ Just dropTempTouch
+                                   & eOwner .~ Just edictRef)
+     gameImport <- use (gameBaseGlobals.gbGameImport)
+     (gameImport^.giSetModel) droppedRef (gItem^.giWorldModel)
+     forward <- maybe (calcNoClientForward droppedRef edict) 
+                      (calcClientForward droppedRef edictRef edict)
+                      (edict^.eClient)
+     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+     modifyRef droppedRef (\v -> v & eVelocity .~ (fmap (* 100) forward & _z .~ 300)
+                                   & eThink .~ Just dropMakeTouchable
+                                   & eNextThink .~ levelTime + 1)
+     (gameImport^.giLinkEntity) droppedRef
+     return droppedRef
+
+calcNoClientForward :: EdictRef -> EdictT -> Quake (V3 Float)
+calcNoClientForward droppedRef edict =
+  do modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ (edict^.eEntityState.esOrigin))
+     return forward
+  where (forward, _, _) = Math3D.angleVectors (edict^.eEntityState.esAngles) True False False
+
+calcClientForward :: EdictRef -> EdictRef -> EdictT -> GClientRef -> Quake (V3 Float)
+calcClientForward droppedRef edictRef edict gClientRef =
+  do gClient <- readRef gClientRef
+     let (forward, right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
+         offset = V3 24 0 (-16)
+         origin = Math3D.projectSource (edict^.eEntityState.esOrigin) offset forward right
+     modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ origin)
+     dropped <- readRef droppedRef
+     trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+     traceT <- trace (edict^.eEntityState.esOrigin) (Just (dropped^.eMins)) (Just (dropped^.eMaxs)) (dropped^.eEntityState.esOrigin) (Just edictRef) Constants.contentsSolid
+     modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+     return forward
+
 playItemSound :: EdictRef -> B.ByteString -> GameImportT -> Quake ()
 playItemSound edictRef soundItem gameImport =
   do soundIdx <- soundIndex (Just soundItem)
      sound (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
   where soundIndex = gameImport^.giSoundIndex
         sound = gameImport^.giSound
+        
+respawnItem :: B.ByteString -> EdictRef -> Maybe GItemRef -> Quake ()
+respawnItem errMsg _ Nothing = Com.fatalError errMsg
+respawnItem _ edictRef (Just gItemRef) =
+  do gItem <- readRef gItemRef
+     setRespawn edictRef (fromIntegral (gItem^.giQuantity))
+
+checkBullets :: GClientRef -> Quake ()
+checkBullets = checkAmmoGeneric "Bullets" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxBullets
+
+checkShells :: GClientRef -> Quake ()
+checkShells = checkAmmoGeneric "Shells" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxShells
+
+checkCells :: GClientRef -> Quake ()
+checkCells = checkAmmoGeneric "Cells" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxCells
+
+checkGrenades :: GClientRef -> Quake ()
+checkGrenades = checkAmmoGeneric "Grenades" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxGrenades
+
+checkRockets :: GClientRef -> Quake ()
+checkRockets = checkAmmoGeneric "Rockets" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxRockets
+
+checkSlugs :: GClientRef -> Quake ()
+checkSlugs = checkAmmoGeneric "Slugs" itemMaxQuantity
+  where itemMaxQuantity gClient = gClient^.gcPers.cpMaxSlugs
+
+checkAmmoGeneric :: B.ByteString -> (GClientT -> Int) -> GClientRef -> Quake ()
+checkAmmoGeneric itemName itemMaxQuantity gClientRef =
+  do foundItem <- findItem itemName
+     maybe (return ()) applyItem foundItem
+  where applyItem gItemRef =
+          do gClient <- readRef gClientRef
+             gItem <- readRef gItemRef
+             modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix (gItem^.giIndex) %~ updateQuantity gClient gItem)
+        updateQuantity gClient gItem v = min (v + (gItem^.giQuantity)) (itemMaxQuantity gClient)
+
+doRespawn :: EntThink
+doRespawn = EntThink "doRespawn" doRespawnF
+
+doRespawnF :: EdictRef -> Quake Bool
+doRespawnF edictRef =
+  do edict <- readRef edictRef
+     entRef <- maybe (return edictRef) (pickRandomTeamMember edict) (edict^.eTeam)
+     modifyRef entRef (\v -> v & eSvFlags %~ (.&. complement Constants.svfNoClient)
+                               & eSolid .~ Constants.solidTrigger)
+     linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+     linkEntity entRef
+     modifyRef entRef (\v -> v & eEntityState.esEvent .~ Constants.evItemRespawn)
+     return False
+  where pickRandomTeamMember edict _ = 
+          do count <- countTeamDepth (edict^.eTeamMaster) 0
+             choice <- fmap ((`mod` count) . fromIntegral) Lib.rand :: Quake Int
+             chooseTeamMember (edict^.eTeamMaster) 0 choice
+        countTeamDepth Nothing count = return count
+        countTeamDepth (Just entRef) count =
+          do ent <- readRef entRef
+             countTeamDepth (ent^.eChain) (count + 1)
+        chooseTeamMember Nothing _ _ = chooseError
+        chooseTeamMember (Just entRef) idx maxIdx
+          | idx >= maxIdx = return entRef
+          | otherwise =
+              do ent <- readRef entRef
+                 chooseTeamMember (ent^.eChain) (idx + 1) maxIdx
+        chooseError =
+          do Com.fatalError "GameItems.doRespawn ent^.eTeamMaster/ent^.eChain is Nothing"
+             return (EdictRef (-1))
+
+dropTempTouch :: EntTouch
+dropTempTouch = EntTouch "dropTempTouch" dropTempTouchF
+
+dropTempTouchF :: EdictRef -> EdictRef -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+dropTempTouchF edictRef otherRef plane surf =
+  do edict <- readRef edictRef
+     unless (Just otherRef == (edict^.eOwner)) $
+       entTouch touchItem edictRef otherRef plane surf
+
+dropMakeTouchable :: EntThink
+dropMakeTouchable = EntThink "dropMakeTouchable" dropMakeTouchableF
+
+dropMakeTouchableF :: EdictRef -> Quake Bool
+dropMakeTouchableF edictRef =
+  do modifyRef edictRef (\v -> v & eTouch .~ Just touchItem)
+     applyDeathmatchActions =<< deathmatchValue
+     return False
+  where deathmatchValue = fmap (^.cvValue) deathmatchCVar
+        applyDeathmatchActions dmv
+          | dmv == 0 = return ()
+          | otherwise =
+              do levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+                 modifyRef edictRef (\v -> v & eNextThink .~ levelTime + 29
+                                             & eThink .~ Just GameUtil.freeEdictA)
+
+touchItem :: EntTouch
+touchItem = error "GameItems.touchItem" -- TODO

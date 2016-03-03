@@ -63,6 +63,7 @@ executable hake2
                      , Game.GameItemsList
                      , Game.GameLocalsT
                      , Game.GameSVCmds
+                     , Game.GameUtil
                      , Game.GClientT
                      , Game.GItemArmorT
                      , Game.GItemT
@@ -139,3 +140,4 @@ executable hake2
                      , Types
                      , Util.Binary
                      , Util.Lib
+                     , Util.Math3D
