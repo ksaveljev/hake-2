@@ -7,6 +7,7 @@ module QCommon.SZ
   ) where
 
 import qualified QCommon.Com as Com
+import           QCommon.SizeBufT
 import           QuakeState
 import           Types
 import           Util.Binary (encode)

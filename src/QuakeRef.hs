@@ -2,8 +2,10 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module QuakeRef where
 
+import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
+import           Server.ServerStaticT
 import           Types
 
 import           Control.Lens (use, ix, (%=), (.=))

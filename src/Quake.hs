@@ -3,6 +3,7 @@ module Quake
   ) where
 
 import qualified Constants
+import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.QCommon as QCommon

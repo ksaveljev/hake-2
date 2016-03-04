@@ -5,4 +5,4 @@ module Sound.S
 import Types
 
 initialize :: Quake ()
-initialize = error "S.initialize" -- TODO
+initialize = request (io (putStrLn "S.initialize IMPLEMENT ME!"))

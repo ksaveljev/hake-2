@@ -12,6 +12,7 @@ module QCommon.CVarShared
   ) where
 
 import qualified Constants
+import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.Shared as FS
 import           QuakeState

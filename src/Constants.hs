@@ -3,6 +3,7 @@ module Constants where
 
 import           Data.Bits ((.|.),shiftL)
 import qualified Data.ByteString as B
+import           Data.Char (ord)
 import           Data.Int (Int8)
 import qualified Data.Vector as V
 import           Linear (V3(..))
@@ -1356,6 +1357,11 @@ maxExplosions = 32 :: Int
 maxBeams      = 32 :: Int
 maxLasers     = 32 :: Int
 maxSustains   = 32 :: Int
+
+-- move from QCommon/FS
+maxRead        = 0x10000 :: Int
+idPakHeader    = (ord 'K' `shiftL` 24) + (ord 'C' `shiftL` 16) + (ord 'A' `shiftL` 8) + ord 'P' :: Int
+maxFilesInPack = 4096 :: Int
 
 byteDirs :: V.Vector (V3 Float)
 byteDirs =

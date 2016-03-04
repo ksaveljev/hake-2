@@ -10,22 +10,32 @@ module QCommon.FS
 
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVarShared as CVar
+import           QCommon.FileLinkT
 import           QCommon.FSShared
+import           QCommon.PackT
+import           QCommon.SearchPathT
 import           QCommon.Shared
 import           QuakeState
 import           Types
 import           Util.Binary (encode)
+import qualified Util.Lib as Lib
 
 import           Control.Lens (use, (.=), (^.), (%=), (&), (.~))
 import           Control.Monad (when, unless)
+import           Control.Monad.State.Strict (runStateT)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Sequence ((|>), (><))
 import qualified Data.Sequence as Seq
+import           Pipes.Binary (deMessage)
+import qualified Pipes.Binary as PB
+import qualified Pipes.ByteString as PBS
 import           System.Directory
+import           System.IO (Handle, IOMode(ReadMode))
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands = [("path", Just pathF), ("link", Just linkF), ("dir", Just dirF)] 
@@ -163,4 +173,19 @@ addPackFiles dir idx =
         newSearchPath pak = SearchPathT "" (Just pak)
 
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
-loadPackFile = error "FS.loadPackFile" -- TODO
+loadPackFile packFile =
+  do fileHandle <- Lib.fOpenBinary packFile ReadMode
+     maybe (return Nothing) (loadPackT packFile) fileHandle
+
+loadPackT :: B.ByteString -> Handle -> Quake (Maybe PackT)
+loadPackT packFile fileHandle =
+  do (res, _) <- request parsePackT
+     either packTParseError printInfoAndReturn res
+  where parsePackT = runStateT packT (PBS.fromHandle fileHandle)
+        packT = PB.decodeGet (getPackT packFile fileHandle)
+        packTParseError err =
+          do Com.fatalError (BC.pack (deMessage err))
+             return Nothing
+        printInfoAndReturn pack =
+          do Com.printf (B.concat ["Added packfile ", packFile, " (", encode (pack^.pNumFiles), " files)\n"])
+             return (Just pack)

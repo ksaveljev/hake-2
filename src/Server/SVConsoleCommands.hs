@@ -4,14 +4,19 @@ module Server.SVConsoleCommands
 
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import           Game.CVarT
 import qualified Game.GameSVCmds as GameSVCmds
 import qualified Game.Info as Info
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.FSShared as FS
+import           QCommon.XCommandT (runXCommandT)
 import           QuakeRef
 import           QuakeState
+import           Server.ClientT
+import           Server.ServerStaticT
+import           Server.ServerT
 import qualified Server.SVInit as SVInit
 import qualified Server.SVMainShared as SVMain
 import qualified Server.SVSend as SVSend

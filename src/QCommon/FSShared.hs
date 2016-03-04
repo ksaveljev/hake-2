@@ -7,6 +7,10 @@ module QCommon.FSShared
 
 import qualified Constants
 import qualified QCommon.Com as Com
+import           QCommon.FileLinkT
+import           QCommon.PackFileT
+import           QCommon.PackT
+import           QCommon.SearchPathT
 import           QuakeState
 import           Types
 

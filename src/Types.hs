@@ -9,14 +9,16 @@ import           Control.Monad.State (State, StateT, MonadState, MonadIO, lift, 
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
-import           Data.Int (Int8, Int16)
+import           Data.Int (Int8, Int16, Int32)
+import           Data.IORef (IORef)
 import           Data.Sequence (Seq)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
-import           Data.Word (Word8, Word16)
+import           Data.Word (Word8, Word16, Word32)
+import qualified Graphics.UI.GLFW as GLFW
 import           Linear (V3, V4)
 import           Network.Socket (HostAddress)
 import           System.IO (Handle)
@@ -69,6 +71,7 @@ newtype LinkRef = LinkRef Int deriving Eq
 newtype GItemRef = GItemRef Int deriving Eq
 newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
 newtype CPlaneRef = CPlaneRef Int deriving Eq
+newtype GLPolyRef = GLPolyRef Int deriving Eq
 
 dummyGClientRef :: GClientRef
 dummyGClientRef = GClientRef (-1)
@@ -92,6 +95,7 @@ data Globals = Globals
   , _gUserInfoModified :: Bool
   , _gCVars            :: HM.HashMap B.ByteString CVarT
   , _gCon              :: ConsoleT
+  , _gVidDef           :: VidDefT
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
@@ -294,6 +298,12 @@ data SearchPathT = SearchPathT
   { _spFilename :: B.ByteString
   , _spPack     :: Maybe PackT
   } deriving (Eq)
+  
+data DPackHeaderT = DPackHeaderT
+  { _dphIdent  :: Int -- IDPAKHEADER
+  , _dphDirOfs :: Int
+  , _dphDirLen :: Int
+  }
 
 data PackT = PackT
   { _pFilename   :: B.ByteString
@@ -1036,6 +1046,350 @@ data ConsoleT = ConsoleT
   , _cVisLines    :: Int
   , _cTimes       :: UV.Vector Float
   }
+
+data VidDefT = VidDefT
+  { _vdWidth     :: Int
+  , _vdHeight    :: Int
+  , _vdNewWidth  :: Int
+  , _vdNewHeight :: Int
+  }
+
+data Renderer = Renderer 
+  { _rName      :: B.ByteString
+  , _rRefExport :: RefExportT
+  }
+
+data RefExportT = RefExportT
+  { _reInit                :: Int -> Int -> Quake Bool
+  , _reShutDown            :: Quake ()
+  , _reBeginRegistration   :: B.ByteString -> Quake ()
+  , _reRegisterModel       :: B.ByteString -> Quake (Maybe (IORef ModelT))
+  , _reRegisterSkin        :: B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _reRegisterPic         :: B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
+  , _reEndRegistration     :: Quake ()
+  , _reRenderFrame         :: RefDefT -> Quake ()
+  , _reDrawGetPicSize      :: B.ByteString -> Quake (Maybe (Int, Int))
+  , _reDrawPic             :: Int -> Int -> B.ByteString -> Quake ()
+  , _reDrawStretchPic      :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _reDrawChar            :: Int -> Int -> Int -> Quake ()
+  , _reDrawTileClear       :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _reDrawFill            :: Int -> Int -> Int -> Int -> Int -> Quake ()
+  , _reDrawFadeScreen      :: Quake ()
+  , _reDrawStretchRaw      :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _reCinematicSetPalette :: Maybe B.ByteString -> Quake ()
+  , _reBeginFrame          :: Float -> Quake ()
+  , _reEndFrame            :: Quake ()
+  , _reAppActivate         :: Bool -> Quake ()
+  , _reUpdateScreen        :: XCommandT -> Quake ()
+  , _reApiVersion          :: Int
+  , _reGetModeList         :: Quake (V.Vector VideoMode)
+  , _reGetKeyboardHandler  :: KBD
+  }
+
+data ModelT = ModelT
+  { _mName                 :: B.ByteString
+  , _mRegistrationSequence :: Int
+  , _mType                 :: Int
+  , _mNumFrames            :: Int
+  , _mFlags                :: Int
+  , _mMins                 :: V3 Float
+  , _mMaxs                 :: V3 Float
+  , _mRadius               :: Float
+  , _mClipBox              :: Bool
+  , _mClipMins             :: V3 Float
+  , _mClipMaxs             :: V3 Float
+  , _mFirstModelSurface    :: Int
+  , _mNumModelSurfaces     :: Int
+  , _mLightmap             :: Int
+  , _mNumSubModels         :: Int
+  , _mSubModels            :: V.Vector (IORef MModelT)
+  , _mNumPlanes            :: Int
+  , _mPlanes               :: V.Vector (IORef CPlaneT)
+  , _mNumLeafs             :: Int
+  , _mLeafs                :: V.Vector (IORef MLeafT)
+  , _mNumVertexes          :: Int
+  , _mVertexes             :: V.Vector (IORef MVertexT)
+  , _mNumEdges             :: Int
+  , _mEdges                :: V.Vector (IORef MEdgeT)
+  , _mNumNodes             :: Int
+  , _mFirstNode            :: Int
+  , _mNodes                :: V.Vector (IORef MNodeT)
+  , _mNumTexInfo           :: Int
+  , _mTexInfo              :: V.Vector (IORef MTexInfoT)
+  , _mNumSurfaces          :: Int
+  , _mSurfaces             :: V.Vector (IORef MSurfaceT)
+  , _mNumSurfEdges         :: Int
+  , _mSurfEdges            :: V.Vector Int
+  , _mNumMarkSurfaces      :: Int
+  , _mMarkSurfaces         :: V.Vector (IORef MSurfaceT)
+  , _mVis                  :: Maybe DVisT
+  , _mLightdata            :: Maybe B.ByteString
+  , _mSkins                :: V.Vector (Maybe (IORef ImageT))
+  , _mExtraDataSize        :: Int
+  , _mExtraData            :: Maybe ModelExtra
+  }
+
+data ImageT = ImageT
+  { _iId                   :: Int
+  , _iName                 :: B.ByteString
+  , _iType                 :: Int
+  , _iWidth                :: Int
+  , _iHeight               :: Int
+  , _iUploadWidth          :: Int
+  , _iUploadHeight         :: Int
+  , _iRegistrationSequence :: Int
+  , _iTextureChain         :: Maybe (IORef MSurfaceT)
+  , _iTexNum               :: Int
+  , _iSL                   :: Float
+  , _iTL                   :: Float
+  , _iSH                   :: Float
+  , _iTH                   :: Float
+  , _iScrap                :: Bool
+  , _iHasAlpha             :: Bool
+  , _iPaletted             :: Bool
+  }
+
+data RefDefT = RefDefT
+  { _rdX            :: Int
+  , _rdY            :: Int
+  , _rdWidth        :: Int
+  , _rdHeight       :: Int
+  , _rdFovX         :: Float
+  , _rdFovY         :: Float
+  , _rdViewOrg      :: V3 Float
+  , _rdViewAngles   :: V3 Float
+  , _rdBlend        :: V4 Float
+  , _rdTime         :: Float
+  , _rdRdFlags      :: Int
+  , _rdAreaBits     :: UV.Vector Word8
+  , _rdLightStyles  :: V.Vector LightStyleT
+  , _rdNumEntities  :: Int
+  , _rdEntities     :: V.Vector (IORef EntityT)
+  , _rdNumDLights   :: Int
+  , _rdDLights      :: V.Vector DLightT
+  , _rdNumParticles :: Int
+  }
+
+data KBD = KBD
+  { _kbdInit           :: Quake ()
+  , _kbdUpdate         :: Quake ()
+  , _kbdClose          :: Quake ()
+  , _kbdDoKeyEvent     :: Int -> Bool -> Quake ()
+  , _kbdInstallGrabs   :: Quake ()
+  , _kbdUninstallGrabs :: Quake ()
+  }
+
+data MModelT = MModelT
+  { _mmMins      :: V3 Float
+  , _mmMaxs      :: V3 Float
+  , _mmOrigin    :: V3 Float
+  , _mmRadius    :: Float
+  , _mmHeadNode  :: Int
+  , _mmVisLeafs  :: Int
+  , _mmFirstFace :: Int
+  , _mmNumFaces  :: Int
+  }
+
+data MLeafT = MLeafT
+  { _mlContents        :: Int
+  , _mlVisFrame        :: Int
+  , _mlMins            :: V3 Float
+  , _mlMaxs            :: V3 Float
+  , _mlParent          :: Maybe (IORef MNodeT)
+  , _mlCluster         :: Int
+  , _mlArea            :: Int
+  , _mlNumMarkSurfaces :: Int
+  , _mlMarkIndex       :: Int
+  }
+
+data MNodeChild = MNodeChildRef (IORef MNodeT)
+                | MLeafChildRef (IORef MLeafT)
+
+data MNodeT = MNodeT
+  { _mnContents     :: Int
+  , _mnVisFrame     :: Int
+  , _mnMins         :: V3 Float
+  , _mnMaxs         :: V3 Float
+  , _mnParent       :: Maybe (IORef MNodeT)
+  , _mnPlane        :: IORef CPlaneT
+  , _mnChildren     :: (MNodeChild, MNodeChild)
+  , _mnFirstSurface :: Int
+  , _mnNumSurfaces  :: Int
+  }
+
+data MEdgeT = MEdgeT
+  { _meV                :: (Word16, Word16)
+  , _meCachedEdgeOffset :: Int
+  }
+
+data MVertexT = MVertexT
+  { _mvPosition :: V3 Float
+  }
+
+data MSurfaceT = MSurfaceT
+  { _msVisFrame           :: Int
+  , _msPlane              :: Maybe (IORef CPlaneT)
+  , _msFlags              :: Int
+  , _msFirstEdge          :: Int
+  , _msNumEdges           :: Int
+  , _msTextureMins        :: (Int16, Int16)
+  , _msExtents            :: (Int16, Int16)
+  , _msLightS             :: Int
+  , _msLightT             :: Int
+  , _msDLightS            :: Int
+  , _msDLightT            :: Int
+  , _msPolys              :: Maybe GLPolyRef
+  , _msTextureChain       :: Maybe (IORef MSurfaceT)
+  , _msLightmapChain      :: Maybe (IORef MSurfaceT)
+  , _msTexInfo            :: MTexInfoT
+  , _msDLightFrame        :: Int
+  , _msDLightBits         :: Int
+  , _msLightmapTextureNum :: Int
+  , _msStyles             :: B.ByteString
+  , _msCachedLight        :: UV.Vector Float
+  , _msSamples            :: Maybe B.ByteString
+  }
+
+data MTexInfoT = MTexInfoT
+  { _mtiVecs      :: (V4 Float, V4 Float)
+  , _mtiFlags     :: Int
+  , _mtiNumFrames :: Int
+  , _mtiNext      :: Maybe (IORef MTexInfoT)
+  , _mtiImage     :: Maybe (IORef ImageT)
+  }
+
+data LightStyleT = LightStyleT
+  { _lsRGB   :: V3 Float
+  , _lsWhite :: Float
+  }
+
+data EntityT = EntityT
+  { _eModel      :: Maybe (IORef ModelT)
+  , _eAngles     :: V3 Float
+  , _eOrigin     :: V3 Float
+  , _eFrame      :: Int
+  , _eOldOrigin  :: V3 Float
+  , _eOldFrame   :: Int
+  , _eBackLerp   :: Float
+  , _eSkinNum    :: Int
+  , _eLightStyle :: Int
+  , _eAlpha      :: Float
+  , _eSkin       :: Maybe (IORef ImageT)
+  , _enFlags     :: Int -- name clash with EdictT._eFlags
+  }
+
+data DLightT = DLightT
+  { _dlOrigin    :: V3 Float
+  , _dlColor     :: V3 Float
+  , _dlIntensity :: Float
+  }
+
+data DMdlT = DMdlT
+  { _dmIdent              :: Int
+  , _dmVersion            :: Int
+  , _dmSkinWidth          :: Int
+  , _dmSkinHeight         :: Int
+  , _dmFrameSize          :: Int
+  , _dmNumSkins           :: Int
+  , _dmNumXYZ             :: Int
+  , _dmNumST              :: Int
+  , _dmNumTris            :: Int
+  , _dmNumGlCmds          :: Int
+  , _dmNumFrames          :: Int
+  , _dmOfsSkins           :: Int
+  , _dmOfsST              :: Int
+  , _dmOfsTris            :: Int
+  , _dmOfsFrames          :: Int
+  , _dmOfsGlCmds          :: Int
+  , _dmOfsEnd             :: Int
+  , _dmSkinNames          :: Maybe (V.Vector B.ByteString)
+  , _dmSTVerts            :: Maybe (V.Vector DSTVertT)
+  , _dmTriAngles          :: Maybe (V.Vector DTriangleT)
+  , _dmGlCmds             :: Maybe (UV.Vector Word32)
+  , _dmAliasFrames        :: Maybe (V.Vector DAliasFrameT)
+  , _dmTextureCoordBufIdx :: Int
+  , _dmVertexIndexBufIdx  :: Int
+  , _dmCounts             :: UV.Vector Int32
+  , _dmIndexElements      :: V.Vector (Int, Int)
+  }
+
+data DTriangleT = DTriangleT
+  { _dtIndexXYZ :: V3 Int16
+  , _dtIndexST  :: V3 Int16
+  }
+
+data DSTVertT = DSTVertT
+  { _dstvS :: Int16
+  , _dstvT :: Int16
+  }
+
+data DAliasFrameT = DAliasFrameT
+  { _dafScale     :: V3 Float
+  , _dafTranslate :: V3 Float
+  , _dafName      :: B.ByteString
+  , _dafVerts     :: UV.Vector Int
+  } deriving Eq
+
+
+data DSpriteT = DSpriteT
+  { _dsIdent     :: Int
+  , _dsVersion   :: Int
+  , _dsNumFrames :: Int
+  , _dsFrames    :: V.Vector DSprFrameT
+  }
+
+data DSprFrameT = DSprFrameT
+  { _dsfWidth   :: Int
+  , _dsfHeight  :: Int
+  , _dsfOriginX :: Int
+  , _dsfOriginY :: Int
+  , _dsfName    :: B.ByteString
+  }
+  
+data RenderAPI = RenderAPI
+  { _rInit              :: GLDriver -> Int -> Int -> Quake Bool
+  , _rInit2             :: GLDriver -> Quake Bool
+  , _rShutdown          :: GLDriver -> Quake ()
+  , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
+  , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ModelT))
+  , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
+  , _rEndRegistration   :: GLDriver -> Quake ()
+  , _rRenderFrame       :: GLDriver -> RefDefT -> Quake ()
+  , _rDrawGetPicSize    :: GLDriver -> B.ByteString -> Quake (Maybe (Int, Int))
+  , _rDrawPic           :: GLDriver -> Int -> Int -> B.ByteString -> Quake ()
+  , _rDrawStretchPic    :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _rDrawChar          :: GLDriver -> Int -> Int -> Int -> Quake ()
+  , _rDrawTileClear     :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _rDrawFill          :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
+  , _rDrawFadeScreen    :: GLDriver -> Quake ()
+  , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
+  , _rBeginFrame        :: GLDriver -> Float -> Quake ()
+  , _glScreenShotF      :: GLDriver -> Quake ()
+  }
+  
+data GLDriver = GLDriver
+  { _gldInit            :: Int -> Int -> Quake Bool
+  , _gldSetMode         :: (Int, Int) -> Int -> Bool -> Quake Int
+  , _gldShutdown        :: Quake ()
+  , _gldBeginFrame      :: Float -> Quake ()
+  , _gldEndFrame        :: Quake ()
+  , _gldAppActivate     :: Bool -> Quake ()
+  , _gldEnableLogging   :: Bool -> Quake ()
+  , _gldLogNewFrame     :: Quake ()
+  , _gldGetModeList     :: Quake (V.Vector VideoMode)
+  , _gldUpdateScreen    :: XCommandT -> Quake ()
+  , _gldSetSwapInterval :: Int -> Quake ()
+  }
+
+data VideoMode = GLFWbVideoMode GLFW.VideoMode
+            -- | GLUTVideoMode GLUT.GameModeCapability
+
+data ModelExtra = AliasModelExtra DMdlT
+                | SpriteModelExtra DSpriteT
 
 data AI = AI
   { _aiId :: B.ByteString

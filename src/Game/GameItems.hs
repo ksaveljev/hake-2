@@ -26,7 +26,16 @@ module Game.GameItems
   ) where
 
 import qualified Constants
+import           Game.ClientPersistantT
+import           Game.CVarT
+import           Game.EdictT
+import           Game.EntityStateT
 import qualified Game.GameUtil as GameUtil
+import           Game.GClientT
+import           Game.GItemArmorT
+import           Game.GItemT
+import           Game.LevelLocalsT
+import           Game.TraceT
 import qualified QCommon.Com as Com
 import           QCommon.CVarVariables
 import           QuakeRef

@@ -13,6 +13,7 @@ module QCommon.CVar
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified Game.Info as Info
+import           Game.CVarT
 import qualified QCommon.Com as Com
 import           QCommon.CVarShared
 import           QuakeState

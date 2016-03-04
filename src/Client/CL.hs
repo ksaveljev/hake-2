@@ -4,6 +4,7 @@ module Client.CL
   , writeConfiguration
   ) where
 
+import           Client.ClientStaticT
 import qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
 import qualified Client.Console as Console
@@ -14,6 +15,7 @@ import qualified Client.VID as VID
 import qualified Constants
 import           Data.Bits ((.|.))
 import qualified Game.Cmd as Cmd
+import           Game.CVarT
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables

@@ -8,13 +8,18 @@ module Game.Cmd
   , initialize
   ) where
 
+import           Client.ClientStaticT
 import qualified Constants
+import           Game.CmdAliasT
 import qualified QCommon.CBufShared as CBuf
+import           QCommon.CmdFunctionT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVarShared as CVar
 import qualified QCommon.FSShared as FS
 import qualified QCommon.MSG as MSG
+import           QCommon.NetChanT
 import qualified QCommon.SZ as SZ
+import           QCommon.XCommandT (runXCommandT)
 import           QuakeState
 import           Types
 import           Util.Binary (encode)
