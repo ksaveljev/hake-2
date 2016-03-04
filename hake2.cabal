@@ -49,6 +49,9 @@ executable hake2
                      , Client.V
                      , Client.VID
                      , Client.VidDefT
+                     , Client.VIDGlobals
+                     , Client.VidModeT
+                     , Client.VidModes
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT

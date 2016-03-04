@@ -6,6 +6,7 @@ module QuakeState
   where
 
 import Client.KeyGlobals as X
+import Client.VIDGlobals as X
 import Game.CmdGlobals as X
 import Game.GameBaseGlobals as X
 import {-# SOURCE #-} Game.GameImportT as X
@@ -32,4 +33,5 @@ initialQuakeState =
              , _gameBaseGlobals  = initialGameBaseGlobals
              , _cmGlobals        = initialCMGlobals
              , _gameItemsGlobals = initialGameItemsGlobals
+             , _vidGlobals       = initialVIDGlobals
              }

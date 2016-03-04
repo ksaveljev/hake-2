@@ -45,6 +45,7 @@ data QuakeState = QuakeState
   , _gameBaseGlobals  :: GameBaseGlobals
   , _cmGlobals        :: CMGlobals
   , _gameItemsGlobals :: GameItemsGlobals
+  , _vidGlobals       :: VIDGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -72,6 +73,7 @@ newtype GItemRef = GItemRef Int deriving Eq
 newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
 newtype CPlaneRef = CPlaneRef Int deriving Eq
 newtype GLPolyRef = GLPolyRef Int deriving Eq
+newtype MenuFrameworkSRef = MenuFrameworkSRef Int deriving Eq
 
 dummyGClientRef :: GClientRef
 dummyGClientRef = GClientRef (-1)
@@ -264,6 +266,17 @@ data GameItemsGlobals = GameItemsGlobals
   , _giBodyArmorIndex       :: GItemRef
   , _giPowerScreenIndex     :: GItemRef
   , _giPowerShieldIndex     :: GItemRef
+  }
+
+data VIDGlobals = VIDGlobals
+  { _vgVidModes           :: V.Vector VidModeT
+  , _vgRefLibActive       :: Bool
+  , _vgFSModes            :: Maybe (V.Vector VidModeT)
+  , _vgFSResolutions      :: V.Vector B.ByteString
+  , _vgModeX              :: Int
+  , _vgRefs               :: V.Vector B.ByteString
+  , _vgDrivers            :: V.Vector B.ByteString
+  , _vgCurrentMenu        :: Maybe MenuFrameworkSRef
   }
   
 data CVarT = CVarT
@@ -1383,6 +1396,13 @@ data GLDriver = GLDriver
   , _gldGetModeList     :: Quake (V.Vector VideoMode)
   , _gldUpdateScreen    :: XCommandT -> Quake ()
   , _gldSetSwapInterval :: Int -> Quake ()
+  }
+
+data VidModeT = VidModeT
+  { _vmDescription :: B.ByteString
+  , _vmWidth       :: Int
+  , _vmHeight      :: Int
+  , _vmMode        :: Int
   }
 
 data VideoMode = GLFWbVideoMode GLFW.VideoMode
