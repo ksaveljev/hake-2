@@ -16,6 +16,7 @@ import QCommon.CMGlobals as X
 import QCommon.ComGlobals as X
 import QCommon.FSGlobals as X
 import Server.SVGlobals as X
+import Sys.INGlobals as X
 import Types
 
 import Control.Lens (makeLenses)
@@ -34,4 +35,5 @@ initialQuakeState =
              , _cmGlobals        = initialCMGlobals
              , _gameItemsGlobals = initialGameItemsGlobals
              , _vidGlobals       = initialVIDGlobals
+             , _inGlobals        = initialINGlobals
              }

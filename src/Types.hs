@@ -46,6 +46,7 @@ data QuakeState = QuakeState
   , _cmGlobals        :: CMGlobals
   , _gameItemsGlobals :: GameItemsGlobals
   , _vidGlobals       :: VIDGlobals
+  , _inGlobals        :: INGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -94,10 +95,12 @@ data Globals = Globals
   , _gCmdAlias         :: Seq CmdAliasT
   , _gLogStatsFile     :: Maybe Handle
   , _gCls              :: ClientStaticT
+  , _gCl               :: ClientStateT
   , _gUserInfoModified :: Bool
   , _gCVars            :: HM.HashMap B.ByteString CVarT
   , _gCon              :: ConsoleT
   , _gVidDef           :: VidDefT
+  , _gRenderer         :: Maybe Renderer
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
@@ -277,6 +280,17 @@ data VIDGlobals = VIDGlobals
   , _vgRefs               :: V.Vector B.ByteString
   , _vgDrivers            :: V.Vector B.ByteString
   , _vgCurrentMenu        :: Maybe MenuFrameworkSRef
+  }
+
+data INGlobals = INGlobals
+  { _inMouseAvail          :: Bool
+  , _inMouseActive         :: Bool
+  , _inIgnoreFirst         :: Bool
+  , _inMouseButtonState    :: Int
+  , _inMouseOldButtonState :: Int
+  , _inOldMouseX           :: Int
+  , _inOldMouseY           :: Int
+  , _inMLooking            :: Bool
   }
   
 data CVarT = CVarT
@@ -1404,6 +1418,93 @@ data VidModeT = VidModeT
   , _vmHeight      :: Int
   , _vmMode        :: Int
   }
+
+data ClientStateT = ClientStateT
+  { _csTimeOutCount           :: Int
+  , _csTimeDemoFrames         :: Int
+  , _csTimeDemoStart          :: Int
+  , _csRefreshPrepped         :: Bool
+  , _csSoundPrepped           :: Bool
+  , _csForceRefDef            :: Bool
+  , _csParseEntities          :: Int
+  , _csCmd                    :: UserCmdT
+  , _csCmds                   :: V.Vector UserCmdT
+  , _csCmdTime                :: UV.Vector Int
+  , _csPredictedOrigins       :: UV.Vector (V3 Int16)
+  , _csPredictedStep          :: Float
+  , _csPredictedStepTime      :: Int
+  , _csPredictedOrigin        :: V3 Float
+  , _csPredictedAngles        :: V3 Float
+  , _csPredictionError        :: V3 Float
+  , _csFrame                  :: FrameT
+  , _csSurpressCount          :: Int
+  , _csFrames                 :: V.Vector FrameT
+  , _csViewAngles             :: V3 Float
+  , _csTime                   :: Int
+  , _csLerpFrac               :: Float
+  , _csRefDef                 :: RefDefT
+  , _csVForward               :: V3 Float
+  , _csVRight                 :: V3 Float
+  , _csVUp                    :: V3 Float
+  , _csLayout                 :: B.ByteString
+  , _csInventory              :: UV.Vector Int
+  , _csCinematicFile          :: Maybe Handle
+  , _csCinematicTime          :: Int
+  , _csCinematicFrame         :: Int
+  , _csCinematicPalette       :: B.ByteString
+  , _csCinematicPaletteActive :: Bool
+  , _csAttractLoop            :: Bool
+  , _csServerCount            :: Int
+  , _csGameDir                :: B.ByteString
+  , _csPlayerNum              :: Int
+  , _csConfigStrings          :: V.Vector B.ByteString
+  , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
+  , _csModelClip              :: V.Vector (Maybe CModelRef)
+  , _csSoundPrecache          :: V.Vector (Maybe (IORef SfxT))
+  , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
+  , _csClientInfo             :: V.Vector ClientInfoT
+  , _csBaseClientInfo         :: ClientInfoT
+  }
+
+data FrameT = FrameT
+  { _fValid         :: Bool
+  , _fServerFrame   :: Int
+  , _fServerTime    :: Int
+  , _fDeltaFrame    :: Int
+  , _fAreaBits      :: UV.Vector Word8
+  , _fPlayerState   :: PlayerStateT
+  , _fNumEntities   :: Int
+  , _fParseEntities :: Int
+  }
+
+data SfxT = SfxT
+  { _sfxName                 :: B.ByteString
+  , _sfxRegistrationSequence :: Int
+  , _sfxCache                :: Maybe SfxCacheT
+  , _sfxTrueName             :: B.ByteString
+  , _sfxBufferId             :: Int
+  , _sfxIsCached             :: Bool
+  }
+
+data SfxCacheT = SfxCacheT
+  { _scLength    :: Int
+  , _scLoopStart :: Int
+  , _scSpeed     :: Int
+  , _scWidth     :: Int
+  , _scStereo    :: Int
+  , _scData      :: B.ByteString
+  }
+
+data ClientInfoT = ClientInfoT
+  { _ciName        :: B.ByteString
+  , _ciCInfo       :: B.ByteString
+  , _ciSkin        :: Maybe (IORef ImageT)
+  , _ciIcon        :: Maybe (IORef ImageT)
+  , _ciIconName    :: B.ByteString
+  , _ciModel       :: Maybe (IORef ModelT)
+  , _ciWeaponModel :: V.Vector (Maybe (IORef ModelT))
+  }
+
 
 data VideoMode = GLFWbVideoMode GLFW.VideoMode
             -- | GLUTVideoMode GLUT.GameModeCapability

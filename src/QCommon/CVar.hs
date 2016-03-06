@@ -6,6 +6,7 @@ module QCommon.CVar
   , initializeCVars
   , serverInfo
   , set
+  , setValueF
   , update
   , variableString
   ) where
@@ -102,3 +103,10 @@ bitInfo bit =
   do vars <- fmap (filter (\v -> (v^.cvFlags) .&. bit /= 0) . HM.elems) (use (globals.gCVars))
      collectInfo B.empty vars
   where collectInfo = foldM (\info var -> Info.setValueForKey info (var^.cvName) (var^.cvString))
+
+setValueF :: B.ByteString -> Float -> Quake ()
+setValueF name value = void (set name val)
+  where val | value == fromIntegral tv = encode tv
+            | otherwise = encode value
+        tv = truncate value :: Int
+

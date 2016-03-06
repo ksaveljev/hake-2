@@ -36,15 +36,20 @@ executable hake2
   default-extensions:  OverloadedStrings
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CL
+                     , Client.ClientInfoT
+                     , Client.ClientStateT
                      , Client.ClientStaticT
                      , Client.CLInput
                      , Client.CLParse
                      , Client.Console
                      , Client.ConsoleT
+                     , Client.FrameT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
                      , Client.Menu
+                     , Client.RefDefT
+                     , Client.RefExportT
                      , Client.SCR
                      , Client.V
                      , Client.VID
@@ -131,8 +136,13 @@ executable hake2
                      , QuakeRef
                      , QuakeState
                      , Render.Basic.BasicRenderAPI
+                     , Render.DummyRenderer
+                     , Render.Fast.FastRenderAPI
                      , Render.GLFWbRenderer
+                     , Render.OpenGL.GLDriver
+                     , Render.OpenGL.GLFWbGLDriver
                      , Render.QRenderer
+                     , Render.RenderAPI
                      , Render.Renderer
                      , Server.AreaNodeT
                      , Server.ChallengeT
@@ -148,6 +158,8 @@ executable hake2
                      , Server.SVSend
                      , Sound.S
                      , Sys.IN
+                     , Sys.INGlobals
+                     , Sys.KBD
                      , Sys.NET
                      , Sys.Timer
                      , Types

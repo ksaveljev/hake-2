@@ -3,6 +3,7 @@ module Globals
   ( module Globals
   ) where
 
+import           Client.ClientStateT (newClientStateT)
 import           Client.ClientStaticT (newClientStaticT)
 import           Client.ConsoleT (newConsoleT)
 import           Client.VidDefT (newVidDefT)
@@ -13,6 +14,7 @@ import           Control.Lens (makeLenses)
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
+import           Render.DummyRenderer (dummyRenderer)
 import           System.Random (mkStdGen)
 
 makeLenses ''Globals
@@ -31,10 +33,12 @@ initialGlobals =
           , _gCmdAlias         = Seq.empty
           , _gLogStatsFile     = Nothing
           , _gCls              = newClientStaticT
+          , _gCl               = newClientStateT
           , _gUserInfoModified = False
           , _gCVars            = HM.empty
           , _gCon              = newConsoleT
           , _gVidDef           = newVidDefT
+          , _gRenderer         = Just dummyRenderer
           , _gKeyBindings      = V.replicate 256 Nothing
           , _gKeyLines         = V.replicate 32 ""
           , _gKeyLinePos       = 0

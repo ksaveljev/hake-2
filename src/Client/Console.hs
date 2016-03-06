@@ -1,5 +1,6 @@
 module Client.Console
   ( initialize
+  , toggleConsoleF
   ) where
 
 import           Client.ConsoleT
