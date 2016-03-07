@@ -3,6 +3,7 @@ module QCommon.FSShared
   , gameDir
   , fileLength
   , loadFile
+  , fOpenFile
   ) where
 
 import qualified Constants

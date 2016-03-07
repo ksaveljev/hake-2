@@ -60,4 +60,6 @@ initialQuakeIOState =
                , _lmsLightmapBuffer      = unsafePerformIO (MSV.new (4 * blockWidth * blockHeight))
                , _cgDLights              = unsafePerformIO (V.thaw (V.replicate Constants.maxDLights newCDLightT))
                , _cgParticles            = unsafePerformIO (V.thaw (V.replicate Constants.maxParticles newCParticleT))
+               , _pVertexArray           = unsafePerformIO (MSV.new (Constants.maxParticles * 3))
+               , _pColorArray            = unsafePerformIO (MSV.new Constants.maxParticles)
                }

@@ -1,5 +1,6 @@
 module QCommon.FS
   ( execAutoexec
+  , fOpenFile
   , gameDir
   , initializeFileSystem
   , loadFile

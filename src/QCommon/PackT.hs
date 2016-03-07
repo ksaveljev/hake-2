@@ -15,7 +15,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (toLower)
 import qualified Data.HashMap.Lazy as HM
-import           Pipes.Binary (Get)
+import           Data.Binary.Get (Get)
 import           System.IO (Handle)
 
 makeLenses ''PackT

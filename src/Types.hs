@@ -9,6 +9,7 @@ import           Control.Lens (Lens')
 import           Control.Monad.State (State, StateT, MonadState, MonadIO, lift, get, put, liftIO)
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Lazy as HM
 import           Data.Int (Int8, Int16, Int32, Int64)
 import           Data.IORef (IORef)
@@ -52,6 +53,7 @@ data QuakeState = QuakeState
   , _fastRenderAPIGlobals :: FastRenderAPIGlobals
   , _glfwbGlobals         :: GLFWbGlobals
   , _clientGlobals        :: ClientGlobals
+  , _particleTGlobals     :: ParticleTGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -72,6 +74,8 @@ data QuakeIOState = QuakeIOState
   , _lmsLightmapBuffer      :: MSV.IOVector Word8
   , _cgDLights              :: MV.IOVector CDLightT
   , _cgParticles            :: MV.IOVector CParticleT
+  , _pVertexArray           :: MSV.IOVector Float
+  , _pColorArray            :: MSV.IOVector Int32
   }
 
 data IORequest x
@@ -84,20 +88,6 @@ request :: Monad m => QuakeIO a -> Coroutine IORequest m a
 request x = suspend (RunIO x return)
 
 data Ref a = Ref Int deriving (Eq, Show, Ord)
-{-
-newtype EdictRef = EdictRef Int deriving (Eq, Show, Ord)
-newtype ClientRef = ClientRef Int deriving Eq
-newtype GClientRef = GClientRef Int deriving Eq
-newtype CModelRef = CModelRef Int deriving Eq
-newtype LinkRef = LinkRef Int deriving Eq
-newtype GItemRef = GItemRef Int deriving Eq
-newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
-newtype CPlaneRef = CPlaneRef Int deriving Eq
-newtype GLPolyRef = GLPolyRef Int deriving Eq
-newtype MenuFrameworkSRef = MenuFrameworkSRef Int deriving Eq
-newtype ModelRef = ModelRef Int deriving Eq
-newtype ImageRef = ImageRef Int deriving Eq
--}
 
 dummyGClientRef :: Ref GClientT
 dummyGClientRef = Ref (-1)
@@ -440,6 +430,10 @@ data ClientGlobals = ClientGlobals
   , _cgPMPassEnt          :: Maybe (Ref EdictT)
   , _cgIsDown             :: Bool
   , _cgAVelocities        :: V.Vector (V3 Float)
+  }
+
+data ParticleTGlobals = ParticleTGlobals
+  { _pColorTable :: UV.Vector Int32
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1791,6 +1785,26 @@ data CParticleT = CParticleT
   , _cpAlpha    :: Float
   , _cpAlphaVel :: Float
   , _cpNext     :: Maybe (IORef CParticleT)
+  }
+
+data PcxT = PcxT
+  { _pcxManufacturer :: Int8
+  , _pcxVersion      :: Int8
+  , _pcxEncoding     :: Int8
+  , _pcxBitsPerPixel :: Int8
+  , _pcxXMin         :: Word16
+  , _pcxYMin         :: Word16
+  , _pcxXMax         :: Word16
+  , _pcxYMax         :: Word16
+  , _pcxHRes         :: Word16
+  , _pcxVRes         :: Word16
+  , _pcxPalette      :: B.ByteString -- size 48
+  , _pcxReserved     :: Int8
+  , _pcxColorPlanes  :: Int8
+  , _pcxBytesPerLine :: Word16
+  , _pcxPaletteType  :: Word16
+  , _pcxFiller       :: B.ByteString -- size 58
+  , _pcxData         :: B.ByteString -- unbounded
   }
 
 data MenuItemRef = MenuListRef (Ref MenuListS)

@@ -48,9 +48,7 @@ initialCommands =
   , ("alias", Just aliasF), ("wait", Just waitF) ]
 
 addInitialCommands :: [(B.ByteString, Maybe XCommandT)] -> Quake ()
-addInitialCommands blah = 
-  do request (io (mapM_ (print . fst) blah))
-     mapM_ (uncurry addCommand) blah
+addInitialCommands = mapM_ (uncurry addCommand)
   
 initialize :: Quake ()
 initialize = addInitialCommands initialCommands
