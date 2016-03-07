@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
 module QuakeRef where
 
 import           Game.GameLocalsT
@@ -12,63 +11,63 @@ import           Control.Lens (use, ix, (%=), (.=))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
-class QuakeRef a b | a -> b where
-  readRef :: a -> Quake b
-  modifyRef :: a -> (b -> b) -> Quake ()
-  writeRef :: a -> b -> Quake ()
+class QuakeRef a where
+  readRef :: Ref a -> Quake a
+  modifyRef :: Ref a -> (a -> a) -> Quake ()
+  writeRef :: Ref a -> a -> Quake ()
 
-instance QuakeRef EdictRef EdictT where
-  readRef (EdictRef idx) =
-    request (do edicts <- use ioGEdicts
+instance QuakeRef EdictT where
+  readRef (Ref idx) =
+    request (do edicts <- use gbGEdicts
                 io (MV.read edicts idx))
-  modifyRef (EdictRef idx) f =
-    request (do edicts <- use ioGEdicts
+  modifyRef (Ref idx) f =
+    request (do edicts <- use gbGEdicts
                 io (MV.modify edicts f idx))
-  writeRef (EdictRef idx) edict =
-    request (do edicts <- use ioGEdicts
+  writeRef (Ref idx) edict =
+    request (do edicts <- use gbGEdicts
                 io (MV.write edicts idx edict))
 
-instance QuakeRef ClientRef ClientT where
-  readRef (ClientRef idx) =
+instance QuakeRef ClientT where
+  readRef (Ref idx) =
     do clients <- use (svGlobals.svServerStatic.ssClients)
        return (clients V.! idx)
-  modifyRef (ClientRef idx) f =
+  modifyRef (Ref idx) f =
     svGlobals.svServerStatic.ssClients.ix idx %= f
-  writeRef (ClientRef idx) client =
+  writeRef (Ref idx) client =
     svGlobals.svServerStatic.ssClients.ix idx .= client
   
-instance QuakeRef GClientRef GClientT where
-  readRef (GClientRef idx) =
+instance QuakeRef GClientT where
+  readRef (Ref idx) =
     do gClients <- use (gameBaseGlobals.gbGame.glClients)
        return (gClients V.! idx)
-  modifyRef (GClientRef idx) f =
+  modifyRef (Ref idx) f =
     gameBaseGlobals.gbGame.glClients.ix idx %= f
-  writeRef (GClientRef idx) gClient =
+  writeRef (Ref idx) gClient =
     gameBaseGlobals.gbGame.glClients.ix idx .= gClient
   
-instance QuakeRef CModelRef CModelT where
-  readRef (CModelRef idx) =
+instance QuakeRef CModelT where
+  readRef (Ref idx) =
     do cModels <- use (cmGlobals.cmMapCModels)
        return (cModels V.! idx)
-  modifyRef (CModelRef idx) f =
+  modifyRef (Ref idx) f =
     cmGlobals.cmMapCModels.ix idx %= f
-  writeRef (CModelRef idx) cModel =
+  writeRef (Ref idx) cModel =
     cmGlobals.cmMapCModels.ix idx .= cModel
   
-instance QuakeRef LinkRef LinkT where
-  readRef (LinkRef idx) =
+instance QuakeRef LinkT where
+  readRef (Ref idx) =
     do links <- use (svGlobals.svLinks)
        return (links V.! idx)
-  modifyRef (LinkRef idx) f =
+  modifyRef (Ref idx) f =
     svGlobals.svLinks.ix idx %= f
-  writeRef (LinkRef idx) link =
+  writeRef (Ref idx) link =
     svGlobals.svLinks.ix idx .= link
 
-instance QuakeRef GItemRef GItemT where
-  readRef (GItemRef idx) =
+instance QuakeRef GItemT where
+  readRef (Ref idx) =
     do items <- use (gameBaseGlobals.gbItemList)
        return (items V.! idx)
-  modifyRef (GItemRef idx) f =
+  modifyRef (Ref idx) f =
     gameBaseGlobals.gbItemList.ix idx %= f
-  writeRef (GItemRef idx) item =
+  writeRef (Ref idx) item =
     gameBaseGlobals.gbItemList.ix idx .= item

@@ -12,14 +12,14 @@ import           Control.Lens (Lens')
 import qualified Data.Vector as V
 import           Linear (V3)
 
-trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictRef -> Int -> Quake TraceT
+trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
 trace = error "SVWorld.trace" -- TODO
 
-unlinkEdict :: EdictRef -> Quake ()
+unlinkEdict :: Ref EdictT -> Quake ()
 unlinkEdict = error "SVWorld.unlinkEdict" -- TODO
 
-linkEdict :: EdictRef -> Quake ()
+linkEdict :: Ref EdictT -> Quake ()
 linkEdict = error "SVWorld.linkEdict" -- TODO
 
-areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictRef) -> Int -> Int -> Quake Int
+areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
 areaEdicts = error "SVWorld.areaEdicts" -- TODO

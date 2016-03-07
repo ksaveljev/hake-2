@@ -42,5 +42,7 @@ initialGlobals =
           , _gKeyBindings      = V.replicate 256 Nothing
           , _gKeyLines         = V.replicate 32 ""
           , _gKeyLinePos       = 0
+          , _gGunFrame         = 0
+          , _gGunModel         = Nothing
           , _gRnd              = mkStdGen 0
           }

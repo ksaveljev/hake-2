@@ -39,8 +39,7 @@ initialize =
 
 setF :: XCommandT
 setF = XCommandT "CVar.setF" $
-  do c <- Cmd.argc
-     checkParamsAndSet c
+  checkParamsAndSet =<< Cmd.argc
   where checkParamsAndSet c
           | c /= 3 && c /= 4 = showUsageMessage
           | c == 4 = handleFullSet

@@ -1,5 +1,6 @@
 module Client.VID
   ( initialize
+  , printf
   ) where
 
 import           Client.ClientStateT
@@ -8,6 +9,7 @@ import qualified Client.Console as Console
 import           Client.RefExportT
 import           Client.VidDefT
 import           Client.VidModeT
+import           Client.VIDShared
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT

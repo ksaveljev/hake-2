@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Lib
   ( atof
+  , atoi
   , fOpen
   , fOpenBinary
   , fClose
@@ -24,6 +25,11 @@ atof :: B.ByteString -> Float
 atof str
   | B.null str = 0.0
   | otherwise = fromMaybe 0.0 (readMaybe (BC.unpack str)) -- IMPROVE?
+
+atoi :: B.ByteString -> Int
+atoi str
+  | B.null str = 0
+  | otherwise = fromMaybe 0 (readMaybe (BC.unpack str)) -- IMPROVE?
 
 fOpenCommon :: (FilePath -> IOMode -> IO Handle) -> B.ByteString -> IOMode -> Quake (Maybe Handle)
 fOpenCommon f name mode = request (io (tryToOpenFile f name mode))

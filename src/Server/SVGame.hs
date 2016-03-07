@@ -24,13 +24,13 @@ import           Linear (V3)
 dprintf :: B.ByteString -> Quake ()
 dprintf = Com.printf
 
-cprintf :: Maybe EdictRef -> Int -> B.ByteString -> Quake ()
+cprintf :: Maybe (Ref EdictT) -> Int -> B.ByteString -> Quake ()
 cprintf = error "SVGame.cprintf" -- TODO
 
-centerPrintf :: EdictRef -> B.ByteString -> Quake ()
+centerPrintf :: Ref EdictT -> B.ByteString -> Quake ()
 centerPrintf = error "SVGame.centerPrintf" -- TODO
 
-startSound :: Maybe EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (Ref EdictT) -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound = error "SVGame.startSound" -- TODO
 
 configString :: Int -> B.ByteString -> Quake ()
@@ -39,13 +39,13 @@ configString = error "SVGame.configString" -- TODO
 pfError2 :: Int -> B.ByteString -> Quake ()
 pfError2 = error "SVGame.pfError2" -- TODO
 
-setModel :: EdictRef -> Maybe B.ByteString -> Quake ()
+setModel :: Ref EdictT -> Maybe B.ByteString -> Quake ()
 setModel = error "SVGame.setModel" -- TODO
 
 inPHS :: V3 Float -> V3 Float -> Quake Bool
 inPHS = error "SVGame.inPHS" -- TODO
 
-unicast :: EdictRef -> Bool -> Quake ()
+unicast :: Ref EdictT -> Bool -> Quake ()
 unicast = error "SVGame.unicast" -- TODO
 
 writeByte :: Int -> Quake ()

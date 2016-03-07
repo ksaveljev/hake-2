@@ -13,7 +13,7 @@ import           Linear (V3)
 broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = error "SVSend.broadcastPrintf" -- TODO
 
-startSound :: Maybe (V3 Float) -> EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound = error "SVSend.startSound" -- TODO
 
 multicast :: V3 Float -> Int -> Quake ()

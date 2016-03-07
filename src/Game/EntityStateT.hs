@@ -10,9 +10,9 @@ import Linear (V3(..))
 
 makeLenses ''EntityStateT
 
-newEntityStateT :: Maybe EdictRef -> EntityStateT
+newEntityStateT :: Maybe (Ref EdictT) -> EntityStateT
 newEntityStateT edictRef =
-  EntityStateT { _esNumber         = number
+  EntityStateT { _esNumber         = number edictRef
                , _esOrigin         = V3 0 0 0
                , _esAngles         = V3 0 0 0
                , _esOldOrigin      = V3 0 0 0
@@ -29,6 +29,5 @@ newEntityStateT edictRef =
                , _esEvent          = 0
                , _esSurroundingEnt = edictRef
                }
-  where number = case edictRef of
-                   Just (EdictRef idx) -> idx
-                   Nothing -> 0
+  where number Nothing = 0
+        number (Just (Ref idx)) = idx

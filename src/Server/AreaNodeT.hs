@@ -15,6 +15,6 @@ newAreaNodeT idx =
   AreaNodeT { _anAxis          = 0
             , _anDist          = 0
             , _anChildren      = (Nothing, Nothing)
-            , _anTriggerEdicts = LinkRef idx
-            , _anSolidEdicts   = LinkRef (Constants.areaNodes + idx)
+            , _anTriggerEdicts = Ref idx
+            , _anSolidEdicts   = Ref (Constants.areaNodes + idx)
             }

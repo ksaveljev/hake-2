@@ -56,8 +56,7 @@ heartbeatF = XCommandT "SVConsoleCommands.heartbeatF" $
 kickF :: XCommandT
 kickF = XCommandT "SVConsoleCommands.kickF" $
   do initialized <- use (svGlobals.svServerStatic.ssInitialized)
-     c <- Cmd.argc
-     tryToKick initialized c
+     tryToKick initialized =<< Cmd.argc
   where tryToKick initialized c
           | not initialized = Com.printf "No server running.\n"
           | c /= 2 = Com.printf "Usage: kick <userid>\n"
@@ -72,7 +71,7 @@ kick True =
      maybe kickError proceedKicking clientRef
   where kickError = Com.fatalError "svGlobals.svClient is Nothing"
 
-proceedKicking :: ClientRef -> Quake ()
+proceedKicking :: Ref ClientT -> Quake ()
 proceedKicking clientRef =
   do client <- readRef clientRef
      SVSend.broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " was kicked\n")
@@ -94,8 +93,7 @@ serverInfoF = XCommandT "SVConsoleCommands.serverInfoF" $
 
 dumpUserF :: XCommandT
 dumpUserF = XCommandT "SVConsoleCommands.dumpUserF" $
-  do c <- Cmd.argc
-     tryToDumpUser c
+  tryToDumpUser =<< Cmd.argc
   where tryToDumpUser c
           | c /= 2 = Com.printf "Usage: info <userid>\n"
           | otherwise =
@@ -111,7 +109,7 @@ dumpUser True =
      maybe dumpUserError proceedDumpingUser clientRef
   where dumpUserError = Com.fatalError "svGlobals.svClient is Nothing"
 
-proceedDumpingUser :: ClientRef -> Quake ()
+proceedDumpingUser :: Ref ClientT -> Quake ()
 proceedDumpingUser clientRef =
   do client <- readRef clientRef
      Info.printInfo (client^.cUserInfo)
@@ -165,8 +163,7 @@ saveGameF = XCommandT "SVConsoleCommands.saveGameF" $
 
 loadGameF :: XCommandT
 loadGameF = XCommandT "SVConsoleCommands.loadGameF" $
-  do c <- Cmd.argc
-     tryLoadingGame c
+  tryLoadingGame =<< Cmd.argc
   where tryLoadingGame c
           | c /= 2 = Com.printf "Usage: loadgame <directory>\n"
           | otherwise =
@@ -203,8 +200,7 @@ serverCommandF = XCommandT "SVConsoleCommands.serverCommandF" GameSVCmds.serverC
 
 conSayF :: XCommandT
 conSayF = XCommandT "SVConsoleCommands.conSayF" $
-  do c <- Cmd.argc
-     tryConSay c
+  tryConSay =<< Cmd.argc
   where tryConSay c
           | c < 2 = return ()
           | otherwise =

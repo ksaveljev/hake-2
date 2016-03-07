@@ -56,7 +56,7 @@ proceedCheckResize width lineWidth
       doResize width oldWidth oldTotalLines lineWidth
       updateConsoleValues
   where emptyConsole =
-          request (do consoleBuffer <- use ioText
+          request (do consoleBuffer <- use cText
                       io (consoleBuffer `MSV.set` ' '))
         updateConsoleValues =
           do totalLines <- use (globals.gCon.cTotalLines)
@@ -74,7 +74,7 @@ doResize width oldWidth oldTotalLines lineWidth =
 
 refillConsoleBuffer :: Int -> Int -> Int -> Int -> Int -> Int -> QuakeIO ()
 refillConsoleBuffer width oldWidth totalLines oldTotalLines currentLine lineWidth =
-  do consoleBuffer <- use ioText
+  do consoleBuffer <- use cText
      io (do tbuf <- MSV.clone consoleBuffer
             fillInBuf consoleBuffer tbuf width oldWidth totalLines oldTotalLines currentLine lineWidth 0 0)
 

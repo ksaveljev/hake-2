@@ -4,6 +4,7 @@ module Render.MSurfaceT
   ) where
 
 import qualified Constants
+import           Render.MTexInfoT
 import           Types
 
 import           Control.Lens (makeLenses)

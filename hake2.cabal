@@ -26,24 +26,32 @@ executable hake2
                      , mtl
                      , monad-coroutine
                      , network
+                     , OpenGLRaw
                      , pipes-binary
                      , pipes-bytestring
                      , random
+                     , stm
                      , time
                      , vector
                      , unix-compat
                      , unordered-containers
   default-extensions:  OverloadedStrings
   ghc-options:         -O0 -rtsopts -Wall
-  other-modules:       Client.CL
+  other-modules:       Client.CDLightT
+                     , Client.CL
+                     , Client.ClientGlobals
                      , Client.ClientInfoT
                      , Client.ClientStateT
                      , Client.ClientStaticT
+                     , Client.CLightStyleT
                      , Client.CLInput
                      , Client.CLParse
                      , Client.Console
                      , Client.ConsoleT
+                     , Client.CParticleT
+                     , Client.DLightT
                      , Client.FrameT
+                     , Client.KButtonT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
@@ -57,6 +65,7 @@ executable hake2
                      , Client.VIDGlobals
                      , Client.VidModeT
                      , Client.VidModes
+                     , Client.VIDShared
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT
@@ -137,8 +146,21 @@ executable hake2
                      , QuakeState
                      , Render.Basic.BasicRenderAPI
                      , Render.DummyRenderer
+                     , Render.Fast.Draw
                      , Render.Fast.FastRenderAPI
+                     , Render.Fast.FastRenderAPIGlobals
+                     , Render.Fast.GLLightMapStateT
+                     , Render.Fast.Image
+                     , Render.Fast.Model
+                     , Render.Fast.Warp
+                     , Render.GLConfigT
+                     , Render.GLFWbGlobals
                      , Render.GLFWbRenderer
+                     , Render.GLStateT
+                     , Render.ImageT
+                     , Render.ModelT
+                     , Render.MSurfaceT
+                     , Render.MTexInfoT
                      , Render.OpenGL.GLDriver
                      , Render.OpenGL.GLFWbGLDriver
                      , Render.QRenderer

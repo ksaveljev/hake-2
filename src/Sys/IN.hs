@@ -1,5 +1,6 @@
 module Sys.IN
-  ( initialize
+  ( centerView
+  , initialize
   , realINInit
   , shutdown
   ) where
@@ -42,7 +43,7 @@ initialize :: Quake ()
 initialize = CVar.initializeCVars initialCVars
 
 shutdown :: Quake ()
-shutdown = error "IN.shutdown" -- TODO
+shutdown = inGlobals.inMouseAvail .= False
 
 realINInit :: Quake ()
 realINInit =

@@ -103,8 +103,7 @@ printLinks =
 
 linkF :: XCommandT
 linkF = XCommandT "FS.linkF" $
-  do c <- Cmd.argc
-     link c
+  link =<< Cmd.argc
   where link c
           | c /= 3 = Com.printf "USAGE: link <from> <to>\n"
           | otherwise =

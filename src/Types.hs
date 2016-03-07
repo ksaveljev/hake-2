@@ -4,12 +4,13 @@
 {-# LANGUAGE ExistentialQuantification #-}
 module Types where
 
+import           Control.Concurrent.STM.TChan (TChan)
 import           Control.Lens (Lens')
 import           Control.Monad.State (State, StateT, MonadState, MonadIO, lift, get, put, liftIO)
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
-import           Data.Int (Int8, Int16, Int32)
+import           Data.Int (Int8, Int16, Int32, Int64)
 import           Data.IORef (IORef)
 import           Data.Sequence (Seq)
 import qualified Data.Vector as V
@@ -19,6 +20,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import           Data.Word (Word8, Word16, Word32)
 import qualified Graphics.UI.GLFW as GLFW
+import qualified Graphics.GL as GL
 import           Linear (V3, V4)
 import           Network.Socket (HostAddress)
 import           System.IO (Handle)
@@ -36,24 +38,40 @@ io :: MonadIO m => IO a -> m a
 io = liftIO
 
 data QuakeState = QuakeState
-  { _globals          :: Globals
-  , _comGlobals       :: ComGlobals
-  , _cmdGlobals       :: CmdGlobals
-  , _keyGlobals       :: KeyGlobals
-  , _fsGlobals        :: FSGlobals
-  , _svGlobals        :: SVGlobals
-  , _gameBaseGlobals  :: GameBaseGlobals
-  , _cmGlobals        :: CMGlobals
-  , _gameItemsGlobals :: GameItemsGlobals
-  , _vidGlobals       :: VIDGlobals
-  , _inGlobals        :: INGlobals
+  { _globals              :: Globals
+  , _comGlobals           :: ComGlobals
+  , _cmdGlobals           :: CmdGlobals
+  , _keyGlobals           :: KeyGlobals
+  , _fsGlobals            :: FSGlobals
+  , _svGlobals            :: SVGlobals
+  , _gameBaseGlobals      :: GameBaseGlobals
+  , _cmGlobals            :: CMGlobals
+  , _gameItemsGlobals     :: GameItemsGlobals
+  , _vidGlobals           :: VIDGlobals
+  , _inGlobals            :: INGlobals
+  , _fastRenderAPIGlobals :: FastRenderAPIGlobals
+  , _glfwbGlobals         :: GLFWbGlobals
+  , _clientGlobals        :: ClientGlobals
   }
 
 data QuakeIOState = QuakeIOState
-  { _ioGEdicts    :: MV.IOVector EdictT
-  , _ioMapPlanes  :: MV.IOVector CPlaneT
-  , _ioMapBrushes :: MV.IOVector CBrushT
-  , _ioText       :: MSV.IOVector Char
+  { _gbGEdicts              :: MV.IOVector EdictT
+  , _cmMapPlanes            :: MV.IOVector CPlaneT
+  , _cmMapBrushes           :: MV.IOVector CBrushT
+  , _cText                  :: MSV.IOVector Char
+  , _frGLTextures           :: MV.IOVector ImageT
+  , _frModKnown             :: MV.IOVector ModelT
+  , _frModInline            :: MV.IOVector ModelT
+  , _frFrustum              :: MV.IOVector CPlaneT
+  , _frVertexArrayBuf       :: MSV.IOVector Float
+  , _frModelTextureCoordBuf :: MSV.IOVector Float
+  , _frModelVertexIndexBuf  :: MSV.IOVector Int32
+  , _frPolygonBuffer        :: MSV.IOVector Float
+  , _frPolygonCache         :: MV.IOVector GLPolyT
+  , _lmsLightmapSurfaces    :: MV.IOVector MSurfaceT
+  , _lmsLightmapBuffer      :: MSV.IOVector Word8
+  , _cgDLights              :: MV.IOVector CDLightT
+  , _cgParticles            :: MV.IOVector CParticleT
   }
 
 data IORequest x
@@ -65,6 +83,8 @@ instance Functor IORequest where
 request :: Monad m => QuakeIO a -> Coroutine IORequest m a
 request x = suspend (RunIO x return)
 
+data Ref a = Ref Int deriving (Eq, Show, Ord)
+{-
 newtype EdictRef = EdictRef Int deriving (Eq, Show, Ord)
 newtype ClientRef = ClientRef Int deriving Eq
 newtype GClientRef = GClientRef Int deriving Eq
@@ -75,12 +95,15 @@ newtype MapSurfaceRef = MapSurfaceRef Int deriving Eq
 newtype CPlaneRef = CPlaneRef Int deriving Eq
 newtype GLPolyRef = GLPolyRef Int deriving Eq
 newtype MenuFrameworkSRef = MenuFrameworkSRef Int deriving Eq
+newtype ModelRef = ModelRef Int deriving Eq
+newtype ImageRef = ImageRef Int deriving Eq
+-}
 
-dummyGClientRef :: GClientRef
-dummyGClientRef = GClientRef (-1)
+dummyGClientRef :: Ref GClientT
+dummyGClientRef = Ref (-1)
 
-dummyGItemRef :: GItemRef
-dummyGItemRef = GItemRef (-1)
+dummyGItemRef :: Ref GItemT
+dummyGItemRef = Ref (-1)
 
 data Globals = Globals
   { _gCurTime          :: Int
@@ -104,6 +127,8 @@ data Globals = Globals
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
+  , _gGunFrame         :: Int
+  , _gGunModel         :: Maybe (IORef ModelT)
   , _gRnd              :: StdGen
   }
 
@@ -146,24 +171,24 @@ data FSGlobals = FSGlobals
 
 data SVGlobals = SVGlobals
   { _svMasterAdr    :: V.Vector NetAdrT
-  , _svClient       :: Maybe ClientRef
+  , _svClient       :: Maybe (Ref ClientT)
   , _svServer       :: ServerT
   , _svServerStatic :: ServerStaticT
-  , _svPlayer       :: Maybe EdictRef
+  , _svPlayer       :: Maybe (Ref EdictT)
   , _svFirstMap     :: B.ByteString
   , _svMsgBuf       :: B.ByteString
   , _svNumAreaNodes :: Int
   , _svAreaNodes    :: V.Vector AreaNodeT
   , _svAreaMins     :: V3 Float
   , _svAreaMaxs     :: V3 Float
-  , _svAreaList     :: V.Vector EdictRef
+  , _svAreaList     :: V.Vector (Ref EdictT)
   , _svAreaCount    :: Int
   , _svAreaMaxCount :: Int
   , _svAreaType     :: Int
   , _svLeafs        :: UV.Vector Int
   , _svClusters     :: UV.Vector Int
-  , _svTouch        :: V.Vector EdictRef
-  , _svTouchList    :: V.Vector EdictRef
+  , _svTouch        :: V.Vector (Ref EdictT)
+  , _svTouchList    :: V.Vector (Ref EdictT)
   , _svLinks        :: V.Vector LinkT
   , _svMsg          :: SizeBufT
   , _svLeafsTmp     :: UV.Vector Int
@@ -183,14 +208,14 @@ data GameBaseGlobals = GameBaseGlobals
   , _gbItemList      :: V.Vector GItemT
   , _gbPushed        :: V.Vector PushedT
   , _gbPushedP       :: Int
-  , _gbObstacle      :: Maybe EdictRef
+  , _gbObstacle      :: Maybe (Ref EdictT)
   , _gbCYes          :: Int
   , _gbCNo           :: Int
-  , _gbTouch         :: V.Vector EdictRef
+  , _gbTouch         :: V.Vector (Ref EdictT)
   , _gbIsQuad        :: Bool
   , _gbIsSilenced    :: Int
-  , _gbCurrentPlayer :: Maybe EdictRef
-  , _gbCurrentClient :: Maybe GClientRef
+  , _gbCurrentPlayer :: Maybe (Ref EdictT)
+  , _gbCurrentClient :: Maybe (Ref GClientT)
   , _gbForward       :: V3 Float
   , _gbRight         :: V3 Float
   , _gbUp            :: V3 Float
@@ -264,11 +289,11 @@ data GameItemsGlobals = GameItemsGlobals
   , _giCombatArmorInfo      :: GItemArmorT
   , _giBodyArmorInfo        :: GItemArmorT
   , _giQuakeDropTimeoutHack :: Int
-  , _giJacketArmorIndex     :: GItemRef
-  , _giCombatArmorIndex     :: GItemRef
-  , _giBodyArmorIndex       :: GItemRef
-  , _giPowerScreenIndex     :: GItemRef
-  , _giPowerShieldIndex     :: GItemRef
+  , _giJacketArmorIndex     :: Ref GItemT
+  , _giCombatArmorIndex     :: Ref GItemT
+  , _giBodyArmorIndex       :: Ref GItemT
+  , _giPowerScreenIndex     :: Ref GItemT
+  , _giPowerShieldIndex     :: Ref GItemT
   }
 
 data VIDGlobals = VIDGlobals
@@ -279,7 +304,7 @@ data VIDGlobals = VIDGlobals
   , _vgModeX              :: Int
   , _vgRefs               :: V.Vector B.ByteString
   , _vgDrivers            :: V.Vector B.ByteString
-  , _vgCurrentMenu        :: Maybe MenuFrameworkSRef
+  , _vgCurrentMenu        :: Maybe (Ref MenuFrameworkS)
   }
 
 data INGlobals = INGlobals
@@ -292,6 +317,138 @@ data INGlobals = INGlobals
   , _inOldMouseY           :: Int
   , _inMLooking            :: Bool
   }
+
+data FastRenderAPIGlobals = FastRenderAPIGlobals
+  { _frGLDepthMin           :: Float
+  , _frGLDepthMax           :: Float
+  , _frGLConfig             :: GLConfigT
+  , _frGLState              :: GLStateT
+  , _frd8to24table          :: UV.Vector Int
+  , _frVid                  :: VidDefT
+  , _frColorTableEXT        :: Bool
+  , _frActiveTextureARB     :: Bool
+  , _frPointParameterEXT    :: Bool
+  , _frLockArraysEXT        :: Bool
+  , _frSwapIntervalEXT      :: Bool
+  , _frTexture0             :: Int
+  , _frTexture1             :: Int
+  , _frGLTexSolidFormat     :: Int
+  , _frGLTexAlphaFormat     :: Int
+  , _frGLFilterMin          :: Int
+  , _frGLFilterMax          :: Int
+  , _frNumGLTextures        :: Int
+  , _frLastModes            :: (Int, Int)
+  , _frRegistrationSequence :: Int
+  , _frGammaTable           :: B.ByteString
+  , _frIntensityTable       :: B.ByteString
+  , _frModNumKnown          :: Int
+  , _frCurrentModel         :: Maybe (IORef ModelT)
+  , _frModNoVis             :: B.ByteString
+  , _frUploadWidth          :: Int
+  , _frUploadHeight         :: Int
+  , _frUploadedPaletted     :: Bool
+  , _frDrawChars            :: Maybe (IORef ImageT)
+  , _frTrickFrame           :: Int
+  , _frScrapDirty           :: Bool
+  , _frViewCluster          :: Int
+  , _frViewCluster2         :: Int
+  , _frOldViewCluster       :: Int
+  , _frOldViewCluster2      :: Int
+  , _frWorldModel           :: Maybe (IORef ModelT)
+  , _frModelTextureCoordIdx :: Int
+  , _frModelVertexIndexIdx  :: Int
+  , _frPolygonS1Old         :: UV.Vector Float
+  , _frPolygonBufferIndex   :: Int
+  , _frPolygonCount         :: Int
+  , _frGLLms                :: GLLightMapStateT
+  , _frNewRefDef            :: RefDefT
+  , _frFrameCount           :: Int
+  , _frWarpFace             :: Maybe MSurfaceT
+  , _frModelVisibility      :: Maybe B.ByteString
+  , _frSkyName              :: B.ByteString
+  , _frSkyRotate            :: Float
+  , _frSkyAxis              :: V3 Float
+  , _frSkyImages            :: V.Vector (Maybe (IORef ImageT))
+  , _frSkyMin               :: Float
+  , _frSkyMax               :: Float
+  , _frCBrushPolys          :: Int
+  , _frCAliasPolys          :: Int
+  , _frDLightFrameCount     :: Int
+  , _frOrigin               :: V3 Float
+  , _frVUp                  :: V3 Float
+  , _frVPn                  :: V3 Float
+  , _frVRight               :: V3 Float
+  , _frVBlend               :: V4 Float
+  , _frWorldMatrix          :: [GL.GLfloat]
+  , _frVisFrameCount        :: Int
+  , _frModelOrg             :: V3 Float
+  , _frCurrentEntity        :: Maybe (IORef EntityT)
+  , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
+  , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
+  , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
+  , _frBlockLights          :: UV.Vector Float
+  , _frPointColor           :: V3 Float
+  , _frLightSpot            :: V3 Float
+  , _frRawPalette           :: UV.Vector Int
+  , _frLoadModel            :: Ref ModelT
+  , _frNoTexture            :: Ref ImageT
+  , _frParticleTexture      :: Ref ImageT
+  }
+
+data GLFWbGlobals = GLFWbGlobals
+  { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
+  , _glfwbWindow         :: Maybe GLFW.Window
+  , _glfwbWindowXPos     :: Int
+  , _glfwbWindowYPos     :: Int
+  , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
+  }
+
+data ClientGlobals = ClientGlobals
+  { _cgExtraTime          :: Int
+  , _cgNumCheatVars       :: Int
+  , _cgBuf                :: SizeBufT
+  , _cgFrameMsec          :: Int64
+  , _cgOldSysFrameTime    :: Int64
+  , _cgInKLook            :: KButtonT
+  , _cgInLeft             :: KButtonT
+  , _cgInRight            :: KButtonT
+  , _cgInForward          :: KButtonT
+  , _cgInBack             :: KButtonT
+  , _cgInLookUp           :: KButtonT
+  , _cgInLookDown         :: KButtonT
+  , _cgInMoveLeft         :: KButtonT
+  , _cgInMoveRight        :: KButtonT
+  , _cgInStrafe           :: KButtonT
+  , _cgInSpeed            :: KButtonT
+  , _cgInUse              :: KButtonT
+  , _cgInAttack           :: KButtonT
+  , _cgInUp               :: KButtonT
+  , _cgInDown             :: KButtonT
+  , _cgInImpulse          :: Int
+  , _cgLightStyle         :: V.Vector CLightStyleT
+  , _cgLastOfs            :: Int
+  , _cgCR                 :: Int -- from Console.hs
+  , _cgActiveParticles    :: Maybe (IORef CParticleT)
+  , _cgFreeParticles      :: Maybe (IORef CParticleT)
+  , _cgPrecacheCheck      :: Int
+  , _cgPrecacheSpawnCount :: Int
+  , _cgPrecacheTex        :: Int
+  , _cgPrecacheModelSkin  :: Int
+  , _cgPrecacheModel      :: Maybe B.ByteString
+  , _cgNumCLWeaponModels  :: Int
+  , _cgWeaponModels       :: V.Vector B.ByteString
+  , _cgPMPassEnt          :: Maybe (Ref EdictT)
+  , _cgIsDown             :: Bool
+  , _cgAVelocities        :: V.Vector (V3 Float)
+  }
+
+data GLFWKBDEvent = KeyPress GLFW.Key
+                  | KeyRelease GLFW.Key
+                  | CursorPosition Double Double
+                  | MouseButtonPress GLFW.MouseButton
+                  | MouseButtonRelease GLFW.MouseButton
+                  | MouseWheelScroll Double
+                  | ConfigureNotify
   
 data CVarT = CVarT
   { _cvName          :: B.ByteString
@@ -373,7 +530,7 @@ data ServerT = ServerT
   , _sTime          :: Int
   , _sFrameNum      :: Int
   , _sName          :: B.ByteString
-  , _sModels        :: V.Vector CModelRef
+  , _sModels        :: V.Vector (Ref CModelT)
   , _sConfigStrings :: V.Vector B.ByteString
   , _sBaselines     :: V.Vector EntityStateT
   , _sMulticast     :: SizeBufT
@@ -402,15 +559,15 @@ data AreaNodeT = AreaNodeT
   { _anAxis          :: Int
   , _anDist          :: Float
   , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes IMPROVE: newtype?
-  , _anTriggerEdicts :: LinkRef
-  , _anSolidEdicts   :: LinkRef
+  , _anTriggerEdicts :: Ref LinkT
+  , _anSolidEdicts   :: Ref LinkT
   }
 
 data LinkT = LinkT
   { _lIndex :: Int
-  , _lPrev  :: Maybe LinkRef
-  , _lNext  :: Maybe LinkRef
-  , _lEdict :: Maybe EdictRef
+  , _lPrev  :: Maybe (Ref LinkT)
+  , _lNext  :: Maybe (Ref LinkT)
+  , _lEdict :: Maybe (Ref EdictT)
   }
 
 data ChallengeT = ChallengeT
@@ -435,7 +592,7 @@ data EntityStateT = EntityStateT
   , _esSolid          :: Int
   , _esSound          :: Int
   , _esEvent          :: Int
-  , _esSurroundingEnt :: Maybe EdictRef
+  , _esSurroundingEnt :: Maybe (Ref EdictT)
   }
 
 data ClientT = ClientT
@@ -449,7 +606,7 @@ data ClientT = ClientT
   , _cMessageSize   :: UV.Vector Int
   , _cRate          :: Int
   , _cSurpressCount :: Int
-  , _cEdict         :: Maybe EdictRef
+  , _cEdict         :: Maybe (Ref EdictT)
   , _cName          :: B.ByteString
   , _cMessageLevel  :: Int
   , _cDatagram      :: SizeBufT
@@ -525,12 +682,12 @@ data PMoveT = PMoveT
   , _pmCmd           :: UserCmdT
   , _pmSnapInitial   :: Bool
   , _pmNumTouch      :: Int
-  , _pmTouchEnts     :: V.Vector EdictRef
+  , _pmTouchEnts     :: V.Vector (Ref EdictT)
   , _pmViewAngles    :: V3 Float
   , _pmViewHeight    :: Float
   , _pmMins          :: V3 Float
   , _pmMaxs          :: V3 Float
-  , _pmGroundEntity  :: Maybe EdictRef
+  , _pmGroundEntity  :: Maybe (Ref EdictT)
   , _pmWaterType     :: Int
   , _pmWaterLevel    :: Int
   , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
@@ -555,7 +712,7 @@ data TraceT = TraceT
   , _tPlane      :: CPlaneT
   , _tSurface    :: Maybe CSurfaceT
   , _tContents   :: Int
-  , _tEnt        :: Maybe EdictRef
+  , _tEnt        :: Maybe (Ref EdictT)
   }
 
 data CPlaneT = CPlaneT
@@ -577,7 +734,7 @@ data EdictT =
          , _eInUse                 :: Bool
          , _eClassName             :: B.ByteString
          , _eLinkCount             :: Int
-         , _eArea                  :: LinkRef
+         , _eArea                  :: Ref LinkT
          , _eNumClusters           :: Int
          , _eClusterNums           :: UV.Vector Int
          , _eHeadNode              :: Int
@@ -605,9 +762,9 @@ data EdictT =
          , _eGravity               :: Float
          , _eYawSpeed              :: Float
          , _eIdealYaw              :: Float
-         , _eTargetEnt             :: Maybe EdictRef
-         , _eGoalEntity            :: Maybe EdictRef
-         , _eMoveTarget            :: Maybe EdictRef
+         , _eTargetEnt             :: Maybe (Ref EdictT)
+         , _eGoalEntity            :: Maybe (Ref EdictT)
+         , _eMoveTarget            :: Maybe (Ref EdictT)
          , _eNextThink             :: Float
          , _ePrethink              :: Maybe EntThink
          , _eThink                 :: Maybe EntThink
@@ -635,15 +792,15 @@ data EdictT =
          , _eSounds                :: Int
          , _eCount                 :: Int
          , _eGroundEntityLinkCount :: Int
-         , _eChain                 :: Maybe EdictRef
-         , _eEnemy                 :: Maybe EdictRef
-         , _eOldEnemy              :: Maybe EdictRef
-         , _eActivator             :: Maybe EdictRef
-         , _eGroundEntity          :: Maybe EdictRef
-         , _eTeamChain             :: Maybe EdictRef
-         , _eTeamMaster            :: Maybe EdictRef
-         , _eMyNoise               :: Maybe EdictRef
-         , _eMyNoise2              :: Maybe EdictRef
+         , _eChain                 :: Maybe (Ref EdictT)
+         , _eEnemy                 :: Maybe (Ref EdictT)
+         , _eOldEnemy              :: Maybe (Ref EdictT)
+         , _eActivator             :: Maybe (Ref EdictT)
+         , _eGroundEntity          :: Maybe (Ref EdictT)
+         , _eTeamChain             :: Maybe (Ref EdictT)
+         , _eTeamMaster            :: Maybe (Ref EdictT)
+         , _eMyNoise               :: Maybe (Ref EdictT)
+         , _eMyNoise2              :: Maybe (Ref EdictT)
          , _eNoiseIndex            :: Int
          , _eNoiseIndex2           :: Int
          , _eVolume                :: Float
@@ -658,11 +815,11 @@ data EdictT =
          , _eMoveAngles            :: V3 Float
          , _eLightLevel            :: Int
          , _eStyle                 :: Int
-         , _eItem                  :: Maybe GItemRef
+         , _eItem                  :: Maybe (Ref GItemT)
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
-         , _eClient                :: Maybe GClientRef
-         , _eOwner                 :: Maybe EdictRef
+         , _eClient                :: Maybe (Ref GClientT)
+         , _eOwner                 :: Maybe (Ref EdictT)
          , _eIndex                 :: Int
          , _eiModel                :: Maybe B.ByteString
          , _eMessage               :: Maybe B.ByteString
@@ -762,7 +919,7 @@ data GClientT = GClientT
   , _gcOldButtons         :: Int
   , _gcLatchedButtons     :: Int
   , _gcWeaponThunk        :: Bool
-  , _gcNewWeapon          :: Maybe GItemRef
+  , _gcNewWeapon          :: Maybe (Ref GItemT)
   , _gcDamageArmor        :: Int
   , _gcDamagePArmor       :: Int
   , _gcDamageBlood        :: Int
@@ -805,7 +962,7 @@ data GClientT = GClientT
   , _gcFloodWhen          :: UV.Vector Float
   , _gcFloodWhenHead      :: Int
   , _gcRespawnTime        :: Float
-  , _gcChaseTarget        :: Maybe EdictRef
+  , _gcChaseTarget        :: Maybe (Ref EdictT)
   , _gcUpdateChase        :: Bool
   , _gcIndex              :: Int
   }
@@ -826,8 +983,8 @@ data ClientPersistantT = ClientPersistantT
   , _cpMaxGrenades     :: Int
   , _cpMaxCells        :: Int
   , _cpMaxSlugs        :: Int
-  , _cpWeapon          :: Maybe GItemRef
-  , _cpLastWeapon      :: Maybe GItemRef
+  , _cpWeapon          :: Maybe (Ref GItemT)
+  , _cpLastWeapon      :: Maybe (Ref GItemT)
   , _cpPowerCubes      :: Int
   , _cpScore           :: Int
   , _cpGameHelpChanged :: Int
@@ -931,12 +1088,12 @@ data LevelLocalsT = LevelLocalsT
   , _llExitIntermission     :: Bool
   , _llIntermissionOrigin   :: V3 Float
   , _llIntermissionAngle    :: V3 Float
-  , _llSightClient          :: Maybe EdictRef
-  , _llSightEntity          :: Maybe EdictRef
+  , _llSightClient          :: Maybe (Ref EdictT)
+  , _llSightEntity          :: Maybe (Ref EdictT)
   , _llSightEntityFrameNum  :: Int
-  , _llSoundEntity          :: Maybe EdictRef
+  , _llSoundEntity          :: Maybe (Ref EdictT)
   , _llSoundEntityFrameNum  :: Int
-  , _llSound2Entity         :: Maybe EdictRef
+  , _llSound2Entity         :: Maybe (Ref EdictT)
   , _llSound2EntityFrameNum :: Int
   , _llPicHealth            :: Int
   , _llTotalSecrets         :: Int
@@ -945,7 +1102,7 @@ data LevelLocalsT = LevelLocalsT
   , _llFoundGoals           :: Int
   , _llTotalMonsters        :: Int
   , _llKilledMonsters       :: Int
-  , _llCurrentEntity        :: Maybe EdictRef
+  , _llCurrentEntity        :: Maybe (Ref EdictT)
   , _llBodyQue              :: Int
   , _llPowerCubes           :: Int
   }
@@ -953,28 +1110,28 @@ data LevelLocalsT = LevelLocalsT
 data GameImportT = GameImportT
   { _giBprintf            :: Int -> B.ByteString -> Quake ()
   , _giDprintf            :: B.ByteString -> Quake ()
-  , _giCprintf            :: Maybe EdictRef -> Int -> B.ByteString -> Quake ()
-  , _giCenterPrintf       :: EdictRef -> B.ByteString -> Quake ()
-  , _giSound              :: Maybe EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
-  , _giPositionedSound    :: Maybe (V3 Float) -> EdictRef -> Int -> Int -> Float -> Float -> Float -> Quake ()
+  , _giCprintf            :: Maybe (Ref EdictT) -> Int -> B.ByteString -> Quake ()
+  , _giCenterPrintf       :: Ref EdictT -> B.ByteString -> Quake ()
+  , _giSound              :: Maybe (Ref EdictT) -> Int -> Int -> Float -> Float -> Float -> Quake ()
+  , _giPositionedSound    :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
   , _giConfigString       :: Int -> B.ByteString -> Quake ()
   , _giError              :: B.ByteString -> Quake ()
   , _giError2             :: Int -> B.ByteString -> Quake ()
   , _giModelIndex         :: Maybe B.ByteString -> Quake Int
   , _giSoundIndex         :: Maybe B.ByteString -> Quake Int
   , _giImageIndex         :: Maybe B.ByteString -> Quake Int
-  , _giSetModel           :: EdictRef -> Maybe B.ByteString -> Quake ()
-  , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictRef -> Int -> Quake TraceT
+  , _giSetModel           :: Ref EdictT -> Maybe B.ByteString -> Quake ()
+  , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
   , _giPointContents      :: V3 Float -> Quake Int
   , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
   , _giSetAreaPortalState :: Int -> Bool -> Quake ()
   , _giAreasConnected     :: Int -> Int -> Quake Bool
-  , _giLinkEntity         :: EdictRef -> Quake ()
-  , _giUnlinkEntity       :: EdictRef -> Quake ()
-  , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictRef) -> Int -> Int -> Quake Int
+  , _giLinkEntity         :: Ref EdictT -> Quake ()
+  , _giUnlinkEntity       :: Ref EdictT -> Quake ()
+  , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
   , _giPMove              :: PMoveT -> Quake PMoveT
   , _giMulticast          :: V3 Float -> Int -> Quake ()
-  , _giUnicast            :: EdictRef -> Bool -> Quake ()
+  , _giUnicast            :: Ref EdictT -> Bool -> Quake ()
   , _giWriteByte          :: Int -> Quake ()
   , _giWriteShort         :: Int -> Quake ()
   , _giWriteString        :: B.ByteString -> Quake ()
@@ -1008,7 +1165,7 @@ data SpawnTempT = SpawnTempT
   }
 
 data PushedT = PushedT
-  { _pEnt      :: Maybe EdictRef
+  { _pEnt      :: Maybe (Ref EdictT)
   , _pOrigin   :: V3 Float
   , _pAngles   :: V3 Float
   , _pDeltaYaw :: Float
@@ -1022,8 +1179,8 @@ data CBrushT = CBrushT
   }
 
 data CBrushSideT = CBrushSideT
-  { _cbsPlane   :: Maybe CPlaneRef
-  , _cbsSurface :: Maybe MapSurfaceRef -- Nothing means nullsurface (from jake2)
+  { _cbsPlane   :: Maybe (Ref CPlaneT)
+  , _cbsSurface :: Maybe (Ref MapSurfaceT) -- Nothing means nullsurface (from jake2)
   }
 
 data MapSurfaceT = MapSurfaceT
@@ -1032,7 +1189,7 @@ data MapSurfaceT = MapSurfaceT
   }
 
 data CNodeT = CNodeT
-  { _cnPlane    :: Maybe CPlaneRef
+  { _cnPlane    :: Maybe (Ref CPlaneT)
   , _cnChildren :: (Int, Int)
   }
 
@@ -1266,7 +1423,7 @@ data MSurfaceT = MSurfaceT
   , _msLightT             :: Int
   , _msDLightS            :: Int
   , _msDLightT            :: Int
-  , _msPolys              :: Maybe GLPolyRef
+  , _msPolys              :: Maybe (Ref GLPolyT)
   , _msTextureChain       :: Maybe (IORef MSurfaceT)
   , _msLightmapChain      :: Maybe (IORef MSurfaceT)
   , _msTexInfo            :: MTexInfoT
@@ -1459,7 +1616,7 @@ data ClientStateT = ClientStateT
   , _csPlayerNum              :: Int
   , _csConfigStrings          :: V.Vector B.ByteString
   , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
-  , _csModelClip              :: V.Vector (Maybe CModelRef)
+  , _csModelClip              :: V.Vector (Maybe (Ref CModelT))
   , _csSoundPrecache          :: V.Vector (Maybe (IORef SfxT))
   , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
   , _csClientInfo             :: V.Vector ClientInfoT
@@ -1505,6 +1662,143 @@ data ClientInfoT = ClientInfoT
   , _ciWeaponModel :: V.Vector (Maybe (IORef ModelT))
   }
 
+data GLPolyT = GLPolyT
+  { _glpNext           :: Maybe (Ref GLPolyT)
+  , _glpChain          :: Maybe (Ref GLPolyT)
+  , _glpNumVerts       :: Int
+  , _glpFlags          :: Int
+  , _glpPos            :: Int
+  }
+
+data GLConfigT = GLConfigT
+  { _glcRenderer         :: Int
+  , _glcRendererString   :: B.ByteString
+  , _glcVendorString     :: B.ByteString
+  , _glcVersionString    :: B.ByteString
+  , _glcExtensionsString :: B.ByteString
+  , _glcAllowCds         :: Bool
+  , _glcVersion          :: Float
+  }
+
+data GLStateT = GLStateT
+  { _glsInverseIntensity        :: Float
+  , _glsFullScreen              :: Bool
+  , _glsPrevMode                :: Int
+  , _glsD16To8Table             :: Maybe B.ByteString
+  , _glsLightmapTextures        :: Int
+  , _glsCurrentTextures         :: (Int, Int)
+  , _glsCurrentTmu              :: Int
+  , _glsCameraSeparation        :: Float
+  , _glsStereoEnabled           :: Bool
+  , _glsOriginalRedGammaTable   :: UV.Vector Word8
+  , _glsOriginalGreenGammaTable :: UV.Vector Word8
+  , _glsOriginalBlueGammaTable  :: UV.Vector Word8
+  }
+
+data GLLightMapStateT = GLLightMapStateT
+  { _lmsInternalFormat         :: Int
+  , _lmsCurrentLightmapTexture :: Int
+  , _lmsAllocated              :: UV.Vector Int
+  }
+
+data MenuFrameworkS = MenuFrameworkS
+  { _mfX          :: Int
+  , _mfY          :: Int
+  , _mfCursor     :: Int
+  , _mfNItems     :: Int
+  , _mfNSlots     :: Int
+  , _mfItems      :: V.Vector MenuItemRef
+  , _mfStatusBar  :: Maybe B.ByteString
+  , _mfCursorDraw :: Maybe (Quake ())
+  }
+
+data MenuCommonS = MenuCommonS
+  { _mcType          :: Int
+  , _mcName          :: Maybe B.ByteString
+  , _mcX             :: Int
+  , _mcY             :: Int
+  , _mcParent        :: Maybe (Ref MenuFrameworkS)
+  , _mcCursorOffset  :: Int
+  , _mcLocalData     :: V4 Int
+  , _mcFlags         :: Int
+  , _mcN             :: Int
+  , _mcStatusBar     :: Maybe B.ByteString
+  , _mcCallback      :: Maybe (Quake ())
+  , _mcStatusBarFunc :: Maybe (Quake ())
+  , _mcOwnerDraw     :: Maybe (Quake ())
+  , _mcCursorDraw    :: Maybe (Quake ())
+  }
+
+data MenuListS = MenuListS
+  { _mlGeneric   :: MenuCommonS
+  , _mlCurValue  :: Int
+  , _mlItemNames :: V.Vector B.ByteString
+  }
+
+data MenuSliderS = MenuSliderS
+  { _msGeneric  :: MenuCommonS
+  , _msMinValue :: Float
+  , _msMaxValue :: Float
+  , _msCurValue :: Float
+  , _msRange    :: Float
+  }
+
+data MenuActionS = MenuActionS
+  { _maGeneric :: MenuCommonS
+  }
+
+data MenuSeparatorS = MenuSeparatorS
+  { _mspGeneric :: MenuCommonS
+  }
+
+data MenuFieldS = MenuFieldS
+  { _mflGeneric       :: MenuCommonS
+  , _mflBuffer        :: B.ByteString
+  , _mflCursor        :: Int
+  , _mflLength        :: Int
+  , _mflVisibleLength :: Int
+  , _mflVisibleOffset :: Int
+  }
+
+data KButtonT = KButtonT
+  { _kbDown     :: (Int, Int)
+  , _kbDownTime :: Int64
+  , _kbMsec     :: Int64
+  , _kbState    :: Int
+  }
+
+data CDLightT = CDLightT
+  { _cdlKey      :: Int
+  , _cdlColor    :: V3 Float
+  , _cdlOrigin   :: V3 Float
+  , _cdlRadius   :: Float
+  , _cdlDie      :: Float
+  , _cdlMinLight :: Float
+  }
+
+data CLightStyleT = CLightStyleT
+  { _clsLength :: Int
+  , _clsValue  :: V3 Float
+  , _clsMap    :: UV.Vector Float
+  }
+
+data CParticleT = CParticleT
+  { _cpTime     :: Float
+  , _cpOrg      :: V3 Float
+  , _cpVel      :: V3 Float
+  , _cpAccel    :: V3 Float
+  , _cpColor    :: Float
+  , _cpAlpha    :: Float
+  , _cpAlphaVel :: Float
+  , _cpNext     :: Maybe (IORef CParticleT)
+  }
+
+data MenuItemRef = MenuListRef (Ref MenuListS)
+                 | MenuActionRef (Ref MenuActionS)
+                 | MenuSliderRef (Ref MenuSliderS)
+                 | MenuSeparatorRef (Ref MenuSeparatorS)
+                 | MenuFieldRef (Ref MenuFieldS)
+                 deriving Eq
 
 data VideoMode = GLFWbVideoMode GLFW.VideoMode
             -- | GLUTVideoMode GLUT.GameModeCapability
@@ -1514,55 +1808,55 @@ data ModelExtra = AliasModelExtra DMdlT
 
 data AI = AI
   { _aiId :: B.ByteString
-  , _aiAi :: EdictRef -> Float -> Quake ()
+  , _aiAi :: Ref EdictT -> Float -> Quake ()
   }
 
 data EntInteract = EntInteract
   { entInteractId       :: B.ByteString
-  , entInteract :: EdictRef -> EdictRef -> Quake Bool
+  , entInteract :: Ref EdictT -> Ref EdictT -> Quake Bool
   }
 
 data EntThink = EntThink
   { entThinkId    :: B.ByteString
-  , entThink :: EdictRef -> Quake Bool
+  , entThink :: Ref EdictT -> Quake Bool
   }
 
 data EntBlocked = EntBlocked
   { entBlockedId      :: B.ByteString
-  , entBlocked :: EdictRef -> EdictRef -> Quake ()
+  , entBlocked :: Ref EdictT -> Ref EdictT -> Quake ()
   }
 
 data EntDodge = EntDodge
   { entDodgeId    :: B.ByteString
-  , entDodge :: EdictRef -> EdictRef -> Float -> Quake ()
+  , entDodge :: Ref EdictT -> Ref EdictT -> Float -> Quake ()
   }
 
 data EntTouch = EntTouch
   { entTouchId    :: B.ByteString
-  , entTouch :: EdictRef -> EdictRef -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+  , entTouch :: Ref EdictT -> Ref EdictT -> CPlaneT -> Maybe CSurfaceT -> Quake ()
   }
 
 data EntUse = EntUse
   { entUseId  :: B.ByteString
-  , entUse :: EdictRef -> Maybe EdictRef -> Maybe EdictRef -> Quake ()
+  , entUse :: Ref EdictT -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
   }
 
 data EntPain = EntPain
   { entPainId   :: B.ByteString
-  , entPain :: EdictRef -> EdictRef -> Float -> Int -> Quake ()
+  , entPain :: Ref EdictT -> Ref EdictT -> Float -> Int -> Quake ()
   }
 
 data EntDie = EntDie
   { entDieId  :: B.ByteString
-  , entDie :: EdictRef -> EdictRef -> EdictRef -> Int -> V3 Float -> Quake ()
+  , entDie :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Int -> V3 Float -> Quake ()
   }
 
 data ItemUse = ItemUse
   { itemUseId  :: B.ByteString
-  , itemUse :: EdictRef -> GItemRef -> Quake ()
+  , itemUse :: Ref EdictT -> Ref GItemT -> Quake ()
   }
 
 data ItemDrop = ItemDrop
   { itemDropId   :: B.ByteString
-  , itemDrop :: EdictRef -> GItemRef -> Quake ()
+  , itemDrop :: Ref EdictT -> Ref GItemT -> Quake ()
   }

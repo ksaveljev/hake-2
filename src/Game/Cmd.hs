@@ -6,6 +6,7 @@ module Game.Cmd
   , argv
   , executeString
   , initialize
+  , removeCommands
   ) where
 
 import           Client.ClientStaticT
@@ -47,7 +48,9 @@ initialCommands =
   , ("alias", Just aliasF), ("wait", Just waitF) ]
 
 addInitialCommands :: [(B.ByteString, Maybe XCommandT)] -> Quake ()
-addInitialCommands = mapM_ (uncurry addCommand)
+addInitialCommands blah = 
+  do request (io (mapM_ (print . fst) blah))
+     mapM_ (uncurry addCommand) blah
   
 initialize :: Quake ()
 initialize = addInitialCommands initialCommands
@@ -319,3 +322,10 @@ writeMessage cmd =
           do cmdArgs <- args
              SZ.printSB message " "
              SZ.printSB message cmdArgs
+
+removeCommand :: B.ByteString -> Quake ()
+removeCommand name =
+    cmdGlobals.cgCmdFunctions %= Seq.filter (\cmd -> (cmd^.cfName) /= name)
+
+removeCommands :: [B.ByteString] -> Quake ()
+removeCommands = mapM_ removeCommand

@@ -17,11 +17,11 @@ makeLenses ''EdictT
 
 newEdictT :: Int -> EdictT
 newEdictT idx =
-  EdictT { _eEntityState           = newEntityStateT (Just (EdictRef idx))
+  EdictT { _eEntityState           = newEntityStateT (Just (Ref idx))
          , _eInUse                 = False
          , _eClassName             = ""
          , _eLinkCount             = 0
-         , _eArea                  = LinkRef (2 * Constants.areaNodes + idx)
+         , _eArea                  = Ref (2 * Constants.areaNodes + idx)
          , _eNumClusters           = 0
          , _eClusterNums           = UV.replicate Constants.maxEntClusters 0
          , _eHeadNode              = 0

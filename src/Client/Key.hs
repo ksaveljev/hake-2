@@ -47,8 +47,7 @@ initialize =
 
 bindF :: XCommandT
 bindF = XCommandT "Key.bindF" $
-  do c <- Cmd.argc
-     checkArgs c
+  checkArgs =<< Cmd.argc
   where checkArgs c
           | c < 2 = Com.printf "bind <key> [command] : attach a command to a key\n"
           | otherwise =
@@ -86,8 +85,7 @@ stringToKeynum str
 
 unbindF :: XCommandT
 unbindF = XCommandT "Key.unbindF" $
-  do c <- Cmd.argc
-     checkArgs c
+  checkArgs =<< Cmd.argc
   where checkArgs c
           | c /= 2 = Com.printf "unbind <key> : remove commands from a key\n"
           | otherwise = unbind
