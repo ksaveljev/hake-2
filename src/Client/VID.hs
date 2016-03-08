@@ -1,5 +1,7 @@
 module Client.VID
-  ( initialize
+  ( getModeInfo
+  , initialize
+  , newWindow
   , printf
   ) where
 
