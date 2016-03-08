@@ -15,8 +15,7 @@ import qualified Data.ByteString as B
 
 insertText :: B.ByteString -> Quake ()
 insertText text =
-  do Com.printf text
-     cmdText <- use (globals.gCmdText)
+  do cmdText <- use (globals.gCmdText)
      SZ.clear (globals.gCmdText)
      addText text
      when ((cmdText^.sbCurSize) /= 0) (appendLeftoverCommands cmdText)

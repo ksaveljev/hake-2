@@ -7,6 +7,7 @@ module QCommon.CVar
   , serverInfo
   , set
   , setValueF
+  , setValueI
   , update
   , variableString
   ) where
@@ -109,3 +110,5 @@ setValueF name value = void (set name val)
             | otherwise = encode value
         tv = truncate value :: Int
 
+setValueI :: B.ByteString -> Int -> Quake ()
+setValueI name value = void (set name (encode value))

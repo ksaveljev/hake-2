@@ -1,5 +1,6 @@
 module Render.Fast.Image
   ( getPalette
+  , glImageListF
   , glShutdownImages
   , rRegisterSkin
   ) where
@@ -80,8 +81,7 @@ constructPalette bs i = (255 `shiftL` 24) .|. (b `shiftL` 16) .|. (g `shiftL` 8)
 
 loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe B.ByteString, Maybe B.ByteString, Maybe (Int, Int))
 loadPCX fileName returnPalette returnDimensions =
-  do blah <- FS.loadFile fileName
-     FS.fOpenFile fileName >>= loadPcxT >>= parseRawPCX
+  FS.fOpenFileWithLength fileName >>= loadPcxT >>= parseRawPCX
   where parseRawPCX Nothing = badPCXFile
         parseRawPCX (Just pcx)
           | not (validPCX pcx) = badPCXFile
@@ -101,12 +101,12 @@ validPCX pcx
         invalidXMax = (pcx^.pcxXMax) >= 640
         invalidYMax = (pcx^.pcxYMax) >= 480
 
-loadPcxT :: Maybe Handle -> Quake (Maybe PcxT)
+loadPcxT :: Maybe (Handle, Int) -> Quake (Maybe PcxT)
 loadPcxT Nothing = return Nothing
-loadPcxT (Just fileHandle) =
-  do (res, _) <- request parsePcxT
+loadPcxT (Just (fileHandle, len)) =
+  do (res, _) <- request parsePcxT 
      either (const (return Nothing)) (return . Just) res
-  where parsePcxT = runStateT (PB.decodeGet getPcxT) (PBS.fromHandle fileHandle)
+  where parsePcxT = runStateT (PB.decodeGet (getPcxT len)) (PBS.fromHandle fileHandle)
 
 decodePCX :: Bool -> Bool -> PcxT -> (Maybe B.ByteString, Maybe B.ByteString, Maybe (Int, Int))
 decodePCX returnPalette returnDimensions pcx = (Just pix, palette, dimensions)
@@ -134,3 +134,6 @@ buildAcc :: BB.Builder -> BB.Builder -> Int -> BB.Builder
 buildAcc acc byte idx
   | idx <= 0 = acc
   | otherwise = buildAcc (acc <> byte) byte (idx - 1)
+
+glImageListF :: XCommandT
+glImageListF = error "Image.glImageListF" -- TODO

@@ -11,5 +11,5 @@ import Data.Binary (Get)
 
 makeLenses ''DPackHeaderT
 
-getDPackHeader :: Get DPackHeaderT
-getDPackHeader = DPackHeaderT <$> getInt <*> getInt <*> getInt 
+getDPackHeaderT :: Get DPackHeaderT
+getDPackHeaderT = DPackHeaderT <$> getInt <*> getInt <*> getInt 

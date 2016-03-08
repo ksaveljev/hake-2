@@ -1,6 +1,8 @@
 module QCommon.FS
   ( execAutoexec
+  , fileLength
   , fOpenFile
+  , fOpenFileWithLength
   , gameDir
   , initializeFileSystem
   , loadFile
@@ -14,8 +16,10 @@ import qualified Game.Cmd as Cmd
 import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVarShared as CVar
+import           QCommon.DPackHeaderT
 import           QCommon.FileLinkT
 import           QCommon.FSShared
+import           QCommon.PackFileT
 import           QCommon.PackT
 import           QCommon.SearchPathT
 import           QCommon.Shared
@@ -30,13 +34,15 @@ import           Control.Monad.State.Strict (runStateT)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower)
+import qualified Data.HashMap.Lazy as HM
 import           Data.Sequence ((|>), (><))
 import qualified Data.Sequence as Seq
 import           Pipes.Binary (deMessage)
 import qualified Pipes.Binary as PB
 import qualified Pipes.ByteString as PBS
 import           System.Directory
-import           System.IO (Handle, IOMode(ReadMode))
+import           System.IO (Handle, IOMode(ReadMode), SeekMode(AbsoluteSeek), hSeek)
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands = [("path", Just pathF), ("link", Just linkF), ("dir", Just dirF)] 
@@ -179,13 +185,41 @@ loadPackFile packFile =
 
 loadPackT :: B.ByteString -> Handle -> Quake (Maybe PackT)
 loadPackT packFile fileHandle =
-  do (res, _) <- request parsePackT
-     either packTParseError printInfoAndReturn res
-  where parsePackT = runStateT packT (PBS.fromHandle fileHandle)
-        packT = PB.decodeGet (getPackT packFile fileHandle)
-        packTParseError err =
+  do header <- loadDPackHeaderT fileHandle
+     loadPackFileTs packFile fileHandle header
+     
+loadPackFileTs :: B.ByteString -> Handle -> Maybe DPackHeaderT -> Quake (Maybe PackT)
+loadPackFileTs _ _ Nothing = return Nothing
+loadPackFileTs packFile fileHandle (Just header) =
+  do (res, _) <- request parsePackFiles
+     either parsePackFilesError constructPackT res
+  where numPackFiles = (header^.dphDirLen) `div` packFileSize
+        parsePackFiles =
+          do io (hSeek fileHandle AbsoluteSeek (fromIntegral (header^.dphDirOfs)))
+             runStateT packFiles (PBS.fromHandle fileHandle)
+        packFiles = PB.decodeGet (getPackFiles numPackFiles HM.empty)
+        parsePackFilesError err =
           do Com.fatalError (BC.pack (deMessage err))
              return Nothing
-        printInfoAndReturn pack =
-          do Com.printf (B.concat ["Added packfile ", packFile, " (", encode (pack^.pNumFiles), " files)\n"])
-             return (Just pack)
+        constructPackT files =
+          do Com.printf (B.concat ["Added packfile ", packFile, " (", encode numPackFiles, " files)\n"])
+             return (Just (PackT packFile (Just fileHandle) "" numPackFiles files))
+
+loadDPackHeaderT :: Handle -> Quake (Maybe DPackHeaderT)
+loadDPackHeaderT fileHandle =
+  do (res, _) <- request parseDPackHeaderT
+     either dPackHeaderTParseError (return . Just) res
+  where parseDPackHeaderT =
+          do io (hSeek fileHandle AbsoluteSeek 0)
+             runStateT dPackHeaderT (PBS.fromHandle fileHandle)
+        dPackHeaderT = PB.decodeGet getDPackHeaderT
+        dPackHeaderTParseError err =
+          do Com.fatalError (BC.pack (deMessage err))
+             return Nothing
+
+getPackFiles :: Int -> HM.HashMap B.ByteString PackFileT -> PB.Get (HM.HashMap B.ByteString PackFileT)
+getPackFiles numPackFiles files
+  | numPackFiles == 0 = return files
+  | otherwise =
+      do file@(PackFileT name _ _) <- getPackFile
+         getPackFiles (numPackFiles - 1) (HM.insert (BC.map toLower name) file files)

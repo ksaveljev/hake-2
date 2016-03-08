@@ -2,8 +2,9 @@ module QCommon.FSShared
   ( canRead
   , gameDir
   , fileLength
-  , loadFile
   , fOpenFile
+  , fOpenFileWithLength
+  , loadFile
   ) where
 
 import qualified Constants
@@ -48,6 +49,16 @@ openAndRead path len =
           request (do contents <- io (B.hGet fileHandle len)
                       io (hClose fileHandle)
                       return (Just contents))
+
+fOpenFileWithLength :: B.ByteString -> Quake (Maybe (Handle, Int))
+fOpenFileWithLength fileName =
+  do len <- fileLength fileName
+     maybe (return Nothing) (openWithLength fileName) len
+
+openWithLength :: B.ByteString -> Int -> Quake (Maybe (Handle, Int))
+openWithLength fileName len =
+  do fileHandle <- fOpenFile fileName
+     maybe (return Nothing) (\h -> return (Just (h, len))) fileHandle
 
 fOpenFile :: B.ByteString -> Quake (Maybe Handle)
 fOpenFile fileName =

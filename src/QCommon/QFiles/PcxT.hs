@@ -7,13 +7,12 @@ import Types
 import Util.Binary (getInt8)
 
 import Control.Lens (makeLenses)
-import Data.Binary.Get (Get, getWord16le, getByteString, getRemainingLazyByteString)
-import qualified Data.ByteString.Lazy as BL
+import Data.Binary.Get (Get, getWord16le, getByteString)
 
 makeLenses ''PcxT
 
-getPcxT :: Get PcxT
-getPcxT =
+getPcxT :: Int -> Get PcxT
+getPcxT len =
   PcxT <$> getInt8
        <*> getInt8
        <*> getInt8
@@ -30,4 +29,4 @@ getPcxT =
        <*> getWord16le
        <*> getWord16le
        <*> getByteString 58
-       <*> (BL.toStrict <$> getRemainingLazyByteString)
+       <*> getByteString (len - 128)

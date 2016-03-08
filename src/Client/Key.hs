@@ -100,7 +100,7 @@ unbind =
           | otherwise = setBinding keynum Nothing
 
 unbindAllF :: XCommandT
-unbindAllF = error "Key.unbindAllF" -- TODO
+unbindAllF = XCommandT "Key.unbindAllF" (globals.gKeyBindings .= V.replicate 256 Nothing)
 
 bindListF :: XCommandT
 bindListF = XCommandT "Key.bindListF" $

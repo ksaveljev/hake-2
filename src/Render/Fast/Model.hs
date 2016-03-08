@@ -1,5 +1,6 @@
 module Render.Fast.Model
   ( freeAll
+  , modelListF
   , rBeginRegistration
   , rRegisterModel
   , rEndRegistration
@@ -40,3 +41,6 @@ freeModels models idx maxIdx
          freeModels models (idx + 1) maxIdx
   where freeModelWithExtraData Nothing = return ()
         freeModelWithExtraData (Just _) = io (MV.write models idx newModelT)
+
+modelListF :: XCommandT
+modelListF = error "Model.modelListF" -- TODO
