@@ -5,7 +5,7 @@ module Render.Fast.Image
   , rRegisterSkin
   ) where
 
-import qualified Client.VIDShared as VID
+import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
 import qualified QCommon.Com as Com
 import qualified QCommon.FS as FS

@@ -3,7 +3,7 @@ module Render.GLFWbRenderer
   , glfwbRenderer
   ) where
 
-import qualified Client.VIDShared as VID
+import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
 import           QCommon.XCommandT (runXCommandT)
 import           QuakeState

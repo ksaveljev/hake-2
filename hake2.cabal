@@ -56,6 +56,15 @@ executable hake2
                      , Client.KeyConstants
                      , Client.KeyGlobals
                      , Client.Menu
+                     , Client.MenuActionS
+                     , Client.MenuCommonS
+                     , Client.MenuFieldS
+                     , Client.MenuFrameworkS
+                     , Client.MenuGlobals
+                     , Client.MenuLayerT
+                     , Client.MenuListS
+                     , Client.MenuSeparatorS
+                     , Client.MenuSliderS
                      , Client.ParticleTGlobals
                      , Client.RefDefT
                      , Client.RefExportT
@@ -66,7 +75,6 @@ executable hake2
                      , Client.VIDGlobals
                      , Client.VidModeT
                      , Client.VidModes
-                     , Client.VIDShared
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT

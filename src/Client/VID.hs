@@ -1,6 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Client.VID
   ( getModeInfo
   , initialize
+  , menuDrawF
+  , menuInit
+  , menuKeyF
   , newWindow
   , printf
   ) where
@@ -8,10 +12,15 @@ module Client.VID
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.Console as Console
+import qualified Client.Menu as Menu
+import           Client.MenuActionS
+import           Client.MenuCommonS
+import           Client.MenuFrameworkS
+import           Client.MenuListS
+import           Client.MenuSliderS
 import           Client.RefExportT
 import           Client.VidDefT
 import           Client.VidModeT
-import           Client.VIDShared
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
@@ -19,6 +28,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import           QCommon.XCommandT (runXCommandT)
+import           QuakeRef
 import           QuakeState
 import qualified Render.QRenderer as QRenderer
 import           Render.Renderer
@@ -26,11 +36,33 @@ import qualified Sound.S as S
 import qualified Sys.IN as IN
 import           Sys.KBD
 import           Types
+import           Util.Binary (encode)
 
-import           Control.Lens (use, ix, (.=), (%=), (^.), (&), (.~))
+import           Control.Lens (use, ix, (.=), (%=), (^.), (&), (.~), (-~))
 import           Control.Monad (when, unless, void)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower)
 import qualified Data.Vector as V
+import qualified Graphics.UI.GLFW as GLFW
+
+resolutions :: V.Vector B.ByteString
+resolutions = V.fromList [ "[320 240  ]"
+                         , "[400 300  ]"
+                         , "[512 384  ]"
+                         , "[640 480  ]"
+                         , "[800 600  ]"
+                         , "[960 720  ]"
+                         , "[1024 768 ]"
+                         , "[1152 864 ]"
+                         , "[1280 1024]"
+                         , "[1600 1200]"
+                         , "[2048 1536]"
+                         , "user mode"
+                         ]
+
+yesNoNames :: V.Vector B.ByteString
+yesNoNames = V.fromList ["no", "yes"]
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars = [ ("vid_ref", QRenderer.getPreferredName, Constants.cvarArchive)
@@ -169,3 +201,295 @@ tryMode vidRef (Just glMode)
   | otherwise = fallBackError
   where fallBackError = Com.fatalError (B.concat ["Couldn't fall back to ", vidRef^.cvString, " refresh!"])
 
+printf :: Int -> B.ByteString -> Quake ()
+printf printLevel str
+  | printLevel == Constants.printAll = Com.printf str
+  | otherwise = Com.dprintf str
+
+newWindow :: Int -> Int -> Quake ()
+newWindow width height =
+  do globals.gVidDef.vdNewWidth .= width
+     globals.gVidDef.vdNewHeight .= height
+
+getModeInfo :: Int -> Quake (Maybe (Int, Int))
+getModeInfo mode =
+  do maybe initModeList (const (return ())) =<< use (vidGlobals.vgFSModes)
+     modes <- getModes =<< fullScreenValue
+     return (modeInfo modes mode)
+  where fullScreenValue = fmap (^.cvValue) vidFullScreenCVar
+        getModes fullScreen
+          | fullScreen /= 0 = maybe vidModesError return =<< use (vidGlobals.vgFSModes)
+          | otherwise = use (vidGlobals.vgVidModes)
+        vidModesError =
+          do Com.fatalError "VID.getModeInfo vidGlobals.vgFSModes is Nothing"
+             return V.empty
+
+initModeList :: Quake ()
+initModeList =
+  do renderer <- use (globals.gRenderer)
+     maybe rendererError' proceedInitModeList renderer
+  where rendererError' = Com.fatalError "VID.initModeList renderer is Nothing"
+        proceedInitModeList renderer =
+          updateModes =<< renderer^.rRefExport.reGetModeList
+
+updateModes :: V.Vector VideoMode -> Quake ()
+updateModes modes =
+  do vidGlobals.vgFSModes .= Just fsModes
+     vidGlobals.vgFSResolutions .= fsResolutions
+  where (fsResolutions, fsModes) = V.unzip (V.imap parseMode modes)
+
+parseMode :: Int -> VideoMode -> (B.ByteString, VidModeT)
+parseMode idx mode = (res', VidModeT m width height idx)
+  where width = getVideoModeWidth mode
+        height = getVideoModeHeight mode
+        widthS = encode width
+        heightS = encode height
+        res = B.concat ["[", widthS, " ", heightS]
+        len = B.length res
+        resLine | len < 10 = res `B.append` BC.replicate (10 - len) ' '
+                | otherwise = res
+        res' = resLine `B.append` "]"
+        m = B.concat ["Mode ", encode idx, widthS, "x", heightS]
+
+modeInfo :: V.Vector VidModeT -> Int -> Maybe (Int, Int)
+modeInfo modes mode
+  | mode < 0 || mode > V.length modes = Nothing
+  | otherwise = Just (m^.vmWidth, m^.vmHeight)
+  where m = modes V.! mode
+
+getVideoModeWidth :: VideoMode -> Int
+getVideoModeWidth (GLFWbVideoMode mode) = GLFW.videoModeWidth mode
+getVideoModeWidth DummyVideoMode = 640
+
+getVideoModeHeight :: VideoMode -> Int
+getVideoModeHeight (GLFWbVideoMode mode) = GLFW.videoModeHeight mode
+getVideoModeHeight DummyVideoMode = 480
+
+menuInitCVars :: [(B.ByteString, B.ByteString, Int)]
+menuInitCVars = [ ("gl_driver", QRenderer.getPreferredName, 0)
+                , ("gl_picmip", "0", 0), ("gl_mode", "3", 0)
+                , ("gl_ext_palettedtexture", "1", Constants.cvarArchive)
+                , ("gl_swapinterval", "0", Constants.cvarArchive)
+                ]
+
+menuInit :: Quake ()
+menuInit =
+  do initRefs
+     setMenuInitCVars
+     setMenuGLMode =<< glModeCVar
+     setMenuResolutionList =<< vidFullScreenCVar
+     setNonExistingCVar ("viewsize", "100", Constants.cvarArchive)
+     setMenuViewSize =<< viewSizeCVar
+     setMenuDriver =<< vidRefCVar
+     setMenuVidDef =<< use (globals.gVidDef)
+     setMenuRefs =<< use (vidGlobals.vgRefs)
+     setMenuModeListRef
+     setMenuScreenSizeSlider
+     setMenuBrightnessSlider =<< vidGammaCVar
+     setMenuFullscreenCheckbox =<< vidFullScreenCVar
+     setMenuTextureQualitySlider =<< glPicMipCVar
+     setMenuPalettedTextureCheckbox =<< glExtPalettedTextureCVar
+     setMenuSwapIntervalCheckbox =<< glSwapIntervalCVar
+     setMenuResetToDefault
+     setMenuApplyAction
+     setOpenGLMenu
+
+initRefs :: Quake ()
+initRefs =
+  do vidGlobals.vgDrivers .= drivers
+     vidGlobals.vgRefs .= V.map constructRef drivers
+  where drivers = QRenderer.getDriverNames
+
+constructRef :: B.ByteString -> B.ByteString
+constructRef driver = ref
+  where start = "[OpenGL " `B.append` driver
+        mid | len < 16 = start `B.append` BC.replicate (16 - len) ' '
+            | otherwise = start
+        len = B.length start
+        ref = mid `B.append` "]"
+
+setMenuInitCVars :: Quake ()
+setMenuInitCVars = mapM_ setNonExistingCVar menuInitCVars
+
+setNonExistingCVar :: (B.ByteString, B.ByteString, Int) -> Quake ()
+setNonExistingCVar (name, value, flags) =
+  do var <- CVar.findVar name
+     maybe setVar (const (return ())) var
+  where setVar = void (CVar.get name value flags)
+
+setMenuGLMode :: CVarT -> Quake ()
+setMenuGLMode glMode =
+  modifyRef modeListRef (\v -> v & mlCurValue .~ truncate (glMode^.cvValue))
+
+setMenuResolutionList :: CVarT -> Quake ()
+setMenuResolutionList fullScreen
+  | fullScreen^.cvValue /= 0 =
+      do res <- use (vidGlobals.vgFSResolutions)
+         curValue <- updateResolutionMenu res =<< readRef modeListRef
+         maybe fsModesError (setModeX curValue) =<< use (vidGlobals.vgFSModes)
+  | otherwise =
+      do curValue <- updateResolutionMenu resolutions =<< readRef modeListRef
+         setModeX curValue =<< use (vidGlobals.vgVidModes)
+  where fsModesError = Com.fatalError "VID.setMenuResolutionList fsModes is Nothing"
+        setModeX curValue modes =
+          vidGlobals.vgModeX .= (modes V.! curValue)^.vmWidth
+
+updateResolutionMenu :: V.Vector B.ByteString -> MenuListS -> Quake Int
+updateResolutionMenu res menuItem =
+  do modifyRef modeListRef (\v -> v & mlCurValue .~ curValue
+                                    & mlItemNames .~ res)
+     return curValue
+  where curValue | (menuItem^.mlCurValue) >= V.length res - 1 = 0
+                 | otherwise = menuItem^.mlCurValue
+
+setMenuViewSize :: CVarT -> Quake ()
+setMenuViewSize viewSize =
+  modifyRef screenSizeSliderRef (\v -> v & msCurValue .~ fromIntegral intv)
+  where intv = truncate ((viewSize^.cvValue) / 10) :: Int
+
+setMenuDriver :: CVarT -> Quake ()
+setMenuDriver vidRef =
+  do drivers <- use (vidGlobals.vgDrivers)
+     updateMenu (V.findIndex (== (vidRef^.cvString)) drivers)
+  where updateMenu Nothing = return ()
+        updateMenu (Just idx) = modifyRef refListRef (\v -> v & mlCurValue .~ idx)
+
+setMenuVidDef :: VidDefT -> Quake ()
+setMenuVidDef vidDef =
+  modifyRef openGLMenuRef (\v -> v & mfX .~ truncate (widthF / 2)
+                                   & mfNItems .~ 0)
+  where widthF = fromIntegral (vidDef^.vdWidth) :: Float
+
+setMenuRefs :: V.Vector B.ByteString -> Quake ()
+setMenuRefs refs =
+  modifyRef refListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                & mlGeneric.mcName .~ Just "driver"
+                                & mlGeneric.mcX .~ 0
+                                & mlGeneric.mcY .~ 0
+                                & mlGeneric.mcCallback .~ Just (vidGlobals.vgCurrentMenu .= Just openGLMenuRef)
+                                & mlItemNames .~ refs)
+
+setMenuModeListRef :: Quake ()
+setMenuModeListRef =
+  modifyRef modeListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                 & mlGeneric.mcName .~ Just "video mode"
+                                 & mlGeneric.mcX .~ 0
+                                 & mlGeneric.mcY .~ 10)
+
+setMenuScreenSizeSlider :: Quake ()
+setMenuScreenSizeSlider =
+  modifyRef screenSizeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+                                         & msGeneric.mcX .~ 0
+                                         & msGeneric.mcY .~ 20
+                                         & msGeneric.mcName .~ Just "screen size"
+                                         & msMinValue .~ 3
+                                         & msMaxValue .~ 12
+                                         & msGeneric.mcCallback .~ Just screenSizeCallback)
+
+screenSizeCallback :: Quake ()
+screenSizeCallback =
+  do menuItem <- readRef screenSizeSliderRef
+     CVar.setValueF "viewsize" ((menuItem^.msCurValue) * 10)
+
+setMenuBrightnessSlider :: CVarT -> Quake ()
+setMenuBrightnessSlider vidGamma =
+  modifyRef brightnessSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+                                         & msGeneric.mcX .~ 0
+                                         & msGeneric.mcY .~ 30
+                                         & msGeneric.mcName .~ Just "brightness"
+                                         & msMinValue .~ 5
+                                         & msMaxValue .~ 13
+                                         & msCurValue .~ (1.3 - (vidGamma^.cvValue) + 0.5) * 10
+                                         & msGeneric.mcCallback .~ Just brightnessCallback)
+
+brightnessCallback :: Quake ()
+brightnessCallback = setBrightness =<< vidRefCVar
+
+setBrightness :: CVarT -> Quake ()
+setBrightness vidRef
+  | str == "soft" || str == "softx" =
+      do menuItem <- readRef brightnessSliderRef
+         CVar.setValueF "vid_gamma" ((0.8 - ((menuItem^.msCurValue) / 10 - 0.5)) + 0.5)
+  | otherwise = return ()
+  where str = BC.map toLower (vidRef^.cvString)
+
+setMenuFullscreenCheckbox :: CVarT -> Quake ()
+setMenuFullscreenCheckbox fullScreen =
+  modifyRef fsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                              & mlGeneric.mcX .~ 0
+                              & mlGeneric.mcY .~ 40
+                              & mlGeneric.mcName .~ Just "fullscreen"
+                              & mlItemNames .~ yesNoNames
+                              & mlCurValue .~ truncate (fullScreen^.cvValue)
+                              & mlGeneric.mcCallback .~ Just fsBoxCallback)
+
+fsBoxCallback :: Quake ()
+fsBoxCallback = error "VID.fsBoxCallback" -- TODO
+
+setMenuTextureQualitySlider :: CVarT -> Quake ()
+setMenuTextureQualitySlider picMip =
+  modifyRef tqSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+                                 & msGeneric.mcX .~ 0
+                                 & msGeneric.mcY .~ 60
+                                 & msGeneric.mcName .~ Just "texture quality"
+                                 & msMinValue .~ 0
+                                 & msMaxValue .~ 3
+                                 & msCurValue .~ 3 - (picMip^.cvValue))
+
+setMenuPalettedTextureCheckbox :: CVarT -> Quake ()
+setMenuPalettedTextureCheckbox palettedTexture =
+  modifyRef palettedTextureBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                           & mlGeneric.mcX .~ 0
+                                           & mlGeneric.mcY .~ 70
+                                           & mlGeneric.mcName .~ Just "8-bit textures"
+                                           & mlItemNames .~ yesNoNames
+                                           & mlCurValue .~ truncate (palettedTexture^.cvValue))
+
+setMenuSwapIntervalCheckbox :: CVarT -> Quake ()
+setMenuSwapIntervalCheckbox swapInterval =
+  modifyRef vSyncBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+                                 & mlGeneric.mcX .~ 0
+                                 & mlGeneric.mcY .~ 80
+                                 & mlGeneric.mcName .~ Just "sync every frame"
+                                 & mlItemNames .~ yesNoNames
+                                 & mlCurValue .~ truncate (swapInterval^.cvValue))
+
+setMenuResetToDefault :: Quake ()
+setMenuResetToDefault =
+  modifyRef defaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                       & maGeneric.mcName .~ Just "reset to default"
+                                       & maGeneric.mcX .~ 0
+                                       & maGeneric.mcY .~ 100
+                                       & maGeneric.mcCallback .~ Just menuInit)
+
+setMenuApplyAction :: Quake ()
+setMenuApplyAction =
+  modifyRef applyActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                    & maGeneric.mcName .~ Just "apply"
+                                    & maGeneric.mcX .~ 0
+                                    & maGeneric.mcY .~ 110
+                                    & maGeneric.mcCallback .~ Just applyChanges)
+
+applyChanges :: Quake ()
+applyChanges = error "VID.applyChanges" -- TODO
+
+setOpenGLMenu :: Quake ()
+setOpenGLMenu =
+  do Menu.menuAddItem openGLMenuRef (MenuListRef refListRef)
+     Menu.menuAddItem openGLMenuRef (MenuListRef modeListRef)
+     Menu.menuAddItem openGLMenuRef (MenuSliderRef screenSizeSliderRef)
+     Menu.menuAddItem openGLMenuRef (MenuSliderRef brightnessSliderRef)
+     Menu.menuAddItem openGLMenuRef (MenuListRef fsBoxRef)
+     Menu.menuAddItem openGLMenuRef (MenuSliderRef tqSliderRef)
+     Menu.menuAddItem openGLMenuRef (MenuListRef palettedTextureBoxRef)
+     Menu.menuAddItem openGLMenuRef (MenuListRef vSyncBoxRef)
+     Menu.menuAddItem openGLMenuRef (MenuActionRef defaultsActionRef)
+     Menu.menuAddItem openGLMenuRef (MenuActionRef applyActionRef)
+     Menu.menuCenter openGLMenuRef
+     modifyRef openGLMenuRef (\v -> v & mfX -~ 8)
+
+menuDrawF :: XCommandT
+menuDrawF = error "VID.menuDrawF" -- TODO
+
+menuKeyF :: KeyFuncT
+menuKeyF = error "VID.menuKeyF" -- TODO

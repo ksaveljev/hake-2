@@ -1,5 +1,6 @@
 module QCommon.CVar 
-  ( forceSet
+  ( findVar
+  , forceSet
   , get
   , getExisting
   , initialize

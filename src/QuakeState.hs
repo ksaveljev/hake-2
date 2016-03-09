@@ -7,6 +7,7 @@ module QuakeState
 
 import Client.ClientGlobals as X
 import Client.KeyGlobals as X
+import Client.MenuGlobals as X
 import Client.ParticleTGlobals as X
 import Client.VIDGlobals as X
 import Game.CmdGlobals as X
@@ -44,4 +45,5 @@ initialQuakeState =
              , _glfwbGlobals         = initialGLFWbGlobals
              , _clientGlobals        = initialClientGlobals
              , _particleTGlobals     = initialParticleTGlobals
+             , _menuGlobals          = initialMenuGlobals
              }

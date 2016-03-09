@@ -71,3 +71,57 @@ instance QuakeRef GItemT where
     gameBaseGlobals.gbItemList.ix idx %= f
   writeRef (Ref idx) item =
     gameBaseGlobals.gbItemList.ix idx .= item
+
+instance QuakeRef MenuFrameworkS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuFrameworks)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuFrameworks.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuFrameworks.ix idx .= item
+
+instance QuakeRef MenuListS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuListSItems)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuListSItems.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuListSItems.ix idx .= item
+
+instance QuakeRef MenuSliderS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuSliderSItems)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuSliderSItems.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuSliderSItems.ix idx .= item
+
+instance QuakeRef MenuActionS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuActionSItems)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuActionSItems.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuActionSItems.ix idx .= item
+
+instance QuakeRef MenuFieldS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuFieldSItems)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuFieldSItems.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuFieldSItems.ix idx .= item
+
+instance QuakeRef MenuSeparatorS where
+  readRef (Ref idx) =
+    do menuItems <- use (menuGlobals.mgMenuSeparatorSItems)
+       return (menuItems V.! idx)
+  modifyRef (Ref idx) f =
+    menuGlobals.mgMenuSeparatorSItems.ix idx %= f
+  writeRef (Ref idx) item =
+    menuGlobals.mgMenuSeparatorSItems.ix idx .= item

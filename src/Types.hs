@@ -9,7 +9,6 @@ import           Control.Lens (Lens')
 import           Control.Monad.State (State, StateT, MonadState, MonadIO, lift, get, put, liftIO)
 import           Control.Monad.Coroutine (Coroutine(..), suspend)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Lazy as HM
 import           Data.Int (Int8, Int16, Int32, Int64)
 import           Data.IORef (IORef)
@@ -54,6 +53,7 @@ data QuakeState = QuakeState
   , _glfwbGlobals         :: GLFWbGlobals
   , _clientGlobals        :: ClientGlobals
   , _particleTGlobals     :: ParticleTGlobals
+  , _menuGlobals          :: MenuGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -434,6 +434,33 @@ data ClientGlobals = ClientGlobals
 
 data ParticleTGlobals = ParticleTGlobals
   { _pColorTable :: UV.Vector Int32
+  }
+
+data MenuGlobals = MenuGlobals
+  { _mgMenuFrameworks      :: V.Vector MenuFrameworkS
+  , _mgMenuListSItems      :: V.Vector MenuListS
+  , _mgMenuSliderSItems    :: V.Vector MenuSliderS
+  , _mgMenuActionSItems    :: V.Vector MenuActionS
+  , _mgMenuSeparatorSItems :: V.Vector MenuSeparatorS
+  , _mgMenuFieldSItems     :: V.Vector MenuFieldS
+  , _mgLayers              :: V.Vector MenuLayerT
+  , _mgDrawFunc            :: Maybe XCommandT
+  , _mgKeyFunc             :: Maybe KeyFuncT
+  , _mgEnterSound          :: Bool
+  , _mgMenuDepth           :: Int
+  , _mgMainCursor          :: Int
+  , _mgCached              :: Bool
+  , _mgGameCursor          :: Int
+  , _mgSaveStrings         :: V.Vector B.ByteString
+  , _mgSaveValid           :: V.Vector Bool
+  , _mgLocalServerNames    :: V.Vector B.ByteString
+  , _mgLocalServerNetAdr   :: V.Vector NetAdrT
+  , _mgCreditsStartTime    :: Int
+  , _mgCredits             :: V.Vector B.ByteString
+  , _mgNumServers          :: Int
+  , _mgBindGrab            :: Bool
+  , _mgDmOptionsStatusBar  :: Maybe B.ByteString
+  , _mgMapNames            :: Maybe (V.Vector B.ByteString)
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1754,6 +1781,11 @@ data MenuFieldS = MenuFieldS
   , _mflVisibleOffset :: Int
   }
 
+data MenuLayerT = MenuLayerT
+  { _mlDraw :: Maybe XCommandT
+  , _mlKey  :: Maybe KeyFuncT
+  }
+
 data KButtonT = KButtonT
   { _kbDown     :: (Int, Int)
   , _kbDownTime :: Int64
@@ -1807,6 +1839,14 @@ data PcxT = PcxT
   , _pcxData         :: B.ByteString -- unbounded
   }
 
+data KeyFuncT = KeyFuncT
+  { _kfName :: B.ByteString
+  , _kfFunc :: Int -> Quake (Maybe B.ByteString)
+  }
+
+instance Eq KeyFuncT where
+    x == y = _kfName x == _kfName y
+
 data MenuItemRef = MenuListRef (Ref MenuListS)
                  | MenuActionRef (Ref MenuActionS)
                  | MenuSliderRef (Ref MenuSliderS)
@@ -1815,6 +1855,7 @@ data MenuItemRef = MenuListRef (Ref MenuListS)
                  deriving Eq
 
 data VideoMode = GLFWbVideoMode GLFW.VideoMode
+               | DummyVideoMode
             -- | GLUTVideoMode GLUT.GameModeCapability
 
 data ModelExtra = AliasModelExtra DMdlT

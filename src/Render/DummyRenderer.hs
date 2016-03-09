@@ -46,7 +46,7 @@ dummyRefExportT kbd renderAPI =
              , _reAppActivate         = \_ -> return ()
              , _reUpdateScreen        = runXCommandT
              , _reApiVersion          = Constants.apiVersion
-             , _reGetModeList         = return V.empty
+             , _reGetModeList         = return (V.fromList [DummyVideoMode])
              , _reGetKeyboardHandler  = kbd
              }
              

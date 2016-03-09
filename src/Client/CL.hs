@@ -1,12 +1,14 @@
 module Client.CL
   ( frame
   , initialize
+  , quitF
   , writeConfiguration
   ) where
 
 import           Client.ClientStaticT
 import qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
+import           Client.CLShared as CLShared
 import qualified Client.Console as Console
 import qualified Client.Menu as Menu
 import qualified Client.SCR as SCR
@@ -148,9 +150,6 @@ recordF = error "CL.recordF" -- TODO
 
 stopF :: XCommandT
 stopF = error "CL.stopF" -- TODO
-
-quitF :: XCommandT
-quitF = error "CL.quitF" -- TODO
 
 connectF :: XCommandT
 connectF = error "CL.connectF" -- TODO
