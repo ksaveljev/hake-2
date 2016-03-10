@@ -5,6 +5,7 @@ module Render.Fast.Draw
   , fill
   , findPic
   , getPicSize
+  , initLocal
   , stretchPic
   , stretchRaw
   ) where
@@ -13,6 +14,9 @@ import           Types
 
 import qualified Data.ByteString as B
 import           Data.IORef
+
+initLocal :: Quake ()
+initLocal = error "Draw.initLocal" -- TODO
 
 findPic :: B.ByteString -> Quake (Maybe (IORef ImageT))
 findPic = error "Draw.findPic" -- TODO

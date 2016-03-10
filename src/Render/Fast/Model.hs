@@ -1,6 +1,7 @@
 module Render.Fast.Model
   ( freeAll
   , modelListF
+  , modInit
   , rBeginRegistration
   , rRegisterModel
   , rEndRegistration
@@ -15,6 +16,9 @@ import           Control.Lens (use, (^.))
 import qualified Data.ByteString as B
 import           Data.IORef (IORef)
 import qualified Data.Vector.Mutable as MV
+
+modInit :: Quake ()
+modInit = error "Model.modInit" -- TODO
 
 rBeginRegistration :: B.ByteString -> Quake ()
 rBeginRegistration = error "Model.rBeginRegistration" -- TODO

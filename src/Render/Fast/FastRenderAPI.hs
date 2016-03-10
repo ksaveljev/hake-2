@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.FastRenderAPI
   ( fastRenderAPI
   ) where
@@ -14,13 +15,22 @@ import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Model as Model
 import qualified Render.Fast.Warp as Warp
+import           Render.GLConfigT
 import           Render.GLStateT
 import           Render.OpenGL.GLDriver
 import           Types
 
+import           Control.Exception (handle, IOException)
 import           Control.Lens (use, (^.), (.=), (&), (.~))
-import           Data.Bits ((.|.))
+import           Control.Monad (void, when, unless)
+import           Data.Bits ((.|.), (.&.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower, toUpper)
+import           Data.Maybe (fromMaybe)
+import           Foreign.Ptr (nullPtr, castPtr)
+import qualified Graphics.GL as GL
+import           Text.Read (readMaybe)
 
 fastRenderAPI :: RenderAPI
 fastRenderAPI =
@@ -62,183 +72,201 @@ fastInit glDriver _ _ =
 fastInit2 :: GLDriver -> Quake Bool
 fastInit2 glDriver =
   do VID.menuInit
-     error "FastRenderAPI.fastInit2" -- TODO
-{-
-    -- get our various GL strings
-    vendor <- io $ getGLString GL.gl_VENDOR
-    renderer <- io $ getGLString GL.gl_RENDERER
-    version <- io $ getGLString GL.gl_VERSION
-    extensions <- io $ getGLString GL.gl_EXTENSIONS
+     initGLStrings
+     identifyGLRenderer
+     rendererSpecificSettings =<< use (fastRenderAPIGlobals.frGLConfig.glcRenderer)
+     initExtensions =<< use (fastRenderAPIGlobals.frGLConfig.glcExtensionsString)
+     finishInit glDriver =<< use (fastRenderAPIGlobals.frActiveTextureARB)
 
-    zoom (fastRenderAPIGlobals.frGLConfig) $ do
-      glcVendorString .= vendor
-      glcRendererString .= renderer
-      glcVersionString .= version
-      glcExtensionsString .= extensions
-      glcVersion .= (let v = B.take 3 version
-                     in fromMaybe 1.1 (readMaybe (BC.unpack v))) -- IMPROVE?
+initGLStrings :: Quake ()
+initGLStrings =
+  do vendor <- request (io (getGLString GL.GL_VENDOR))
+     renderer <- request (io (getGLString GL.GL_RENDERER))
+     version <- request (io (getGLString GL.GL_VERSION))
+     extensions <- request (io (getGLString GL.GL_EXTENSIONS))
+     fastRenderAPIGlobals.frGLConfig.glcVendorString .= vendor
+     fastRenderAPIGlobals.frGLConfig.glcRendererString .= renderer
+     fastRenderAPIGlobals.frGLConfig.glcVersionString .= version
+     fastRenderAPIGlobals.frGLConfig.glcExtensionsString .= extensions
+     fastRenderAPIGlobals.frGLConfig.glcVersion .= versionString version
+     VID.printf Constants.printAll (B.concat ["GL_VENDOR: ", vendor, "\n"])
+     VID.printf Constants.printAll (B.concat ["GL_RENDERER: ", renderer, "\n"])
+     VID.printf Constants.printAll (B.concat ["GL_VERSION: ", version, "\n"])
+     VID.printf Constants.printAll (B.concat ["GL_EXTENSIONS: ", extensions, "\n"])
+  where versionString version =
+          fromMaybe 1.1 (readMaybe (BC.unpack (B.take 3 version)))
 
-    VID.printf Constants.printAll $ "GL_VENDOR: " `B.append` vendor `B.append` "\n"
-    VID.printf Constants.printAll $ "GL_RENDERER: " `B.append` renderer `B.append` "\n"
-    VID.printf Constants.printAll $ "GL_VERSION: " `B.append` version `B.append` "\n"
-    VID.printf Constants.printAll $ "GL_EXTENSIONS: " `B.append` extensions `B.append` "\n"
+identifyGLRenderer :: Quake ()
+identifyGLRenderer =
+  do renderer <- fmap (BC.map toLower) (use (fastRenderAPIGlobals.frGLConfig.glcRendererString))
+     vendor <- fmap (BC.map toLower) (use (fastRenderAPIGlobals.frGLConfig.glcVendorString))
+     fastRenderAPIGlobals.frGLConfig.glcRenderer .= identifyRenderer renderer vendor
+  where identifyRenderer renderer vendor
+          | "voodoo" `BC.isInfixOf` renderer = pickVoodoo renderer
+          | "sgi" `BC.isInfixOf` vendor = Constants.glRendererSGI
+          | "permedia" `BC.isInfixOf` renderer = Constants.glRendererPerMedia2
+          | "glint" `BC.isInfixOf` renderer = Constants.glRendererGlintMX
+          | "glzicd" `BC.isInfixOf` renderer = Constants.glRendererRealizm
+          | "gdi" `BC.isInfixOf` renderer = Constants.glRendererMCD
+          | "pcx2" `BC.isInfixOf` renderer = Constants.glRendererPCX2
+          | "verite" `BC.isInfixOf` renderer = Constants.glRendererRendition
+          | otherwise = Constants.glRendererOther
+        pickVoodoo renderer
+          | "rush" `BC.isInfixOf` renderer = Constants.glRendererVoodooRush
+          | otherwise = Constants.glRendererVoodoo
 
-    let rendererBuffer = BC.map toLower renderer
-        vendorBuffer = BC.map toLower vendor
+rendererSpecificSettings :: Int -> Quake ()
+rendererSpecificSettings rendererId =
+  do monoLightSettings rendererId =<< glMonoLightMapCVar
+     void (CVar.set "scr_drawall" setDrawAll)
+     when (rendererId == Constants.glRendererMCD) (CVar.setValueI "gl_finish" 1)
+     setAllowCds rendererId
+  where setDrawAll | rendererId .&. Constants.glRendererPowerVR /= 0 = "1"
+                   | otherwise = "0"
 
-    let rendererInt = if | "voodoo"   `BC.isInfixOf` rendererBuffer ->
-                             if "rush" `BC.isInfixOf`rendererBuffer 
-                               then RenderAPIConstants.glRendererVoodooRush
-                               else RenderAPIConstants.glRendererVoodoo
-                         | "sgi"      `BC.isInfixOf` vendorBuffer -> RenderAPIConstants.glRendererSGI
-                         | "permedia" `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPerMedia2
-                         | "glint"    `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererGlintMX
-                         | "glzicd"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRealizm
-                         | "gdi"      `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererMCD
-                         | "pcx2"     `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererPCX2
-                         | "verite"   `BC.isInfixOf` rendererBuffer -> RenderAPIConstants.glRendererRendition
-                         | otherwise -> RenderAPIConstants.glRendererOther
+monoLightSettings :: Int -> CVarT -> Quake ()
+monoLightSettings rendererId monoLightMap
+  | useMlm && rendererId == Constants.glRendererPerMedia2 =
+      do void (CVar.set "gl_monolightmap" "A")
+         VID.printf Constants.printAll "...using gl_monolightmap 'a'\n"
+  | useMlm = void (CVar.set "gl_monolightmap" "0")
+  | otherwise = return ()
+  where mlm = BC.map toUpper (monoLightMap^.cvString)
+        useMlm = B.length mlm < 2 || mlm `BC.index` 1 /= 'F'
 
-    fastRenderAPIGlobals.frGLConfig.glcRenderer .= rendererInt
+setAllowCds :: Int -> Quake ()
+setAllowCds rendererId =
+  do allow <- checkAllow
+     fastRenderAPIGlobals.frGLConfig.glcAllowCds .= allow
+     VID.printf Constants.printAll (allowStr allow)
+  where checkAllow | rendererId .&. Constants.glRenderer3DLabs /= 0 =
+                       fmap ((== 0) . (^.cvValue)) gl3DLabsBrokenCVar
+                   | otherwise = return True
+        allowStr True = "...allowing CDS\n"
+        allowStr False = "...disabling CDS\n"
 
-    monoLightMapValue <- liftM (BC.map toUpper . (^.cvString)) glMonoLightMapCVar
-    when (B.length monoLightMapValue < 2 || BC.index monoLightMapValue 1 /= 'F') $ do
-      if rendererInt == RenderAPIConstants.glRendererPerMedia2
-        then do
-          void $ CVar.set "gl_monolightmap" "A"
-          VID.printf Constants.printAll "...using gl_monolightmap 'a'\n"
-        else
-          void $ CVar.set "gl_monolightmap" "0"
+initExtensions :: B.ByteString -> Quake ()
+initExtensions extensions =
+  do checkCompiledVertexArray extensions
+     checkSwapControl extensions
+     checkPointParameters extensions
+     checkColorTable extensions
+     checkMultiTexture extensions
 
-    -- power vr can't have anything stay in the framebuffer, so
-    -- the screen needs to redraw the tiled background every frame
-    if rendererInt .&. RenderAPIConstants.glRendererPowerVR /= 0
-      then void $ CVar.set "scr_drawall" "1"
-      else void $ CVar.set "scr_drawall" "0"
+checkCompiledVertexArray :: B.ByteString -> Quake ()
+checkCompiledVertexArray extensions =
+  do enabled <- checkEnabled
+     fastRenderAPIGlobals.frLockArraysEXT .= enabled
+  where checkEnabled
+          | extensionAvailable =
+              do VID.printf Constants.printAll "...enabling GL_EXT_compiled_vertex_array\n"
+                 fmap ((/= 0) . (^.cvValue)) glExtCompiledVertexArrayCVar
+          | otherwise =
+              do VID.printf Constants.printAll "...GL_EXT_compiled_vertex_array not found\n"
+                 return False
+        extensionAvailable =
+          or (fmap (`BC.isInfixOf` extensions) ["GL_EXT_compiled_vertex_array", "GL_SGI_compiled_vertex_array"])
 
-    -- MCD has buffering issues
-    when (rendererInt == RenderAPIConstants.glRendererMCD) $
-      CVar.setValueI "gl_finish" 1
-
-    allow <- if rendererInt .&. RenderAPIConstants.glRenderer3DLabs /= 0
-               then do
-                 brokenValue <- liftM (^.cvValue) gl3DLabsBrokenCVar
-                 if brokenValue /= 0
-                   then return False
-                   else return True
-             else return True
-                   
-    fastRenderAPIGlobals.frGLConfig.glcAllowCds .= allow
-
-    VID.printf Constants.printAll (if allow
-                                     then "...allowing CDS\n"
-                                     else "...disabling CDS\n")
-
-    -- grab extensions
-    cva <- if "GL_EXT_compiled_vertex_array" `BC.isInfixOf` extensions ||
-             "GL_SGI_compiled_vertex_array" `BC.isInfixOf` extensions
-             then do
-               VID.printf Constants.printAll "...enabling GL_EXT_compiled_vertex_array\n"
-               liftM (^.cvValue) glExtCompiledVertexArrayCVar >>= \v ->
-                if v /= 0 then return True else return False
-             else do
-               VID.printf Constants.printAll "...GL_EXT_compiled_vertex_array not found\n"
-               return False
-
-    fastRenderAPIGlobals.frLockArraysEXT .= cva
-
-    si <- if "WGL_EXT_swap_control" `BC.isInfixOf` extensions
-            then do
-              VID.printf Constants.printAll "...enabling WGL_EXT_swap_control\n"
-              return True
-            else do
-              VID.printf Constants.printAll "...WGL_EXT_swap_control not found\n"
-              return False
-
-    fastRenderAPIGlobals.frSwapIntervalEXT .= si
-
-    pp <- if "GL_EXT_point_parameters" `BC.isInfixOf` extensions
-            then do
-              liftM (^.cvValue) glExtPointParametersCVar >>= \v ->
-                if v /= 0
-                  then do
-                    VID.printf Constants.printAll "...using GL_EXT_point_parameters\n"
-                    return True
-                  else do
-                    VID.printf Constants.printAll "...ignoring GL_EXT_point_parameters\n"
-                    return False
-            else do
-              VID.printf Constants.printAll "...GL_EXT_point_parameters not found\n"
-              return False
-
-    fastRenderAPIGlobals.frPointParameterEXT .= pp
-
-    colorTable <- use $ fastRenderAPIGlobals.frColorTableEXT
-    ct <- if not colorTable &&
-             "GL_EXT_paletted_texture" `BC.isInfixOf` extensions &&
-             "GL_EXT_shared_texture_palette" `BC.isInfixOf` extensions
-            then do
-              liftM (^.cvValue) glExtPalettedTextureCVar >>= \v ->
-                if v /= 0
-                  then do
-                    VID.printf Constants.printAll "...using GL_EXT_shared_texture_palette\n"
-                    return True
-                  else do
-                    VID.printf Constants.printAll "...ignoring GL_EXT_shared_texture_palette\n"
-                    return False
-            else do
-              VID.printf Constants.printAll "...GL_EXT_shared_texture_palette not found\n"
-              return False
-
-    fastRenderAPIGlobals.frColorTableEXT .= ct
-
-    cat <- if "GL_ARB_multitexture" `BC.isInfixOf` extensions
-             then do
-               -- check if the extension really exists
-               ok <- io $ handle (\(_ :: IOException) -> return False) $ do
-                 GL.glClientActiveTextureARB (fromIntegral QGLConstants.glTexture0ARB)
-                 -- seems to work correctly
+checkSwapControl :: B.ByteString -> Quake ()
+checkSwapControl extensions =
+  do enabled <- checkEnabled
+     fastRenderAPIGlobals.frSwapIntervalEXT .= enabled
+  where checkEnabled
+          | extensionAvailable =
+              do VID.printf Constants.printAll "...enabling WGL_EXT_swap_control\n"
                  return True
+          | otherwise =
+              do VID.printf Constants.printAll "...WGL_EXT_swap_control not found\n"
+                 return False
+        extensionAvailable = "WGL_EXT_swap_control" `BC.isInfixOf` extensions
 
-               if ok
-                 then do
-                   VID.printf Constants.printAll "...using GL_ARB_multitexture\n"
-                   fastRenderAPIGlobals.frTexture0 .= QGLConstants.glTexture0ARB
-                   fastRenderAPIGlobals.frTexture1 .= QGLConstants.glTexture1ARB
-                   return True
-                 else
-                   return False
-             else do
-               VID.printf Constants.printAll "...GL_ARB_multitexture not found\n"
-               return False
+checkPointParameters :: B.ByteString -> Quake ()
+checkPointParameters extensions =
+  do enabled <- checkEnabled
+     fastRenderAPIGlobals.frPointParameterEXT .= enabled
+  where checkEnabled
+          | extensionAvailable =
+              checkIgnore =<< glExtPointParametersCVar
+          | otherwise =
+              do VID.printf Constants.printAll "...GL_EXT_point_parameters not found\n"
+                 return False
+        extensionAvailable = "GL_EXT_point_parameters" `BC.isInfixOf` extensions
+        checkIgnore pointParameters
+          | (pointParameters^.cvValue) /= 0 =
+              do VID.printf Constants.printAll "...using GL_EXT_point_parameters\n"
+                 return True
+          | otherwise =
+              do VID.printf Constants.printAll "...ignoring GL_EXT_point_parameters\n"
+                 return False
 
-    fastRenderAPIGlobals.frActiveTextureARB .= cat
+checkColorTable :: B.ByteString -> Quake ()
+checkColorTable extensions =
+  do colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
+     enabled <- checkEnabled colorTable
+     fastRenderAPIGlobals.frColorTableEXT .= enabled
+  where checkEnabled colorTable
+          | extensionAvailable colorTable =
+              checkIgnore =<< glExtPalettedTextureCVar
+          | otherwise =
+              do VID.printf Constants.printAll "...GL_EXT_shared_texture_palette not found\n"
+                 return False
+        extensionAvailable colorTable =
+          not colorTable && or (fmap (`BC.isInfixOf` extensions) ["GL_EXT_paletted_texture", "GL_EXT_shared_texture_palette"])
+        checkIgnore palettedTexture
+          | (palettedTexture^.cvValue) /= 0 =
+              do VID.printf Constants.printAll "...using GL_EXT_shared_texture_palette\n"
+                 return True
+          | otherwise =
+              do VID.printf Constants.printAll "...ignoring GL_EXT_shared_texture_palette\n"
+                 return False
 
-    if not cat
-      then do
-        VID.printf Constants.printAll "Missing multi-texturing!\n"
-        return False
-      else do
-        glSetDefaultState glDriver
-        Image.glInitImages
-        Model.modInit
-        rInitParticleTexture
-        Draw.initLocal
+checkMultiTexture :: B.ByteString -> Quake ()
+checkMultiTexture extensions =
+  do enabled <- checkEnabled =<< checkExtensionWorks
+     fastRenderAPIGlobals.frActiveTextureARB .= enabled
+  where checkEnabled ok
+          | extensionAvailable && ok =
+              do VID.printf Constants.printAll "...using GL_ARB_multitexture\n"
+                 fastRenderAPIGlobals.frTexture0 .= Constants.glTexture0ARB
+                 fastRenderAPIGlobals.frTexture1 .= Constants.glTexture1ARB
+                 return True
+          | extensionAvailable = return False
+          | otherwise =
+              do VID.printf Constants.printAll "...GL_ARB_multitexture not found\n"
+                 return False
+        checkExtensionWorks = request (io execActiveTexture)
+        execActiveTexture = handle (\(_ :: IOException) -> return False) $
+          do GL.glClientActiveTextureARB (fromIntegral Constants.glTexture0ARB)
+             return True
+        extensionAvailable = "GL_ARB_multitexture" `BC.isInfixOf` extensions
 
-        err <- io $ GL.glGetError
-        unless (err == GL.gl_NO_ERROR) $
-          VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
+finishInit :: GLDriver -> Bool -> Quake Bool
+finishInit glDriver enabled
+  | not enabled =
+      do VID.printf Constants.printAll "Missing multi-texturing!\n"
+         return False
+  | otherwise =
+      do glSetDefaultState glDriver
+         Image.glInitImages
+         Model.modInit
+         rInitParticleTexture
+         Draw.initLocal
+         checkGLError
+         glDriver^.gldEndFrame
+         return True
 
-        glDriver^.gldEndFrame
-        return True
+checkGLError :: Quake ()
+checkGLError =
+  do err <- request (io GL.glGetError)
+     unless (err == GL.GL_NO_ERROR) $
+       VID.printf Constants.printAll "gl.glGetError() = TODO" -- TODO: add error information
 
-  where getGLString :: GL.GLenum -> IO B.ByteString
-        getGLString n = GL.glGetString n >>= maybeNullPtr (return "") (B.packCString . castPtr)
-
-        maybeNullPtr :: b -> (Ptr a -> b) -> Ptr a -> b
-        maybeNullPtr n f ptr | ptr == nullPtr = n
-                             | otherwise      = f ptr
-                             -}
+getGLString :: GL.GLenum -> IO B.ByteString
+getGLString n =
+  do str <- GL.glGetString n
+     maybeNullPtr (return "") (B.packCString . castPtr) str
+  where maybeNullPtr nothing f ptr | ptr == nullPtr = nothing
+                                   | otherwise = f ptr
 
 shutdownCommands :: [B.ByteString]
 shutdownCommands = ["modellist", "screenshot", "imagelist", "gl_strings"]
@@ -383,3 +411,9 @@ fastScreenShotF = error "FastRenderAPI.fastScreenShotF" -- TODO
 
 glStringsF :: XCommandT
 glStringsF = error "FastRenderAPI.glStringsF" -- TODO
+
+glSetDefaultState :: GLDriver -> Quake ()
+glSetDefaultState = error "FastRenderAPI.glSetDefaultState" -- TODO
+
+rInitParticleTexture :: Quake ()
+rInitParticleTexture = error "FastRenderAPI.rInitParticleTexture" -- TODO

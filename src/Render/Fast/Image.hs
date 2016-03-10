@@ -1,6 +1,7 @@
 module Render.Fast.Image
   ( getPalette
   , glImageListF
+  , glInitImages
   , glShutdownImages
   , rRegisterSkin
   ) where
@@ -137,3 +138,6 @@ buildAcc acc byte idx
 
 glImageListF :: XCommandT
 glImageListF = error "Image.glImageListF" -- TODO
+
+glInitImages :: Quake ()
+glInitImages = error "Image.glInitImages" -- TODO
