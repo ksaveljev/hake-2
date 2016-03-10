@@ -54,6 +54,7 @@ data QuakeState = QuakeState
   , _clientGlobals        :: ClientGlobals
   , _particleTGlobals     :: ParticleTGlobals
   , _menuGlobals          :: MenuGlobals
+  , _pMoveGlobals         :: PMoveGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -105,6 +106,7 @@ data Globals = Globals
   , _gServerState      :: Int
   , _gNetMessage       :: SizeBufT
   , _gCmdText          :: SizeBufT
+  , _gDeferTextBuf     :: B.ByteString -- length 8192
   , _gCmdAlias         :: Seq CmdAliasT
   , _gLogStatsFile     :: Maybe Handle
   , _gCls              :: ClientStaticT
@@ -461,6 +463,21 @@ data MenuGlobals = MenuGlobals
   , _mgBindGrab            :: Bool
   , _mgDmOptionsStatusBar  :: Maybe B.ByteString
   , _mgMapNames            :: Maybe (V.Vector B.ByteString)
+  }
+
+data PMoveGlobals = PMoveGlobals
+  { _pmPM              :: PMoveT
+  , _pmPML             :: PmlT
+  , _pmPlanes          :: V.Vector (V3 Float)
+  , _pmStopSpeed       :: Float
+  , _pmMaxSpeed        :: Float
+  , _pmDuckSpeed       :: Float
+  , _pmAccelerate      :: Float
+  , _pmAirAccelerate   :: Float
+  , _pmWaterAccelerate :: Float
+  , _pmFriction        :: Float
+  , _pmWaterFriction   :: Float
+  , _pmWaterSpeed      :: Float
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1837,6 +1854,19 @@ data PcxT = PcxT
   , _pcxPaletteType  :: Word16
   , _pcxFiller       :: B.ByteString -- size 58
   , _pcxData         :: B.ByteString -- unbounded
+  }
+
+data PmlT = PmlT
+  { _pmlOrigin         :: V3 Float
+  , _pmlVelocity       :: V3 Float
+  , _pmlForward        :: V3 Float
+  , _pmlRight          :: V3 Float
+  , _pmlUp             :: V3 Float
+  , _pmlFrameTime      :: Float
+  , _pmlGroundSurface  :: Maybe CSurfaceT
+  , _pmlGroundContents :: Int
+  , _pmlPreviousOrigin :: V3 Float
+  , _pmlLadder         :: Bool
   }
 
 data KeyFuncT = KeyFuncT

@@ -18,6 +18,7 @@ import Globals as X
 import QCommon.CMGlobals as X
 import QCommon.ComGlobals as X
 import QCommon.FSGlobals as X
+import QCommon.PMoveGlobals as X
 import Render.Fast.FastRenderAPIGlobals as X
 import Render.GLFWbGlobals as X
 import Server.SVGlobals as X
@@ -46,4 +47,5 @@ initialQuakeState =
              , _clientGlobals        = initialClientGlobals
              , _particleTGlobals     = initialParticleTGlobals
              , _menuGlobals          = initialMenuGlobals
+             , _pMoveGlobals         = initialPMoveGlobals
              }

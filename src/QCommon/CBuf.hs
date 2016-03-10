@@ -2,6 +2,7 @@ module QCommon.CBuf
   ( addEarlyCommands
   , addLateCommands
   , addText
+  , copyToDefer
   , execute
   , initialize
   ) where
@@ -87,3 +88,10 @@ execute =
 
 initialize :: Quake ()
 initialize = SZ.initialize (globals.gCmdText) "" 8192
+
+copyToDefer :: Quake ()
+copyToDefer =
+  do cmdText <- use (globals.gCmdText)
+     globals.gDeferTextBuf .= B.take (cmdText^.sbCurSize) (cmdText^.sbData)
+     globals.gCmdText.sbData .= ""
+     globals.gCmdText.sbCurSize .= 0

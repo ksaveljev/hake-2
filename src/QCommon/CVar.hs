@@ -1,6 +1,7 @@
 module QCommon.CVar 
   ( findVar
   , forceSet
+  , fullSet
   , get
   , getExisting
   , initialize
@@ -11,6 +12,7 @@ module QCommon.CVar
   , setValueI
   , update
   , variableString
+  , variableValue
   ) where
 
 import qualified Constants
@@ -113,3 +115,8 @@ setValueF name value = void (set name val)
 
 setValueI :: B.ByteString -> Int -> Quake ()
 setValueI name value = void (set name (encode value))
+
+variableValue :: B.ByteString -> Quake Float
+variableValue name =
+  do var <- findVar name
+     return (maybe 0 (Lib.atof . (^.cvString)) var)

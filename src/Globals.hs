@@ -30,6 +30,7 @@ initialGlobals =
           , _gServerState      = 0
           , _gNetMessage       = newSizeBufT
           , _gCmdText          = newSizeBufT
+          , _gDeferTextBuf     = ""
           , _gCmdAlias         = Seq.empty
           , _gLogStatsFile     = Nothing
           , _gCls              = newClientStaticT

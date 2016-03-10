@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Server.SVWorld
   ( areaEdicts
+  , clearWorld
   , linkEdict
   , trace
   , unlinkEdict
@@ -23,3 +24,6 @@ linkEdict = error "SVWorld.linkEdict" -- TODO
 
 areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
 areaEdicts = error "SVWorld.areaEdicts" -- TODO
+
+clearWorld :: Quake ()
+clearWorld = error "SVWorld.clearWorld" -- TODO

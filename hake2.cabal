@@ -46,6 +46,7 @@ executable hake2
                      , Client.CLightStyleT
                      , Client.CLInput
                      , Client.CLParse
+                     , Client.CLShared
                      , Client.Console
                      , Client.ConsoleT
                      , Client.CParticleT
@@ -87,12 +88,14 @@ executable hake2
                      , Game.CVarT
                      , Game.EdictT
                      , Game.EntityStateT
+                     , Game.GameBase
                      , Game.GameBaseGlobals
                      , Game.GameImportT
                      , Game.GameItems
                      , Game.GameItemsGlobals
                      , Game.GameItemsList
                      , Game.GameLocalsT
+                     , Game.GameSpawn
                      , Game.GameSVCmds
                      , Game.GameUtil
                      , Game.GClientT
@@ -122,6 +125,7 @@ executable hake2
                      , QCommon.CBufShared
                      , QCommon.CLeafT
                      , QCommon.CmdFunctionT
+                     , QCommon.CM
                      , QCommon.CMGlobals
                      , QCommon.CNodeT
                      , QCommon.ComGlobals
@@ -140,6 +144,8 @@ executable hake2
                      , QCommon.NetChanT
                      , QCommon.PackFileT
                      , QCommon.PackT
+                     , QCommon.PmlT
+                     , QCommon.PMoveGlobals
                      , QCommon.QCommon
                      , QCommon.QFiles.BSP.DAreaPortalT
                      , QCommon.QFiles.BSP.DVisT
@@ -188,6 +194,7 @@ executable hake2
                      , Server.SVMain
                      , Server.SVMainShared
                      , Server.SVSend
+                     , Server.SVWorld
                      , Sound.S
                      , Sys.IN
                      , Sys.INGlobals
