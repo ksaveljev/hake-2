@@ -4,36 +4,42 @@ module Client.Menu
   , menuCenter
   ) where
 
-import                          Client.ClientStaticT
-import                qualified Client.CLShared as CL
-import                qualified Client.KeyConstants as KeyConstants
-import                          Client.MenuActionS
-import                          Client.MenuCommonS
-import                          Client.MenuFieldS
-import                          Client.MenuFrameworkS
-import                          Client.MenuLayerT
-import                          Client.MenuListS
-import                          Client.MenuSeparatorS
-import                          Client.MenuSliderS
-import                          Client.RefExportT
+import           Client.ClientStaticT
+import qualified Client.CLShared as CL
+import qualified Client.KeyConstants as KeyConstants
+import           Client.MenuActionS
+import           Client.MenuCommonS
+import           Client.MenuFieldS
+import           Client.MenuFrameworkS
+import           Client.MenuLayerT
+import           Client.MenuListS
+import           Client.MenuSeparatorS
+import           Client.MenuSliderS
+import           Client.RefExportT
 import {-# SOURCE #-} qualified Client.VID as VID
-import                          Client.VidDefT
-import                qualified Constants
-import                qualified Game.Cmd as Cmd
-import                qualified QCommon.Com as Com
-import                qualified QCommon.CVar as CVar
-import                          QCommon.XCommandT (runXCommandT)
-import                          QuakeRef
-import                          QuakeState
-import                          Render.Renderer
-import                          Types
-import                          Util.Binary (encode)
+import           Client.VidDefT
+import qualified Constants
+import qualified Game.Cmd as Cmd
+import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
+import           QCommon.XCommandT (runXCommandT)
+import           QuakeRef
+import           QuakeState
+import           Render.Renderer
+import           Types
+import           Util.Binary (encode)
 
-import           Control.Lens (use, (^.), (.=), (&), (.~), (%~), (+~))
+import           Control.Lens (use, (^.), (.=), (%=), (&), (.~), (%~), (+~))
 import           Control.Monad (void)
 import qualified Data.ByteString as B
 import           Data.Char (ord)
 import qualified Data.Vector as V
+
+mainItems :: Int
+mainItems = 5
+
+menuMoveSound :: B.ByteString
+menuMoveSound = "misc/menu2.wav"
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
@@ -188,7 +194,29 @@ mainDrawF :: XCommandT
 mainDrawF = error "Menu.mainDrawF" -- TODO
 
 mainKeyF :: KeyFuncT
-mainKeyF = error "Menu.mainKeyF" -- TODO
+mainKeyF = KeyFuncT "Menu.mainKeyF" mainKey
+
+mainKey :: Int -> Quake (Maybe B.ByteString)
+mainKey key
+  | key == KeyConstants.kEscape =
+      do popMenu
+         return Nothing
+  | key `elem` [KeyConstants.kKpDownArrow, KeyConstants.kDownArrow] =
+      do menuGlobals.mgMainCursor %= (\v -> if v + 1 >= mainItems then 0 else v + 1)
+         return (Just menuMoveSound)
+  | key `elem` [KeyConstants.kKpUpArrow, KeyConstants.kUpArrow] =
+      do menuGlobals.mgMainCursor %= (\v -> if v - 1 < 0 then mainItems - 1 else v - 1)
+         return (Just menuMoveSound)
+  | key `elem` [KeyConstants.kKpEnter, KeyConstants.kEnter] =
+      do menuGlobals.mgEnterSound .= True
+         menuToOpen <- pickMenuToOpen <$> use (menuGlobals.mgMainCursor)
+         maybe (return ()) runXCommandT menuToOpen
+         return Nothing
+  | otherwise = return Nothing
+  where pickMenuToOpen idx
+          | idx < 0 || idx > 4 = Nothing
+          | otherwise = Just (menus V.! idx)
+        menus = V.fromList [menuGameF, menuMultiplayerF, menuOptionsF, menuVideoF, menuQuitF]
 
 gameMenuInit :: Quake ()
 gameMenuInit = error "Menu.gameMenuInit" -- TODO
@@ -373,7 +401,7 @@ quitKey key =
           | key `elem` [ KeyConstants.kEscape, ord 'n', ord 'N' ] = popMenu
           | key `elem` [ ord 'Y', ord 'y' ] =
               do globals.gCls.csKeyDest .= Constants.keyConsole
-                 runXCommandT (CL.quitF)
+                 runXCommandT CL.quitF
           | otherwise = return ()
 
 keysMenuDrawF :: XCommandT
