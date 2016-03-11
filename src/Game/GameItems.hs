@@ -17,6 +17,11 @@ module Game.GameItems
   , pickupPack
   , pickupPowerArmor
   , pickupPowerup
+  , spawnItem
+  , spItemHealth
+  , spItemHealthLarge
+  , spItemHealthMega
+  , spItemHealthSmall
   , useBreather
   , useEnviroSuit
   , useInvulnerability
@@ -900,3 +905,18 @@ dropMakeTouchableF edictRef =
 
 touchItem :: EntTouch
 touchItem = error "GameItems.touchItem" -- TODO
+
+spawnItem :: Ref EdictT -> Ref GItemT -> Quake ()
+spawnItem = error "GameItems.spawnItem" -- TODO
+
+spItemHealth :: Ref EdictT -> Quake ()
+spItemHealth = error "GameItems.spItemHealth" -- TODO
+
+spItemHealthLarge :: Ref EdictT -> Quake ()
+spItemHealthLarge = error "GameItems.spItemHealthLarge" -- TODO
+
+spItemHealthMega :: Ref EdictT -> Quake ()
+spItemHealthMega = error "GameItems.spItemHealthMega" -- TODO
+
+spItemHealthSmall :: Ref EdictT -> Quake ()
+spItemHealthSmall = error "GameItems.spItemHealthSmall" -- TODO

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Types where
 
 import           Control.Concurrent.STM.TChan (TChan)
@@ -28,7 +29,7 @@ import           System.Random (StdGen)
 
 type Quake = Coroutine IORequest (State QuakeState)
 
-instance MonadState QuakeState Quake where
+instance (MonadState s m) => MonadState s (Coroutine IORequest m) where
   get = lift get
   put = lift . put
 
@@ -108,6 +109,8 @@ data Globals = Globals
   , _gCmdText          :: SizeBufT
   , _gDeferTextBuf     :: B.ByteString -- length 8192
   , _gCmdAlias         :: Seq CmdAliasT
+  , _gTimeBeforeGame   :: Int
+  , _gTimeAfterGame    :: Int
   , _gLogStatsFile     :: Maybe Handle
   , _gCls              :: ClientStaticT
   , _gCl               :: ClientStateT
@@ -1867,6 +1870,11 @@ data PmlT = PmlT
   , _pmlGroundContents :: Int
   , _pmlPreviousOrigin :: V3 Float
   , _pmlLadder         :: Bool
+  }
+
+data SpawnT = SpawnT
+  { _spName  :: B.ByteString
+  , _spSpawn :: EntThink
   }
 
 data KeyFuncT = KeyFuncT

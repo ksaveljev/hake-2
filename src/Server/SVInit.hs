@@ -26,8 +26,9 @@ import           Types
 import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
-import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~), (%~))
+import           Control.Lens (use, zoom, (^.), (.=), (+=), (%=), (&), (.~), (%~))
 import           Control.Monad (void, when)
+import           Control.Monad.Coroutine (mapMonad)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -35,8 +36,9 @@ import qualified Data.Vector as V
 
 svMap :: Bool -> B.ByteString -> Bool -> Quake ()
 svMap attractLoop levelString loadGame =
-  do svGlobals.svServer.sLoadGame .= loadGame -- TODO: zoom
-     svGlobals.svServer.sAttractLoop .= attractLoop
+  do mapMonad (zoom (svGlobals.svServer)) $ do
+       sLoadGame .= loadGame
+       sAttractLoop .= attractLoop
      checkInitGame loadGame =<< use (svGlobals.svServer.sState)
      level <- extractLevelAndNextServer levelString
      checkFirstMap levelString =<< use (svGlobals.svFirstMap)
@@ -128,12 +130,6 @@ spawnServer server spawnPoint srvState attractLoop loadGame =
      SVWorld.clearWorld
      updateServerModels
      spawnMapEntities server spawnPoint srvState
-     -- TODO
-     -- TODO
-     -- TODO
-     -- TODO
-     -- TODO
-     -- TODO
 
 spawnServerUpdateState :: B.ByteString -> Bool -> Bool -> Quake ()
 spawnServerUpdateState server attractLoop loadGame =
@@ -162,9 +158,10 @@ initServerMulticast =
 
 initServerClientsAndModels :: B.ByteString -> Int -> Quake ()
 initServerClientsAndModels server srvState =
-  do svGlobals.svServer.sName .= server
-     svGlobals.svServer.sTime .= 1000
-     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
+  do mapMonad (zoom (svGlobals.svServer)) $ do
+       sName .= server
+       sTime .= 1000
+       sConfigStrings %= (V.// [(Constants.csName, server)])
      svGlobals.svServerStatic.ssClients %= fmap updateClientState
      (modelIdx, iw) <- loadContent
      svGlobals.svServer.sModels %= (V.// [(1, Ref modelIdx)])
@@ -185,10 +182,10 @@ updateClientState client = client & cState .~ updatedState
 updateServerModels :: Quake ()
 updateServerModels =
   do modelsCount <- CM.numInlineModels
-     svGlobals.svServer.sConfigStrings %= (V.// fmap (updateModelsConfigStrings modelsCount) [1..modelsCount-1])
+     svGlobals.svServer.sConfigStrings %= (V.// fmap updateModelsConfigStrings [1..modelsCount-1])
      updatedModels <- mapM inlineModels [1..modelsCount-1]
      svGlobals.svServer.sModels %= (V.// updatedModels)
-  where updateModelsConfigStrings modelsCount idx = (Constants.csModels + 1 + idx, "*" `B.append` encode idx) 
+  where updateModelsConfigStrings idx = (Constants.csModels + 1 + idx, "*" `B.append` encode idx) 
         inlineModels idx = CM.inlineModel ("*" `B.append` encode idx) >>= \ref -> return (idx + 1, ref)
 
 spawnMapEntities :: B.ByteString -> B.ByteString -> Int -> Quake ()

@@ -90,13 +90,18 @@ executable hake2
                      , Game.EntityStateT
                      , Game.GameBase
                      , Game.GameBaseGlobals
+                     , Game.GameFunc
                      , Game.GameImportT
                      , Game.GameItems
                      , Game.GameItemsGlobals
                      , Game.GameItemsList
                      , Game.GameLocalsT
+                     , Game.GameMisc
                      , Game.GameSpawn
                      , Game.GameSVCmds
+                     , Game.GameTarget
+                     , Game.GameTrigger
+                     , Game.GameTurret
                      , Game.GameUtil
                      , Game.GClientT
                      , Game.GItemArmorT
@@ -108,12 +113,36 @@ executable hake2
                      , Game.MFrameT
                      , Game.MMoveT
                      , Game.MonsterInfoT
+                     , Game.Monsters.MActor
+                     , Game.Monsters.MBerserk
+                     , Game.Monsters.MBoss2
+                     , Game.Monsters.MBoss3
+                     , Game.Monsters.MBoss31
+                     , Game.Monsters.MBrain
+                     , Game.Monsters.MChick
+                     , Game.Monsters.MFlipper
+                     , Game.Monsters.MFloat
+                     , Game.Monsters.MFlyer
+                     , Game.Monsters.MGladiator
+                     , Game.Monsters.MGunner
+                     , Game.Monsters.MHover
+                     , Game.Monsters.MInfantry
+                     , Game.Monsters.MInsane
+                     , Game.Monsters.MMedic
+                     , Game.Monsters.MMutant
+                     , Game.Monsters.MParasite
+                     , Game.Monsters.MSoldier
+                     , Game.Monsters.MSuperTank
+                     , Game.Monsters.MTank
                      , Game.MoveInfoT
+                     , Game.PlayerClient
                      , Game.PlayerStateT
+                     , Game.PlayerTrail
                      , Game.PlayerWeapon
                      , Game.PMoveStateT
                      , Game.PMoveT
                      , Game.PushedT
+                     , Game.SpawnT
                      , Game.SpawnTempT
                      , Game.TraceT
                      , Game.UserCmdT
@@ -189,6 +218,7 @@ executable hake2
                      , Server.ServerStaticT
                      , Server.ServerT
                      , Server.SVConsoleCommands
+                     , Server.SVEnts
                      , Server.SVGlobals
                      , Server.SVInit
                      , Server.SVMain

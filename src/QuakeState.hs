@@ -29,6 +29,9 @@ import Control.Lens (makeLenses)
 
 makeLenses ''QuakeState
 
+worldRef :: Ref EdictT
+worldRef = Ref 0
+
 initialQuakeState :: QuakeState
 initialQuakeState =
   QuakeState { _globals              = initialGlobals

@@ -1,5 +1,6 @@
 module QCommon.NetChannel
   ( initialize
+  , outOfBandPrint
   ) where
 
 import qualified Constants
@@ -22,3 +23,6 @@ initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars = [ ("showpackets", "0", 0)
                , ("showdrop", "0", 0)
                ]
+
+outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
+outOfBandPrint = error "NetChannel.outOfBandPrint" -- TODO
