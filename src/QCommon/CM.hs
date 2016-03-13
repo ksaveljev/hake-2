@@ -28,7 +28,8 @@ loadMap = error "CM.loadMap" -- TODO
 
 inlineModel :: B.ByteString -> Quake (Ref CModelT)
 inlineModel name =
-  do checkNumCModels =<< numInlineModels
+  do checkName
+     checkNumCModels =<< numInlineModels
      return (Ref num)
   where checkName
           | name == "" || BC.head name /= '*' =

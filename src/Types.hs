@@ -78,6 +78,7 @@ data QuakeIOState = QuakeIOState
   , _cgParticles            :: MV.IOVector CParticleT
   , _pVertexArray           :: MSV.IOVector Float
   , _pColorArray            :: MSV.IOVector Int32
+  , _frFifo                 :: MV.IOVector (Int, Int)
   }
 
 data IORequest x
@@ -342,7 +343,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frUploadWidth          :: Int
   , _frUploadHeight         :: Int
   , _frUploadedPaletted     :: Bool
-  , _frDrawChars            :: Maybe (IORef ImageT)
+  , _frDrawChars            :: Maybe (Ref ImageT)
   , _frTrickFrame           :: Int
   , _frScrapDirty           :: Bool
   , _frViewCluster          :: Int
@@ -1875,6 +1876,17 @@ data PmlT = PmlT
 data SpawnT = SpawnT
   { _spName  :: B.ByteString
   , _spSpawn :: EntThink
+  }
+
+data GLModeT = GLModeT
+  { _glmName     :: B.ByteString
+  , _glmMinimize :: Int
+  , _glmMaximize :: Int
+  }
+
+data GLTModeT = GLTModeT
+  { _gltmName :: B.ByteString
+  , _gltmMode :: Int
   }
 
 data KeyFuncT = KeyFuncT

@@ -125,3 +125,14 @@ instance QuakeRef MenuSeparatorS where
     menuGlobals.mgMenuSeparatorSItems.ix idx %= f
   writeRef (Ref idx) item =
     menuGlobals.mgMenuSeparatorSItems.ix idx .= item
+
+instance QuakeRef ImageT where
+  readRef (Ref idx) =
+    request (do images <- use frGLTextures
+                io (MV.read images idx))
+  modifyRef (Ref idx) f =
+    request (do images <- use frGLTextures
+                io (MV.modify images f idx))
+  writeRef (Ref idx) item =
+    request (do images <- use frGLTextures
+                io (MV.write images idx item))

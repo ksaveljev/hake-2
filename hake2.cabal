@@ -201,7 +201,9 @@ executable hake2
                      , Render.GLConfigT
                      , Render.GLFWbGlobals
                      , Render.GLFWbRenderer
+                     , Render.GLModeT
                      , Render.GLStateT
+                     , Render.GLTModeT
                      , Render.ImageT
                      , Render.ModelT
                      , Render.MSurfaceT

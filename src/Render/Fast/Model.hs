@@ -7,18 +7,24 @@ module Render.Fast.Model
   , rEndRegistration
   ) where
 
+import qualified Constants
 import           QuakeIOState
 import           QuakeState
 import           Render.ModelT
 import           Types
 
-import           Control.Lens (use, (^.))
+import           Control.Lens (use, (^.), (.=))
 import qualified Data.ByteString as B
 import           Data.IORef (IORef)
 import qualified Data.Vector.Mutable as MV
 
 modInit :: Quake ()
-modInit = error "Model.modInit" -- TODO
+modInit =
+  do request resetModels
+     fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
+  where resetModels =
+          do models <- use frModKnown
+             MV.set models newModelT
 
 rBeginRegistration :: B.ByteString -> Quake ()
 rBeginRegistration = error "Model.rBeginRegistration" -- TODO

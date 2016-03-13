@@ -29,6 +29,7 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.Char (toLower, toUpper)
 import           Data.Maybe (fromMaybe)
 import           Foreign.Ptr (nullPtr, castPtr)
+import           Foreign.Marshal.Array (withArray)
 import qualified Graphics.GL as GL
 import           Text.Read (readMaybe)
 
@@ -413,7 +414,169 @@ glStringsF :: XCommandT
 glStringsF = error "FastRenderAPI.glStringsF" -- TODO
 
 glSetDefaultState :: GLDriver -> Quake ()
-glSetDefaultState = error "FastRenderAPI.glSetDefaultState" -- TODO
+glSetDefaultState glDriver =
+  do request glDefaultState
+     setImageTextureModes
+     setTextureFilterWrapBlend
+     Image.glTexEnv GL.GL_REPLACE
+     pointParameterSetting =<< use (fastRenderAPIGlobals.frPointParameterEXT)
+     palettedTextureSettings
+     glUpdateSwapInterval glDriver
+     vertexArraySettings =<< use (fastRenderAPIGlobals.frTexture0)
+
+glDefaultState :: QuakeIO ()
+glDefaultState =
+  do GL.glClearColor 1 0 0.5 0.5
+     GL.glCullFace GL.GL_FRONT
+     GL.glEnable GL.GL_TEXTURE_2D
+     GL.glEnable GL.GL_ALPHA_TEST
+     GL.glAlphaFunc GL.GL_GREATER 0.666
+     GL.glDisable GL.GL_DEPTH_TEST
+     GL.glDisable GL.GL_CULL_FACE
+     GL.glDisable GL.GL_BLEND
+     GL.glColor4f 1 1 1 1
+     GL.glPolygonMode GL.GL_FRONT_AND_BACK GL.GL_FILL
+     GL.glShadeModel GL.GL_FLAT
+
+setImageTextureModes :: Quake ()
+setImageTextureModes =
+  do Image.glTextureMode =<< fmap (^.cvString) glTextureModeCVar
+     Image.glTextureAlphaMode =<< fmap (^.cvString) glTextureAlphaModeCVar
+     Image.glTextureSolidMode =<< fmap (^.cvString) glTextureSolidModeCVar
+
+setTextureFilterWrapBlend :: Quake ()
+setTextureFilterWrapBlend =
+  do minFilter <- use (fastRenderAPIGlobals.frGLFilterMin)
+     maxFilter <- use (fastRenderAPIGlobals.frGLFilterMax)
+     request (setGLParams minFilter maxFilter)
+  where setGLParams minFilter maxFilter =
+          do GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral minFilter)
+             GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral maxFilter)
+             GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_WRAP_S (fromIntegral GL.GL_REPEAT)
+             GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_WRAP_T (fromIntegral GL.GL_REPEAT)
+             GL.glBlendFunc GL.GL_SRC_ALPHA GL.GL_ONE_MINUS_SRC_ALPHA
+
+pointParameterSetting :: Bool -> Quake ()
+pointParameterSetting False = return ()
+pointParameterSetting True =
+  do a <- fmap (^.cvValue) glParticleAttACVar
+     b <- fmap (^.cvValue) glParticleAttBCVar
+     c <- fmap (^.cvValue) glParticleAttCCVar
+     minSize <- fmap (^.cvValue) glParticleMinSizeCVar
+     maxSize <- fmap (^.cvValue) glParticleMaxSizeCVar
+     request (ppExt a b c minSize maxSize)
+  where ppExt a b c minSize maxSize =
+          do GL.glEnable GL.GL_POINT_SMOOTH
+             GL.glPointParameterfEXT GL.GL_POINT_SIZE_MIN_EXT (realToFrac minSize)
+             GL.glPointParameterfEXT GL.GL_POINT_SIZE_MAX_EXT (realToFrac maxSize)
+             io (withArray (fmap realToFrac [a, b, c] :: [GL.GLfloat]) $ \ptr ->
+               GL.glPointParameterfvEXT GL.GL_DISTANCE_ATTENUATION_EXT ptr)
+
+palettedTextureSettings :: Quake ()
+palettedTextureSettings =
+  do colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
+     palettedTexture <- fmap (^.cvValue) glExtPalettedTextureCVar
+     when (colorTable && palettedTexture /= 0) $ do
+       request (GL.glEnable GL.GL_SHARED_TEXTURE_PALETTE_EXT)
+       d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
+       Image.glSetTexturePalette d8to24table
+
+vertexArraySettings :: Int -> Quake ()
+vertexArraySettings texture0 =
+  request (
+    do GL.glEnableClientState GL.GL_VERTEX_ARRAY
+       GL.glClientActiveTextureARB (fromIntegral texture0)
+       GL.glEnableClientState GL.GL_TEXTURE_COORD_ARRAY)
+       -- perspective correction (commented out in jake2 source)
+       -- gl.glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
 rInitParticleTexture :: Quake ()
-rInitParticleTexture = error "FastRenderAPI.rInitParticleTexture" -- TODO
+rInitParticleTexture =
+  do pt <- Image.glLoadPic "***particle***" particleTexture 8 8 Constants.itSprite 32
+     nt <- Image.glLoadPic "***r_notexture***" noTexture 8 8 Constants.itWall 32
+     fastRenderAPIGlobals.frParticleTexture .= pt
+     fastRenderAPIGlobals.frNoTexture .= nt
+
+glUpdateSwapInterval :: GLDriver -> Quake ()
+glUpdateSwapInterval glDriver =
+  updateSwapInterval =<< glSwapIntervalCVar
+  where updateSwapInterval swapInterval
+          | swapInterval^.cvModified =
+              do CVar.update (swapInterval & cvModified .~ False)
+                 setSwapInterval swapInterval =<< use (fastRenderAPIGlobals.frGLState.glsStereoEnabled)
+          | otherwise = return ()
+        setSwapInterval swapInterval False =
+          (glDriver^.gldSetSwapInterval) (truncate (swapInterval^.cvValue))
+        setSwapInterval _ True = return ()
+
+particleTexture :: B.ByteString
+particleTexture =
+    B.pack [ 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255, 255, 255, 255, 255, 255
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255, 255
+           , 255, 255, 255, 255, 255, 255, 255, 255
+           , 255, 255, 255, 255, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255, 255
+           , 255, 255, 255, 255, 255, 255, 255, 255
+           , 255, 255, 255, 255, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255, 255, 255, 255, 255, 255
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           , 255, 255, 255,   0, 255, 255, 255,   0
+           ]
+
+noTexture :: B.ByteString
+noTexture =
+    B.pack [   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255,   0, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ,   0, 0, 0, 255, 255, 0, 0, 255
+           , 255, 0, 0, 255, 255, 0, 0, 255
+           ]

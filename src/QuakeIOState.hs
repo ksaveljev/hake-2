@@ -41,6 +41,9 @@ blockWidth = 128
 blockHeight :: Int
 blockHeight = 128
 
+floodFillFifoSize :: Int
+floodFillFifoSize = 0x1000
+
 initialQuakeIOState :: QuakeIOState
 initialQuakeIOState =
   QuakeIOState { _gbGEdicts              = unsafePerformIO (V.thaw (V.generate (Constants.maxEdicts + 1) newEdictT)) -- one extra for "dummy edict"
@@ -62,4 +65,5 @@ initialQuakeIOState =
                , _cgParticles            = unsafePerformIO (V.thaw (V.replicate Constants.maxParticles newCParticleT))
                , _pVertexArray           = unsafePerformIO (MSV.new (Constants.maxParticles * 3))
                , _pColorArray            = unsafePerformIO (MSV.new Constants.maxParticles)
+               , _frFifo                 = unsafePerformIO (MV.replicate floodFillFifoSize (0, 0))
                }
