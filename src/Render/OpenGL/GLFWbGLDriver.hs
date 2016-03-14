@@ -120,7 +120,11 @@ glDriverBeginFrame :: Float -> Quake ()
 glDriverBeginFrame _ = return () -- do nothing
 
 glDriverEndFrame :: Quake ()
-glDriverEndFrame = error "GLFWbGLDriver.glDriverEndFrame" -- TODO
+glDriverEndFrame =
+  do window <- use (glfwbGlobals.glfwbWindow)
+     maybe windowError swapBuf window
+  where windowError = error "GLFWbGLDriver.glDriverEndFrame window is Nothing"
+        swapBuf window = request (io (GLFW.swapBuffers window))
 
 glDriverAppActivate :: Bool -> Quake ()
 glDriverAppActivate _ = return () -- do nothing

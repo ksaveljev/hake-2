@@ -6,10 +6,12 @@ module Util.Lib
   , fOpenBinary
   , fClose
   , rand
+  , vtos
   ) where
 
 import           QuakeState
 import           Types
+import           Util.Binary (encode)
 
 import           Control.Exception (handle, IOException)
 import           Control.Lens (use, (.=))
@@ -17,6 +19,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Int (Int16)
 import           Data.Maybe (fromMaybe)
+import           Linear (V3(..))
 import           System.IO (Handle, IOMode, openFile, hClose, openBinaryFile)
 import           System.Random (random)
 import           Text.Read (readMaybe)
@@ -55,3 +58,9 @@ rand =
      let (result, newG) = random g
      globals.gRnd .= newG
      return (abs result)
+
+vtos :: V3 Float -> B.ByteString
+vtos (V3 a b c) = B.concat [encode a', " ", encode b', " ", encode c']
+  where a' = truncate a :: Int
+        b' = truncate b :: Int
+        c' = truncate c :: Int

@@ -23,6 +23,7 @@ import Render.Fast.FastRenderAPIGlobals as X
 import Render.GLFWbGlobals as X
 import Server.SVGlobals as X
 import Sys.INGlobals as X
+import Sys.KBDGlobals as X
 import Types
 
 import Control.Lens (makeLenses)
@@ -51,4 +52,5 @@ initialQuakeState =
              , _particleTGlobals     = initialParticleTGlobals
              , _menuGlobals          = initialMenuGlobals
              , _pMoveGlobals         = initialPMoveGlobals
+             , _kbdGlobals           = initialKBDGlobals
              }

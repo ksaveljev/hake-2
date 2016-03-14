@@ -56,6 +56,7 @@ data QuakeState = QuakeState
   , _particleTGlobals     :: ParticleTGlobals
   , _menuGlobals          :: MenuGlobals
   , _pMoveGlobals         :: PMoveGlobals
+  , _kbdGlobals           :: KBDGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -482,6 +483,17 @@ data PMoveGlobals = PMoveGlobals
   , _pmFriction        :: Float
   , _pmWaterFriction   :: Float
   , _pmWaterSpeed      :: Float
+  }
+
+data KBDGlobals = KBDGlobals
+  { _kbdMx    :: Int
+  , _kbdMy    :: Int
+  , _kbdWinx  :: Int
+  , _kbdWiny  :: Int
+  , _kbdWinW2 :: Int
+  , _kbdWinH2 :: Int
+  , _kbdX     :: Int
+  , _kbdY     :: Int
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1290,8 +1302,8 @@ data RefExportT = RefExportT
   , _reShutDown            :: Quake ()
   , _reBeginRegistration   :: B.ByteString -> Quake ()
   , _reRegisterModel       :: B.ByteString -> Quake (Maybe (IORef ModelT))
-  , _reRegisterSkin        :: B.ByteString -> Quake (Maybe (IORef ImageT))
-  , _reRegisterPic         :: B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _reRegisterSkin        :: B.ByteString -> Quake (Maybe (Ref ImageT))
+  , _reRegisterPic         :: B.ByteString -> Quake (Maybe (Ref ImageT))
   , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
   , _reEndRegistration     :: Quake ()
   , _reRenderFrame         :: RefDefT -> Quake ()
@@ -1579,8 +1591,8 @@ data RenderAPI = RenderAPI
   , _rShutdown          :: GLDriver -> Quake ()
   , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
   , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ModelT))
-  , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
-  , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ImageT))
+  , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe (Ref ImageT))
+  , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe (Ref ImageT))
   , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
   , _rEndRegistration   :: GLDriver -> Quake ()
   , _rRenderFrame       :: GLDriver -> RefDefT -> Quake ()
@@ -1887,6 +1899,18 @@ data GLModeT = GLModeT
 data GLTModeT = GLTModeT
   { _gltmName :: B.ByteString
   , _gltmMode :: Int
+  }
+
+data MiptexT = MiptexT
+  { _mtName      :: B.ByteString
+  , _mtWidth     :: Int
+  , _mtHeight    :: Int
+  , _mtOffsets   :: UV.Vector Int
+  , _mtAnimFrame :: B.ByteString
+  , _mtFlags     :: Int
+  , _mtContents  :: Int
+  , _mtValue     :: Int
+  , _mtBuf       :: B.ByteString
   }
 
 data KeyFuncT = KeyFuncT

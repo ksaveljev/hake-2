@@ -88,6 +88,7 @@ executable hake2
                      , Game.CVarT
                      , Game.EdictT
                      , Game.EntityStateT
+                     , Game.GameAI
                      , Game.GameBase
                      , Game.GameBaseGlobals
                      , Game.GameFunc
@@ -167,6 +168,7 @@ executable hake2
                      , QCommon.FS
                      , QCommon.FSGlobals
                      , QCommon.FSShared
+                     , QCommon.MiptexT
                      , QCommon.MSG
                      , QCommon.NetAdrT
                      , QCommon.NetChannel
@@ -174,6 +176,7 @@ executable hake2
                      , QCommon.PackFileT
                      , QCommon.PackT
                      , QCommon.PmlT
+                     , QCommon.PMove
                      , QCommon.PMoveGlobals
                      , QCommon.QCommon
                      , QCommon.QFiles.BSP.DAreaPortalT
@@ -221,6 +224,7 @@ executable hake2
                      , Server.ServerT
                      , Server.SVConsoleCommands
                      , Server.SVEnts
+                     , Server.SVGame
                      , Server.SVGlobals
                      , Server.SVInit
                      , Server.SVMain
@@ -231,6 +235,7 @@ executable hake2
                      , Sys.IN
                      , Sys.INGlobals
                      , Sys.KBD
+                     , Sys.KBDGlobals
                      , Sys.NET
                      , Sys.Timer
                      , Types

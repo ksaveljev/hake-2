@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Render.Fast.Image
   ( getPalette
+  , glBind
+  , glFindImage
   , glImageListF
   , glInitImages
   , glLoadPic
@@ -20,6 +22,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.FS as FS
+import           QCommon.MiptexT
 import           QCommon.QFiles.PcxT
 import           QuakeIOState
 import           QuakeRef
@@ -44,7 +47,6 @@ import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
 import           Data.Char (toUpper)
-import           Data.IORef (IORef)
 import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
 import qualified Data.Vector as V
@@ -97,35 +99,31 @@ glSolidModes = V.fromList
   , GLTModeT "GL_R3_G3_B2" (fromIntegral GL.GL_R3_G3_B2)
   ]
 
-rRegisterSkin :: B.ByteString -> Quake (Maybe (IORef ImageT))
-rRegisterSkin = error "Image.rRegisterSkin" -- TODO
+rRegisterSkin :: B.ByteString -> Quake (Maybe (Ref ImageT))
+rRegisterSkin name = glFindImage name Constants.itSkin
 
 glShutdownImages :: Quake ()
-glShutdownImages =
-  do numTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
-     request $
-       do textures <- use frGLTextures
-          clearTextures textures 0 numTextures
+glShutdownImages = clearTextures 0 =<< use (fastRenderAPIGlobals.frNumGLTextures)
 
-clearTextures :: MV.IOVector ImageT -> Int -> Int -> QuakeIO ()
-clearTextures textures idx maxIdx
+clearTextures :: Int -> Int -> Quake ()
+clearTextures idx maxIdx
   | idx >= maxIdx = return ()
   | otherwise =
-      do image <- MV.read textures idx
+      do image <- readRef (Ref idx)
          clearWithRegSeq (image^.iTexNum) (image^.iRegistrationSequence)
-         clearTextures textures (idx + 1) maxIdx
+         clearTextures (idx + 1) maxIdx
   where clearWithRegSeq _ 0 = return ()
-        clearWithRegSeq texNum _ = io $
-          with (fromIntegral texNum) $ \ptr ->
-            do GL.glDeleteTextures 1 ptr
-               MV.write textures idx (newImageT idx)
+        clearWithRegSeq texNum _ =
+          do request (deleteTexture texNum)
+             writeRef (Ref idx) (newImageT idx)
+        deleteTexture texNum = io (with (fromIntegral texNum) (GL.glDeleteTextures 1))
 
 getPalette :: Quake ()
 getPalette =
-  do (_, result, _) <- loadPCX "pics/colormap.pcx" True False
-     proceedConstructPalette result
+  do imageData <- loadPCX "pics/colormap.pcx" True False
+     proceedConstructPalette imageData
   where proceedConstructPalette Nothing = paletteError
-        proceedConstructPalette (Just palette)
+        proceedConstructPalette (Just (_, palette, _))
           | B.length palette /= 768 = paletteError
           | otherwise = buildPalette palette
         paletteError = Com.fatalError "Couldn't load pics/colormap.pcx"
@@ -145,16 +143,16 @@ constructPalette bs i = (255 `shiftL` 24) .|. (b `shiftL` 16) .|. (g `shiftL` 8)
         g = fromIntegral (B.index bs (j + 1)) :: Int
         b = fromIntegral (B.index bs (j + 2)) :: Int
 
-loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe B.ByteString, Maybe B.ByteString, Maybe (Int, Int))
+loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe (B.ByteString, B.ByteString, (Int, Int)))
 loadPCX fileName returnPalette returnDimensions =
   FS.fOpenFileWithLength fileName >>= loadPcxT >>= parseRawPCX
   where parseRawPCX Nothing = badPCXFile
         parseRawPCX (Just pcx)
           | not (validPCX pcx) = badPCXFile
-          | otherwise = return (decodePCX returnPalette returnDimensions pcx)
+          | otherwise = return (Just (decodePCX returnPalette returnDimensions pcx))
         badPCXFile =
           do VID.printf Constants.printDeveloper (B.concat ["Bad pcx file ", fileName, "\n"])
-             return (Nothing, Nothing, Nothing)
+             return Nothing
 
 validPCX :: PcxT -> Bool
 validPCX pcx
@@ -174,14 +172,14 @@ loadPcxT (Just (fileHandle, len)) =
      either (const (return Nothing)) (return . Just) res
   where parsePcxT = runStateT (PB.decodeGet (getPcxT len)) (PBS.fromHandle fileHandle)
 
-decodePCX :: Bool -> Bool -> PcxT -> (Maybe B.ByteString, Maybe B.ByteString, Maybe (Int, Int))
-decodePCX returnPalette returnDimensions pcx = (Just pix, palette, dimensions)
+decodePCX :: Bool -> Bool -> PcxT -> (B.ByteString, B.ByteString, (Int, Int))
+decodePCX returnPalette returnDimensions pcx = (pix, palette, dimensions)
   where width = fromIntegral ((pcx^.pcxXMax) - (pcx^.pcxXMin) + 1)
         height = fromIntegral ((pcx^.pcxYMax) - (pcx^.pcxYMin) + 1)
-        palette | returnPalette = Just (B.drop (B.length (pcx^.pcxData) - 768) (pcx^.pcxData))
-                | otherwise = Nothing
-        dimensions | returnDimensions = Just (width, height)
-                   | otherwise = Nothing
+        palette | returnPalette = B.drop (B.length (pcx^.pcxData) - 768) (pcx^.pcxData)
+                | otherwise = ""
+        dimensions | returnDimensions = (width, height)
+                   | otherwise = (0, 0)
         pix = doDecodePCX (pcx^.pcxData) 0 0 0 width height mempty
 
 doDecodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
@@ -353,7 +351,7 @@ bindImage glState texNum
 glLoadPic :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> Quake (Ref ImageT)
 glLoadPic name pic width height picType bits =
   do numGLTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
-     idx <- request (findFreeImage numGLTextures)
+     idx <- findFreeImage 0 numGLTextures
      updateNumGLTextures numGLTextures idx
      checkNameError
      setImageInfo idx =<< use (fastRenderAPIGlobals.frRegistrationSequence)
@@ -390,17 +388,14 @@ glLoadPic name pic width height picType bits =
                                           & iTL .~ 0
                                           & iTH .~ 1)
 
-findFreeImage :: Int -> QuakeIO Int
-findFreeImage numGLTextures =
-  do images <- use frGLTextures
-     findFree images 0
-  where findFree images idx
-          | idx >= numGLTextures = return idx
-          | otherwise =
-              do img <- io (MV.read images idx)
-                 case img^.iTexNum of
-                   0 -> return idx
-                   _ -> findFree images (idx + 1)
+findFreeImage :: Int -> Int -> Quake Int
+findFreeImage idx numGLTextures
+  | idx >= numGLTextures = return idx
+  | otherwise =
+      do img <- readRef (Ref idx)
+         case img^.iTexNum of
+           0 -> return idx
+           _ -> findFreeImage (idx + 1) numGLTextures
 
 updateNumGLTextures :: Int -> Int -> Quake ()
 updateNumGLTextures numGLTextures idx
@@ -651,3 +646,65 @@ applyFilters mipmap =
 
 glBuildPalettedTexture :: B.ByteString -> Int -> Int -> Quake B.ByteString
 glBuildPalettedTexture = error "Image.glBuildPalettedTexture" -- TODO
+
+glFindImage :: B.ByteString -> Int -> Quake (Maybe (Ref ImageT))
+glFindImage imageName imageType
+  | B.length imageName < 1 = return Nothing
+  | otherwise = do
+      numGLTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
+      imageRef <- findImage imageName 0 numGLTextures
+      maybe (loadFromDisk imageName imageType) updateAndReturn imageRef
+
+loadFromDisk :: B.ByteString -> Int -> Quake (Maybe (Ref ImageT))
+loadFromDisk imageName imageType
+  | ".pcx" `BC.isSuffixOf` imageName =
+      do imageData <- loadPCX imageName False True
+         maybe (return Nothing) loadPCXImage imageData
+  | ".wal" `BC.isSuffixOf` imageName = fmap Just (glLoadWal imageName)
+  | ".tga" `BC.isSuffixOf` imageName =
+      do imageData <- loadTGA imageName
+         maybe (return Nothing) loadTGAImage imageData
+  | otherwise =
+      do imageData <- loadPCX (B.concat ["pics/", imageName, ".pcx"]) False True
+         maybe (return Nothing) loadPCXImage imageData
+  where loadPCXImage (pic, _, (width, height)) =
+          fmap Just (glLoadPic imageName pic width height imageType 8)
+        loadTGAImage (pic, (width, height)) =
+          fmap Just (glLoadPic imageName pic width height imageType 32)
+
+updateAndReturn :: Ref ImageT -> Quake (Maybe (Ref ImageT))
+updateAndReturn imageRef =
+  do rs <- use (fastRenderAPIGlobals.frRegistrationSequence)
+     modifyRef imageRef (\v -> v & iRegistrationSequence .~ rs)
+     return (Just imageRef)
+
+findImage :: B.ByteString -> Int -> Int -> Quake (Maybe (Ref ImageT))
+findImage imageName idx maxIdx
+  | idx >= maxIdx = return Nothing
+  | otherwise =
+      do image <- readRef imageRef
+         checkAndProceed (image^.iName)
+  where imageRef = Ref idx
+        checkAndProceed name
+          | imageName == name = return (Just imageRef)
+          | otherwise = findImage imageName (idx + 1) maxIdx
+
+glLoadWal :: B.ByteString -> Quake (Ref ImageT)
+glLoadWal name = FS.fOpenFile name >>= loadMiptexT >>= uploadMiptexT name
+
+loadMiptexT :: Maybe Handle -> Quake (Maybe MiptexT)
+loadMiptexT Nothing = return Nothing
+loadMiptexT (Just fileHandle) =
+  do (res, _) <- request parseMiptexT
+     either (const (return Nothing)) (return . Just) res
+  where parseMiptexT = runStateT (PB.decodeGet getMiptexT) (PBS.fromHandle fileHandle)
+
+uploadMiptexT :: B.ByteString -> Maybe MiptexT -> Quake (Ref ImageT)
+uploadMiptexT name Nothing =
+  do VID.printf Constants.printAll (B.concat ["GL_FindImage: can't load ", name, "\n"])
+     use (fastRenderAPIGlobals.frNoTexture)
+uploadMiptexT name (Just miptex) =
+  glLoadPic name (miptex^.mtBuf) (miptex^.mtWidth) (miptex^.mtHeight) Constants.itWall 8
+
+loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
+loadTGA = error "Image.loadTGA" -- TODO
