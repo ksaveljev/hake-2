@@ -168,7 +168,8 @@ validPCX pcx
 loadPcxT :: Maybe (Handle, Int) -> Quake (Maybe PcxT)
 loadPcxT Nothing = return Nothing
 loadPcxT (Just (fileHandle, len)) =
-  do (res, _) <- request parsePcxT
+  do request (io (print ("LEN = " ++ show len))) -- TODO REMOVE
+     (res, _) <- request parsePcxT
      either (const (return Nothing)) (return . Just) res
   where parsePcxT = runStateT (PB.decodeGet (getPcxT len)) (PBS.fromHandle fileHandle)
 
@@ -468,7 +469,54 @@ floodFillStep skin fifo inpt pos x y fillColor fdc off dx dy =
           | otherwise = return (inpt, fdc)
 
 glUpload8 :: B.ByteString -> Int -> Int -> Bool -> Bool -> Quake Bool
-glUpload8 = error "Image.glUpload8" -- TODO
+glUpload8 image width height mipmap isSky =
+  do checkDimensions
+     colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
+     palettedTexture <- glExtPalettedTextureCVar
+     proceedUpload colorTable palettedTexture
+  where checkDimensions
+          | width * height > sz =
+              Com.comError Constants.errDrop "GL_Upload8: too large"
+          | otherwise = return ()
+        sz = 512 * 256
+        proceedUpload colorTable palettedTexture
+          | colorTable && (palettedTexture^.cvValue) /= 0 && isSky =
+              do request (io (BU.unsafeUseAsCString image upload))
+                 filterMax <- use (fastRenderAPIGlobals.frGLFilterMax)
+                 request (glApplyFilters filterMax)
+                 return False
+          | otherwise =
+              do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
+                 glUpload32 (constructTrans image width d8to24table 0 sz mempty) width height mipmap
+        upload =
+          GL.glTexImage2D GL.GL_TEXTURE_2D
+                          0
+                          (fromIntegral GL.GL_COLOR_INDEX8_EXT)
+                          (fromIntegral width)
+                          (fromIntegral height)
+                          0
+                          GL.GL_COLOR_INDEX
+                          GL.GL_UNSIGNED_BYTE
+        glApplyFilters filterMax =
+          do GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral filterMax)
+             GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral filterMax)
+
+constructTrans :: B.ByteString -> Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
+constructTrans image width d8to24table idx maxIdx acc
+  | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
+  | otherwise = constructTrans image width d8to24table (idx + 1) maxIdx (acc `mappend` BB.int32LE (fromIntegral t'))
+  where p = image `B.index` idx
+        t = d8to24table UV.! fromIntegral p
+        p' | p == 0xFF = scanAround
+           | otherwise = p
+        t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
+           | otherwise = t
+        scanAround
+          | idx > width && (image `B.index` (idx - width)) /= 0xFF = image `B.index` (idx - width)
+          | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF = image `B.index` (idx + width)
+          | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF = image `B.index` (idx - 1)
+          | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF = image `B.index` (idx + 1)
+          | otherwise = 0
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap =
