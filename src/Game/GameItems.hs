@@ -6,6 +6,7 @@ module Game.GameItems
   , dropGeneral
   , dropPowerArmor
   , findItem
+  , initItems
   , jacketArmorInfo
   , pickupAdrenaline
   , pickupAmmo
@@ -35,6 +36,8 @@ import           Game.ClientPersistantT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
+import {-# SOURCE #-} qualified Game.GameItemsList as GameItemsList
+import           Game.GameLocalsT
 import qualified Game.GameUtil as GameUtil
 import           Game.GClientT
 import           Game.GItemArmorT
@@ -920,3 +923,7 @@ spItemHealthMega = error "GameItems.spItemHealthMega" -- TODO
 
 spItemHealthSmall :: Ref EdictT -> Quake ()
 spItemHealthSmall = error "GameItems.spItemHealthSmall" -- TODO
+
+initItems :: Quake ()
+initItems =
+  gameBaseGlobals.gbGame.glNumItems .= V.length GameItemsList.itemList -- TODO; jake2 has -1 here...

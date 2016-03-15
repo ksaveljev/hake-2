@@ -7,13 +7,24 @@ module Server.SVSend
   , startSound
   ) where
 
+import qualified Constants
+import qualified QCommon.MSG as MSG
+import           QuakeState
+import           Server.ServerT
 import           Types
 
+import           Control.Lens (use)
 import qualified Data.ByteString as B
-import           Linear (V3)
+import           Linear (V3(..))
 
 broadcastCommand :: B.ByteString -> Quake ()
-broadcastCommand = error "SVSend.broadcastCommand" -- TODO
+broadcastCommand cmd = broadcast =<< use (svGlobals.svServer.sState)
+  where broadcast state
+          | state == 0 = return ()
+          | otherwise =
+              do MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcStuffText)
+                 MSG.writeString (svGlobals.svServer.sMulticast) cmd
+                 multicast (V3 0 0 0) Constants.multicastAllR -- TODO: we send V3 0 0 0 but there is NULL in jake2
 
 broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = error "SVSend.broadcastPrintf" -- TODO
