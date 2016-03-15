@@ -3,9 +3,10 @@ module Sound.SfxCacheT
   ( module Sound.SfxCacheT
   ) where
 
-import Types
+import           Types
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 
 makeLenses ''SfxCacheT
 
@@ -16,5 +17,5 @@ newSfxCacheT =
             , _scSpeed     = 0
             , _scWidth     = 0
             , _scStereo    = 0
-            , _scData      = ""
+            , _scData      = B.empty
             }

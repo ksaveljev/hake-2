@@ -3,17 +3,18 @@ module Client.MenuCommonS
   ( module Client.MenuCommonS
   ) where
 
-import Types
+import           Types
 
-import Control.Lens (makeLenses)
-import Linear (V4(..))
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
+import           Linear (V4(..))
 
 makeLenses ''MenuCommonS
 
 newMenuCommonS :: MenuCommonS
 newMenuCommonS =
   MenuCommonS { _mcType          = 0
-              , _mcName          = Just ""
+              , _mcName          = Just B.empty
               , _mcX             = 0
               , _mcY             = 0
               , _mcParent        = Nothing

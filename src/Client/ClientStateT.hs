@@ -11,6 +11,7 @@ import           Game.UserCmdT (newUserCmdT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..))
@@ -46,18 +47,18 @@ newClientStateT =
                , _csVForward               = V3 0 0 0
                , _csVRight                 = V3 0 0 0
                , _csVUp                    = V3 0 0 0
-               , _csLayout                 = ""
+               , _csLayout                 = B.empty
                , _csInventory              = UV.replicate Constants.maxItems 0
                , _csCinematicFile          = Nothing
                , _csCinematicTime          = 0
                , _csCinematicFrame         = 0
-               , _csCinematicPalette       = "" -- size 768
+               , _csCinematicPalette       = B.empty -- size 768
                , _csCinematicPaletteActive = False
                , _csAttractLoop            = False
                , _csServerCount            = 0
-               , _csGameDir                = ""
+               , _csGameDir                = B.empty
                , _csPlayerNum              = 0
-               , _csConfigStrings          = V.replicate Constants.maxConfigStrings ""
+               , _csConfigStrings          = V.replicate Constants.maxConfigStrings B.empty
                , _csModelDraw              = V.replicate Constants.maxModels Nothing
                , _csModelClip              = V.replicate Constants.maxModels Nothing
                , _csSoundPrecache          = V.replicate Constants.maxSounds Nothing

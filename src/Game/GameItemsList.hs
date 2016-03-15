@@ -8,15 +8,16 @@ import qualified Game.PlayerWeapon as PlayerWeapon
 import           Types
 
 import           Data.Bits ((.|.))
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 itemList :: V.Vector GItemT
 itemList = V.fromList
   [
     -- leave index 0 alone
-    GItemT "" Nothing Nothing Nothing Nothing
+    GItemT B.empty Nothing Nothing Nothing Nothing
            Nothing Nothing 0 Nothing Nothing Nothing
-           0 0 Nothing 0 0 Nothing 0 "" 0
+           0 0 Nothing 0 0 Nothing 0 B.empty 0
   
   --
   -- ARMOR
@@ -36,7 +37,7 @@ itemList = V.fromList
            3 0 Nothing Constants.itArmor 0 (Just GameItems.bodyArmorInfo)
            Constants.armorBody
            -- precache
-           ""
+           B.empty
            -- index
            1
   
@@ -54,7 +55,7 @@ itemList = V.fromList
            3 0 Nothing Constants.itArmor 0 (Just GameItems.combatArmorInfo)
            Constants.armorCombat
            -- precache
-           ""
+           B.empty
            -- index
            2
   
@@ -72,7 +73,7 @@ itemList = V.fromList
            3 0 Nothing Constants.itArmor 0 (Just GameItems.jacketArmorInfo)
            Constants.armorJacket
            -- precache
-           ""
+           B.empty
            -- index
            3
   
@@ -89,7 +90,7 @@ itemList = V.fromList
            -- width
            3 0 Nothing Constants.itArmor 0 Nothing Constants.armorShard
            -- precache
-           ""
+           B.empty
            -- index
            4
   
@@ -107,7 +108,7 @@ itemList = V.fromList
            -- width
            0 60 Nothing Constants.itArmor 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            5
   
@@ -422,7 +423,7 @@ itemList = V.fromList
            -- width
            3 10 Nothing Constants.itAmmo 0 Nothing Constants.ammoShells
            -- precache
-           ""
+           B.empty
            -- index
            18
   
@@ -440,7 +441,7 @@ itemList = V.fromList
            3 50 Nothing Constants.itAmmo 0 Nothing
            Constants.ammoBullets
            -- precache
-           ""
+           B.empty
            -- index
            19
   
@@ -457,7 +458,7 @@ itemList = V.fromList
            -- width
            3 50 Nothing Constants.itAmmo 0 Nothing Constants.ammoCells
            -- precache
-           ""
+           B.empty
            -- index
            20
   
@@ -474,7 +475,7 @@ itemList = V.fromList
            -- width
            3 5 Nothing Constants.itAmmo 0 Nothing Constants.ammoRockets
            -- precache
-           ""
+           B.empty
            -- index
            21
   
@@ -491,7 +492,7 @@ itemList = V.fromList
            -- width
            3 10 Nothing Constants.itAmmo 0 Nothing Constants.ammoSlugs
            -- precache
-           ""
+           B.empty
            -- index
            22
   
@@ -547,7 +548,7 @@ itemList = V.fromList
            -- width
            2 60 Nothing Constants.itPowerup 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            25
   
@@ -601,7 +602,7 @@ itemList = V.fromList
            -- width
            2 60 Nothing 0 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            28
   
@@ -619,7 +620,7 @@ itemList = V.fromList
            -- width
            2 60 Nothing 0 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            29
   
@@ -636,7 +637,7 @@ itemList = V.fromList
            -- width
            2 60 Nothing 0 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            30
   
@@ -653,7 +654,7 @@ itemList = V.fromList
            -- width
            2 180 Nothing 0 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            31
   
@@ -671,7 +672,7 @@ itemList = V.fromList
            Nothing (Just "k_datacd") (Just "Data CD") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            32
   
@@ -685,7 +686,7 @@ itemList = V.fromList
            Nothing (Just "k_powercube") (Just "Power Cube") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            33
   
@@ -699,7 +700,7 @@ itemList = V.fromList
            Nothing (Just "k_pyramid") (Just "Pyramid Key") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            34
   
@@ -713,7 +714,7 @@ itemList = V.fromList
            Nothing (Just "k_dataspin") (Just "Data Spinner") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            35
   
@@ -726,7 +727,7 @@ itemList = V.fromList
            Constants.efRotate Nothing (Just "k_security") (Just "Security Pass") 2
            0 Nothing (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            36
   
@@ -740,7 +741,7 @@ itemList = V.fromList
            (Just "k_bluekey") (Just "Blue Key") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            37
   
@@ -754,7 +755,7 @@ itemList = V.fromList
            Nothing (Just "k_redkey") (Just "Red Key") 2 0 Nothing
            (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            38
   
@@ -773,7 +774,7 @@ itemList = V.fromList
            -- width
            2 0 Nothing (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            39
   
@@ -792,11 +793,11 @@ itemList = V.fromList
            -- width
            2 0 Nothing (Constants.itStayCoop .|. Constants.itKey) 0 Nothing 0
            -- precache
-           ""
+           B.empty
            -- index
            40
   
-  , GItemT "" (Just GameItems.pickupHealth) Nothing Nothing Nothing
+  , GItemT B.empty (Just GameItems.pickupHealth) Nothing Nothing Nothing
            (Just "items/pkup.wav") Nothing 0 Nothing
            -- icon
            (Just "i_health")

@@ -9,6 +9,7 @@ import           Server.ChallengeT (newChallengeT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 makeLenses ''ServerStaticT
@@ -17,7 +18,7 @@ newServerStaticT :: ServerStaticT
 newServerStaticT =
   ServerStaticT { _ssInitialized        = False
                 , _ssRealTime           = 0
-                , _ssMapCmd             = ""
+                , _ssMapCmd             = B.empty
                 , _ssSpawnCount         = 0
                 , _ssClients            = V.empty
                 , _ssNumClientEntities  = 0
@@ -27,5 +28,5 @@ newServerStaticT =
                 , _ssChallenges         = V.replicate Constants.maxChallenges newChallengeT
                 , _ssDemoFile           = Nothing
                 , _ssDemoMulticast      = newSizeBufT
-                , _ssDemoMulticastBuf   = ""
+                , _ssDemoMulticastBuf   = B.empty
                 }

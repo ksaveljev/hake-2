@@ -11,6 +11,7 @@ import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
@@ -30,7 +31,7 @@ initialGlobals =
           , _gServerState      = 0
           , _gNetMessage       = newSizeBufT
           , _gCmdText          = newSizeBufT
-          , _gDeferTextBuf     = ""
+          , _gDeferTextBuf     = B.empty
           , _gCmdAlias         = Seq.empty
           , _gTimeBeforeGame   = 0
           , _gTimeAfterGame    = 0
@@ -43,7 +44,7 @@ initialGlobals =
           , _gVidDef           = newVidDefT
           , _gRenderer         = Just dummyRenderer
           , _gKeyBindings      = V.replicate 256 Nothing
-          , _gKeyLines         = V.replicate 32 ""
+          , _gKeyLines         = V.replicate 32 B.empty
           , _gKeyLinePos       = 0
           , _gGunFrame         = 0
           , _gGunModel         = Nothing

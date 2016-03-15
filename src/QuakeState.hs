@@ -9,6 +9,7 @@ import Client.ClientGlobals as X
 import Client.KeyGlobals as X
 import Client.MenuGlobals as X
 import Client.ParticleTGlobals as X
+import Client.SCRGlobals as X
 import Client.VIDGlobals as X
 import Game.CmdGlobals as X
 import Game.GameBaseGlobals as X
@@ -53,4 +54,5 @@ initialQuakeState =
              , _menuGlobals          = initialMenuGlobals
              , _pMoveGlobals         = initialPMoveGlobals
              , _kbdGlobals           = initialKBDGlobals
+             , _scrGlobals           = initialSCRGlobals
              }

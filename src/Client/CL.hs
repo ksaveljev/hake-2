@@ -1,5 +1,6 @@
 module Client.CL
-  ( frame
+  ( dropClient
+  , frame
   , initialize
   , quitF
   , writeConfiguration
@@ -29,17 +30,17 @@ import qualified Sys.IN as IN
 import qualified Sys.Timer as Timer
 import           Types
 
-import           Control.Lens ((^.), (.=), (&), (.~))
-import           Control.Monad (unless)
+import           Control.Lens (use, (^.), (.=), (&), (.~))
+import           Control.Monad (unless, when)
 import qualified Data.ByteString as B
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
-  [ ("adr0", "", Constants.cvarArchive), ("adr1", "", Constants.cvarArchive)
-  , ("adr2", "", Constants.cvarArchive), ("adr3", "", Constants.cvarArchive)
-  , ("adr4", "", Constants.cvarArchive), ("adr5", "", Constants.cvarArchive)
-  , ("adr6", "", Constants.cvarArchive), ("adr7", "", Constants.cvarArchive)
-  , ("adr8", "", Constants.cvarArchive)
+  [ ("adr0", B.empty, Constants.cvarArchive), ("adr1", B.empty, Constants.cvarArchive)
+  , ("adr2", B.empty, Constants.cvarArchive), ("adr3", B.empty, Constants.cvarArchive)
+  , ("adr4", B.empty, Constants.cvarArchive), ("adr5", B.empty, Constants.cvarArchive)
+  , ("adr6", B.empty, Constants.cvarArchive), ("adr7", B.empty, Constants.cvarArchive)
+  , ("adr8", B.empty, Constants.cvarArchive)
   , ("cl_stereo_separation", "0.4", Constants.cvarArchive)
   , ("cl_stereo", "0", 0), ("cl_blend", "1", 0), ("cl_lights", "1", 0)
   , ("cl_particles", "1", 0), ("cl_entities", "1", 0), ("cl_gun", "1", 0)
@@ -55,8 +56,8 @@ initialCVars =
   , ("m_yaw", "0.022", 0) , ("m_forward", "1", 0) , ("m_side", "1", 0)
   , ("cl_shownet", "0", 0) , ("cl_showmiss", "0", 0) , ("showclamp", "0", 0)
   , ("cl_timeout", "120", 0) , ("paused", "0", 0) , ("timedemo", "0", 0)
-  , ("rcon_password", "", 0) , ("rcon_address", "", 0) , ("r_lightlevel", "0", 0)
-  , ("password", "", Constants.cvarUserInfo)
+  , ("rcon_password", B.empty, 0) , ("rcon_address", B.empty, 0) , ("r_lightlevel", "0", 0)
+  , ("password", B.empty, Constants.cvarUserInfo)
   , ("spectator", "0", Constants.cvarUserInfo)
   , ("name", "unnamed", Constants.cvarUserInfo .|. Constants.cvarArchive)
   , ("skin", "male/grunt", Constants.cvarUserInfo .|. Constants.cvarArchive)
@@ -95,7 +96,7 @@ initialize =
           S.initialize
           VID.initialize
           V.initialize
-          SZ.initialize (globals.gNetMessage) "" Constants.maxMsgLen
+          SZ.initialize (globals.gNetMessage) B.empty Constants.maxMsgLen
           Menu.initialize
           SCR.initialize
           initializeLocal
@@ -165,3 +166,14 @@ precacheF = error "CL.precacheF" -- TODO
 
 frame :: Int -> Quake ()
 frame = error "CL.frame" -- TODO
+
+dropClient :: Quake ()
+dropClient =
+  do clientStatic <- use (globals.gCls)
+     when ((clientStatic^.csState) `notElem` [Constants.caUninitialized, Constants.caDisconnected])
+       disconnect
+     when ((clientStatic^.csDisableServerCount) /= -1)
+       SCR.endLoadingPlaque
+
+disconnect :: Quake ()
+disconnect = error "CL.disconnect" -- TODO

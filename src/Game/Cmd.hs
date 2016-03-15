@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Game.Cmd
   ( addCommand
   , addInitialCommands
@@ -165,7 +166,7 @@ args = use (cmdGlobals.cgCmdArgs)
 argv :: Int -> Quake B.ByteString
 argv idx =
   do cmdArgv <- use (cmdGlobals.cgCmdArgv)
-     return (fromMaybe "" (cmdArgv V.!? idx))
+     return (fromMaybe B.empty (cmdArgv V.!? idx))
 
 executeString :: B.ByteString -> Quake ()
 executeString text =
@@ -222,7 +223,7 @@ tokenizeString text macroExpand =
      expandText >>= maybe (return ()) (`tokenize` 0)
   where clearArgs =
           do cmdGlobals.cgCmdArgc .= 0
-             cmdGlobals.cgCmdArgs .= ""
+             cmdGlobals.cgCmdArgs .= B.empty
         expandText
           | macroExpand = macroExpandString text (B.length text)
           | otherwise = return (Just text)
@@ -235,8 +236,8 @@ tokenize text idx
          when (cmdArgc == 1) setArgsAfterFirst
          (var, updatedIdx) <- Com.parse text textLen newIdx
          maybe (return ()) (processVar text cmdArgc updatedIdx) var
-  where newIdx = skipWhitesToEOL text idx
-        textLen = B.length text
+  where !newIdx = skipWhitesToEOL text idx
+        !textLen = B.length text
         skipWhitesToEOL str startIdx =
           startIdx + B.length (BC.takeWhile isWhite (B.drop startIdx str))
         isWhite c = c <= ' ' && c /= '\n' && c /= chr 0

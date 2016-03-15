@@ -16,6 +16,7 @@ import           QCommon.QFiles.BSP.DVisT (emptyDVisT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..))
@@ -25,7 +26,7 @@ makeLenses ''CMGlobals
 initialCMGlobals :: CMGlobals
 initialCMGlobals =
   CMGlobals { _cmCheckCount      = 0
-            , _cmMapName         = ""
+            , _cmMapName         = B.empty
             , _cmNumBrushSides   = 0
             , _cmMapBrushSides   = V.replicate Constants.maxMapBrushSides newCBrushSideT
             , _cmNumTexInfo      = 0
@@ -43,10 +44,10 @@ initialCMGlobals =
             , _cmMapCModels      = V.replicate Constants.maxMapModels newCModelT
             , _cmNumBrushes      = 0
             , _cmNumVisibility   = 0
-            , _cmMapVisibility   = "" -- size is Constants.maxMapVisibility
+            , _cmMapVisibility   = B.empty -- size is Constants.maxMapVisibility
             , _cmMapVis          = emptyDVisT
             , _cmNumEntityChars  = 0
-            , _cmMapEntityString = ""
+            , _cmMapEntityString = B.empty
             , _cmNumAreas        = 1
             , _cmMapAreas        = V.replicate Constants.maxMapAreas newCAreaT
             , _cmNumAreaPortals  = 0

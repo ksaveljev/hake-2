@@ -46,11 +46,11 @@ initialize :: Quake ()
 initialize =
   do SVConsoleCommands.initOperatorCommands
      CVar.initializeCVars initialCVars
-     SZ.initialize (globals.gNetMessage) "" Constants.maxMsgLen
+     SZ.initialize (globals.gNetMessage) B.empty Constants.maxMsgLen
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
-  [ ("rcon_password", "", 0)
+  [ ("rcon_password", B.empty, 0)
   , ("skill", "1", 0)
   , ("deathmatch", "0", Constants.cvarLatch)
   , ("coop", "0", Constants.cvarLatch)

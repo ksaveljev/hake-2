@@ -3,6 +3,7 @@ module Server.SVGame
   , configString
   , cprintf
   , dprintf
+  , initGameProgs
   , inPHS
   , pfError2
   , setModel
@@ -15,6 +16,9 @@ module Server.SVGame
   , writeString
   ) where
 
+import qualified Game.GameBase as GameBase
+import {-# SOURCE #-} Game.GameImportT
+import qualified Game.GameSave as GameSave
 import qualified QCommon.Com as Com
 import           Types
 
@@ -62,3 +66,12 @@ writePos = error "SVGame.writePos" -- TODO
 
 writeDir :: V3 Float -> Quake ()
 writeDir = error "SVGame.writeDir" -- TODO
+
+initGameProgs :: Quake ()
+initGameProgs =
+  do shutdownGameProgs
+     GameBase.getGameApi newGameImportT
+     GameSave.initGame
+
+shutdownGameProgs :: Quake ()
+shutdownGameProgs = GameBase.shutdownGame

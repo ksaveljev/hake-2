@@ -27,11 +27,11 @@ initializeArgv args =
   do when (len > Constants.maxNumArgvs) $
        fatalError "argc > MAX_NUM_ARGVS"
      comGlobals.cgComArgc .= len
-     comGlobals.cgComArgv .= V.fromList (fmap (BC.pack . stripLongArg) args)
+     comGlobals.cgComArgv .= V.fromList (fmap stripLongArg args)
   where len = length args 
         stripLongArg s
-          | length s > Constants.maxTokenChars = ""
-          | otherwise = s 
+          | length s > Constants.maxTokenChars = B.empty
+          | otherwise = BC.pack s 
 
 printf :: B.ByteString -> Quake ()
 printf str =
@@ -50,11 +50,11 @@ fatalError = comError Constants.errFatal
 argv :: Int -> Quake B.ByteString
 argv idx = do
   comArgv <- use (comGlobals.cgComArgv)
-  return (fromMaybe "" (comArgv V.!? idx))
+  return (fromMaybe B.empty (comArgv V.!? idx))
 
 clearArgv :: Int -> Quake ()
 clearArgv idx =
-  comGlobals.cgComArgv %= (\v -> if idx < 0 || idx >= V.length v then v else v V.// [(idx, "")])
+  comGlobals.cgComArgv %= (\v -> if idx < 0 || idx >= V.length v then v else v V.// [(idx, B.empty)])
 
 parse :: B.ByteString -> Int -> Int -> Quake (Maybe B.ByteString, Int)
 parse text len idx
@@ -87,7 +87,7 @@ parseRegularWord text skipWhitesIdx
         lengthExceeded = B.length str >= Constants.maxTokenChars
         lengthExceededError =
           do printf (B.concat["Token exceeded ", encode Constants.maxTokenChars, " chars, discarded.\n"])
-             return (Just "", newIdx)
+             return (Just B.empty, newIdx)
 
 skipWhites :: B.ByteString -> Int -> Int
 skipWhites str startIdx =

@@ -10,6 +10,7 @@ import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import           Linear (V3(..))
 
@@ -49,7 +50,7 @@ initialClientGlobals =
                 , _cgPrecacheModelSkin  = 0
                 , _cgPrecacheModel      = Nothing
                 , _cgNumCLWeaponModels  = 0
-                , _cgWeaponModels       = V.replicate Constants.maxClientWeaponModels ""
+                , _cgWeaponModels       = V.replicate Constants.maxClientWeaponModels B.empty
                 , _cgPMPassEnt          = Nothing
                 , _cgIsDown             = False
                 , _cgAVelocities        = V.replicate Constants.numVertexNormals (V3 0 0 0)

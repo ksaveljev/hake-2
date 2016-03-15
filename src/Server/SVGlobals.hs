@@ -13,6 +13,7 @@ import           Server.ServerT (newServerT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..))
@@ -26,8 +27,8 @@ initialSVGlobals =
             , _svServer       = newServerT
             , _svServerStatic = newServerStaticT
             , _svPlayer       = Nothing
-            , _svFirstMap     = ""
-            , _svMsgBuf       = ""
+            , _svFirstMap     = B.empty
+            , _svMsgBuf       = B.empty
             , _svNumAreaNodes = 0
             , _svAreaNodes    = V.generate Constants.areaNodes newAreaNodeT
             , _svAreaMins     = V3 0 0 0

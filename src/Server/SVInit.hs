@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Server.SVInit
   ( imageIndex
   , modelIndex
@@ -5,11 +6,14 @@ module Server.SVInit
   , svMap
   ) where
 
+import qualified Client.CL as CL
 import qualified Client.SCR as SCR
 import qualified Constants
 import           Game.CVarT
+import           Game.EntityStateT
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSpawn as GameSpawn
+import           Game.UserCmdT
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
@@ -20,8 +24,11 @@ import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
+import qualified Server.SVGame as SVGame
+import qualified Server.SVMainShared as SVMain
 import qualified Server.SVSend as SVSend
 import qualified Server.SVWorld as SVWorld
+import qualified Sys.NET as NET
 import           Types
 import           Util.Binary (encode)
 import qualified Util.Lib as Lib
@@ -54,7 +61,7 @@ extractLevelAndNextServer :: B.ByteString -> Quake B.ByteString
 extractLevelAndNextServer levelString = maybe noNextServer setNextServer splitIdx
   where splitIdx = '+' `BC.elemIndex` levelString
         noNextServer =
-          do void (CVar.set "nextserver" "")
+          do void (CVar.set "nextserver" B.empty)
              return levelString
         setNextServer idx =
           do void (CVar.set "nextserver" (B.concat ["gamemap \"", B.drop (idx + 1) levelString, "\""]))
@@ -83,7 +90,7 @@ spawnLevelAndReconnect level attractLoop loadGame =
      spawnServerBasedOnType finalLevel spawnPoint attractLoop loadGame
      SVSend.broadcastCommand "reconnect\n"
   where (spawnPoint, updatedLevel) = checkSpawnPoint ('$' `BC.elemIndex` level)
-        checkSpawnPoint Nothing = ("", level)
+        checkSpawnPoint Nothing = (B.empty, level)
         checkSpawnPoint (Just idx) = (B.drop (idx + 1) level, B.take idx level)
         finalLevel | BC.head updatedLevel == '*' = B.drop 1 updatedLevel -- TODO: what if empty updatedLevel?
                    | otherwise = updatedLevel
@@ -115,7 +122,84 @@ imageIndex :: Maybe B.ByteString -> Quake Int
 imageIndex name = findIndex name Constants.csImages Constants.maxImages True
 
 initGame :: Quake ()
-initGame = error "SVInit.initGame" -- TODO
+initGame =
+  do restartServer =<< use (svGlobals.svServerStatic.ssInitialized)
+     CVar.getLatchedVars
+     svGlobals.svServerStatic.ssInitialized .= True
+     checkCoopDeathmatch
+     checkCoopDedicated
+     initClients
+     setServerStaticSettings
+     NET.config . (> 1) =<< fmap (^.cvValue) maxClientsCVar
+     initHeartbeat
+     SVGame.initGameProgs
+     resetClients
+
+restartServer :: Bool -> Quake ()
+restartServer True = SVMain.shutdown "Server restarted\n" True
+restartServer False =
+  do CL.dropClient
+     SCR.beginLoadingPlaque
+
+checkCoopDeathmatch :: Quake ()
+checkCoopDeathmatch =
+  do coop <- CVar.variableValue "coop"
+     deathmatch <- CVar.variableValue "deathmatch"
+     when (coop /= 0 && deathmatch /= 0) $
+       do Com.printf "Deathmatch and Coop both set, disabling Coop\n"
+          void (CVar.fullSet "coop" "0" (Constants.cvarServerInfo .|. Constants.cvarLatch))
+
+checkCoopDedicated :: Quake ()
+checkCoopDedicated =
+  do coop <- CVar.variableValue "coop"
+     dedicated <- dedicatedCVar
+     when ((dedicated^.cvValue) /= 0 && coop == 0) $
+       void (CVar.fullSet "deathmatch" "1" (Constants.cvarServerInfo .|. Constants.cvarLatch))
+
+initClients :: Quake ()
+initClients =
+  do coop <- CVar.variableValue "coop"
+     deathmatch <- CVar.variableValue "deathmatch"
+     maxClients <- fmap (truncate .(^.cvValue)) maxClientsCVar
+     doInitClients coop deathmatch maxClients
+
+doInitClients :: Float -> Float -> Int -> Quake ()
+doInitClients coop deathmatch maxClients
+  | deathmatch /= 0 = setDeathmatchMaxClients
+  | coop /= 0 = setCoopMaxClients
+  | otherwise = void (CVar.fullSet "maxclients" "1" serverLatchFlags)
+  where setDeathmatchMaxClients
+          | maxClients <= 1 = void $ CVar.fullSet "maxclients" "8" serverLatchFlags
+          | maxClients > Constants.maxClients = void (CVar.fullSet "maxclients" (encode Constants.maxClients) serverLatchFlags)
+          | otherwise = return ()
+        setCoopMaxClients
+          | maxClients <= 1 || maxClients > 4 = void (CVar.fullSet "maxclients" "4" serverLatchFlags)
+          | otherwise = return ()
+        serverLatchFlags = Constants.cvarServerInfo .|. Constants.cvarLatch
+
+setServerStaticSettings :: Quake ()
+setServerStaticSettings =
+  do r <- Lib.rand
+     maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+     mapMonad (zoom (svGlobals.svServerStatic)) $
+       do ssSpawnCount .= fromIntegral r
+          ssClients .= V.generate maxClients (\idx -> newClientT & cServerIndex .~ idx)
+          ssNumClientEntities .= maxClients * Constants.updateBackup * 64
+          ssClientEntities .= V.replicate (maxClients * Constants.updateBackup * 64) (newEntityStateT Nothing)
+
+initHeartbeat :: Quake ()
+initHeartbeat =
+  do svGlobals.svServerStatic.ssLastHeartbeat .= -99999
+     idMasterNetAdr <- NET.stringToAdr ("192.246.40.37:" `B.append` encode Constants.portMaster)
+     maybe netAdrError setMasterAdr idMasterNetAdr
+  where netAdrError = error "SVInit.initHeartbeat idMasterNetAdr is Nothing"
+        setMasterAdr adr = svGlobals.svMasterAdr %= (V.// [(0, adr)])
+
+resetClients :: Quake ()
+resetClients =
+  svGlobals.svServerStatic.ssClients %= V.imap resetClient
+  where resetClient idx client = client & cEdict .~ Just (Ref (idx + 1))
+                                        & cLastCmd .~ newUserCmdT
 
 spawnServer :: B.ByteString -> B.ByteString -> Int -> Bool -> Bool -> Quake ()
 spawnServer server spawnPoint srvState attractLoop loadGame =
@@ -166,7 +250,7 @@ initServerClientsAndModels server srvState =
      (modelIdx, iw) <- loadContent
      svGlobals.svServer.sModels %= (V.// [(1, Ref modelIdx)])
      svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, encode (head iw))])
-  where loadContent | srvState /= Constants.ssGame = CM.loadMap "" False [0] -- no real map
+  where loadContent | srvState /= Constants.ssGame = CM.loadMap B.empty False [0] -- no real map
                     | otherwise =
                         do svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
                            CM.loadMap mapName False [0]

@@ -68,7 +68,7 @@ startWithBaseq2 :: CVarT -> Quake ()
 startWithBaseq2 baseDir =
   do addGameDirectory (B.concat [baseDir^.cvString, "/", Constants.baseDirName])
      markBaseSearchPaths
-     gameDirVar <- CVar.get "game" "" (Constants.cvarLatch .|. Constants.cvarServerInfo)
+     gameDirVar <- CVar.get "game" B.empty (Constants.cvarLatch .|. Constants.cvarServerInfo)
      maybe (Com.fatalError "game cvar not set") updateGameDir gameDirVar
   where updateGameDir dir =
           when (B.length (dir^.cvString) > 0) $
@@ -76,7 +76,7 @@ startWithBaseq2 baseDir =
 
 setCDDir :: Quake ()
 setCDDir =
-  do cdDir <- CVar.get "cddir" "" Constants.cvarArchive
+  do cdDir <- CVar.get "cddir" B.empty Constants.cvarArchive
      maybe (Com.fatalError "cddir cvar not set") addDir cdDir
   where addDir cdDir = unless (B.null (cdDir^.cvString)) (addGameDirectory (cdDir^.cvString))
 
@@ -176,7 +176,7 @@ addPackFiles dir idx =
              maybe (return ()) updateSearchPaths pak
         updateSearchPaths :: PackT -> Quake ()
         updateSearchPaths pak = fsGlobals.fsSearchPaths %= (newSearchPath pak :)
-        newSearchPath pak = SearchPathT "" (Just pak)
+        newSearchPath pak = SearchPathT B.empty (Just pak)
 
 loadPackFile :: B.ByteString -> Quake (Maybe PackT)
 loadPackFile packFile =
@@ -203,7 +203,7 @@ loadPackFileTs packFile fileHandle (Just header) =
              return Nothing
         constructPackT files =
           do Com.printf (B.concat ["Added packfile ", packFile, " (", encode numPackFiles, " files)\n"])
-             return (Just (PackT packFile (Just fileHandle) "" numPackFiles files))
+             return (Just (PackT packFile (Just fileHandle) B.empty numPackFiles files))
 
 loadDPackHeaderT :: Handle -> Quake (Maybe DPackHeaderT)
 loadDPackHeaderT fileHandle =

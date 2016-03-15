@@ -27,7 +27,6 @@ import qualified Graphics.GL as GL
 initLocal :: Quake ()
 initLocal =
   do imageRef <- Image.glFindImage "pics/conchars.pcx" Constants.itPic
-     error "Pfff" -- TODO REMOVE
      maybe imageRefError bindImageRef imageRef
   where imageRefError = error "Draw.initLocal imageRef is Nothing"
         bindImageRef imageRef =

@@ -4,6 +4,7 @@ module QCommon.CVar
   , fullSet
   , get
   , getExisting
+  , getLatchedVars
   , initialize
   , initializeCVars
   , serverInfo
@@ -21,13 +22,14 @@ import qualified Game.Info as Info
 import           Game.CVarT
 import qualified QCommon.Com as Com
 import           QCommon.CVarShared
+import {-# SOURCE #-} qualified QCommon.Shared as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
 import           Util.Binary (encode)
 
-import           Control.Lens (use, (^.), (&), (.~))
-import           Control.Monad (void, foldM)
+import           Control.Lens (use, (^.), (.=), (&), (.~))
+import           Control.Monad (void, when, foldM)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
@@ -120,3 +122,24 @@ variableValue :: B.ByteString -> Quake Float
 variableValue name =
   do var <- findVar name
      return (maybe 0 (Lib.atof . (^.cvString)) var)
+
+getLatchedVars :: Quake ()
+getLatchedVars = updateLatchedVars =<< use (globals.gCVars)
+
+updateLatchedVars :: HM.HashMap B.ByteString CVarT -> Quake ()
+updateLatchedVars cVars =
+  do globals.gCVars .= updatedCVars
+     when (gameVarBefore /= gameVarAfter) $
+       maybe (return ()) autoexec gameVarAfter
+  where updatedCVars = HM.map updateLatchedVar cVars
+        gameVarBefore = HM.lookup "game" cVars
+        gameVarAfter = HM.lookup "game" updatedCVars
+        autoexec game =
+          do FS.setGameDir (game^.cvString)
+             FS.execAutoexec
+
+updateLatchedVar :: CVarT -> CVarT
+updateLatchedVar var = maybe var updateVar (var^.cvLatchedString)
+  where updateVar latchedString = var & cvString .~ latchedString
+                                      & cvLatchedString .~ Nothing
+                                      & cvValue .~ Lib.atof latchedString

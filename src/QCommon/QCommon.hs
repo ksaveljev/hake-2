@@ -149,7 +149,7 @@ initialize args =
      
 reconfigure :: Bool -> Quake ()
 reconfigure clear =
-  do cdDirCVar <- CVar.get "cddir" "" Constants.cvarArchive
+  do cdDirCVar <- CVar.get "cddir" B.empty Constants.cvarArchive
      maybe (Com.fatalError "cddir cvar not set") proceed cdDirCVar
   where proceed cdDir =
           do CBuf.addText "exec default.cfg\n\

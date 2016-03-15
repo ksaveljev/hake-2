@@ -3,16 +3,17 @@ module Render.ImageT
   ( module Render.ImageT
   ) where
 
-import Types
+import           Types
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 
 makeLenses ''ImageT
 
 newImageT :: Int -> ImageT
 newImageT idx =
   ImageT { _iId                   = idx
-         , _iName                 = ""
+         , _iName                 = B.empty
          , _iType                 = 0
          , _iWidth                = 0
          , _iHeight               = 0

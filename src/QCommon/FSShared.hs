@@ -204,4 +204,4 @@ gameDir :: Quake B.ByteString
 gameDir =
   do userDir <- use (fsGlobals.fsUserDir)
      -- IMPROVE: decide if fsUserDir should be Maybe B.ByteString...
-     return (if userDir /= "" then userDir else Constants.baseDirName)
+     return (if not (B.null userDir) then userDir else Constants.baseDirName)

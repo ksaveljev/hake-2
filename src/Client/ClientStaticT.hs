@@ -3,10 +3,11 @@ module Client.ClientStaticT
   ( module Client.ClientStaticT
   ) where
 
-import QCommon.NetChanT (newNetChanT)
-import Types
+import           QCommon.NetChanT (newNetChanT)
+import           Types
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 
 makeLenses ''ClientStaticT
 
@@ -19,15 +20,15 @@ newClientStaticT =
                 , _csFrameTime          = 0
                 , _csDisableScreen      = 0
                 , _csDisableServerCount = 0
-                , _csServerName         = ""
+                , _csServerName         = B.empty
                 , _csConnectTime        = 0
                 , _csQuakePort          = 0
                 , _csNetChan            = newNetChanT
                 , _csServerProtocol     = 0
                 , _csChallenge          = 0
                 , _csDownload           = Nothing
-                , _csDownloadTempName   = ""
-                , _csDownloadName       = ""
+                , _csDownloadTempName   = B.empty
+                , _csDownloadName       = B.empty
                 , _csDownloadNumber     = 0
                 , _csDownloadType       = 0
                 , _csDownloadPercent    = 0

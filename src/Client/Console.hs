@@ -1,5 +1,6 @@
 module Client.Console
-  ( initialize
+  ( clearNotify
+  , initialize
   , toggleConsoleF
   ) where
 

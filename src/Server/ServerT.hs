@@ -9,6 +9,7 @@ import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 makeLenses ''ServerT
@@ -20,12 +21,12 @@ newServerT =
           , _sLoadGame      = False
           , _sTime          = 0
           , _sFrameNum      = 0
-          , _sName          = ""
+          , _sName          = B.empty
           , _sModels        = V.replicate Constants.maxModels (Ref (-1))
-          , _sConfigStrings = V.replicate Constants.maxConfigStrings ""
+          , _sConfigStrings = V.replicate Constants.maxConfigStrings B.empty
           , _sBaselines     = V.replicate Constants.maxEdicts (newEntityStateT Nothing)
           , _sMulticast     = newSizeBufT
-          , _sMulticastBuf  = ""
+          , _sMulticastBuf  = B.empty
           , _sDemoFile      = Nothing
           , _sTimeDemo      = 0
           }

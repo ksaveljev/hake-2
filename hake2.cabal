@@ -38,6 +38,7 @@ executable hake2
   default-extensions:  OverloadedStrings
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CDLightT
+                     , Client.CinematicsT
                      , Client.CL
                      , Client.ClientGlobals
                      , Client.ClientInfoT
@@ -50,6 +51,7 @@ executable hake2
                      , Client.Console
                      , Client.ConsoleT
                      , Client.CParticleT
+                     , Client.DirtyT
                      , Client.DLightT
                      , Client.FrameT
                      , Client.KButtonT
@@ -70,6 +72,7 @@ executable hake2
                      , Client.RefDefT
                      , Client.RefExportT
                      , Client.SCR
+                     , Client.SCRGlobals
                      , Client.V
                      , Client.VID
                      , Client.VidDefT

@@ -3,10 +3,11 @@ module Game.LevelLocalsT
   ( module Game.LevelLocalsT
   ) where
 
-import Types
+import           Types
 
-import Control.Lens (makeLenses)
-import Linear (V3(..))
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
+import           Linear (V3(..))
 
 makeLenses ''LevelLocalsT
 
@@ -14,11 +15,11 @@ newLevelLocalsT :: LevelLocalsT
 newLevelLocalsT =
   LevelLocalsT { _llFrameNum             = 0
                , _llTime                 = 0
-               , _llLevelName            = ""
-               , _llMapName              = ""
-               , _llNextMap              = ""
+               , _llLevelName            = B.empty
+               , _llMapName              = B.empty
+               , _llNextMap              = B.empty
                , _llIntermissionTime     = 0
-               , _llChangeMap            = ""
+               , _llChangeMap            = B.empty
                , _llExitIntermission     = False
                , _llIntermissionOrigin   = V3 0 0 0
                , _llIntermissionAngle    = V3 0 0 0

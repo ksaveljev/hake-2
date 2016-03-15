@@ -3,6 +3,7 @@ module Sys.NET
   , config
   , initialize
   , sleep
+  , stringToAdr
   ) where
 
 import           QCommon.NetAdrT
@@ -30,3 +31,6 @@ adrToString adr = B.concat [encode a, ".", encode b, ".", encode c, ".", encode 
         c = (hostAddress `shiftR` 16) .&. 0xFF
         b = (hostAddress `shiftR` 8) .&. 0xFF
         a = hostAddress .&. 0xFF
+
+stringToAdr :: B.ByteString -> Quake (Maybe NetAdrT)
+stringToAdr = error "NET.stringToAdr" -- TODO

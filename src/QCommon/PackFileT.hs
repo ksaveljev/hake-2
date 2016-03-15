@@ -21,4 +21,4 @@ packFileNameSize = 56
 getPackFile :: Get PackFileT
 getPackFile = PackFileT <$> getName <*> getInt <*> getInt
   where getName = strip <$> getByteString packFileNameSize
-        strip = B.takeWhile (/= 0)
+        strip str = maybe str (`B.take` str) (B.findIndex (== 0) str)

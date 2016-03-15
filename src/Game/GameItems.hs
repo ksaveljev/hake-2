@@ -695,7 +695,7 @@ findItem pickupName =
   where search items = V.findIndex searchByName (V.drop 1 items)
         name = BC.map toLower pickupName
         searchByName gItem
-          | name == BC.map toLower (fromMaybe "" (gItem^.giPickupName)) = True
+          | name == BC.map toLower (fromMaybe B.empty (gItem^.giPickupName)) = True
           | otherwise = False
 
 setRespawn :: Ref EdictT -> Float -> Quake ()

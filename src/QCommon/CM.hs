@@ -32,7 +32,7 @@ inlineModel name =
      checkNumCModels =<< numInlineModels
      return (Ref num)
   where checkName
-          | name == "" || BC.head name /= '*' =
+          | B.null name || BC.head name /= '*' =
               Com.comError Constants.errDrop "CM_InlineModel: bad name"
           | otherwise = return ()
         checkNumCModels numCModels

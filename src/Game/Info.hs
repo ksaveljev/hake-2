@@ -28,7 +28,7 @@ composePrintString (k:v:xs) acc = composePrintString xs acc'
   where acc' = acc <> bs k <> bs spaces <> "=" <> bs v <> bs "\n"
         bs = BB.byteString
         spaces | klen < 20 = B.drop klen fillSpaces
-               | otherwise = ""
+               | otherwise = B.empty
         klen = B.length k
 composePrintString _ _ =
   do Com.printf "MISSING VALUE\n"

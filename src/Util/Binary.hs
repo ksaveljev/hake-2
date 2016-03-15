@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Util.Binary
   ( encode
   , getInt
@@ -13,8 +14,9 @@ encode :: Show a => a -> B.ByteString
 encode = BC.pack . show
 
 getInt :: Get Int
-getInt = let x = fromIntegral <$> getWord32le :: Get Int32
+getInt = let !x = fromIntegral <$> getWord32le :: Get Int32
          in fromIntegral <$> x
+{-# INLINE getInt #-}
 
 getInt8 :: Get Int8
 getInt8 = fromIntegral <$> getWord8

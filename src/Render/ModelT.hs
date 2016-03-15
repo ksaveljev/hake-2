@@ -6,6 +6,7 @@ module Render.ModelT
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import           Linear (V3(..))
 
@@ -13,7 +14,7 @@ makeLenses ''ModelT
 
 newModelT :: ModelT
 newModelT =
-  ModelT { _mName                 = ""
+  ModelT { _mName                 = B.empty
          , _mRegistrationSequence = 0
          , _mType                 = 0
          , _mNumFrames            = 0

@@ -14,7 +14,7 @@ module QCommon.CVarShared
 import qualified Constants
 import           Game.CVarT
 import qualified QCommon.Com as Com
-import qualified QCommon.Shared as FS
+import {-# SOURCE #-} qualified QCommon.Shared as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
@@ -65,7 +65,7 @@ findVar name =
 variableString :: B.ByteString -> Quake B.ByteString
 variableString varName =
   do foundVar <- findVar varName
-     return (maybe "" (^.cvString) foundVar)
+     return (maybe B.empty (^.cvString) foundVar)
 
 command :: Quake Bool
 command = error "CVar.command" -- TODO
@@ -148,7 +148,7 @@ updateVar var value force
 createFailedError :: Quake CVarT
 createFailedError =
   do Com.fatalError "Failed to create cvar"
-     return (CVarT "" "" Nothing 0 False 0)
+     return (CVarT B.empty B.empty Nothing 0 False 0)
      
 checkUserInfoModified :: CVarT -> Quake () -- make compiler happy
 checkUserInfoModified var =

@@ -95,7 +95,7 @@ checkChanges =
 changeRefresh :: CVarT -> Quake ()
 changeRefresh vidRef
   | vidRef^.cvModified =
-      do S.stopAllSound
+      do S.stopAllSounds
          updateState =<< vidFullScreenCVar
          loaded <- loadRefresh (vidRef^.cvString) True
          unless loaded $

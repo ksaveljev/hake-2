@@ -1,15 +1,19 @@
 module Game.GameBase
-  ( runFrame
+  ( getGameApi
+  , runFrame
   , setMoveDir
+  , shutdownGame
   ) where
 
 import           Game.EdictT
 import           Game.EntityStateT
 import           QuakeRef
+import           QuakeState
+import qualified Server.SVWorld as SVWorld
 import           Types
 import qualified Util.Math3D as Math3D
 
-import           Control.Lens ((^.), (&), (.~))
+import           Control.Lens (use, (^.), (.=), (&), (.~))
 import           Linear (V3(..))
 
 vecUp :: V3 Float
@@ -36,3 +40,12 @@ setMoveDir edictRef edict =
                 | angles == vecDown = moveDirDown
                 | otherwise = let (forward, _, _) = Math3D.angleVectors angles True False False
                               in forward
+
+shutdownGame :: Quake ()
+shutdownGame =
+  do gameImport <- use (gameBaseGlobals.gbGameImport)
+     (gameImport^.giDprintf) "==== ShutdownGame ====\n"
+
+getGameApi :: GameImportT -> Quake ()
+getGameApi imp =
+  gameBaseGlobals.gbGameImport .= (imp & giPointContents .~ SVWorld.pointContents)

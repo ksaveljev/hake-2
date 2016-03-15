@@ -3,11 +3,12 @@ module QCommon.NetChanT
   ( module QCommon.NetChanT
   ) where
 
-import QCommon.NetAdrT (newNetAdrT)
-import QCommon.SizeBufT (newSizeBufT)
-import Types
+import           QCommon.NetAdrT (newNetAdrT)
+import           QCommon.SizeBufT (newSizeBufT)
+import           Types
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 
 makeLenses ''NetChanT
 
@@ -29,5 +30,5 @@ newNetChanT =
            , _ncLastReliableSequence         = 0
            , _ncMessage                      = newSizeBufT
            , _ncReliableLength               = 0
-           , _ncReliableBuf                  = "" -- size [Constants.maxMsgLen - 16] -- TODO: do we need it ?
+           , _ncReliableBuf                  = B.empty -- size [Constants.maxMsgLen - 16] -- TODO: do we need it ?
            }

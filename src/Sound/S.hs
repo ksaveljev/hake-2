@@ -1,6 +1,6 @@
 module Sound.S
   ( initialize
-  , stopAllSound
+  , stopAllSounds
   ) where
 
 import Types
@@ -8,5 +8,5 @@ import Types
 initialize :: Quake ()
 initialize = request (io (putStrLn "S.initialize IMPLEMENT ME!")) -- TODO
 
-stopAllSound :: Quake ()
-stopAllSound = request (io (putStrLn "S.stopAllSound IMPLEMENT ME!")) -- TODO
+stopAllSounds :: Quake ()
+stopAllSounds = request (io (putStrLn "S.stopAllSound IMPLEMENT ME!")) -- TODO

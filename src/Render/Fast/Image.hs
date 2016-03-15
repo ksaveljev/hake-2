@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Render.Fast.Image
   ( getPalette
@@ -168,8 +169,7 @@ validPCX pcx
 loadPcxT :: Maybe (Handle, Int) -> Quake (Maybe PcxT)
 loadPcxT Nothing = return Nothing
 loadPcxT (Just (fileHandle, len)) =
-  do request (io (print ("LEN = " ++ show len))) -- TODO REMOVE
-     (res, _) <- request parsePcxT
+  do (res, _) <- request parsePcxT
      either (const (return Nothing)) (return . Just) res
   where parsePcxT = runStateT (PB.decodeGet (getPcxT len)) (PBS.fromHandle fileHandle)
 
@@ -178,27 +178,22 @@ decodePCX returnPalette returnDimensions pcx = (pix, palette, dimensions)
   where width = fromIntegral ((pcx^.pcxXMax) - (pcx^.pcxXMin) + 1)
         height = fromIntegral ((pcx^.pcxYMax) - (pcx^.pcxYMin) + 1)
         palette | returnPalette = B.drop (B.length (pcx^.pcxData) - 768) (pcx^.pcxData)
-                | otherwise = ""
+                | otherwise = B.empty
         dimensions | returnDimensions = (width, height)
                    | otherwise = (0, 0)
         pix = doDecodePCX (pcx^.pcxData) 0 0 0 width height mempty
 
 doDecodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-doDecodePCX raw idx x y maxX maxY acc
+doDecodePCX raw idx x y maxX maxY !acc
   | y >= maxY = BL.toStrict (BB.toLazyByteString acc)
   | x >= maxX = doDecodePCX raw idx 0 (y + 1) maxX maxY acc
   | dataByte .&. 0xC0 == 0xC0
-      = doDecodePCX raw (idx + 2) (x + runLength) y maxX maxY (buildAcc acc (BB.word8 byte) runLength)
+      = doDecodePCX raw (idx + 2) (x + runLength) y maxX maxY (acc <> BB.byteString (B.replicate runLength byte))
   | otherwise
       = doDecodePCX raw (idx + 1) (x + 1) y maxX maxY (acc <> BB.word8 dataByte)
-  where dataByte = B.index raw idx
-        runLength = fromIntegral (dataByte .&. 0x3F)
-        byte = B.index raw (idx + 1)
-
-buildAcc :: BB.Builder -> BB.Builder -> Int -> BB.Builder
-buildAcc acc byte idx
-  | idx <= 0 = acc
-  | otherwise = buildAcc (acc <> byte) byte (idx - 1)
+  where !dataByte = B.index raw idx
+        !runLength = fromIntegral (dataByte .&. 0x3F)
+        !byte = B.index raw (idx + 1)
 
 glImageListF :: XCommandT
 glImageListF = error "Image.glImageListF" -- TODO
@@ -475,10 +470,10 @@ glUpload8 image width height mipmap isSky =
      palettedTexture <- glExtPalettedTextureCVar
      proceedUpload colorTable palettedTexture
   where checkDimensions
-          | width * height > sz =
+          | sz > 512 * 256 =
               Com.comError Constants.errDrop "GL_Upload8: too large"
           | otherwise = return ()
-        sz = 512 * 256
+        sz = width * height
         proceedUpload colorTable palettedTexture
           | colorTable && (palettedTexture^.cvValue) /= 0 && isSky =
               do request (io (BU.unsafeUseAsCString image upload))
@@ -502,24 +497,24 @@ glUpload8 image width height mipmap isSky =
              GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral filterMax)
 
 constructTrans :: B.ByteString -> Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
-constructTrans image width d8to24table idx maxIdx acc
+constructTrans image width d8to24table idx maxIdx !acc
   | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
-  | otherwise = constructTrans image width d8to24table (idx + 1) maxIdx (acc `mappend` BB.int32LE (fromIntegral t'))
-  where p = image `B.index` idx
-        t = d8to24table UV.! fromIntegral p
-        p' | p == 0xFF = scanAround
-           | otherwise = p
-        t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
-           | otherwise = t
-        scanAround
-          | idx > width && (image `B.index` (idx - width)) /= 0xFF = image `B.index` (idx - width)
-          | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF = image `B.index` (idx + width)
-          | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF = image `B.index` (idx - 1)
-          | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF = image `B.index` (idx + 1)
-          | otherwise = 0
+  | otherwise = let !p = image `B.index` idx
+                    !t = d8to24table UV.! fromIntegral p
+                    !p' | p == 0xFF = scanAround
+                        | otherwise = p
+                    !t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
+                        | otherwise = t
+                    scanAround
+                      | idx > width && (image `B.index` (idx - width)) /= 0xFF = image `B.index` (idx - width)
+                      | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF = image `B.index` (idx + width)
+                      | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF = image `B.index` (idx - 1)
+                      | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF = image `B.index` (idx + 1)
+                      | otherwise = 0
+                in constructTrans image width d8to24table (idx + 1) maxIdx (acc `mappend` BB.int32LE (fromIntegral t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
-glUpload32 image width height mipmap =
+glUpload32 !image width height mipmap =
   do scaledWidth <- calcScaledValue width mipmap
      scaledHeight <- calcScaledValue height mipmap
      mapMonad (zoom fastRenderAPIGlobals) $ do

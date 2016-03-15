@@ -7,14 +7,15 @@ import qualified Constants
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
 makeLenses ''ClientPersistantT
 
 newClientPersistantT :: ClientPersistantT
 newClientPersistantT =
-  ClientPersistantT { _cpUserInfo        = ""
-                    , _cpNetName         = ""
+  ClientPersistantT { _cpUserInfo        = B.empty
+                    , _cpNetName         = B.empty
                     , _cpHand            = 0
                     , _cpConnected       = False
                     , _cpHealth          = 0

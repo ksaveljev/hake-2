@@ -3,11 +3,12 @@ module QCommon.SizeBufT
   ( module QCommon.SizeBufT
   ) where
 
-import Types
+import           Types
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 
 makeLenses ''SizeBufT
 
 newSizeBufT :: SizeBufT
-newSizeBufT = SizeBufT False False "" 0 0 0
+newSizeBufT = SizeBufT False False B.empty 0 0 0

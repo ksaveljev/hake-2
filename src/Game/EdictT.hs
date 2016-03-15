@@ -10,6 +10,7 @@ import           Game.MoveInfoT (newMoveInfoT)
 import           Types
 
 import           Control.Lens (makeLenses)
+import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..))
 
@@ -19,7 +20,7 @@ newEdictT :: Int -> EdictT
 newEdictT idx =
   EdictT { _eEntityState           = newEntityStateT (Just (Ref idx))
          , _eInUse                 = False
-         , _eClassName             = ""
+         , _eClassName             = B.empty
          , _eLinkCount             = 0
          , _eArea                  = Ref (2 * Constants.areaNodes + idx)
          , _eNumClusters           = 0

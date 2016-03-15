@@ -53,10 +53,10 @@ getSpace bufLens len =
             Com.fatalError (B.concat ["SZ_GetSpace: ", encode len, " is > full buffer size"])
 
 clear :: ASetter' QuakeState SizeBufT -> Quake ()
-clear bufLens = do
-    bufLens.sbCurSize .= 0
-    bufLens.sbData .= ""
-    bufLens.sbOverflowed .= False
+clear bufLens =
+  bufLens %= (\v -> v & sbCurSize .~ 0
+                      & sbData .~ B.empty
+                      & sbOverflowed .~ False)
 
 printSB :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()
 printSB = error "SZ.print" -- TODO

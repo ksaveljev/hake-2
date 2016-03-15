@@ -3,6 +3,7 @@ module Server.SVWorld
   ( areaEdicts
   , clearWorld
   , linkEdict
+  , pointContents
   , trace
   , unlinkEdict
   ) where
@@ -27,3 +28,6 @@ areaEdicts = error "SVWorld.areaEdicts" -- TODO
 
 clearWorld :: Quake ()
 clearWorld = error "SVWorld.clearWorld" -- TODO
+
+pointContents :: V3 Float -> Quake Int
+pointContents = error "SVWorld.pointContents" -- TODO

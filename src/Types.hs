@@ -57,6 +57,7 @@ data QuakeState = QuakeState
   , _menuGlobals          :: MenuGlobals
   , _pMoveGlobals         :: PMoveGlobals
   , _kbdGlobals           :: KBDGlobals
+  , _scrGlobals           :: SCRGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -80,6 +81,7 @@ data QuakeIOState = QuakeIOState
   , _pVertexArray           :: MSV.IOVector Float
   , _pColorArray            :: MSV.IOVector Int32
   , _frFifo                 :: MV.IOVector (Int, Int)
+  , _cHNodes1               :: Maybe (MV.IOVector Int)
   }
 
 data IORequest x
@@ -494,6 +496,26 @@ data KBDGlobals = KBDGlobals
   , _kbdWinH2 :: Int
   , _kbdX     :: Int
   , _kbdY     :: Int
+  }
+
+data SCRGlobals = SCRGlobals
+  { _scrConCurrent      :: Float
+  , _scrConLines        :: Float
+  , _scrInitialized     :: Bool
+  , _scrDrawLoading     :: Int
+  , _scrDirty           :: DirtyT
+  , _scrOldDirty        :: (DirtyT, DirtyT)
+  , _scrCrosshairPic    :: B.ByteString
+  , _scrCrosshairWidth  :: Int
+  , _scrCrosshairHeight :: Int
+  , _scrLastFrames      :: Int
+  , _scrLastTime        :: Int
+  , _scrFPSValue        :: B.ByteString
+  , _scrCin             :: CinematicsT
+  , _scrCenterString    :: B.ByteString
+  , _scrCenterTimeStart :: Float
+  , _scrCenterTimeOff   :: Float
+  , _scrCenterLines     :: Int
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1911,6 +1933,27 @@ data MiptexT = MiptexT
   , _mtContents  :: Int
   , _mtValue     :: Int
   , _mtBuf       :: B.ByteString
+  }
+
+data DirtyT = DirtyT
+  { _x1 :: Int
+  , _x2 :: Int
+  , _y1 :: Int
+  , _y2 :: Int
+  }
+
+data CinematicsT = CinematicsT
+  { _cRestartSound :: Bool
+  , _cSRate        :: Int
+  , _cSWidth       :: Int
+  , _cSChannels    :: Int
+  , _cWidth        :: Int
+  , _cHeight       :: Int
+  , _cPic          :: Maybe B.ByteString
+  , _cPicPending   :: Maybe B.ByteString
+  , _cNumHNodes1   :: UV.Vector Int
+  , _cHUsed        :: UV.Vector Int
+  , _cHCount       :: UV.Vector Int
   }
 
 data KeyFuncT = KeyFuncT

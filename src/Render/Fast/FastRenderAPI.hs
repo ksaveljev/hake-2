@@ -243,7 +243,7 @@ checkMultiTexture extensions =
 
 finishInit :: GLDriver -> Bool -> Quake Bool
 finishInit glDriver enabled
-  | not enabled =
+  | not enabled && not True = -- TODO: remove me, used for testing with dummy gldriver
       do VID.printf Constants.printAll "Missing multi-texturing!\n"
          return False
   | otherwise =
@@ -265,7 +265,7 @@ checkGLError =
 getGLString :: GL.GLenum -> IO B.ByteString
 getGLString n =
   do str <- GL.glGetString n
-     maybeNullPtr (return "") (B.packCString . castPtr) str
+     maybeNullPtr (return B.empty) (B.packCString . castPtr) str
   where maybeNullPtr nothing f ptr | ptr == nullPtr = nothing
                                    | otherwise = f ptr
 
