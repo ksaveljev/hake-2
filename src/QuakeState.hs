@@ -25,6 +25,7 @@ import Render.GLFWbGlobals as X
 import Server.SVGlobals as X
 import Sys.INGlobals as X
 import Sys.KBDGlobals as X
+import Sys.NETGlobals as X
 import Types
 
 import Control.Lens (makeLenses)
@@ -55,4 +56,5 @@ initialQuakeState =
              , _pMoveGlobals         = initialPMoveGlobals
              , _kbdGlobals           = initialKBDGlobals
              , _scrGlobals           = initialSCRGlobals
+             , _netGlobals           = initialNETGlobals
              }

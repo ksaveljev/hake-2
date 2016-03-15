@@ -101,6 +101,7 @@ executable hake2
                      , Game.GameItemsList
                      , Game.GameLocalsT
                      , Game.GameMisc
+                     , Game.GameSave
                      , Game.GameSpawn
                      , Game.GameSVCmds
                      , Game.GameTarget
@@ -239,7 +240,11 @@ executable hake2
                      , Sys.INGlobals
                      , Sys.KBD
                      , Sys.KBDGlobals
+                     , Sys.LoopbackT
+                     , Sys.LoopMsgT
                      , Sys.NET
+                     , Sys.NETGlobals
+                     , Sys.Socket
                      , Sys.Timer
                      , Types
                      , Util.Binary

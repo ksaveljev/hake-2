@@ -58,6 +58,7 @@ data QuakeState = QuakeState
   , _pMoveGlobals         :: PMoveGlobals
   , _kbdGlobals           :: KBDGlobals
   , _scrGlobals           :: SCRGlobals
+  , _netGlobals           :: NETGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -516,6 +517,14 @@ data SCRGlobals = SCRGlobals
   , _scrCenterTimeStart :: Float
   , _scrCenterTimeOff   :: Float
   , _scrCenterLines     :: Int
+  }
+
+data NETGlobals = NETGlobals
+  { _ngLoopbackClient :: LoopbackT
+  , _ngLoopbackServer :: LoopbackT
+  , _ngIpSocketClient :: Maybe Socket
+  , _ngIpSocketServer :: Maybe Socket
+  , _ngSend           :: SizeBufT
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1956,6 +1965,17 @@ data CinematicsT = CinematicsT
   , _cHCount       :: UV.Vector Int
   }
 
+data LoopbackT = LoopbackT
+  { _lMsgs :: V.Vector LoopMsgT
+  , _lGet  :: Int
+  , _lSend :: Int
+  }
+
+data LoopMsgT = LoopMsgT
+  { _lmData    :: B.ByteString -- max len is Constants.maxMsgLen
+  , _lmDataLen :: Int
+  }
+
 data KeyFuncT = KeyFuncT
   { _kfName :: B.ByteString
   , _kfFunc :: Int -> Quake (Maybe B.ByteString)
@@ -1963,6 +1983,8 @@ data KeyFuncT = KeyFuncT
 
 instance Eq KeyFuncT where
     x == y = _kfName x == _kfName y
+
+data Socket = Socket Int
 
 data MenuItemRef = MenuListRef (Ref MenuListS)
                  | MenuActionRef (Ref MenuActionS)
