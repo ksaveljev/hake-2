@@ -497,7 +497,7 @@ glUpload8 image width height mipmap isSky =
              GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral filterMax)
 
 constructTrans :: B.ByteString -> Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
-constructTrans image width d8to24table idx maxIdx !acc
+constructTrans image width d8to24table idx maxIdx acc
   | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
   | otherwise = let !p = image `B.index` idx
                     !t = d8to24table UV.! fromIntegral p
@@ -514,7 +514,7 @@ constructTrans image width d8to24table idx maxIdx !acc
                 in constructTrans image width d8to24table (idx + 1) maxIdx (acc `mappend` BB.int32LE (fromIntegral t'))
 
 glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
-glUpload32 !image width height mipmap =
+glUpload32 image width height mipmap =
   do scaledWidth <- calcScaledValue width mipmap
      scaledHeight <- calcScaledValue height mipmap
      mapMonad (zoom fastRenderAPIGlobals) $ do

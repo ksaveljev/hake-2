@@ -15,6 +15,7 @@ import Game.CmdGlobals as X
 import Game.GameBaseGlobals as X
 import {-# SOURCE #-} Game.GameImportT as X
 import Game.GameItemsGlobals as X
+import Game.PlayerTrailGlobals as X
 import Globals as X
 import QCommon.CMGlobals as X
 import QCommon.ComGlobals as X
@@ -57,4 +58,5 @@ initialQuakeState =
              , _kbdGlobals           = initialKBDGlobals
              , _scrGlobals           = initialSCRGlobals
              , _netGlobals           = initialNETGlobals
+             , _playerTrailGlobals   = initialPlayerTrailGlobals
              }

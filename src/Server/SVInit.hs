@@ -247,8 +247,8 @@ initServerClientsAndModels server srvState =
        sTime .= 1000
        sConfigStrings %= (V.// [(Constants.csName, server)])
      svGlobals.svServerStatic.ssClients %= fmap updateClientState
-     (modelIdx, iw) <- loadContent
-     svGlobals.svServer.sModels %= (V.// [(1, Ref modelIdx)])
+     (modelRef, iw) <- loadContent
+     svGlobals.svServer.sModels %= (V.// [(1, modelRef)])
      svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, encode (head iw))])
   where loadContent | srvState /= Constants.ssGame = CM.loadMap B.empty False [0] -- no real map
                     | otherwise =

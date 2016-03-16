@@ -83,7 +83,7 @@ execF = XCommandT "Cmd.execF" $
              script <- FS.loadFile fileName
              maybe (failedToExec fileName) (execScript fileName) script
         failedToExec fileName =
-             Com.printf (B.concat ["couldn't exec ", fileName, "\n"])
+          Com.printf (B.concat ["couldn't exec ", fileName, "\n"])
         execScript fileName contents =
           do Com.printf (B.concat ["execing ", fileName, "\n"])
              CBuf.insertText contents
@@ -111,12 +111,10 @@ aliasF = XCommandT "Cmd.aliasF" $
 listAliases :: Quake ()
 listAliases =
   do Com.printf "Current alias commands:\n"
-     aliases <- use (globals.gCmdAlias)
-     mapM_ printAlias aliases
+     mapM_ printAlias =<< use (globals.gCmdAlias)
 
 printAlias :: CmdAliasT -> Quake ()
-printAlias alias = Com.printf aliasInfo
-  where aliasInfo = B.concat [alias^.caName, " : ", alias^.caValue]
+printAlias alias = Com.printf (B.concat [alias^.caName, " : ", alias^.caValue])
 
 aliasCmd :: B.ByteString -> Int -> Quake ()
 aliasCmd arg c
@@ -199,16 +197,13 @@ aliasNotFound =
 handleExistingAlias :: CmdAliasT -> Quake ()
 handleExistingAlias alias =
   do globals.gAliasCount += 1
-     count <- use (globals.gAliasCount)
-     handle count
+     handle =<< use (globals.gAliasCount)
   where handle count
           | count + 1 >= aliasLoopCount = Com.printf "ALIAS_LOOP_COUNT\n"
           | otherwise = CBuf.insertText (alias^.caValue)
 
 sameNameAs :: B.ByteString -> B.ByteString -> Bool
-sameNameAs expected given =
-  let current = BC.map toUpper given
-  in expected == current
+sameNameAs expected given = expected == BC.map toUpper given
 
 sameFunctionNameAs :: B.ByteString -> CmdFunctionT -> Bool
 sameFunctionNameAs expected fn = sameNameAs expected (fn^.cfName)

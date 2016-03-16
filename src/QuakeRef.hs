@@ -136,3 +136,30 @@ instance QuakeRef ImageT where
   writeRef (Ref idx) item =
     request (do images <- use frGLTextures
                 io (MV.write images idx item))
+
+instance QuakeRef CAreaT where
+  readRef (Ref idx) =
+    do areas <- use (cmGlobals.cmMapAreas)
+       return (areas V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapAreas.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapAreas.ix idx .= item
+
+instance QuakeRef DAreaPortalT where
+  readRef (Ref idx) =
+    do areaPortals <- use (cmGlobals.cmMapAreaPortals)
+       return (areaPortals V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapAreaPortals.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapAreaPortals.ix idx .= item
+
+instance QuakeRef AreaNodeT where
+  readRef (Ref idx) =
+    do areaNodes <- use (svGlobals.svAreaNodes)
+       return (areaNodes V.! idx)
+  modifyRef (Ref idx) f =
+    svGlobals.svAreaNodes.ix idx %= f
+  writeRef (Ref idx) item =
+    svGlobals.svAreaNodes.ix idx .= item

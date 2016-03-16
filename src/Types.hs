@@ -59,6 +59,7 @@ data QuakeState = QuakeState
   , _kbdGlobals           :: KBDGlobals
   , _scrGlobals           :: SCRGlobals
   , _netGlobals           :: NETGlobals
+  , _playerTrailGlobals   :: PlayerTrailGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -263,7 +264,6 @@ data CMGlobals = CMGlobals
   , _cmNumClusters     :: Int
   , _cmFloodValid      :: Int
   , _cmPortalOpen      :: UV.Vector Bool
-  , _cmCModBase        :: Maybe B.ByteString
   , _cmChecksum        :: Int
   , _cmLastChecksum    :: Int
   , _cmDebugLoadMap    :: Bool
@@ -527,6 +527,12 @@ data NETGlobals = NETGlobals
   , _ngSend           :: SizeBufT
   }
 
+data PlayerTrailGlobals = PlayerTrailGlobals
+  { _ptTrail       :: V.Vector (Ref EdictT)
+  , _ptTrailHead   :: Int
+  , _ptTrailActive :: Bool
+  }
+
 data GLFWKBDEvent = KeyPress GLFW.Key
                   | KeyRelease GLFW.Key
                   | CursorPosition Double Double
@@ -643,7 +649,7 @@ data ServerStaticT = ServerStaticT
 data AreaNodeT = AreaNodeT
   { _anAxis          :: Int
   , _anDist          :: Float
-  , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes IMPROVE: newtype?
+  , _anChildren      :: (Maybe (Ref AreaNodeT), Maybe (Ref AreaNodeT))
   , _anTriggerEdicts :: Ref LinkT
   , _anSolidEdicts   :: Ref LinkT
   }

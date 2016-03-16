@@ -55,7 +55,6 @@ initialCMGlobals =
             , _cmNumClusters     = 1
             , _cmFloodValid      = 0
             , _cmPortalOpen      = UV.replicate Constants.maxMapAreaPortals False
-            , _cmCModBase        = Nothing
             , _cmChecksum        = 0
             , _cmLastChecksum    = 0
             , _cmDebugLoadMap    = False

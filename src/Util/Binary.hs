@@ -2,6 +2,7 @@
 module Util.Binary
   ( encode
   , getInt
+  , getInt4T
   , getInt8
   ) where
 
@@ -20,3 +21,6 @@ getInt = let !x = fromIntegral <$> getWord32le :: Get Int32
 
 getInt8 :: Get Int8
 getInt8 = fromIntegral <$> getWord8
+
+getInt4T :: Get (Int, Int, Int, Int)
+getInt4T = (,,,) <$> getInt <*> getInt <*> getInt <*> getInt

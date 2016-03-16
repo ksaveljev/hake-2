@@ -189,7 +189,42 @@ finishSpawn entities mapName idx inhibited edictRef removed
          parseEntities entities mapName False idx inhibited
 
 findTeams :: Quake ()
-findTeams = error "GameSpawn.findTeams" -- TODO
+findTeams =
+  do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
+     (teamsNum, entitiesNum) <- findNextTeam 0 0 1 numEdicts
+     dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+     dprintf (B.concat [encode teamsNum, " teams with ", encode entitiesNum, " entities\n"])
+
+findNextTeam :: Int -> Int -> Int -> Int -> Quake (Int, Int)
+findNextTeam c c2 idx maxIdx
+  | idx >= maxIdx = return (c, c2)
+  | otherwise =
+      do edict <- readRef (Ref idx)
+         proceedFindNextTeam (Ref idx) edict (edict^.eTeam)
+  where proceedFindNextTeam _ _ Nothing = findNextTeam c c2 (idx + 1) maxIdx
+        proceedFindNextTeam edictRef edict (Just team)
+          | not (edict^.eInUse) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 =
+              findNextTeam c c2 (idx + 1) maxIdx
+          | otherwise =
+              do modifyRef edictRef (\v ->v & eTeamMaster .~ Just edictRef)
+                 c2' <- findTeamMembers team edictRef edictRef idx maxIdx c2
+                 findNextTeam (c + 1) c2' (idx + 1) maxIdx
+
+findTeamMembers :: B.ByteString -> Ref EdictT -> Ref EdictT -> Int -> Int -> Int -> Quake Int
+findTeamMembers teamName master chainRef idx maxIdx c2
+  | idx >= maxIdx = return c2
+  | otherwise =
+      do edict <- readRef (Ref idx)
+         proceedFindTeamMembers (Ref idx) edict (edict^.eTeam)
+  where proceedFindTeamMembers _ _ Nothing = findTeamMembers teamName master chainRef (idx + 1) maxIdx c2
+        proceedFindTeamMembers edictRef edict (Just team)
+          | not (edict^.eInUse) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= team =
+              findTeamMembers teamName master chainRef (idx + 1) maxIdx c2
+          | otherwise =
+              do modifyRef chainRef (\v -> v & eTeamChain .~ Just edictRef)
+                 modifyRef edictRef (\v -> v & eTeamMaster .~ Just master
+                                             & eFlags %~ (.|. Constants.flTeamSlave))
+                 findTeamMembers teamName master edictRef (idx + 1) maxIdx (c2 + 1)
 
 parseEdict :: Ref EdictT -> B.ByteString -> Int -> Quake Int
 parseEdict = error "GameSpawn.parseEdict" -- TODO
