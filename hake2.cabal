@@ -59,6 +59,7 @@ executable hake2
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
+                     , Client.M
                      , Client.Menu
                      , Client.MenuActionS
                      , Client.MenuCommonS

@@ -1,5 +1,6 @@
 module Game.PlayerClient
-  ( saveClientData
+  ( clientBeginServerFrame
+  , saveClientData
   , spInfoPlayerCoop
   , spInfoPlayerDeathmatch
   , spInfoPlayerIntermission
@@ -51,3 +52,6 @@ spInfoPlayerIntermission = error "PlayerClient.spInfoPlayerIntermission" -- TODO
 
 spInfoPlayerStart :: Ref EdictT -> Quake ()
 spInfoPlayerStart = error "PlayerClient.spInfoPlayerStart" -- TODO
+
+clientBeginServerFrame :: Ref EdictT -> Quake ()
+clientBeginServerFrame = error "PlayerClient.clientBeginServerFrame" -- TODO
