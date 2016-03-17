@@ -10,6 +10,7 @@ import qualified Client.CL as CL
 import qualified Client.SCR as SCR
 import qualified Constants
 import           Game.CVarT
+import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameBase as GameBase
 import qualified Game.GameSpawn as GameSpawn
@@ -20,6 +21,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.SZ as SZ
+import           QuakeRef
 import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
@@ -33,7 +35,7 @@ import           Types
 import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
-import           Control.Lens (use, zoom, (^.), (.=), (+=), (%=), (&), (.~), (%~))
+import           Control.Lens (use, zoom, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~))
 import           Control.Monad (void, when)
 import           Control.Monad.Coroutine (mapMonad)
 import           Data.Bits ((.|.))
@@ -287,7 +289,28 @@ spawnMapEntities server spawnPoint srvState =
      void (CVar.fullSet "mapname" server (Constants.cvarServerInfo .|. Constants.cvarNoSet))
 
 createBaseline :: Quake ()
-createBaseline = error "SVInit.createBaseline" -- TODO
+createBaseline =
+  do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
+     mapM_ (fmap edictBaseline . readEdict) [1..numEdicts-1]
+
+readEdict :: Int -> Quake (Ref EdictT, EdictT)
+readEdict idx =
+  do edict <- readRef (Ref idx)
+     return (Ref idx, edict)
+
+edictBaseline :: (Ref EdictT, EdictT) -> Quake ()
+edictBaseline (edictRef@(Ref idx), edict)
+  | not (edict^.eInUse) || ((edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0) =
+      return ()
+  | otherwise =
+      do modifyRef edictRef (\v -> v & eEntityState.esNumber .~ idx
+                                     & eEntityState.esOldOrigin .~ (edict^.eEntityState.esOrigin))
+         saveEdictEntityState edictRef
+
+saveEdictEntityState :: Ref EdictT -> Quake ()
+saveEdictEntityState edictRef@(Ref idx) =
+  do edict <- readRef edictRef
+     svGlobals.svServer.sBaselines.ix idx .= (edict^.eEntityState)
 
 checkForSavegame :: Quake ()
-checkForSavegame = error "SVInit.checkForSavegame" -- TODO
+checkForSavegame = request (io (putStrLn "SVInit.checkForSavegame IMPLEMENT ME!"))

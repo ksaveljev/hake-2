@@ -15,17 +15,23 @@ import qualified Game.GameAI as GameAI
 import           Game.GClientT
 import           Game.LevelLocalsT
 import qualified Game.PlayerClient as PlayerClient
+import qualified Game.PlayerView as PlayerView
+import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import qualified Server.SVWorld as SVWorld
 import           Types
 import qualified Util.Math3D as Math3D
+import           Util.Binary (encode)
 
 import           Control.Lens (use, (^.), (.=), (+=), (&), (.~))
-import           Control.Monad (when)
+import           Control.Monad (when, void)
 import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower)
+import           Data.Maybe (isJust)
 import           Linear (V3(..))
 
 vecUp :: V3 Float
@@ -51,11 +57,13 @@ runFrame =
               do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
                  mapM_ (fmap treatObject . readEdict) [0..numEdicts-1]
                  checkDMRules
-                 checkNeedPass
+                 checkNeedPassword
                  clientEndServerFrames
-        readEdict idx =
-          do edict <- readRef (Ref idx)
-             return (Ref idx, edict)
+
+readEdict :: Int -> Quake (Ref EdictT, EdictT)
+readEdict idx =
+  do edict <- readRef (Ref idx)
+     return (Ref idx, edict)
 
 updateLevelGlobals :: Quake ()
 updateLevelGlobals =
@@ -129,14 +137,11 @@ applyDMRules timeLimit fragLimit levelTime bprintf
          endDMLevel
   | fragLimit /= 0 =
       do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-         shouldEnd <- or <$> mapM (\idx -> readEdict (Ref idx) >>= checkScore fragLimit) [1..maxClients]
+         shouldEnd <- or <$> mapM (\idx -> readEdict idx >>= checkScore fragLimit) [1..maxClients]
          when shouldEnd $
            do bprintf Constants.printHigh "Fraglimit hit.\n"
               endDMLevel
   | otherwise = return ()
-  where readEdict edictRef =
-          do edict <- readRef edictRef
-             return (edictRef, edict)
 
 checkScore :: Int -> (Ref EdictT, EdictT) -> Quake Bool
 checkScore fragLimit (Ref idx, edict)
@@ -145,11 +150,35 @@ checkScore fragLimit (Ref idx, edict)
          return ((client^.gcResp.crScore) >= fragLimit)
   | otherwise = return False
 
-checkNeedPass :: Quake ()
-checkNeedPass = error "GameBase.checkNeedPass" -- TODO
+checkNeedPassword :: Quake ()
+checkNeedPassword =
+  do password <- infoPasswordCVar
+     spectatorPassword <- spectatorPasswordCVar
+     checkPassword password spectatorPassword
+
+checkPassword :: CVarT -> CVarT -> Quake ()
+checkPassword password spectatorPassword
+  | (password^.cvModified) || (spectatorPassword^.cvModified) =
+      do CVar.update (password & cvModified .~ False)
+         CVar.update (spectatorPassword & cvModified .~ False)
+         cVarSet <- use (gameBaseGlobals.gbGameImport.giCVarSet)
+         void (cVarSet "needpass" (encode need))
+  | otherwise = return ()
+  where needPassword = BC.map toLower (password^.cvString) /= "none"
+        needSpectatorPassword = BC.map toLower (spectatorPassword^.cvString) /= "none"
+        need | needPassword && needSpectatorPassword = 3 :: Int
+             | needSpectatorPassword = 2
+             | needPassword = 1
+             | otherwise = 0
 
 clientEndServerFrames :: Quake ()
-clientEndServerFrames = error "GameBase.clientEndServerFrames" -- TODO
+clientEndServerFrames =
+  do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+     mapM_ (fmap checkEdict . readEdict) [1..maxClients]
+  where checkEdict (edictRef, edict)
+          | (edict^.eInUse) && isJust (edict^.eClient) =
+              PlayerView.clientEndServerFrame edictRef
+          | otherwise = return ()
 
 runEntity :: Ref EdictT -> Quake ()
 runEntity = error "GameBase.runEntity" -- TODO
