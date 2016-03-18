@@ -1,18 +1,26 @@
 module Sys.IN
   ( centerView
+  , commands
+  , frame
   , initialize
   , realINInit
   , shutdown
   ) where
 
+import           Client.ClientStateT
+import           Client.ClientStaticT
+import           Client.RefExportT
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CVar as CVar
 import           QCommon.XCommandT (runXCommandT)
 import           QuakeState
+import           Render.Renderer
+import           Sys.KBD
 import           Types
 
-import           Control.Lens ((.=))
+import           Control.Lens (use, (^.), (.=))
+import           Control.Monad (when)
 import qualified Data.ByteString as B
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
@@ -67,3 +75,49 @@ toggleMouse = error "IN.toggleMouse" -- TODO
 
 centerView :: XCommandT
 centerView = error "IN.centerView" -- TODO
+
+frame :: Quake ()
+frame =
+  do cl <- use (globals.gCl)
+     keyDest <- use (globals.gCls.csKeyDest)
+     runFrame cl keyDest
+  where runFrame cl keyDest
+          | not (cl^.csCinematicPaletteActive) && (not (cl^.csRefreshPrepped) || keyDest == Constants.keyConsole || keyDest == Constants.keyMenu) =
+              deactivateMouse
+          | otherwise = activateMouse
+
+activateMouse :: Quake ()
+activateMouse =
+  do mouseAvail <- use (inGlobals.inMouseAvail)
+     mouseActive <- use (inGlobals.inMouseActive)
+     when (mouseAvail && not mouseActive) $
+       do kbdGlobals.kbdMx .= 0
+          kbdGlobals.kbdMy .= 0
+          installGrabs
+          inGlobals.inMouseActive .= True
+
+deactivateMouse :: Quake ()
+deactivateMouse =
+  do mouseActive <- use (inGlobals.inMouseActive)
+     when mouseActive $
+       do uninstallGrabs
+          inGlobals.inMouseActive .= False
+          
+installGrabs :: Quake ()
+installGrabs =
+  do renderer <- use (globals.gRenderer)
+     maybe rendererError doInstallGrabs renderer
+  where rendererError = error "IN.installGrabs renderer is Nothing"
+        doInstallGrabs renderer =
+          do renderer^.rRefExport.reGetKeyboardHandler.kbdInstallGrabs
+             inGlobals.inIgnoreFirst .= True
+
+uninstallGrabs :: Quake ()
+uninstallGrabs =
+  do renderer <- use (globals.gRenderer)
+     maybe rendererError doUninstallGrabs renderer
+  where rendererError = error "IN.uninstallGrabs renderer is Nothing"
+        doUninstallGrabs renderer = renderer^.rRefExport.reGetKeyboardHandler.kbdUninstallGrabs
+
+commands :: Quake ()
+commands = error "IN.commands" -- TODO

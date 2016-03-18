@@ -14,6 +14,7 @@ module QCommon.CVar
   , update
   , variableString
   , variableValue
+  , writeVariables
   ) where
 
 import qualified Constants
@@ -34,6 +35,7 @@ import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
 import           Data.Maybe (fromMaybe)
+import           System.IO (Handle, IOMode(ReadWriteMode), hSeek, hFileSize, SeekMode(AbsoluteSeek))
 
 getExisting :: B.ByteString -> Quake CVarT
 getExisting = fmap (fromMaybe (error "CVar.getExisting returned Nothing")) . findVar
@@ -143,3 +145,21 @@ updateLatchedVar var = maybe var updateVar (var^.cvLatchedString)
   where updateVar latchedString = var & cvString .~ latchedString
                                       & cvLatchedString .~ Nothing
                                       & cvValue .~ Lib.atof latchedString
+
+writeVariables :: B.ByteString -> Quake ()
+writeVariables path =
+  do fileHandle <- Lib.fOpen path ReadWriteMode
+     maybe (return ()) proceedWriteVariables fileHandle
+  where proceedWriteVariables fileHandle =
+          do vars <- use (globals.gCVars)
+             request (io $
+               do fileSize <- hFileSize fileHandle -- IMPROVE: exceptions
+                  hSeek fileHandle AbsoluteSeek fileSize
+                  mapM_ (writeVariable fileHandle) vars)
+             Lib.fClose fileHandle
+
+writeVariable :: Handle -> CVarT -> IO ()
+writeVariable fileHandle var
+  | (var^.cvFlags) .&. Constants.cvarArchive /= 0 =
+      B.hPut fileHandle (B.concat ["set ", var^.cvName, " \"", var^.cvString, "\"\n"])
+  | otherwise = return ()

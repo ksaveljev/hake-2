@@ -163,3 +163,12 @@ instance QuakeRef AreaNodeT where
     svGlobals.svAreaNodes.ix idx %= f
   writeRef (Ref idx) item =
     svGlobals.svAreaNodes.ix idx .= item
+
+instance QuakeRef CLeafT where
+  readRef (Ref idx) =
+    do leafs <- use (cmGlobals.cmMapLeafs)
+       return (leafs V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapLeafs.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapLeafs.ix idx .= item

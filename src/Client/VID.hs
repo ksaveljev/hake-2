@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Client.VID
-  ( getModeInfo
+  ( checkChanges
+  , getModeInfo
   , initialize
   , menuDrawF
   , menuInit

@@ -1,5 +1,6 @@
 module Client.Key
   ( initialize
+  , writeBindings
   ) where
 
 import           Client.KeyConstants
@@ -17,6 +18,7 @@ import           Data.Char (ord, toUpper, chr)
 import           Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import           System.IO (Handle)
 
 keyboardButtons :: [Int]
 keyboardButtons = 
@@ -124,3 +126,14 @@ keynumToString keynum =
           | keynum < 0 || keynum > 255 = "<KEY NOT FOUND>"
           | keynum > 32 && keynum < 127 = encode (chr keynum)
           | otherwise = fromMaybe "<UNKNOWN KEYNUM>" (keyNames V.! keynum)
+
+writeBindings :: Handle -> Quake ()
+writeBindings fileHandle =
+  do kb <- use (globals.gKeyBindings)
+     V.imapM_ (writeKeyBinding fileHandle) kb -- IMPROVE: move io outside
+
+writeKeyBinding :: Handle -> Int -> Maybe B.ByteString -> Quake ()
+writeKeyBinding _ _ Nothing = return ()
+writeKeyBinding fileHandle num (Just binding) =
+  do keyStr <- keynumToString num
+     request (io (B.hPut fileHandle (B.concat ["bind ", keyStr, " \"", binding, "\"\n"])))

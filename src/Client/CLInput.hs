@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Client.CLInput
   ( initializeInput
+  , sendCmd
   ) where
 
 import qualified Game.Cmd as Cmd
@@ -155,3 +156,6 @@ inputKeyDown = error "CLInput.inputKeyDown" -- TODO
 
 inputKeyUp :: Lens' QuakeState KButtonT -> Quake ()
 inputKeyUp = error "CLInput.inputKeyUp" -- TODO
+
+sendCmd :: Quake ()
+sendCmd = error "CL.sendCmd" -- TODO

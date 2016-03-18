@@ -41,6 +41,7 @@ executable hake2
   other-modules:       Client.CDLightT
                      , Client.CinematicsT
                      , Client.CL
+                     , Client.CLFX
                      , Client.ClientGlobals
                      , Client.ClientInfoT
                      , Client.ClientStateT
@@ -48,7 +49,9 @@ executable hake2
                      , Client.CLightStyleT
                      , Client.CLInput
                      , Client.CLParse
+                     , Client.CLPred
                      , Client.CLShared
+                     , Client.CLView
                      , Client.Console
                      , Client.ConsoleT
                      , Client.CParticleT
@@ -146,6 +149,7 @@ executable hake2
                      , Game.PlayerStateT
                      , Game.PlayerTrail
                      , Game.PlayerTrailGlobals
+                     , Game.PlayerView
                      , Game.PlayerWeapon
                      , Game.PMoveStateT
                      , Game.PMoveT
@@ -238,6 +242,7 @@ executable hake2
                      , Server.SVMain
                      , Server.SVMainShared
                      , Server.SVSend
+                     , Server.SVUser
                      , Server.SVWorld
                      , Sound.S
                      , Sys.IN
@@ -249,6 +254,7 @@ executable hake2
                      , Sys.NET
                      , Sys.NETGlobals
                      , Sys.Socket
+                     , Sys.Sys
                      , Sys.Timer
                      , Types
                      , Util.Binary

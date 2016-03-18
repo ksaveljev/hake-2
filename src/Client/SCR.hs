@@ -3,6 +3,9 @@ module Client.SCR
   ( beginLoadingPlaque
   , endLoadingPlaque
   , initialize
+  , runCinematic
+  , runConsole
+  , updateScreen
   ) where
 
 import           Client.ClientStateT
@@ -113,3 +116,9 @@ updateScreenF = XCommandT "SCR.updateScreenF" updateScreen2
 
 updateScreen2 :: Quake ()
 updateScreen2 = error "SCR.updateScreen2" -- TODO
+
+runCinematic :: Quake ()
+runCinematic = error "SCR.runCinematic" -- TODO
+
+runConsole :: Quake ()
+runConsole = error "SCR.runConsole" -- TODO

@@ -1,6 +1,8 @@
+{-# LANGUAGE Rank2Types #-}
 module QCommon.NetChannel
   ( initialize
   , outOfBandPrint
+  , process
   ) where
 
 import qualified Constants
@@ -9,6 +11,7 @@ import qualified Sys.Timer as Timer
 import           Types
 import           Util.Binary (encode)
 
+import           Control.Lens (Traversal', Lens')
 import           Control.Monad (void)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
@@ -26,3 +29,6 @@ initialCVars = [ ("showpackets", "0", 0)
 
 outOfBandPrint :: Int -> NetAdrT -> B.ByteString -> Quake ()
 outOfBandPrint = error "NetChannel.outOfBandPrint" -- TODO
+
+process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
+process = error "NetChannel.process" -- TODO

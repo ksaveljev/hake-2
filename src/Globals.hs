@@ -7,6 +7,7 @@ import           Client.ClientStateT (newClientStateT)
 import           Client.ClientStaticT (newClientStaticT)
 import           Client.ConsoleT (newConsoleT)
 import           Client.VidDefT (newVidDefT)
+import           QCommon.NetAdrT (newNetAdrT)
 import           QCommon.SizeBufT (newSizeBufT)
 import           Types
 
@@ -46,7 +47,9 @@ initialGlobals =
           , _gKeyBindings      = V.replicate 256 Nothing
           , _gKeyLines         = V.replicate 32 B.empty
           , _gKeyLinePos       = 0
+          , _gSysFrameTime     = 0
           , _gGunFrame         = 0
           , _gGunModel         = Nothing
+          , _gNetFrom          = newNetAdrT
           , _gRnd              = mkStdGen 0
           }

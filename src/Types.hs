@@ -128,8 +128,10 @@ data Globals = Globals
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
+  , _gSysFrameTime     :: Int
   , _gGunFrame         :: Int
   , _gGunModel         :: Maybe (IORef ModelT)
+  , _gNetFrom          :: NetAdrT
   , _gRnd              :: StdGen
   }
 

@@ -1,13 +1,19 @@
 module QCommon.CM
   ( areasConnected
+  , clusterPHS
+  , clusterPVS
   , entityString
   , inlineModel
+  , leafArea
+  , leafCluster
   , loadMap
   , numInlineModels
+  , pointLeafNum
   , setAreaPortalState
   ) where
 
 import           QCommon.CAreaT
+import           QCommon.CLeafT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FSShared as FS
@@ -26,6 +32,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
+import           Linear (V3)
 import           System.IO (Handle)
 
 setAreaPortalState :: Int -> Bool -> Quake ()
@@ -77,6 +84,7 @@ proceedLoadMap :: [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
 proceedLoadMap checksum (fileHandle, len) =
   do buf <- request (io (BL.hGet fileHandle len))
      cmGlobals.cmLastChecksum .= MD4.blockChecksum buf (fromIntegral len)
+     error "CM.proceedLoadMap" -- TODO
      return (Ref 0, 0 : tail checksum) -- TODO: fix this
 {-
            let Just buf = BL.fromStrict <$> loadedFile
@@ -184,3 +192,28 @@ floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
                  when (portalOpen UV.! (areaPortal^.dapPortalNum)) $
                    floodAreaR (Ref (areaPortal^.dapOtherArea)) floodValid floodNum
                  floodPortals area portalOpen (idx + 1) maxIdx
+
+pointLeafNum :: V3 Float -> Quake Int
+pointLeafNum = error "CM.pointLeafNum" -- TODO
+
+leafArea :: Int -> Quake Int
+leafArea leafNum =
+  do verifyLeafNum leafNum "CM_LeafArea: bad number"
+     fmap (^.clArea) (readRef (Ref leafNum))
+
+verifyLeafNum :: Int -> B.ByteString -> Quake ()
+verifyLeafNum leafNum errMsg =
+  do numLeafs <- use (cmGlobals.cmNumLeafs)
+     when (leafNum < 0 || leafNum >= numLeafs) $
+       Com.comError Constants.errDrop errMsg
+
+leafCluster :: Int -> Quake Int
+leafCluster leafNum =
+  do verifyLeafNum leafNum "CM_LeafCluster: bad number"
+     fmap (^.clCluster) (readRef (Ref leafNum))
+
+clusterPHS :: Int -> Quake B.ByteString
+clusterPHS = error "CM.clusterPHS" -- TODO
+
+clusterPVS :: Int -> Quake B.ByteString
+clusterPVS = error "CM.clusterPVS" -- TODO
