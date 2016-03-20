@@ -6,6 +6,7 @@ module Client.CL
   , writeConfiguration
   ) where
 
+import           Client.CheatVarT
 import qualified Client.CLFX as CLFX
 import           Client.ClientStateT
 import           Client.ClientStaticT
@@ -17,7 +18,6 @@ import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
 import qualified Client.Menu as Menu
-import qualified Client.CLParse as CLParse
 import           Client.RefDefT
 import qualified Client.SCR as SCR
 import qualified Client.V as V
@@ -45,13 +45,24 @@ import           Types
 import qualified Util.Lib as Lib
 
 import           Control.Concurrent (threadDelay)
-import           Control.Lens (use, (^.), (.=), (+=), (&), (.~))
-import           Control.Monad (unless, when)
+import           Control.Lens (preuse, use, ix, (^.), (.=), (+=), (&), (.~))
+import           Control.Monad (unless, when, void)
 import qualified Data.ByteString as B
+import qualified Data.Vector as Vector
 import           System.IO (Handle, IOMode(ReadWriteMode), hSeek, hSetFileSize, SeekMode(AbsoluteSeek))
 
 remoteCommandHeader :: B.ByteString
 remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
+
+cheatVars :: Vector.Vector CheatVarT
+cheatVars = Vector.fromList
+  [ CheatVarT "timescale" "1"          , CheatVarT "timedemo" "0"
+  , CheatVarT "r_drawworld" "1"        , CheatVarT "cl_testlights" "0"
+  , CheatVarT "r_fullbright" "0"       , CheatVarT "r_drawflat" "0"
+  , CheatVarT "paused" "0"             , CheatVarT "fixedtime" "0"
+  , CheatVarT "sw_draworder" "0"       , CheatVarT "gl_lightmap" "0"
+  , CheatVarT "gl_saturatelighting" "0"
+  ]
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
@@ -358,7 +369,19 @@ connectionlessPacket :: Quake ()
 connectionlessPacket = error "CL.connectionlessPacket" -- TODO
 
 fixCVarCheats :: Quake ()
-fixCVarCheats = error "CL.fixCVarCheats" -- TODO
+fixCVarCheats =
+  do maxClients <- preuse (globals.gCl.csConfigStrings.ix Constants.csMaxClients)
+     maybe maxClientsError checkSingleOrMultiplayer maxClients
+  where maxClientsError = error "CL.fixCVarCheats maxClients is Nothing"
+        checkSingleOrMultiplayer maxClients
+          | maxClients == "1" || B.null maxClients = return () -- single player can cheat
+          | otherwise = Vector.mapM_ fixCVar cheatVars
+
+fixCVar :: CheatVarT -> Quake ()
+fixCVar cheatVar =
+  do var <- CVar.getExisting (cheatVar^.chvName)
+     when ((var^.cvString) /= (cheatVar^.chvValue)) $
+       void (CVar.set (cheatVar^.chvName) (cheatVar^.chvValue))
 
 checkForResend :: Quake ()
 checkForResend = error "CL.checkForResend" -- TODO

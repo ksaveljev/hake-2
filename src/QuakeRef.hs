@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module QuakeRef where
 
+import           Client.ClientStateT
 import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
@@ -172,3 +173,12 @@ instance QuakeRef CLeafT where
     cmGlobals.cmMapLeafs.ix idx %= f
   writeRef (Ref idx) item =
     cmGlobals.cmMapLeafs.ix idx .= item
+
+instance QuakeRef UserCmdT where
+  readRef (Ref idx) =
+    do cmds <- use (globals.gCl.csCmds)
+       return (cmds V.! idx)
+  modifyRef (Ref idx) f =
+    globals.gCl.csCmds.ix idx %= f
+  writeRef (Ref idx) item =
+    globals.gCl.csCmds.ix idx .= item

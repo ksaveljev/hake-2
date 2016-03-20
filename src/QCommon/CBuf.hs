@@ -4,6 +4,7 @@ module QCommon.CBuf
   , addText
   , copyToDefer
   , execute
+  , executeText
   , initialize
   ) where
 
@@ -95,3 +96,6 @@ copyToDefer =
      globals.gDeferTextBuf .= B.take (cmdText^.sbCurSize) (cmdText^.sbData)
      globals.gCmdText %= (\v -> v & sbData .~ B.empty
                                   & sbCurSize .~ 0)
+
+executeText :: Int -> B.ByteString -> Quake ()
+executeText = error "CBuf.executeText" -- TODO

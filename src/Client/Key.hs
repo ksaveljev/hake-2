@@ -1,5 +1,6 @@
 module Client.Key
-  ( initialize
+  ( event
+  , initialize
   , writeBindings
   ) where
 
@@ -137,3 +138,6 @@ writeKeyBinding _ _ Nothing = return ()
 writeKeyBinding fileHandle num (Just binding) =
   do keyStr <- keynumToString num
      request (io (B.hPut fileHandle (B.concat ["bind ", keyStr, " \"", binding, "\"\n"])))
+
+event :: Int -> Bool -> Int -> Quake ()
+event = error "Key.event" -- TODO

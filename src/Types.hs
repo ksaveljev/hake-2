@@ -1984,6 +1984,11 @@ data LoopMsgT = LoopMsgT
   , _lmDataLen :: Int
   }
 
+data CheatVarT = CheatVarT
+  { _chvName  :: B.ByteString
+  , _chvValue :: B.ByteString
+  }
+
 data KeyFuncT = KeyFuncT
   { _kfName :: B.ByteString
   , _kfFunc :: Int -> Quake (Maybe B.ByteString)

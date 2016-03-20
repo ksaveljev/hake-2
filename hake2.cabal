@@ -39,6 +39,7 @@ executable hake2
   default-extensions:  OverloadedStrings
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CDLightT
+                     , Client.CheatVarT
                      , Client.CinematicsT
                      , Client.CL
                      , Client.CLFX
