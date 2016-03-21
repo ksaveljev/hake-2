@@ -8,6 +8,7 @@ module Sys.NET
   , config
   , getPacket
   , initialize
+  , sendPacket
   , sleep
   , stringToAdr
   ) where
@@ -28,8 +29,8 @@ import qualified Util.Lib as Lib
 
 import           Control.Concurrent (threadDelay)
 import           Control.Exception (IOException, handle)
-import           Control.Lens (Lens', preuse, use, ix, (^.), (.=), (+=), (&), (.~))
-import           Control.Monad (when)
+import           Control.Lens (Lens', preuse, use, ix, (^.), (.=), (+=), (%=), (&), (.~))
+import           Control.Monad (when, void)
 import           Data.Bits (shiftR, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -68,7 +69,7 @@ sleep msec =
      dedicated <- dedicatedCVar
      proceedSleep ipSocketServer dedicated
   where proceedSleep Nothing _ = return ()
-        proceedSleep (Just socketServer) dedicated
+        proceedSleep (Just _) dedicated
           | (dedicated^.cvValue) == 0 = return ()
           | otherwise = request (io netSleep)
         netSleep =
@@ -177,3 +178,32 @@ compareBaseAdr a b
 
 compareAdr :: NetAdrT -> NetAdrT -> Bool
 compareAdr a b = (a^.naIP) == (b^.naIP) && (a^.naPort) == (b^.naPort)
+
+sendPacket :: Int -> Int -> B.ByteString -> NetAdrT -> Quake ()
+sendPacket sock len buf adr
+  | (adr^.naType) == Constants.naLoopback = sendLoopPacket sock len buf
+  | sock == Constants.nsServer = doSendPacket buf adr =<< use (netGlobals.ngIpSocketServer)
+  | otherwise = doSendPacket buf adr =<< use (netGlobals.ngIpSocketClient)
+
+doSendPacket :: B.ByteString -> NetAdrT -> Maybe Socket -> Quake ()
+doSendPacket _ _ Nothing = return ()
+doSendPacket buf adr (Just sock)
+  | (adr^.naType) `notElem` [Constants.naBroadcast, Constants.naIp] =
+      Com.fatalError "NET_SendPacket: bad address type"
+  | otherwise = maybe addressIPError doSend (adr^.naIP)
+  where addressIPError = error "NET.doSendPacket adr^.naIP is Nothing"
+        doSend ip = void (request (io (Socket.sendTo sock buf ip (adr^.naPort))))
+
+sendLoopPacket :: Int -> Int -> B.ByteString -> Quake ()
+sendLoopPacket sock len buf
+  | sock == Constants.nsServer = doSendLoopPacket buf len (netGlobals.ngLoopbackClient)
+  | otherwise = doSendLoopPacket buf len (netGlobals.ngLoopbackServer)
+
+doSendLoopPacket :: B.ByteString -> Int -> Lens' QuakeState LoopbackT -> Quake ()
+doSendLoopPacket buf len socketLens =
+  do loop <- use socketLens
+     socketLens.lSend += 1
+     setMsgData ((loop^.lSend) .&. (maxLoopback - 1))
+  where setMsgData idx =
+          socketLens.lMsgs.ix idx %= (\v -> v & lmData .~ buf
+                                              & lmDataLen .~ len)

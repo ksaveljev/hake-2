@@ -1,5 +1,6 @@
 module Client.Menu
-  ( initialize
+  ( draw
+  , initialize
   , menuAddItem
   , menuCenter
   ) where
@@ -436,3 +437,6 @@ menuAdjustCursor = error "Menu.menuAdjustCursor" -- TODO
 
 popMenu :: Quake ()
 popMenu = error "Menu.popMenu" -- TODO
+
+draw :: Quake ()
+draw = error "Menu.draw" -- TODO

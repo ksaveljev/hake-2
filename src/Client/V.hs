@@ -1,5 +1,6 @@
 module Client.V
   ( initialize
+  , renderView
   ) where
 
 import           Client.ClientStateT
@@ -81,3 +82,6 @@ printPos refDef = Com.printf (BC.pack line)
         orgY = truncate (refDef^.rdViewOrg._y) :: Int
         orgZ = truncate (refDef^.rdViewOrg._z) :: Int
         angleY = truncate (refDef^.rdViewAngles._y) :: Int
+
+renderView :: Float -> Quake ()
+renderView = error "V.renderView" -- TODO

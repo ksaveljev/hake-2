@@ -31,6 +31,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.FS as FS
+import           QCommon.NetAdrT
 import qualified QCommon.NetChannel as NetChannel
 import           QCommon.NetChanT
 import           QCommon.SizeBufT
@@ -42,6 +43,7 @@ import qualified Sys.NET as NET
 import qualified Sys.Sys as Sys
 import qualified Sys.Timer as Timer
 import           Types
+import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
 import           Control.Concurrent (threadDelay)
@@ -384,4 +386,52 @@ fixCVar cheatVar =
        void (CVar.set (cheatVar^.chvName) (cheatVar^.chvValue))
 
 checkForResend :: Quake ()
-checkForResend = error "CL.checkForResend" -- TODO
+checkForResend =
+  do state <- use (globals.gCls.csState)
+     serverState <- use (globals.gServerState)
+     doCheckForResend state serverState
+  where doCheckForResend state serverState
+          | state == Constants.caDisconnected && serverState /= 0 =
+              do globals.gCls.csState .= Constants.caConnecting
+                 globals.gCls.csServerName .= "localhost"
+                 sendConnectPacket
+          | otherwise =
+              do realTime <- use (globals.gCls.csRealTime)
+                 connectTime <- use (globals.gCls.csConnectTime)
+                 unless (state /= Constants.caConnecting || (fromIntegral realTime - connectTime) < 3000) $
+                   do serverName <- use (globals.gCls.csServerName)
+                      adrMaybe <- NET.stringToAdr serverName
+                      maybe badServerError (resend realTime serverName) adrMaybe
+        badServerError =
+          do Com.printf "Bad server address\n"
+             globals.gCls.csState .= Constants.caDisconnected
+
+resend :: Int -> B.ByteString -> NetAdrT -> Quake ()
+resend realTime serverName adr =
+  do globals.gCls.csConnectTime .= fromIntegral realTime
+     Com.printf (B.concat ["Connecting to ", serverName, "...\n"])
+     NetChannel.outOfBandPrint Constants.nsClient address "getchallenge\n"
+  where address | (adr^.naPort) == 0 = adr & naPort .~ Constants.portServer
+                | otherwise = adr
+
+sendConnectPacket :: Quake ()
+sendConnectPacket =
+  do serverName <- use (globals.gCls.csServerName)
+     adr <- NET.stringToAdr serverName
+     maybe badServerError doSendConnectPacket adr
+  where badServerError =
+          do Com.printf "Bad server address\n"
+             globals.gCls.csConnectTime .= 0
+
+doSendConnectPacket :: NetAdrT -> Quake ()
+doSendConnectPacket adr =
+  do port <- fmap truncate (CVar.variableValue "qport") :: Quake Int
+     challenge <- use (globals.gCls.csChallenge)
+     userInfo <- CVar.userInfo
+     globals.gUserInfoModified .= False
+     NetChannel.outOfBandPrint Constants.nsClient address (connectString port challenge userInfo)
+  where address | (adr^.naPort) == 0 = adr & naPort .~ Constants.portServer
+                | otherwise = adr
+        connectString port challenge userInfo =
+          B.concat [ "connect ", encode Constants.protocolVersion, " "
+                   , encode port, " ", encode challenge, " \"", userInfo, "\"\n"]

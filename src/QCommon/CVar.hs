@@ -12,6 +12,7 @@ module QCommon.CVar
   , setValueF
   , setValueI
   , update
+  , userInfo
   , variableString
   , variableValue
   , writeVariables
@@ -163,3 +164,6 @@ writeVariable fileHandle var
   | (var^.cvFlags) .&. Constants.cvarArchive /= 0 =
       B.hPut fileHandle (B.concat ["set ", var^.cvName, " \"", var^.cvString, "\"\n"])
   | otherwise = return ()
+
+userInfo :: Quake B.ByteString
+userInfo = bitInfo Constants.cvarUserInfo

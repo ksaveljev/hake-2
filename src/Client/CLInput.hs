@@ -5,21 +5,32 @@ module Client.CLInput
   , sendCmd
   ) where
 
+import           Client.CLShared as CL
 import           Client.ClientStateT
 import           Client.ClientStaticT
+import           Client.FrameT
 import           Client.KButtonT
+import qualified Client.SCR as SCR
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
+import           Game.PlayerStateT
+import           Game.PMoveStateT
 import           Game.UserCmdT
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
+import qualified QCommon.MSG as MSG
+import qualified QCommon.NetChannel as NetChannel
 import           QCommon.NetChanT
+import           QCommon.SizeBufT
+import qualified QCommon.SZ as SZ
 import           QuakeRef
 import           QuakeState
 import qualified Sys.IN as IN
 import           Types
 import qualified Util.Lib as Lib
+import qualified Util.Math3D as Math3D
 
 import           Control.Lens (Lens', use, ix, (^.), (.=), (%=), (&), (.~), (+~), (-~), (*~), (%~))
 import           Control.Monad (void, when)
@@ -63,6 +74,9 @@ initialCommands =
   , ("+klook", Just kLookDown)
   , ("-klook", Just kLookUp)
   ]
+
+nullcmd :: UserCmdT
+nullcmd = newUserCmdT
 
 initializeInput :: Quake ()
 initializeInput =
@@ -176,7 +190,79 @@ sendCmd =
      doSendCmd cmdRef =<< use (globals.gCls.csState)
 
 doSendCmd :: Ref UserCmdT -> Int -> Quake ()
-doSendCmd cmdRef state = error "CLInput.sendCmd" -- TODO
+doSendCmd cmdRef state
+  | state `elem` [Constants.caDisconnected, Constants.caConnecting] = return ()
+  | state == Constants.caConnected =
+      do curSize <- use (globals.gCls.csNetChan.ncMessage.sbCurSize)
+         curTime <- use (globals.gCurTime)
+         lastSent <- use (globals.gCls.csNetChan.ncLastSent)
+         when (curSize /= 0 || (curTime - lastSent) > 1000) $
+           NetChannel.transmit (globals.gCls.csNetChan) 0 B.empty
+  | otherwise =
+      do sendUserUpdate =<< use (globals.gUserInfoModified)
+         SZ.initialize (clientGlobals.cgBuf) B.empty 128
+         checkSkipCinematics
+         MSG.writeByteI (clientGlobals.cgBuf) (fromIntegral Constants.clcMove)
+         checksumIndex <- use (clientGlobals.cgBuf.sbCurSize)
+         MSG.writeByteI (clientGlobals.cgBuf) 0
+         setCompressionInfo
+         writeCommandsToBuf =<< use (globals.gCls.csNetChan.ncOutgoingSequence)
+         calculateChecksum checksumIndex
+         deliverMessage
+  where checkSkipCinematics =
+          do shouldSkip <- shouldSkipCinematic cmdRef
+             when shouldSkip SCR.finishCinematic
+
+sendUserUpdate :: Bool -> Quake ()
+sendUserUpdate False = return ()
+sendUserUpdate True =
+  do CL.fixUpGender
+     globals.gUserInfoModified .= False
+     MSG.writeByteI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcUserInfo)
+     MSG.writeString (globals.gCls.csNetChan.ncMessage) =<< CVar.userInfo
+
+shouldSkipCinematic :: Ref UserCmdT -> Quake Bool
+shouldSkipCinematic cmdRef =
+  do cmd <- readRef cmdRef
+     realTime <- use (globals.gCls.csRealTime)
+     cl <- use (globals.gCl)
+     return ((cmd^.ucButtons) /= 0 && (cl^.csCinematicTime) > 0 && not (cl^.csAttractLoop) && realTime - (cl^.csCinematicTime) > 1000)
+
+setCompressionInfo :: Quake ()
+setCompressionInfo =
+  do noDelta <- clNoDeltaCVar
+     validFrame <- use (globals.gCl.csFrame.fValid)
+     demoWaiting <- use (globals.gCls.csDemoWaiting)
+     doSetCompressionInfo noDelta validFrame demoWaiting
+  where doSetCompressionInfo noDelta validFrame demoWaiting
+          | (noDelta^.cvValue) /= 0 || not validFrame || demoWaiting =
+              MSG.writeLong (clientGlobals.cgBuf) (-1)
+          | otherwise =
+              MSG.writeLong (clientGlobals.cgBuf) =<< use (globals.gCl.csFrame.fServerFrame)
+
+writeCommandsToBuf :: Int -> Quake ()
+writeCommandsToBuf outgoingSequence =
+  do cmdI <- readRef (Ref i)
+     cmdJ <- readRef (Ref j)
+     cmdK <- readRef (Ref k)
+     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) nullcmd cmdI
+     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) cmdI cmdJ
+     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) cmdJ cmdK
+  where i = (outgoingSequence - 2) .&. (Constants.cmdBackup - 1)
+        j = (outgoingSequence - 1) .&. (Constants.cmdBackup - 1)
+        k = outgoingSequence .&. (Constants.cmdBackup - 1)
+
+deliverMessage :: Quake ()
+deliverMessage =
+  do buf <- use (clientGlobals.cgBuf)
+     NetChannel.transmit (globals.gCls.csNetChan) (buf^.sbCurSize) (buf^.sbData)
+
+calculateChecksum :: Int -> Quake ()
+calculateChecksum checksumIndex =
+  do buf <- use (clientGlobals.cgBuf)
+     outgoingSequence <- use (globals.gCls.csNetChan.ncOutgoingSequence)
+     crcByte <- Com.blockSequenceCRCByte (buf^.sbData) (checksumIndex + 1) ((buf^.sbCurSize) - checksumIndex - 1) outgoingSequence
+     clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData)) -- IMPROVE?
 
 saveCommandForPrediction :: ClientStaticT -> Quake (Ref UserCmdT)
 saveCommandForPrediction cls =
@@ -264,7 +350,16 @@ finishMove cmdRef =
      checkKeyDown cmdRef
      calcMs cmdRef =<< use (globals.gCls.csFrameTime)
      clampPitch
-     undefined -- TODO
+     updateViewAngles =<< use (globals.gCl.csViewAngles)
+     updateImpulse =<< use (clientGlobals.cgInImpulse)
+     updateLightLevel =<< clLightLevelCVar
+  where updateViewAngles viewAngles =
+          modifyRef cmdRef (\v -> v & ucAngles .~ fmap Math3D.angleToShort viewAngles)
+        updateImpulse inImpulse =
+          do modifyRef cmdRef (\v -> v & ucImpulse .~ fromIntegral inImpulse)
+             clientGlobals.cgInImpulse .= 0
+        updateLightLevel lightLevel =
+          modifyRef cmdRef (\v -> v & ucLightLevel .~ truncate (lightLevel^.cvValue))
 
 checkInAttack :: Ref UserCmdT -> Quake ()
 checkInAttack cmdRef =
@@ -345,4 +440,15 @@ adjustAngles =
           | otherwise = return ()
 
 clampPitch :: Quake ()
-clampPitch = error "CLInput.clampPitch" -- TODO
+clampPitch =
+  do pitch <- use (globals.gCl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles._x)
+     doClampPitch (Math3D.shortToAngle (fromIntegral pitch))
+
+doClampPitch :: Float -> Quake ()
+doClampPitch p =
+  do globals.gCl.csViewAngles._x %= (\v -> if v + pitch < (-360) then v + 360 else v)
+     globals.gCl.csViewAngles._x %= (\v -> if v + pitch > 360 then v - 360 else v)
+     globals.gCl.csViewAngles._x %= (\v -> if v + pitch > 89 then 89 - pitch else v)
+     globals.gCl.csViewAngles._x %= (\v -> if v + pitch < (-89) then (-89 - pitch) else v)
+  where pitch | p > 180 = p - 360
+              | otherwise = p

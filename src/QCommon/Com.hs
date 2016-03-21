@@ -1,5 +1,6 @@
 module QCommon.Com
   ( argv
+  , blockSequenceCRCByte
   , clearArgv
   , comError
   , dprintf
@@ -21,6 +22,7 @@ import qualified Data.ByteString.Char8 as BC
 import           Data.Char (chr)
 import           Data.Maybe (fromMaybe)
 import qualified Data.Vector as V
+import           Data.Word (Word8)
 
 initializeArgv :: [String] -> Quake ()
 initializeArgv args =
@@ -100,3 +102,7 @@ skipToEOL str startIdx =
   let droppedStr = B.drop startIdx str
       notEOL c = c /= '\n' && c /= chr 0
   in startIdx + B.length (BC.takeWhile notEOL droppedStr)
+
+blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
+blockSequenceCRCByte _ _ _ _ =
+  request (io (putStrLn ("Com.blockSequenceCRCByte IMPLEMENT ME!"))) >> return 0

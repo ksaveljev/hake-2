@@ -1,13 +1,19 @@
 module Util.Math3D
-  ( angleVectors
+  ( angleToShort
+  , angleVectors
   , projectSource
+  , shortToAngle
   ) where
 
 import Control.Lens ((^.))
+import Data.Int (Int16)
 import Linear (V3(..), _x, _y, _z)
 
 piRatio :: Float
 piRatio = pi / 360
+
+shortRatio :: Float
+shortRatio = 360.0 / 65536.0
 
 angleVectors :: V3 Float -> Bool -> Bool -> Bool -> (V3 Float, V3 Float, V3 Float)
 angleVectors angles setForward setRight setUp = (forward, right, up)
@@ -34,3 +40,9 @@ projectSource point distance forward right = V3 a b c
   where a = (point^._x) + (forward^._x) * (distance^._x) + (right^._x) * (distance^._y)
         b = (point^._y) + (forward^._y) * (distance^._x) + (right^._y) * (distance^._y)
         c = (point^._z) + (forward^._z) * (distance^._x) + (right^._z) * (distance^._y) + (distance^._z)
+
+shortToAngle :: Int -> Float
+shortToAngle x = (fromIntegral x) * shortRatio
+
+angleToShort :: Float -> Int16
+angleToShort x = truncate (x / shortRatio)

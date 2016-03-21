@@ -49,6 +49,7 @@ executable hake2
                      , Client.ClientStaticT
                      , Client.CLightStyleT
                      , Client.CLInput
+                     , Client.CLInv
                      , Client.CLParse
                      , Client.CLPred
                      , Client.CLShared

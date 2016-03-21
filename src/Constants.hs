@@ -1600,6 +1600,15 @@ glDistanceAttenuationExt    = 0x8129 :: Int
 maxVertices :: Int
 maxVertices = 64
 
+-- move from Game.PMoveT
+pmfDucked        =  1 :: Int8
+pmfJumpHeld      =  2 :: Int8
+pmfOnGround      =  4 :: Int8
+pmfTimeWaterJump =  8 :: Int8
+pmfTimeLand      = 16 :: Int8
+pmfTimeTeleport  = 32 :: Int8
+pmfNoPrediction  = 64 :: Int8
+
 byteDirs :: V.Vector (V3 Float)
 byteDirs =
     V.fromList [ V3 (-0.525731)   0.000000    0.850651

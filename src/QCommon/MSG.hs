@@ -4,6 +4,9 @@ module QCommon.MSG
   , readShort
   , readLong
   , writeByteI
+  , writeDeltaUserCmd
+  , writeInt
+  , writeLong
   , writeString
   ) where
 
@@ -13,7 +16,7 @@ import qualified QCommon.SZ as SZ
 import           Types
 
 import           Control.Lens (Traversal', Lens', use, (^.), (.=), (+=))
-import           Data.Bits (shiftL, (.&.), (.|.))
+import           Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import           Data.Int (Int16, Int32)
 import           Data.Word (Word8, Word16, Word32)
@@ -21,6 +24,18 @@ import           Data.Word (Word8, Word16, Word32)
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1
   where c' = fromIntegral (c .&. 0xFF) :: Word8
+
+writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeInt sizeBufLens v = do -- IMPROVE?
+    let v' = fromIntegral v :: Word32
+        a = fromIntegral (v' .&. 0xFF) :: Word8
+        b = fromIntegral ((v' `shiftR` 8) .&. 0xFF) :: Word8
+        c = fromIntegral ((v' `shiftR` 16) .&. 0xFF) :: Word8
+        d = fromIntegral ((v' `shiftR` 24) .&. 0xFF) :: Word8
+    SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
+
+writeLong :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeLong sizeBufLens v = writeInt sizeBufLens v
 
 writeString :: Traversal' QuakeState SizeBufT -> B.ByteString -> Quake ()
 writeString sizeBufLens str = do
@@ -66,3 +81,6 @@ doReadLong sizeBufLens sizeBuf
         c = fromIntegral (B.index buf (readCount + 2)) :: Word32
         d = fromIntegral (B.index buf (readCount + 3)) :: Word32
         result = fromIntegral (a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)) :: Int32
+
+writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
+writeDeltaUserCmd = error "MSG.writeDeltaUserCmd" -- TODO
