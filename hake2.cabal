@@ -42,6 +42,7 @@ executable hake2
                      , Client.CheatVarT
                      , Client.CinematicsT
                      , Client.CL
+                     , Client.CLEnts
                      , Client.CLFX
                      , Client.ClientGlobals
                      , Client.ClientInfoT
@@ -59,11 +60,13 @@ executable hake2
                      , Client.CParticleT
                      , Client.DirtyT
                      , Client.DLightT
+                     , Client.EntityT
                      , Client.FrameT
                      , Client.KButtonT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
+                     , Client.LightStyleT
                      , Client.M
                      , Client.Menu
                      , Client.MenuActionS
@@ -80,12 +83,15 @@ executable hake2
                      , Client.RefExportT
                      , Client.SCR
                      , Client.SCRGlobals
+                     , Client.SCRShared
                      , Client.V
+                     , Client.VGlobals
                      , Client.VID
                      , Client.VidDefT
                      , Client.VIDGlobals
                      , Client.VidModeT
                      , Client.VidModes
+                     , Client.VRectT
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT
@@ -262,3 +268,4 @@ executable hake2
                      , Util.Binary
                      , Util.Lib
                      , Util.Math3D
+                     , Util.Unsafe

@@ -10,6 +10,7 @@ import Client.KeyGlobals as X
 import Client.MenuGlobals as X
 import Client.ParticleTGlobals as X
 import Client.SCRGlobals as X
+import Client.VGlobals as X
 import Client.VIDGlobals as X
 import Game.CmdGlobals as X
 import Game.GameBaseGlobals as X
@@ -59,4 +60,5 @@ initialQuakeState =
              , _scrGlobals           = initialSCRGlobals
              , _netGlobals           = initialNETGlobals
              , _playerTrailGlobals   = initialPlayerTrailGlobals
+             , _vGlobals             = initialVGlobals
              }

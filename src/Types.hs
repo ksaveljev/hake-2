@@ -60,6 +60,7 @@ data QuakeState = QuakeState
   , _scrGlobals           :: SCRGlobals
   , _netGlobals           :: NETGlobals
   , _playerTrailGlobals   :: PlayerTrailGlobals
+  , _vGlobals             :: VGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -128,6 +129,7 @@ data Globals = Globals
   , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
   , _gKeyLines         :: V.Vector B.ByteString
   , _gKeyLinePos       :: Int
+  , _gScrVRect         :: VRectT
   , _gSysFrameTime     :: Int
   , _gGunFrame         :: Int
   , _gGunModel         :: Maybe (IORef ModelT)
@@ -533,6 +535,15 @@ data PlayerTrailGlobals = PlayerTrailGlobals
   { _ptTrail       :: V.Vector (Ref EdictT)
   , _ptTrailHead   :: Int
   , _ptTrailActive :: Bool
+  }
+
+data VGlobals = VGlobals
+  { _vgNumDLights   :: Int
+  , _vgNumEntities  :: Int
+  , _vgNumParticles :: Int
+  , _vgLightStyles  :: V.Vector LightStyleT
+  , _vgDLights      :: V.Vector DLightT
+  , _vgEntities     :: V.Vector EntityT
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1442,7 +1453,7 @@ data RefDefT = RefDefT
   , _rdAreaBits     :: UV.Vector Word8
   , _rdLightStyles  :: V.Vector LightStyleT
   , _rdNumEntities  :: Int
-  , _rdEntities     :: V.Vector (IORef EntityT)
+  , _rdEntities     :: V.Vector EntityT
   , _rdNumDLights   :: Int
   , _rdDLights      :: V.Vector DLightT
   , _rdNumParticles :: Int
@@ -1987,6 +1998,13 @@ data LoopMsgT = LoopMsgT
 data CheatVarT = CheatVarT
   { _chvName  :: B.ByteString
   , _chvValue :: B.ByteString
+  }
+
+data VRectT = VRectT
+  { _vrX      :: Int
+  , _vrY      :: Int
+  , _vrWidth  :: Int
+  , _vrHeight :: Int
   }
 
 data KeyFuncT = KeyFuncT

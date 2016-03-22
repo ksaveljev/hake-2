@@ -1,10 +1,16 @@
 module Client.Console
-  ( clearNotify
+  ( checkResize
+  , clearNotify
+  , drawConsole
+  , drawNotify
   , initialize
   , toggleConsoleF
   ) where
 
+import           Client.ClientStaticT
 import           Client.ConsoleT
+import           Client.RefExportT
+import qualified Client.SCRShared as SCR
 import           Client.VidDefT
 import qualified Constants
 import qualified Game.Cmd as Cmd
@@ -12,14 +18,20 @@ import qualified QCommon.CVar as CVar
 import qualified QCommon.Com as Com
 import           QuakeState
 import           QuakeIOState
+import           Render.Renderer
 import           Types
+import           Util.Unsafe
 
 import           Control.Lens (use, (.=), (^.))
-import           Control.Monad (void)
-import           Data.Bits (shiftR)
+import           Control.Monad (void, unless)
+import           Data.Bits (shiftR, shiftL)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (ord)
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
+import           System.IO (Handle)
+import           Text.Printf (printf)
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
@@ -117,3 +129,81 @@ dumpF = XCommandT "Console.dumpF" $
   
 clearNotify :: Quake ()
 clearNotify = globals.gCon.cTimes .= UV.replicate Constants.numConTimes 0
+
+drawConsole :: Float -> VidDefT -> Quake ()
+drawConsole frac vidDef =
+  do renderer <- use (globals.gRenderer)
+     maybe rendererError (doDrawConsole frac vidDef) renderer
+  where rendererError = Com.fatalError "Console.drawConsole renderer is Nothing"
+
+doDrawConsole :: Float -> VidDefT -> Renderer -> Quake ()
+doDrawConsole frac vidDef renderer =
+  unless (tmpLinesNum <= 0) $
+    do (renderer^.rRefExport.reDrawStretchPic) 0 (-height + linesNum) width height "conback"
+       SCR.addDirtyPoint 0 0
+       SCR.addDirtyPoint (width - 1) (linesNum - 1)
+       drawVersion renderer version width linesNum 0 5
+       globals.gCon.cVisLines .= linesNum
+       console <- use (globals.gCon)
+       (rows, y) <- calcRowsAndDrawArrows renderer console linesNum
+       drawText renderer console (console^.cDisplay) y 0 rows
+       checkDownload =<< use (globals.gCls.csDownload)
+       drawInput renderer
+  where width = vidDef^.vdWidth
+        height = vidDef^.vdHeight
+        tmpLinesNum = truncate ((fromIntegral height) * frac)
+        linesNum | tmpLinesNum > height = height
+                 | otherwise = tmpLinesNum
+        version = BC.pack (printf "v%4.2f" Constants.version)
+        
+drawText :: Renderer -> ConsoleT -> Int -> Int -> Int -> Int -> Quake ()
+drawText renderer console row y idx maxIdx
+  | idx >= maxIdx || row < 0 || (console^.cCurrent) - row >= (console^.cTotalLines) = return ()
+  | otherwise = do
+      text <- fmap (mVectorToByteString 'a') (request (use cText))
+      drawLine drawChar text first y 0 (console^.cLineWidth)
+      drawText renderer console (row - 1) (y - 8) (idx + 1) maxIdx
+  where first = (row `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+        drawChar = renderer^.rRefExport.reDrawChar
+
+drawLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+drawLine drawChar text first y idx maxIdx
+  | idx >= maxIdx = return ()
+  | otherwise = do
+      let ch = text `BC.index` (idx + first)
+      drawChar ((idx + 1) `shiftL` 3) y $! (ord ch)
+      drawLine drawChar text first y (idx + 1) maxIdx
+
+-- IMPROVE: mapM_ or something
+drawVersion :: Renderer -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+drawVersion renderer version width linesNum idx maxIdx
+  | idx >= maxIdx = return ()
+  | otherwise = do
+      (renderer^.rRefExport.reDrawChar) (width - 44 + idx * 8) (linesNum - 12) (128 + ord (BC.index version idx))
+      drawVersion renderer version width linesNum (idx + 1) maxIdx
+
+calcRowsAndDrawArrows :: Renderer -> ConsoleT -> Int -> Quake (Int, Int)
+calcRowsAndDrawArrows renderer console linesNum
+  | (console^.cDisplay) /= (console^.cCurrent) =
+      do drawArrows renderer 0 (console^.cLineWidth) y
+         return (rows - 1, y - 8)
+  | otherwise = return (rows, y)
+  where rows = (linesNum - 22) `shiftR` 3
+        y = linesNum - 30
+        
+drawArrows :: Renderer -> Int -> Int -> Int -> Quake ()
+drawArrows renderer x maxX y
+  | x >= maxX = return ()
+  | otherwise = do
+      (renderer^.rRefExport.reDrawChar) ((x + 1) `shiftL` 3) y (ord '^')
+      drawArrows renderer (x + 4) maxX y
+
+checkDownload :: Maybe Handle -> Quake ()
+checkDownload Nothing = return ()
+checkDownload _ = error "Console.checkDownload" -- TODO
+
+drawNotify :: Quake ()
+drawNotify = error "Console.drawNotify" -- TODO
+
+drawInput :: Renderer -> Quake ()
+drawInput = error "Console.drawInput" -- TODO

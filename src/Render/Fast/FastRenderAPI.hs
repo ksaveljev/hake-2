@@ -8,6 +8,7 @@ import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import           QuakeState
@@ -20,9 +21,10 @@ import           Render.GLStateT
 import           Render.OpenGL.GLDriver
 import           Types
 
+import           Control.Applicative (liftA2)
 import           Control.Exception (handle, IOException)
-import           Control.Lens (use, (^.), (.=), (&), (.~))
-import           Control.Monad (void, when, unless)
+import           Control.Lens (use, (^.), (.=), (%=), (+=), (&), (.~))
+import           Control.Monad (void, when, unless, join)
 import           Data.Bits ((.|.), (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -286,7 +288,89 @@ fastSetPalette :: Maybe B.ByteString -> Quake ()
 fastSetPalette = error "FastRenderAPI.fastSetPalette" -- TODO
 
 fastBeginFrame :: GLDriver -> Float -> Quake ()
-fastBeginFrame = error "FastRenderAPI.fastBeginFrame" -- TODO
+fastBeginFrame glDriver cameraSeparation =
+  do updateVidDef =<< use (fastRenderAPIGlobals.frVid)
+     fastRenderAPIGlobals.frGLState.glsCameraSeparation .= cameraSeparation
+     join (liftA2 changeModeIfNeeded vidFullScreenCVar glModeCVar)
+     checkGLLog glDriver =<< glLogCVar
+     checkVidGamma =<< vidGammaCVar
+     (glDriver^.gldBeginFrame) cameraSeparation
+     setGL2D =<< use (fastRenderAPIGlobals.frVid)
+     drawBufferStuff =<< glDrawBufferCVar
+     textureModeStuff
+     glUpdateSwapInterval glDriver
+     join (liftA2 rClear glZTrickCVar glClearCVar)
+
+updateVidDef :: VidDefT -> Quake ()
+updateVidDef vid =
+  do fastRenderAPIGlobals.frVid %= (\v -> v & vdWidth .~ (vid^.vdNewWidth)
+                                            & vdHeight .~ (vid^.vdNewHeight))
+
+changeModeIfNeeded :: CVarT -> CVarT -> Quake ()
+changeModeIfNeeded fullScreen glMode
+  | (fullScreen^.cvModified) || (glMode^.cvModified) =
+      do ref <- CVar.get "vid_ref" "GLFWb" 0
+         maybe vidRefError updateVar ref
+  | otherwise = return ()
+  where vidRefError = Com.fatalError "FastRenderAPI.changeModeIfNeeded ref is Nothing"
+        updateVar ref = CVar.update (ref & cvModified .~ True)
+
+checkGLLog :: GLDriver -> CVarT -> Quake ()
+checkGLLog glDriver glLog =
+  do when (glLog^.cvModified) $
+       do (glDriver^.gldEnableLogging) logEnabled
+          CVar.update (glLog & cvModified .~ False)
+     when logEnabled (glDriver^.gldLogNewFrame)
+  where logEnabled = (glLog^.cvValue) /= 0
+
+checkVidGamma :: CVarT -> Quake ()
+checkVidGamma vidGamma
+  | vidGamma^.cvModified =
+      do CVar.update (vidGamma & cvModified .~ False)
+         r <- use (fastRenderAPIGlobals.frGLConfig.glcRenderer)
+         when (r .&. Constants.glRendererVoodoo /= 0) $
+           VID.printf Constants.printDeveloper "gamma anpassung fuer VOODOO nicht gesetzt"
+  | otherwise = return ()
+
+drawBufferStuff :: CVarT -> Quake ()
+drawBufferStuff drawBuffer
+  | drawBuffer^.cvModified =
+      do CVar.update (drawBuffer & cvModified .~ False)
+         glState <- use (fastRenderAPIGlobals.frGLState)
+         when ((glState^.glsCameraSeparation) == 0 || not (glState^.glsStereoEnabled)) $
+           request (io (drawFrontOrBackBuffer (BC.map toUpper (drawBuffer^.cvString))))
+  | otherwise = return ()
+  where drawFrontOrBackBuffer buf
+          | buf == "GL_FRONT" = GL.glDrawBuffer GL.GL_FRONT
+          | otherwise = GL.glDrawBuffer GL.GL_BACK
+
+textureModeStuff :: Quake ()
+textureModeStuff =
+  do checkTextureMode =<< glTextureModeCVar
+     checkTextureAlphaMode =<< glTextureAlphaModeCVar
+     checkTextureSolidMode =<< glTextureSolidModeCVar
+
+checkTextureMode :: CVarT -> Quake ()
+checkTextureMode textureMode
+  | textureMode^.cvModified =
+      do Image.glTextureMode (textureMode^.cvString)
+         CVar.update (textureMode & cvModified .~ False)
+  | otherwise = return ()
+
+
+checkTextureAlphaMode :: CVarT -> Quake ()
+checkTextureAlphaMode textureAlphaMode
+  | textureAlphaMode^.cvModified =
+      do Image.glTextureAlphaMode (textureAlphaMode^.cvString)
+         CVar.update (textureAlphaMode & cvModified .~ False)
+  | otherwise = return ()
+
+checkTextureSolidMode :: CVarT -> Quake ()
+checkTextureSolidMode textureSolidMode
+  | textureSolidMode^.cvModified =
+      do Image.glTextureSolidMode (textureSolidMode^.cvString)
+         CVar.update (textureSolidMode & cvModified .~ False)
+  | otherwise = return ()
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
@@ -508,6 +592,62 @@ glUpdateSwapInterval glDriver =
         setSwapInterval swapInterval False =
           (glDriver^.gldSetSwapInterval) (truncate (swapInterval^.cvValue))
         setSwapInterval _ True = return ()
+
+setGL2D :: VidDefT -> Quake ()
+setGL2D vid = request (io set2D)
+  where set2D =
+          do GL.glViewport 0 0 (fromIntegral width) (fromIntegral height)
+             GL.glMatrixMode GL.GL_PROJECTION
+             GL.glLoadIdentity
+             GL.glOrtho 0 (fromIntegral width) (fromIntegral height) 0 (-99999) 99999
+             GL.glMatrixMode GL.GL_MODELVIEW
+             GL.glLoadIdentity
+             GL.glDisable GL.GL_DEPTH_TEST
+             GL.glDisable GL.GL_CULL_FACE
+             GL.glDisable GL.GL_BLEND
+             GL.glEnable GL.GL_ALPHA_TEST
+             GL.glColor4f 1 1 1 1
+        width = vid^.vdWidth
+        height = vid^.vdHeight
+
+rClear :: CVarT -> CVarT -> Quake ()
+rClear ztrick clear
+  | (ztrick^.cvValue) /= 0 =
+      do when ((clear^.cvValue) /= 0) $
+           request (io (GL.glClear GL.GL_COLOR_BUFFER_BIT))
+         fastRenderAPIGlobals.frTrickFrame += 1
+         checkTrickFrame =<< use (fastRenderAPIGlobals.frTrickFrame)
+         setDepthRange
+  | otherwise =
+      do checkClear clear
+         fastRenderAPIGlobals.frGLDepthMin .= 0
+         fastRenderAPIGlobals.frGLDepthMax .= 1
+         request (io (GL.glDepthFunc GL.GL_LEQUAL))
+         setDepthRange
+
+checkTrickFrame :: Int -> Quake ()
+checkTrickFrame trickFrame
+  | trickFrame .&. 1 /= 0 =
+      do fastRenderAPIGlobals.frGLDepthMin .= 0
+         fastRenderAPIGlobals.frGLDepthMax .= 0.49999
+         request (io (GL.glDepthFunc GL.GL_LEQUAL))
+  | otherwise =
+      do fastRenderAPIGlobals.frGLDepthMin .= 1
+         fastRenderAPIGlobals.frGLDepthMax .= 0.5
+         request (io (GL.glDepthFunc GL.GL_GEQUAL))
+
+checkClear :: CVarT -> Quake ()
+checkClear clear
+  | (clear^.cvValue) /= 0 =
+      request (io (GL.glClear (GL.GL_COLOR_BUFFER_BIT .|. GL.GL_DEPTH_BUFFER_BIT)))
+  | otherwise =
+      request (io (GL.glClear GL.GL_DEPTH_BUFFER_BIT))
+
+setDepthRange :: Quake ()
+setDepthRange =
+  do depthMin <- use (fastRenderAPIGlobals.frGLDepthMin)
+     depthMax <- use (fastRenderAPIGlobals.frGLDepthMax)
+     request (io (GL.glDepthRange (realToFrac depthMin) (realToFrac depthMax)))
 
 particleTexture :: B.ByteString
 particleTexture =

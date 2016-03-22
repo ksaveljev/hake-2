@@ -5,6 +5,7 @@ module Client.Menu
   , menuCenter
   ) where
 
+import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.CLShared as CL
 import qualified Client.KeyConstants as KeyConstants
@@ -17,6 +18,7 @@ import           Client.MenuListS
 import           Client.MenuSeparatorS
 import           Client.MenuSliderS
 import           Client.RefExportT
+import qualified Client.SCRShared as SCR
 import {-# SOURCE #-} qualified Client.VID as VID
 import           Client.VidDefT
 import qualified Constants
@@ -27,11 +29,13 @@ import           QCommon.XCommandT (runXCommandT)
 import           QuakeRef
 import           QuakeState
 import           Render.Renderer
+import qualified Sound.S as S
 import           Types
 import           Util.Binary (encode)
 
+import           Control.Applicative (liftA2)
 import           Control.Lens (use, (^.), (.=), (%=), (&), (.~), (%~), (+~))
-import           Control.Monad (void)
+import           Control.Monad (void, join, when)
 import qualified Data.ByteString as B
 import           Data.Char (ord)
 import qualified Data.Vector as V
@@ -41,6 +45,9 @@ mainItems = 5
 
 menuMoveSound :: B.ByteString
 menuMoveSound = "misc/menu2.wav"
+
+menuInSound :: B.ByteString
+menuInSound = "misc/menu1.wav"
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
@@ -438,5 +445,29 @@ menuAdjustCursor = error "Menu.menuAdjustCursor" -- TODO
 popMenu :: Quake ()
 popMenu = error "Menu.popMenu" -- TODO
 
-draw :: Quake ()
-draw = error "Menu.draw" -- TODO
+draw :: Renderer -> Int -> Quake ()
+draw renderer keyDest =
+  when (keyDest == Constants.keyMenu) $
+    do SCR.dirtyScreen
+       join (liftA2 (checkCinematicTime renderer) cinematicTime vidDef)
+       runDrawFunc =<< use (menuGlobals.mgDrawFunc)
+       checkEnterSound =<< use (menuGlobals.mgEnterSound)
+  where cinematicTime = use (globals.gCl.csCinematicTime)
+        vidDef = use (globals.gVidDef)
+
+checkCinematicTime :: Renderer -> Int -> VidDefT -> Quake ()
+checkCinematicTime renderer cinematicTime vidDef
+  | cinematicTime > 0 =
+      (renderer^.rRefExport.reDrawFill) 0 0 (vidDef^.vdWidth) (vidDef^.vdHeight) 0
+  | otherwise = renderer^.rRefExport.reDrawFadeScreen
+
+runDrawFunc :: Maybe XCommandT -> Quake ()
+runDrawFunc Nothing = Com.fatalError "Menu.runDrawFunc drawFunc is Nothing"
+runDrawFunc (Just drawFunc) = runXCommandT drawFunc
+
+checkEnterSound :: Bool -> Quake ()
+checkEnterSound enterSound
+  | enterSound =
+      do S.startLocalSound menuInSound
+         menuGlobals.mgEnterSound .= False
+  | otherwise = return ()
