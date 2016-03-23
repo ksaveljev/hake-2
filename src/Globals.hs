@@ -17,6 +17,7 @@ import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
+import           Linear (V3(..))
 import           Render.DummyRenderer (dummyRenderer)
 import           System.Random (mkStdGen)
 
@@ -53,5 +54,6 @@ initialGlobals =
           , _gGunFrame         = 0
           , _gGunModel         = Nothing
           , _gNetFrom          = newNetAdrT
+          , _gVec3Origin       = V3 0 0 0
           , _gRnd              = mkStdGen 0
           }

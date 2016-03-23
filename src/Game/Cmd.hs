@@ -8,6 +8,7 @@ module Game.Cmd
   , executeString
   , initialize
   , removeCommands
+  , tokenizeString
   ) where
 
 import           Client.ClientStaticT

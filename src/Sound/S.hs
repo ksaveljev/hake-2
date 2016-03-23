@@ -1,5 +1,6 @@
 module Sound.S
-  ( initialize
+  ( disableStreaming
+  , initialize
   , startLocalSound
   , stopAllSounds
   , update
@@ -21,3 +22,6 @@ stopAllSounds = request (io (putStrLn "S.stopAllSound IMPLEMENT ME!")) -- TODO
 
 update :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake ()
 update _ _ _ _ = request (io (putStrLn "S.update IMPLEMENT ME!")) -- TODO
+
+disableStreaming :: Quake ()
+disableStreaming = request (io (putStrLn "S.disableStreaming IMPLEMENT ME!")) -- TODO

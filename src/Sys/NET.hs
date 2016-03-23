@@ -8,6 +8,7 @@ module Sys.NET
   , config
   , getPacket
   , initialize
+  , isLocalAddress
   , sendPacket
   , sleep
   , stringToAdr
@@ -207,3 +208,6 @@ doSendLoopPacket buf len socketLens =
   where setMsgData idx =
           socketLens.lMsgs.ix idx %= (\v -> v & lmData .~ buf
                                               & lmDataLen .~ len)
+
+isLocalAddress :: NetAdrT -> Bool
+isLocalAddress adr = compareAdr adr netLocalAdr

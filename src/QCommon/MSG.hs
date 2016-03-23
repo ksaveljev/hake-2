@@ -1,12 +1,15 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.MSG
   ( beginReading
-  , readShort
   , readLong
+  , readShort
+  , readStringLine
   , writeByteI
+  , writeCharI
   , writeDeltaUserCmd
   , writeInt
   , writeLong
+  , writeShort
   , writeString
   ) where
 
@@ -18,21 +21,34 @@ import           Types
 import           Control.Lens (Traversal', Lens', use, (^.), (.=), (+=))
 import           Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
-import           Data.Int (Int16, Int32)
+import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import           Data.Int (Int8, Int16, Int32)
 import           Data.Word (Word8, Word16, Word32)
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1
   where c' = fromIntegral (c .&. 0xFF) :: Word8
 
+writeCharI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeCharI = writeByteI
+
 writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
-writeInt sizeBufLens v = do -- IMPROVE?
-    let v' = fromIntegral v :: Word32
-        a = fromIntegral (v' .&. 0xFF) :: Word8
-        b = fromIntegral ((v' `shiftR` 8) .&. 0xFF) :: Word8
-        c = fromIntegral ((v' `shiftR` 16) .&. 0xFF) :: Word8
-        d = fromIntegral ((v' `shiftR` 24) .&. 0xFF) :: Word8
-    SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
+writeInt sizeBufLens v = -- IMPROVE ?
+  do let v' = fromIntegral v :: Word32
+         a = fromIntegral (v' .&. 0xFF) :: Word8
+         b = fromIntegral ((v' `shiftR` 8) .&. 0xFF) :: Word8
+         c = fromIntegral ((v' `shiftR` 16) .&. 0xFF) :: Word8
+         d = fromIntegral ((v' `shiftR` 24) .&. 0xFF) :: Word8
+     SZ.write sizeBufLens (B.pack [a, b, c, d]) 4
+
+writeShort :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
+writeShort sizeBufLens c =
+  do let c' = fromIntegral c :: Word32
+         a = fromIntegral (c' .&. 0xFF) :: Word8
+         b = fromIntegral ((c' `shiftR` 8) .&. 0xFF) :: Word8
+     SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeLong :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeLong sizeBufLens v = writeInt sizeBufLens v
@@ -81,6 +97,34 @@ doReadLong sizeBufLens sizeBuf
         c = fromIntegral (B.index buf (readCount + 2)) :: Word32
         d = fromIntegral (B.index buf (readCount + 3)) :: Word32
         result = fromIntegral (a .|. (b `shiftL` 8) .|. (c `shiftL` 16) .|. (d `shiftL` 24)) :: Int32
+
+readStringLine :: Lens' QuakeState SizeBufT -> Quake B.ByteString
+readStringLine sizeBufLens =
+  do str <- fmap trim (readStr sizeBufLens 0 mempty)
+     Com.dprintf (B.concat ["MSG.ReadStringLine:[", str, "]\n"])
+     return str
+  where trim = B.reverse . BC.dropWhile (<= ' ') . B.reverse -- IMPROVE ?
+
+readStr :: Lens' QuakeState SizeBufT -> Int -> BB.Builder -> Quake B.ByteString
+readStr sizeBufLens idx acc
+  | idx >= 2047 = return (BL.toStrict (BB.toLazyByteString acc))
+  | otherwise =
+      do c <- readChar sizeBufLens
+         processChar c
+  where processChar c
+          | c `elem` [-1, 0, 0x0A] =
+              return (BL.toStrict (BB.toLazyByteString acc))
+          | otherwise = readStr sizeBufLens (idx + 1) (acc `mappend` BB.int8 c)
+
+readChar :: Lens' QuakeState SizeBufT -> Quake Int8
+readChar sizeBufLens = doReadChar sizeBufLens =<< use sizeBufLens
+
+doReadChar :: Lens' QuakeState SizeBufT -> SizeBufT -> Quake Int8
+doReadChar sizeBufLens msgRead =
+  do sizeBufLens.sbReadCount += 1
+     return c
+  where c | (msgRead^.sbReadCount) + 1 > (msgRead^.sbCurSize) = -1
+          | otherwise = fromIntegral (B.index (msgRead^.sbData) (msgRead^.sbReadCount))
 
 writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
 writeDeltaUserCmd = error "MSG.writeDeltaUserCmd" -- TODO

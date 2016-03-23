@@ -1,6 +1,8 @@
 module Game.Info
   ( printInfo
   , setValueForKey
+  , validate
+  , valueForKey
   ) where
 
 import qualified Constants
@@ -84,3 +86,20 @@ composeTokens str key (k:v:xs) acc
 composeTokens str _ _ _ =
   do Com.printf "MISSING VALUE\n"
      return str
+
+valueForKey :: B.ByteString -> B.ByteString -> Quake B.ByteString
+valueForKey str key = findTokenValue str key (if null tokens then tokens else tail tokens)
+  where tokens = BC.split '\\' str -- ulgy hack for BC.split because
+                                   -- BC.split '\\' "\\cheats\\0" == ["", "cheats", "0"]
+
+findTokenValue :: B.ByteString -> B.ByteString -> [B.ByteString] -> Quake B.ByteString
+findTokenValue _ _ [] = return B.empty
+findTokenValue str key (k:v:xs)
+  | k == key = return v
+  | otherwise = findTokenValue str key xs
+findTokenValue str _ _ =
+  do Com.printf "MISSING VALUE\n"
+     return str
+
+validate :: B.ByteString -> Bool
+validate str = not ('"' `BC.elem` str || ';' `BC.elem` str)

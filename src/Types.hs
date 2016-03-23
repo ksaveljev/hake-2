@@ -134,6 +134,7 @@ data Globals = Globals
   , _gGunFrame         :: Int
   , _gGunModel         :: Maybe (IORef ModelT)
   , _gNetFrom          :: NetAdrT
+  , _gVec3Origin       :: V3 Float
   , _gRnd              :: StdGen
   }
 
@@ -714,7 +715,6 @@ data ClientT = ClientT
   , _cName          :: B.ByteString
   , _cMessageLevel  :: Int
   , _cDatagram      :: SizeBufT
-  , _cDatagramBuf   :: B.ByteString
   , _cFrames        :: V.Vector ClientFrameT
   , _cDownload      :: Maybe B.ByteString
   , _cDownloadSize  :: Int

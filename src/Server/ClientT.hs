@@ -33,7 +33,6 @@ newClientT =
           , _cName          = B.empty
           , _cMessageLevel  = 0
           , _cDatagram      = newSizeBufT
-          , _cDatagramBuf   = B.empty
           , _cFrames        = V.replicate Constants.updateBackup newClientFrameT
           , _cDownload      = Nothing
           , _cDownloadSize  = 0

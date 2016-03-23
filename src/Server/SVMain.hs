@@ -7,10 +7,13 @@ module Server.SVMain
   ) where
 
 import qualified Constants
+import qualified Game.Cmd as Cmd
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.GClientT
+import qualified Game.Info as Info
+import qualified Game.PlayerClient as PlayerClient
 import           Game.PlayerStateT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -23,6 +26,7 @@ import           QCommon.SizeBufT
 import qualified QCommon.SZ as SZ
 import           QuakeRef
 import           QuakeState
+import           Server.ChallengeT
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
@@ -284,4 +288,177 @@ appendClientInfo acc client gClient
                           ]
 
 connectionlessPacket :: Quake ()
-connectionlessPacket = error "SVMain.connectionlessPacket" -- TODO
+connectionlessPacket =
+  do MSG.beginReading (globals.gNetMessage)
+     void (MSG.readLong (globals.gNetMessage)) -- skip the -1 marker
+     str <- MSG.readStringLine (globals.gNetMessage)
+     Cmd.tokenizeString str False
+     command <- Cmd.argv 0
+     from <- use (globals.gNetFrom)
+     processConnectionlessPacket command from
+
+processConnectionlessPacket :: B.ByteString -> NetAdrT -> Quake ()
+processConnectionlessPacket "ping" from = svcPing from
+processConnectionlessPacket "ack" from = svcAck from
+processConnectionlessPacket "status" from = svcStatus from
+processConnectionlessPacket "info" _ = svcInfo
+processConnectionlessPacket "getchallenge" from = svcGetChallenge from
+processConnectionlessPacket "connect" from = svcDirectConnect from
+processConnectionlessPacket "rcon" _ = svcRemoteCommand
+processConnectionlessPacket str from =
+  do Com.printf (B.concat ["bad connectionless packet from ", NET.adrToString from, "\n"])
+     Com.printf (B.concat ["[", str, "]\n"])
+     -- IMPROVE: print hexdump of data like in jake2?
+
+svcPing :: NetAdrT -> Quake ()
+svcPing from = NetChannel.outOfBandPrint Constants.nsServer from "ack"
+
+svcAck :: NetAdrT -> Quake ()
+svcAck from = Com.printf (B.concat ["Ping acknowledge from ", NET.adrToString from, "\n"])
+
+svcStatus :: NetAdrT -> Quake ()
+svcStatus from =
+  do status <- statusString
+     NetChannel.outOfBandPrint Constants.nsServer from ("print\n" `B.append` status)
+
+svcInfo :: Quake ()
+svcInfo = error "SVMain.svcInfo" -- TODO
+
+svcGetChallenge :: NetAdrT -> Quake ()
+svcGetChallenge = error "SVMain.svcGetChallenge" -- TODO
+
+svcDirectConnect :: NetAdrT -> Quake ()
+svcDirectConnect adr =
+  do Com.printf "SVC_DirectConnect ()\n"
+     version <- fmap Lib.atoi (Cmd.argv 1)
+     proceedDirectConnect version
+  where proceedDirectConnect version
+          | version /= Constants.protocolVersion =
+              do NetChannel.outOfBandPrint Constants.nsServer adr (B.concat ["print\nServer is version ", encode Constants.version, "\n"]) -- IMPROVE ?
+                 Com.dprintf (B.concat ["    rejected connect from version ", encode version, "\n"])
+          | otherwise =
+              do qport <- fmap Lib.atoi (Cmd.argv 2)
+                 challenge <- fmap Lib.atoi (Cmd.argv 3)
+                 attractLoop <- use (svGlobals.svServer.sAttractLoop)
+                 userInfo <- getUserInfo
+                 doDirectConnect adr qport challenge attractLoop userInfo
+        getUserInfo =
+          do v <- Cmd.argv 4
+             Info.setValueForKey v "ip" (NET.adrToString adr)
+
+doDirectConnect :: NetAdrT -> Int -> Int -> Bool -> B.ByteString -> Quake ()
+doDirectConnect adr qport challenge attractLoop userInfo
+  | attractLoop && not isLocalAddress =
+      do Com.printf "Remote connect in attract loop.  Ignored.\n"
+         NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
+  | otherwise =
+      do valid <- checkValidChallenge
+         when valid $
+           do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+              clients <- fmap (V.take maxClients) (use (svGlobals.svServerStatic.ssClients))
+              done <- findAndReuseIPSlot clients adr qport challenge userInfo 0 maxClients
+              unless done $
+                maybe serverFull foundEmptySlot (V.findIndex freeClient clients)
+  where isLocalAddress = NET.isLocalAddress adr
+        checkValidChallenge
+          | not isLocalAddress =
+              do challenges <- use (svGlobals.svServerStatic.ssChallenges)
+                 maybe noChallenge challengeFound (V.find challengeForAdr challenges)
+          | otherwise = return True
+        challengeForAdr c = NET.compareBaseAdr adr (c^.chAdr)
+        noChallenge =
+          do NetChannel.outOfBandPrint Constants.nsServer adr "print\nNo challenge for address.\n"
+             return False
+        challengeFound ch
+          | (ch^.chChallenge) == challenge = return True
+          | otherwise =
+              do NetChannel.outOfBandPrint Constants.nsServer adr "print\nBad challenge.\n"
+                 return False
+        freeClient c = c^.cState == Constants.csFree
+        serverFull =
+          do NetChannel.outOfBandPrint Constants.nsServer adr "print\nServer is full.\n"
+             Com.dprintf "Rejected a connection.\n"
+        foundEmptySlot idx = gotNewClient (Ref idx) challenge userInfo adr qport
+
+findAndReuseIPSlot :: V.Vector ClientT -> NetAdrT -> Int -> Int -> B.ByteString -> Int -> Int -> Quake Bool
+findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
+  | idx >= maxIdx = return False
+  | otherwise = checkClientSlot (clients V.! idx)
+  where checkClientSlot client
+          | client^.cState == Constants.csFree =
+              findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
+          | NET.compareBaseAdr adr (client^.cNetChan.ncRemoteAddress) && ((client^.cNetChan.ncRemoteQPort) == qport || (adr^.naPort) == (client^.cNetChan.ncRemoteAddress.naPort)) =
+              do realTime <- use (svGlobals.svServerStatic.ssRealTime)
+                 reconnectLimit <- svReconnectLimitCVar
+                 checkReconnect client realTime reconnectLimit
+          | otherwise =
+              findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
+        checkReconnect client realTime reconnectLimit
+          | (not (NET.isLocalAddress adr)) && (realTime - (client^.cLastConnect) < truncate ((reconnectLimit^.cvValue) * 1000)) =
+              do Com.dprintf (NET.adrToString adr `B.append` ":reconnect rejected : too soon\n")
+                 return True
+          | otherwise =
+              do Com.printf (NET.adrToString adr `B.append` ":reconnect\n")
+                 gotNewClient (Ref idx) challenge userInfo adr qport
+                 return True
+
+svcRemoteCommand :: Quake ()
+svcRemoteCommand = error "SVMain.svcRemoteCommand" -- TODO
+
+gotNewClient :: Ref ClientT -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
+gotNewClient clientRef@(Ref idx) challenge userInfo adr qport =
+  do svGlobals.svClient .= Just clientRef
+     modifyRef clientRef (\v -> v & cEdict .~ Just edictRef
+                                  & cChallenge .~ challenge)
+     (allowed, userInfo') <- PlayerClient.clientConnect edictRef userInfo
+     checkConnectionAllowed clientRef adr qport allowed userInfo'
+  where edictRef = Ref (idx + 1)
+
+checkConnectionAllowed :: Ref ClientT -> NetAdrT -> Int -> Bool -> B.ByteString -> Quake ()
+checkConnectionAllowed clientRef@(Ref idx) adr qport allowed userInfo
+  | not allowed =
+      do value <- Info.valueForKey userInfo "rejmsg"
+         printRefusedMessage value
+         Com.dprintf "Game rejected a connection.\n"
+  | otherwise =
+      do modifyRef clientRef (\v -> v & cUserInfo .~ userInfo)
+         userInfoChanged clientRef
+         NetChannel.outOfBandPrint Constants.nsServer adr "client_connect"
+         NetChannel.setup Constants.nsServer (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) adr qport
+         modifyRef clientRef (\v -> v & cState .~ Constants.csConnected)
+         initAndAddClient clientRef
+  where printRefusedMessage str
+          | B.null str = NetChannel.outOfBandPrint Constants.nsServer adr "print\nConnection refused.\n"
+          | otherwise = NetChannel.outOfBandPrint Constants.nsServer adr (B.concat ["print\n", str, "\nConnection refused.\n"])
+
+initAndAddClient :: Ref ClientT -> Quake ()
+initAndAddClient clientRef@(Ref idx) =
+  do SZ.initialize (svGlobals.svServerStatic.ssClients.ix idx.cDatagram) B.empty Constants.maxMsgLen
+     realTime <- use (svGlobals.svServerStatic.ssRealTime)
+     modifyRef clientRef (\v -> v & cDatagram.sbAllowOverflow .~ True
+                                  & cLastMessage .~ realTime
+                                  & cLastConnect .~ realTime)
+     Com.dprintf "new client added.\n"
+
+userInfoChanged :: Ref ClientT -> Quake ()
+userInfoChanged clientRef =
+  do client <- readRef clientRef
+     maybe edictRefError (proceedUserInfoChanged client) (client^.cEdict)
+  where edictRefError = Com.fatalError "SVMain.userInfoChanged client^.cEdict is Nothing"
+        proceedUserInfoChanged client edictRef =
+          do void (PlayerClient.clientUserInfoChanged edictRef (client^.cUserInfo))
+             name <- Info.valueForKey (client^.cUserInfo) "name"
+             modifyRef clientRef (\v -> v & cName .~ name)
+             setRateCommand =<< Info.valueForKey (client^.cUserInfo) "rate"
+             msg <- Info.valueForKey (client^.cUserInfo) "msg"
+             when (B.length msg > 0) $
+               modifyRef clientRef (\v -> v & cMessageLevel .~ Lib.atoi msg)
+        setRateCommand val =
+          modifyRef clientRef (\v -> v & cRate .~ (calcRate val))
+        calcRate val
+          | B.length val > 0 = convertValToRate (Lib.atoi val)
+          | otherwise = 5000
+        convertValToRate val
+          | val < 100 = 100
+          | val > 15000 = 15000
+          | otherwise = val

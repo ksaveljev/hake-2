@@ -10,6 +10,7 @@ module Client.SCR
   , updateScreen
   ) where
 
+import           Client.CinematicsT
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.CLInv as CLInv
@@ -33,6 +34,7 @@ import           QCommon.CVarVariables
 import qualified QCommon.MSG as MSG
 import           QCommon.NetChanT
 import qualified QCommon.SZ as SZ
+import           QuakeIOState
 import           QuakeState
 import           Render.Renderer
 import qualified Sound.S as S
@@ -233,10 +235,56 @@ runFrames renderer separation idx =
           | otherwise = void drawCinematic
 
 runCinematic :: Quake ()
-runCinematic = error "SCR.runCinematic" -- TODO
+runCinematic =
+  do cl <- use (globals.gCl)
+     cls <- use (globals.gCls)
+     doRunCinematic cl cls
+
+doRunCinematic :: ClientStateT -> ClientStaticT -> Quake ()
+doRunCinematic cl cls
+  | cl^.csCinematicTime <= 0 = stopCinematic
+  | cl^.csCinematicFrame == -1 = return ()
+  | cls^.csKeyDest /= Constants.keyGame =
+      globals.gCl.csCinematicTime .= (cls^.csRealTime) - (cl^.csCinematicFrame) * 1000 `div` 14
+  | frame > (cl^.csCinematicFrame) =
+      do when (frame > (cl^.csCinematicFrame) + 1) $
+           do Com.printf (B.concat ["Dropped frame: ", encode frame, " > ", encode ((cl^.csCinematicTime) + 1)])
+              globals.gCl.csCinematicTime .= (cls^.csRealTime) - (cl^.csCinematicFrame) * 1000 `div` 14
+         copyValue (use (scrGlobals.scrCin.cPicPending)) (scrGlobals.scrCin.cPic)
+         copyValue readNextFrame (scrGlobals.scrCin.cPicPending)
+         checkFinishCinematic =<< use (scrGlobals.scrCin.cPicPending)
+  | otherwise = return ()
+  where frameF = fromIntegral (cls^.csRealTime) - fromIntegral (cl^.csCinematicTime) * 14 / 1000 :: Float
+        frame = truncate frameF :: Int
+        copyValue a b = a >>= (b .=)
+
+checkFinishCinematic :: Maybe B.ByteString -> Quake ()
+checkFinishCinematic (Just _) = return ()
+checkFinishCinematic Nothing =
+  do stopCinematic
+     finishCinematic
+     globals.gCl.csCinematicTime .= 1
+     beginLoadingPlaque
+     globals.gCl.csCinematicTime .= 0
 
 runConsole :: Quake ()
-runConsole = error "SCR.runConsole" -- TODO
+runConsole =
+  do keyDest <- use (globals.gCls.csKeyDest)
+     let conLines | keyDest == Constants.keyConsole = 0.5
+                  | otherwise = 0
+     scrGlobals.scrConLines .= conLines
+     conCurrent <- use (scrGlobals.scrConCurrent)
+     frameTime <- use (globals.gCls.csFrameTime)
+     conSpeed <- scrConSpeedCVar
+     doRunConsole conLines conCurrent frameTime conSpeed
+
+doRunConsole :: Float -> Float -> Float -> CVarT -> Quake ()
+doRunConsole conLines conCurrent frameTime conSpeed
+  | conLines < conCurrent = scrGlobals.scrConCurrent .= max v1 conLines
+  | conLines > conCurrent = scrGlobals.scrConCurrent .= min v2 conLines
+  | otherwise = return ()
+  where v1 = conCurrent - (conSpeed^.cvValue) * frameTime
+        v2 = conCurrent + (conSpeed^.cvValue) * frameTime
 
 finishCinematic :: Quake ()
 finishCinematic =
@@ -802,3 +850,27 @@ parseLayoutString = error "SCR.parseLayoutString" -- TODO
                                 then return newIdx
                                 else skipToEndIf newIdx
                                 -}
+
+readNextFrame :: Quake (Maybe B.ByteString)
+readNextFrame = error "SCR.readNextFrame" -- TODO
+
+stopCinematic :: Quake ()
+stopCinematic = doStopCinematic =<< use (scrGlobals.scrCin.cRestartSound)
+  where doStopCinematic False = return ()
+        doStopCinematic True =
+          do globals.gCl.csCinematicTime .= 0
+             scrGlobals.scrCin.cPic .= Nothing
+             scrGlobals.scrCin.cPicPending .= Nothing
+             checkCinematicPalette =<< use (globals.gCl.csCinematicPaletteActive)
+             globals.gCl.csCinematicFile .= Nothing -- IMPROVE: research if need to close handle?
+             request (cHNodes1 .= Nothing)
+             S.disableStreaming
+             scrGlobals.scrCin.cRestartSound .= False
+        checkCinematicPalette False = return ()
+        checkCinematicPalette True =
+          do renderer <- use (globals.gRenderer)
+             maybe rendererError unsetCinematicPalette renderer
+        rendererError = Com.fatalError "SCR.stopCinematic renderer is Nothing"
+        unsetCinematicPalette renderer =
+          do (renderer^.rRefExport.reCinematicSetPalette) Nothing
+             globals.gCl.csCinematicPaletteActive .= False
