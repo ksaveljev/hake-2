@@ -12,6 +12,7 @@ module Render.Fast.Draw
 
 import           Client.VidDefT
 import qualified Constants
+import qualified QCommon.Com as Com
 import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Image as Image
@@ -22,6 +23,7 @@ import           Control.Lens (use, (.=), (^.))
 import           Data.Bits (shiftR, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.GL as GL
 
 initLocal :: Quake ()
@@ -88,7 +90,31 @@ drawChar x y num
         y' = fromIntegral y
 
 fill :: Int -> Int -> Int -> Int -> Int -> Quake ()
-fill = error "Draw.fill" -- TODO
+fill x y w h colorIndex
+  | colorIndex > 255 =
+      Com.fatalError "Draw_Fill: bad color"
+  | otherwise =
+      do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
+         request (io (doFill x y w h (d8to24table UV.! colorIndex)))
+
+doFill :: Int -> Int -> Int -> Int -> Int -> IO ()
+doFill x y w h color =
+  do GL.glDisable GL.GL_TEXTURE_2D
+     GL.glColor3ub (fromIntegral ((color `shiftR`  0) .&. 0xFF)) -- r
+                   (fromIntegral ((color `shiftR`  8) .&. 0xFF)) -- g
+                   (fromIntegral ((color `shiftR` 16) .&. 0xFF)) -- b
+     GL.glBegin GL.GL_QUADS
+     GL.glVertex2f x' y'
+     GL.glVertex2f (x' + w') y'
+     GL.glVertex2f (x' + w') (y' + h')
+     GL.glVertex2f x' (y' + h')
+     GL.glEnd
+     GL.glColor3f 1 1 1
+     GL.glEnable GL.GL_TEXTURE_2D
+  where x' = fromIntegral x
+        y' = fromIntegral y
+        w' = fromIntegral w
+        h' = fromIntegral h
 
 fadeScreen :: Quake ()
 fadeScreen =

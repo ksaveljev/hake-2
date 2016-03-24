@@ -21,6 +21,7 @@ import Globals as X
 import QCommon.CMGlobals as X
 import QCommon.ComGlobals as X
 import QCommon.FSGlobals as X
+import QCommon.NetChannelGlobals as X
 import QCommon.PMoveGlobals as X
 import Render.Fast.FastRenderAPIGlobals as X
 import Render.GLFWbGlobals as X
@@ -61,4 +62,5 @@ initialQuakeState =
              , _netGlobals           = initialNETGlobals
              , _playerTrailGlobals   = initialPlayerTrailGlobals
              , _vGlobals             = initialVGlobals
+             , _netChannelGlobals    = initialNetChannelGlobals
              }

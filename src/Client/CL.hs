@@ -31,6 +31,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import qualified QCommon.FS as FS
+import qualified QCommon.MSG as MSG
 import           QCommon.NetAdrT
 import qualified QCommon.NetChannel as NetChannel
 import           QCommon.NetChanT
@@ -368,7 +369,73 @@ processPacket cls netMsg
                  when ok CLParse.parseServerMessage
 
 connectionlessPacket :: Quake ()
-connectionlessPacket = error "CL.connectionlessPacket" -- TODO
+connectionlessPacket =
+  do MSG.beginReading (globals.gNetMessage)
+     void (MSG.readLong (globals.gNetMessage)) -- skip the -1 marker
+     str <- MSG.readStringLine (globals.gNetMessage)
+     Cmd.tokenizeString str False
+     command <- Cmd.argv 0
+     from <- use (globals.gNetFrom)
+     Com.printf (B.concat [NET.adrToString from, ": ", command, "\n"])
+     processConnectionlessPacket command from
+
+processConnectionlessPacket :: B.ByteString -> NetAdrT -> Quake ()
+processConnectionlessPacket "client_connect" from = clcClientConnect from
+processConnectionlessPacket "info" from = parseStatusMessage from
+processConnectionlessPacket "cmd" from = clcCmd from
+processConnectionlessPacket "print" _ = clcPrint
+processConnectionlessPacket "ping" from = clcPing from
+processConnectionlessPacket "challenge" _ = clcChallenge
+processConnectionlessPacket "echo" from = clcEcho from
+processConnectionlessPacket _ _ = Com.printf "Unknown command.\n"
+
+clcClientConnect :: NetAdrT -> Quake ()
+clcClientConnect from =
+  doClientConnect =<< use (globals.gCls.csState)
+  where doClientConnect state
+          | state == Constants.caConnected =
+              Com.printf "Dup connect received.  Ignored.\n"
+          | otherwise =
+              do qport <- use (globals.gCls.csQuakePort)
+                 NetChannel.setup Constants.nsClient (globals.gCls.csNetChan) from qport
+                 MSG.writeCharI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
+                 MSG.writeString (globals.gCls.csNetChan.ncMessage) "new"
+                 globals.gCls.csState .= Constants.caConnected
+
+parseStatusMessage :: NetAdrT -> Quake ()
+parseStatusMessage from =
+  do str <- MSG.readString (globals.gNetMessage)
+     Com.printf (str `B.append` "\n")
+     Menu.addToServerList from str
+
+clcCmd :: NetAdrT -> Quake ()
+clcCmd from
+  | not (NET.isLocalAddress from) =
+      Com.printf "Command packet from remote host.  Ignored.\n"
+  | otherwise =
+      do cmd <- MSG.readString (globals.gNetMessage)
+         CBuf.addText cmd
+         CBuf.addText "\n"
+
+clcPrint :: Quake ()
+clcPrint =
+  do msg <- MSG.readString (globals.gNetMessage)
+     when (B.length msg > 0) $
+       Com.printf msg
+
+clcPing :: NetAdrT -> Quake ()
+clcPing from = NetChannel.outOfBandPrint Constants.nsClient from "ack"
+
+clcChallenge :: Quake ()
+clcChallenge =
+  do v1 <- Cmd.argv 1
+     globals.gCls.csChallenge .= Lib.atoi v1
+     sendConnectPacket
+
+clcEcho :: NetAdrT -> Quake ()
+clcEcho from =
+  do v1 <- Cmd.argv 1
+     NetChannel.outOfBandPrint Constants.nsClient from v1
 
 fixCVarCheats :: Quake ()
 fixCVarCheats =

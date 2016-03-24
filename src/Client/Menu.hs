@@ -1,5 +1,6 @@
 module Client.Menu
-  ( draw
+  ( addToServerList
+  , draw
   , initialize
   , menuAddItem
   , menuCenter
@@ -471,3 +472,6 @@ checkEnterSound enterSound
       do S.startLocalSound menuInSound
          menuGlobals.mgEnterSound .= False
   | otherwise = return ()
+
+addToServerList :: NetAdrT -> B.ByteString -> Quake ()
+addToServerList = error "Menu.addToServerList" -- TODO

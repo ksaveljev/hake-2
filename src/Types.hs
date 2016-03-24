@@ -61,6 +61,7 @@ data QuakeState = QuakeState
   , _netGlobals           :: NETGlobals
   , _playerTrailGlobals   :: PlayerTrailGlobals
   , _vGlobals             :: VGlobals
+  , _netChannelGlobals    :: NetChannelGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -545,6 +546,10 @@ data VGlobals = VGlobals
   , _vgLightStyles  :: V.Vector LightStyleT
   , _vgDLights      :: V.Vector DLightT
   , _vgEntities     :: V.Vector EntityT
+  }
+
+data NetChannelGlobals = NetChannelGlobals
+  { _ncSend :: SizeBufT
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key

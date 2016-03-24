@@ -192,6 +192,7 @@ executable hake2
                      , QCommon.MSG
                      , QCommon.NetAdrT
                      , QCommon.NetChannel
+                     , QCommon.NetChannelGlobals
                      , QCommon.NetChanT
                      , QCommon.PackFileT
                      , QCommon.PackT

@@ -3,6 +3,7 @@ module QCommon.MSG
   ( beginReading
   , readLong
   , readShort
+  , readString
   , readStringLine
   , writeByteI
   , writeCharI
@@ -61,6 +62,16 @@ writeString sizeBufLens str = do
 beginReading :: Lens' QuakeState SizeBufT -> Quake ()
 beginReading sizeBufLens = sizeBufLens.sbReadCount .= 0
 
+readByte :: Lens' QuakeState SizeBufT -> Quake Int
+readByte sizeBufLens = doReadByte sizeBufLens =<< use sizeBufLens
+
+doReadByte :: Lens' QuakeState SizeBufT -> SizeBufT -> Quake Int
+doReadByte sizeBufLens sizeBuf =
+  do sizeBufLens.sbReadCount += 1
+     return c
+  where c | (sizeBuf^.sbReadCount) + 1 > (sizeBuf^.sbCurSize) = -1
+          | otherwise = fromIntegral ((sizeBuf^.sbData) `B.index` (sizeBuf^.sbReadCount))
+
 readShort :: Lens' QuakeState SizeBufT -> Quake Int
 readShort sizeBufLens = doReadShort sizeBufLens =<< use sizeBufLens
 
@@ -115,6 +126,18 @@ readStr sizeBufLens idx acc
           | c `elem` [-1, 0, 0x0A] =
               return (BL.toStrict (BB.toLazyByteString acc))
           | otherwise = readStr sizeBufLens (idx + 1) (acc `mappend` BB.int8 c)
+
+readString :: Lens' QuakeState SizeBufT -> Quake B.ByteString
+readString sizeBufLens = buildString 0 mempty
+  where buildString len acc
+          | len >= 2047 = return (BL.toStrict (BB.toLazyByteString acc))
+          | otherwise = do
+              c <- readByte sizeBufLens
+              processChar len acc c
+        processChar len acc c
+          | c `elem` [-1, 0] =
+              return (BL.toStrict (BB.toLazyByteString acc))
+          | otherwise = buildString (len + 1) (acc `mappend` (BB.word8 (fromIntegral c)))
 
 readChar :: Lens' QuakeState SizeBufT -> Quake Int8
 readChar sizeBufLens = doReadChar sizeBufLens =<< use sizeBufLens
