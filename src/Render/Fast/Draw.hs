@@ -10,16 +10,19 @@ module Render.Fast.Draw
   , stretchRaw
   ) where
 
+import {-# SOURCE #-} qualified Client.VID as VID
 import           Client.VidDefT
 import qualified Constants
 import qualified QCommon.Com as Com
 import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Image as Image
+import           Render.GLConfigT
 import           Render.ImageT
 import           Types
 
 import           Control.Lens (use, (.=), (^.))
+import           Control.Monad (when)
 import           Data.Bits (shiftR, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -56,7 +59,44 @@ drawPic :: Int -> Int -> B.ByteString -> Quake ()
 drawPic = error "Draw.drawPic" -- TODO
 
 stretchPic :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
-stretchPic = error "Draw.stretchPic" -- TODO
+stretchPic x y w h pic =
+  do imageRef <- findPic pic
+     maybe imageRefError proceedStretchPic imageRef
+  where imageRefError =
+          VID.printf Constants.printAll (B.concat ["Can't find pic: ", pic, "\n"])
+        proceedStretchPic imageRef =
+          do image <- readRef imageRef
+             scrapDirty <- use (fastRenderAPIGlobals.frScrapDirty)
+             glConfig <- use (fastRenderAPIGlobals.frGLConfig)
+             when scrapDirty Image.scrapUpload
+             Image.glBind (image^.iTexNum)
+             request (io (doStretchPic x y h w image glConfig))
+
+doStretchPic :: Int -> Int -> Int -> Int -> ImageT -> GLConfigT -> IO ()
+doStretchPic x y h w image glConfig =
+  do when alphaTest $
+       GL.glDisable GL.GL_ALPHA_TEST
+     GL.glBegin GL.GL_QUADS
+     GL.glTexCoord2f isl itl
+     GL.glVertex2f x' y'
+     GL.glTexCoord2f ish itl
+     GL.glVertex2f (x' + w') y'
+     GL.glTexCoord2f ish ith
+     GL.glVertex2f (x' + w') (y' + h')
+     GL.glTexCoord2f isl ith
+     GL.glVertex2f x' (y' + h')
+     GL.glEnd
+     when alphaTest $
+       GL.glEnable GL.GL_ALPHA_TEST
+  where isl = realToFrac (image^.iSL)
+        itl = realToFrac (image^.iTL)
+        ith = realToFrac (image^.iTH)
+        ish = realToFrac (image^.iSH)
+        x' = fromIntegral x
+        y' = fromIntegral y
+        w' = fromIntegral w
+        h' = fromIntegral h
+        alphaTest = (((glConfig^.glcRenderer) == Constants.glRendererMCD) || ((glConfig^.glcRenderer) .&. Constants.glRendererRendition /= 0)) && not (image^.iHasAlpha)
 
 drawChar :: Int -> Int -> Int -> Quake ()
 drawChar x y num

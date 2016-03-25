@@ -14,6 +14,7 @@ module Render.Fast.Image
   , glTextureAlphaMode
   , glTextureSolidMode
   , rRegisterSkin
+  , scrapUpload
   ) where
 
 import {-# SOURCE #-} qualified Client.VID as VID
@@ -184,7 +185,7 @@ decodePCX returnPalette returnDimensions pcx = (pix, palette, dimensions)
         pix = doDecodePCX (pcx^.pcxData) 0 0 0 width height mempty
 
 doDecodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-doDecodePCX raw idx x y maxX maxY !acc
+doDecodePCX raw idx x y maxX maxY acc
   | y >= maxY = BL.toStrict (BB.toLazyByteString acc)
   | x >= maxX = doDecodePCX raw idx 0 (y + 1) maxX maxY acc
   | dataByte .&. 0xC0 == 0xC0
@@ -624,23 +625,25 @@ glLightScaleTexture image width height onlyGamma =
 buildFromGammaTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
 buildFromGammaTable image gammaTable idx p maxIdx acc
   | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
-  | otherwise = buildFromGammaTable image gammaTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
-      where p3 = image `B.index` (p + 3)
-            a = gammaTable `B.index` fromIntegral (image `B.index` p)
-            b = gammaTable `B.index` fromIntegral (image `B.index` (p + 1))
-            c = gammaTable `B.index` fromIntegral (image `B.index` (p + 2))
+  | otherwise =
+      let !p3 = image `B.index` (p + 3)
+          !a = gammaTable `B.index` fromIntegral (image `B.index` p)
+          !b = gammaTable `B.index` fromIntegral (image `B.index` (p + 1))
+          !c = gammaTable `B.index` fromIntegral (image `B.index` (p + 2))
+      in buildFromGammaTable image gammaTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
   
 buildFromGammaAndIntensityTable :: B.ByteString -> B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
 buildFromGammaAndIntensityTable image gammaTable intensityTable idx p maxIdx acc
   | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
-  | otherwise = buildFromGammaAndIntensityTable image gammaTable intensityTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
-      where p3 = image `B.index` (p + 3)
-            i0 = intensityTable `B.index` fromIntegral (image `B.index` p)
-            i1 = intensityTable `B.index` fromIntegral (image `B.index` (p + 1))
-            i2 = intensityTable `B.index` fromIntegral (image `B.index` (p + 2))
-            a = gammaTable `B.index` fromIntegral i0
-            b = gammaTable `B.index` fromIntegral i1
-            c = gammaTable `B.index` fromIntegral i2
+  | otherwise =
+      let !p3 = image `B.index` (p + 3)
+          !i0 = intensityTable `B.index` fromIntegral (image `B.index` p)
+          !i1 = intensityTable `B.index` fromIntegral (image `B.index` (p + 1))
+          !i2 = intensityTable `B.index` fromIntegral (image `B.index` (p + 2))
+          !a = gammaTable `B.index` fromIntegral i0
+          !b = gammaTable `B.index` fromIntegral i1
+          !c = gammaTable `B.index` fromIntegral i2
+      in buildFromGammaAndIntensityTable image gammaTable intensityTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
 
 uploadMipMaps :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadMipMaps image scaledWidth scaledHeight mipLevel samples comp
@@ -751,3 +754,6 @@ uploadMiptexT name (Just miptex) =
 
 loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
 loadTGA = error "Image.loadTGA" -- TODO
+
+scrapUpload :: Quake ()
+scrapUpload = error "Image.scrapUpload" -- TODO

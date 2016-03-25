@@ -24,9 +24,10 @@ import           Util.Binary (encode)
 
 import           Control.Lens (Traversal', Lens', preuse, use, (^.), (.=), (+=), (%=), (&), (.~), (%~))
 import           Control.Monad (void, when)
-import           Data.Bits (complement, shiftL, xor, (.&.), (.|.))
+import           Data.Bits (complement, shiftR, shiftL, xor, (.&.), (.|.))
 import qualified Data.ByteString as B
 import           Data.Int (Int32)
+import           Data.Word (Word32)
 
 initialize :: Quake ()
 initialize =
@@ -48,7 +49,59 @@ outOfBandPrint sock adr buf =
      NET.sendPacket sock (send^.sbCurSize) (send^.sbData) adr
 
 process :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Quake Bool
-process = error "NetChannel.process" -- TODO
+process netChanLens msgLens =
+  do MSG.beginReading msgLens
+     seqn <- MSG.readLong msgLens
+     seqnAck <- MSG.readLong msgLens
+     skipQPort =<< preuse (netChanLens.ncSock)
+     proceedProcess netChanLens msgLens seqn seqnAck
+  where skipQPort Nothing = Com.fatalError "NetChannel.process netChanLens.ncSock is Nothing"
+        skipQPort (Just sock)
+          | sock == Constants.nsServer = void (MSG.readShort msgLens)
+          | otherwise = return ()
+
+proceedProcess :: Traversal' QuakeState NetChanT -> Lens' QuakeState SizeBufT -> Int -> Int -> Quake Bool
+proceedProcess netChanLens msgLens seqn seqnAck =
+  do showPacketInfo =<< showPacketsCVar
+     chan <- preuse netChanLens
+     maybe chanError (doProcess netChanLens seqn' seqnAck' reliableMessage reliableAck) chan
+  where seqnU = fromIntegral seqn :: Word32
+        seqnAckU = fromIntegral seqnAck :: Word32
+        reliableMessage = fromIntegral (seqnU `shiftR` 31) :: Int
+        reliableAck = fromIntegral (seqnAckU `shiftR` 31) :: Int
+        mask = complement (1 `shiftL` 31) :: Int32
+        seqn' = fromIntegral (fromIntegral seqn .&. mask) :: Int
+        seqnAck' = fromIntegral (fromIntegral seqnAck .&. mask) :: Int
+        showPacketInfo showPackets = error "NetChannel.proceedProcess showPacketInfo" -- TODO
+        chanError =
+          do Com.fatalError "NetChannel.proceedProcess chan is Nothing"
+             return False
+
+doProcess :: Traversal' QuakeState NetChanT -> Int -> Int -> Int -> Int -> NetChanT -> Quake Bool
+doProcess netChanLens seqn seqnAck reliableMessage reliableAck chan
+  | seqn <= (chan^.ncIncomingSequence) =
+      do showDropInfo =<< showDropCVar
+         return False
+  | otherwise =
+      do netChanLens.ncDropped .= dropped
+         when (dropped > 0) $
+           showDropInfo =<< showDropCVar
+         when (reliableAck == (chan^.ncReliableSequence)) $
+           netChanLens.ncReliableLength .= 0
+         netChanLens %= (\v -> v & ncIncomingSequence .~ seqn
+                                & ncIncomingAcknowledged .~ seqnAck
+                                & ncIncomingReliableAcknowledged .~ reliableAck)
+         when (reliableMessage /= 0) $
+           netChanLens.ncIncomingReliableSequence %= (`xor` 1)
+         curTime <- use (globals.gCurTime)
+         netChanLens.ncLastReceived .= curTime
+         return True
+  where dropped = seqn - ((chan^.ncIncomingSequence) + 1)
+
+showDropInfo :: CVarT -> Quake ()
+showDropInfo showDrop
+  | (showDrop^.cvValue) /= 0 = error "NetChannel.showDropInfo" -- TODO
+  | otherwise = return ()
 
 transmit :: Traversal' QuakeState NetChanT -> Int -> B.ByteString -> Quake ()
 transmit netChanLens len buf =
