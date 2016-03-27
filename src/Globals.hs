@@ -49,6 +49,7 @@ initialGlobals =
           , _gKeyBindings      = V.replicate 256 Nothing
           , _gKeyLines         = V.replicate 32 B.empty
           , _gKeyLinePos       = 0
+          , _gEditLine         = 0
           , _gScrVRect         = newVRectT
           , _gSysFrameTime     = 0
           , _gGunFrame         = 0

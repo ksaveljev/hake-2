@@ -22,14 +22,15 @@ import           Render.Renderer
 import           Types
 import           Util.Unsafe
 
-import           Control.Lens (use, (.=), (^.))
+import           Control.Lens (preuse, use, ix, (.=), (^.))
 import           Control.Monad (void, unless)
-import           Data.Bits (shiftR, shiftL)
+import           Data.Bits (shiftR, shiftL, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (ord)
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
+import           Data.Word (Word8)
 import           System.IO (Handle)
 import           Text.Printf (printf)
 
@@ -206,4 +207,36 @@ drawNotify :: Quake ()
 drawNotify = error "Console.drawNotify" -- TODO
 
 drawInput :: Renderer -> Quake ()
-drawInput = error "Console.drawInput" -- TODO
+drawInput renderer =
+  do keyDest <- use (globals.gCls.csKeyDest)
+     state <- use (globals.gCls.csState)
+     unless (keyDest == Constants.keyMenu || (keyDest /= Constants.keyConsole && state == Constants.caActive)) $
+       do editLine <- use (globals.gEditLine)
+          text <- preuse (globals.gKeyLines.ix editLine)
+          linePos <- use (globals.gKeyLinePos)
+          lineWidth <- use (globals.gCon.cLineWidth)
+          realTime <- use (globals.gCls.csRealTime)
+          visLines <- use (globals.gCon.cVisLines)
+          proceedDrawInput renderer text linePos lineWidth realTime visLines
+
+proceedDrawInput :: Renderer -> Maybe B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+proceedDrawInput _ Nothing _ _ _ _ =
+  Com.fatalError "Console.drawInput text is Nothing"
+proceedDrawInput renderer (Just text) linePos lineWidth realTime visLines =
+  drawInputLine (renderer^.rRefExport.reDrawChar) fullLine (visLines - 22) start lineWidth -- TODO: make sure start is here (jake2 bug with not using start?)
+  where cursorFrame = fromIntegral (10 + ((realTime `shiftR` 8) .&. 1)) :: Word8
+        fullLine = text `B.append` B.unfoldr buildRemainder 0
+        buildRemainder idx
+          | idx == 0 = Just (cursorFrame, 1)
+          | linePos + 1 + idx < lineWidth = Just (32, idx + 1)
+          | otherwise = Nothing
+        start | linePos >= lineWidth = 1 + linePos - lineWidth
+              | otherwise = 0
+
+-- TODO: mapM_ or something?
+drawInputLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Quake ()
+drawInputLine drawChar text y idx maxIdx
+  | idx >= maxIdx = return ()
+  | otherwise =
+      do drawChar ((idx + 1) `shiftL` 3) y (ord (BC.index text idx))
+         drawInputLine drawChar text y (idx + 1) maxIdx

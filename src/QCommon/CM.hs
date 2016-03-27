@@ -54,7 +54,7 @@ doLoadMap name clientLoad checksum mapName flushMap
   | mapName == name && (clientLoad || flushMap == 0) =
       do lastChecksum <- use (cmGlobals.cmLastChecksum)
          unless clientLoad $
-           do cmGlobals.cmPortalOpen %= (UV.map (const False))
+           do cmGlobals.cmPortalOpen %= UV.map (const False)
               floodAreaConnections
          return (Ref 0, lastChecksum : tail checksum)
   | B.null name =

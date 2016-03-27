@@ -26,7 +26,7 @@ import qualified Util.Math3D as Math3D
 import           Util.Binary (encode)
 
 import           Control.Lens (use, (^.), (.=), (+=), (&), (.~))
-import           Control.Monad (when, void)
+import           Control.Monad (when, void, (>=>))
 import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -137,7 +137,7 @@ applyDMRules timeLimit fragLimit levelTime bprintf
          endDMLevel
   | fragLimit /= 0 =
       do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-         shouldEnd <- or <$> mapM (\idx -> readEdict idx >>= checkScore fragLimit) [1..maxClients]
+         shouldEnd <- or <$> mapM (readEdict >=> checkScore fragLimit) [1..maxClients]
          when shouldEnd $
            do bprintf Constants.printHigh "Fraglimit hit.\n"
               endDMLevel

@@ -113,7 +113,7 @@ initKBDCallbacks window kbdChan =
 
 glfwbKBDUpdate :: Quake ()
 glfwbKBDUpdate =
-  do request (io (GLFW.pollEvents))
+  do request (io GLFW.pollEvents)
      window <- use (glfwbGlobals.glfwbWindow)
      maybe windowError checkWindowClose window
      kbdChan <- use (glfwbGlobals.glfwbKBDChan)

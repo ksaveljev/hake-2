@@ -151,7 +151,7 @@ getNetworkPacket :: Lens' QuakeState NetAdrT -> Lens' QuakeState SizeBufT -> Boo
 getNetworkPacket _ _ True _ = return True
 getNetworkPacket netFromLens netMessageLens False socketLens =
   do socket <- use socketLens
-     maybe (return False) (readNetworkPacket) socket
+     maybe (return False) readNetworkPacket socket
   where readNetworkPacket socket =
           do packet <- request (io (Socket.recvFrom socket 2048))
              maybe (return False) networkPacket packet

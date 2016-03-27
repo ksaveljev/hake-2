@@ -43,7 +43,7 @@ projectSource point distance forward right = V3 a b c
         c = (point^._z) + (forward^._z) * (distance^._x) + (right^._z) * (distance^._y) + (distance^._z)
 
 shortToAngle :: Int -> Float
-shortToAngle x = (fromIntegral x) * shortRatio
+shortToAngle x = fromIntegral x * shortRatio
 
 angleToShort :: Float -> Int16
 angleToShort x = truncate (x / shortRatio)

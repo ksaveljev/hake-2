@@ -52,7 +52,7 @@ writeShort sizeBufLens c =
      SZ.write sizeBufLens (B.pack [a, b]) 2
 
 writeLong :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
-writeLong sizeBufLens v = writeInt sizeBufLens v
+writeLong = writeInt
 
 writeString :: Traversal' QuakeState SizeBufT -> B.ByteString -> Quake ()
 writeString sizeBufLens str = do
@@ -87,8 +87,8 @@ doReadShort sizeBufLens sizeBuf
         readCount = sizeBuf^.sbReadCount
         a = B.index buf readCount
         b = B.index buf (readCount + 1)
-        b' = (fromIntegral b) `shiftL` 8 :: Word16
-        result = fromIntegral ((fromIntegral a) .|. b') :: Int16
+        b' = fromIntegral b `shiftL` 8 :: Word16
+        result = fromIntegral (fromIntegral a .|. b') :: Int16
 
 readLong :: Lens' QuakeState SizeBufT -> Quake Int
 readLong sizeBufLens = doReadLong sizeBufLens =<< use sizeBufLens
@@ -137,7 +137,7 @@ readString sizeBufLens = buildString 0 mempty
         processChar len acc c
           | c `elem` [-1, 0] =
               return (BL.toStrict (BB.toLazyByteString acc))
-          | otherwise = buildString (len + 1) (acc `mappend` (BB.word8 (fromIntegral c)))
+          | otherwise = buildString (len + 1) (acc `mappend` BB.word8 (fromIntegral c))
 
 readChar :: Lens' QuakeState SizeBufT -> Quake Int8
 readChar sizeBufLens = doReadChar sizeBufLens =<< use sizeBufLens

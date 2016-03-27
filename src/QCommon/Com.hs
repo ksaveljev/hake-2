@@ -105,4 +105,4 @@ skipToEOL str startIdx =
 
 blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
 blockSequenceCRCByte _ _ _ _ =
-  request (io (putStrLn ("Com.blockSequenceCRCByte IMPLEMENT ME!"))) >> return 0
+  request (io (putStrLn "Com.blockSequenceCRCByte IMPLEMENT ME!")) >> return 0

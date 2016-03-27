@@ -11,6 +11,7 @@ import qualified Game.Cmd as Cmd
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
+import qualified Game.GameBase as GameBase
 import           Game.GClientT
 import qualified Game.Info as Info
 import qualified Game.PlayerClient as PlayerClient
@@ -36,12 +37,14 @@ import           Server.SVMainShared
 import qualified Server.SVSend as SVSend
 import qualified Server.SVUser as SVUser
 import qualified Sys.NET as NET
+import qualified Sys.Timer as Timer
 import           Types
 import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
+import           Control.Applicative (liftA2)
 import           Control.Lens (use, ix, (^.), (.=), (+=), (%=), (&), (.~))
-import           Control.Monad (void, when, unless)
+import           Control.Monad (void, when, unless, join)
 import           Data.Bits ((.|.), (.&.))
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -205,7 +208,36 @@ checkClientPacket client netAdr qport idx maxIdx
   where clientRef = Ref idx :: Ref ClientT
 
 calcPings :: Quake ()
-calcPings = error "SVMain.calcPings" -- TODO
+calcPings =
+  do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+     mapM_ (fmap updateClientPing . readClient) [0..maxClients-1]
+  where readClient idx =
+          do client <- readRef (Ref idx)
+             return (Ref idx, client)
+
+updateClientPing :: (Ref ClientT, ClientT) -> Quake ()
+updateClientPing (clientRef, client)
+  | (client^.cState) == Constants.csSpawned =
+      do modifyRef clientRef (\v -> v & cPing .~ ping)
+         maybe edictRefError updateGClient (client^.cEdict)
+  | otherwise = return ()
+  where ping = calcFrameLatency client 0 0 0 Constants.latencyCounts
+        edictRefError = Com.fatalError "SVMain.updateClientPing client^.cEdict is Nothing"
+        updateGClient edictRef =
+          do edict <- readRef edictRef
+             maybe gClientRefError updateGClientPing (edict^.eClient)
+        gClientRefError = Com.fatalError "SVMain.updateClientPing edict^.eClient is Nothing"
+        updateGClientPing gClientRef =
+          modifyRef gClientRef (\v -> v & gcPing .~ ping)
+
+calcFrameLatency :: ClientT -> Int -> Int -> Int -> Int -> Int
+calcFrameLatency client count total idx maxIdx
+  | idx >= maxIdx && count == 0 = 0
+  | idx >= maxIdx = total `div` count
+  | (client^.cFrameLatency) UV.! idx > 0 =
+      calcFrameLatency client (count + 1) (total + (client^.cFrameLatency) UV.! idx) (idx + 1) maxIdx
+  | otherwise =
+      calcFrameLatency client count total (idx + 1) maxIdx
 
 giveMsec :: Quake ()
 giveMsec = checkAndGive =<< use (svGlobals.svServer.sFrameNum)
@@ -218,7 +250,36 @@ giveMsec = checkAndGive =<< use (svGlobals.svServer.sFrameNum)
           | otherwise = client & cCommandMsec .~ 1800 -- 1600 + some slop
 
 runGameFrame :: Quake ()
-runGameFrame = error "SVMain.runGameFrame" -- TODO
+runGameFrame =
+  do setTimeBeforeGame =<< hostSpeedsCVar
+     svGlobals.svServer.sFrameNum += 1
+     frameNum <- use (svGlobals.svServer.sFrameNum)
+     svGlobals.svServer.sTime .= frameNum * 100
+     join (liftA2 doRunGameFrame pausedCVar maxClientsCVar)
+     setTimeAfterGame =<< hostSpeedsCVar
+  where setTimeBeforeGame hostSpeeds
+          | (hostSpeeds^.cvValue) /= 0 =
+              do ms <- Timer.milliseconds
+                 globals.gTimeBeforeGame .= ms
+          | otherwise = return ()
+        setTimeAfterGame hostSpeeds
+          | (hostSpeeds^.cvValue) /= 0 =
+              do ms <- Timer.milliseconds
+                 globals.gTimeAfterGame .= ms
+          | otherwise = return ()
+
+doRunGameFrame :: CVarT -> CVarT -> Quake ()
+doRunGameFrame paused maxClients
+  | (paused^.cvValue) == 0 || (maxClients^.cvValue) > 1 =
+      do GameBase.runFrame
+         time <- use (svGlobals.svServer.sTime)
+         realTime <- use (svGlobals.svServerStatic.ssRealTime)
+         when (time < realTime) $
+           do showClamp <- showClampCVar
+              when ((showClamp^.cvValue) /= 0) $
+                Com.printf "sv highclamp\n"
+              svGlobals.svServerStatic.ssRealTime .= time
+  | otherwise = return ()
 
 masterHeartbeat :: Quake ()
 masterHeartbeat =
@@ -394,7 +455,7 @@ findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
           | otherwise =
               findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
         checkReconnect client realTime reconnectLimit
-          | (not (NET.isLocalAddress adr)) && (realTime - (client^.cLastConnect) < truncate ((reconnectLimit^.cvValue) * 1000)) =
+          | not (NET.isLocalAddress adr) && (realTime - (client^.cLastConnect) < truncate ((reconnectLimit^.cvValue) * 1000)) =
               do Com.dprintf (NET.adrToString adr `B.append` ":reconnect rejected : too soon\n")
                  return True
           | otherwise =
@@ -454,7 +515,7 @@ userInfoChanged clientRef =
              when (B.length msg > 0) $
                modifyRef clientRef (\v -> v & cMessageLevel .~ Lib.atoi msg)
         setRateCommand val =
-          modifyRef clientRef (\v -> v & cRate .~ (calcRate val))
+          modifyRef clientRef (\v -> v & cRate .~ calcRate val)
         calcRate val
           | B.length val > 0 = convertValToRate (Lib.atoi val)
           | otherwise = 5000

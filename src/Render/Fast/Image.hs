@@ -40,22 +40,19 @@ import           Util.Binary (encode)
 import           Control.Lens (use, zoom, (^.), (.=), (+=), _1, _2, (&), (.~))
 import           Control.Monad (void, when)
 import           Control.Monad.Coroutine (mapMonad)
+import           Control.Monad.ST (ST, runST)
 import           Control.Monad.State.Strict (runStateT)
 import           Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Internal as BI
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Unsafe as BU
 import           Data.Char (toUpper)
 import           Data.Maybe (fromMaybe)
-import           Data.Monoid ((<>))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
-import           Data.Word (Word8)
+import           Data.Word (Word8, Word32)
 import           Foreign.Marshal.Utils (with)
 import qualified Graphics.GL as GL
 import qualified Pipes.Binary as PB
@@ -145,7 +142,7 @@ constructPalette bs i = (255 `shiftL` 24) .|. (b `shiftL` 16) .|. (g `shiftL` 8)
         g = fromIntegral (B.index bs (j + 1)) :: Int
         b = fromIntegral (B.index bs (j + 2)) :: Int
 
-loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe (B.ByteString, B.ByteString, (Int, Int)))
+loadPCX :: B.ByteString -> Bool -> Bool -> Quake (Maybe (SV.Vector Word8, B.ByteString, (Int, Int)))
 loadPCX fileName returnPalette returnDimensions =
   FS.fOpenFileWithLength fileName >>= loadPcxT >>= parseRawPCX
   where parseRawPCX Nothing = badPCXFile
@@ -174,7 +171,7 @@ loadPcxT (Just (fileHandle, len)) =
      either (const (return Nothing)) (return . Just) res
   where parsePcxT = runStateT (PB.decodeGet (getPcxT len)) (PBS.fromHandle fileHandle)
 
-decodePCX :: Bool -> Bool -> PcxT -> (B.ByteString, B.ByteString, (Int, Int))
+decodePCX :: Bool -> Bool -> PcxT -> (SV.Vector Word8, B.ByteString, (Int, Int))
 decodePCX returnPalette returnDimensions pcx = (pix, palette, dimensions)
   where width = fromIntegral ((pcx^.pcxXMax) - (pcx^.pcxXMin) + 1)
         height = fromIntegral ((pcx^.pcxYMax) - (pcx^.pcxYMin) + 1)
@@ -182,19 +179,27 @@ decodePCX returnPalette returnDimensions pcx = (pix, palette, dimensions)
                 | otherwise = B.empty
         dimensions | returnDimensions = (width, height)
                    | otherwise = (0, 0)
-        pix = doDecodePCX (pcx^.pcxData) 0 0 0 width height mempty
+        pix = runST $
+          do v <- MSV.new (width * height)
+             doDecodePCX v (pcx^.pcxData) 0 0 0 0 width height
 
-doDecodePCX :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-doDecodePCX raw idx x y maxX maxY acc
-  | y >= maxY = BL.toStrict (BB.toLazyByteString acc)
-  | x >= maxX = doDecodePCX raw idx 0 (y + 1) maxX maxY acc
-  | dataByte .&. 0xC0 == 0xC0
-      = doDecodePCX raw (idx + 2) (x + runLength) y maxX maxY (acc <> BB.byteString (B.replicate runLength byte))
-  | otherwise
-      = doDecodePCX raw (idx + 1) (x + 1) y maxX maxY (acc <> BB.word8 dataByte)
-  where !dataByte = B.index raw idx
-        !runLength = fromIntegral (dataByte .&. 0x3F)
-        !byte = B.index raw (idx + 1)
+doDecodePCX :: MSV.STVector s Word8 -> B.ByteString -> Int -> Int -> Int -> Int -> Int -> Int -> ST s (SV.Vector Word8)
+doDecodePCX v raw inIdx outIdx x y width height
+  | y >= height = SV.unsafeFreeze v
+  | x >= width = doDecodePCX v raw inIdx outIdx 0 (y + 1) width height
+  | (raw `B.index` inIdx) .&. 0xC0 == 0xC0 =
+      do let !runLength = fromIntegral ((raw `B.index` inIdx) .&. 0x3F)
+             !byte = raw `B.index` (inIdx + 1)
+         writeRunLength outIdx runLength byte
+         doDecodePCX v raw (inIdx + 2) (outIdx + runLength) (x + runLength) y width height
+  | otherwise =
+      do MSV.write v outIdx (raw `B.index` inIdx)
+         doDecodePCX v raw (inIdx + 1) (outIdx + 1) (x + 1) y width height
+  where writeRunLength out len byte
+          | len == 0 = return ()
+          | otherwise =
+              do MSV.write v out byte
+                 writeRunLength (out + 1) (len - 1) byte
 
 glImageListF :: XCommandT
 glImageListF = error "Image.glImageListF" -- TODO
@@ -345,7 +350,7 @@ bindImage glState texNum
           | glState^.glsCurrentTmu == 0 = fastRenderAPIGlobals.frGLState.glsCurrentTextures._1 .= texNum
           | otherwise = fastRenderAPIGlobals.frGLState.glsCurrentTextures._2 .= texNum
 
-glLoadPic :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> Int -> Quake (Ref ImageT)
+glLoadPic :: B.ByteString -> SV.Vector Word8 -> Int -> Int -> Int -> Int -> Quake (Ref ImageT)
 glLoadPic name pic width height picType bits =
   do numGLTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
      idx <- findFreeImage 0 numGLTextures
@@ -404,7 +409,7 @@ updateNumGLTextures numGLTextures idx
                        Com.comError Constants.errDrop "MAX_GLTEXTURES"
                    | otherwise = return ()
 
-floodFillImage :: B.ByteString -> Int -> Int -> Int -> Int -> Quake B.ByteString
+floodFillImage :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Quake (SV.Vector Word8)
 floodFillImage pic width height picType bits
   | picType == Constants.itSkin && bits == 8 =
       do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
@@ -412,18 +417,15 @@ floodFillImage pic width height picType bits
          request (io (rFloodFillSkin pic width height d8to24table fifo))
   | otherwise = return pic
 
-rFloodFillSkin :: B.ByteString -> Int -> Int -> UV.Vector Int -> MV.IOVector (Int, Int) -> IO B.ByteString
+rFloodFillSkin :: SV.Vector Word8 -> Int -> Int -> UV.Vector Int -> MV.IOVector (Int, Int) -> IO (SV.Vector Word8)
 rFloodFillSkin skin skinWidth skinHeight d8to24table fifo
   | fillColor == filledColor || fillColor == 255 = return skin
   | otherwise =
-      do floodFill skinMutable skinWidth skinHeight fifo (fromIntegral filledColor) (fromIntegral fillColor) 1 0
-         return (fromMV skinMutable)
-  where fillColor = fromIntegral (B.head skin)
+      do skinMutable <- SV.unsafeThaw skin
+         floodFill skinMutable skinWidth skinHeight fifo (fromIntegral filledColor) (fromIntegral fillColor) 1 0
+         SV.unsafeFreeze skinMutable
+  where fillColor = fromIntegral (SV.head skin)
         filledColor = fromMaybe 0 (UV.findIndex (== 0xFF000000) d8to24table)
-        skinMutable = toMV skin
-        toMV (BI.PS ptr 0 n) = MSV.MVector n ptr -- ugly hack IMPROVE
-        toMV _ = error "Couldn't convert ByteString to MVector" -- shouldn't happen
-        fromMV (MSV.MVector n ptr) = BI.PS ptr 0 n
 
 floodFill :: MSV.IOVector Word8 -> Int -> Int -> MV.IOVector (Int, Int) -> Word8 -> Word8 -> Int -> Int -> IO ()
 floodFill skin skinWidth skinHeight fifo filledColor fillColor inpt outpt
@@ -464,7 +466,7 @@ floodFillStep skin fifo inpt pos x y fillColor fdc off dx dy =
           | b /= 255 = return (inpt, b)
           | otherwise = return (inpt, fdc)
 
-glUpload8 :: B.ByteString -> Int -> Int -> Bool -> Bool -> Quake Bool
+glUpload8 :: SV.Vector Word8 -> Int -> Int -> Bool -> Bool -> Quake Bool
 glUpload8 image width height mipmap isSky =
   do checkDimensions
      colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
@@ -477,13 +479,13 @@ glUpload8 image width height mipmap isSky =
         sz = width * height
         proceedUpload colorTable palettedTexture
           | colorTable && (palettedTexture^.cvValue) /= 0 && isSky =
-              do request (io (BU.unsafeUseAsCString image upload))
+              do request (io (SV.unsafeWith image upload))
                  filterMax <- use (fastRenderAPIGlobals.frGLFilterMax)
                  request (glApplyFilters filterMax)
                  return False
           | otherwise =
               do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
-                 glUpload32 (constructTrans image width d8to24table 0 sz mempty) width height mipmap
+                 glUpload32 (constructTrans image width d8to24table 0 sz) width height mipmap
         upload =
           GL.glTexImage2D GL.GL_TEXTURE_2D
                           0
@@ -497,24 +499,39 @@ glUpload8 image width height mipmap isSky =
           do GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral filterMax)
              GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral filterMax)
 
-constructTrans :: B.ByteString -> Int -> UV.Vector Int -> Int -> Int -> BB.Builder -> B.ByteString
-constructTrans image width d8to24table idx maxIdx acc
-  | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
-  | otherwise = let !p = image `B.index` idx
-                    !t = d8to24table UV.! fromIntegral p
-                    !p' | p == 0xFF = scanAround
-                        | otherwise = p
-                    !t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
-                        | otherwise = t
-                    scanAround
-                      | idx > width && (image `B.index` (idx - width)) /= 0xFF = image `B.index` (idx - width)
-                      | idx < maxIdx - width && (image `B.index` (idx + width)) /= 0xFF = image `B.index` (idx + width)
-                      | idx > 0 && (image `B.index` (idx - 1)) /= 0xFF = image `B.index` (idx - 1)
-                      | idx < maxIdx - 1 && (image `B.index` (idx + 1)) /= 0xFF = image `B.index` (idx + 1)
-                      | otherwise = 0
-                in constructTrans image width d8to24table (idx + 1) maxIdx (acc `mappend` BB.int32LE (fromIntegral t'))
+constructTrans :: SV.Vector Word8 -> Int -> UV.Vector Int -> Int -> Int -> SV.Vector Word8
+constructTrans image width d8to24table idx sz = runST $
+  do v <- MSV.new (4 * sz)
+     doConstructTrans image v width d8to24table idx sz
 
-glUpload32 :: B.ByteString -> Int -> Int -> Bool -> Quake Bool
+doConstructTrans :: SV.Vector Word8 -> MSV.STVector s Word8 -> Int -> UV.Vector Int -> Int -> Int -> ST s (SV.Vector Word8)
+doConstructTrans image v width d8to24table idx maxIdx
+  | idx >= maxIdx = SV.unsafeFreeze v
+  | otherwise =
+      do let p = image SV.! idx
+             t = d8to24table UV.! fromIntegral p
+             p' | p == 0xFF = scanAround
+                 | otherwise = p
+             t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
+                 | otherwise = t
+             scanAround
+               | idx > width && (image SV.! (idx - width)) /= 0xFF = image SV.! (idx - width)
+               | idx < maxIdx - width && (image SV.! (idx + width)) /= 0xFF = image SV.! (idx + width)
+               | idx > 0 && (image SV.! (idx - 1)) /= 0xFF = image SV.! (idx - 1)
+               | idx < maxIdx - 1 && (image SV.! (idx + 1)) /= 0xFF = image SV.! (idx + 1)
+               | otherwise = 0
+             t'' = fromIntegral t' :: Word32
+             a = fromIntegral (t'' .&. 0xFF) :: Word8
+             b = fromIntegral ((t'' `shiftR` 8) .&. 0xFF) :: Word8
+             c = fromIntegral ((t'' `shiftR` 16) .&. 0xFF) :: Word8
+             d = fromIntegral ((t'' `shiftR` 24) .&. 0xFF) :: Word8
+         MSV.write v (idx * 4 + 0) a
+         MSV.write v (idx * 4 + 1) b
+         MSV.write v (idx * 4 + 2) c
+         MSV.write v (idx * 4 + 3) d
+         doConstructTrans image v width d8to24table (idx + 1) maxIdx
+
+glUpload32 :: SV.Vector Word8 -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap =
   do scaledWidth <- calcScaledValue width mipmap
      scaledHeight <- calcScaledValue height mipmap
@@ -528,7 +545,7 @@ glUpload32 image width height mipmap =
      uploadResampled resampled scaledWidth scaledHeight mipmap samples comp
      applyFilters mipmap
      return (samples == glAlphaFormat)
-  where samples = scanAlpha image 0 3 (width * height)
+  where !samples = scanAlpha image 0 3 (width * height)
 
 calcScaledValue :: Int -> Bool -> Quake Int
 calcScaledValue value mipmap =
@@ -550,11 +567,12 @@ calcScaledValue value mipmap =
           | sv < 1 = 1
           | otherwise = sv
 
-scanAlpha :: B.ByteString -> Int -> Int -> Int -> Int
-scanAlpha image idx scan maxIdx
+scanAlpha :: SV.Vector Word8 -> Int -> Int -> Int -> Int
+scanAlpha !image !idx !scan maxIdx
   | idx >= maxIdx = glSolidFormat
-  | image `B.index` scan /= 0xFF = glAlphaFormat
+  | image SV.! scan /= 0xFF = glAlphaFormat
   | otherwise = scanAlpha image (idx + 1) (scan + 4) maxIdx
+{-# INLINE scanAlpha #-}
 
 checkScaledError :: Int -> Int -> Quake ()
 checkScaledError scaledWidth scaledHeight =
@@ -569,7 +587,7 @@ getTextureComponents samples
       do VID.printf Constants.printAll (B.concat ["Unknown number of texture components ", encode samples, "\n"])
          return samples
 
-uploadOrResample :: B.ByteString -> Int -> Int -> Bool -> Int -> Int -> Int -> Int -> Quake (Maybe B.ByteString)
+uploadOrResample :: SV.Vector Word8 -> Int -> Int -> Bool -> Int -> Int -> Int -> Int -> Quake (Maybe (SV.Vector Word8))
 uploadOrResample image width height mipmap scaledWidth scaledHeight samples comp
   | sameDimensions && not mipmap =
       do uploadImage image scaledWidth scaledHeight 0 samples comp
@@ -578,10 +596,48 @@ uploadOrResample image width height mipmap scaledWidth scaledHeight samples comp
   | otherwise = return (Just (glResampleTexture image width height scaledWidth scaledHeight))
   where sameDimensions = scaledWidth == width && scaledHeight == height
 
-glResampleTexture :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString
-glResampleTexture = error "Image.glResampleTexture" -- TODO
+glResampleTexture :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> SV.Vector Word8
+glResampleTexture image width height scaledWidth scaledHeight =
+  let fracStep = (width * 0x10000) `div` scaledWidth
+      frac = fracStep `shiftR` 2
+      p1 = UV.unfoldrN 1024 buildP (0, frac, fracStep)
+      frac' = 3 * (fracStep `shiftR` 2)
+      p2 = UV.unfoldrN 1024 buildP (0, frac', fracStep)
+  in runST $
+       do v <- MSV.new (4 * scaledWidth * scaledHeight)
+          resample v fracStep p1 p2 0 0 scaledHeight
+  where buildP (idx, frac, fracStep)
+          | idx >= scaledWidth = Just (0, (idx + 1, frac + fracStep, fracStep))
+          | otherwise = Just (4 * (frac `shiftR` 16), (idx + 1, frac + fracStep, fracStep))
+        resample v fracStep p1 p2 outIdx idx maxIdx
+          | idx >= maxIdx = SV.unsafeFreeze v
+          | otherwise =
+              do let inRow = 4 * width * truncate ((fromIntegral idx + 0.25 :: Float) * fromIntegral height / fromIntegral scaledHeight)
+                     inRow2 = 4 * width * truncate ((fromIntegral idx + 0.75 :: Float) * fromIntegral height / fromIntegral scaledHeight)
+                 outIdx' <- buildRow v p1 p2 inRow inRow2 outIdx 0 scaledWidth
+                 resample v fracStep p1 p2 outIdx' (idx + 1) maxIdx
+        buildRow v p1 p2 inRow inRow2 outIdx idx maxIdx
+          | idx >= maxIdx = return outIdx
+          | otherwise =
+              do let !pix1 = inRow  + (p1 UV.! idx)
+                     !pix2 = inRow  + (p2 UV.! idx)
+                     !pix3 = inRow2 + (p1 UV.! idx)
+                     !pix4 = inRow2 + (p2 UV.! idx)
+                     !r1 = fromIntegral (image SV.! (pix1 + 0)) :: Int
+                     !g1 = fromIntegral (image SV.! (pix1 + 1)) :: Int
+                     !b1 = fromIntegral (image SV.! (pix1 + 2)) :: Int
+                     !a1 = fromIntegral (image SV.! (pix1 + 3)) :: Int
+                     !r = fromIntegral ((r1 + fromIntegral (image SV.! (pix2 + 0)) + fromIntegral (image SV.! (pix3 + 0)) + fromIntegral (image SV.! (pix4 + 0))) `shiftR` 2) :: Word8
+                     !g = fromIntegral ((g1 + fromIntegral (image SV.! (pix2 + 1)) + fromIntegral (image SV.! (pix3 + 1)) + fromIntegral (image SV.! (pix4 + 1))) `shiftR` 2) :: Word8
+                     !b = fromIntegral ((b1 + fromIntegral (image SV.! (pix2 + 2)) + fromIntegral (image SV.! (pix3 + 2)) + fromIntegral (image SV.! (pix4 + 2))) `shiftR` 2) :: Word8
+                     !a = fromIntegral ((a1 + fromIntegral (image SV.! (pix2 + 3)) + fromIntegral (image SV.! (pix3 + 3)) + fromIntegral (image SV.! (pix4 + 3))) `shiftR` 2) :: Word8
+                 MSV.write v (outIdx + 0) r
+                 MSV.write v (outIdx + 1) g
+                 MSV.write v (outIdx + 2) b
+                 MSV.write v (outIdx + 3) a
+                 buildRow v p1 p2 inRow inRow2 (outIdx + 4) (idx + 1) maxIdx
 
-uploadImage :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
+uploadImage :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadImage image scaledWidth scaledHeight mipLevel samples comp =
   do colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
      palettedTextureValue <- fmap (^.cvValue) glExtPalettedTextureCVar
@@ -590,9 +646,9 @@ uploadImage image scaledWidth scaledHeight mipLevel samples comp =
           | colorTable && palettedTextureValue /= 0 && samples == glSolidFormat =
               do fastRenderAPIGlobals.frUploadedPaletted .= True
                  palettedTexture <- glBuildPalettedTexture image scaledWidth scaledHeight
-                 request (io (BU.unsafeUseAsCString palettedTexture (upload GL.GL_COLOR_INDEX8_EXT GL.GL_COLOR_INDEX)))
+                 request (io (SV.unsafeWith palettedTexture (upload GL.GL_COLOR_INDEX8_EXT GL.GL_COLOR_INDEX)))
           | otherwise =
-              request (io (BU.unsafeUseAsCString image (upload comp GL.GL_RGBA)))
+              request (io (SV.unsafeWith image (upload comp GL.GL_RGBA)))
         upload internalFormat format =
           GL.glTexImage2D GL.GL_TEXTURE_2D
                           (fromIntegral mipLevel) 
@@ -603,7 +659,7 @@ uploadImage image scaledWidth scaledHeight mipLevel samples comp =
                           format
                           GL.GL_UNSIGNED_BYTE
 
-uploadResampled :: Maybe B.ByteString -> Int -> Int -> Bool -> Int -> Int -> Quake ()
+uploadResampled :: Maybe (SV.Vector Word8) -> Int -> Int -> Bool -> Int -> Int -> Quake ()
 uploadResampled Nothing _ _ _ _ _ = return ()
 uploadResampled (Just image) scaledWidth scaledHeight mipmap samples comp =
   do scaled <- glLightScaleTexture image scaledWidth scaledHeight (not mipmap)
@@ -611,45 +667,59 @@ uploadResampled (Just image) scaledWidth scaledHeight mipmap samples comp =
      when mipmap $
        uploadMipMaps scaled scaledWidth scaledHeight 0 samples comp
 
-glLightScaleTexture :: B.ByteString -> Int -> Int -> Bool -> Quake B.ByteString
+glLightScaleTexture :: SV.Vector Word8 -> Int -> Int -> Bool -> Quake (SV.Vector Word8)
 glLightScaleTexture image width height onlyGamma =
   do gammaTable <- use (fastRenderAPIGlobals.frGammaTable)
      lightscale gammaTable
-  where lightscale gammaTable
-          | onlyGamma = return (buildFromGammaTable image gammaTable 0 0 c mempty)
+  where lightscale :: B.ByteString -> Quake (SV.Vector Word8)
+        lightscale gammaTable
+          | onlyGamma = return $ runST $
+              do v <- MSV.new (c * 4)
+                 buildFromGammaTable image v gammaTable 0 0 c
           | otherwise =
               do intensityTable <- use (fastRenderAPIGlobals.frIntensityTable)
-                 return (buildFromGammaAndIntensityTable image gammaTable intensityTable 0 0 c mempty)
+                 return $ runST $
+                   do v <- MSV.new (c * 4)
+                      buildFromGammaAndIntensityTable image v gammaTable intensityTable 0 0 c
         c = width * height
 
-buildFromGammaTable :: B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-buildFromGammaTable image gammaTable idx p maxIdx acc
-  | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
+buildFromGammaTable :: SV.Vector Word8 -> MSV.STVector s Word8 -> B.ByteString -> Int -> Int -> Int -> ST s (SV.Vector Word8)
+buildFromGammaTable image v gammaTable idx p maxIdx
+  | idx >= maxIdx = SV.unsafeFreeze v
   | otherwise =
-      let !p3 = image `B.index` (p + 3)
-          !a = gammaTable `B.index` fromIntegral (image `B.index` p)
-          !b = gammaTable `B.index` fromIntegral (image `B.index` (p + 1))
-          !c = gammaTable `B.index` fromIntegral (image `B.index` (p + 2))
-      in buildFromGammaTable image gammaTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
+      do let !p3 = image SV.! (p + 3)
+             !a = gammaTable `B.index` fromIntegral (image SV.! p)
+             !b = gammaTable `B.index` fromIntegral (image SV.! (p + 1))
+             !c = gammaTable `B.index` fromIntegral (image SV.! (p + 2))
+         MSV.write v (p + 0) a
+         MSV.write v (p + 1) b
+         MSV.write v (p + 2) c
+         MSV.write v (p + 3) p3
+         buildFromGammaTable image v gammaTable (idx + 1) (p + 4) maxIdx
   
-buildFromGammaAndIntensityTable :: B.ByteString -> B.ByteString -> B.ByteString -> Int -> Int -> Int -> BB.Builder -> B.ByteString
-buildFromGammaAndIntensityTable image gammaTable intensityTable idx p maxIdx acc
-  | idx >= maxIdx = BL.toStrict (BB.toLazyByteString acc)
+buildFromGammaAndIntensityTable :: SV.Vector Word8 -> MSV.STVector s Word8 -> B.ByteString -> B.ByteString -> Int -> Int -> Int -> ST s (SV.Vector Word8)
+buildFromGammaAndIntensityTable image v gammaTable intensityTable idx p maxIdx
+  | idx >= maxIdx = SV.unsafeFreeze v
   | otherwise =
-      let !p3 = image `B.index` (p + 3)
-          !i0 = intensityTable `B.index` fromIntegral (image `B.index` p)
-          !i1 = intensityTable `B.index` fromIntegral (image `B.index` (p + 1))
-          !i2 = intensityTable `B.index` fromIntegral (image `B.index` (p + 2))
-          !a = gammaTable `B.index` fromIntegral i0
-          !b = gammaTable `B.index` fromIntegral i1
-          !c = gammaTable `B.index` fromIntegral i2
-      in buildFromGammaAndIntensityTable image gammaTable intensityTable (idx + 1) (p + 4) maxIdx (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 p3])
+      do let !p3 = image SV.! (p + 3)
+             !i0 = intensityTable `B.index` fromIntegral (image SV.! p)
+             !i1 = intensityTable `B.index` fromIntegral (image SV.! (p + 1))
+             !i2 = intensityTable `B.index` fromIntegral (image SV.! (p + 2))
+             !a = gammaTable `B.index` fromIntegral i0
+             !b = gammaTable `B.index` fromIntegral i1
+             !c = gammaTable `B.index` fromIntegral i2
+         MSV.write v (p + 0) a
+         MSV.write v (p + 1) b
+         MSV.write v (p + 2) c
+         MSV.write v (p + 3) p3
+         buildFromGammaAndIntensityTable image v gammaTable intensityTable (idx + 1) (p + 4) maxIdx
 
-uploadMipMaps :: B.ByteString -> Int -> Int -> Int -> Int -> Int -> Quake ()
+uploadMipMaps :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadMipMaps image scaledWidth scaledHeight mipLevel samples comp
   | scaledWidth <= 1 && scaledHeight <= 1 = return ()
   | otherwise =
-      do uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
+      do request (io (print ("sw = " ++ show scaledWidth' ++ " sh = " ++ show scaledHeight')))
+         uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
          uploadMipMaps scaled scaledWidth' scaledHeight' mipLevel' samples comp
   where scaled = glMipMap image scaledWidth scaledHeight
         sw = scaledWidth `shiftR` 1
@@ -658,25 +728,24 @@ uploadMipMaps image scaledWidth scaledHeight mipLevel samples comp
         scaledHeight' = max 1 sh
         mipLevel' = mipLevel + 1
 
-glMipMap :: B.ByteString -> Int -> Int -> B.ByteString
-glMipMap image width height
-  | width == 1 || height == 1 = B.replicate (width * height) 255 -- TODO: UGLY HACK!!!!!! FIXME!! mipmap generation fails when w or h is 1 (in jake2 and quake2 it uses the fact that input array is huge and can overflow, but we cannot)
-  | otherwise = forI 0 0 (height `shiftR` 1) mempty
-  where forI inIdx i maxI acc
-          | i >= maxI = BL.toStrict (BB.toLazyByteString acc)
+glMipMap :: SV.Vector Word8 -> Int -> Int -> SV.Vector Word8
+glMipMap image width height = runST $
+  do v <- SV.unsafeThaw image
+     generateMipMap v 0 0 0 0
+  where generateMipMap v inIdx outIdx i j
+          | i >= height = SV.unsafeFreeze v
+          | j >= width = generateMipMap v (inIdx + width) outIdx (i + 1) 0
           | otherwise =
-              let w = width `shiftL` 2
-                  (inIdx', r) = forJ inIdx 0 w mempty
-              in forI (inIdx' + w) (i + 1) maxI (acc `mappend` r)
-        forJ inIdx j maxJ acc
-          | j >= maxJ = (inIdx, acc)
-          | otherwise =
-              let w = width `shiftL` 2
-                  a = ((image `B.index` (inIdx + 0)) + (image `B.index` (inIdx + 4)) + (image `B.index` (inIdx + w + 0)) + (image `B.index` (inIdx + w + 4))) `shiftR` 2
-                  b = ((image `B.index` (inIdx + 1)) + (image `B.index` (inIdx + 5)) + (image `B.index` (inIdx + w + 1)) + (image `B.index` (inIdx + w + 5))) `shiftR` 2
-                  c = ((image `B.index` (inIdx + 2)) + (image `B.index` (inIdx + 6)) + (image `B.index` (inIdx + w + 2)) + (image `B.index` (inIdx + w + 6))) `shiftR` 2
-                  d = ((image `B.index` (inIdx + 3)) + (image `B.index` (inIdx + 7)) + (image `B.index` (inIdx + w + 3)) + (image `B.index` (inIdx + w + 7))) `shiftR` 2
-              in forJ (inIdx + 8) (j + 8) maxJ (mconcat [acc, BB.word8 a, BB.word8 b, BB.word8 c, BB.word8 d])
+              do let w = width `shiftL` 2
+                     a = ((image SV.! (inIdx + 0)) + (image SV.! (inIdx + 4)) + (image SV.! (inIdx + w + 0)) + (image SV.! (inIdx + w + 4))) `shiftR` 2
+                     b = ((image SV.! (inIdx + 1)) + (image SV.! (inIdx + 5)) + (image SV.! (inIdx + w + 1)) + (image SV.! (inIdx + w + 5))) `shiftR` 2
+                     c = ((image SV.! (inIdx + 2)) + (image SV.! (inIdx + 6)) + (image SV.! (inIdx + w + 2)) + (image SV.! (inIdx + w + 6))) `shiftR` 2
+                     d = ((image SV.! (inIdx + 3)) + (image SV.! (inIdx + 7)) + (image SV.! (inIdx + w + 3)) + (image SV.! (inIdx + w + 7))) `shiftR` 2
+                 MSV.write v (outIdx + 0) a
+                 MSV.write v (outIdx + 1) b
+                 MSV.write v (outIdx + 2) c
+                 MSV.write v (outIdx + 3) d
+                 generateMipMap v (inIdx + 8) (outIdx + 4) i (j + 8)
 
 applyFilters :: Bool -> Quake ()
 applyFilters mipmap =
@@ -690,7 +759,7 @@ applyFilters mipmap =
               do GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral a)
                  GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral b)
 
-glBuildPalettedTexture :: B.ByteString -> Int -> Int -> Quake B.ByteString
+glBuildPalettedTexture :: SV.Vector Word8 -> Int -> Int -> Quake (SV.Vector Word8)
 glBuildPalettedTexture = error "Image.glBuildPalettedTexture" -- TODO
 
 glFindImage :: B.ByteString -> Int -> Quake (Maybe (Ref ImageT))
@@ -750,9 +819,11 @@ uploadMiptexT name Nothing =
   do VID.printf Constants.printAll (B.concat ["GL_FindImage: can't load ", name, "\n"])
      use (fastRenderAPIGlobals.frNoTexture)
 uploadMiptexT name (Just miptex) =
-  glLoadPic name (miptex^.mtBuf) (miptex^.mtWidth) (miptex^.mtHeight) Constants.itWall 8
+  glLoadPic name (fromBStoSV (miptex^.mtBuf)) (miptex^.mtWidth) (miptex^.mtHeight) Constants.itWall 8
+  where fromBStoSV str =
+          SV.generate (B.length str) (str `B.index`)
 
-loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
+loadTGA :: B.ByteString -> Quake (Maybe (SV.Vector Word8, (Int, Int)))
 loadTGA = error "Image.loadTGA" -- TODO
 
 scrapUpload :: Quake ()

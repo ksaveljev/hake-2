@@ -119,10 +119,30 @@ checkMask (Just edictRef) area1 mask =
      cluster <- CM.leafCluster leafNum
      area2 <- CM.leafArea leafNum
      connected <- CM.areasConnected area1 area2
-     return (not connected || cluster == -1 || (B.index mask (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) == 0)
+     return (not connected || cluster == -1 || B.index mask (cluster `shiftR` 3) .&. (1 `shiftL` (cluster .&. 7)) == 0)
 
 clientPrintf :: ClientT -> Int -> B.ByteString -> Quake ()
 clientPrintf = error "SVSend.clientPrintf" -- TODO
 
 sendClientMessages :: Quake ()
-sendClientMessages = error "SVSend.sendClientMessages" -- TODO
+sendClientMessages =
+  do state <- use (svGlobals.svServer.sState)
+     demoFile <- use (svGlobals.svServer.sDemoFile)
+     msgLen <- readDemoMessage state demoFile
+     maybe (return ()) sendMessages msgLen
+  where readDemoMessage _ Nothing = return (Just 0)
+        readDemoMessage state (Just demoFile)
+          | state == Constants.ssDemo = proceedReadDemoMessage demoFile =<< pausedCVar
+          | otherwise = return (Just 0)
+        proceedReadDemoMessage demoFile paused
+          | (paused^.cvValue) /= 0 = return (Just 0)
+          | otherwise =
+              do readBytes <- request (io (BL.hGet h 4))
+                 checkDemoCompleted demoFile readBytes
+        checkDemoCompleted demoFile readBytes
+          | BL.length readBytes /= 4 || runGet getInt readBytes == -1 =
+              do demoCompleted
+                 return Nothing
+          | otherwise = do
+              ???
+        sendMessages msgLen = error "" -- TODO

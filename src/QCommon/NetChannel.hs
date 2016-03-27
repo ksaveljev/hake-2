@@ -123,10 +123,10 @@ proceedTransmit netChanLens len buf chan
                      | otherwise = 0
         setReliable =
           when ((chan^.ncReliableLength) == 0 && (chan^.ncMessage.sbCurSize) /= 0) $
-            do netChanLens %= (\v -> v & ncReliableBuf .~ B.take (chan^.ncMessage.sbCurSize) (chan^.ncMessage.sbData) -- TODO: make sure this sbData stuff is correct (jake2 reads from ncMessageBuf)
-                                       & ncReliableLength .~ (chan^.ncMessage.sbCurSize)
-                                       & ncMessage.sbCurSize .~ 0
-                                       & ncReliableSequence %~ (`xor` 1))
+            netChanLens %= (\v -> v & ncReliableBuf .~ B.take (chan^.ncMessage.sbCurSize) (chan^.ncMessage.sbData) -- TODO: make sure this sbData stuff is correct (jake2 reads from ncMessageBuf)
+                                    & ncReliableLength .~ (chan^.ncMessage.sbCurSize)
+                                    & ncMessage.sbCurSize .~ 0
+                                    & ncReliableSequence %~ (`xor` 1))
         writePacketHeader =
           do SZ.initialize (netChannelGlobals.ncSend) B.empty Constants.maxMsgLen
              netChanLens.ncOutgoingSequence += 1
