@@ -24,12 +24,14 @@ import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
 import           Types
-import           Util.Binary (encode)
+import           Util.Binary (encode, getInt)
 
-import           Control.Lens (use, ix, (^.))
-import           Control.Monad (unless, (>=>))
+import           Control.Lens (use, ix, (.=), (^.))
+import           Control.Monad (when, unless, (>=>))
+import           Data.Binary.Get (runGet)
 import           Data.Bits (shiftR, shiftL, (.&.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import           Linear (V3(..))
 
 broadcastCommand :: B.ByteString -> Quake ()
@@ -137,12 +139,34 @@ sendClientMessages =
         proceedReadDemoMessage demoFile paused
           | (paused^.cvValue) /= 0 = return (Just 0)
           | otherwise =
-              do readBytes <- request (io (BL.hGet h 4))
+              do readBytes <- request (io (BL.hGet demoFile 4))
                  checkDemoCompleted demoFile readBytes
         checkDemoCompleted demoFile readBytes
           | BL.length readBytes /= 4 || runGet getInt readBytes == -1 =
               do demoCompleted
                  return Nothing
-          | otherwise = do
-              ???
-        sendMessages msgLen = error "" -- TODO
+          | otherwise =
+              do let len = runGet getInt readBytes
+                 when (len > Constants.maxMsgLen) $
+                   Com.comError Constants.errDrop "SV_SendClientMessages: msglen > MAX_MSGLEN"
+                 buf <- request (io (B.hGet demoFile len))
+                 svGlobals.svMsgBuf .= buf
+                 verifyDemoData (B.length buf) len
+        verifyDemoData bufLen len
+          | bufLen /= len =
+              do Com.printf "IOError: reading demo file"
+                 demoCompleted
+                 return Nothing
+          | otherwise = return (Just len)
+        sendMessages _ =
+          do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+             mapM_ (fmap sendClientMessage . readClient) [0..maxClients-1]
+        readClient idx =
+          do client <- readRef (Ref idx)
+             return (Ref idx, client)
+
+sendClientMessage :: (Ref ClientT, ClientT) -> Quake ()
+sendClientMessage = error "SVSend.sendClientMessage" -- TODO
+
+demoCompleted :: Quake ()
+demoCompleted = error "SVSend.demoCompleted" -- TODO
