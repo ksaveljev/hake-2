@@ -72,7 +72,10 @@ proceedProcess netChanLens msgLens seqn seqnAck =
         mask = complement (1 `shiftL` 31) :: Int32
         seqn' = fromIntegral (fromIntegral seqn .&. mask) :: Int
         seqnAck' = fromIntegral (fromIntegral seqnAck .&. mask) :: Int
-        showPacketInfo showPackets = error "NetChannel.proceedProcess showPacketInfo" -- TODO
+        showPacketInfo showPackets
+          | (showPackets^.cvValue) /= 0 =
+              error "NetChannel.proceedProcess showPacketInfo" -- TODO
+          | otherwise = return ()
         chanError =
           do Com.fatalError "NetChannel.proceedProcess chan is Nothing"
              return False
@@ -93,7 +96,7 @@ doProcess netChanLens seqn seqnAck reliableMessage reliableAck chan
                                 & ncIncomingReliableAcknowledged .~ reliableAck)
          when (reliableMessage /= 0) $
            netChanLens.ncIncomingReliableSequence %= (`xor` 1)
-         curTime <- use (globals.gCurTime)
+         curTime <- Timer.getCurTime
          netChanLens.ncLastReceived .= curTime
          return True
   where dropped = seqn - ((chan^.ncIncomingSequence) + 1)
@@ -130,7 +133,7 @@ proceedTransmit netChanLens len buf chan
         writePacketHeader =
           do SZ.initialize (netChannelGlobals.ncSend) B.empty Constants.maxMsgLen
              netChanLens.ncOutgoingSequence += 1
-             curTime <- use (globals.gCurTime)
+             curTime <- Timer.getCurTime
              netChanLens.ncLastSent .= curTime
              MSG.writeInt (netChannelGlobals.ncSend) w1
              MSG.writeInt (netChannelGlobals.ncSend) w2
@@ -185,7 +188,7 @@ doTransmit netChanLens len buf sendReliable chan =
 
 setup :: Int -> Traversal' QuakeState NetChanT -> NetAdrT -> Int -> Quake ()
 setup sock netChanLens adr qport =
-  do curTime <- use (globals.gCurTime)
+  do curTime <- Timer.getCurTime
      netChanLens .= newNetChanT { _ncSock = sock
                                 , _ncRemoteAddress = adr
                                 , _ncRemoteQPort = qport

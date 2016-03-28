@@ -262,7 +262,7 @@ clientFrame msec =
 calcSimulationTime :: Quake ()
 calcSimulationTime =
   do extraTime <- use (clientGlobals.cgExtraTime)
-     curTime <- use (globals.gCurTime)
+     curTime <- Timer.getCurTime
      globals.gCls.csFrameTime .= max (fromIntegral extraTime / 1000) 0.2
      globals.gCls.csRealTime .= curTime
      globals.gCl.csTime += extraTime

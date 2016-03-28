@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Util.Binary
   ( encode
   , getInt

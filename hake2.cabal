@@ -37,6 +37,7 @@ executable hake2
                      , unix-compat
                      , unordered-containers
   default-extensions:  OverloadedStrings
+                     , BangPatterns
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CDLightT
                      , Client.CheatVarT
@@ -253,6 +254,7 @@ executable hake2
                      , Server.SVSend
                      , Server.SVUser
                      , Server.SVWorld
+                     , Server.UCmdT
                      , Sound.S
                      , Sys.IN
                      , Sys.INGlobals

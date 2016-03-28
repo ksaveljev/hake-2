@@ -65,7 +65,8 @@ data QuakeState = QuakeState
   }
 
 data QuakeIOState = QuakeIOState
-  { _gbGEdicts              :: MV.IOVector EdictT
+  { _gCurTime               :: IORef Int
+  , _gbGEdicts              :: MV.IOVector EdictT
   , _cmMapPlanes            :: MV.IOVector CPlaneT
   , _cmMapBrushes           :: MV.IOVector CBrushT
   , _cText                  :: MSV.IOVector Char
@@ -106,8 +107,7 @@ dummyGItemRef :: Ref GItemT
 dummyGItemRef = Ref (-1)
 
 data Globals = Globals
-  { _gCurTime          :: Int
-  , _gCmdWait          :: Bool
+  { _gCmdWait          :: Bool
   , _gAliasCount       :: Int
   , _gCTraces          :: Int
   , _gCBrushTraces     :: Int
@@ -2011,6 +2011,11 @@ data VRectT = VRectT
   , _vrY      :: Int
   , _vrWidth  :: Int
   , _vrHeight :: Int
+  }
+
+data UCmdT = UCmdT
+  { _ucName :: B.ByteString
+  , _ucFunc :: XCommandT
   }
 
 data KeyFuncT = KeyFuncT

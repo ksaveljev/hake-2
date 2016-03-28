@@ -28,6 +28,7 @@ import qualified QCommon.SZ as SZ
 import           QuakeRef
 import           QuakeState
 import qualified Sys.IN as IN
+import qualified Sys.Timer as Timer
 import           Types
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
@@ -194,7 +195,7 @@ doSendCmd cmdRef state
   | state `elem` [Constants.caDisconnected, Constants.caConnecting] = return ()
   | state == Constants.caConnected =
       do curSize <- use (globals.gCls.csNetChan.ncMessage.sbCurSize)
-         curTime <- use (globals.gCurTime)
+         curTime <- Timer.getCurTime
          lastSent <- use (globals.gCls.csNetChan.ncLastSent)
          when (curSize /= 0 || (curTime - lastSent) > 1000) $
            NetChannel.transmit (globals.gCls.csNetChan) 0 B.empty

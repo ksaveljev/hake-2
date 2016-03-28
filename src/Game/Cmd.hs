@@ -1,10 +1,10 @@
-{-# LANGUAGE BangPatterns #-}
 module Game.Cmd
   ( addCommand
   , addInitialCommands
   , argc
   , args
   , argv
+  , clientCommand
   , executeString
   , initialize
   , removeCommands
@@ -324,3 +324,6 @@ removeCommand name =
 
 removeCommands :: [B.ByteString] -> Quake ()
 removeCommands = mapM_ removeCommand
+
+clientCommand :: Ref EdictT -> Quake ()
+clientCommand = error "Cmd.clientCommand" -- TODO

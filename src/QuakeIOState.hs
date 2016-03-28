@@ -13,6 +13,7 @@ import           Render.MSurfaceT
 import           Types
 
 import           Control.Lens (makeLenses)
+import           Data.IORef (newIORef)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
@@ -46,7 +47,8 @@ floodFillFifoSize = 0x1000
 
 initialQuakeIOState :: QuakeIOState
 initialQuakeIOState =
-  QuakeIOState { _gbGEdicts              = unsafePerformIO (V.thaw (V.generate (Constants.maxEdicts + 1) newEdictT)) -- one extra for "dummy edict"
+  QuakeIOState { _gCurTime               = unsafePerformIO (newIORef 0)
+               , _gbGEdicts              = unsafePerformIO (V.thaw (V.generate (Constants.maxEdicts + 1) newEdictT)) -- one extra for "dummy edict"
                , _cmMapPlanes            = unsafePerformIO (V.thaw (V.replicate (Constants.maxMapPlanes + 6) newCPlaneT))
                , _cmMapBrushes           = unsafePerformIO (V.thaw (V.replicate Constants.maxMapBrushes newCBrushT))
                , _cText                  = unsafePerformIO (MSV.replicate Constants.conTextSize ' ')

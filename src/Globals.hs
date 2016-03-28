@@ -25,8 +25,7 @@ makeLenses ''Globals
 
 initialGlobals :: Globals
 initialGlobals =
-  Globals { _gCurTime          = 0
-          , _gCmdWait          = False
+  Globals { _gCmdWait          = False
           , _gAliasCount       = 0
           , _gCTraces          = 0
           , _gCBrushTraces     = 0

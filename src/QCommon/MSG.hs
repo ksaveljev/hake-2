@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.MSG
   ( beginReading
+  , readByte
   , readLong
   , readShort
   , readString
