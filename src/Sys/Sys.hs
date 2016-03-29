@@ -1,7 +1,9 @@
 module Sys.Sys
-  ( sendKeyEvents
+  ( quit
+  , sendKeyEvents
   ) where
 
+import {-# SOURCE #-} qualified Client.CL as CL
 import           Client.RefExportT
 import           QuakeState
 import           Render.Renderer
@@ -10,6 +12,7 @@ import qualified Sys.Timer as Timer
 import           Types
 
 import           Control.Lens (use, (^.), (.=))
+import           System.Exit (exitSuccess)
 
 sendKeyEvents :: Quake ()
 sendKeyEvents =
@@ -20,3 +23,8 @@ sendKeyEvents =
           do renderer^.rRefExport.reGetKeyboardHandler.kbdUpdate
              time <- Timer.milliseconds
              globals.gSysFrameTime .= time
+
+quit :: Quake ()
+quit =
+  do CL.shutdown
+     request (io exitSuccess)

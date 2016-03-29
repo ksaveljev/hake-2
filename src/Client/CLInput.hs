@@ -5,7 +5,7 @@ module Client.CLInput
   , sendCmd
   ) where
 
-import           Client.CLShared as CL
+import {-# SOURCE #-} qualified Client.CL as CL
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import           Client.FrameT

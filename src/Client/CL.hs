@@ -1,8 +1,10 @@
 module Client.CL
   ( dropClient
+  , fixUpGender
   , frame
   , initialize
   , quitF
+  , shutdown
   , writeConfiguration
   ) where
 
@@ -13,7 +15,6 @@ import           Client.ClientStaticT
 import qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
-import           Client.CLShared as CLShared
 import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
@@ -26,6 +27,7 @@ import qualified Constants
 import           Data.Bits ((.|.))
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
+import qualified Game.Info as Info
 import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
@@ -177,10 +179,30 @@ initializeLocal =
              CVar.update (gender & cvModified .~ False)
 
 forwardToServerF :: XCommandT
-forwardToServerF = error "CL.forwardToServerF" -- TODO
+forwardToServerF = XCommandT "CL.forwardToServerF" forwardToServer
+
+forwardToServer :: Quake ()
+forwardToServer = checkState =<< use (globals.gCls.csState)
+  where checkState state
+          | state `notElem` [Constants.caConnected, Constants.caActive] =
+              do arg <- Com.argv 0
+                 Com.printf (B.concat ["Can't \"", arg, "\", not connected\n"])
+          | otherwise =
+              do c <- Cmd.argc
+                 when (c > 1) $
+                   do MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+                      SZ.printSB (globals.gCls.csNetChan.ncMessage) =<< Cmd.args
 
 pauseF :: XCommandT
-pauseF = error "CL.pauseF" -- TODO
+pauseF = XCommandT "CL.pauseF" $
+  do maxClients <- CVar.variableValue "maxclients"
+     state <- use (globals.gServerState)
+     doPause maxClients state
+  where doPause maxClients state
+          | maxClients > 1 || state == 0 = CVar.setValueI "paused" 0
+          | otherwise =
+              do paused <- pausedCVar
+                 CVar.setValueF "paused" (paused^.cvValue)
 
 pingServersF :: XCommandT
 pingServersF = error "CL.pingServersF" -- TODO
@@ -189,16 +211,28 @@ skinsF :: XCommandT
 skinsF = error "CL.skinsF" -- TODO
 
 userInfoF :: XCommandT
-userInfoF = error "CL.userInfoF" -- TODO
+userInfoF = XCommandT "CL.userInfoF" $
+  do Com.printf "User info settings:\n"
+     Info.printInfo =<< CVar.userInfo
 
 sndRestartF :: XCommandT
-sndRestartF = error "CL.sndRestartF" -- TODO
+sndRestartF = XCommandT "CL.sndRestartF" $
+  do S.shutdown
+     S.initialize
+     CLParse.registerSounds
 
 changingF :: XCommandT
-changingF = error "CL.changingF" -- TODO
+changingF = XCommandT "CL.changingF" $
+  doChanging =<< use (globals.gCls.csDownload)
+  where doChanging (Just _) = return ()
+        doChanging Nothing =
+          do SCR.beginLoadingPlaque
+             globals.gCls.csState .= Constants.caConnected
+             Com.printf "\nChanging map...\n"
 
 disconnectF :: XCommandT
-disconnectF = error "CL.disconnectF" -- TODO
+disconnectF = XCommandT "CL.disconnectF" $
+  Com.comError Constants.errDrop "Disconnected from server"
 
 recordF :: XCommandT
 recordF = error "CL.recordF" -- TODO
@@ -307,9 +341,6 @@ dropClient =
        disconnect
      when ((clientStatic^.csDisableServerCount) /= -1)
        SCR.endLoadingPlaque
-
-disconnect :: Quake ()
-disconnect = error "CL.disconnect" -- TODO
 
 sendCommand :: Quake ()
 sendCommand =
@@ -502,3 +533,24 @@ doSendConnectPacket adr =
         connectString port challenge userInfo =
           B.concat [ "connect ", encode Constants.protocolVersion, " "
                    , encode port, " ", encode challenge, " \"", userInfo, "\"\n"]
+
+shutdown :: Quake ()
+shutdown = doShutdown =<< use (clientGlobals.cgIsDown)
+  where doShutdown True = request (io (putStrLn "recursive shutdown\n"))
+        doShutdown False =
+          do clientGlobals.cgIsDown .= True
+             writeConfiguration
+             S.shutdown
+             IN.shutdown
+             VID.shutdown
+
+quitF :: XCommandT
+quitF = XCommandT "CL.quitF" $
+  do disconnect
+     Com.quit
+
+fixUpGender :: Quake ()
+fixUpGender = error "CL.fixUpGender" -- TODO
+
+disconnect :: Quake ()
+disconnect = error "CL.disconnect" -- TODO

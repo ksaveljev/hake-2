@@ -136,6 +136,7 @@ data Globals = Globals
   , _gGunFrame         :: Int
   , _gGunModel         :: Maybe (IORef ModelT)
   , _gNetFrom          :: NetAdrT
+  , _gLogFile          :: Maybe Handle
   , _gVec3Origin       :: V3 Float
   , _gRnd              :: StdGen
   }

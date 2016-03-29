@@ -54,7 +54,6 @@ executable hake2
                      , Client.CLInv
                      , Client.CLParse
                      , Client.CLPred
-                     , Client.CLShared
                      , Client.CLView
                      , Client.Console
                      , Client.ConsoleT

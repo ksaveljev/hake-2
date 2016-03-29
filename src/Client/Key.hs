@@ -1,5 +1,6 @@
 module Client.Key
-  ( event
+  ( clearStates
+  , event
   , initialize
   , writeBindings
   ) where
@@ -141,3 +142,6 @@ writeKeyBinding fileHandle num (Just binding) =
 
 event :: Int -> Bool -> Int -> Quake ()
 event = error "Key.event" -- TODO
+
+clearStates :: Quake ()
+clearStates = error "Key.clearStates" -- TODO

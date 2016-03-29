@@ -94,20 +94,6 @@ execute clientRef c moveIssued stringCmdCount
                  do realTime <- use (svGlobals.svServerStatic.ssRealTime)
                     modifyRef clientRef (\v -> v & cFrameLatency.ix (lastFrame .&. (Constants.latencyCounts - 1)) .~ realTime - (((client^.cFrames) V.! (lastFrame .&. Constants.updateMask))^.cfSentTime))
 {-
-                 | c == Constants.clcMove -> do
-                         Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
-
-                         checksumIndex <- use $ globals.netMessage.sbReadCount
-                         checksum <- MSG.readByte (globals.netMessage)
-                         lastFrame <- MSG.readLong (globals.netMessage)
-
-                         when (lastFrame /= (client^.cLastFrame)) $ do
-                           svGlobals.svServerStatic.ssClients.ix clientIdx.cLastFrame .= lastFrame
-                           when (lastFrame > 0) $ do
-                             realTime <- use $ svGlobals.svServerStatic.ssRealTime
-                             let idx = lastFrame .&. (Constants.latencyCounts - 1)
-                             svGlobals.svServerStatic.ssClients.ix clientIdx.cFrameLatency.ix idx .= realTime - (((client^.cFrames) V.! (lastFrame .&. Constants.updateMask))^.cfSentTime)
-
                          oldest <- MSG.readDeltaUserCmd (globals.netMessage) nullCmd
                          oldcmd <- MSG.readDeltaUserCmd (globals.netMessage) oldest
                          newcmd <- MSG.readDeltaUserCmd (globals.netMessage) oldcmd

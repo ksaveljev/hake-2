@@ -1,6 +1,7 @@
 module Sound.S
   ( disableStreaming
   , initialize
+  , shutdown
   , startLocalSound
   , stopAllSounds
   , update
@@ -25,3 +26,6 @@ update _ _ _ _ = request (io (putStrLn "S.update IMPLEMENT ME!")) -- TODO
 
 disableStreaming :: Quake ()
 disableStreaming = request (io (putStrLn "S.disableStreaming IMPLEMENT ME!")) -- TODO
+
+shutdown :: Quake ()
+shutdown = request (io (putStrLn "S.shutdown IMPLEMENT ME!")) -- TODO

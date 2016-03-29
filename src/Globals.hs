@@ -54,6 +54,7 @@ initialGlobals =
           , _gGunFrame         = 0
           , _gGunModel         = Nothing
           , _gNetFrom          = newNetAdrT
+          , _gLogFile          = Nothing
           , _gVec3Origin       = V3 0 0 0
           , _gRnd              = mkStdGen 0
           }

@@ -8,7 +8,8 @@ module Client.Menu
 
 import           Client.ClientStateT
 import           Client.ClientStaticT
-import qualified Client.CLShared as CL
+import {-# SOURCE #-} qualified Client.CL as CL
+import qualified Client.Key as Key
 import qualified Client.KeyConstants as KeyConstants
 import           Client.MenuActionS
 import           Client.MenuCommonS
@@ -24,9 +25,10 @@ import {-# SOURCE #-} qualified Client.VID as VID
 import           Client.VidDefT
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import qualified QCommon.CBuf as CBuf
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
-import           QCommon.XCommandT (runXCommandT)
+import           QCommon.XCommandT
 import           QuakeRef
 import           QuakeState
 import           Render.Renderer
@@ -35,20 +37,24 @@ import           Types
 import           Util.Binary (encode)
 
 import           Control.Applicative (liftA2)
-import           Control.Lens (use, (^.), (.=), (%=), (&), (.~), (%~), (+~))
+import           Control.Lens (use, ix, (^.), (.=), (%=), (-=), (&), (.~), (%~), (+~))
 import           Control.Monad (void, join, when)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import           Data.Char (ord)
 import qualified Data.Vector as V
 
 mainItems :: Int
 mainItems = 5
 
+menuInSound :: B.ByteString
+menuInSound = "misc/menu1.wav"
+
 menuMoveSound :: B.ByteString
 menuMoveSound = "misc/menu2.wav"
 
-menuInSound :: B.ByteString
-menuInSound = "misc/menu1.wav"
+menuOutSound :: B.ByteString
+menuOutSound = "misc/menu3.wav"
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =
@@ -228,7 +234,56 @@ mainKey key
         menus = V.fromList [menuGameF, menuMultiplayerF, menuOptionsF, menuVideoF, menuQuitF]
 
 gameMenuInit :: Quake ()
-gameMenuInit = error "Menu.gameMenuInit" -- TODO
+gameMenuInit =
+  do vidDef <- use (globals.gVidDef)
+     modifyRef gameMenuRef (\v -> v & mfX .~ (vidDef^.vdWidth) `div` 2
+                                    & mfNItems .~ 0)
+     modifyRef easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                          & maGeneric.mcX .~ 0
+                                          & maGeneric.mcY .~ 0
+                                          & maGeneric.mcName .~ Just "easy"
+                                          & maGeneric.mcCallback .~ Just easyGameFunc)
+     modifyRef mediumGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                            & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                            & maGeneric.mcX .~ 0
+                                            & maGeneric.mcY .~ 10
+                                            & maGeneric.mcName .~ Just "medium"
+                                            & maGeneric.mcCallback .~ Just mediumGameFunc)
+     modifyRef hardGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                          & maGeneric.mcX .~ 0
+                                          & maGeneric.mcY .~ 20
+                                          & maGeneric.mcName .~ Just "hard"
+                                          & maGeneric.mcCallback .~ Just hardGameFunc)
+     modifyRef blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
+     modifyRef loadGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                          & maGeneric.mcX .~ 0
+                                          & maGeneric.mcY .~ 40
+                                          & maGeneric.mcName .~ Just "load game"
+                                          & maGeneric.mcCallback .~ Just (menuLoadGameF^.xcCmd))
+     modifyRef saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                          & maGeneric.mcX .~ 0
+                                          & maGeneric.mcY .~ 50
+                                          & maGeneric.mcName .~ Just "save game"
+                                          & maGeneric.mcCallback .~ Just (menuSaveGameF^.xcCmd))
+     modifyRef creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+                                         & maGeneric.mcFlags .~ Constants.qmfLeftJustify
+                                         & maGeneric.mcX .~ 0
+                                         & maGeneric.mcY .~ 60
+                                         & maGeneric.mcName .~ Just "credits"
+                                         & maGeneric.mcCallback .~ Just (menuCreditsF^.xcCmd))
+     menuAddItem gameMenuRef (MenuActionRef easyGameActionRef)
+     menuAddItem gameMenuRef (MenuActionRef mediumGameActionRef)
+     menuAddItem gameMenuRef (MenuActionRef hardGameActionRef)
+     menuAddItem gameMenuRef (MenuSeparatorRef blankLineRef)
+     menuAddItem gameMenuRef (MenuActionRef loadGameActionRef)
+     menuAddItem gameMenuRef (MenuActionRef saveGameActionRef)
+     menuAddItem gameMenuRef (MenuSeparatorRef blankLineRef)
+     menuAddItem gameMenuRef (MenuActionRef creditsActionRef)
+     menuCenter gameMenuRef
 
 gameMenuDrawF :: XCommandT
 gameMenuDrawF = error "Menu.gameMenuDrawF" -- TODO
@@ -444,7 +499,26 @@ menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
 menuAdjustCursor = error "Menu.menuAdjustCursor" -- TODO
 
 popMenu :: Quake ()
-popMenu = error "Menu.popMenu" -- TODO
+popMenu =
+  do S.startLocalSound menuOutSound
+     menuGlobals.mgMenuDepth -= 1
+     doPopMenu =<< use (menuGlobals.mgMenuDepth)
+  where doPopMenu menuDepth
+          | menuDepth < 0 = Com.fatalError "PopMenu: depth < 0"
+          | menuDepth > 0 =
+              do layers <- use (menuGlobals.mgLayers)
+                 menuGlobals.mgDrawFunc .= ((layers V.! (menuDepth - 1))^.mlDraw)
+                 menuGlobals.mgKeyFunc .= ((layers V.! (menuDepth - 1))^.mlKey)
+          | otherwise = forceMenuOff
+
+forceMenuOff :: Quake ()
+forceMenuOff =
+  do menuGlobals %= (\v -> v & mgDrawFunc .~ Nothing
+                             & mgKeyFunc .~ Nothing
+                             & mgMenuDepth .~ 0)
+     globals.gCls.csKeyDest .= Constants.keyGame
+     Key.clearStates
+     void (CVar.set "paused" "0")
 
 draw :: Renderer -> Int -> Quake ()
 draw renderer keyDest =
@@ -474,4 +548,40 @@ checkEnterSound enterSound
   | otherwise = return ()
 
 addToServerList :: NetAdrT -> B.ByteString -> Quake ()
-addToServerList = error "Menu.addToServerList" -- TODO
+addToServerList adr info =
+  join (liftA2 (proceedAddToServerList adr info') numServers localServerNames)
+  where info' = trim info
+        trim = lstrip . rstrip
+        lstrip = BC.dropWhile (`BC.elem` " \t")
+        rstrip = BC.reverse . lstrip . BC.reverse
+        numServers = use (menuGlobals.mgNumServers)
+        localServerNames = use (menuGlobals.mgLocalServerNames)
+
+proceedAddToServerList :: NetAdrT -> B.ByteString -> Int -> V.Vector B.ByteString -> Quake ()
+proceedAddToServerList adr info numServers localServerNames
+  | numServers == Constants.maxLocalServers = return ()
+  | info `V.elem` localServerNames = return () -- ignore if duplicated
+  | otherwise =
+      do modifyRef (joinServerActions V.! numServers) (\v -> v & maGeneric.mcName .~ Just info)
+         menuGlobals %= (\v -> v & mgLocalServerNetAdr.ix numServers .~ adr
+                                 & mgLocalServerNames.ix numServers .~ info
+                                 & mgNumServers +~ 1)
+
+easyGameFunc :: Quake ()
+easyGameFunc = CVar.forceSet "skill" "0" >> startGame
+
+mediumGameFunc :: Quake ()
+mediumGameFunc = CVar.forceSet "skill" "1" >> startGame
+
+hardGameFunc :: Quake ()
+hardGameFunc = CVar.forceSet "skill" "2" >> startGame
+
+startGame :: Quake ()
+startGame =
+  do globals.gCl.csServerCount .= -1
+     forceMenuOff
+     CVar.setValueI "deathmatch" 0
+     CVar.setValueI "coop" 0
+     CVar.setValueI "gamerules" 0
+     CBuf.addText "loading ; killserver ; wait ; newgame\n"
+     globals.gCls.csKeyDest .= Constants.keyGame

@@ -8,6 +8,7 @@ module Client.VID
   , menuKeyF
   , newWindow
   , printf
+  , shutdown
   ) where
 
 import           Client.ClientStateT
@@ -494,3 +495,16 @@ menuDrawF = error "VID.menuDrawF" -- TODO
 
 menuKeyF :: KeyFuncT
 menuKeyF = error "VID.menuKeyF" -- TODO
+
+shutdown :: Quake ()
+shutdown = proceedShutdown =<< use (vidGlobals.vgRefLibActive)
+  where proceedShutdown False = return ()
+        proceedShutdown True =
+          do renderer <- use (globals.gRenderer)
+             maybe rendererError doShutdown renderer
+        rendererError = Com.fatalError "VID.shutdown renderer is Nothing"
+        doShutdown renderer =
+          do renderer^.rRefExport.reGetKeyboardHandler.kbdClose
+             IN.shutdown
+             renderer^.rRefExport.reShutDown
+             freeRefLib

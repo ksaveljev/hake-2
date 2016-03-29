@@ -8,12 +8,17 @@ module QCommon.Com
   , initializeArgv
   , parse
   , printf
+  , quit
   ) where
 
+import {-# SOURCE #-} qualified Client.CL as CL
 import qualified Constants
 import           QuakeState
+import qualified Server.SVMainShared as SVMain
+import qualified Sys.Sys as Sys
 import           Types
 import           Util.Binary (encode)
+import qualified Util.Lib as Lib
 
 import           Control.Lens (use, (.=), (%=))
 import           Control.Monad (when)
@@ -106,3 +111,13 @@ skipToEOL str startIdx =
 blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
 blockSequenceCRCByte _ _ _ _ =
   request (io (putStrLn "Com.blockSequenceCRCByte IMPLEMENT ME!")) >> return 0
+
+quit :: Quake ()
+quit =
+  do SVMain.shutdown "Server quit\n" False
+     CL.shutdown
+     closeLogFile =<< use (globals.gLogFile)
+     globals.gLogFile .= Nothing
+     Sys.quit
+  where closeLogFile Nothing = return ()
+        closeLogFile (Just fileHandle) = Lib.fClose fileHandle
