@@ -160,7 +160,7 @@ sendClientMessages =
           | otherwise = return (Just len)
         sendMessages _ =
           do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-             mapM_ (fmap sendClientMessage . readClient) [0..maxClients-1]
+             mapM_ (readClient >=> sendClientMessage) [0..maxClients-1]
         readClient idx =
           do client <- readRef (Ref idx)
              return (Ref idx, client)

@@ -55,7 +55,7 @@ runFrame =
           | level^.llExitIntermission = exitLevel
           | otherwise =
               do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
-                 mapM_ (fmap treatObject . readEdict) [0..numEdicts-1]
+                 mapM_ (readEdict >=> treatObject) [0..numEdicts-1]
                  checkDMRules
                  checkNeedPassword
                  clientEndServerFrames
@@ -174,7 +174,7 @@ checkPassword password spectatorPassword
 clientEndServerFrames :: Quake ()
 clientEndServerFrames =
   do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-     mapM_ (fmap checkEdict . readEdict) [1..maxClients]
+     mapM_ (readEdict >=> checkEdict) [1..maxClients]
   where checkEdict (edictRef, edict)
           | (edict^.eInUse) && isJust (edict^.eClient) =
               PlayerView.clientEndServerFrame edictRef

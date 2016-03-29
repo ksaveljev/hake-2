@@ -126,7 +126,7 @@ keynumToString keynum =
      return (convertKeyNum keyNames)
   where convertKeyNum keyNames
           | keynum < 0 || keynum > 255 = "<KEY NOT FOUND>"
-          | keynum > 32 && keynum < 127 = encode (chr keynum)
+          | keynum > 32 && keynum < 127 = BC.pack [chr keynum]
           | otherwise = fromMaybe "<UNKNOWN KEYNUM>" (keyNames V.! keynum)
 
 writeBindings :: Handle -> Quake ()

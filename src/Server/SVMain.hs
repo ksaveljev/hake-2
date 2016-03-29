@@ -44,7 +44,7 @@ import qualified Util.Lib as Lib
 
 import           Control.Applicative (liftA2)
 import           Control.Lens (use, ix, (^.), (.=), (+=), (%=), (&), (.~))
-import           Control.Monad (void, when, unless, join)
+import           Control.Monad (void, when, unless, join, (>=>))
 import           Data.Bits ((.|.), (.&.))
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
@@ -210,7 +210,7 @@ checkClientPacket client netAdr qport idx maxIdx
 calcPings :: Quake ()
 calcPings =
   do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-     mapM_ (fmap updateClientPing . readClient) [0..maxClients-1]
+     mapM_ (readClient >=> updateClientPing) [0..maxClients-1]
   where readClient idx =
           do client <- readRef (Ref idx)
              return (Ref idx, client)

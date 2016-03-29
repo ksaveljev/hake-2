@@ -36,7 +36,7 @@ import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
 import           Control.Lens (use, zoom, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~))
-import           Control.Monad (void, when)
+import           Control.Monad (void, when, (>=>))
 import           Control.Monad.Coroutine (mapMonad)
 import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
@@ -291,7 +291,7 @@ spawnMapEntities server spawnPoint srvState =
 createBaseline :: Quake ()
 createBaseline =
   do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
-     mapM_ (fmap edictBaseline . readEdict) [1..numEdicts-1]
+     mapM_ (readEdict >=> edictBaseline) [1..numEdicts-1]
 
 readEdict :: Int -> Quake (Ref EdictT, EdictT)
 readEdict idx =
