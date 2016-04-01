@@ -62,6 +62,7 @@ data QuakeState = QuakeState
   , _playerTrailGlobals   :: PlayerTrailGlobals
   , _vGlobals             :: VGlobals
   , _netChannelGlobals    :: NetChannelGlobals
+  , _clTEntGlobals        :: CLTEntGlobals
   }
 
 data QuakeIOState = QuakeIOState
@@ -122,6 +123,7 @@ data Globals = Globals
   , _gLogStatsFile     :: Maybe Handle
   , _gCls              :: ClientStaticT
   , _gCl               :: ClientStateT
+  , _gClEntities       :: V.Vector CEntityT
   , _gUserInfoModified :: Bool
   , _gCVars            :: HM.HashMap B.ByteString CVarT
   , _gCon              :: ConsoleT
@@ -134,7 +136,7 @@ data Globals = Globals
   , _gScrVRect         :: VRectT
   , _gSysFrameTime     :: Int
   , _gGunFrame         :: Int
-  , _gGunModel         :: Maybe (IORef ModelT)
+  , _gGunModel         :: Maybe (Ref ModelT)
   , _gNetFrom          :: NetAdrT
   , _gLogFile          :: Maybe Handle
   , _gVec3Origin       :: V3 Float
@@ -436,8 +438,8 @@ data ClientGlobals = ClientGlobals
   , _cgLightStyle         :: V.Vector CLightStyleT
   , _cgLastOfs            :: Int
   , _cgCR                 :: Int -- from Console.hs
-  , _cgActiveParticles    :: Maybe (IORef CParticleT)
-  , _cgFreeParticles      :: Maybe (IORef CParticleT)
+  , _cgActiveParticles    :: Maybe (Ref CParticleT)
+  , _cgFreeParticles      :: Maybe (Ref CParticleT)
   , _cgPrecacheCheck      :: Int
   , _cgPrecacheSpawnCount :: Int
   , _cgPrecacheTex        :: Int
@@ -552,6 +554,43 @@ data VGlobals = VGlobals
 
 data NetChannelGlobals = NetChannelGlobals
   { _ncSend :: SizeBufT
+  }
+
+data CLTEntGlobals = CLTEntGlobals
+  { _clteExplosions         :: V.Vector ExplosionT
+  , _clteBeams              :: V.Vector BeamT
+  , _cltePlayerBeams        :: V.Vector BeamT
+  , _clteLasers             :: V.Vector LaserT
+  , _clteSustains           :: V.Vector CLSustainT
+  , _clteSfxRic1            :: Maybe (Ref SfxT)
+  , _clteSfxRic2            :: Maybe (Ref SfxT)
+  , _clteSfxRic3            :: Maybe (Ref SfxT)
+  , _clteSfxLashIt          :: Maybe (Ref SfxT)
+  , _clteSfxSpark5          :: Maybe (Ref SfxT)
+  , _clteSfxSpark6          :: Maybe (Ref SfxT)
+  , _clteSfxSpark7          :: Maybe (Ref SfxT)
+  , _clteSfxRailg           :: Maybe (Ref SfxT)
+  , _clteSfxRockExp         :: Maybe (Ref SfxT)
+  , _clteSfxGrenExp         :: Maybe (Ref SfxT)
+  , _clteSfxWatrExp         :: Maybe (Ref SfxT)
+  , _clteSfxPlasExp         :: Maybe (Ref SfxT)
+  , _clteSfxFootsteps       :: V.Vector (Maybe (Ref SfxT))
+  , _clteModExplode         :: Maybe (Ref ModelT)
+  , _clteModSmoke           :: Maybe (Ref ModelT)
+  , _clteModFlash           :: Maybe (Ref ModelT)
+  , _clteModParasiteSegment :: Maybe (Ref ModelT)
+  , _clteModGrappleCable    :: Maybe (Ref ModelT)
+  , _clteModParasiteTip     :: Maybe (Ref ModelT)
+  , _clteModExplo4          :: Maybe (Ref ModelT)
+  , _clteModBfgExplo        :: Maybe (Ref ModelT)
+  , _clteModPowerScreen     :: Maybe (Ref ModelT)
+  , _clteModPlasmaExplo     :: Maybe (Ref ModelT)
+  , _clteSfxLightning       :: Maybe (Ref SfxT)
+  , _clteSfxDisrExp         :: Maybe (Ref SfxT)
+  , _clteModLightning       :: Maybe (Ref ModelT)
+  , _clteModHeatBeam        :: Maybe (Ref ModelT)
+  , _clteModMonsterHeatBeam :: Maybe (Ref ModelT)
+  , _clteModExplo4Big       :: Maybe (Ref ModelT)
   }
 
 data GLFWKBDEvent = KeyPress GLFW.Key
@@ -1358,7 +1397,7 @@ data RefExportT = RefExportT
   { _reInit                :: Int -> Int -> Quake Bool
   , _reShutDown            :: Quake ()
   , _reBeginRegistration   :: B.ByteString -> Quake ()
-  , _reRegisterModel       :: B.ByteString -> Quake (Maybe (IORef ModelT))
+  , _reRegisterModel       :: B.ByteString -> Quake (Maybe (Ref ModelT))
   , _reRegisterSkin        :: B.ByteString -> Quake (Maybe (Ref ImageT))
   , _reRegisterPic         :: B.ByteString -> Quake (Maybe (Ref ImageT))
   , _reSetSky              :: B.ByteString -> Float -> V3 Float -> Quake ()
@@ -1647,7 +1686,7 @@ data RenderAPI = RenderAPI
   , _rInit2             :: GLDriver -> Quake Bool
   , _rShutdown          :: GLDriver -> Quake ()
   , _rBeginRegistration :: GLDriver -> B.ByteString -> Quake ()
-  , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe (IORef ModelT))
+  , _rRegisterModel     :: GLDriver -> B.ByteString -> Quake (Maybe (Ref ModelT))
   , _rRegisterSkin      :: GLDriver -> B.ByteString -> Quake (Maybe (Ref ImageT))
   , _rDrawFindPic       :: GLDriver -> B.ByteString -> Quake (Maybe (Ref ImageT))
   , _rSetSky            :: GLDriver -> B.ByteString -> Float -> V3 Float -> Quake ()
@@ -1725,11 +1764,11 @@ data ClientStateT = ClientStateT
   , _csServerCount            :: Int
   , _csGameDir                :: B.ByteString
   , _csPlayerNum              :: Int
-  , _csConfigStrings          :: V.Vector B.ByteString
-  , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
+  , _csConfigStrings          :: V.Vector B.ByteString -- TODO: create newtype and QuakeRef for it so we do not use preuse
+  , _csModelDraw              :: V.Vector (Maybe (Ref ModelT))
   , _csModelClip              :: V.Vector (Maybe (Ref CModelT))
-  , _csSoundPrecache          :: V.Vector (Maybe (IORef SfxT))
-  , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
+  , _csSoundPrecache          :: V.Vector (Maybe (Ref SfxT))
+  , _csImagePrecache          :: V.Vector (Maybe (Ref ImageT))
   , _csClientInfo             :: V.Vector ClientInfoT
   , _csBaseClientInfo         :: ClientInfoT
   }
@@ -1906,7 +1945,7 @@ data CParticleT = CParticleT
   , _cpColor    :: Float
   , _cpAlpha    :: Float
   , _cpAlphaVel :: Float
-  , _cpNext     :: Maybe (IORef CParticleT)
+  , _cpNext     :: Maybe (Ref CParticleT)
   }
 
 data PcxT = PcxT
@@ -2019,6 +2058,55 @@ data UCmdT = UCmdT
   , _ucFunc :: XCommandT
   }
 
+data CEntityT = CEntityT
+  { _ceBaseline    :: EntityStateT
+  , _ceCurrent     :: EntityStateT
+  , _cePrev        :: EntityStateT
+  , _ceServerFrame :: Int
+  , _ceTrailCount  :: Int
+  , _ceLerpOrigin  :: V3 Float
+  , _ceFlyStopTime :: Int
+  }
+
+data ExplosionT = ExplosionT
+  { _eType       :: Int
+  , _eEnt        :: EntityT
+  , _eFrames     :: Int
+  , _eLight      :: Float
+  , _eLightColor :: V3 Float
+  , _eStart      :: Float
+  , _eBaseFrame  :: Int
+  }
+
+data BeamT = BeamT
+  { _bEntity     :: Int
+  , _bDestEntity :: Int
+  , _bModel      :: Maybe (Ref ModelT)
+  , _bEndTime    :: Int
+  , _bOffset     :: V3 Float
+  , _bStart      :: V3 Float
+  , _bEnd        :: V3 Float
+  }
+
+data CLSustainT = CLSustainT
+  { _clsId            :: Int
+  , _clsType          :: Int
+  , _clsEndTime       :: Int
+  , _clsNextThink     :: Int
+  , _clsThinkInterval :: Int
+  , _clsOrg           :: V3 Float
+  , _clsDir           :: V3 Float
+  , _clsColor         :: Int
+  , _clsCount         :: Int
+  , _clsMagnitude     :: Int
+  , _clsThink         :: Maybe (CLSustainT -> Quake Bool)
+  }
+
+data LaserT = LaserT
+  { _lEnt     :: EntityT
+  , _lEndTime :: Int
+  }
+
 data KeyFuncT = KeyFuncT
   { _kfName :: B.ByteString
   , _kfFunc :: Int -> Quake (Maybe B.ByteString)
@@ -2049,51 +2137,51 @@ data AI = AI
   }
 
 data EntInteract = EntInteract
-  { entInteractId       :: B.ByteString
-  , entInteract :: Ref EdictT -> Ref EdictT -> Quake Bool
+  { entInteractId :: B.ByteString
+  , entInteract   :: Ref EdictT -> Ref EdictT -> Quake Bool
   }
 
 data EntThink = EntThink
-  { entThinkId    :: B.ByteString
-  , entThink :: Ref EdictT -> Quake Bool
+  { entThinkId :: B.ByteString
+  , entThink   :: Ref EdictT -> Quake Bool
   }
 
 data EntBlocked = EntBlocked
-  { entBlockedId      :: B.ByteString
-  , entBlocked :: Ref EdictT -> Ref EdictT -> Quake ()
+  { entBlockedId :: B.ByteString
+  , entBlocked   :: Ref EdictT -> Ref EdictT -> Quake ()
   }
 
 data EntDodge = EntDodge
-  { entDodgeId    :: B.ByteString
-  , entDodge :: Ref EdictT -> Ref EdictT -> Float -> Quake ()
+  { entDodgeId :: B.ByteString
+  , entDodge   :: Ref EdictT -> Ref EdictT -> Float -> Quake ()
   }
 
 data EntTouch = EntTouch
-  { entTouchId    :: B.ByteString
-  , entTouch :: Ref EdictT -> Ref EdictT -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+  { entTouchId :: B.ByteString
+  , entTouch   :: Ref EdictT -> Ref EdictT -> CPlaneT -> Maybe CSurfaceT -> Quake ()
   }
 
 data EntUse = EntUse
-  { entUseId  :: B.ByteString
-  , entUse :: Ref EdictT -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
+  { entUseId :: B.ByteString
+  , entUse   :: Ref EdictT -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
   }
 
 data EntPain = EntPain
-  { entPainId   :: B.ByteString
-  , entPain :: Ref EdictT -> Ref EdictT -> Float -> Int -> Quake ()
+  { entPainId :: B.ByteString
+  , entPain   :: Ref EdictT -> Ref EdictT -> Float -> Int -> Quake ()
   }
 
 data EntDie = EntDie
-  { entDieId  :: B.ByteString
-  , entDie :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Int -> V3 Float -> Quake ()
+  { entDieId :: B.ByteString
+  , entDie   :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Int -> V3 Float -> Quake ()
   }
 
 data ItemUse = ItemUse
-  { itemUseId  :: B.ByteString
-  , itemUse :: Ref EdictT -> Ref GItemT -> Quake ()
+  { itemUseId :: B.ByteString
+  , itemUse   :: Ref EdictT -> Ref GItemT -> Quake ()
   }
 
 data ItemDrop = ItemDrop
-  { itemDropId   :: B.ByteString
-  , itemDrop :: Ref EdictT -> Ref GItemT -> Quake ()
+  { itemDropId :: B.ByteString
+  , itemDrop   :: Ref EdictT -> Ref GItemT -> Quake ()
   }

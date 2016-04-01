@@ -1,10 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Client.SCR
   ( beginLoadingPlaque
+  , centerPrint
+  , debugGraph
   , dirtyScreen
   , endLoadingPlaque
   , finishCinematic
   , initialize
+  , playCinematic
   , runCinematic
   , runConsole
   , updateScreen
@@ -874,3 +877,12 @@ stopCinematic = doStopCinematic =<< use (scrGlobals.scrCin.cRestartSound)
         unsetCinematicPalette renderer =
           do (renderer^.rRefExport.reCinematicSetPalette) Nothing
              globals.gCl.csCinematicPaletteActive .= False
+
+centerPrint :: B.ByteString -> Quake ()
+centerPrint = error "SCR.centerPrint" -- TODO
+
+playCinematic :: B.ByteString -> Quake ()
+playCinematic = error "SCR.playCinematic" -- TODO
+
+debugGraph :: Float -> Int -> Quake ()
+debugGraph _ _ = request (io (putStrLn "SCR.debugGraph IMPLEMENT ME!"))

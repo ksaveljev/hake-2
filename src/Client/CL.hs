@@ -1,13 +1,16 @@
 module Client.CL
-  ( dropClient
+  ( clearState
+  , dropClient
   , fixUpGender
   , frame
   , initialize
   , quitF
   , shutdown
   , writeConfiguration
+  , writeDemoMessage
   ) where
 
+import           Client.CEntityT
 import           Client.CheatVarT
 import qualified Client.CLFX as CLFX
 import           Client.ClientStateT
@@ -15,6 +18,7 @@ import           Client.ClientStaticT
 import qualified Client.CLInput as CLInput
 import qualified Client.CLParse as CLParse
 import qualified Client.CLPred as CLPred
+import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import qualified Client.Console as Console
 import qualified Client.Key as Key
@@ -29,6 +33,7 @@ import qualified Game.Cmd as Cmd
 import           Game.CVarT
 import qualified Game.Info as Info
 import qualified QCommon.CBuf as CBuf
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
@@ -50,7 +55,7 @@ import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
 import           Control.Concurrent (threadDelay)
-import           Control.Lens (preuse, use, ix, (^.), (.=), (+=), (&), (.~))
+import           Control.Lens (preuse, use, ix, (^.), (.=), (%=), (+=), (&), (.~))
 import           Control.Monad (unless, when, void)
 import qualified Data.ByteString as B
 import qualified Data.Vector as Vector
@@ -250,7 +255,24 @@ rconF :: XCommandT
 rconF = error "CL.rconF" -- TODO
 
 precacheF :: XCommandT
-precacheF = error "CL.precacheF" -- TODO
+precacheF = XCommandT "CL.precacheF" $
+  precache =<< Cmd.argc
+  where precache c
+          | c < 2 =
+              do name <- preuse (globals.gCl.csConfigStrings.ix (Constants.csModels + 1))
+                 maybe nameError loadMapAndRefresh name
+          | otherwise =
+              do arg <- Cmd.argv 1
+                 clientGlobals %= (\v -> v & cgPrecacheCheck .~ Constants.csModels
+                                           & cgPrecacheSpawnCount .~ Lib.atoi arg
+                                           & cgPrecacheModel .~ Nothing
+                                           & cgPrecacheModelSkin .~ 0)
+                 requestNextDownload
+        nameError = Com.fatalError "CL.precacheF name is Nothing"
+        loadMapAndRefresh name =
+          do void (CM.loadMap name True [0])
+             CLParse.registerSounds
+             CLView.prepRefresh
 
 frame :: Int -> Quake ()
 frame msec = runFrame msec =<< dedicatedCVar
@@ -554,3 +576,18 @@ fixUpGender = error "CL.fixUpGender" -- TODO
 
 disconnect :: Quake ()
 disconnect = error "CL.disconnect" -- TODO
+
+writeDemoMessage :: Quake ()
+writeDemoMessage = error "CL.writeDemoMessage" -- TODO
+
+clearState :: Quake ()
+clearState =
+  do S.stopAllSounds
+     CLFX.clearEffects
+     CLTEnt.clearTEnts
+     globals.gCl .= newClientStateT
+     globals.gClEntities .= Vector.replicate Constants.maxEdicts newCEntityT
+     SZ.clear (globals.gCls.csNetChan.ncMessage)
+
+requestNextDownload :: Quake ()
+requestNextDownload = error "CL.requestNextDownload" -- TODO

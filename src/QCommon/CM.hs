@@ -47,10 +47,10 @@ loadMap name clientLoad checksum =
      void (CVar.get "map_noareas" "0" 0)
      mapName <- use (cmGlobals.cmMapName)
      flushMap <- CVar.variableValue "flushmap"
-     doLoadMap name clientLoad checksum mapName flushMap
+     proceedLoadMap name clientLoad checksum mapName flushMap
 
-doLoadMap :: B.ByteString -> Bool -> [Int] -> B.ByteString -> Float -> Quake (Ref CModelT, [Int])
-doLoadMap name clientLoad checksum mapName flushMap
+proceedLoadMap :: B.ByteString -> Bool -> [Int] -> B.ByteString -> Float -> Quake (Ref CModelT, [Int])
+proceedLoadMap name clientLoad checksum mapName flushMap
   | mapName == name && (clientLoad || flushMap == 0) =
       do lastChecksum <- use (cmGlobals.cmLastChecksum)
          unless clientLoad $
@@ -69,7 +69,7 @@ doLoadMap name clientLoad checksum mapName flushMap
          cmGlobals.cmNumNodes .= 0
          cmGlobals.cmNumLeafs .= 0
          fileHandle <- FS.fOpenFileWithLength name
-         maybe loadMapError (proceedLoadMap checksum) fileHandle
+         maybe loadMapError (doLoadMap checksum) fileHandle
   where resetCommonCMGlobals =
           do cmGlobals.cmNumCModels .= 0
              cmGlobals.cmNumVisibility .= 0
@@ -80,11 +80,11 @@ doLoadMap name clientLoad checksum mapName flushMap
           do Com.comError Constants.errDrop ("Couldn't load " `B.append` name)
              return (Ref 0, 0 : tail checksum)
 
-proceedLoadMap :: [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
-proceedLoadMap checksum (fileHandle, len) =
+doLoadMap :: [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
+doLoadMap checksum (fileHandle, len) =
   do buf <- request (io (BL.hGet fileHandle len))
      cmGlobals.cmLastChecksum .= MD4.blockChecksum buf (fromIntegral len)
-     error "CM.proceedLoadMap" -- TODO
+     error "CM.doLoadMap" -- TODO
      return (Ref 0, 0 : tail checksum) -- TODO: fix this
 {-
            let Just buf = BL.fromStrict <$> loadedFile

@@ -3,6 +3,8 @@ module Globals
   ( module Globals
   ) where
 
+import qualified Constants
+import           Client.CEntityT (newCEntityT)
 import           Client.ClientStateT (newClientStateT)
 import           Client.ClientStaticT (newClientStaticT)
 import           Client.ConsoleT (newConsoleT)
@@ -40,6 +42,7 @@ initialGlobals =
           , _gLogStatsFile     = Nothing
           , _gCls              = newClientStaticT
           , _gCl               = newClientStateT
+          , _gClEntities       = V.replicate Constants.maxEdicts newCEntityT
           , _gUserInfoModified = False
           , _gCVars            = HM.empty
           , _gCon              = newConsoleT

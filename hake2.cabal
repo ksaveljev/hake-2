@@ -40,6 +40,7 @@ executable hake2
                      , BangPatterns
   ghc-options:         -O0 -rtsopts -Wall
   other-modules:       Client.CDLightT
+                     , Client.CEntityT
                      , Client.CheatVarT
                      , Client.CinematicsT
                      , Client.CL
@@ -54,6 +55,7 @@ executable hake2
                      , Client.CLInv
                      , Client.CLParse
                      , Client.CLPred
+                     , Client.CLTEnt
                      , Client.CLView
                      , Client.Console
                      , Client.ConsoleT

@@ -10,7 +10,6 @@ import qualified Game.Cmd as Cmd
 import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
-import           Util.Binary (encode)
 
 import           Control.Lens (use, (.=), (%=))
 import           Control.Monad (unless)

@@ -15,7 +15,9 @@ import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import           QCommon.CVarVariables
 import qualified QCommon.MSG as MSG
+import           QCommon.NetAdrT
 import           QCommon.NetChanT
+import qualified QCommon.NetChannel as NetChannel
 import           QCommon.SizeBufT
 import qualified QCommon.SZ as SZ
 import           QuakeRef
@@ -23,11 +25,13 @@ import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
+import qualified Server.SVMainShared as SVMain
+import qualified Sys.Timer as Timer
 import           Types
 import           Util.Binary (encode, getInt)
 
 import           Control.Lens (use, ix, (.=), (^.))
-import           Control.Monad (when, unless, (>=>))
+import           Control.Monad (when, unless, void, (>=>))
 import           Data.Binary.Get (runGet)
 import           Data.Bits (shiftR, shiftL, (.&.))
 import qualified Data.ByteString as B
@@ -166,7 +170,44 @@ sendClientMessages =
              return (Ref idx, client)
 
 sendClientMessage :: (Ref ClientT, ClientT) -> Quake ()
-sendClientMessage = error "SVSend.sendClientMessage" -- TODO
+sendClientMessage (clientRef, client)
+  | (client^.cState) /= 0 =
+      do checkReliableMessageOverflow clientRef client
+         sendToClient clientRef client =<< use (svGlobals.svServer.sState)
+  | otherwise = return ()
+
+checkReliableMessageOverflow :: Ref ClientT -> ClientT -> Quake ()
+checkReliableMessageOverflow clientRef@(Ref idx) client
+  | (client^.cNetChan.ncMessage.sbOverflowed) = -- reliable message overflowed, drop the client
+      do SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage)
+         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cDatagram)
+         broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " overflowed\n")
+         SVMain.dropClient clientRef
+  | otherwise = return ()
+
+sendToClient :: Ref ClientT -> ClientT -> Int -> Quake ()
+sendToClient clientRef@(Ref idx) client state
+  | state `elem` [Constants.ssCinematic, Constants.ssDemo, Constants.ssPic] =
+      do msg <- use (svGlobals.svMsgBuf)
+         NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) (B.length msg) msg
+  | (client^.cState) == Constants.csSpawned =
+      do flooded <- rateDrop clientRef
+         unless flooded $ -- don't overrun bandwidth
+           void (sendClientDatagram clientRef)
+  | otherwise =
+      do curTime <- Timer.getCurTime
+         when ((client^.cNetChan.ncMessage.sbCurSize) /= 0 || curTime - (client^.cNetChan.ncLastSent) > 1000) $
+           NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) 0 B.empty
 
 demoCompleted :: Quake ()
 demoCompleted = error "SVSend.demoCompleted" -- TODO
+
+rateDrop :: Ref ClientT -> Quake Bool
+rateDrop clientRef = doRateDrop =<< readRef clientRef
+  where doRateDrop client
+          | (client^.cNetChan.ncRemoteAddress.naType) == Constants.naLoopback =
+              return False -- never drop the loopback
+          | otherwise = error "SVSend.rateDrop" -- TODO
+
+sendClientDatagram :: Ref ClientT -> Quake Bool
+sendClientDatagram = error "SVSend.sendClientDatagram" -- TODO

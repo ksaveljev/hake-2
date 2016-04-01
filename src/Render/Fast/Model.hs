@@ -15,7 +15,6 @@ import           Types
 
 import           Control.Lens (use, (^.), (.=))
 import qualified Data.ByteString as B
-import           Data.IORef (IORef)
 import qualified Data.Vector.Mutable as MV
 
 modInit :: Quake ()
@@ -29,7 +28,7 @@ modInit =
 rBeginRegistration :: B.ByteString -> Quake ()
 rBeginRegistration = error "Model.rBeginRegistration" -- TODO
 
-rRegisterModel :: B.ByteString -> Quake (Maybe (IORef ModelT))
+rRegisterModel :: B.ByteString -> Quake (Maybe (Ref ModelT))
 rRegisterModel = error "Model.rRegisterModel" -- TODO
 
 rEndRegistration :: Quake ()

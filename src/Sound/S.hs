@@ -1,6 +1,7 @@
 module Sound.S
   ( disableStreaming
   , initialize
+  , registerSound
   , shutdown
   , startLocalSound
   , stopAllSounds
@@ -29,3 +30,6 @@ disableStreaming = request (io (putStrLn "S.disableStreaming IMPLEMENT ME!")) --
 
 shutdown :: Quake ()
 shutdown = request (io (putStrLn "S.shutdown IMPLEMENT ME!")) -- TODO
+
+registerSound :: B.ByteString -> Quake (Maybe (Ref SfxT))
+registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> return Nothing

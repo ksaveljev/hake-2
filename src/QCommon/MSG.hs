@@ -1,8 +1,11 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.MSG
   ( beginReading
+  , readAngle
   , readByte
+  , readCoord
   , readLong
+  , readPos
   , readShort
   , readString
   , readStringLine
@@ -28,6 +31,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.Int (Int8, Int16, Int32)
 import           Data.Word (Word8, Word16, Word32)
+import           Linear (V3(..))
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1
@@ -149,6 +153,17 @@ doReadChar sizeBufLens msgRead =
      return c
   where c | (msgRead^.sbReadCount) + 1 > (msgRead^.sbCurSize) = -1
           | otherwise = fromIntegral (B.index (msgRead^.sbData) (msgRead^.sbReadCount))
+
+readPos :: Lens' QuakeState SizeBufT -> Quake (V3 Float)
+readPos sizeBufLens = V3 <$> readCoord sizeBufLens
+                         <*> readCoord sizeBufLens
+                         <*> readCoord sizeBufLens
+
+readCoord :: Lens' QuakeState SizeBufT -> Quake Float
+readCoord sizeBufLens = fmap ((* (1.0 / 8.0)) . fromIntegral) (readShort sizeBufLens)
+
+readAngle :: Lens' QuakeState SizeBufT -> Quake Float
+readAngle sizeBufLens = fmap ((* (360.0 / 256)) . fromIntegral) (readChar sizeBufLens)
 
 writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
 writeDeltaUserCmd = error "MSG.writeDeltaUserCmd" -- TODO
