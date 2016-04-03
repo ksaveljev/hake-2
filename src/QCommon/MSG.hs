@@ -18,12 +18,15 @@ module QCommon.MSG
   , writeString
   ) where
 
+import qualified Constants
+import           Game.UserCmdT
 import qualified QCommon.Com as Com
 import           QCommon.SizeBufT
 import qualified QCommon.SZ as SZ
 import           Types
 
 import           Control.Lens (Traversal', Lens', use, (^.), (.=), (+=))
+import           Control.Monad (when)
 import           Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
@@ -31,7 +34,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.Int (Int8, Int16, Int32)
 import           Data.Word (Word8, Word16, Word32)
-import           Linear (V3(..))
+import           Linear (V3(..), _x, _y, _z)
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1
@@ -166,4 +169,33 @@ readAngle :: Lens' QuakeState SizeBufT -> Quake Float
 readAngle sizeBufLens = fmap ((* (360.0 / 256)) . fromIntegral) (readChar sizeBufLens)
 
 writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
-writeDeltaUserCmd = error "MSG.writeDeltaUserCmd" -- TODO
+writeDeltaUserCmd sizeBufLens from cmd =
+  do writeByteI sizeBufLens (fromIntegral bits)
+     when (bits .&. Constants.cmAngle1 /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucAngles._x))
+     when (bits .&. Constants.cmAngle2 /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucAngles._y))
+     when (bits .&. Constants.cmAngle3 /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucAngles._z))
+     when (bits .&. Constants.cmForward /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucForwardMove))
+     when (bits .&. Constants.cmSide /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucSideMove))
+     when (bits .&. Constants.cmUp /= 0) $
+       writeShort sizeBufLens (fromIntegral (cmd^.ucUpMove))
+     when (bits .&. Constants.cmButtons /= 0) $
+       writeByteI sizeBufLens (fromIntegral (cmd^.ucButtons))
+     when (bits .&. Constants.cmImpulse /= 0) $
+       writeByteI sizeBufLens (fromIntegral (cmd^.ucImpulse))
+     writeByteI sizeBufLens (fromIntegral (cmd^.ucMsec))
+     writeByteI sizeBufLens (fromIntegral (cmd^.ucLightLevel))
+  where a = fromBool Constants.cmAngle1 ((cmd^.ucAngles._x) /= (from^.ucAngles._x))
+        b = fromBool Constants.cmAngle2 ((cmd^.ucAngles._y) /= (from^.ucAngles._y))
+        c = fromBool Constants.cmAngle3 ((cmd^.ucAngles._z) /= (from^.ucAngles._z))
+        d = fromBool Constants.cmForward ((cmd^.ucForwardMove) /= (from^.ucForwardMove))
+        e = fromBool Constants.cmSide ((cmd^.ucSideMove) /= (from^.ucSideMove))
+        f = fromBool Constants.cmUp ((cmd^.ucUpMove) /= (from^.ucUpMove))
+        g = fromBool Constants.cmButtons ((cmd^.ucButtons) /= (from^.ucButtons))
+        h = fromBool Constants.cmImpulse ((cmd^.ucImpulse) /= (from^.ucImpulse))
+        bits = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h
+        fromBool v p = if p then v else 0
