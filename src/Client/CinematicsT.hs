@@ -21,6 +21,5 @@ newCinematicsT =
               , _cPic          = Nothing
               , _cPicPending   = Nothing
               , _cNumHNodes1   = UV.replicate 256 0
-              , _cHUsed        = UV.replicate 512 0
-              , _cHCount       = UV.replicate 512 0
+              , _cHNodes1      = Nothing
               }

@@ -1,6 +1,7 @@
 module Sound.S
   ( disableStreaming
   , initialize
+  , rawSamples
   , registerSound
   , shutdown
   , startLocalSound
@@ -12,6 +13,7 @@ import           Types
 
 import qualified Data.ByteString as B
 import           Linear (V3)
+import           System.IO (Handle)
 
 initialize :: Quake ()
 initialize = request (io (putStrLn "S.initialize IMPLEMENT ME!")) -- TODO
@@ -33,3 +35,6 @@ shutdown = request (io (putStrLn "S.shutdown IMPLEMENT ME!")) -- TODO
 
 registerSound :: B.ByteString -> Quake (Maybe (Ref SfxT))
 registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> return Nothing
+
+rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
+rawSamples _ _ _ _ _ = request (io (putStrLn "S.rawSamples IMPLEMENT ME!"))

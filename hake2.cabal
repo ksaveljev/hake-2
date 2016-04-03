@@ -39,7 +39,8 @@ executable hake2
   default-extensions:  OverloadedStrings
                      , BangPatterns
   ghc-options:         -O0 -rtsopts -Wall
-  other-modules:       Client.CDLightT
+  other-modules:       Client.BeamT
+                     , Client.CDLightT
                      , Client.CEntityT
                      , Client.CheatVarT
                      , Client.CinematicsT
@@ -55,7 +56,9 @@ executable hake2
                      , Client.CLInv
                      , Client.CLParse
                      , Client.CLPred
+                     , Client.CLSustainT
                      , Client.CLTEnt
+                     , Client.CLTEntGlobals
                      , Client.CLView
                      , Client.Console
                      , Client.ConsoleT
@@ -63,11 +66,13 @@ executable hake2
                      , Client.DirtyT
                      , Client.DLightT
                      , Client.EntityT
+                     , Client.ExplosionT
                      , Client.FrameT
                      , Client.KButtonT
                      , Client.Key
                      , Client.KeyConstants
                      , Client.KeyGlobals
+                     , Client.LaserT
                      , Client.LightStyleT
                      , Client.M
                      , Client.Menu

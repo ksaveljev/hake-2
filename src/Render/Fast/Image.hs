@@ -605,7 +605,7 @@ glResampleTexture image width height scaledWidth scaledHeight =
   in runST $
        do v <- MSV.new (4 * scaledWidth * scaledHeight)
           resample v fracStep p1 p2 0 0 scaledHeight
-  where buildP (idx, frac, fracStep)
+  where buildP (!idx, !frac, !fracStep)
           | idx >= scaledWidth = Just (0, (idx + 1, frac + fracStep, fracStep))
           | otherwise = Just (4 * (frac `shiftR` 16), (idx + 1, frac + fracStep, fracStep))
         resample v fracStep p1 p2 outIdx idx maxIdx
@@ -615,26 +615,38 @@ glResampleTexture image width height scaledWidth scaledHeight =
                      inRow2 = 4 * width * truncate ((fromIntegral idx + 0.75 :: Float) * fromIntegral height / fromIntegral scaledHeight)
                  outIdx' <- buildRow v p1 p2 inRow inRow2 outIdx 0 scaledWidth
                  resample v fracStep p1 p2 outIdx' (idx + 1) maxIdx
-        buildRow v p1 p2 inRow inRow2 outIdx idx maxIdx
+        buildRow !v !p1 !p2 !inRow !inRow2 !outIdx !idx !maxIdx
           | idx >= maxIdx = return outIdx
           | otherwise =
-              do let !pix1 = inRow  + (p1 UV.! idx)
-                     !pix2 = inRow  + (p2 UV.! idx)
+              do let !pix1 = inRow + (p1 UV.! idx)
+                     !pix2 = inRow + (p2 UV.! idx)
                      !pix3 = inRow2 + (p1 UV.! idx)
                      !pix4 = inRow2 + (p2 UV.! idx)
-                     !r1 = fromIntegral (image SV.! (pix1 + 0)) :: Int
-                     !g1 = fromIntegral (image SV.! (pix1 + 1)) :: Int
-                     !b1 = fromIntegral (image SV.! (pix1 + 2)) :: Int
-                     !a1 = fromIntegral (image SV.! (pix1 + 3)) :: Int
-                     !r = fromIntegral ((r1 + fromIntegral (image SV.! (pix2 + 0)) + fromIntegral (image SV.! (pix3 + 0)) + fromIntegral (image SV.! (pix4 + 0))) `shiftR` 2) :: Word8
-                     !g = fromIntegral ((g1 + fromIntegral (image SV.! (pix2 + 1)) + fromIntegral (image SV.! (pix3 + 1)) + fromIntegral (image SV.! (pix4 + 1))) `shiftR` 2) :: Word8
-                     !b = fromIntegral ((b1 + fromIntegral (image SV.! (pix2 + 2)) + fromIntegral (image SV.! (pix3 + 2)) + fromIntegral (image SV.! (pix4 + 2))) `shiftR` 2) :: Word8
-                     !a = fromIntegral ((a1 + fromIntegral (image SV.! (pix2 + 3)) + fromIntegral (image SV.! (pix3 + 3)) + fromIntegral (image SV.! (pix4 + 3))) `shiftR` 2) :: Word8
+                 MSV.write v (outIdx + 0) ((image SV.! (pix1 + 0) + image SV.! (pix2 + 0) + image SV.! (pix3 + 0) + image SV.! (pix4 + 0)) `shiftR` 2)
+                 MSV.write v (outIdx + 1) ((image SV.! (pix1 + 1) + image SV.! (pix2 + 1) + image SV.! (pix3 + 1) + image SV.! (pix4 + 1)) `shiftR` 2)
+                 MSV.write v (outIdx + 2) ((image SV.! (pix1 + 2) + image SV.! (pix2 + 2) + image SV.! (pix3 + 2) + image SV.! (pix4 + 2)) `shiftR` 2)
+                 MSV.write v (outIdx + 3) ((image SV.! (pix1 + 3) + image SV.! (pix2 + 3) + image SV.! (pix3 + 3) + image SV.! (pix4 + 3)) `shiftR` 2)
+                 buildRow v p1 p2 inRow inRow2 (outIdx + 4) (idx + 1) maxIdx
+                 -- TODO: make sure the implementation is ok
+            {-
+              do let pix1 = inRow  + (p1 UV.! idx)
+                     pix2 = inRow  + (p2 UV.! idx)
+                     pix3 = inRow2 + (p1 UV.! idx)
+                     pix4 = inRow2 + (p2 UV.! idx)
+                     r1 = fromIntegral (image SV.! (pix1 + 0)) :: Int
+                     g1 = fromIntegral (image SV.! (pix1 + 1)) :: Int
+                     b1 = fromIntegral (image SV.! (pix1 + 2)) :: Int
+                     a1 = fromIntegral (image SV.! (pix1 + 3)) :: Int
+                     r = fromIntegral ((r1 + fromIntegral (image SV.! (pix2 + 0)) + fromIntegral (image SV.! (pix3 + 0)) + fromIntegral (image SV.! (pix4 + 0))) `shiftR` 2) :: Word8
+                     g = fromIntegral ((g1 + fromIntegral (image SV.! (pix2 + 1)) + fromIntegral (image SV.! (pix3 + 1)) + fromIntegral (image SV.! (pix4 + 1))) `shiftR` 2) :: Word8
+                     b = fromIntegral ((b1 + fromIntegral (image SV.! (pix2 + 2)) + fromIntegral (image SV.! (pix3 + 2)) + fromIntegral (image SV.! (pix4 + 2))) `shiftR` 2) :: Word8
+                     a = fromIntegral ((a1 + fromIntegral (image SV.! (pix2 + 3)) + fromIntegral (image SV.! (pix3 + 3)) + fromIntegral (image SV.! (pix4 + 3))) `shiftR` 2) :: Word8
                  MSV.write v (outIdx + 0) r
                  MSV.write v (outIdx + 1) g
                  MSV.write v (outIdx + 2) b
                  MSV.write v (outIdx + 3) a
                  buildRow v p1 p2 inRow inRow2 (outIdx + 4) (idx + 1) maxIdx
+                 -}
 
 uploadImage :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadImage image scaledWidth scaledHeight mipLevel samples comp =

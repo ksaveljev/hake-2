@@ -87,7 +87,6 @@ data QuakeIOState = QuakeIOState
   , _pVertexArray           :: MSV.IOVector Float
   , _pColorArray            :: MSV.IOVector Int32
   , _frFifo                 :: MV.IOVector (Int, Int)
-  , _cHNodes1               :: Maybe (MV.IOVector Int)
   }
 
 data IORequest x
@@ -2023,11 +2022,10 @@ data CinematicsT = CinematicsT
   , _cSChannels    :: Int
   , _cWidth        :: Int
   , _cHeight       :: Int
-  , _cPic          :: Maybe B.ByteString
-  , _cPicPending   :: Maybe B.ByteString
+  , _cPic          :: Maybe (UV.Vector Word8)
+  , _cPicPending   :: Maybe (UV.Vector Word8)
   , _cNumHNodes1   :: UV.Vector Int
-  , _cHUsed        :: UV.Vector Int
-  , _cHCount       :: UV.Vector Int
+  , _cHNodes1      :: Maybe (UV.Vector Int)
   }
 
 data LoopbackT = LoopbackT

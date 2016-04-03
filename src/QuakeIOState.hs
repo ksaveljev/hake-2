@@ -68,5 +68,4 @@ initialQuakeIOState =
                , _pVertexArray           = unsafePerformIO (MSV.new (Constants.maxParticles * 3))
                , _pColorArray            = unsafePerformIO (MSV.new Constants.maxParticles)
                , _frFifo                 = unsafePerformIO (MV.replicate floodFillFifoSize (0, 0))
-               , _cHNodes1               = Nothing
                }

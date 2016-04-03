@@ -34,24 +34,31 @@ import           Game.PlayerStateT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
+import qualified QCommon.FS as FS
 import qualified QCommon.MSG as MSG
 import           QCommon.NetChanT
 import qualified QCommon.SZ as SZ
-import           QuakeIOState
 import           QuakeState
 import           Render.Renderer
 import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 import           Types
-import           Util.Binary (encode)
+import           Util.Binary (encode, getInt)
 
 import           Control.Applicative (liftA2)
-import           Control.Lens (preuse, use, ix, (^.), (.=), (-=), (%=), (&), (.~), _1, _2)
+import           Control.Lens (preuse, use, ix, (^.), (.=), (-=), (%=), (+=), (&), (.~), _1, _2)
 import           Control.Monad (when, unless, void, join)
-import           Data.Bits (complement, (.&.))
+import           Control.Monad.ST (ST, runST)
+import           Data.Binary.Get (runGet)
+import           Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
 import           Data.Char (ord)
+import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Unboxed.Mutable as MUV
+import           Data.Word (Word8)
+import           System.IO (Handle, hTell, hSeek, SeekMode(AbsoluteSeek))
 
 beginLoadingPlaque :: Quake ()
 beginLoadingPlaque =
@@ -261,7 +268,7 @@ doRunCinematic cl cls
         frame = truncate frameF :: Int
         copyValue a b = a >>= (b .=)
 
-checkFinishCinematic :: Maybe B.ByteString -> Quake ()
+checkFinishCinematic :: Maybe (UV.Vector Word8) -> Quake ()
 checkFinishCinematic (Just _) = return ()
 checkFinishCinematic Nothing =
   do stopCinematic
@@ -854,19 +861,59 @@ parseLayoutString = error "SCR.parseLayoutString" -- TODO
                                 else skipToEndIf newIdx
                                 -}
 
-readNextFrame :: Quake (Maybe B.ByteString)
-readNextFrame = error "SCR.readNextFrame" -- TODO
+readNextFrame :: Quake (Maybe (UV.Vector Word8))
+readNextFrame =
+  do cinematicFileHandle <- use (globals.gCl.csCinematicFile)
+     maybe cinematicFileHandleError proceedReadNextFrame cinematicFileHandle
+  where cinematicFileHandleError =
+          do Com.fatalError "SCR.readNextFrame cinematicFileHandle is Nothing"
+             return Nothing
+        proceedReadNextFrame cinematicFileHandle =
+          do command <- request (io (BL.hGet cinematicFileHandle 4))
+             doReadNextFrame cinematicFileHandle (runGet getInt command)
+
+doReadNextFrame :: Handle -> Int -> Quake (Maybe (UV.Vector Word8))
+doReadNextFrame cinematicFileHandle command
+  | command == 2 = return Nothing -- last frame marker
+  | otherwise =
+      do when (command == 1) $
+           do palette <- request (io (B.hGet cinematicFileHandle 768))
+              globals.gCl.csCinematicPalette .= palette
+              globals.gCl.csCinematicPaletteActive .= False -- dubious... exposes an edge case
+         size <- fmap (runGet getInt) (request (io (BL.hGet cinematicFileHandle 4)))
+         checkSize size
+         compressed <- getCompressedData size
+         join (liftA2 (readSounds cinematicFileHandle) (use (globals.gCl.csCinematicFrame)) (use (scrGlobals.scrCin)))
+         pic <- huff1Decompress compressed size
+         globals.gCl.csCinematicFrame += 1
+         return (Just pic)
+  where checkSize size
+          | size > 0x20000 || size < 1 =
+              Com.comError Constants.errDrop ("Bad compressed frame size:" `B.append` encode size)
+          | otherwise = return ()
+        getCompressedData size =
+          do compressed <- request (io (B.hGet cinematicFileHandle size))
+             return (compressed `B.append` (B.replicate (0x20000 - size) 0))
+
+readSounds :: Handle -> Int -> CinematicsT -> Quake ()
+readSounds cinematicFileHandle cinematicFrame cin =
+  do position <- request (io (hTell cinematicFileHandle))
+     S.rawSamples count (cin^.cSRate) (cin^.cSWidth) (cin^.cSChannels) cinematicFileHandle
+     request (io (hSeek cinematicFileHandle AbsoluteSeek (fromIntegral (fromIntegral position + count * (cin^.cSWidth) * (cin^.cSChannels)))))
+  where start = cinematicFrame * (cin^.cSRate) `div` 14
+        end = (cinematicFrame + 1) * (cin^.cSRate) `div` 14
+        count = end - start
 
 stopCinematic :: Quake ()
 stopCinematic = doStopCinematic =<< use (scrGlobals.scrCin.cRestartSound)
   where doStopCinematic False = return ()
         doStopCinematic True =
           do globals.gCl.csCinematicTime .= 0
-             scrGlobals.scrCin.cPic .= Nothing
-             scrGlobals.scrCin.cPicPending .= Nothing
+             scrGlobals.scrCin %= (\v -> v & cPic .~ Nothing
+                                           & cPicPending .~ Nothing
+                                           & cHNodes1 .~ Nothing)
              checkCinematicPalette =<< use (globals.gCl.csCinematicPaletteActive)
              globals.gCl.csCinematicFile .= Nothing -- IMPROVE: research if need to close handle?
-             request (cHNodes1 .= Nothing)
              S.disableStreaming
              scrGlobals.scrCin.cRestartSound .= False
         checkCinematicPalette False = return ()
@@ -882,7 +929,147 @@ centerPrint :: B.ByteString -> Quake ()
 centerPrint = error "SCR.centerPrint" -- TODO
 
 playCinematic :: B.ByteString -> Quake ()
-playCinematic = error "SCR.playCinematic" -- TODO
+playCinematic arg =
+  do globals.gCl.csCinematicFrame .= 0
+     proceedPlayCinematic
+  where proceedPlayCinematic
+          | ".pcx" `BC.isSuffixOf` arg = staticPCXImage ("pics/" `B.append` arg)
+          | otherwise = playVideo ("video/" `B.append` arg)
+
+staticPCXImage :: B.ByteString -> Quake ()
+staticPCXImage name = error "SCR.staticPCXImage" -- TODO
+
+playVideo :: B.ByteString -> Quake ()
+playVideo name =
+  do cinematicFile <- FS.fOpenFile name
+     globals.gCl.csCinematicFile .= cinematicFile
+     maybe finishPlayVideo doPlayVideo cinematicFile
+  where finishPlayVideo =
+          do finishCinematic
+             globals.gCl.csCinematicTime .= 0
+
+doPlayVideo :: Handle -> Quake ()
+doPlayVideo cinematicFileHandle =
+  do endLoadingPlaque
+     globals.gCls.csState .= Constants.caActive
+     cinematicData <- request (io (BL.hGet cinematicFileHandle 20))
+     let (width, height, sRate, sWidth, sChannels) = runGet getCinematicData cinematicData
+     scrGlobals.scrCin %= (\v -> v & cWidth .~ width
+                                   & cHeight .~ height
+                                   & cSRate .~ sRate
+                                   & cSWidth .~ sWidth
+                                   & cSChannels .~ sChannels)
+     huff1TableInit
+     scrGlobals.scrCin.cRestartSound .= True
+     globals.gCl.csCinematicFrame .= 0
+     pic <- readNextFrame
+     scrGlobals.scrCin.cPic .= pic
+     ms <- Timer.milliseconds
+     globals.gCl.csCinematicTime .= ms
+  where getCinematicData = (,,,,) <$> getInt <*> getInt <*> getInt <*> getInt <*> getInt
 
 debugGraph :: Float -> Int -> Quake ()
 debugGraph _ _ = request (io (putStrLn "SCR.debugGraph IMPLEMENT ME!"))
+
+huff1TableInit :: Quake ()
+huff1TableInit =
+  do cinematicFileHandle <- use (globals.gCl.csCinematicFile)
+     maybe cinematicFileHandleError proceedTableInit cinematicFileHandle
+  where cinematicFileHandleError = Com.fatalError "SCR.huff1TableInit cinematicFileHandle is Nothing"
+        proceedTableInit cinematicFileHandle =
+          do allCounts <- request (io (B.hGet cinematicFileHandle (256 * 256)))
+             let (hNodes, numHNodes) = calcNodes allCounts
+             scrGlobals.scrCin.cHNodes1 .= Just hNodes
+             scrGlobals.scrCin.cNumHNodes1 .= numHNodes
+        calcNodes allCounts = runST $
+          do hNodes <- MUV.replicate (256 * 256 * 2) 0
+             numHNodes <- UV.generateM 256 (tableInit hNodes allCounts)
+             hNodes' <- UV.unsafeFreeze hNodes
+             return (hNodes', numHNodes)
+
+-- TODO: find all code entires with MV.new (or unsafeThaw) and check if it
+-- can be turned to Unboxed version
+tableInit :: MUV.STVector s Int -> B.ByteString -> Int -> ST s Int
+tableInit hNodes allCounts idx =
+  do hCount <- UV.unsafeThaw (UV.generate 512 (\i -> if i < 256 then fromIntegral (counts `B.index` i) else 0))
+     hUsed <- MUV.replicate 512 0
+     initNodes hNodes hUsed hCount (idx * 256 * 2) 256
+  where counts = B.take 256 (B.drop (idx * 256) allCounts)
+
+initNodes :: MUV.STVector s Int -> MUV.STVector s Int -> MUV.STVector s Int -> Int -> Int -> ST s Int
+initNodes hNodes hUsed hCount nodeBase numHNodes
+  | numHNodes >= 511 = return numHNodes
+  | otherwise =
+      do b1 <- smallestNode1 hUsed hCount numHNodes
+         MUV.write hNodes index b1
+         checkB1 b1
+  where index = nodeBase + (numHNodes - 256) * 2
+        checkB1 b1
+          | b1 == -1 = return numHNodes
+          | otherwise =
+              do MUV.write hUsed b1 1
+                 b2 <- smallestNode1 hUsed hCount numHNodes
+                 checkB2 b1 b2
+        checkB2 b1 b2
+          | b2 == -1 = return numHNodes
+          | otherwise =
+              do MUV.write hUsed b2 1
+                 v1 <- MUV.read hCount b1
+                 v2 <- MUV.read hCount b2
+                 MUV.write hCount numHNodes (v1 + v2)
+                 initNodes hNodes hUsed hCount nodeBase (numHNodes + 1)
+
+smallestNode1 :: MUV.STVector s Int -> MUV.STVector s Int -> Int -> ST s Int
+smallestNode1 hUsed hCount numHNodes = findBestNode 99999999 (-1) 0
+  where findBestNode best bestNode idx
+          | idx >= numHNodes = return bestNode
+          | otherwise =
+              do u <- MUV.read hUsed idx
+                 c <- MUV.read hCount idx
+                 checkBest best bestNode idx u c
+        checkBest best bestNode idx u c
+          | u /= 0 = findBestNode best bestNode (idx + 1)
+          | c == 0 = findBestNode best bestNode (idx + 1)
+          | c < best = findBestNode c idx (idx + 1)
+          | otherwise = findBestNode best bestNode (idx + 1)
+
+huff1Decompress :: B.ByteString -> Int -> Quake (UV.Vector Word8)
+huff1Decompress frame size =
+  do hNodes <- use (scrGlobals.scrCin.cHNodes1)
+     numHNodes <- use (scrGlobals.scrCin.cNumHNodes1)
+     maybe hNodesError (return . proceedHuff1Decompress numHNodes) hNodes
+  where a = fromIntegral (frame `B.index` 0) :: Int
+        b = (fromIntegral (frame `B.index` 1) :: Int) `shiftL` 8
+        c = (fromIntegral (frame `B.index` 2) :: Int) `shiftL` 16
+        d = (fromIntegral (frame `B.index` 3) :: Int) `shiftL` 24
+        count = a .|. b .|. c .|. d
+        index = (-256) * 2
+        hNodesError =
+          do Com.fatalError "SCR.huff1Decompress hNodes is Nothing"
+             return UV.empty
+        proceedHuff1Decompress numHNodes hNodes = runST $
+          do out <- MUV.new count
+             decompress frame hNodes numHNodes (numHNodes UV.! 0) 4 0 out index count
+
+decompress :: B.ByteString -> UV.Vector Int -> UV.Vector Int -> Int -> Int -> Int -> MUV.STVector s Word8 -> Int -> Int -> ST s (UV.Vector Word8)
+decompress frame hNodes numHNodes nodeNum inIdx outIdx out index count
+  | count == 0 = UV.unsafeFreeze out -- TODO: Decompression overread by ... error ...
+  | otherwise =
+      do (index', count', nodeNum', outIdx') <- processByte hNodes numHNodes nodeNum (frame `B.index` inIdx) outIdx out index count 0 8
+         decompress frame hNodes numHNodes nodeNum' (inIdx + 1) outIdx' out index' count'
+
+processByte :: UV.Vector Int -> UV.Vector Int -> Int -> Word8 -> Int -> MUV.STVector s Word8 -> Int -> Int -> Int -> Int -> ST s (Int, Int, Int, Int)
+processByte hNodes numHNodes nodeNum inByte outIdx out index count idx maxIdx
+  | idx >= maxIdx = return (index, count, nodeNum, outIdx)
+  | nodeNum < 256 =
+      do let index' = (-256) * 2 + (nodeNum `shiftL` 9)
+             count' = count - 1
+         MUV.write out outIdx (fromIntegral nodeNum)
+         case count' == 0 of
+           True -> return (index', count', nodeNum, outIdx + 1)
+           False ->
+             do let nodeNum' = hNodes UV.! (index' + (numHNodes UV.! nodeNum) * 2 + fromIntegral (inByte .&. 1))
+                processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) (outIdx + 1) out index' count' (idx + 1) maxIdx
+  | otherwise =
+      do let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
+         processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) outIdx out index count (idx + 1) maxIdx
