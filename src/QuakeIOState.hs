@@ -6,7 +6,6 @@ import           Client.CParticleT (newCParticleT)
 import qualified Constants
 import           Game.CPlaneT (newCPlaneT)
 import           Game.EdictT (newEdictT)
-import           QCommon.CBrushT (newCBrushT)
 import           Render.ImageT
 import           Render.ModelT
 import           Render.MSurfaceT
@@ -49,8 +48,6 @@ initialQuakeIOState :: QuakeIOState
 initialQuakeIOState =
   QuakeIOState { _gCurTime               = unsafePerformIO (newIORef 0)
                , _gbGEdicts              = unsafePerformIO (V.thaw (V.generate (Constants.maxEdicts + 1) newEdictT)) -- one extra for "dummy edict"
-               , _cmMapPlanes            = unsafePerformIO (V.thaw (V.replicate (Constants.maxMapPlanes + 6) newCPlaneT))
-               , _cmMapBrushes           = unsafePerformIO (V.thaw (V.replicate Constants.maxMapBrushes newCBrushT))
                , _cText                  = unsafePerformIO (MSV.replicate Constants.conTextSize ' ')
                , _frGLTextures           = unsafePerformIO (V.thaw (V.generate Constants.maxGLTextures newImageT))
                , _frModKnown             = unsafePerformIO (V.thaw (V.replicate maxModKnown newModelT))

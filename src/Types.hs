@@ -68,8 +68,6 @@ data QuakeState = QuakeState
 data QuakeIOState = QuakeIOState
   { _gCurTime               :: IORef Int
   , _gbGEdicts              :: MV.IOVector EdictT
-  , _cmMapPlanes            :: MV.IOVector CPlaneT
-  , _cmMapBrushes           :: MV.IOVector CBrushT
   , _cText                  :: MSV.IOVector Char
   , _frGLTextures           :: MV.IOVector ImageT
   , _frModKnown             :: MV.IOVector ModelT
@@ -250,6 +248,7 @@ data CMGlobals = CMGlobals
   , _cmNumTexInfo      :: Int
   , _cmMapSurfaces     :: V.Vector MapSurfaceT
   , _cmNumPlanes       :: Int
+  , _cmMapPlanes       :: V.Vector CPlaneT
   , _cmNumNodes        :: Int
   , _cmMapNodes        :: V.Vector CNodeT
   , _cmNumLeafs        :: Int
@@ -261,6 +260,7 @@ data CMGlobals = CMGlobals
   , _cmNumCModels      :: Int
   , _cmMapCModels      :: V.Vector CModelT
   , _cmNumBrushes      :: Int
+  , _cmMapBrushes      :: V.Vector CBrushT
   , _cmNumVisibility   :: Int
   , _cmMapVisibility   :: B.ByteString
   , _cmMapVis          :: DVisT
@@ -2122,6 +2122,30 @@ data TexInfoT = TexInfoT
   , _tiValue       :: Int
   , _tiTexture     :: B.ByteString
   , _tiNextTexInfo :: Int
+  }
+
+data DLeafT = DLeafT
+  { _dlContents       :: Int
+  , _dlCluster        :: Int16
+  , _dlArea           :: Int16
+  , _dlMins           :: V3 Int16
+  , _dlMaxs           :: V3 Int16
+  , _dlFirstLeafFace  :: Word16
+  , _dlNumLeafFaces   :: Word16
+  , _dlFirstLeafBrush :: Word16
+  , _dlNumLeafBrushes :: Word16
+  }
+
+data DPlaneT = DPlaneT
+  { _dpNormal :: V3 Float
+  , _dpDist   :: Float
+  , _dpType   :: Int
+  }
+
+data DBrushT = DBrushT
+  { _dbFirstSide :: Int
+  , _dbNumSides  :: Int
+  , _dbContents  :: Int
   }
 
 data KeyFuncT = KeyFuncT

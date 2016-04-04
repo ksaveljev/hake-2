@@ -21,28 +21,27 @@ import           QCommon.LumpT
 import           QCommon.TexInfoT
 import qualified QCommon.MD4 as MD4
 import           QCommon.QFiles.BSP.DAreaPortalT
+import           QCommon.QFiles.BSP.DBrushT
 import           QCommon.QFiles.BSP.DHeaderT
+import           QCommon.QFiles.BSP.DLeafT
+import           QCommon.QFiles.BSP.DPlaneT
 import qualified Constants
 import           QuakeRef
 import           QuakeState
 import           Types
 import           Util.Binary (encode, getMany)
 import qualified Util.Lib as Lib
-import           Util.Vector (pipeToVector)
 
 import           Control.Lens (use, (.=), (%=), (+=), (^.), (&), (.~))
 import           Control.Monad (void, unless, when)
-import           Control.Monad.State.Strict (runStateT)
+import           Data.Binary.Get (runGet, getWord16le)
+import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
-import           Linear (V3)
-import           Pipes.Binary (deMessage)
-import qualified Pipes.Binary as PB
-import qualified Pipes.ByteString as PBS
-import qualified Pipes.Parse as PP
+import           Linear (V3(..))
 import           System.IO (Handle)
 
 setAreaPortalState :: Int -> Bool -> Quake ()
@@ -93,11 +92,7 @@ proceedLoadMap name clientLoad checksum mapName flushMap
 doLoadMap :: B.ByteString -> [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
 doLoadMap name checksum (fileHandle, len) =
   do buf <- request (io (BL.hGet fileHandle len))
-     (res, _) <- runStateT (PB.decodeGet getDHeaderT) (PBS.fromLazy buf)
-     either dHeaderTParseError (loadBSP name checksum buf len) res
-  where dHeaderTParseError err =
-          do Com.fatalError (BC.pack (deMessage err))
-             return (Ref 0, 0 : tail checksum)
+     loadBSP name checksum buf len (runGet getDHeaderT buf)
 
 loadBSP :: B.ByteString -> [Int] -> BL.ByteString -> Int -> DHeaderT -> Quake (Ref CModelT, [Int])
 loadBSP name checksum buf len header =
@@ -215,11 +210,10 @@ loadSurfaces :: BL.ByteString -> LumpT -> Quake ()
 loadSurfaces buf lump =
   do Com.dprintf "CMod_LoadSurfaces()\n"
      checkLump
-     cmGlobals.cmNumTexInfo .= count
      Com.dprintf (B.concat [" numtexinfo=", encode count, "\n"])
+     cmGlobals.cmNumTexInfo .= count
      -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
-     texInfo <- request (pipeToVector texInfoProducer) :: Quake (V.Vector TexInfoT)
-     -- TODO: make sure texInfo is of size count
+     let texInfo = V.generate count readTexInfo
      cmGlobals.cmMapSurfaces %= (\v -> V.update v (V.imap (\i t -> (i, toMapSurface t)) texInfo))
   where count = (lump^.lFileLen) `div` texInfoTSize
         checkLump =
@@ -229,7 +223,9 @@ loadSurfaces buf lump =
                Com.comError Constants.errDrop "Map with no surfaces"
              when (count > Constants.maxMapTexInfo) $
                Com.comError Constants.errDrop "Map has too many surfaces"
-        texInfoProducer = (getMany getTexInfoT (PBS.fromLazy (BL.drop (fromIntegral (lump^.lFileOfs)) buf))) ^. PP.splitAt count
+        readTexInfo idx =
+          let offset = fromIntegral ((lump^.lFileOfs) + idx * texInfoTSize)
+          in runGet getTexInfoT (BL.drop offset buf)
 
 toMapSurface :: TexInfoT -> MapSurfaceT
 toMapSurface texInfo = MapSurfaceT { _msCSurface = cSurface, _msRName = Just (texInfo^.tiTexture) }
@@ -239,16 +235,129 @@ toMapSurface texInfo = MapSurfaceT { _msCSurface = cSurface, _msRName = Just (te
                              }
 
 loadLeafs :: BL.ByteString -> LumpT -> Quake ()
-loadLeafs = error "CM.loadLeafs" -- TODO
+loadLeafs buf lump =
+  do Com.dprintf "CMod_LoadLeafs()\n"
+     checkLump
+     Com.dprintf (B.concat [" numleafes=", encode count, "\n"])
+     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+     let dLeafs = V.generate count readDLeaf
+         numClusters = V.foldl' countNumClusters 0 dLeafs
+     cmGlobals.cmMapLeafs %= (\v -> V.update v (V.imap (\i d -> (i, toCLeaf d)) dLeafs))
+     cmGlobals.cmNumLeafs .= count
+     cmGlobals.cmNumClusters .= numClusters
+     checkFirstLeaf =<< use (cmGlobals.cmMapLeafs)
+     findEmptyLeaf =<< use (cmGlobals.cmMapLeafs)
+  where count = (lump^.lFileLen) `div` dLeafTSize
+        checkLump =
+          do when ((lump^.lFileLen) `mod` dLeafTSize /= 0) $
+               Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+             when (count < 1) $
+               Com.comError Constants.errDrop "Map with no leafs"
+             when (count > Constants.maxMapPlanes) $
+               Com.comError Constants.errDrop "Map has too many planes"
+        readDLeaf idx =
+          let offset = fromIntegral ((lump^.lFileOfs) + idx * dLeafTSize)
+          in runGet getDLeafT (BL.drop offset buf)
+        countNumClusters numClusters leaf
+          | fromIntegral (leaf^.dlCluster) >= numClusters = fromIntegral (leaf^.dlCluster) + 1
+          | otherwise = numClusters
+        checkFirstLeaf mapLeafs =
+          do when (((V.head mapLeafs)^.clContents) /= Constants.contentsSolid) $ -- TODO: head is kinda safe here but would probably be a better idea to use a more safe approach
+               Com.comError Constants.errDrop "Map leaf 0 is not CONTENTS_SOLID"
+             cmGlobals.cmSolidLeaf .= 0
+        findEmptyLeaf mapLeafs =
+          case V.findIndex (\leaf -> leaf^.clContents == 0) mapLeafs of
+            Nothing -> Com.comError Constants.errDrop "Map does not have an empty leaf"
+            Just idx -> cmGlobals.cmEmptyLeaf .= idx
+
+toCLeaf :: DLeafT -> CLeafT
+toCLeaf dLeaf = CLeafT { _clContents       = dLeaf^.dlContents
+                       , _clCluster        = fromIntegral (dLeaf^.dlCluster)
+                       , _clArea           = fromIntegral (dLeaf^.dlArea)
+                       , _clFirstLeafBrush = dLeaf^.dlFirstLeafBrush
+                       , _clNumLeafBrushes = dLeaf^.dlNumLeafBrushes
+                       }
 
 loadLeafBrushes :: BL.ByteString -> LumpT -> Quake ()
-loadLeafBrushes = error "CM.loadLeafBrushes" -- TODO
+loadLeafBrushes buf lump =
+  do Com.dprintf "CMod_LoadLeafBrushes()\n"
+     checkLump
+     Com.dprintf (B.concat [" numbrushes=", encode count, "\n"])
+     cmGlobals.cmNumLeafBrushes .= count
+     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+     let leafBrushes = UV.generate count readMapLeafBrush
+     cmGlobals.cmMapLeafBrushes %= (\v -> UV.update v (UV.imap (\i b -> (i, b)) leafBrushes))
+  where count = (lump^.lFileLen) `div` 2
+        checkLump =
+          do when ((lump^.lFileLen) `mod` 2 /= 0) $
+               Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+             when (count < 1) $
+               Com.comError Constants.errDrop "Map with no planes"
+             when (count > Constants.maxMapLeafBrushes) $
+               Com.comError Constants.errDrop "Map has too many leafbrushes"
+        readMapLeafBrush idx =
+          let offset = fromIntegral ((lump^.lFileOfs) + idx * 2)
+          in runGet getWord16le (BL.drop offset buf)
 
 loadPlanes :: BL.ByteString -> LumpT -> Quake ()
-loadPlanes = error "CM.loadPlanes" -- TODO
+loadPlanes buf lump =
+  do Com.dprintf "CMod_LoadPlanes()\n"
+     checkLump
+     Com.dprintf (B.concat [" numplanes=", encode count, "\n"])
+     cmGlobals.cmNumPlanes .= count
+     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+     let planes = V.generate count readDPlane
+     cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) planes))
+  where count = (lump^.lFileLen) `div` dPlaneTSize
+        checkLump =
+          do when ((lump^.lFileLen) `mod` dPlaneTSize /= 0) $
+               Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+             when (count < 1) $
+               Com.comError Constants.errDrop "Map with no planes"
+             when (count > Constants.maxMapPlanes) $
+               Com.comError Constants.errDrop "Map has too many planes"
+        readDPlane idx =
+          let offset = fromIntegral ((lump^.lFileOfs) + idx * dPlaneTSize)
+          in runGet getDPlaneT (BL.drop offset buf)
+
+toCPlane :: DPlaneT -> CPlaneT
+toCPlane dPlane = CPlaneT { _cpNormal   = dPlane^.dpNormal
+                          , _cpDist     = dPlane^.dpDist
+                          , _cpType     = fromIntegral (dPlane^.dpType)
+                          , _cpSignBits = getBits (dPlane^.dpNormal)
+                          , _cpPad      = (0, 0)
+                          }
+  where getBits (V3 a b c) =
+          let a' = if a < 0 then 1 else 0
+              b' = if b < 0 then 2 else 0
+              c' = if c < 0 then 4 else 0
+          in a' .|. b' .|. c'
 
 loadBrushes :: BL.ByteString -> LumpT -> Quake ()
-loadBrushes = error "CM.loadBrushes" -- TODO
+loadBrushes buf lump =
+  do Com.dprintf "CMod_LoadBrushes()\n"
+     checkLump
+     Com.dprintf (B.concat [" numbrushes=", encode count, "\n"])
+     cmGlobals.cmNumBrushes .= count
+     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+     let brushes = V.generate count readDBrush
+     cmGlobals.cmMapBrushes %= (\v -> V.update v (V.imap (\i b -> (i, toCBrush b)) brushes))
+  where count = (lump^.lFileLen) `div` dBrushTSize
+        checkLump =
+          do when ((lump^.lFileLen) `mod` dBrushTSize /= 0) $
+               Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+             when (count > Constants.maxMapBrushes) $
+               Com.comError Constants.errDrop "Map has too many brushes"
+        readDBrush idx =
+          let offset = fromIntegral ((lump^.lFileOfs) + idx * dBrushTSize)
+          in runGet getDBrushT (BL.drop offset buf)
+
+toCBrush :: DBrushT -> CBrushT
+toCBrush dBrush = CBrushT { _cbContents       = dBrush^.dbContents
+                          , _cbNumSides       = dBrush^.dbNumSides
+                          , _cbFirstBrushSide = dBrush^.dbFirstSide
+                          , _cbCheckCount     = 0
+                          }
 
 loadBrushSides :: BL.ByteString -> LumpT -> Quake ()
 loadBrushSides = error "CM.loadBrushSides" -- TODO
