@@ -2105,6 +2105,25 @@ data LaserT = LaserT
   , _lEndTime :: Int
   }
 
+data DHeaderT = DHeaderT
+  { _dhIdent   :: Int
+  , _dhVersion :: Int
+  , _dhLumps   :: V.Vector LumpT
+  }
+
+data LumpT = LumpT
+  { _lFileOfs :: Int
+  , _lFileLen :: Int
+  }
+
+data TexInfoT = TexInfoT
+  { _tiVecs        :: (V4 Float, V4 Float)
+  , _tiFlags       :: Int
+  , _tiValue       :: Int
+  , _tiTexture     :: B.ByteString
+  , _tiNextTexInfo :: Int
+  }
+
 data KeyFuncT = KeyFuncT
   { _kfName :: B.ByteString
   , _kfFunc :: Int -> Quake (Maybe B.ByteString)

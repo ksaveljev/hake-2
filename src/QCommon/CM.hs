@@ -17,22 +17,32 @@ import           QCommon.CLeafT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FSShared as FS
+import           QCommon.LumpT
+import           QCommon.TexInfoT
 import qualified QCommon.MD4 as MD4
 import           QCommon.QFiles.BSP.DAreaPortalT
+import           QCommon.QFiles.BSP.DHeaderT
 import qualified Constants
 import           QuakeRef
 import           QuakeState
 import           Types
+import           Util.Binary (encode, getMany)
 import qualified Util.Lib as Lib
+import           Util.Vector (pipeToVector)
 
 import           Control.Lens (use, (.=), (%=), (+=), (^.), (&), (.~))
 import           Control.Monad (void, unless, when)
+import           Control.Monad.State.Strict (runStateT)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3)
+import           Pipes.Binary (deMessage)
+import qualified Pipes.Binary as PB
+import qualified Pipes.ByteString as PBS
+import qualified Pipes.Parse as PP
 import           System.IO (Handle)
 
 setAreaPortalState :: Int -> Bool -> Quake ()
@@ -69,7 +79,7 @@ proceedLoadMap name clientLoad checksum mapName flushMap
          cmGlobals.cmNumNodes .= 0
          cmGlobals.cmNumLeafs .= 0
          fileHandle <- FS.fOpenFileWithLength name
-         maybe loadMapError (doLoadMap checksum) fileHandle
+         maybe loadMapError (doLoadMap name checksum) fileHandle
   where resetCommonCMGlobals =
           do cmGlobals.cmNumCModels .= 0
              cmGlobals.cmNumVisibility .= 0
@@ -80,61 +90,44 @@ proceedLoadMap name clientLoad checksum mapName flushMap
           do Com.comError Constants.errDrop ("Couldn't load " `B.append` name)
              return (Ref 0, 0 : tail checksum)
 
-doLoadMap :: [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
-doLoadMap checksum (fileHandle, len) =
+doLoadMap :: B.ByteString -> [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
+doLoadMap name checksum (fileHandle, len) =
   do buf <- request (io (BL.hGet fileHandle len))
-     cmGlobals.cmLastChecksum .= MD4.blockChecksum buf (fromIntegral len)
-     error "CM.doLoadMap" -- TODO
-     return (Ref 0, 0 : tail checksum) -- TODO: fix this
-{-
-           let Just buf = BL.fromStrict <$> loadedFile
-               len = BL.length buf
-               bufChecksum = MD4.blockChecksum buf len
-               updatedChecksum = bufChecksum : tail checksum
+     (res, _) <- runStateT (PB.decodeGet getDHeaderT) (PBS.fromLazy buf)
+     either dHeaderTParseError (loadBSP name checksum buf len) res
+  where dHeaderTParseError err =
+          do Com.fatalError (BC.pack (deMessage err))
+             return (Ref 0, 0 : tail checksum)
 
-           cmGlobals.cmLastChecksum .= bufChecksum
-
-           let header = newDHeaderT buf
-
-           when (header^.dhVersion /= Constants.bspVersion) $
-             Com.comError Constants.errDrop
-                          ("CMod_LoadBrushModel: " `B.append`
-                           name `B.append`
-                           " has wrong version number (" `B.append`
-                           BC.pack (show $ header^.dhVersion) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
-                           " should be " `B.append`
-                           BC.pack (show Constants.bspVersion) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
-                           ")")
-
-           cmGlobals.cmCModBase .= Just buf
-
-           let lumps = header^.dhLumps
-
-           loadSurfaces (lumps V.! Constants.lumpTexInfo)
-           loadLeafs (lumps V.! Constants.lumpLeafs)
-           loadLeafBrushes (lumps V.! Constants.lumpLeafBrushes)
-           loadPlanes (lumps V.! Constants.lumpPlanes)
-           loadBrushes (lumps V.! Constants.lumpBrushes)
-           loadBrushSides (lumps V.! Constants.lumpBrushSides)
-           loadSubmodels (lumps V.! Constants.lumpModels)
-
-           loadNodes (lumps V.! Constants.lumpNodes)
-           loadAreas (lumps V.! Constants.lumpAreas)
-           loadAreaPortals (lumps V.! Constants.lumpAreaPortals)
-           loadVisibility (lumps V.! Constants.lumpVisibility)
-           loadEntityString (lumps V.! Constants.lumpEntities)
-
-           initBoxHull
-
-           cmGlobals.cmPortalOpen %= UV.map (const False)
-
-           floodAreaConnections
-
-           cmGlobals.cmMapName .= name
-
-           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (0, updatedChecksum)
-           -}
+loadBSP :: B.ByteString -> [Int] -> BL.ByteString -> Int -> DHeaderT -> Quake (Ref CModelT, [Int])
+loadBSP name checksum buf len header =
+  do checkHeader
+     cmGlobals.cmLastChecksum .= bufChecksum
+     loadSurfaces     buf (lumps V.! Constants.lumpTexInfo)
+     loadLeafs        buf (lumps V.! Constants.lumpLeafs)
+     loadLeafBrushes  buf (lumps V.! Constants.lumpLeafBrushes)
+     loadPlanes       buf (lumps V.! Constants.lumpPlanes)
+     loadBrushes      buf (lumps V.! Constants.lumpBrushes)
+     loadBrushSides   buf (lumps V.! Constants.lumpBrushSides)
+     loadSubmodels    buf (lumps V.! Constants.lumpModels)
+     loadNodes        buf (lumps V.! Constants.lumpNodes)
+     loadAreas        buf (lumps V.! Constants.lumpAreas)
+     loadAreaPortals  buf (lumps V.! Constants.lumpAreaPortals)
+     loadVisibility   buf (lumps V.! Constants.lumpVisibility)
+     loadEntityString buf (lumps V.! Constants.lumpEntities)
+     initBoxHull
+     cmGlobals.cmPortalOpen %= UV.map (const False)
+     floodAreaConnections
+     cmGlobals.cmMapName .= name
+     return (Ref 0, updatedChecksum)
+  where checkHeader =
+          when (header^.dhVersion /= Constants.bspVersion) $
+            Com.comError Constants.errDrop (B.concat
+              [ "CMod_LoadBrushModel: ", name, " has wrong version number ("
+              , encode (header^.dhVersion), " should be ", encode Constants.bspVersion, ")"])
+        bufChecksum = MD4.blockChecksum buf (fromIntegral len)
+        updatedChecksum = bufChecksum : tail checksum
+        lumps = header^.dhLumps
 
 inlineModel :: B.ByteString -> Quake (Ref CModelT)
 inlineModel name =
@@ -217,3 +210,66 @@ clusterPHS = error "CM.clusterPHS" -- TODO
 
 clusterPVS :: Int -> Quake B.ByteString
 clusterPVS = error "CM.clusterPVS" -- TODO
+
+loadSurfaces :: BL.ByteString -> LumpT -> Quake ()
+loadSurfaces buf lump =
+  do Com.dprintf "CMod_LoadSurfaces()\n"
+     checkLump
+     cmGlobals.cmNumTexInfo .= count
+     Com.dprintf (B.concat [" numtexinfo=", encode count, "\n"])
+     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+     texInfo <- request (pipeToVector texInfoProducer) :: Quake (V.Vector TexInfoT)
+     -- TODO: make sure texInfo is of size count
+     cmGlobals.cmMapSurfaces %= (\v -> V.update v (V.imap (\i t -> (i, toMapSurface t)) texInfo))
+  where count = (lump^.lFileLen) `div` texInfoTSize
+        checkLump =
+          do when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $
+               Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+             when (count < 1) $
+               Com.comError Constants.errDrop "Map with no surfaces"
+             when (count > Constants.maxMapTexInfo) $
+               Com.comError Constants.errDrop "Map has too many surfaces"
+        texInfoProducer = (getMany getTexInfoT (PBS.fromLazy (BL.drop (fromIntegral (lump^.lFileOfs)) buf))) ^. PP.splitAt count
+
+toMapSurface :: TexInfoT -> MapSurfaceT
+toMapSurface texInfo = MapSurfaceT { _msCSurface = cSurface, _msRName = Just (texInfo^.tiTexture) }
+  where cSurface = CSurfaceT { _csName = texInfo^.tiTexture
+                             , _csFlags = texInfo^.tiFlags
+                             , _csValue = texInfo^.tiValue
+                             }
+
+loadLeafs :: BL.ByteString -> LumpT -> Quake ()
+loadLeafs = error "CM.loadLeafs" -- TODO
+
+loadLeafBrushes :: BL.ByteString -> LumpT -> Quake ()
+loadLeafBrushes = error "CM.loadLeafBrushes" -- TODO
+
+loadPlanes :: BL.ByteString -> LumpT -> Quake ()
+loadPlanes = error "CM.loadPlanes" -- TODO
+
+loadBrushes :: BL.ByteString -> LumpT -> Quake ()
+loadBrushes = error "CM.loadBrushes" -- TODO
+
+loadBrushSides :: BL.ByteString -> LumpT -> Quake ()
+loadBrushSides = error "CM.loadBrushSides" -- TODO
+
+loadSubmodels :: BL.ByteString -> LumpT -> Quake ()
+loadSubmodels = error "CM.loadSubmodels" -- TODO
+
+loadNodes :: BL.ByteString -> LumpT -> Quake ()
+loadNodes = error "CM.loadNodes" -- TODO
+
+loadAreas :: BL.ByteString -> LumpT -> Quake ()
+loadAreas = error "CM.loadAreas" -- TODO
+
+loadAreaPortals :: BL.ByteString -> LumpT -> Quake ()
+loadAreaPortals = error "CM.loadAreaPortals" -- TODO
+
+loadVisibility :: BL.ByteString -> LumpT -> Quake ()
+loadVisibility = error "CM.loadVisibility" -- TODO
+
+loadEntityString :: BL.ByteString -> LumpT -> Quake ()
+loadEntityString = error "CM.loadEntityString" -- TODO
+
+initBoxHull :: Quake ()
+initBoxHull = error "CM.initBoxHull" -- TODO

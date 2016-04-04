@@ -20,6 +20,7 @@ executable hake2
                      , bytestring
                      , containers
                      , cryptohash
+                     , data-binary-ieee754
                      , directory
                      , GLFW-b
                      , lens
@@ -28,8 +29,11 @@ executable hake2
                      , monad-coroutine
                      , network
                      , OpenGLRaw
+                     , pipes
                      , pipes-binary
                      , pipes-bytestring
+                     , pipes-parse
+                     , primitive
                      , random
                      , stm
                      , time
