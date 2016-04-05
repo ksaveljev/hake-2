@@ -1,5 +1,7 @@
 module Sound.S
-  ( disableStreaming
+  ( beginRegistration
+  , disableStreaming
+  , endRegistration
   , initialize
   , rawSamples
   , registerSound
@@ -38,3 +40,9 @@ registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> ret
 
 rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
 rawSamples _ _ _ _ _ = request (io (putStrLn "S.rawSamples IMPLEMENT ME!"))
+
+beginRegistration :: Quake ()
+beginRegistration = request (io (putStrLn "S.beginRegistration IMPLEMENT ME!"))
+
+endRegistration :: Quake ()
+endRegistration = request (io (putStrLn "S.endRegistration IMPLEMENT ME!"))

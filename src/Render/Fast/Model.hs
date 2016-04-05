@@ -8,25 +8,43 @@ module Render.Fast.Model
   ) where
 
 import qualified Constants
+import           Game.CVarT
+import qualified QCommon.Com as Com
+import qualified QCommon.CVar as CVar
 import           QuakeIOState
+import           QuakeRef
 import           QuakeState
+import qualified Render.Fast.Polygon as Polygon
 import           Render.ModelT
 import           Types
 
-import           Control.Lens (use, (^.), (.=))
+import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=))
+import           Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Mutable as MV
 
 modInit :: Quake ()
 modInit =
-  do request resetModels
+  do fastRenderAPIGlobals.frModKnown %= fmap (const newModelT)
      fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
-  where resetModels =
-          do models <- use frModKnown
-             MV.set models newModelT
 
 rBeginRegistration :: B.ByteString -> Quake ()
-rBeginRegistration = error "Model.rBeginRegistration" -- TODO
+rBeginRegistration model =
+  do resetModelArrays
+     Polygon.reset
+     fastRenderAPIGlobals.frRegistrationSequence += 1
+     fastRenderAPIGlobals.frOldViewCluster .= (-1) -- force markleafs
+     flushMap <- CVar.get "flushmap" "0" 0
+     doBeginRegistration flushMap
+  where fullName = B.concat ["maps/", model, ".bsp"]
+        doBeginRegistration Nothing= Com.fatalError "Model.rBeginRegistration flushMap is Nothing"
+        doBeginRegistration (Just flushMap)=
+          do model <- readRef (Ref 0)
+             when ((model^.mName) /= fullName || (flushMap^.cvValue) /= 0) $
+               modFree (Ref 0)
+             modelRef <- modForName fullName True
+             fastRenderAPIGlobals.frWorldModel .= modelRef
+             fastRenderAPIGlobals.frViewCluster .= (-1)
 
 rRegisterModel :: B.ByteString -> Quake (Maybe (Ref ModelT))
 rRegisterModel = error "Model.rRegisterModel" -- TODO
@@ -35,21 +53,24 @@ rEndRegistration :: Quake ()
 rEndRegistration = error "Model.rEndRegistration" -- TODO
 
 freeAll :: Quake ()
-freeAll =
-  do num <- use (fastRenderAPIGlobals.frModNumKnown)
-     request $
-       do models <- use frModKnown
-          freeModels models 0 num
+freeAll = fastRenderAPIGlobals.frModKnown %= fmap freeModel
 
-freeModels :: MV.IOVector ModelT -> Int -> Int -> QuakeIO ()
-freeModels models idx maxIdx
-  | idx >= maxIdx = return ()
-  | otherwise =
-      do model <- io (MV.read models idx)
-         freeModelWithExtraData (model^.mExtraData)
-         freeModels models (idx + 1) maxIdx
-  where freeModelWithExtraData Nothing = return ()
-        freeModelWithExtraData (Just _) = io (MV.write models idx newModelT)
+freeModel :: ModelT -> ModelT
+freeModel model =
+  case model^.mExtraData of
+    Nothing -> model
+    Just _ -> newModelT
 
 modelListF :: XCommandT
 modelListF = error "Model.modelListF" -- TODO
+
+modFree :: Ref ModelT -> Quake ()
+modFree = error "Model.modFree" -- TODO
+
+modForName :: B.ByteString -> Bool -> Quake (Maybe (Ref ModelT))
+modForName = error "Model.modForName" -- TODO
+
+resetModelArrays :: Quake ()
+resetModelArrays =
+  do fastRenderAPIGlobals.frModelTextureCoordIdx .= 0
+     fastRenderAPIGlobals.frModelVertexIndexIdx .= 0

@@ -6,9 +6,12 @@ module Render.Fast.FastRenderAPIGlobals
 import           Client.RefDefT
 import           Client.VidDefT
 import qualified Constants
+import           Game.CPlaneT (newCPlaneT)
 import           Render.Fast.GLLightMapStateT
 import           Render.GLConfigT
 import           Render.GLStateT
+import           Render.ImageT (newImageT)
+import           Render.ModelT (newModelT)
 import           Types
 
 import           Control.Lens (makeLenses)
@@ -27,6 +30,10 @@ initialFastRenderAPIGlobals =
                        , _frGLState              = newGLStateT
                        , _frd8to24table          = UV.replicate 256 0
                        , _frVid                  = newVidDefT
+                       , _frGLTextures           = V.generate Constants.maxGLTextures newImageT
+                       , _frModKnown             = V.replicate Constants.maxModKnown newModelT
+                       , _frModInline            = V.replicate Constants.maxModKnown newModelT
+                       , _frFrustum              = V.replicate 4 newCPlaneT
                        , _frColorTableEXT        = False
                        , _frActiveTextureARB     = False
                        , _frPointParameterEXT    = False

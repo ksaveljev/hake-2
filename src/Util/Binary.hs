@@ -2,6 +2,7 @@ module Util.Binary
   ( encode
   , getInt
   , getInt16
+  , getInt2
   , getInt4T
   , getInt8
   , getMany
@@ -27,6 +28,9 @@ encode = BC.pack . show
 getInt :: Get Int
 getInt = let !x = fromIntegral <$> getWord32le :: Get Int32
          in fromIntegral <$> x
+
+getInt2 :: Get (Int, Int)
+getInt2 = (,) <$> getInt <*> getInt
 
 getInt16 :: Get Int16
 getInt16 = fromIntegral <$> getWord16le

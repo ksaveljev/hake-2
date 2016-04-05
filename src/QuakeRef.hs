@@ -2,6 +2,7 @@
 module QuakeRef where
 
 import           Client.ClientStateT
+import qualified Constants
 import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
@@ -129,14 +130,12 @@ instance QuakeRef MenuSeparatorS where
 
 instance QuakeRef ImageT where
   readRef (Ref idx) =
-    request (do images <- use frGLTextures
-                io (MV.read images idx))
+    do images <- use (fastRenderAPIGlobals.frGLTextures)
+       return (images V.! idx)
   modifyRef (Ref idx) f =
-    request (do images <- use frGLTextures
-                io (MV.modify images f idx))
+    fastRenderAPIGlobals.frGLTextures.ix idx %= f
   writeRef (Ref idx) item =
-    request (do images <- use frGLTextures
-                io (MV.write images idx item))
+    fastRenderAPIGlobals.frGLTextures.ix idx .= item
 
 instance QuakeRef CAreaT where
   readRef (Ref idx) =
@@ -182,3 +181,54 @@ instance QuakeRef UserCmdT where
     globals.gCl.csCmds.ix idx %= f
   writeRef (Ref idx) item =
     globals.gCl.csCmds.ix idx .= item
+
+instance QuakeRef CBrushT where
+  readRef (Ref idx) =
+    do brushes <- use (cmGlobals.cmMapBrushes)
+       return (brushes V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapBrushes.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapBrushes.ix idx .= item
+
+instance QuakeRef CBrushSideT where
+  readRef (Ref idx) =
+    do brushSides <- use (cmGlobals.cmMapBrushSides)
+       return (brushSides V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapBrushSides.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapBrushSides.ix idx .= item
+
+instance QuakeRef CNodeT where
+  readRef (Ref idx) =
+    do nodes <- use (cmGlobals.cmMapNodes)
+       return (nodes V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapNodes.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapNodes.ix idx .= item
+
+instance QuakeRef CPlaneT where
+  readRef (Ref idx) =
+    do planes <- use (cmGlobals.cmMapPlanes)
+       return (planes V.! idx)
+  modifyRef (Ref idx) f =
+    cmGlobals.cmMapPlanes.ix idx %= f
+  writeRef (Ref idx) item =
+    cmGlobals.cmMapPlanes.ix idx .= item
+
+instance QuakeRef ModelT where
+  readRef (Ref idx)
+    | idx < Constants.maxModKnown =
+        do models <- use (fastRenderAPIGlobals.frModKnown)
+           return (models V.! idx)
+    | otherwise =
+        do models <- use (fastRenderAPIGlobals.frModInline)
+           return (models V.! (idx - Constants.maxModKnown))
+  modifyRef (Ref idx) f
+    | idx < Constants.maxModKnown = fastRenderAPIGlobals.frModKnown.ix idx %= f
+    | otherwise = fastRenderAPIGlobals.frModInline.ix (idx - Constants.maxModKnown) %= f
+  writeRef (Ref idx) item
+    | idx < Constants.maxModKnown = fastRenderAPIGlobals.frModKnown.ix idx .= item
+    | otherwise = fastRenderAPIGlobals.frModInline.ix (idx - Constants.maxModKnown) .= item

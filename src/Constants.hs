@@ -1609,6 +1609,9 @@ pmfTimeLand      = 16 :: Int8
 pmfTimeTeleport  = 32 :: Int8
 pmfNoPrediction  = 64 :: Int8
 
+-- move from FastRenderAPIGlobals
+maxModKnown = 512 :: Int
+
 byteDirs :: V.Vector (V3 Float)
 byteDirs =
     V.fromList [ V3 (-0.525731)   0.000000    0.850651

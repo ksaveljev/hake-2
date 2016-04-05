@@ -69,10 +69,6 @@ data QuakeIOState = QuakeIOState
   { _gCurTime               :: IORef Int
   , _gbGEdicts              :: MV.IOVector EdictT
   , _cText                  :: MSV.IOVector Char
-  , _frGLTextures           :: MV.IOVector ImageT
-  , _frModKnown             :: MV.IOVector ModelT
-  , _frModInline            :: MV.IOVector ModelT
-  , _frFrustum              :: MV.IOVector CPlaneT
   , _frVertexArrayBuf       :: MSV.IOVector Float
   , _frModelTextureCoordBuf :: MSV.IOVector Float
   , _frModelVertexIndexBuf  :: MSV.IOVector Int32
@@ -334,6 +330,10 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frGLState              :: GLStateT
   , _frd8to24table          :: UV.Vector Int
   , _frVid                  :: VidDefT
+  , _frGLTextures           :: V.Vector ImageT
+  , _frModKnown             :: V.Vector ModelT
+  , _frModInline            :: V.Vector ModelT
+  , _frFrustum              :: V.Vector CPlaneT
   , _frColorTableEXT        :: Bool
   , _frActiveTextureARB     :: Bool
   , _frPointParameterEXT    :: Bool
@@ -351,7 +351,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frGammaTable           :: B.ByteString
   , _frIntensityTable       :: B.ByteString
   , _frModNumKnown          :: Int
-  , _frCurrentModel         :: Maybe (IORef ModelT)
+  , _frCurrentModel         :: Maybe (Ref ModelT)
   , _frModNoVis             :: B.ByteString
   , _frUploadWidth          :: Int
   , _frUploadHeight         :: Int
@@ -363,7 +363,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frViewCluster2         :: Int
   , _frOldViewCluster       :: Int
   , _frOldViewCluster2      :: Int
-  , _frWorldModel           :: Maybe (IORef ModelT)
+  , _frWorldModel           :: Maybe (Ref ModelT)
   , _frModelTextureCoordIdx :: Int
   , _frModelVertexIndexIdx  :: Int
   , _frPolygonS1Old         :: UV.Vector Float
@@ -377,7 +377,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frSkyName              :: B.ByteString
   , _frSkyRotate            :: Float
   , _frSkyAxis              :: V3 Float
-  , _frSkyImages            :: V.Vector (Maybe (IORef ImageT))
+  , _frSkyImages            :: V.Vector (Maybe (Ref ImageT))
   , _frSkyMin               :: Float
   , _frSkyMax               :: Float
   , _frCBrushPolys          :: Int
@@ -391,10 +391,10 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frWorldMatrix          :: [GL.GLfloat]
   , _frVisFrameCount        :: Int
   , _frModelOrg             :: V3 Float
-  , _frCurrentEntity        :: Maybe (IORef EntityT)
+  , _frCurrentEntity        :: Maybe (Ref EntityT)
   , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
   , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
-  , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
+  , _frAlphaSurfaces        :: Maybe (Ref MSurfaceT)
   , _frBlockLights          :: UV.Vector Float
   , _frPointColor           :: V3 Float
   , _frLightSpot            :: V3 Float
@@ -2146,6 +2146,34 @@ data DBrushT = DBrushT
   { _dbFirstSide :: Int
   , _dbNumSides  :: Int
   , _dbContents  :: Int
+  }
+
+data DBrushSideT = DBrushSideT
+  { _dbsPlaneNum :: Word16
+  , _dbsTexInfo  :: Int16
+  }
+
+data DModelT = DModelT
+  { _dmMins      :: V3 Float
+  , _dmMaxs      :: V3 Float
+  , _dmOrigin    :: V3 Float
+  , _dmHeadNode  :: Int
+  , _dmFirstFace :: Int
+  , _dmNumFaces  :: Int
+  }
+
+data DNodeT = DNodeT
+  { _dnPlaneNum  :: Int
+  , _dnChildren  :: (Int, Int)
+  , _dnMins      :: V3 Int16
+  , _dnMaxs      :: V3 Int16
+  , _dnFirstFace :: Word16
+  , _dnNumFaces  :: Word16
+  }
+
+data DAreaT = DAreaT
+  { _daNumAreaPortals  :: Int
+  , _daFirstAreaPortal :: Int
   }
 
 data KeyFuncT = KeyFuncT

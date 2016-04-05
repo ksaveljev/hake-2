@@ -1,5 +1,6 @@
 module Client.CLParse
   ( downloadF
+  , loadClientInfo
   , parseServerMessage
   , registerSounds
   ) where
@@ -11,6 +12,7 @@ import qualified Client.CLFX as CLFX
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.CLInv as CLInv
+import           Client.CLParseShared
 import qualified Client.CLTEnt as CLTEnt
 import qualified Client.CLView as CLView
 import           Client.ConsoleT
@@ -29,14 +31,16 @@ import           QCommon.SizeBufT
 import           QuakeState
 import           Render.Renderer
 import qualified Sound.S as S
+import qualified Sys.Sys as Sys
 import           Types
 import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
 import           Control.Applicative (liftA2)
 import           Control.Lens (use, preuse, ix, (.=), (^.))
-import           Control.Monad (join, when, void)
+import           Control.Monad (join, when, void, unless)
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 
 downloadF :: XCommandT
 downloadF = error "CLParse.downloadF" -- TODO
@@ -95,7 +99,23 @@ checkSaveDemo demoRecording demoWaiting
   | otherwise = return ()
 
 registerSounds :: Quake ()
-registerSounds = error "CLParse.registerSounds" -- TODO
+registerSounds =
+  do S.beginRegistration
+     CLTEnt.registerTEntSounds
+     configStrings <- use (globals.gCl.csConfigStrings)
+     precacheSounds configStrings 1 Constants.maxSounds
+     S.endRegistration
+
+precacheSounds :: V.Vector B.ByteString -> Int -> Int -> Quake ()
+precacheSounds configSrings idx maxIdx
+  | idx >= maxIdx = return ()
+  | otherwise =
+      do let cs = configSrings V.! (Constants.csSounds + idx)
+         unless (cs == "" || cs == "\0") $
+           do sfxRef <- S.registerSound cs
+              globals.gCl.csSoundPrecache.ix idx .= sfxRef
+              Sys.sendKeyEvents -- pump message loop
+              precacheSounds configSrings (idx + 1) maxIdx
 
 showNet :: B.ByteString -> CVarT -> Quake ()
 showNet str showNetVar
@@ -231,6 +251,3 @@ parseLayout :: Quake ()
 parseLayout =
   do layout <- MSG.readString (globals.gNetMessage)
      globals.gCl.csLayout .= layout
-
-parseClientInfo :: Int -> Quake ()
-parseClientInfo = error "CLParse.parseClientInfo" -- TODO

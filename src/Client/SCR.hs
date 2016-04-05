@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Client.SCR
-  ( beginLoadingPlaque
+  ( addDirtyPoint
+  , beginLoadingPlaque
   , centerPrint
   , debugGraph
   , dirtyScreen
@@ -10,6 +11,7 @@ module Client.SCR
   , playCinematic
   , runCinematic
   , runConsole
+  , touchPics
   , updateScreen
   ) where
 
@@ -1073,3 +1075,6 @@ processByte hNodes numHNodes nodeNum inByte outIdx out index count idx maxIdx
   | otherwise =
       do let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
          processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) outIdx out index count (idx + 1) maxIdx
+
+touchPics :: Quake ()
+touchPics = error "SCR.touchPics" -- TODO

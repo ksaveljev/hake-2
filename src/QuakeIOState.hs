@@ -4,10 +4,7 @@ module QuakeIOState where
 import           Client.CDLightT (newCDLightT)
 import           Client.CParticleT (newCParticleT)
 import qualified Constants
-import           Game.CPlaneT (newCPlaneT)
 import           Game.EdictT (newEdictT)
-import           Render.ImageT
-import           Render.ModelT
 import           Render.MSurfaceT
 import           Types
 
@@ -19,9 +16,6 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import           System.IO.Unsafe (unsafePerformIO)
 
 makeLenses ''QuakeIOState
-
-maxModKnown :: Int
-maxModKnown = 512
 
 modelBufferSize :: Int
 modelBufferSize = 50000
@@ -49,10 +43,6 @@ initialQuakeIOState =
   QuakeIOState { _gCurTime               = unsafePerformIO (newIORef 0)
                , _gbGEdicts              = unsafePerformIO (V.thaw (V.generate (Constants.maxEdicts + 1) newEdictT)) -- one extra for "dummy edict"
                , _cText                  = unsafePerformIO (MSV.replicate Constants.conTextSize ' ')
-               , _frGLTextures           = unsafePerformIO (V.thaw (V.generate Constants.maxGLTextures newImageT))
-               , _frModKnown             = unsafePerformIO (V.thaw (V.replicate maxModKnown newModelT))
-               , _frModInline            = unsafePerformIO (V.thaw (V.replicate maxModKnown newModelT))
-               , _frFrustum              = unsafePerformIO (V.thaw (V.replicate 4 newCPlaneT))
                , _frVertexArrayBuf       = unsafePerformIO (MSV.new (Constants.maxVerts * 3))
                , _frModelTextureCoordBuf = unsafePerformIO (MSV.new (modelBufferSize * 2))
                , _frModelVertexIndexBuf  = unsafePerformIO (MSV.new modelBufferSize)
