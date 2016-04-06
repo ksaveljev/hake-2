@@ -59,6 +59,7 @@ executable hake2
                      , Client.CLInput
                      , Client.CLInv
                      , Client.CLParse
+                     , Client.CLParseShared
                      , Client.CLPred
                      , Client.CLSustainT
                      , Client.CLTEnt
@@ -198,6 +199,7 @@ executable hake2
                      , QCommon.FS
                      , QCommon.FSGlobals
                      , QCommon.FSShared
+                     , QCommon.LumpT
                      , QCommon.MD4
                      , QCommon.MiptexT
                      , QCommon.MSG
@@ -212,12 +214,21 @@ executable hake2
                      , QCommon.PMoveGlobals
                      , QCommon.QCommon
                      , QCommon.QFiles.BSP.DAreaPortalT
+                     , QCommon.QFiles.BSP.DAreaT
+                     , QCommon.QFiles.BSP.DBrushSideT
+                     , QCommon.QFiles.BSP.DBrushT
+                     , QCommon.QFiles.BSP.DHeaderT
+                     , QCommon.QFiles.BSP.DLeafT
+                     , QCommon.QFiles.BSP.DModelT
+                     , QCommon.QFiles.BSP.DNodeT
+                     , QCommon.QFiles.BSP.DPlaneT
                      , QCommon.QFiles.BSP.DVisT
                      , QCommon.QFiles.PcxT
                      , QCommon.SearchPathT
                      , QCommon.Shared
                      , QCommon.SizeBufT
                      , QCommon.SZ
+                     , QCommon.TexInfoT
                      , QCommon.XCommandT
                      , Quake
                      , QuakeIO
@@ -231,7 +242,11 @@ executable hake2
                      , Render.Fast.FastRenderAPIGlobals
                      , Render.Fast.GLLightMapStateT
                      , Render.Fast.Image
+                     , Render.Fast.Light
+                     , Render.Fast.Mesh
                      , Render.Fast.Model
+                     , Render.Fast.Polygon
+                     , Render.Fast.Surf
                      , Render.Fast.Warp
                      , Render.GLConfigT
                      , Render.GLFWbGlobals

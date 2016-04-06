@@ -1,40 +1,56 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Render.Fast.FastRenderAPI
   ( fastRenderAPI
   ) where
 
+import           Client.RefDefT
 import           Client.VidDefT
 import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
 import qualified Game.Cmd as Cmd
+import           Game.CPlaneT
 import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
+import           QuakeIOState
+import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Draw as Draw
 import qualified Render.Fast.Image as Image
+import qualified Render.Fast.Light as Light
+import qualified Render.Fast.Mesh as Mesh
 import qualified Render.Fast.Model as Model
+import qualified Render.Fast.Surf as Surf
 import qualified Render.Fast.Warp as Warp
 import           Render.GLConfigT
 import           Render.GLStateT
+import           Render.ImageT
 import           Render.OpenGL.GLDriver
 import           Types
+import qualified Util.Math3D as Math3D
 
 import           Control.Applicative (liftA2)
 import           Control.Exception (handle, IOException)
 import           Control.Lens (use, (^.), (.=), (%=), (+=), (&), (.~))
 import           Control.Monad (void, when, unless, join)
-import           Data.Bits ((.|.), (.&.))
+import           Data.Bits (shiftL, shiftR, (.|.), (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (toLower, toUpper)
+import           Data.Int (Int8, Int32)
 import           Data.Maybe (fromMaybe)
+import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
+import qualified Data.Vector.Storable.Mutable as MSV
+import qualified Data.Vector.Unboxed as UV
 import           Data.Word (Word8)
 import           Foreign.Ptr (nullPtr, castPtr)
-import           Foreign.Marshal.Array (withArray)
+import           Foreign.Marshal.Array (withArray, allocaArray, peekArray)
+import           GHC.Float (float2Double)
 import qualified Graphics.GL as GL
+import           Linear (V3, dot, _x, _y, _z, _w)
 import           Text.Read (readMaybe)
 
 fastRenderAPI :: RenderAPI
@@ -284,10 +300,72 @@ fastShutdown glDriver =
      glDriver^.gldShutdown
 
 fastRenderFrame :: RefDefT -> Quake ()
-fastRenderFrame = error "FastRenderAPI.fastRenderFrame" -- TODO
+fastRenderFrame refDef =
+  do renderView refDef
+     setLightLevel =<< use (fastRenderAPIGlobals.frNewRefDef)
+     setGL2D =<< use (fastRenderAPIGlobals.frVid)
+
+renderView :: RefDefT -> Quake ()
+renderView refDef =
+  do checkRefresh =<< noRefreshCVar
+     checkWorldModel =<< use (fastRenderAPIGlobals.frWorldModel)
+     checkSpeeds =<< speedsCVar
+     Light.rPushDLights
+     checkGLFinish =<< glFinishCVar
+     rSetupFrame
+     rSetFrustum
+     rSetupGL
+     Surf.rMarkLeaves -- done here so we know if we're in water
+     Surf.rDrawWorld
+     rDrawEntitiesOnList
+     Light.rRenderDLights
+     rDrawParticles
+     Surf.rDrawAlphaSurfaces
+     rFlash
+  where checkRefresh noRefresh =
+          when ((noRefresh^.cvValue) == 0) $
+            fastRenderAPIGlobals.frNewRefDef .= refDef
+        checkWorldModel (Just _) = return ()
+        checkWorldModel Nothing =
+          when ((refDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0) $
+            Com.comError Constants.errDrop "R_RenderView: NULL worldmodel"
+        checkSpeeds speeds =
+          when ((speeds^.cvValue) /= 0) $
+            do fastRenderAPIGlobals.frCBrushPolys .= 0
+               fastRenderAPIGlobals.frCAliasPolys .= 0
+        checkGLFinish glFinish =
+          when ((glFinish^.cvValue) /= 0) $
+            request GL.glFinish
+
+setLightLevel :: RefDefT -> Quake ()
+setLightLevel newRefDef
+  | (newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0 =
+      do light <- Light.rLightPoint (newRefDef^.rdViewOrg)
+         lightLevel <- clLightLevelCVar
+         CVar.update (lightLevel & cvValue .~ 150 * (maximum light))
+  | otherwise = return ()
 
 fastSetPalette :: Maybe B.ByteString -> Quake ()
-fastSetPalette = error "FastRenderAPI.fastSetPalette" -- TODO
+fastSetPalette maybePalette =
+  do maybe noPalette generatePalette maybePalette
+     rawPalette <- use (fastRenderAPIGlobals.frRawPalette)
+     Image.glSetTexturePalette rawPalette
+     request glClearColor
+  where noPalette =
+          do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
+             fastRenderAPIGlobals.frRawPalette .= UV.map (.|. 0xFF000000) d8to24table
+        generatePalette palette =
+          fastRenderAPIGlobals.frRawPalette .= UV.generate 256 (fromPalette palette)
+        fromPalette palette idx =
+          let j = idx * 3
+              a = (fromIntegral (palette `B.index` (j + 0)) .&. 0xFF) `shiftL` 0
+              b = (fromIntegral (palette `B.index` (j + 1)) .&. 0xFF) `shiftL` 8
+              c = (fromIntegral (palette `B.index` (j + 2)) .&. 0xFF) `shiftL` 16
+          in 0xFF000000 .|. a .|. b .|. c
+        glClearColor =
+          do GL.glClearColor 0 0 0 0
+             GL.glClear GL.GL_COLOR_BUFFER_BIT
+             GL.glClearColor 1.0 0.0 0.5 0.5
 
 fastBeginFrame :: GLDriver -> Float -> Quake ()
 fastBeginFrame glDriver cameraSeparation =
@@ -650,6 +728,166 @@ setDepthRange =
   do depthMin <- use (fastRenderAPIGlobals.frGLDepthMin)
      depthMax <- use (fastRenderAPIGlobals.frGLDepthMax)
      request (io (GL.glDepthRange (realToFrac depthMin) (realToFrac depthMax)))
+
+rFlash :: Quake ()
+rFlash = rPolyBlend
+
+rPolyBlend :: Quake ()
+rPolyBlend =
+  do polyBlend <- glPolyBlendCVar
+     vBlend <- use (fastRenderAPIGlobals.frVBlend)
+     unless ((polyBlend^.cvValue) == 0 || (vBlend^._w) == 0) $
+       request (doPolyBlend vBlend)
+  where doPolyBlend vBlend =
+          do GL.glDisable GL.GL_ALPHA_TEST
+             GL.glEnable GL.GL_BLEND
+             GL.glDisable GL.GL_DEPTH_TEST
+             GL.glDisable GL.GL_TEXTURE_2D
+             GL.glLoadIdentity
+             GL.glRotatef (-90) 1 0 0 -- put Z going up
+             GL.glRotatef 90 0 0 1 -- put Z going up
+             GL.glColor4f (realToFrac (vBlend^._x)) (realToFrac (vBlend^._y)) (realToFrac (vBlend^._z)) (realToFrac (vBlend^._w))
+             GL.glBegin GL.GL_QUADS
+             GL.glVertex3f 10 100 100
+             GL.glVertex3f 10 (-100) 100
+             GL.glVertex3f 10 (-100) (-100)
+             GL.glVertex3f 10 100 (-100)
+             GL.glEnd
+             GL.glDisable GL.GL_BLEND
+             GL.glEnable GL.GL_TEXTURE_2D
+             GL.glEnable GL.GL_ALPHA_TEST
+             GL.glColor4f 1 1 1 1
+
+rSetFrustum :: Quake ()
+rSetFrustum =
+  do vUp <- use (fastRenderAPIGlobals.frVUp)
+     vRight <- use (fastRenderAPIGlobals.frVRight)
+     vPn <- use (fastRenderAPIGlobals.frVPn)
+     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+     origin <- use (fastRenderAPIGlobals.frOrigin)
+     fastRenderAPIGlobals.frFrustum %= V.imap (updateFrustum (calcNormals vUp vRight vPn newRefDef) origin)
+  where calcNormals vUp vRight vPn newRefDef = V.fromList
+          [ Math3D.rotatePointAroundVector vUp vPn (0 - (90 - (newRefDef^.rdFovX) / 2))
+          , Math3D.rotatePointAroundVector vUp vPn (90 - (newRefDef^.rdFovX) / 2)
+          , Math3D.rotatePointAroundVector vRight vPn (90 - (newRefDef^.rdFovY) / 2)
+          , Math3D.rotatePointAroundVector vRight vPn (0 - (90 - (newRefDef^.rdFovY) / 2))
+          ]
+        updateFrustum normals origin idx plane =
+          plane & cpNormal .~ normals V.! idx
+                & cpType .~ Constants.planeAnyZ
+                & cpDist .~ origin `dot` (normals V.! idx)
+                & cpSignBits .~ signbitsForPlane (normals V.! idx)
+
+signbitsForPlane :: V3 Float -> Int8
+signbitsForPlane normal =
+    let a = if (normal^._x) < 0 then 1 else 0
+        b = if (normal^._y) < 0 then 2 else 0
+        c = if (normal^._z) < 0 then 4 else 0
+    in a .|. b .|. c
+
+rSetupGL :: Quake ()
+rSetupGL =
+  do newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+     vid <- use (fastRenderAPIGlobals.frVid)
+     request $
+       do GL.glViewport (fromIntegral (newRefDef^.rdX))
+                        (fromIntegral ((vid^.vdHeight) - ((newRefDef^.rdY) + (newRefDef^.rdHeight))))
+                        (fromIntegral ((newRefDef^.rdX) + (newRefDef^.rdWidth) - (newRefDef^.rdX)))
+                        (fromIntegral ((vid^.vdHeight) - (newRefDef^.rdY) - ((vid^.vdHeight) - ((newRefDef^.rdY) + (newRefDef^.rdHeight)))))
+          GL.glMatrixMode GL.GL_PROJECTION
+          GL.glLoadIdentity
+     Mesh.myGLUPerspective (float2Double (newRefDef^.rdFovY)) 
+                           (float2Double (fromIntegral (newRefDef^.rdWidth) / fromIntegral (newRefDef^.rdHeight)))
+                           4
+                           4096
+     request $
+       do GL.glCullFace GL.GL_FRONT
+          GL.glMatrixMode GL.GL_MODELVIEW
+          GL.glLoadIdentity
+          GL.glRotatef (-90) 1 0 0 -- put Z going up
+          GL.glRotatef 90 0 0 1 -- put Z going up
+          GL.glRotatef (realToFrac (negate (newRefDef^.rdViewAngles._z))) 1 0 0
+          GL.glRotatef (realToFrac (negate (newRefDef^.rdViewAngles._x))) 0 1 0
+          GL.glRotatef (realToFrac (negate (newRefDef^.rdViewAngles._y))) 0 0 1
+          GL.glTranslatef (realToFrac (negate (newRefDef^.rdViewOrg._x)))
+                          (realToFrac (negate (newRefDef^.rdViewOrg._y)))
+                          (realToFrac (negate (newRefDef^.rdViewOrg._z)))
+     worldMatrix <- request (io (allocaArray 16 $ \ptr ->
+       do GL.glGetFloatv GL.GL_MODELVIEW_MATRIX ptr
+          peekArray 16 ptr))
+     fastRenderAPIGlobals.frWorldMatrix .= worldMatrix
+     setCullFace =<< glCullCVar
+     request $
+       do GL.glDisable GL.GL_BLEND
+          GL.glDisable GL.GL_ALPHA_TEST
+          GL.glEnable GL.GL_DEPTH_TEST
+  where setCullFace glCull
+          | (glCull^.cvValue) /= 0 = request (GL.glEnable GL.GL_CULL_FACE)
+          | otherwise = request (GL.glDisable GL.GL_CULL_FACE)
+
+rDrawEntitiesOnList :: Quake ()
+rDrawEntitiesOnList = error "FastRenderAPI.rDrawEntitiesOnList" -- TODO
+
+rDrawParticles :: Quake ()
+rDrawParticles =
+  do extPointParameters <- glExtPointParametersCVar
+     pointParameterEXT <- use (fastRenderAPIGlobals.frPointParameterEXT)
+     proceedDrawParticles extPointParameters pointParameterEXT
+  where proceedDrawParticles extPointParameters pointParameterEXT
+          | (extPointParameters^.cvValue) /= 0 && pointParameterEXT =
+              error "FastRenderAPI.rDrawParticles" -- TODO
+          | otherwise =
+              do newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+                 glDrawParticles (newRefDef^.rdNumParticles)
+
+glDrawParticles :: Int -> Quake ()
+glDrawParticles numParticles =
+  do vUp <- use (fastRenderAPIGlobals.frVUp)
+     vRight <- use (fastRenderAPIGlobals.frVRight)
+     vPn <- use (fastRenderAPIGlobals.frVPn)
+     origin <- use (fastRenderAPIGlobals.frOrigin)
+     sourceVertices <- request (use pVertexArray)
+     sourceColors <- request (use pColorArray)
+     particleTextureRef <- use (fastRenderAPIGlobals.frParticleTexture)
+     particle <- readRef particleTextureRef
+     Image.glBind (particle^.iTexNum)
+     request $
+       do GL.glDepthMask GL.GL_FALSE -- no z buffering
+          GL.glEnable GL.GL_BLEND
+     Image.glTexEnv GL.GL_MODULATE
+     request $ io $
+       do GL.glBegin GL.GL_TRIANGLES
+          mapM_ (drawParticle sourceVertices sourceColors (fmap (* 1.5) vUp) (fmap (* 1.5) vRight) vPn origin) [0..numParticles-1]
+          GL.glEnd
+          GL.glDisable GL.GL_BLEND
+          GL.glColor4f 1 1 1 1
+          GL.glDepthMask GL.GL_TRUE -- back to normal z buffering
+     Image.glTexEnv GL.GL_REPLACE
+
+drawParticle :: MSV.IOVector Float -> MSV.IOVector Int32 -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> IO ()
+drawParticle sourceVertices sourceColors up right vpn origin idx =
+  do originX <- MSV.read sourceVertices (j + 0)
+     originY <- MSV.read sourceVertices (j + 1)
+     originZ <- MSV.read sourceVertices (j + 2)
+     color <- MSV.read sourceColors idx
+     let scale = (originX - (origin^._x)) * (vpn^._x)
+               + (originY - (origin^._y)) * (vpn^._y)
+               + (originZ - (origin^._z)) * (vpn^._z)
+         scale' = if scale < 20 then 1 else 1 + scale * 0.004
+     GL.glColor4ub (fromIntegral (color .&. 0xFF))
+                   (fromIntegral ((color `shiftR` 8) .&. 0xFF))
+                   (fromIntegral ((color `shiftR` 16) .&. 0xFF))
+                   (fromIntegral ((color `shiftR` 24) .&. 0xFF))
+     GL.glTexCoord2f 0.0625 0.0625
+     GL.glVertex3f (realToFrac originX) (realToFrac originY) (realToFrac originZ)
+     GL.glTexCoord2f 1.0625 0.0625
+     GL.glVertex3f (realToFrac (originX + (up^._x) * scale')) (realToFrac (originY + (up^._y) * scale')) (realToFrac (originZ + (up^._z) * scale'))
+     GL.glTexCoord2f 0.0625 1.0625
+     GL.glVertex3f (realToFrac (originX + (right^._x) * scale')) (realToFrac (originY + (right^._y) * scale')) (realToFrac (originZ + (right^._z) * scale'))
+  where j = idx * 3
+
+rSetupFrame :: Quake ()
+rSetupFrame = error "FastRenderAPI.rSetupFrame" -- TODO
 
 particleTexture :: SV.Vector Word8
 particleTexture =
