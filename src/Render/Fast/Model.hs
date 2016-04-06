@@ -19,7 +19,7 @@ import           Render.ModelT
 import           Types
 
 import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=))
-import           Control.Monad (when)
+import           Control.Monad (when, unless)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Mutable as MV
 
@@ -29,14 +29,14 @@ modInit =
      fastRenderAPIGlobals.frModNoVis .= B.replicate (Constants.maxMapLeafs `div` 8) 0xFF
 
 rBeginRegistration :: B.ByteString -> Quake ()
-rBeginRegistration model =
+rBeginRegistration modelName =
   do resetModelArrays
      Polygon.reset
      fastRenderAPIGlobals.frRegistrationSequence += 1
      fastRenderAPIGlobals.frOldViewCluster .= (-1) -- force markleafs
      flushMap <- CVar.get "flushmap" "0" 0
      doBeginRegistration flushMap
-  where fullName = B.concat ["maps/", model, ".bsp"]
+  where fullName = B.concat ["maps/", modelName, ".bsp"]
         doBeginRegistration Nothing= Com.fatalError "Model.rBeginRegistration flushMap is Nothing"
         doBeginRegistration (Just flushMap)=
           do model <- readRef (Ref 0)
@@ -65,7 +65,7 @@ modelListF :: XCommandT
 modelListF = error "Model.modelListF" -- TODO
 
 modFree :: Ref ModelT -> Quake ()
-modFree = error "Model.modFree" -- TODO
+modFree modelRef = writeRef modelRef newModelT
 
 modForName :: B.ByteString -> Bool -> Quake (Maybe (Ref ModelT))
 modForName = error "Model.modForName" -- TODO
