@@ -223,6 +223,8 @@ executable hake2
                      , QCommon.QFiles.BSP.DNodeT
                      , QCommon.QFiles.BSP.DPlaneT
                      , QCommon.QFiles.BSP.DVisT
+                     , QCommon.QFiles.MD2.DMdlT
+                     , QCommon.QFiles.SP2.DSpriteT
                      , QCommon.QFiles.PcxT
                      , QCommon.SearchPathT
                      , QCommon.Shared

@@ -10,9 +10,13 @@ import           Util.Binary (getInt)
 
 import           Control.Lens (makeLenses)
 import           Data.Binary (Get)
+import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
 makeLenses ''DHeaderT
+
+idBSPHeader :: B.ByteString
+idBSPHeader = "IBSP"
 
 getDHeaderT :: Get DHeaderT
 getDHeaderT = DHeaderT <$> getInt <*> getInt <*> getLumps

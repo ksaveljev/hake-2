@@ -549,25 +549,25 @@ setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx =
                         }
         buildNode emptyLeaf boxHeadNode =
           CNodeT { _cnPlane    = Just (Ref (numPlanes + idx * 2))
-                 , _cnChildren = calcChildren idx side numLeafs emptyLeaf boxHeadNode
+                 , _cnChildren = calcChildren emptyLeaf boxHeadNode
                  }
-        calcChildren idx side numLeafs emptyLeaf boxHeadNode =
+        calcChildren emptyLeaf boxHeadNode =
           let a = (-1) - emptyLeaf
               b = if idx == 5 then (-1) - numLeafs else boxHeadNode + idx + 1
           in if side == 0 then (a, b) else (b, a)
-        p1 = CPlaneT { _cpNormal   = getNormal idx 1
+        p1 = CPlaneT { _cpNormal   = getNormal 1
                      , _cpDist     = 0
                      , _cpType     = fromIntegral (idx `shiftR` 1)
                      , _cpSignBits = 0
                      , _cpPad      = (0, 0)
                      }
-        p2 = CPlaneT { _cpNormal   = getNormal idx (-1)
+        p2 = CPlaneT { _cpNormal   = getNormal (-1)
                      , _cpDist     = 0
                      , _cpType     = fromIntegral (3 + (idx `shiftR` 1))
                      , _cpSignBits = 0
                      , _cpPad      = (0, 0)
                      }
-        getNormal idx v
+        getNormal v
           | x == 0 = V3 v 0 0
           | x == 1 = V3 0 v 0
           | otherwise = V3 0 0 v
