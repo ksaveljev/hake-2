@@ -7,31 +7,44 @@ module Render.Fast.Model
   , rEndRegistration
   ) where
 
+import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
 import           Game.CVarT
 import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
+import           QCommon.LumpT
 import           QCommon.QFiles.BSP.DHeaderT
+import           QCommon.QFiles.BSP.DPlaneT
 import           QCommon.QFiles.SP2.DSpriteT
 import           QCommon.QFiles.MD2.DMdlT
+import           QCommon.TexInfoT
 import           QuakeIOState
 import           QuakeRef
 import           QuakeState
+import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
+import           Render.MEdgeT
 import           Render.ModelT
+import           Render.MTexInfoT
+import           Render.MVertexT
 import           Types
-import           Util.Binary (encode)
+import           Util.Binary (encode, getInt)
 import qualified Util.Lib as Lib
+
+import           Control.Monad.ST (ST, runST)
 
 import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=), (&), (.~))
 import           Control.Monad (when, unless)
 import           Data.Binary.Get (runGet)
+import           Data.Bits ((.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
+import           Linear (V3(..))
 import           System.IO (Handle)
 
 modInit :: Quake ()
@@ -177,22 +190,112 @@ resetModelArrays =
      fastRenderAPIGlobals.frModelVertexIndexIdx .= 0
 
 loadVertexes :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadVertexes = error "Model.loadVertexes" -- TODO
+loadVertexes loadModelRef buf lump =
+  do checkLump
+     modifyRef loadModelRef (\v -> v & mNumVertexes .~ count
+                                     & mVertexes .~ readVertexes)
+  where checkLump =
+          when ((lump^.lFileLen) `mod` mVertexDiskSize /= 0) $
+            do model <- readRef loadModelRef
+               Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+        count = (lump^.lFileLen) `div` mVertexDiskSize
+        readVertexes = runGet (V.replicateM count getMVertexT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
 loadEdges :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadEdges = error "Model.loadEdges" -- TODO
+loadEdges loadModelRef buf lump =
+  do checkLump
+     modifyRef loadModelRef (\v -> v & mNumEdges .~ count
+                                     & mEdges .~ readEdges)
+  where checkLump =
+          when ((lump^.lFileLen) `mod` mEdgeDiskSize /= 0) $
+            do model <- readRef loadModelRef
+               Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+        count = (lump^.lFileLen) `div` mEdgeDiskSize
+        readEdges = runGet (V.replicateM count getMEdgeT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
 loadSurfEdges :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadSurfEdges = error "Model.loadSurfEdges" -- TODO
+loadSurfEdges loadModelRef buf lump =
+  do checkLump
+     modifyRef loadModelRef (\v -> v & mNumSurfEdges .~ count
+                                     & mSurfEdges .~ readOffsets)
+  where count = (lump^.lFileLen) `div` Constants.sizeOfInt
+        checkLump =
+          do when ((lump^.lFileLen) `mod` Constants.sizeOfInt /= 0) $
+               do model <- readRef loadModelRef
+                  Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+             when (count < 1 || count >= Constants.maxMapSurfEdges) $
+               do model <- readRef loadModelRef
+                  Com.comError Constants.errDrop (B.concat ["MOD_LoadBmodel bad surfedges count in ", model^.mName, ": ", encode count])
+        readOffsets = runGet (UV.replicateM count getInt) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
 loadLighting :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadLighting = error "Model.loadLighting" -- TODO
+loadLighting loadModelRef buf lump =
+  modifyRef loadModelRef (\v -> v & mLightdata .~ lightData)
+  where lightData | (lump^.lFileLen) == 0 = Nothing
+                  | otherwise = Just (BL.toStrict (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)))
 
 loadPlanes :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadPlanes = error "Model.loadPlanes" -- TODO
+loadPlanes loadModelRef buf lump =
+  do checkLump
+     modifyRef loadModelRef (\v -> v & mNumPlanes .~ count
+                                     & mPlanes .~ V.map toCPlane getPlanes)
+  where count = (lump^.lFileLen) `div` dPlaneTSize
+        checkLump =
+          when ((lump^.lFileLen) `mod` dPlaneTSize /= 0) $
+            do model <- readRef loadModelRef
+               Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+        getPlanes = runGet (V.replicateM count getDPlaneT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
+-- TODO: same as in QCommon/CM
+toCPlane :: DPlaneT -> CPlaneT
+toCPlane dPlane = CPlaneT { _cpNormal   = dPlane^.dpNormal
+                          , _cpDist     = dPlane^.dpDist
+                          , _cpType     = fromIntegral (dPlane^.dpType)
+                          , _cpSignBits = getBits (dPlane^.dpNormal)
+                          , _cpPad      = (0, 0)
+                          }
+  where getBits (V3 a b c) =
+          let a' = if a < 0 then 1 else 0
+              b' = if b < 0 then 2 else 0
+              c' = if c < 0 then 4 else 0
+          in a' .|. b' .|. c'
+
+-- TODO: optimize allocation rate / memory consumption using mutable vectors
 loadTexInfo :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadTexInfo = error "Model.loadTexInfo" -- TODO
+loadTexInfo loadModelRef buf lump =
+  do checkLump
+     texInfo <- V.mapM toMTexInfo readTexInfo
+     modifyRef loadModelRef (\v -> v & mNumTexInfo .~ count
+                                     & mTexInfo .~ V.imap (countAnimationFrames texInfo) texInfo)
+  where checkLump =
+          when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $
+            do model <- readRef loadModelRef
+               Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+        count = (lump^.lFileLen) `div` texInfoTSize
+        readTexInfo = runGet (V.replicateM count getTexInfoT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
+
+toMTexInfo :: TexInfoT -> Quake MTexInfoT
+toMTexInfo texInfo =
+  do foundImage <- Image.glFindImage name Constants.itWall
+     imageRef <- maybe returnNoTexture return foundImage
+     return MTexInfoT { _mtiVecs = texInfo^.tiVecs
+                      , _mtiFlags = texInfo^.tiFlags
+                      , _mtiNumFrames = 1
+                      , _mtiNext = if (texInfo^.tiNextTexInfo) > 0 then Just (Ref (texInfo^.tiNextTexInfo)) else Nothing
+                      , _mtiImage = Just imageRef
+                      }
+  where name = B.concat ["textures/", texInfo^.tiTexture, ".wal"]
+        returnNoTexture =
+          do VID.printf Constants.printAll (B.concat ["Couldn't load ", name, "\n"])
+             use (fastRenderAPIGlobals.frNoTexture)
+
+countAnimationFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
+countAnimationFrames texInfo idx currentTexInfo =
+  currentTexInfo & mtiNumFrames .~ countFrames (Ref idx) (currentTexInfo^.mtiNext) 1
+  where countFrames _ Nothing count = count
+        countFrames initialRef (Just currentRef@(Ref currentIdx)) count
+          | currentRef == initialRef = count
+          | otherwise = countFrames initialRef ((texInfo V.! currentIdx)^.mtiNext) (count + 1)
 
 loadFaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadFaces = error "Model.loadFaces" -- TODO

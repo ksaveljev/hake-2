@@ -8,6 +8,7 @@ import           Types
 import           Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..))
 
 makeLenses ''ModelT
@@ -46,7 +47,7 @@ newModelT =
          , _mNumSurfaces          = 0
          , _mSurfaces             = V.empty
          , _mNumSurfEdges         = 0
-         , _mSurfEdges            = V.empty
+         , _mSurfEdges            = UV.empty
          , _mNumMarkSurfaces      = 0
          , _mMarkSurfaces         = V.empty
          , _mVis                  = Nothing

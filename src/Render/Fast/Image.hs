@@ -729,8 +729,7 @@ uploadMipMaps :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadMipMaps image scaledWidth scaledHeight mipLevel samples comp
   | scaledWidth <= 1 && scaledHeight <= 1 = return ()
   | otherwise =
-      do request (io (print ("sw = " ++ show scaledWidth' ++ " sh = " ++ show scaledHeight')))
-         uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
+      do uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
          uploadMipMaps scaled scaledWidth' scaledHeight' mipLevel' samples comp
   where scaled = glMipMap image scaledWidth scaledHeight
         sw = scaledWidth `shiftR` 1

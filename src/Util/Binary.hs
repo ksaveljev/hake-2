@@ -9,6 +9,7 @@ module Util.Binary
   , getV3Float
   , getV3Int16
   , getV4Float
+  , getWord162
   ) where
 
 import           Control.Monad.State.Strict (runStateT)
@@ -17,6 +18,7 @@ import           Data.Binary.IEEE754 (getFloat32le)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Int (Int8, Int16, Int32)
+import           Data.Word (Word16)
 import           Pipes (Producer, lift, yield)
 import qualified Pipes.Binary as PB
 import qualified Pipes.ByteString as PBS
@@ -62,3 +64,6 @@ getMany getA = go
             Right !a -> do
               yield a
               go p'
+
+getWord162 :: Get (Word16, Word16)
+getWord162 = (,) <$> getWord16le <*> getWord16le

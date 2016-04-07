@@ -257,9 +257,11 @@ executable hake2
                      , Render.GLStateT
                      , Render.GLTModeT
                      , Render.ImageT
+                     , Render.MEdgeT
                      , Render.ModelT
                      , Render.MSurfaceT
                      , Render.MTexInfoT
+                     , Render.MVertexT
                      , Render.OpenGL.GLDriver
                      , Render.OpenGL.GLFWbGLDriver
                      , Render.QRenderer

@@ -1438,22 +1438,22 @@ data ModelT = ModelT
   , _mNumSubModels         :: Int
   , _mSubModels            :: V.Vector (IORef MModelT)
   , _mNumPlanes            :: Int
-  , _mPlanes               :: V.Vector (IORef CPlaneT)
+  , _mPlanes               :: V.Vector CPlaneT
   , _mNumLeafs             :: Int
   , _mLeafs                :: V.Vector (IORef MLeafT)
   , _mNumVertexes          :: Int
-  , _mVertexes             :: V.Vector (IORef MVertexT)
+  , _mVertexes             :: V.Vector MVertexT
   , _mNumEdges             :: Int
-  , _mEdges                :: V.Vector (IORef MEdgeT)
+  , _mEdges                :: V.Vector MEdgeT
   , _mNumNodes             :: Int
   , _mFirstNode            :: Int
   , _mNodes                :: V.Vector (IORef MNodeT)
   , _mNumTexInfo           :: Int
-  , _mTexInfo              :: V.Vector (IORef MTexInfoT)
+  , _mTexInfo              :: V.Vector MTexInfoT
   , _mNumSurfaces          :: Int
   , _mSurfaces             :: V.Vector (IORef MSurfaceT)
   , _mNumSurfEdges         :: Int
-  , _mSurfEdges            :: V.Vector Int
+  , _mSurfEdges            :: UV.Vector Int
   , _mNumMarkSurfaces      :: Int
   , _mMarkSurfaces         :: V.Vector (IORef MSurfaceT)
   , _mVis                  :: Maybe DVisT
@@ -1588,8 +1588,8 @@ data MTexInfoT = MTexInfoT
   { _mtiVecs      :: (V4 Float, V4 Float)
   , _mtiFlags     :: Int
   , _mtiNumFrames :: Int
-  , _mtiNext      :: Maybe (IORef MTexInfoT)
-  , _mtiImage     :: Maybe (IORef ImageT)
+  , _mtiNext      :: Maybe (Ref MTexInfoT)
+  , _mtiImage     :: Maybe (Ref ImageT)
   }
 
 data LightStyleT = LightStyleT
