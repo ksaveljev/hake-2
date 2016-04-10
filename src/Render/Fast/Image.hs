@@ -2,10 +2,12 @@
 module Render.Fast.Image
   ( getPalette
   , glBind
+  , glEnableMultiTexture
   , glFindImage
   , glImageListF
   , glInitImages
   , glLoadPic
+  , glSelectTexture
   , glSetTexturePalette
   , glShutdownImages
   , glTexEnv
@@ -838,3 +840,30 @@ loadTGA = error "Image.loadTGA" -- TODO
 
 scrapUpload :: Quake ()
 scrapUpload = error "Image.scrapUpload" -- TODO
+
+glSelectTexture :: Int -> Quake ()
+glSelectTexture texture =
+  do texture0 <- use (fastRenderAPIGlobals.frTexture0)
+     glState <- use (fastRenderAPIGlobals.frGLState)
+     doSelectTexture texture texture0 glState
+
+doSelectTexture :: Int -> Int -> GLStateT -> Quake ()
+doSelectTexture texture0 texture glState
+  | tmu /= (glState^.glsCurrentTmu) =
+      do fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
+         request $
+           do GL.glActiveTextureARB (fromIntegral texture)
+              GL.glClientActiveTextureARB (fromIntegral texture)
+  | otherwise = return ()
+  where tmu | texture0 == texture = 0
+            | otherwise = 1
+
+glEnableMultiTexture :: Bool -> Quake ()
+glEnableMultiTexture enable =
+  do glSelectTexture =<< use (fastRenderAPIGlobals.frTexture1)
+     request (glFunc GL.GL_TEXTURE_2D)
+     glTexEnv GL.GL_REPLACE
+     glSelectTexture =<< use (fastRenderAPIGlobals.frTexture0)
+     glTexEnv GL.GL_REPLACE
+  where glFunc | enable = GL.glEnable
+               | otherwise = GL.glDisable

@@ -13,6 +13,9 @@ makeLenses ''GLLightMapStateT
 blockWidth :: Int
 blockWidth = 128
 
+blockHeight :: Int
+blockHeight = 128
+
 newGLLightMapStateT :: GLLightMapStateT
 newGLLightMapStateT =
   GLLightMapStateT { _lmsInternalFormat         = 0

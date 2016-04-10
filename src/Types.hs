@@ -1451,11 +1451,11 @@ data ModelT = ModelT
   , _mNumTexInfo           :: Int
   , _mTexInfo              :: V.Vector MTexInfoT
   , _mNumSurfaces          :: Int
-  , _mSurfaces             :: V.Vector (IORef MSurfaceT)
+  , _mSurfaces             :: V.Vector MSurfaceT
   , _mNumSurfEdges         :: Int
   , _mSurfEdges            :: UV.Vector Int
   , _mNumMarkSurfaces      :: Int
-  , _mMarkSurfaces         :: V.Vector (IORef MSurfaceT)
+  , _mMarkSurfaces         :: V.Vector (Ref MSurfaceT)
   , _mVis                  :: Maybe DVisT
   , _mLightdata            :: Maybe B.ByteString
   , _mSkins                :: V.Vector (Maybe (IORef ImageT))
@@ -2174,6 +2174,16 @@ data DNodeT = DNodeT
 data DAreaT = DAreaT
   { _daNumAreaPortals  :: Int
   , _daFirstAreaPortal :: Int
+  }
+
+data DFaceT = DFaceT
+  { _dfPlaneNum  :: Word16
+  , _dfSide      :: Int16
+  , _dfFirstEdge :: Int
+  , _dfNumEdges  :: Int16
+  , _dfTexInfo   :: Int16
+  , _dfStyles    :: B.ByteString
+  , _dfLightOfs  :: Int
   }
 
 data KeyFuncT = KeyFuncT

@@ -14,6 +14,7 @@ import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FS as FS
 import           QCommon.LumpT
+import           QCommon.QFiles.BSP.DFaceT
 import           QCommon.QFiles.BSP.DHeaderT
 import           QCommon.QFiles.BSP.DPlaneT
 import           QCommon.QFiles.SP2.DSpriteT
@@ -24,8 +25,10 @@ import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
+import qualified Render.Fast.Surf as Surf
 import           Render.MEdgeT
 import           Render.ModelT
+import           Render.MSurfaceT
 import           Render.MTexInfoT
 import           Render.MVertexT
 import           Types
@@ -298,7 +301,19 @@ countAnimationFrames texInfo idx currentTexInfo =
           | otherwise = countFrames initialRef ((texInfo V.! currentIdx)^.mtiNext) (count + 1)
 
 loadFaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadFaces = error "Model.loadFaces" -- TODO
+loadFaces loadModelRef buf lump =
+  do checkLump
+     modifyRef loadModelRef (\v -> v & mNumSurfaces .~ count
+                                     & mSurfaces .~ V.replicate count newMSurfaceT)
+     fastRenderAPIGlobals.frCurrentModel .= Just loadModelRef
+     Surf.glBeginBuildingLightmaps loadModelRef
+     error "Model.loadFaces" >> undefined -- TODO
+  where checkLump =
+          when ((lump^.lFileLen) `mod` dFaceTSize /= 0) $
+            do model <- readRef loadModelRef
+               Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+        count = (lump^.lFileLen) `div` dFaceTSize
+        dFaces = runGet (V.replicateM count getDFaceT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
 loadMarkSurfaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadMarkSurfaces = error "Model.loadMarkSurfaces" -- TODO
