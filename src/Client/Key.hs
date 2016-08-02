@@ -1,5 +1,6 @@
 module Client.Key
   ( clearStates
+  , clearTyping
   , event
   , initialize
   , writeBindings
@@ -11,7 +12,7 @@ import qualified QCommon.Com as Com
 import           QuakeState
 import           Types
 
-import           Control.Lens (use, (.=), (%=))
+import           Control.Lens (use, ix, (.=), (%=))
 import           Control.Monad (unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -144,3 +145,9 @@ event = error "Key.event" -- TODO
 
 clearStates :: Quake ()
 clearStates = error "Key.clearStates" -- TODO
+
+clearTyping :: Quake ()
+clearTyping =
+  do editLine <- use (globals.gEditLine)
+     globals.gKeyLines.ix editLine .= B.pack [93, 0] -- clear any typing
+     globals.gKeyLinePos .= 1

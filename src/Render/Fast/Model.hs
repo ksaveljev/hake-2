@@ -26,6 +26,7 @@ import           QuakeState
 import qualified Render.Fast.Image as Image
 import qualified Render.Fast.Polygon as Polygon
 import qualified Render.Fast.Surf as Surf
+import qualified Render.Fast.Warp as Warp
 import           Render.MEdgeT
 import           Render.ModelT
 import           Render.MSurfaceT
@@ -37,17 +38,17 @@ import qualified Util.Lib as Lib
 
 import           Control.Monad.ST (ST, runST)
 
-import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=), (&), (.~))
+import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~), _1, _2)
 import           Control.Monad (when, unless)
 import           Data.Binary.Get (runGet)
-import           Data.Bits ((.|.))
+import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
-import           Linear (V3(..))
+import           Linear (V3(..), V4(..))
 import           System.IO (Handle)
 
 modInit :: Quake ()
@@ -307,13 +308,91 @@ loadFaces loadModelRef buf lump =
                                      & mSurfaces .~ V.replicate count newMSurfaceT)
      fastRenderAPIGlobals.frCurrentModel .= Just loadModelRef
      Surf.glBeginBuildingLightmaps loadModelRef
-     error "Model.loadFaces" >> undefined -- TODO
+     V.imapM_ (constructMSurfaceT loadModelRef) dFaces
+     Surf.glEndBuildingLightmaps
   where checkLump =
           when ((lump^.lFileLen) `mod` dFaceTSize /= 0) $
             do model <- readRef loadModelRef
                Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
         count = (lump^.lFileLen) `div` dFaceTSize
         dFaces = runGet (V.replicateM count getDFaceT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
+
+constructMSurfaceT :: Ref ModelT -> Int -> DFaceT -> Quake ()
+constructMSurfaceT loadModelRef idx dFace =
+  do model <- readRef loadModelRef
+     when (ti < 0 || ti >= (model^.mNumTexInfo)) $
+       Com.comError Constants.errDrop "MOD_LoadBmodel: bad texinfo number"
+     modifyRef surfaceRef (\v -> v & msFirstEdge .~ dFace^.dfFirstEdge
+                                   & msNumEdges .~ fromIntegral (dFace^.dfNumEdges)
+                                   & msFlags .~ (if (dFace^.dfSide) /= 0 then Constants.surfPlaneBack else 0)
+                                   & msPolys .~ Nothing
+                                   & msPlane .~ Just (Ref (fromIntegral (dFace^.dfPlaneNum)))
+                                   & msTexInfo .~ (Ref ti)
+                                   & msStyles .~ dFace^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
+                                   & msSamples .~ if (dFace^.dfLightOfs) == -1 then Nothing else Just (dFace^.dfLightOfs))
+     calcSurfaceExtents loadModelRef surfaceRef
+     createWarps surfaceRef
+     createLightmaps surfaceRef
+     createPolygons surfaceRef
+  where surfaceRef = Ref idx
+        ti = fromIntegral (dFace^.dfTexInfo)
+
+calcSurfaceExtents :: Ref ModelT -> Ref MSurfaceT -> Quake ()
+calcSurfaceExtents loadModelRef surfaceRef =
+  do model <- readRef loadModelRef
+     surface <- readRef surfaceRef
+     texInfo <- readRef (surface^.msTexInfo)
+     let (mins, maxs) = calcMinsMaxs model texInfo surface 0 (999999, 999999) (-99999, -99999)
+         bmins = mapTuple (floor . (/ 16)) mins
+         bmaxs = mapTuple (ceiling . (/ 16)) maxs
+     modifyRef surfaceRef (\v -> v & msTextureMins .~ mapTuple (* 16) bmins
+                                   & msExtents .~ mapTuple (* 16) (fst bmaxs - fst bmins, snd bmaxs - snd bmins))
+  where mapTuple f (a1, a2) = (f a1, f a2)
+
+calcMinsMaxs :: ModelT -> MTexInfoT -> MSurfaceT -> Int -> (Float, Float) -> (Float, Float) -> ((Float, Float), (Float, Float))
+calcMinsMaxs model texInfo surface idx mins maxs
+  | idx >= (surface^.msNumEdges) = (mins, maxs)
+  | otherwise =
+      let e = (model^.mSurfEdges) UV.! ((surface^.msFirstEdge) + idx)
+          v = getVertex e
+          V3 a b c = v^.mvPosition
+          (V4 a1 b1 c1 d1, V4 a2 b2 c2 d2) = texInfo^.mtiVecs
+          val1 = a * a1 + b * b1 + c * c1 + d1
+          val2 = a * a2 + b * b2 + c * c2 + d2
+          mins' = (min val1 (fst mins), min val2 (snd mins))
+          maxs' = (max val1 (fst maxs), max val2 (snd maxs))
+      in calcMinsMaxs model texInfo surface (idx + 1) mins' maxs'
+  where getVertex e
+          | e >= 0 =
+              let edge = (model^.mEdges) V.! e
+              in (model^.mVertexes) V.! (fromIntegral (edge^.meV._1))
+          | otherwise =
+              let edge = (model^.mEdges) V.! (negate e)
+              in (model^.mVertexes) V.! (fromIntegral (edge^.meV._2))
+
+createWarps :: Ref MSurfaceT -> Quake ()
+createWarps surfaceRef =
+  do surface <- readRef surfaceRef
+     texInfo <- readRef (surface^.msTexInfo)
+     when ((texInfo^.mtiFlags) .&. Constants.surfWarp /= 0) $
+       do modifyRef surfaceRef (\v -> v & msFlags %~ (.|. Constants.surfDrawTurb)
+                                        & msExtents .~ (16384, 16384)
+                                        & msTextureMins .~ (-8192, -8192))
+          Warp.glSubdivideSurface surfaceRef
+
+createLightmaps :: Ref MSurfaceT -> Quake ()
+createLightmaps surfaceRef =
+  do surface <- readRef surfaceRef
+     texInfo <- readRef (surface^.msTexInfo)
+     when ((texInfo^.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0) $
+       Surf.glCreateSurfaceLightmap surfaceRef
+
+createPolygons :: Ref MSurfaceT -> Quake ()
+createPolygons surfaceRef =
+  do surface <- readRef surfaceRef
+     texInfo <- readRef (surface^.msTexInfo)
+     when ((texInfo^.mtiFlags) .&. Constants.surfWarp == 0) $
+       Surf.glBuildPolygonFromSurface surfaceRef
 
 loadMarkSurfaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadMarkSurfaces = error "Model.loadMarkSurfaces" -- TODO

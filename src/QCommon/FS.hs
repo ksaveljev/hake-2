@@ -1,5 +1,7 @@
 module QCommon.FS
-  ( execAutoexec
+  ( canRead
+  , developerSearchPath
+  , execAutoexec
   , fileLength
   , fOpenFile
   , fOpenFileWithLength
@@ -223,3 +225,15 @@ getPackFiles numPackFiles files
   | otherwise =
       do file@(PackFileT name _ _) <- getPackFile
          getPackFiles (numPackFiles - 1) (HM.insert (BC.map toLower name) file files)
+
+developerSearchPath :: Int -> Quake Int
+developerSearchPath _ =
+  do searchPaths <- use (fsGlobals.fsSearchPaths)
+     return (findPath searchPaths)
+
+findPath :: [SearchPathT] -> Int
+findPath [] = 0
+findPath (x:xs)
+  | "xatrix" `BC.isInfixOf` (x^.spFilename) = 1
+  | "rogue" `BC.isInfixOf` (x^.spFilename) = 2
+  | otherwise = findPath xs

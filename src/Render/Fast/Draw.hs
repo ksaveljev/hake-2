@@ -27,6 +27,7 @@ import           Data.Bits (shiftR, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
+import           Data.Word (Word8)
 import qualified Graphics.GL as GL
 
 initLocal :: Quake ()
@@ -174,5 +175,5 @@ fadeScreen =
              GL.glEnable GL.GL_TEXTURE_2D
              GL.glDisable GL.GL_BLEND
 
-stretchRaw :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+stretchRaw :: Int -> Int -> Int -> Int -> Int -> Int -> UV.Vector Word8 -> Quake ()
 stretchRaw = error "Draw.stretchRaw" -- TODO

@@ -16,7 +16,7 @@ import           Data.IORef (IORef)
 import           Data.Sequence (Seq)
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
-import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import           Data.Word (Word8, Word16, Word32)
@@ -74,8 +74,6 @@ data QuakeIOState = QuakeIOState
   , _frModelVertexIndexBuf  :: MSV.IOVector Int32
   , _frPolygonBuffer        :: MSV.IOVector Float
   , _frPolygonCache         :: MV.IOVector GLPolyT
-  , _lmsLightmapSurfaces    :: MV.IOVector MSurfaceT
-  , _lmsLightmapBuffer      :: MSV.IOVector Word8
   , _cgDLights              :: MV.IOVector CDLightT
   , _cgParticles            :: MV.IOVector CParticleT
   , _pVertexArray           :: MSV.IOVector Float
@@ -658,6 +656,8 @@ data FileLinkT = FileLinkT
   , _flFromLength :: Int
   , _flTo         :: B.ByteString
   }
+
+data QuakeFile = QuakeFile Handle
   
 data XCommandT = XCommandT
   { _xcName :: B.ByteString
@@ -793,7 +793,7 @@ data NetChanT = NetChanT
 
 data ClientFrameT = ClientFrameT
   { _cfAreaBytes   :: Int
-  , _cfAreaBits    :: VS.Vector Word8
+  , _cfAreaBits    :: SV.Vector Word8
   , _cfPlayerState :: PlayerStateT
   , _cfNumEntities :: Int
   , _cfFirstEntity :: Int
@@ -1409,7 +1409,7 @@ data RefExportT = RefExportT
   , _reDrawTileClear       :: Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
   , _reDrawFill            :: Int -> Int -> Int -> Int -> Int -> Quake ()
   , _reDrawFadeScreen      :: Quake ()
-  , _reDrawStretchRaw      :: Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _reDrawStretchRaw      :: Int -> Int -> Int -> Int -> Int -> Int -> UV.Vector Word8 -> Quake ()
   , _reCinematicSetPalette :: Maybe B.ByteString -> Quake ()
   , _reBeginFrame          :: Float -> Quake ()
   , _reEndFrame            :: Quake ()
@@ -1562,7 +1562,7 @@ data MVertexT = MVertexT
 
 data MSurfaceT = MSurfaceT
   { _msVisFrame           :: Int
-  , _msPlane              :: Maybe (IORef CPlaneT)
+  , _msPlane              :: Maybe (Ref CPlaneT)
   , _msFlags              :: Int
   , _msFirstEdge          :: Int
   , _msNumEdges           :: Int
@@ -1575,13 +1575,13 @@ data MSurfaceT = MSurfaceT
   , _msPolys              :: Maybe (Ref GLPolyT)
   , _msTextureChain       :: Maybe (IORef MSurfaceT)
   , _msLightmapChain      :: Maybe (IORef MSurfaceT)
-  , _msTexInfo            :: MTexInfoT
+  , _msTexInfo            :: Ref MTexInfoT
   , _msDLightFrame        :: Int
   , _msDLightBits         :: Int
   , _msLightmapTextureNum :: Int
   , _msStyles             :: B.ByteString
   , _msCachedLight        :: UV.Vector Float
-  , _msSamples            :: Maybe B.ByteString
+  , _msSamples            :: Maybe Int -- offset of ModelT^.mLightdata
   }
 
 data MTexInfoT = MTexInfoT
@@ -1698,7 +1698,7 @@ data RenderAPI = RenderAPI
   , _rDrawTileClear     :: GLDriver -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
   , _rDrawFill          :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Quake ()
   , _rDrawFadeScreen    :: GLDriver -> Quake ()
-  , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> B.ByteString -> Quake ()
+  , _rDrawStretchRaw    :: GLDriver -> Int -> Int -> Int -> Int -> Int -> Int -> UV.Vector Word8 -> Quake ()
   , _rSetPalette        :: GLDriver -> Maybe B.ByteString -> Quake ()
   , _rBeginFrame        :: GLDriver -> Float -> Quake ()
   , _glScreenShotF      :: GLDriver -> Quake ()
@@ -1848,6 +1848,8 @@ data GLLightMapStateT = GLLightMapStateT
   { _lmsInternalFormat         :: Int
   , _lmsCurrentLightmapTexture :: Int
   , _lmsAllocated              :: UV.Vector Int
+  , _lmsLightmapSurfaces       :: V.Vector MSurfaceT
+  , _lmsLightmapBuffer         :: SV.Vector Word8
   }
 
 data MenuFrameworkS = MenuFrameworkS
@@ -2211,8 +2213,8 @@ data ModelExtra = AliasModelExtra DMdlT
                 | SpriteModelExtra DSpriteT
 
 data AI = AI
-  { _aiId :: B.ByteString
-  , _aiAi :: Ref EdictT -> Float -> Quake ()
+  { aiId :: B.ByteString
+  , aiAi :: Ref EdictT -> Float -> Quake ()
   }
 
 data EntInteract = EntInteract

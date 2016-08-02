@@ -6,6 +6,7 @@ module Util.Lib
   , fOpenBinary
   , fClose
   , rand
+  , tokenise
   , vtos
   ) where
 
@@ -58,6 +59,10 @@ rand =
      let (result, newG) = random g
      globals.gRnd .= newG
      return (abs result)
+
+tokenise :: B.ByteString -> B.ByteString -> [B.ByteString]
+tokenise x y = let (h, t) = B.breakSubstring x y
+               in h : if B.null t then [] else tokenise x (B.drop (B.length x) t)
 
 vtos :: V3 Float -> B.ByteString
 vtos (V3 a b c) = B.concat [encode a', " ", encode b', " ", encode c']

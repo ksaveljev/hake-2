@@ -4,6 +4,7 @@ module Client.CL
   , fixUpGender
   , frame
   , initialize
+  , pingServersF
   , quitF
   , shutdown
   , writeConfiguration
@@ -17,6 +18,7 @@ dropClient :: Quake ()
 fixUpGender :: Quake ()
 frame :: Int -> Quake ()
 initialize :: Quake ()
+pingServersF :: XCommandT
 quitF :: XCommandT
 shutdown :: Quake ()
 writeConfiguration :: Quake ()

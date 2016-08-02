@@ -16,6 +16,7 @@ module Client.SCR
   ) where
 
 import           Client.CinematicsT
+import           Client.ClientInfoT
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.CLInv as CLInv
@@ -24,6 +25,7 @@ import           Client.ConsoleT
 import           Client.DirtyT
 import           Client.FrameT
 import qualified Client.Menu as Menu
+import           Client.RefDefT
 import           Client.RefExportT
 import           Client.SCRShared
 import qualified Client.V as V
@@ -46,8 +48,9 @@ import qualified Sound.S as S
 import qualified Sys.Timer as Timer
 import           Types
 import           Util.Binary (encode, getInt)
+import qualified Util.Lib as Lib
 
-import           Control.Applicative (liftA2)
+import           Control.Applicative (liftA, liftA2)
 import           Control.Lens (preuse, use, ix, (^.), (.=), (-=), (%=), (+=), (&), (.~), _1, _2)
 import           Control.Monad (when, unless, void, join)
 import           Control.Monad.ST (ST, runST)
@@ -57,10 +60,37 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.Char (ord)
+import           Data.Int (Int16)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Unboxed.Mutable as MUV
 import           Data.Word (Word8)
+import           Linear (V3(..), _y)
 import           System.IO (Handle, hTell, hSeek, SeekMode(AbsoluteSeek))
+import           Text.Printf (printf)
+
+sbNums1 :: V.Vector B.ByteString
+sbNums1 = V.fromList [ "num_0" , "num_1" , "num_2"
+                     , "num_3" , "num_4" , "num_5"
+                     , "num_6" , "num_7" , "num_8"
+                     , "num_9" , "num_minus"
+                     ]
+
+sbNums2 :: V.Vector B.ByteString
+sbNums2 = V.fromList [ "anum_0" , "anum_1" , "anum_2"
+                     , "anum_3" , "anum_4" , "anum_5"
+                     , "anum_6" , "anum_7" , "anum_8"
+                     , "anum_9" , "anum_minus"
+                     ]
+
+charWidth :: Int
+charWidth = 16
+
+statMinus :: Int
+statMinus = 10 -- num frame for '-' stats digit
+
+statLayouts :: Int
+statLayouts = 13
 
 beginLoadingPlaque :: Quake ()
 beginLoadingPlaque =
@@ -114,7 +144,42 @@ initialize =
      scrGlobals.scrInitialized .= True
 
 timeRefreshF :: XCommandT
-timeRefreshF = error "SCR.timeRefreshF" -- TODO
+timeRefreshF = XCommandT "SCR.timeRefreshF" $
+  do state <- use (globals.gCls.csState)
+     renderer <- use (globals.gRenderer)
+     maybe rendererError (timeRefresh state) renderer
+  where rendererError = Com.fatalError "SCR.timeRefreshF renderer is Nothing"
+
+timeRefresh :: Int -> Renderer -> Quake ()
+timeRefresh state renderer
+  | state == Constants.caActive =
+      do start <- Timer.milliseconds
+         c <- Cmd.argc
+         renderFrame renderer c
+         stop <- Timer.milliseconds
+         printTime start stop
+  | otherwise = return ()
+
+renderFrame :: Renderer -> Int -> Quake ()
+renderFrame renderer c
+  | c == 2 =
+      do (renderer^.rRefExport.reBeginFrame) 0
+         mapM_ noPageFlipRender [0..127]
+         renderer^.rRefExport.reEndFrame
+  | otherwise = mapM_ pageFlipRender [0..127]
+  where noPageFlipRender idx =
+          do globals.gCl.csRefDef.rdViewAngles._y .= idx / 128.0 * 360.0
+             (renderer^.rRefExport.reRenderFrame) =<< use (globals.gCl.csRefDef)
+        pageFlipRender idx =
+          do globals.gCl.csRefDef.rdViewAngles._y .= idx / 128.0 * 360.0
+             (renderer^.rRefExport.reBeginFrame) 0
+             (renderer^.rRefExport.reRenderFrame) =<< use (globals.gCl.csRefDef)
+             renderer^.rRefExport.reEndFrame
+
+printTime :: Int -> Int -> Quake ()
+printTime start stop =
+  Com.printf (B.concat [encode time, " seconds (", encode (128.0 / time), " fps)\n"])
+  where time = fromIntegral (stop - start) / 1000 :: Float
 
 loadingF :: XCommandT
 loadingF = XCommandT "SCR.loadingF" beginLoadingPlaque
@@ -136,7 +201,24 @@ sizeDown =
      CVar.setValueF "viewsize" ((viewSize^.cvValue) - 10)
 
 skyF :: XCommandT
-skyF = error "SCR.skyF" -- TODO
+skyF = XCommandT "SCR.skyF" $
+  sky =<< Cmd.argc
+
+sky :: Int -> Quake ()
+sky c
+  | c < 2 = Com.printf "Usage: sky <basename> <rotate> <axis x y z>\n"
+  | otherwise =
+      do rotate <- if c > 2 then fmap Lib.atof (Cmd.argv 2) else return 0
+         axis <- if c == 6
+                   then V3 <$> (Lib.atof <$> Cmd.argv 3)
+                           <*> (Lib.atof <$> Cmd.argv 4)
+                           <*> (Lib.atof <$> Cmd.argv 5)
+                   else return (V3 0 0 1)
+         v <- Cmd.argv 1
+         renderer <- use (globals.gRenderer)
+         maybe rendererError (setSky v rotate axis) renderer
+  where setSky v rotate axis renderer = (renderer^.rRefExport.reSetSky) v rotate axis
+        rendererError = Com.fatalError "SCR.sky renderer is Nothing"
 
 updateScreen :: Quake ()
 updateScreen =
@@ -421,7 +503,11 @@ drawStats =
   where statsStrError = Com.fatalError "SCR.drawStats statsStr is Nothing"
 
 drawLayout :: Quake ()
-drawLayout = error "SCR.drawLayout" -- TODO
+drawLayout =
+  do stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+     case stats UV.!? statLayouts of
+       Nothing -> return ()
+       Just v -> when (v /= 0) (executeLayoutString =<< use (globals.gCl.csLayout))
 
 drawNet :: NetChanT -> Quake ()
 drawNet nc =
@@ -442,7 +528,49 @@ checkDrawCenterString =
           unless (centerTimeOff <= 0) drawCenterString
 
 drawCenterString :: Quake ()
-drawCenterString = error "SCR.drawCenterString" -- TODO
+drawCenterString =
+  do str <- use (scrGlobals.scrCenterString)
+     unless (B.null str) $
+       do centerLines <- use (scrGlobals.scrCenterLines)
+          vidDef <- use (globals.gVidDef)
+          renderer <- use (globals.gRenderer)
+          maybe rendererError (drawLines str vidDef 9999 (calcY centerLines vidDef) 0) renderer
+  where calcY centerLines vidDef
+          | centerLines <= 4 = truncate (fromIntegral (vidDef^.vdHeight) * 0.35 :: Float)
+          | otherwise = 48
+        rendererError = Com.fatalError "SCR.drawCenterString renderer is Nothing"
+
+drawLines :: B.ByteString -> VidDefT -> Int -> Int -> Int -> Renderer -> Quake ()
+drawLines str vidDef remaining y start renderer =
+  do addDirtyPoint x y
+     (remaining', x') <- drawLine renderer str remaining start x y 0 len
+     addDirtyPoint x' (y + 8)
+     when (start' < B.length str) $
+       drawLines str vidDef remaining' (y + 8) (start' + 1) renderer
+  where len = scanLineWidth str start 0 40
+        x = ((vidDef^.vdWidth) - len * 8) `div` 2
+        start' = findEndOfLine str start
+
+scanLineWidth :: B.ByteString -> Int -> Int -> Int -> Int
+scanLineWidth str s idx maxIdx
+  | idx >= maxIdx || (s + idx) >= B.length str = idx
+  | str `BC.index` (s + idx) == '\n' = idx
+  | otherwise = scanLineWidth str s (idx + 1) maxIdx
+
+drawLine :: Renderer -> B.ByteString -> Int -> Int -> Int -> Int -> Int -> Int -> Quake (Int, Int)
+drawLine renderer str remaining start x y idx maxIdx
+  | idx >= maxIdx = return (remaining, x)
+  | otherwise =
+      do (renderer^.rRefExport.reDrawChar) x y (ord (str `BC.index` (start + idx)))
+         if remaining == 0
+           then return (0, x)
+           else drawLine renderer str (remaining - 1) start (x + 8) y (idx + 1) maxIdx
+
+-- IMPROVE: use some built in function to do this?
+findEndOfLine :: B.ByteString -> Int -> Int
+findEndOfLine str idx
+  | idx >= B.length str || str `BC.index` idx == '\n' = idx
+  | otherwise = findEndOfLine str (idx + 1)
 
 drawFPS :: CVarT -> Quake ()
 drawFPS fps
@@ -456,7 +584,7 @@ drawFPS fps
   | otherwise = return ()
   where checkFPSModified
           | fps^.cvModified =
-              do CVar.update fps { _cvModified = False }
+              do CVar.update (fps & cvModified .~ False)
                  CVar.setValueI "cl_maxfps" 1000
           | otherwise = return ()
         lastTime = use (scrGlobals.scrLastTime)
@@ -540,7 +668,34 @@ doDrawConsole state refreshPrepped
                    Console.drawNotify
 
 drawCinematic :: Quake Bool
-drawCinematic = error "SCR.drawCinematic" -- TODO
+drawCinematic =
+  do cinematicTime <- use (globals.gCl.csCinematicTime)
+     keyDest <- use (globals.gCls.csKeyDest)
+     renderer <- use (globals.gRenderer)
+     maybe rendererError (proceedDrawCinematic cinematicTime keyDest) renderer
+  where rendererError =
+          do Com.fatalError "SCR.drawCinematic renderer is Nothing"
+             return False
+
+proceedDrawCinematic :: Int -> Int -> Renderer -> Quake Bool
+proceedDrawCinematic cinematicTime keyDest renderer
+  | cinematicTime <= 0 = return False
+  | keyDest == Constants.keyMenu =
+      do (renderer^.rRefExport.reCinematicSetPalette) Nothing
+         globals.gCl.csCinematicPaletteActive .= False
+         return True
+  | otherwise =
+      do cinematicPaletteActive <- use (globals.gCl.csCinematicPaletteActive)
+         unless cinematicPaletteActive $
+           do cinematicPalette <- use (globals.gCl.csCinematicPalette)
+              (renderer^.rRefExport.reCinematicSetPalette) (Just cinematicPalette)
+              globals.gCl.csCinematicPaletteActive .= True
+         cin <- use (scrGlobals.scrCin)
+         maybe (return True) (doDraw cin) (cin^.cPic)
+  where doDraw cin picture =
+          do vidDef <- use (globals.gVidDef)
+             (renderer^.rRefExport.reDrawStretchRaw) 0 0 (vidDef^.vdWidth) (vidDef^.vdHeight) (cin^.cWidth) (cin^.cHeight) picture
+             return True
 
 drawLoading :: Renderer -> Quake ()
 drawLoading renderer =
@@ -558,310 +713,296 @@ executeLayoutString :: B.ByteString -> Quake ()
 executeLayoutString str =
   do skip <- shouldSkip
      unless skip $
-       parseLayoutString 0 0 3 0
+       parseLayoutString str 0 0 3 0
   where shouldSkip =
           do state <- use (globals.gCls.csState)
              refreshPrepped <- use (globals.gCl.csRefreshPrepped)
              return (state /= Constants.caActive || not refreshPrepped || B.null str)
 
-parseLayoutString :: Int -> Int -> Int -> Int -> Quake ()
-parseLayoutString = error "SCR.parseLayoutString" -- TODO
-
-{-
-        parseLayoutString :: Int -> Int -> Int -> Int -> Quake ()
-        parseLayoutString x y width idx
-          | idx >= B.length str = return ()
-          | otherwise = do
-              (maybeToken, newIdx) <- Com.parse str (B.length str) idx
-
-              case maybeToken of
-                Nothing -> parseLayoutString x y width newIdx
-                Just token -> do
-                  (x', y', width', finalIdx) <- processToken x y width newIdx token
-                  parseLayoutString x' y' width' finalIdx
-
-        processToken :: Int -> Int -> Int -> Int -> B.ByteString -> Quake (Int, Int, Int, Int)
-        processToken x y width idx token =
-          case token of
-            "xl" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let x' = Lib.atoi tkn
-              return (x', y, width, newIdx)
-
-            "xr" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              w <- use $ globals.vidDef.vdWidth
-              let x' = w + Lib.atoi tkn
-              return (x', y, width, newIdx)
-
-            "xv" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              w <- use $ globals.vidDef.vdWidth
-              let x' = w `div` 2 - 160 + Lib.atoi tkn
-              return (x', y, width, newIdx)
-
-            "yt" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let y' = Lib.atoi tkn
-              return (x, y', width, newIdx)
-
-            "yb" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              h <- use $ globals.vidDef.vdHeight
-              let y' = h + Lib.atoi tkn
-              return (x, y', width, newIdx)
-
-            "yv" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              h <- use $ globals.vidDef.vdHeight
-              let y' = h `div` 2 - 120 + Lib.atoi tkn
-              return (x, y', width, newIdx)
-
-            "pic" -> do
-              -- draw a pick from a stat number
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
-              let value' = fromIntegral value
-              when (value' >= Constants.maxImages) $
-                Com.comError Constants.errDrop "Pic >= MAX_IMAGES"
-
-              Just cs <- preuse $ globals.cl.csConfigStrings.ix (Constants.csImages + value')
-              when (B.length cs > 0) $ do -- IMPROVE: do we need to introduce Maybe ByteString in csConfigStrings ?
-                addDirtyPoint x y
-                addDirtyPoint (x + 23) (y + 23)
-                Just renderer <- use $ globals.re
-                (renderer^.rRefExport.reDrawPic) x y cs
-
-              return (x, y, width, newIdx)
-
-            "client" -> do
-              -- draw a deathmatch client block
-              vidDef' <- use $ globals.vidDef
-
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
-
-              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
-              let y' = (vidDef'^.vdHeight) `div` 2 - 120 + Lib.atoi tkn2
-
-              addDirtyPoint x' y'
-              addDirtyPoint (x' + 159) (y' + 31)
-
-              (Just tkn3, newIdx3) <- Com.parse str (B.length str) newIdx2
-              let clientInfoIdx = Lib.atoi tkn3
-              when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
-                Com.comError Constants.errDrop "client >= MAX_CLIENTS"
-
-              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
-              
-              (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
-              let score = Lib.atoi tkn4
-
-              (Just tkn5, newIdx5) <- Com.parse str (B.length str) newIdx4
-              let ping = Lib.atoi tkn5
-
-              (Just tkn6, newIdx6) <- Com.parse str (B.length str) newIdx5
-              let time = Lib.atoi tkn6
-
-              Console.drawAltString (x' + 32) y' (clientInfo^.ciName)
-              Console.drawString (x' + 32) (y' + 8) "Score: "
-              Console.drawAltString (x' + 32 + 7 * 8) (y' + 8) (BC.pack $ show score)
-              Console.drawString (x' + 32) (y' + 16) ("Ping:  " `B.append` BC.pack (show ping)) -- IMPROVE?
-              Console.drawString (x' + 32) (y' + 24) ("Time:  " `B.append` BC.pack (show time)) -- IMPROVE?
-
-              Just renderer <- use $ globals.re
-
-              if isNothing (clientInfo^.ciIcon)
-                then do
-                  iconName <- use $ globals.cl.csBaseClientInfo.ciIconName
-                  (renderer^.rRefExport.reDrawPic) x' y' iconName
-                else
-                  (renderer^.rRefExport.reDrawPic) x' y' (clientInfo^.ciIconName)
-
-              return (x', y', width, newIdx6)
-              
-            "ctf" -> do
-              -- draw a ctf client block
-              vidDef' <- use $ globals.vidDef
-
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
-
-              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
-              let y' = (vidDef'^.vdHeight) `div` 2 - 120 + Lib.atoi tkn2
-
-              addDirtyPoint x' y'
-              addDirtyPoint (x' + 159) (y' + 31)
-
-              (Just tkn3, newIdx3) <- Com.parse str (B.length str) newIdx2
-              let clientInfoIdx = Lib.atoi tkn3
-              when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
-                Com.comError Constants.errDrop "client >= MAX_CLIENTS"
-
-              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
-
-              (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
-              let score = Lib.atoi tkn4
-
-              (Just tkn5, newIdx5) <- Com.parse str (B.length str) newIdx4
-              let tmpPing = Lib.atoi tkn5
-                  ping = if tmpPing > 999 then 999 else tmpPing
-
-              let block = BC.pack $ printf "%3d %3d %-12.12s" score ping (BC.unpack $ clientInfo^.ciName)
-
-              playerNum <- use $ globals.cl.csPlayerNum
-              if clientInfoIdx == playerNum
-                then Console.drawAltString x' y' block
-                else Console.drawString x' y' block
-
-              return (x', y', width, newIdx5)
-
-            "picn" -> do
-              -- draw a pic from a name
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              addDirtyPoint x y
-              addDirtyPoint (x + 23) (y + 23)
-
-              Just renderer <- use $ globals.re
-              (renderer^.rRefExport.reDrawPic) x y tkn
-
-              return (x, y, width, newIdx)
-
-            "num" -> do
-              -- draw a number
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let width' = Lib.atoi tkn
-
-              (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
-              let statsIdx = Lib.atoi tkn2
-
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix statsIdx
-              drawField x y 0 width' (fromIntegral value)
-
-              return (x, y, width', newIdx2)
-
-            "hnum" -> do
-              -- health number
-              let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statHealth
-
-              color <- if | value > 25 -> return 0 -- green
-                          | value > 0 -> do
-                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
-                              return $ (serverFrame `shiftR` 2) .&. 1
-                          | otherwise -> return 1
-
-              Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
-              when (sf .&. 1 /= 0) $ do
-                Just renderer <- use $ globals.re
-                (renderer^.rRefExport.reDrawPic) x y "field_3"
-
-              drawField x y color width' (fromIntegral value)
-
-              return (x, y, width', idx)
-              
-            "anum" -> do
-              -- ammo number
-              let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statAmmo
-
-              color <- if | value > 5 -> return 0 -- green
-                          | value >= 0 -> do
-                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
-                              return $ (serverFrame `shiftR` 2) .&. 1
-                          | otherwise -> return (-1)
-              
-              -- negative number = don't show
-              unless (color == -1) $ do
-                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
-                when (sf .&. 4 /= 0) $ do
-                  Just renderer <- use $ globals.re
-                  (renderer^.rRefExport.reDrawPic) x y "field_3"
-
-                drawField x y color width' (fromIntegral value)
-
-              return (x, y, width', idx)
-
-            "rnum" -> do
-              -- armor number
-              let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statArmor
-
-              unless (value < 1) $ do
-                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
-                when (sf .&. 2 /= 0) $ do
-                  Just renderer <- use $ globals.re
-                  (renderer^.rRefExport.reDrawPic) x y "field_3"
-
-                drawField x y 0 width' (fromIntegral value)
-
-              return (x, y, width', idx)
-
-            "stat_string" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              let index = Lib.atoi tkn
-              
-              when (index < 0 || index >= Constants.maxConfigStrings) $
-                Com.comError Constants.errDrop "Bad stat_string index"
-
-              Just csIndexTmp <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix index
-              let csIndex = fromIntegral csIndexTmp
-
-              when (csIndex < 0 || csIndex >= Constants.maxConfigStrings) $
-                Com.comError Constants.errDrop "Bad stat_string index"
-
-              Just configStr <- preuse $ globals.cl.csConfigStrings.ix csIndex
-
-              Console.drawString x y configStr
-
-              return (x, y, width, newIdx)
-
-            "cstring" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              drawHUDString tkn x y 320 0
-              return (x, y, width, newIdx)
-
-            "string" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Console.drawString x y tkn
-              return (x, y, width, newIdx)
-
-            "cstring2" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              drawHUDString tkn x y 320 0x80
-              return (x, y, width, newIdx)
-
-            "string2" -> do
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Console.drawAltString x y tkn
-              return (x, y, width, newIdx)
-
-            "if" -> do
-              -- draw a number
-              (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
-
-              if value == 0
-                then do
-                  -- skip to endif
-                  finalIdx <- skipToEndIf newIdx
-                  return (x, y, width, finalIdx)
-                else
-                  return (x, y, width, newIdx)
-
-            _ -> return (x, y, width, idx)
-
-        skipToEndIf :: Int -> Quake Int
-        skipToEndIf idx
-          | idx >= B.length str = return idx
-          | otherwise = do
-              (tkn, newIdx) <- Com.parse str (B.length str) idx
-              case tkn of
-                Nothing -> skipToEndIf newIdx
-                Just token -> if token == "endif"
-                                then return newIdx
-                                else skipToEndIf newIdx
-                                -}
+parseLayoutString :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+parseLayoutString str x y width idx
+  | idx >= B.length str = return ()
+  | otherwise =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         maybe (parseLayoutString str x y width newIdx) (parseWithToken newIdx) mToken
+  where parseWithToken newIdx token =
+          do (x', y', width', finalIdx) <- processToken str x y width newIdx token
+             parseLayoutString str x' y' width' finalIdx
+
+processToken :: B.ByteString -> Int -> Int -> Int -> Int -> B.ByteString -> Quake (Int, Int, Int, Int)
+processToken str x y width idx token
+  | token == "xl" = 
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         maybe (tokenError "xl") (\tkn -> return (Lib.atoi tkn, y, width, newIdx)) mToken
+  | token == "xr" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         w <- use (globals.gVidDef.vdWidth)
+         maybe (tokenError "xr") (\tkn -> return (w + Lib.atoi tkn, y, width, newIdx)) mToken
+  | token == "xv" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         w <- use (globals.gVidDef.vdWidth)
+         maybe (tokenError "xv") (\tkn -> return (w `div` 2 - 160 + Lib.atoi tkn, y, width, newIdx)) mToken
+  | token == "yt" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         maybe (tokenError "yt") (\tkn -> return (x, Lib.atoi tkn, width, newIdx)) mToken
+  | token == "yb" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         h <- use (globals.gVidDef.vdHeight)
+         maybe (tokenError "yb") (\tkn -> return (x, h + Lib.atoi tkn, width, newIdx)) mToken
+  | token == "yv" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         h <- use (globals.gVidDef.vdHeight)
+         maybe (tokenError "yv") (\tkn -> return (x, h `div` 2 - 120 + Lib.atoi tkn, width, newIdx)) mToken
+  | token == "pic" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         maybe (tokenError "pic") (processPicToken x y width stats newIdx) mToken
+  | token == "client" =
+      do vidDef <- use (globals.gVidDef)
+         (mToken1, newIdx1) <- Com.parse str (B.length str) idx
+         (mToken2, newIdx2) <- Com.parse str (B.length str) newIdx1
+         (mToken3, newIdx3) <- Com.parse str (B.length str) newIdx2
+         (mToken4, newIdx4) <- Com.parse str (B.length str) newIdx3
+         (mToken5, newIdx5) <- Com.parse str (B.length str) newIdx4
+         (mToken6, newIdx6) <- Com.parse str (B.length str) newIdx5
+         processClientToken width vidDef newIdx6 mToken1 mToken2 mToken3 mToken4 mToken5 mToken6
+  | token == "ctf" =
+      do vidDef <- use (globals.gVidDef)
+         (mToken1, newIdx1) <- Com.parse str (B.length str) idx
+         (mToken2, newIdx2) <- Com.parse str (B.length str) newIdx1
+         (mToken3, newIdx3) <- Com.parse str (B.length str) newIdx2
+         (mToken4, newIdx4) <- Com.parse str (B.length str) newIdx3
+         (mToken5, newIdx5) <- Com.parse str (B.length str) newIdx4
+         processCtfToken width vidDef newIdx5 mToken1 mToken2 mToken3 mToken4 mToken5
+  | token == "picn" =
+      do (mToken1, newIdx1) <- Com.parse str (B.length str) idx
+         renderer <- use (globals.gRenderer)
+         processPicnToken x y width mToken1 newIdx1 renderer
+  | token == "num" =
+      do (mToken1, newIdx1) <- Com.parse str (B.length str) idx
+         (mToken2, newIdx2) <- Com.parse str (B.length str) newIdx1
+         processNumToken x y newIdx2 mToken1 mToken2
+  | token == "hnum" =
+      do stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         serverFrame <- use (globals.gCl.csFrame.fServerFrame)
+         processHnumToken x y idx serverFrame (stats UV.! Constants.statHealth) (stats UV.! Constants.statFlashes)
+  | token == "anum" =
+      do stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         serverFrame <- use (globals.gCl.csFrame.fServerFrame)
+         processAnumToken x y idx serverFrame (stats UV.! Constants.statAmmo) (stats UV.! Constants.statFlashes)
+  | token == "rnum" =
+      do stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         processRnumToken x y idx (stats UV.! Constants.statArmor) (stats UV.! Constants.statFlashes)
+  | token == "stat_string" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         configStrings <- use (globals.gCl.csConfigStrings)
+         processStatStringToken stats configStrings x y width newIdx mToken
+  | token == "cstring" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         drawHUDString mToken x y 320 0
+         return (x, y, width, newIdx)
+  | token == "string" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         processStringToken x y width newIdx mToken
+  | token == "cstring2" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         drawHUDString mToken x y 320 0x80
+         return (x, y, width, newIdx)
+  | token == "string2" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         processString2Token x y width newIdx mToken
+  | token == "if" =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+         processIfToken str stats x y width newIdx mToken -- TODO: make sure we pass arguments in the same order for all functions here (like stats)
+  | otherwise = error "ohno" >> undefined -- TODO
+  where tokenError tkn =
+          do Com.fatalError ("SCR.processToken Com.parse returned Nothing for token " `B.append` tkn)
+             return (0, 0, 0, 0)
+
+processStatStringToken :: UV.Vector Int16 -> V.Vector B.ByteString -> Int -> Int -> Int -> Int -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processStatStringToken stats configStrings x y width newIdx (Just token) =
+  do when (index < 0 || index >= Constants.maxConfigStrings) $
+       Com.comError Constants.errDrop "Bad stat_string index"
+     when (csIndex < 0 || csIndex >= Constants.maxConfigStrings) $
+       Com.comError Constants.errDrop "Bad stat_string index"
+     Console.drawString x y (configStrings V.! csIndex)
+     return (x, y, width, newIdx)
+  where index = Lib.atoi token
+        csIndex = fromIntegral (stats UV.! index)
+processStatStringToken _ _ _ _ _ _ Nothing = processingError "SCR.processStatStringToken token is Nothing"
+
+processIfToken :: B.ByteString -> UV.Vector Int16 -> Int -> Int -> Int -> Int -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processIfToken str stats x y width newIdx (Just token)
+  | value == 0 =
+      do finalIdx <- skipToEndIf str newIdx
+         return (x, y, width, finalIdx)
+  | otherwise = return (x, y, width, newIdx)
+  where index = Lib.atoi token
+        value = stats UV.! index
+processIfToken _ _ _ _ _ _ Nothing = processingError "SCR.processIfToken token is Nothing"
+
+skipToEndIf :: B.ByteString -> Int -> Quake Int
+skipToEndIf str idx
+  | idx >= B.length str = return idx
+  | otherwise =
+      do (mToken, newIdx) <- Com.parse str (B.length str) idx
+         maybe (skipToEndIf str newIdx) (checkToken newIdx) mToken
+  where checkToken newIdx token
+          | token == "endif" = return newIdx
+          | otherwise = skipToEndIf str newIdx
+
+processStringToken :: Int -> Int -> Int -> Int -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processStringToken x y width newIdx (Just token) =
+  do Console.drawString x y token
+     return (x, y, width, newIdx)
+processStringToken _ _ _ _ Nothing = processingError "SCR.processStringToken token is Nothing"
+
+processString2Token :: Int -> Int -> Int -> Int -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processString2Token x y width newIdx (Just token) =
+  do Console.drawAltString x y token
+     return (x, y, width, newIdx)
+processString2Token _ _ _ _ Nothing = processingError "SCR.processString2Token token is Nothing"
+
+processPicToken :: Int -> Int -> Int -> UV.Vector Int16 -> Int -> B.ByteString -> Quake (Int, Int, Int, Int)
+processPicToken x y width stats newIdx token =
+  maybe valueError proceedProcessPicToken (stats UV.!? (Lib.atoi token))
+  where proceedProcessPicToken value =
+          do when (fromIntegral value >= Constants.maxImages) $
+               Com.comError Constants.errDrop "Pic >= MAX_IMAGES"
+             configStrings <- use (globals.gCl.csConfigStrings)
+             maybe configStringError doProcessPicToken (configStrings V.!? (Constants.csImages + fromIntegral value))
+        doProcessPicToken cs =
+          do unless (B.null cs) $
+               do addDirtyPoint x y
+                  addDirtyPoint (x + 23) (y + 23)
+                  renderer <- use (globals.gRenderer)
+                  maybe rendererError (drawPicAndReturn cs) renderer
+             return (x, y, width, newIdx)
+        drawPicAndReturn cs renderer = (renderer^.rRefExport.reDrawPic) x y cs
+        valueError = processingError "SCR.processPicToken mValue is Nothing"
+        configStringError = processingError "SCR.processPicToken configString is Nothing"
+        rendererError = Com.fatalError "SCR.processPicToken renderer is Nothing"
+
+processClientToken :: Int -> VidDefT -> Int -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processClientToken width vidDef newIdx6 (Just token1) (Just token2) (Just token3) (Just token4) (Just token5) (Just token6) =
+  do addDirtyPoint x' y'
+     addDirtyPoint (x' + 159) (y' + 31)
+     clientInfo <- use (globals.gCl.csClientInfo)
+     when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
+       Com.comError Constants.errDrop "client >= MAX_CLIENTS"
+     maybe clientInfoError proceedProcessClientToken (clientInfo V.!? clientInfoIdx)
+  where x' = (vidDef^.vdWidth) `div` 2 - 160 + Lib.atoi token1
+        y' = (vidDef^.vdHeight) `div` 2 - 120 + Lib.atoi token2
+        clientInfoIdx = Lib.atoi token3
+        score = Lib.atoi token4
+        ping = Lib.atoi token5
+        time = Lib.atoi token6
+        clientInfoError = processingError "SCR.processClientToken clientInfo is Nothing"
+        rendererError = Com.fatalError "SCR.processClientToken renderer is Nothing"
+        proceedProcessClientToken clientInfo =
+          do Console.drawAltString (x' + 32) y' (clientInfo^.ciName)
+             Console.drawString (x' + 32) (y' + 8) "Score: "
+             Console.drawAltString (x' + 32 + 7 * 8) (y' + 8) (encode score)
+             Console.drawString (x' + 32) (y' + 16) ("Ping:  " `B.append` encode ping)
+             Console.drawString (x' + 32) (y' + 24) ("Time:  " `B.append` encode time)
+             renderer <- use (globals.gRenderer)
+             maybe rendererError (drawPicAndReturn clientInfo) renderer
+             return (x', y', width, newIdx6)
+        drawPicAndReturn clientInfo renderer =
+          case clientInfo^.ciIcon of
+            Nothing ->
+              do iconName <- use (globals.gCl.csBaseClientInfo.ciIconName)
+                 (renderer^.rRefExport.reDrawPic) x' y' iconName
+            Just _ -> (renderer^.rRefExport.reDrawPic) x' y' (clientInfo^.ciIconName)
+processClientToken _ _ _ _ _ _ _ _ _ = processingError "SCR.processClientToken one of the mTokens is Nothing"
+
+processCtfToken :: Int -> VidDefT -> Int -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processCtfToken width vidDef newIdx5 (Just token1) (Just token2) (Just token3) (Just token4) (Just token5) =
+  do addDirtyPoint x' y'
+     addDirtyPoint (x' + 159) (y' + 31)
+     clientInfo <- use (globals.gCl.csClientInfo)
+     when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
+       Com.comError Constants.errDrop "client >= MAX_CLIENTS"
+     maybe clientInfoError proceedProcessCtfToken (clientInfo V.!? clientInfoIdx)
+  where x' = (vidDef^.vdWidth) `div` 2 - 160 + Lib.atoi token1
+        y' = (vidDef^.vdHeight) `div` 2 - 120 + Lib.atoi token2
+        clientInfoIdx = Lib.atoi token3
+        score = Lib.atoi token4
+        ping = min 999 (Lib.atoi token5)
+        block clientInfo = BC.pack (printf "%3d %3d %-12.12s" score ping (BC.unpack (clientInfo^.ciName)))
+        clientInfoError = processingError "SCR.processCtfToken clientInfo is Nothing"
+        proceedProcessCtfToken clientInfo =
+          do playerNum <- use (globals.gCl.csPlayerNum)
+             drawNumString clientInfo playerNum
+             return (x', y', width, newIdx5)
+        drawNumString clientInfo playerNum
+          | playerNum == clientInfoIdx = Console.drawAltString x' y' (block clientInfo)
+          | otherwise = Console.drawString x' y' (block clientInfo)
+processCtfToken _ _ _ _ _ _ _ _ = processingError "SCR.processCtfToken one of the mTokens is Nothing"
+
+processPicnToken :: Int -> Int -> Int -> Maybe B.ByteString -> Int -> Maybe Renderer -> Quake (Int, Int, Int, Int)
+processPicnToken x y width (Just token) newIdx (Just renderer) =
+  do addDirtyPoint x y
+     addDirtyPoint (x + 23) (y + 23)
+     (renderer^.rRefExport.reDrawPic) x y token
+     return (x, y, width, newIdx)
+processPicnToken _ _ _ _ _ _ = processingError "SCR.processPicToken either mToken or renderer is Nothing"
+
+processNumToken :: Int -> Int -> Int -> Maybe B.ByteString -> Maybe B.ByteString -> Quake (Int, Int, Int, Int)
+processNumToken x y newIdx2 (Just token1) (Just token2) =
+  do stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
+     maybe statsError doDrawStat (stats UV.!? statsIdx)
+  where width = Lib.atoi token1
+        statsIdx = Lib.atoi token2
+        statsError = processingError "SCR.processNumToken stats value is Nothing"
+        doDrawStat value =
+          do drawField x y 0 width (fromIntegral value)
+             return (x, y, width, newIdx2)
+processNumToken _ _ _ _ _ = processingError "SCR.processNumToken one of the mTokens is Nothing"
+
+processHnumToken :: Int -> Int -> Int -> Int -> Int16 -> Int16 -> Quake (Int, Int, Int, Int)
+processHnumToken x y idx serverFrame health flashes =
+  do when (flashes .&. 1 /= 0) $
+       do renderer <- use (globals.gRenderer)
+          maybe rendererError (\r -> (r^.rRefExport.reDrawPic) x y "field_3") renderer
+     drawField x y color 3 (fromIntegral health)
+     return (x, y, 3, idx)
+  where color | health > 25 = 0
+              | health > 0 = (serverFrame `shiftR` 2) .&. 1
+              | otherwise = 1
+        rendererError = Com.fatalError "SCR.processHnumToken renderer is Nothing"
+
+processAnumToken :: Int -> Int -> Int -> Int -> Int16 -> Int16 -> Quake (Int, Int, Int, Int)
+processAnumToken x y idx serverFrame ammo flahes
+  | color == -1 = return (x, y, 3, idx)
+  | otherwise =
+      do when (flahes .&. 4 /= 0) $
+           do renderer <- use (globals.gRenderer)
+              maybe rendererError (\r -> (r^.rRefExport.reDrawPic) x y "field_3") renderer
+         drawField x y color 3 (fromIntegral ammo)
+         return (x, y, 3, idx)
+  where color | ammo > 5 = 0
+              | ammo >= 0 = (serverFrame `shiftR` 2) .&. 1
+              | otherwise = -1
+        rendererError = Com.fatalError "SCR.processAnumToken renderer is Nothing"
+
+processRnumToken :: Int -> Int -> Int -> Int16 -> Int16 -> Quake (Int, Int, Int, Int)
+processRnumToken x y idx armor flashes
+  | armor < 1 = return (x, y, 3, idx)
+  | otherwise =
+      do when (flashes .&. 2 /= 0) $
+           do renderer <- use (globals.gRenderer)
+              maybe rendererError (\r -> (r^.rRefExport.reDrawPic) x y "field_3") renderer
+         drawField x y 0 3 (fromIntegral armor)
+         return (x, y, 3, idx)
+  where rendererError = Com.fatalError "SCR.processRnumToken renderer is Nothing"
+
+processingError :: B.ByteString -> Quake (Int, Int, Int, Int)
+processingError msg =
+  do Com.fatalError msg
+     return (0, 0, 0, 0)
 
 readNextFrame :: Quake (Maybe (UV.Vector Word8))
 readNextFrame =
@@ -1076,5 +1217,55 @@ processByte hNodes numHNodes nodeNum inByte outIdx out index count idx maxIdx
       do let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
          processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) outIdx out index count (idx + 1) maxIdx
 
-touchPics :: Quake ()
-touchPics = error "SCR.touchPics" -- TODO
+touchPics :: Renderer -> Quake ()
+touchPics renderer =
+  do V.mapM_ (renderer^.rRefExport.reRegisterPic) sbNums1
+     processCrosshair renderer =<< crosshairCVar
+
+processCrosshair :: Renderer -> CVarT -> Quake ()
+processCrosshair renderer crosshair
+  | (crosshair^.cvValue) == 0 = return ()
+  | otherwise = join (liftA (updateCrosshair renderer) crossHairValue)
+  where crossHairValue
+          | (crosshair^.cvValue) > 3 || (crosshair^.cvValue) < 0 =
+              do CVar.update (crosshair & cvValue .~ 3)
+                 return 3
+          | otherwise = return (crosshair^.cvValue)
+
+updateCrosshair :: Renderer -> Float -> Quake ()
+updateCrosshair renderer v =
+  do scrGlobals.scrCrosshairPic .= pic
+     dim <- (renderer^.rRefExport.reDrawGetPicSize) pic
+     maybe updateCrosshairError setDimensions dim
+  where i = truncate v :: Int
+        pic = "ch" `B.append` (encode i)
+        updateCrosshairError = Com.fatalError "SCR.updateCrosshair pic size is Nothing"
+        setDimensions (width, height) =
+          do scrGlobals.scrCrosshairWidth .= width
+             scrGlobals.scrCrosshairHeight .= height
+             when (width == 0) $ scrGlobals.scrCrosshairPic .= ""
+
+drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
+drawField x y color width value
+  | width < 1 = return ()
+  | otherwise =
+      do addDirtyPoint x y
+         addDirtyPoint (x + w * charWidth + 2) (y + 23)
+         renderer <- use (globals.gRenderer)
+         maybe rendererError (\r -> mapM_ (doDrawField r num color x' y) [0..len-1]) renderer
+  where w = min width 5
+        num = encode value
+        len = min (B.length num) w
+        x' = x + 2 + charWidth * (w - len)
+        rendererError = Com.fatalError "SCR.drawField renderer is Nothing"
+
+doDrawField :: Renderer -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+doDrawField renderer num color x y idx = (renderer^.rRefExport.reDrawPic) x y pic
+  where ptr = num `BC.index` idx
+        frame | ptr == '-' = statMinus
+              | otherwise = ord ptr - ord '0'
+        pic | color == 0 = sbNums1 V.! frame
+            | otherwise = sbNums2 V.! frame
+
+drawHUDString :: Maybe B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+drawHUDString = error "SCR.drawHUDString" -- TODO

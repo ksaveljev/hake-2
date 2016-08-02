@@ -13,19 +13,25 @@ import qualified Client.SCR as SCR
 import           Client.VidDefT
 import qualified Constants
 import           Game.CVarT
+import qualified QCommon.CM as CM
 import qualified QCommon.Com as Com
 import           QCommon.CVarVariables
 import           QCommon.NetChanT
 import           QuakeState
 import           Render.Renderer
+import qualified Sys.Sys as Sys
 import           Types
+import           Util.Binary (encode)
+import qualified Util.Lib as Lib
 
 import           Control.Applicative (liftA2)
-import           Control.Lens (use, preuse, ix, (^.), (.=))
-import           Control.Monad (join, unless)
+import           Control.Lens (use, preuse, ix, (^.), (.=), (+=))
+import           Control.Monad (join, unless, when)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
+import           Linear (V3(..))
 
 addNetGraph :: Quake ()
 addNetGraph = join (liftA2 proceedAddNetGraph scrDebugGraphCVar scrTimeGraphCVar)
@@ -67,22 +73,22 @@ proceedPrepRefresh (Just str) (Just renderer) =
        -- precache status bar pics
        Com.printf "pics\r"
        SCR.updateScreen
-       SCR.touchPics
+       SCR.touchPics renderer
        Com.printf "                                     \r"
        CLTEnt.registerTEntModels
        clientGlobals.cgNumCLWeaponModels .= 1
        clientGlobals.cgWeaponModels.ix 0 .= "weapon.md2"
-       registerModels configStrings 1 Constants.maxModels
+       mapM_ (registerModel renderer configStrings) [1..Constants.maxImages-1]
        Com.printf "images\r"
        SCR.updateScreen
-       registerImages configStrings 1 Constants.maxImages
+       mapM_ (registerImage renderer configStrings) [1..Constants.maxImages-1]
        Com.printf "                                     \r"
-       processClients configStrings 0 Constants.maxClients
+       mapM_ (processClient configStrings) [0..Constants.maxClients-1]
        CLParse.loadClientInfo (globals.gCl.csBaseClientInfo) "unnamed\\male/grunt"
        -- set sky textures and speed
        Com.printf "sky\r"
        SCR.updateScreen
-       setSky configStrings
+       setSky renderer configStrings
        Com.printf "                                     \r"
        renderer^.rRefExport.reEndRegistration
        Console.clearNotify
@@ -92,87 +98,63 @@ proceedPrepRefresh (Just str) (Just renderer) =
   where mapName = B.drop 5 (B.take (B.length str - 4) str) -- skip "maps/" and cut off ".bsp"
 
 
-registerModels :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-registerModels = error "CLView.registerModels" -- TODO
+registerModel :: Renderer -> V.Vector B.ByteString -> Int -> Quake ()
+registerModel renderer configStrings idx
+  | B.null fullName = return ()
+  | otherwise =
+      do when (name `BC.index` 0 /= '*') $
+           Com.printf (name `B.append` "\r")
+         SCR.updateScreen
+         Sys.sendKeyEvents -- pump message loop
+         doRegisterModel renderer fullName idx
+         when (name `BC.index` 0 /= '*') $
+           Com.printf "                                     \r"
+  where fullName = configStrings V.! (Constants.csModels + idx)
+        name | B.length fullName > 37 = B.take 36 fullName
+             | otherwise = fullName
 
-registerImages :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-registerImages = error "CLView.registerImages" -- TODO
+doRegisterModel :: Renderer -> B.ByteString -> Int -> Quake ()
+doRegisterModel renderer fullName idx
+  | fullName `BC.index` 0 == '#' =
+      do numWeaponModels <- use (clientGlobals.cgNumCLWeaponModels)
+         when (numWeaponModels < Constants.maxClientWeaponModels) $
+           do clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 fullName
+              clientGlobals.cgNumCLWeaponModels += 1
+  | otherwise =
+      do modelRef <- (renderer^.rRefExport.reRegisterModel) fullName
+         globals.gCl.csModelDraw.ix idx .= modelRef
+         setModelClip fullName idx
 
-processClients :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-processClients = error "CLView.processClients" -- TODO
+setModelClip :: B.ByteString -> Int -> Quake ()
+setModelClip fullName idx
+  | fullName `BC.index` 0 == '*' =
+      do inlineModelRef <- CM.inlineModel fullName
+         globals.gCl.csModelClip.ix idx .= Just inlineModelRef
+  | otherwise = globals.gCl.csModelClip.ix idx .= Nothing
 
-setSky :: V.Vector B.ByteString -> Quake ()
-setSky = error "CLView.setSky" -- TODO
+registerImage :: Renderer -> V.Vector B.ByteString -> Int -> Quake ()
+registerImage renderer configStrings idx
+  | B.null configString = return ()
+  | otherwise =
+      do picRef <- (renderer^.rRefExport.reRegisterPic) configString
+         globals.gCl.csImagePrecache.ix idx .= picRef
+         Sys.sendKeyEvents -- pump message loop
+  where configString = configStrings V.! (Constants.csImages + idx)
 
-{-
+processClient :: V.Vector B.ByteString -> Int -> Quake ()
+processClient configStrings idx
+  | B.null configString = return ()
+  | otherwise =
+      do Com.printf (B.concat ["client ", encode idx, "\r"])
+         SCR.updateScreen
+         Sys.sendKeyEvents
+         CLParse.parseClientInfo idx
+         Com.printf "                                     \r"
+  where configString = configStrings V.! (Constants.csPlayerSkins + idx)
 
-  where registerModels :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        registerModels configStrings idx maxIdx
-          | idx >= maxIdx || B.length (configStrings V.! (Constants.csModels + idx)) == 0 = return ()
-          | otherwise = do
-              let fullName = configStrings V.! (Constants.csModels + idx)
-                  name = if B.length fullName > 37
-                           then B.take 36 fullName
-                           else configStrings V.! (Constants.csModels + idx)
-
-              when (name `BC.index` 0 /= '*') $
-                Com.printf (name `B.append` "\r")
-
-              SCR.updateScreen
-              Sys.sendKeyEvents -- pump message loop
-              
-              if name `BC.index` 0 == '#'
-                then do -- special player weapon model
-                  numWeaponModels <- use $ clientGlobals.cgNumCLWeaponModels
-                  when (numWeaponModels < Constants.maxClientWeaponModels) $ do
-                    clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 fullName
-                    clientGlobals.cgNumCLWeaponModels += 1
-                else do
-                  Just renderer <- use $ globals.re
-                  modelRef <- (renderer^.rRefExport.reRegisterModel) fullName
-                  globals.cl.csModelDraw.ix idx .= modelRef
-
-                  if name `BC.index` 0 == '*'
-                    then do
-                      inlineModelRef <- CM.inlineModel fullName
-                      globals.cl.csModelClip.ix idx .= Just inlineModelRef
-                    else
-                      globals.cl.csModelClip.ix idx .= Nothing
-
-              when (name `BC.index` 0 /= '*') $
-                Com.printf "                                     \r"
-
-              registerModels configStrings (idx + 1) maxIdx
-
-        registerImages :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        registerImages configStrings idx maxIdx
-          | idx >= maxIdx || B.length (configStrings V.! (Constants.csImages + idx)) == 0 = return ()
-          | otherwise = do
-              Just renderer <- use $ globals.re
-              picRef <- (renderer^.rRefExport.reRegisterPic) (configStrings V.! (Constants.csImages + idx))
-              globals.cl.csImagePrecache.ix idx .= picRef
-              Sys.sendKeyEvents -- pump message loop
-              registerImages configStrings (idx + 1) maxIdx
-
-        processClients :: V.Vector B.ByteString -> Int -> Int -> Quake ()
-        processClients configStrings idx maxIdx
-          | idx >= maxIdx = return ()
-          | otherwise = do
-              if B.length (configStrings V.! (Constants.csPlayerSkins + idx)) == 0
-                then processClients configStrings (idx + 1) maxIdx
-                else do
-                  Com.printf ("client " `B.append` BC.pack (show idx) `B.append` "\r") -- IMPROVE?
-                  SCR.updateScreen
-                  Sys.sendKeyEvents
-                  CLParse.parseClientInfo idx
-                  Com.printf "                                     \r"
-                  processClients configStrings (idx + 1) maxIdx
-
-        setSky :: V.Vector B.ByteString -> Quake ()
-        setSky configStrings = do
-          let rotate = Lib.atof (configStrings V.! Constants.csSkyRotate)
-              (a:b:c:_) = BC.split ' ' (configStrings V.! Constants.csSkyAxis)
-              axis = V3 (Lib.atof a) (Lib.atof b) (Lib.atof c)
-          Just renderer <- use $ globals.re
-          (renderer^.rRefExport.reSetSky) (configStrings V.! Constants.csSky) rotate axis
-          -}
+setSky :: Renderer -> V.Vector B.ByteString -> Quake ()
+setSky renderer configStrings =
+  (renderer^.rRefExport.reSetSky) (configStrings V.! Constants.csSky) rotate axis
+  where rotate = Lib.atof (configStrings V.! Constants.csSkyRotate)
+        (a:b:c:_) = BC.split ' ' (configStrings V.! Constants.csSkyAxis)
+        axis = fmap Lib.atof (V3 a b c)

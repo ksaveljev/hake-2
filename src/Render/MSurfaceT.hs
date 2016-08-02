@@ -4,7 +4,6 @@ module Render.MSurfaceT
   ) where
 
 import qualified Constants
-import           Render.MTexInfoT
 import           Types
 
 import           Control.Lens (makeLenses)
@@ -29,7 +28,7 @@ newMSurfaceT =
             , _msPolys              = Nothing
             , _msTextureChain       = Nothing
             , _msLightmapChain      = Nothing
-            , _msTexInfo            = newMTexInfoT
+            , _msTexInfo            = Ref (-1)
             , _msDLightFrame        = 0
             , _msDLightBits         = 0
             , _msLightmapTextureNum = 0

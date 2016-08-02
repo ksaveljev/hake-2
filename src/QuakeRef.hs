@@ -6,10 +6,11 @@ import qualified Constants
 import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
+import           Render.ModelT
 import           Server.ServerStaticT
 import           Types
 
-import           Control.Lens (use, ix, (%=), (.=))
+import           Control.Lens (use, ix, (^.), (%=), (.=), (&), (.~), (%~))
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
@@ -232,3 +233,27 @@ instance QuakeRef ModelT where
   writeRef (Ref idx) item
     | idx < Constants.maxModKnown = fastRenderAPIGlobals.frModKnown.ix idx .= item
     | otherwise = fastRenderAPIGlobals.frModInline.ix (idx - Constants.maxModKnown) .= item
+
+instance QuakeRef MSurfaceT where
+  readRef (Ref idx) =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       model <- readRef loadModelRef
+       return ((model^.mSurfaces) V.! idx)
+  modifyRef (Ref idx) f =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       modifyRef loadModelRef (\v -> v & mSurfaces.ix idx %~ f)
+  writeRef (Ref idx) item =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       modifyRef loadModelRef (\v -> v & mSurfaces.ix idx .~ item)
+
+instance QuakeRef MTexInfoT where
+  readRef (Ref idx) =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       model <- readRef loadModelRef
+       return ((model^.mTexInfo) V.! idx)
+  modifyRef (Ref idx) f =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       modifyRef loadModelRef (\v -> v & mTexInfo.ix idx %~ f)
+  writeRef (Ref idx) item =
+    do loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+       modifyRef loadModelRef (\v -> v & mTexInfo.ix idx .~ item)

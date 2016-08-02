@@ -1,5 +1,6 @@
 module Render.Fast.Warp
-  ( rSetSky
+  ( glSubdivideSurface
+  , rSetSky
   ) where
 
 import           Types
@@ -9,3 +10,6 @@ import           Linear (V3)
 
 rSetSky :: B.ByteString -> Float -> V3 Float -> Quake ()
 rSetSky = error "Warp.rSetSky" -- TODO
+
+glSubdivideSurface :: Ref MSurfaceT -> Quake ()
+glSubdivideSurface = error "Warp.glSubdivideSurface" -- TODO

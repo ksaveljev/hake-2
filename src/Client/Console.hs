@@ -1,8 +1,10 @@
 module Client.Console
   ( checkResize
   , clearNotify
+  , drawAltString
   , drawConsole
   , drawNotify
+  , drawString
   , initialize
   , toggleConsoleF
   ) where
@@ -24,7 +26,7 @@ import           Util.Unsafe
 
 import           Control.Lens (preuse, use, ix, (.=), (^.))
 import           Control.Monad (void, unless)
-import           Data.Bits (shiftR, shiftL, (.&.))
+import           Data.Bits (shiftR, shiftL, xor, (.&.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char (ord)
@@ -240,3 +242,20 @@ drawInputLine drawChar text y idx maxIdx
   | otherwise =
       do drawChar ((idx + 1) `shiftL` 3) y (ord (BC.index text idx))
          drawInputLine drawChar text y (idx + 1) maxIdx
+
+drawAltString :: Int -> Int -> B.ByteString -> Quake ()
+drawAltString x y s = doDrawString x y (B.length s) (\idx -> (ord (s `BC.index` idx)) `xor` 0x80)
+
+drawString :: Int -> Int -> B.ByteString -> Quake ()
+drawString x y s = doDrawString x y (B.length s) (\idx -> ord (s `BC.index` idx))
+
+doDrawString :: Int -> Int -> Int -> (Int -> Int) -> Quake ()
+doDrawString x y maxIdx f =
+  do renderer <- use (globals.gRenderer)
+     maybe rendererError (draw x 0) renderer
+  where rendererError = Com.fatalError "Console.drawString renderer is Nothing"
+        draw x' idx renderer
+          | idx >= maxIdx = return ()
+          | otherwise =
+              do (renderer^.rRefExport.reDrawChar) x' y (f idx)
+                 draw (x' + 8) (idx + 1) renderer

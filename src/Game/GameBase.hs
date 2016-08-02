@@ -7,6 +7,7 @@ module Game.GameBase
 
 import qualified Client.M as M
 import qualified Constants
+import           Game.ClientPersistantT
 import           Game.ClientRespawnT
 import           Game.CVarT
 import           Game.EdictT
@@ -16,16 +17,18 @@ import           Game.GClientT
 import           Game.LevelLocalsT
 import qualified Game.PlayerClient as PlayerClient
 import qualified Game.PlayerView as PlayerView
+import qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
+import qualified Server.SV as SV
 import qualified Server.SVWorld as SVWorld
 import           Types
 import qualified Util.Math3D as Math3D
 import           Util.Binary (encode)
 
-import           Control.Lens (use, (^.), (.=), (+=), (&), (.~))
+import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~))
 import           Control.Monad (when, void, (>=>))
 import           Data.Bits ((.&.), (.|.))
 import qualified Data.ByteString as B
@@ -60,7 +63,7 @@ runFrame =
                  checkNeedPassword
                  clientEndServerFrames
 
-readEdict :: Int -> Quake (Ref EdictT, EdictT)
+readEdict :: Int -> Quake (Ref EdictT, EdictT) -- TODO: duplicate with something in SVInit
 readEdict idx =
   do edict <- readRef (Ref idx)
      return (Ref idx, edict)
@@ -114,7 +117,24 @@ getGameApi imp =
   gameBaseGlobals.gbGameImport .= (imp & giPointContents .~ SVWorld.pointContents)
 
 exitLevel :: Quake ()
-exitLevel = error "GameBase.exitLevel" -- TODO
+exitLevel =
+  do changeMap <- use (gameBaseGlobals.gbLevel.llChangeMap)
+     addCommandString <- use (gameBaseGlobals.gbGameImport.giAddCommandString)
+     addCommandString (B.concat ["gamemap \"", changeMap, "\"\n"])
+     gameBaseGlobals.gbLevel %= (\v -> v & llChangeMap .~ B.empty -- TODO: we sure? jake2 has NULL here
+                                         & llExitIntermission .~ False
+                                         & llIntermissionTime .~ 0)
+     clientEndServerFrames
+     maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+     mapM_ (readEdict >=> updateEdictHealth) [1..maxClients]
+  where updateEdictHealth (edictRef, edict)
+          | (edict^.eInUse) = maybe clientError (updateClientHealth edictRef edict) (edict^.eClient)
+          | otherwise = return ()
+        clientError = Com.fatalError "GameBase.exitLevel edict^.eClient is Nothing"
+        updateClientHealth edictRef edict clientRef =
+          do client <- readRef clientRef
+             when ((edict^.eHealth) > (client^.gcPers.cpMaxHealth)) $
+               modifyRef edictRef (\v -> v & eHealth .~ (client^.gcPers.cpMaxHealth))
 
 checkDMRules :: Quake ()
 checkDMRules =
@@ -181,7 +201,22 @@ clientEndServerFrames =
           | otherwise = return ()
 
 runEntity :: Ref EdictT -> Quake ()
-runEntity = error "GameBase.runEntity" -- TODO
+runEntity edictRef =
+  do edict <- readRef edictRef
+     maybe (return ()) doPreThink (edict^.ePrethink)
+     makeNextMove edictRef (edict^.eMoveType)
+  where doPreThink e = void (entThink e edictRef)
+
+makeNextMove :: Ref EdictT -> Int -> Quake ()
+makeNextMove edictRef moveType
+  | any (== moveType) [Constants.moveTypePush, Constants.moveTypeStop] = SV.physicsPusher edictRef
+  | moveType == Constants.moveTypeNone = SV.physicsNone edictRef
+  | moveType == Constants.moveTypeNoClip = SV.physicsNoClip edictRef
+  | moveType == Constants.moveTypeStep = SV.physicsStep edictRef
+  | any (== moveType) [Constants.moveTypeToss, Constants.moveTypeBounce, Constants.moveTypeFly, Constants.moveTypeFlyMissile] = SV.physicsToss edictRef
+  | otherwise =
+      do err <- use (gameBaseGlobals.gbGameImport.giError)
+         err ("SV_Physics: bad movetype " `B.append` encode moveType)
 
 endDMLevel :: Quake ()
 endDMLevel = error "GameBase.endDMLevel" -- TODO

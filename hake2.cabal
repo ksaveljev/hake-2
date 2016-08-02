@@ -217,6 +217,7 @@ executable hake2
                      , QCommon.QFiles.BSP.DAreaT
                      , QCommon.QFiles.BSP.DBrushSideT
                      , QCommon.QFiles.BSP.DBrushT
+                     , QCommon.QFiles.BSP.DFaceT
                      , QCommon.QFiles.BSP.DHeaderT
                      , QCommon.QFiles.BSP.DLeafT
                      , QCommon.QFiles.BSP.DModelT
@@ -273,6 +274,7 @@ executable hake2
                      , Server.ClientT
                      , Server.ServerStaticT
                      , Server.ServerT
+                     , Server.SV
                      , Server.SVConsoleCommands
                      , Server.SVEnts
                      , Server.SVGame
@@ -300,4 +302,5 @@ executable hake2
                      , Util.Binary
                      , Util.Lib
                      , Util.Math3D
+                     , Util.QuakeFile
                      , Util.Unsafe

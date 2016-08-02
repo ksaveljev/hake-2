@@ -2,6 +2,7 @@ module Sound.S
   ( beginRegistration
   , disableStreaming
   , endRegistration
+  , getDriverNames
   , initialize
   , rawSamples
   , registerSound
@@ -14,6 +15,7 @@ module Sound.S
 import           Types
 
 import qualified Data.ByteString as B
+import qualified Data.Vector as V
 import           Linear (V3)
 import           System.IO (Handle)
 
@@ -36,13 +38,16 @@ shutdown :: Quake ()
 shutdown = request (io (putStrLn "S.shutdown IMPLEMENT ME!")) -- TODO
 
 registerSound :: B.ByteString -> Quake (Maybe (Ref SfxT))
-registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> return Nothing
+registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> return Nothing -- TODO
 
 rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
-rawSamples _ _ _ _ _ = request (io (putStrLn "S.rawSamples IMPLEMENT ME!"))
+rawSamples _ _ _ _ _ = request (io (putStrLn "S.rawSamples IMPLEMENT ME!")) -- TODO
 
 beginRegistration :: Quake ()
-beginRegistration = request (io (putStrLn "S.beginRegistration IMPLEMENT ME!"))
+beginRegistration = request (io (putStrLn "S.beginRegistration IMPLEMENT ME!")) -- TODO
 
 endRegistration :: Quake ()
-endRegistration = request (io (putStrLn "S.endRegistration IMPLEMENT ME!"))
+endRegistration = request (io (putStrLn "S.endRegistration IMPLEMENT ME!")) -- TODO
+
+getDriverNames :: Quake (V.Vector B.ByteString)
+getDriverNames = error "S.getDriverNames" -- TODO

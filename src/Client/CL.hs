@@ -4,6 +4,7 @@ module Client.CL
   , fixUpGender
   , frame
   , initialize
+  , pingServersF
   , quitF
   , shutdown
   , writeConfiguration
