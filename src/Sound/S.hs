@@ -8,6 +8,7 @@ module Sound.S
   , registerSound
   , shutdown
   , startLocalSound
+  , startSound
   , stopAllSounds
   , update
   ) where
@@ -51,3 +52,6 @@ endRegistration = request (io (putStrLn "S.endRegistration IMPLEMENT ME!")) -- T
 
 getDriverNames :: Quake (V.Vector B.ByteString)
 getDriverNames = error "S.getDriverNames" -- TODO
+
+startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Maybe (Ref SfxT) -> Float -> Float -> Float -> Quake ()
+startSound _ _ _ _ _ _ _ = request (io (putStrLn "S.startSound IMPLEMENT ME!")) -- TODO

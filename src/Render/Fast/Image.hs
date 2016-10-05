@@ -509,23 +509,23 @@ doConstructTrans :: SV.Vector Word8 -> MSV.STVector s Word8 -> Int -> UV.Vector 
 doConstructTrans image v width d8to24table idx maxIdx
   | idx >= maxIdx = SV.unsafeFreeze v
   | otherwise =
-      do let p = image SV.! idx
-             t = d8to24table UV.! fromIntegral p
-             p' | p == 0xFF = scanAround
-                 | otherwise = p
-             t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
-                 | otherwise = t
+      do let !p = image SV.! idx
+             !t = d8to24table UV.! fromIntegral p
+             !p' | p == 0xFF = scanAround
+                | otherwise = p
+             !t' | p == 0xFF = (d8to24table UV.! fromIntegral p') .&. 0x00FFFFFF
+                | otherwise = t
              scanAround
                | idx > width && (image SV.! (idx - width)) /= 0xFF = image SV.! (idx - width)
                | idx < maxIdx - width && (image SV.! (idx + width)) /= 0xFF = image SV.! (idx + width)
                | idx > 0 && (image SV.! (idx - 1)) /= 0xFF = image SV.! (idx - 1)
                | idx < maxIdx - 1 && (image SV.! (idx + 1)) /= 0xFF = image SV.! (idx + 1)
                | otherwise = 0
-             t'' = fromIntegral t' :: Word32
-             a = fromIntegral (t'' .&. 0xFF) :: Word8
-             b = fromIntegral ((t'' `shiftR` 8) .&. 0xFF) :: Word8
-             c = fromIntegral ((t'' `shiftR` 16) .&. 0xFF) :: Word8
-             d = fromIntegral ((t'' `shiftR` 24) .&. 0xFF) :: Word8
+             !t'' = fromIntegral t' :: Word32
+             !a = fromIntegral (t'' .&. 0xFF) :: Word8
+             !b = fromIntegral ((t'' `shiftR` 8) .&. 0xFF) :: Word8
+             !c = fromIntegral ((t'' `shiftR` 16) .&. 0xFF) :: Word8
+             !d = fromIntegral ((t'' `shiftR` 24) .&. 0xFF) :: Word8
          MSV.write v (idx * 4 + 0) a
          MSV.write v (idx * 4 + 1) b
          MSV.write v (idx * 4 + 2) c
@@ -832,8 +832,7 @@ uploadMiptexT name Nothing =
      use (fastRenderAPIGlobals.frNoTexture)
 uploadMiptexT name (Just miptex) =
   glLoadPic name (fromBStoSV (miptex^.mtBuf)) (miptex^.mtWidth) (miptex^.mtHeight) Constants.itWall 8
-  where fromBStoSV str =
-          SV.generate (B.length str) (str `B.index`)
+  where fromBStoSV str = SV.generate (B.length str) (str `B.index`)
 
 loadTGA :: B.ByteString -> Quake (Maybe (SV.Vector Word8, (Int, Int)))
 loadTGA = error "Image.loadTGA" -- TODO

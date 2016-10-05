@@ -26,6 +26,7 @@ import           Util.Binary (encode)
 
 import           Control.Lens (use, (^.), (.=), (%=), (&), (.~), _1, _2)
 import           Control.Monad (when, unless)
+import           Control.Monad.ST (runST)
 import           Data.Bits (shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -33,6 +34,7 @@ import           Data.Char (toUpper)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Unboxed.Mutable as MUV
 import           Data.Word (Word8)
 import qualified Graphics.GL as GL
 import           Linear (V3(..))
@@ -140,79 +142,34 @@ glBuildPolygonFromSurface = error "Surf.glBuildPolygonFromSurface" -- TODO
 lmAllocBlock :: Int -> Int -> (Int, Int) -> Quake (Bool, (Int, Int))
 lmAllocBlock w h pos =
   do allocated <- use (fastRenderAPIGlobals.frGLLms.lmsAllocated)
-     undefined -- TODO
-{-
-boolean LM_AllocBlock (int w, int h, pos_t pos)
-	{
-		int best = BLOCK_HEIGHT;
-		int x = pos.x; 
-		int best2;
-		int i, j;
-		for (i=0 ; i<BLOCK_WIDTH-w ; i++)
-		{
-			best2 = 0;
+     proceedAlloc allocated w h (findSpot allocated w blockHeight 0 (blockWidth - w) pos)
 
-			for (j=0 ; j<w ; j++)
-			{
-				if (gl_lms.allocated[i+j] >= best)
-					break;
-				if (gl_lms.allocated[i+j] > best2)
-					best2 = gl_lms.allocated[i+j];
-			}
-			if (j == w)
-			{	// this is a valid spot
-				pos.x = x = i;
-				pos.y = best = best2;
-			}
-		}
-		
+findSpot :: UV.Vector Int -> Int -> Int -> Int -> Int -> (Int, Int) -> ((Int, Int), Int)
+findSpot allocated w best i maxI pos
+  | i >= maxI = (pos, best)
+  | j == w = findSpot allocated w best2 (i + 1) maxI (i, best2)
+  | otherwise = findSpot allocated w best (i + 1) maxI pos
+  where (best2, j) = findBest2 allocated best 0 i 0 w
 
-		if (best + h > BLOCK_HEIGHT)
-			return false;
+findBest2 :: UV.Vector Int -> Int -> Int -> Int -> Int -> Int -> (Int, Int)
+findBest2 allocated best best2 i j maxJ
+  | j >= maxJ = (best2, j)
+  | allocated UV.! (i + j) >= best = (best2, j)
+  | allocated UV.! (i + j) > best2 =
+      findBest2 allocated best (allocated UV.! (i + j)) i (j + 1) maxJ
+  | otherwise =
+      findBest2 allocated best best2 i (j + 1) maxJ
 
-		for (i=0 ; i<w ; i++)
-			gl_lms.allocated[x + i] = best + h;
-
-		return true;
-	}
-	-}
-
-{-
-    let (pos', best) = findSpot allocated blockHeight 0 (blockWidth - w) pos
-    -- io $ print "ALLOC BLOCK"
-    -- io $ print ("best = " ++ show best)
-    -- io $ print ("pos = " ++ show pos')
-    --io $ print ("allocated = " ++ show (UV.take 10 allocated))
-    if best + h > blockHeight
-      then return (False, pos')
-      else do
-        let updates = collectUpdates (pos'^._1) best 0 w []
-        fastRenderAPIGlobals.frGLLms.lmsAllocated %= (UV.// updates)
-        return (True, pos')
-
-  where findSpot :: UV.Vector Int -> Int -> Int -> Int -> (Int, Int) -> ((Int, Int), Int)
-        findSpot allocated best i maxI pos
-          | i >= maxI = (pos, best)
-          | otherwise =
-              let (best2, j) = findBest2 allocated best 0 i 0 w
-              in if j == w -- this is a valid spot
-                   then findSpot allocated best2 (i + 1) maxI (i, best2)
-                   else findSpot allocated best (i + 1) maxI pos
-
-        findBest2 :: UV.Vector Int -> Int -> Int -> Int -> Int -> Int -> (Int, Int)
-        findBest2 allocated best best2 i j maxJ
-          | j >= maxJ = (best2, j)
-          | otherwise =
-              let v = allocated UV.! (i + j)
-              in if | v >= best -> (best2, j)
-                    | v > best2 -> findBest2 allocated best v i (j + 1) maxJ
-                    | otherwise -> findBest2 allocated best best2 i (j + 1) maxJ
-
-        collectUpdates :: Int -> Int -> Int -> Int -> [(Int, Int)] -> [(Int, Int)]
-        collectUpdates x best idx maxIdx acc
-          | idx >= maxIdx = acc
-          | otherwise = collectUpdates x best (idx + 1) maxIdx ((x + idx, best + h) : acc)
-          -}
+proceedAlloc :: UV.Vector Int -> Int -> Int -> ((Int, Int), Int) -> Quake (Bool, (Int, Int))
+proceedAlloc allocated w h (pos, best)
+  | best + h > blockHeight = return (False, pos)
+  | otherwise =
+      do fastRenderAPIGlobals.frGLLms.lmsAllocated .= allocated'
+         return (True, pos)
+  where allocated' = runST $
+          do allocatedMutable <- UV.unsafeThaw allocated
+             mapM_ (\idx -> MUV.write allocatedMutable idx (best + h)) [0..w-1]
+             UV.unsafeFreeze allocatedMutable
 
 lmInitBlock :: Quake ()
 lmInitBlock = fastRenderAPIGlobals.frGLLms.lmsAllocated .= UV.replicate blockWidth 0

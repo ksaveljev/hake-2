@@ -150,6 +150,7 @@ executable hake2
                      , Game.Monsters.MBoss31
                      , Game.Monsters.MBrain
                      , Game.Monsters.MChick
+                     , Game.Monsters.MFlash
                      , Game.Monsters.MFlipper
                      , Game.Monsters.MFloat
                      , Game.Monsters.MFlyer

@@ -1,9 +1,15 @@
 module Client.CLTEnt
-  ( clearTEnts
-  , parseTEnt
-  , registerTEntModels
-  , registerTEntSounds
-  ) where
+    ( clearTEnts
+    , parseTEnt
+    , registerTEntModels
+    , registerTEntSounds
+    , smokeAndFlash
+    ) where
+
+import           Control.Lens      (use, (^.), (%=), (&), (.~))
+import           Control.Monad     (void)
+import qualified Data.Vector       as V
+import           Linear            (V3)
 
 import           Client.BeamT
 import           Client.CLSustainT
@@ -11,15 +17,11 @@ import           Client.ExplosionT
 import           Client.LaserT
 import           Client.RefExportT
 import qualified Constants
-import qualified QCommon.Com as Com
+import qualified QCommon.Com       as Com
 import           QuakeState
 import           Render.Renderer
-import qualified Sound.S as S
+import qualified Sound.S           as S
 import           Types
-
-import           Control.Lens (use, (^.), (%=), (&), (.~))
-import           Control.Monad (void)
-import qualified Data.Vector as V
 
 clearTEnts :: Quake ()
 clearTEnts =
@@ -118,3 +120,6 @@ proceedRegisterTEntModels renderer =
                                & clteModExplo4Big .~ modExplo4Big)
   where registerModel = renderer^.rRefExport.reRegisterModel
         registerPic = renderer^.rRefExport.reRegisterPic
+
+smokeAndFlash :: V3 Float -> Quake ()
+smokeAndFlash = error "CLTEnt.smokeAndFlash" -- TODO

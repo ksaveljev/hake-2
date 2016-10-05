@@ -1,15 +1,15 @@
 module Client.CL
-  ( clearState
-  , dropClient
-  , fixUpGender
-  , frame
-  , initialize
-  , pingServersF
-  , quitF
-  , shutdown
-  , writeConfiguration
-  , writeDemoMessage
-  ) where
+    ( clearState
+    , dropClient
+    , fixUpGender
+    , frame
+    , initialize
+    , pingServersF
+    , quitF
+    , shutdown
+    , writeConfiguration
+    , writeDemoMessage
+    ) where
 
 import Types
 

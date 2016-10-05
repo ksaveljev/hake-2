@@ -88,15 +88,12 @@ markBaseSearchPaths =
      fsGlobals.fsBaseSearchPaths .= searchPaths
 
 pathF :: XCommandT
-pathF = XCommandT "FS.pathF" $
-  do printSearchPaths
-     printLinks
+pathF = XCommandT "FS.pathF" (printSearchPaths >> printLinks)
 
 printSearchPaths :: Quake ()
 printSearchPaths =
   do Com.printf "Current search path:\n"
-     searchPaths <- use (fsGlobals.fsSearchPaths)
-     mapM_ printSearchPath searchPaths
+     mapM_ printSearchPath =<< use (fsGlobals.fsSearchPaths)
   where printSearchPath searchPath =
           maybe (printFilename searchPath) printPackInfo (searchPath^.spPack)
         printFilename searchPath = Com.printf ((searchPath^.spFilename) `B.append` "\n")
@@ -106,8 +103,7 @@ printSearchPaths =
 printLinks :: Quake ()
 printLinks =
   do Com.printf "\nLinks:\n"
-     links <- use (fsGlobals.fsLinks)
-     mapM_ printLink links
+     mapM_ printLink =<< use(fsGlobals.fsLinks)
   where printLink link = Com.printf (B.concat [link^.flFrom, " : ", link^.flTo, "\n"])
 
 linkF :: XCommandT

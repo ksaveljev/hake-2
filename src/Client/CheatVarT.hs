@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.CheatVarT
-  ( module Client.CheatVarT
-  ) where
+    ( module Client.CheatVarT
+    ) where
 
-import Types
+import           Control.Lens (makeLenses)
 
-import Control.Lens (makeLenses)
+import           Types
 
 makeLenses ''CheatVarT

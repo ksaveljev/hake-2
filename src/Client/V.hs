@@ -100,30 +100,33 @@ renderView stereoSeparation =
      unless skip $
        do checkTimeDemo =<< timeDemoCVar
           join (liftA3 (doRenderView stereoSeparation) frameValid forceRefDef pausedCVar)
-          undefined -- TODO
-          undefined -- TODO
-          undefined -- TODO
-          undefined -- TODO
-          undefined -- TODO
+          renderer <- use (globals.gRenderer)
+          maybe rendererError finishRenderView renderer
   where frameValid = use (globals.gCl.csFrame.fValid)
         forceRefDef = use (globals.gCl.csForceRefDef)
-{-
-      Just renderer <- use $ globals.re
-      use (globals.cl.csRefDef) >>= \rd ->
-        (renderer^.rRefExport.reRenderFrame) rd
+        rendererError = Com.fatalError "V.renderView renderer is Nothing"
 
-      clStatsCVar >>= \c ->
+finishRenderView :: Renderer -> Quake ()
+finishRenderView renderer =
+  do refDef <- use (globals.gCl.csRefDef)
+     (renderer^.rRefExport.reRenderFrame) refDef
+     -- TODO: stats
+     {- clStatsCVar >>= \c ->
         when ((c^.cvValue) /= 0) $
           Com.printf $ "ent: ??? lt: ??? part: ???" -- TODO: add info here!
-
+          -}
+     -- TODO: log stats
+     {-
       logFile <- use $ globals.logStatsFile
       logStatsCVar >>= \c ->
         when ((c^.cvValue) /= 0 && isJust logFile) $
           io (putStrLn "V.renderView: implement me!")
+          -}
+     vrect <- use (globals.gScrVRect)
+     SCR.addDirtyPoint (vrect^.vrX) (vrect^.vrY)
+     SCR.addDirtyPoint ((vrect^.vrX) + (vrect^.vrWidth) - 1) ((vrect^.vrY) + (vrect^.vrHeight) - 1)
+     SCR.drawCrosshair
 
-      finishRenderView
--}
-          
 shouldSkip :: Quake Bool
 shouldSkip =
   do state <- use (globals.gCls.csState)
@@ -163,7 +166,6 @@ doRenderView stereoSeparation frameValid forceRefDef paused
          copyValue (vGlobals.vgDLights) (globals.gCl.csRefDef.rdDLights)
          copyValue (vGlobals.vgLightStyles) (globals.gCl.csRefDef.rdLightStyles)
          copyValue (globals.gCl.csFrame.fPlayerState.psRDFlags) (globals.gCl.csRefDef.rdRdFlags)
-         undefined -- TODO
   | otherwise = return ()
   where checkNonZeroVar f var = when ((var^.cvValue) /= 0) f
         checkZeroVar f var = when ((var^.cvValue) == 0) f
@@ -188,13 +190,6 @@ updateViewOrg vrect cl =
                                    & rdFovY .~ Math3D.calcFov (cl^.csRefDef.rdFovX) (fromIntegral (vrect^.vrWidth)) (fromIntegral (vrect^.vrHeight))
                                    & rdTime .~ (fromIntegral (cl^.csTime)) * 0.001
                                    & rdAreaBits .~ (cl^.csFrame.fAreaBits))
-
-finishRenderView :: Quake ()
-finishRenderView =
-  do vrect <- use (globals.gScrVRect)
-     SCR.addDirtyPoint (vrect^.vrX) (vrect^.vrY)
-     SCR.addDirtyPoint ((vrect^.vrX) + (vrect^.vrWidth) - 1) ((vrect^.vrY) + (vrect^.vrHeight) - 1)
-     SCR.drawCrosshair
 
 clearScene :: Quake ()
 clearScene =
