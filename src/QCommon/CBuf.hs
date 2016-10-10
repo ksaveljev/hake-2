@@ -6,6 +6,7 @@ module QCommon.CBuf
   , execute
   , executeText
   , initialize
+  , insertFromDefer
   ) where
 
 import qualified Game.Cmd as Cmd
@@ -99,3 +100,9 @@ copyToDefer =
 
 executeText :: Int -> B.ByteString -> Quake ()
 executeText = error "CBuf.executeText" -- TODO
+
+insertFromDefer :: Quake ()
+insertFromDefer = do
+    buf <- use (globals.gDeferTextBuf)
+    insertText buf
+    globals.gDeferTextBuf .= ""

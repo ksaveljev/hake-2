@@ -1,5 +1,6 @@
 module QCommon.CM
   ( areasConnected
+  , boxTrace
   , clusterPHS
   , clusterPVS
   , entityString
@@ -34,7 +35,7 @@ import qualified Constants
 import           QuakeRef
 import           QuakeState
 import           Types
-import           Util.Binary (encode, getMany)
+import           Util.Binary (encode)
 import qualified Util.Lib as Lib
 
 import           Control.Lens (use, (.=), (%=), (+=), (^.), (&), (.~))
@@ -572,3 +573,6 @@ setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx =
           | x == 1 = V3 0 v 0
           | otherwise = V3 0 0 v
           where x = idx `shiftR` 1
+
+boxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Quake TraceT
+boxTrace = error "CM.boxTrace" -- TODO

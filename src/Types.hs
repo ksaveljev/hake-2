@@ -389,7 +389,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
   , _frWorldMatrix          :: [GL.GLfloat]
   , _frVisFrameCount        :: Int
   , _frModelOrg             :: V3 Float
-  , _frCurrentEntity        :: Maybe (Ref EntityT)
+  , _frCurrentEntity        :: Maybe CurrentEntity
   , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
   , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
   , _frAlphaSurfaces        :: Maybe (Ref MSurfaceT)
@@ -597,6 +597,9 @@ data GLFWKBDEvent = KeyPress GLFW.Key
                   | MouseButtonRelease GLFW.MouseButton
                   | MouseWheelScroll Double
                   | ConfigureNotify
+
+data CurrentEntity = EntityRef (Ref EntityT)
+                   | NewEntity EntityT
   
 data CVarT = CVarT
   { _cvName          :: B.ByteString
@@ -2188,10 +2191,24 @@ data DFaceT = DFaceT
   , _dfLightOfs  :: Int
   }
 
+data MoveClipT = MoveClipT
+    { _mcBoxMins     :: V3 Float
+    , _mcBoxMaxs     :: V3 Float
+    , _mcMins        :: V3 Float
+    , _mcMaxs        :: V3 Float
+    , _mcMins2       :: V3 Float
+    , _mcMaxs2       :: V3 Float
+    , _mcStart       :: V3 Float
+    , _mcEnd         :: V3 Float
+    , _mcTrace       :: TraceT
+    , _mcPassEdict   :: Maybe (Ref EdictT)
+    , _mcContentMask :: Int
+    }
+
 data KeyFuncT = KeyFuncT
-  { _kfName :: B.ByteString
-  , _kfFunc :: Int -> Quake (Maybe B.ByteString)
-  }
+    { _kfName :: B.ByteString
+    , _kfFunc :: Int -> Quake (Maybe B.ByteString)
+    }
 
 instance Eq KeyFuncT where
     x == y = _kfName x == _kfName y
@@ -2213,56 +2230,56 @@ data ModelExtra = AliasModelExtra DMdlT
                 | SpriteModelExtra DSpriteT
 
 data AI = AI
-  { aiId :: B.ByteString
-  , aiAi :: Ref EdictT -> Float -> Quake ()
-  }
+    { aiId :: B.ByteString
+    , aiAi :: Ref EdictT -> Float -> Quake ()
+    }
 
 data EntInteract = EntInteract
-  { entInteractId :: B.ByteString
-  , entInteract   :: Ref EdictT -> Ref EdictT -> Quake Bool
-  }
+    { entInteractId :: B.ByteString
+    , entInteract   :: Ref EdictT -> Ref EdictT -> Quake Bool
+    }
 
 data EntThink = EntThink
-  { entThinkId :: B.ByteString
-  , entThink   :: Ref EdictT -> Quake Bool
-  }
+    { entThinkId :: B.ByteString
+    , entThink   :: Ref EdictT -> Quake Bool
+    }
 
 data EntBlocked = EntBlocked
-  { entBlockedId :: B.ByteString
-  , entBlocked   :: Ref EdictT -> Ref EdictT -> Quake ()
-  }
+    { entBlockedId :: B.ByteString
+    , entBlocked   :: Ref EdictT -> Ref EdictT -> Quake ()
+    }
 
 data EntDodge = EntDodge
-  { entDodgeId :: B.ByteString
-  , entDodge   :: Ref EdictT -> Ref EdictT -> Float -> Quake ()
-  }
+    { entDodgeId :: B.ByteString
+    , entDodge   :: Ref EdictT -> Ref EdictT -> Float -> Quake ()
+    }
 
 data EntTouch = EntTouch
-  { entTouchId :: B.ByteString
-  , entTouch   :: Ref EdictT -> Ref EdictT -> CPlaneT -> Maybe CSurfaceT -> Quake ()
-  }
+    { entTouchId :: B.ByteString
+    , entTouch   :: Ref EdictT -> Ref EdictT -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+    }
 
 data EntUse = EntUse
-  { entUseId :: B.ByteString
-  , entUse   :: Ref EdictT -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
-  }
+    { entUseId :: B.ByteString
+    , entUse   :: Ref EdictT -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
+    }
 
 data EntPain = EntPain
-  { entPainId :: B.ByteString
-  , entPain   :: Ref EdictT -> Ref EdictT -> Float -> Int -> Quake ()
-  }
+    { entPainId :: B.ByteString
+    , entPain   :: Ref EdictT -> Ref EdictT -> Float -> Int -> Quake ()
+    }
 
 data EntDie = EntDie
-  { entDieId :: B.ByteString
-  , entDie   :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Int -> V3 Float -> Quake ()
-  }
+    { entDieId :: B.ByteString
+    , entDie   :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Int -> V3 Float -> Quake ()
+    }
 
 data ItemUse = ItemUse
-  { itemUseId :: B.ByteString
-  , itemUse   :: Ref EdictT -> Ref GItemT -> Quake ()
-  }
+    { itemUseId :: B.ByteString
+    , itemUse   :: Ref EdictT -> Ref GItemT -> Quake ()
+    }
 
 data ItemDrop = ItemDrop
-  { itemDropId :: B.ByteString
-  , itemDrop   :: Ref EdictT -> Ref GItemT -> Quake ()
-  }
+    { itemDropId :: B.ByteString
+    , itemDrop   :: Ref EdictT -> Ref GItemT -> Quake ()
+    }

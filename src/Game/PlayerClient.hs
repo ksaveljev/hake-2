@@ -1,5 +1,6 @@
 module Game.PlayerClient
-  ( clientBeginServerFrame
+  ( clientBegin
+  , clientBeginServerFrame
   , clientConnect
   , clientUserInfoChanged
   , saveClientData
@@ -193,3 +194,6 @@ initClientResp gClientRef =
      gClient <- readRef gClientRef
      modifyRef gClientRef (\v -> v & gcResp .~ (newClientRespawnT & crEnterFrame .~ frameNum
                                                                   & crCoopRespawn .~ (gClient^.gcPers)))
+
+clientBegin :: Ref EdictT -> Quake ()
+clientBegin = error "PlayerClient.clientBegin" -- TODO

@@ -273,6 +273,7 @@ executable hake2
                      , Server.ChallengeT
                      , Server.ClientFrameT
                      , Server.ClientT
+                     , Server.MoveClipT
                      , Server.ServerStaticT
                      , Server.ServerT
                      , Server.SV
