@@ -23,7 +23,7 @@ import qualified Data.Vector.Unboxed          as UV
 import qualified Data.Vector.Unboxed.Mutable  as MUV
 import           Data.Word                    (Word8)
 import qualified Graphics.GL                  as GL
-import           Linear                       (V3(..))
+import           Linear                       (V3(..), dot, _x, _y, _z, _xyz, _w)
 
 import           Client.RefDefT
 import qualified Constants
@@ -33,8 +33,15 @@ import           QCommon.CVarVariables
 import           Render.Fast.GLLightMapStateT
 import qualified Render.Fast.Image            as Image
 import qualified Render.Fast.Light            as Light
+import qualified Render.Fast.Polygon          as Polygon
+import           Render.GLPolyT
 import           Render.GLStateT
+import           Render.ImageT
+import           Render.MEdgeT
+import           Render.ModelT
 import           Render.MSurfaceT
+import           Render.MTexInfoT
+import           Render.MVertexT
 import           QuakeRef
 import           QuakeState
 import           Types
@@ -106,14 +113,14 @@ glEndBuildingLightmaps = do
 lmUploadBlock :: Bool -> Quake ()
 lmUploadBlock = error "Surf.lmUploadBlock" -- TODO
 
-glCreateSurfaceLightmap :: Ref MSurfaceT -> Quake ()
-glCreateSurfaceLightmap surfaceRef = do
+glCreateSurfaceLightmap :: Ref MSurfaceT -> Maybe B.ByteString -> Quake ()
+glCreateSurfaceLightmap surfaceRef lightData = do
     surface <- readRef surfaceRef
     when ((surface^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) == 0) $
-        doCreateSurfaceLightmap surfaceRef surface
+        doCreateSurfaceLightmap surfaceRef surface lightData
 
-doCreateSurfaceLightmap :: Ref MSurfaceT -> MSurfaceT -> Quake ()
-doCreateSurfaceLightmap surfaceRef surface = do
+doCreateSurfaceLightmap :: Ref MSurfaceT -> MSurfaceT -> Maybe B.ByteString -> Quake ()
+doCreateSurfaceLightmap surfaceRef surface lightData = do
     pos <- tryAllocBlock
     lightmapTexture <- use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture)
     modifyRef surfaceRef (\v -> v & msLightS .~ (pos^._1)
@@ -121,7 +128,7 @@ doCreateSurfaceLightmap surfaceRef surface = do
                                   & msLightmapTextureNum .~ lightmapTexture)
     Light.rSetCacheState surfaceRef
     buffer <- use (fastRenderAPIGlobals.frGLLms.lmsLightmapBuffer)
-    Light.rBuildLightMap surfaceRef buffer (((pos^._2) * blockWidth + (pos^._1)) * lightmapBytes) (blockWidth * lightmapBytes)
+    Light.rBuildLightMap surfaceRef lightData buffer (((pos^._2) * blockWidth + (pos^._1)) * lightmapBytes) (blockWidth * lightmapBytes)
   where
     smax = fromIntegral (((surface^.msExtents._1) `shiftR` 4) + 1)
     tmax = fromIntegral (((surface^.msExtents._2) `shiftR` 4) + 1)
@@ -138,7 +145,75 @@ doCreateSurfaceLightmap surfaceRef surface = do
         return pos
 
 glBuildPolygonFromSurface :: Ref MSurfaceT -> Quake ()
-glBuildPolygonFromSurface = error "Surf.glBuildPolygonFromSurface" -- TODO
+glBuildPolygonFromSurface surfRef = do
+    surf <- readRef surfRef
+    model <- readCurrentModel
+    image <- readTextureImage surf
+    buildPolygonFromSurface surfRef surf model image
+  where
+    readCurrentModel = do
+        modelRef <- use (fastRenderAPIGlobals.frCurrentModel)
+        maybe currentModelError readRef modelRef
+    currentModelError = do
+        Com.fatalError "Surf.glBuildPolygonFromSurface current model is Nothing"
+        return newModelT
+    readTextureImage surf = do
+        texInfo <- readRef (surf^.msTexInfo)
+        maybe texInfoImageError readRef (texInfo^.mtiImage)
+    texInfoImageError = do
+        Com.fatalError "Surf.glBuildPolygonFromSurface tex info image is Nothing"
+        return (newImageT (-1))
+
+buildPolygonFromSurface :: Ref MSurfaceT -> MSurfaceT -> ModelT -> ImageT -> Quake ()
+buildPolygonFromSurface surfRef surf model image = do
+    polyRef <- Polygon.create lNumVerts
+    modifyRef polyRef (\v -> v & glpNext .~ (surf^.msPolys)
+                               & glpFlags .~ (surf^.msFlags))
+    modifyRef surfRef (\v -> v & msPolys .~ Just polyRef)
+    doStuffWithVerts surf model image polyRef 0 lNumVerts
+  where
+    lNumVerts = surf^.msNumEdges
+
+doStuffWithVerts :: MSurfaceT -> ModelT -> ImageT -> Ref GLPolyT -> Int -> Int -> Quake ()
+doStuffWithVerts surf model image polyRef idx maxIdx
+    | idx >= maxIdx = return ()
+    | otherwise = do
+        texInfo <- readRef (surf^.msTexInfo)
+        let vec = readVertexPosition surf model idx
+            s = vec `dot` ((fst (texInfo^.mtiVecs))^._xyz) + ((fst (texInfo^.mtiVecs))^._w)
+            s' = s / (fromIntegral (image^.iWidth))
+            t = vec `dot` ((snd (texInfo^.mtiVecs))^._xyz) + ((snd (texInfo^.mtiVecs))^._w)
+            t' = t / (fromIntegral (image^.iHeight))
+        Polygon.setPolyX polyRef idx (vec^._x)
+        Polygon.setPolyY polyRef idx (vec^._y)
+        Polygon.setPolyZ polyRef idx (vec^._z)
+        Polygon.setPolyS1 polyRef idx s'
+        Polygon.setPolyT1 polyRef idx t'
+        -- lightmap texture coordinates
+        let a = s - fromIntegral (fst (surf^.msTextureMins))
+            b = a + fromIntegral (surf^.msLightS) * 16
+            c = b + 8
+            d = c / fromIntegral (blockWidth * 16)
+            a' = t - fromIntegral (snd (surf^.msTextureMins))
+            b' = a' + fromIntegral (surf^.msLightT) * 16
+            c' = b' + 8
+            d' = c' / fromIntegral (blockHeight * 16)
+        Polygon.setPolyS2 polyRef idx d
+        Polygon.setPolyT2 polyRef idx d'
+        doStuffWithVerts surf model image polyRef (idx + 1) maxIdx
+
+readVertexPosition :: MSurfaceT -> ModelT -> Int -> V3 Float
+readVertexPosition surf model idx
+    | li > 0 =
+        let edge = (model^.mEdges) V.! li
+            vertex = (model^.mVertexes) V.! fromIntegral (edge^.meV._1)
+        in vertex^.mvPosition
+    | otherwise =
+        let edge = (model^.mEdges) V.! (negate li)
+            vertex = (model^.mVertexes) V.! fromIntegral (edge^.meV._2)
+        in vertex^.mvPosition
+  where
+    li = (model^.mSurfEdges) UV.! (surf^.msFirstEdge + idx)
 
 lmAllocBlock :: Int -> Int -> (Int, Int) -> Quake (Bool, (Int, Int))
 lmAllocBlock w h pos = do

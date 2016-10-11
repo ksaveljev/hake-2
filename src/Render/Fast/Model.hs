@@ -332,7 +332,7 @@ constructMSurfaceT loadModelRef idx dFace =
                                    & msSamples .~ if (dFace^.dfLightOfs) == -1 then Nothing else Just (dFace^.dfLightOfs))
      calcSurfaceExtents loadModelRef surfaceRef
      createWarps surfaceRef
-     createLightmaps surfaceRef
+     createLightmaps surfaceRef (model^.mLightdata)
      createPolygons surfaceRef
   where surfaceRef = Ref idx
         ti = fromIntegral (dFace^.dfTexInfo)
@@ -380,12 +380,12 @@ createWarps surfaceRef =
                                         & msTextureMins .~ (-8192, -8192))
           Warp.glSubdivideSurface surfaceRef
 
-createLightmaps :: Ref MSurfaceT -> Quake ()
-createLightmaps surfaceRef =
+createLightmaps :: Ref MSurfaceT -> Maybe B.ByteString -> Quake ()
+createLightmaps surfaceRef lightData =
   do surface <- readRef surfaceRef
      texInfo <- readRef (surface^.msTexInfo)
      when ((texInfo^.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0) $
-       Surf.glCreateSurfaceLightmap surfaceRef
+       Surf.glCreateSurfaceLightmap surfaceRef lightData
 
 createPolygons :: Ref MSurfaceT -> Quake ()
 createPolygons surfaceRef =

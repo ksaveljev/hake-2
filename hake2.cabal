@@ -256,6 +256,7 @@ executable hake2
                      , Render.GLFWbGlobals
                      , Render.GLFWbRenderer
                      , Render.GLModeT
+                     , Render.GLPolyT
                      , Render.GLStateT
                      , Render.GLTModeT
                      , Render.ImageT

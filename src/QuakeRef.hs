@@ -268,3 +268,14 @@ instance QuakeRef CDLightT where
   writeRef (Ref idx) dLight = request $ do
       dLights <- use cgDLights
       io (MV.write dLights idx dLight)
+
+instance QuakeRef GLPolyT where
+    readRef (Ref idx) = request $ do
+        polygonCache <- use frPolygonCache
+        io (MV.read polygonCache idx)
+    modifyRef (Ref idx) f = request $ do
+        polygonCache <- use frPolygonCache
+        io (MV.modify polygonCache f idx)
+    writeRef (Ref idx) poly = request $ do
+        polygonCache <- use frPolygonCache
+        io (MV.write polygonCache idx poly)
