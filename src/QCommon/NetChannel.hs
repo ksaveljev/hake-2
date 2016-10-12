@@ -165,7 +165,7 @@ doTransmit netChanLens len buf sendReliable chan =
           | (showPackets^.cvValue) /= 0 =
               error "NetChannel.doTransmit showPacketInfo" -- TODO
 {-
-        showPacketsValue <- liftM (^.cvValue) showPacketsCVar
+        showPacketsValue <- fmap (^.cvValue) showPacketsCVar
         when (showPacketsValue /= 0) $ do
           use (netChannelGlobals.ncSend) >>= \send ->
             if sendReliable /= 0

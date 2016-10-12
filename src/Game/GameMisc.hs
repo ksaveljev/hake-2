@@ -1,40 +1,44 @@
 module Game.GameMisc
-  ( spFuncAreaPortal
-  , spFuncClock
-  , spFuncExplosive
-  , spFuncObject
-  , spFuncWall
-  , spInfoNotNull
-  , spInfoNull
-  , spLight
-  , spLightMine1
-  , spLightMine2
-  , spMiscBanner
-  , spMiscBigViper
-  , spMiscBlackHole
-  , spMiscDeadSoldier
-  , spMiscEasterChick
-  , spMiscEasterChick2
-  , spMiscEasterTank
-  , spMiscExploBox
-  , spMiscGibArm
-  , spMiscGibHead
-  , spMiscGibLeg
-  , spMiscSatelliteDish
-  , spMiscStroggShip
-  , spMiscTeleporter
-  , spMiscTeleporterDest
-  , spMiscViper
-  , spMiscViperBomb
-  , spMonsterCommanderBody
-  , spPathCorner
-  , spPointCombat
-  , spTargetCharacter
-  , spTargetString
-  , spViewThing
-  ) where
+    ( spFuncAreaPortal
+    , spFuncClock
+    , spFuncExplosive
+    , spFuncObject
+    , spFuncWall
+    , spInfoNotNull
+    , spInfoNull
+    , spLight
+    , spLightMine1
+    , spLightMine2
+    , spMiscBanner
+    , spMiscBigViper
+    , spMiscBlackHole
+    , spMiscDeadSoldier
+    , spMiscEasterChick
+    , spMiscEasterChick2
+    , spMiscEasterTank
+    , spMiscExploBox
+    , spMiscGibArm
+    , spMiscGibHead
+    , spMiscGibLeg
+    , spMiscSatelliteDish
+    , spMiscStroggShip
+    , spMiscTeleporter
+    , spMiscTeleporterDest
+    , spMiscViper
+    , spMiscViperBomb
+    , spMonsterCommanderBody
+    , spPathCorner
+    , spPointCombat
+    , spTargetCharacter
+    , spTargetString
+    , spViewThing
+    , throwGib
+    , throwHead
+    ) where
 
-import Types
+import qualified Data.ByteString as B
+
+import           Types
 
 spFuncAreaPortal :: EntThink
 spFuncAreaPortal = error "GameMisc.spFuncAreaPortal" -- TODO
@@ -134,3 +138,9 @@ spTargetString = error "GameMisc.spTargetString" -- TODO
 
 spViewThing :: Ref EdictT -> Quake ()
 spViewThing = error "GameMisc.spViewThing" -- TODO
+
+throwGib :: Ref EdictT -> B.ByteString -> Int -> Int -> Quake ()
+throwGib = error "GameMisc.throwGib" -- TODO
+
+throwHead :: Ref EdictT -> B.ByteString -> Int -> Int -> Quake ()
+throwHead = error "GameMisc.throwHead" -- TODO

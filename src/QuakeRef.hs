@@ -2,6 +2,8 @@
 module QuakeRef where
 
 import           Control.Lens         (use, ix, (^.), (%=), (.=), (&), (.~), (%~))
+import           Control.Monad        (void)
+import           Control.Monad.ST     (runST)
 import qualified Data.Vector          as V
 import qualified Data.Vector.Mutable  as MV
 
@@ -11,6 +13,7 @@ import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
 import           Render.ModelT
+import           Render.MSurfaceT
 import           Server.ServerStaticT
 import           Types
 
@@ -241,22 +244,38 @@ instance QuakeRef MSurfaceT where
         return ((model^.mSurfaces) V.! idx)
     modifyRef (Ref idx) f = do
         loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
-        modifyRef loadModelRef (\v -> v & mSurfaces.ix idx %~ f)
+        model <- readRef loadModelRef
+        seq (runST $ do
+            surfaces <- V.unsafeThaw (model^.mSurfaces)
+            MV.modify surfaces f idx
+            void (V.unsafeFreeze surfaces)) (return ())
     writeRef (Ref idx) item = do
         loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
-        modifyRef loadModelRef (\v -> v & mSurfaces.ix idx .~ item)
+        model <- readRef loadModelRef
+        seq (runST $ do
+            surfaces <- V.unsafeThaw (model^.mSurfaces)
+            MV.write surfaces idx item
+            void (V.unsafeFreeze surfaces)) (return ())
 
 instance QuakeRef MTexInfoT where
-  readRef (Ref idx) = do
-      loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
-      model <- readRef loadModelRef
-      return ((model^.mTexInfo) V.! idx)
-  modifyRef (Ref idx) f = do
-      loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
-      modifyRef loadModelRef (\v -> v & mTexInfo.ix idx %~ f)
-  writeRef (Ref idx) item = do
-      loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
-      modifyRef loadModelRef (\v -> v & mTexInfo.ix idx .~ item)
+    readRef (Ref idx) = do
+        loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+        model <- readRef loadModelRef
+        return ((model^.mTexInfo) V.! idx)
+    modifyRef (Ref idx) f = do
+        loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+        model <- readRef loadModelRef
+        seq (runST $ do
+            texInfo <- V.unsafeThaw (model^.mTexInfo)
+            MV.modify texInfo f idx
+            void (V.unsafeFreeze texInfo)) (return ())
+    writeRef (Ref idx) item = do
+        loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
+        model <- readRef loadModelRef
+        seq (runST $ do
+            texInfo <- V.unsafeThaw (model^.mTexInfo)
+            MV.write texInfo idx item
+            void (V.unsafeFreeze texInfo)) (return ())
        
 instance QuakeRef CDLightT where
   readRef (Ref idx) = request $ do

@@ -5,7 +5,6 @@ import           Client.CDLightT (newCDLightT)
 import           Client.CParticleT (newCParticleT)
 import qualified Constants
 import           Game.EdictT (newEdictT)
-import           Render.MSurfaceT
 import           Types
 
 import           Control.Lens (makeLenses)

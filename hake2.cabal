@@ -133,6 +133,7 @@ executable hake2
                      , Game.GameTrigger
                      , Game.GameTurret
                      , Game.GameUtil
+                     , Game.GameWeapon
                      , Game.GClientT
                      , Game.GItemArmorT
                      , Game.GItemT
@@ -145,26 +146,46 @@ executable hake2
                      , Game.MonsterInfoT
                      , Game.Monsters.MActor
                      , Game.Monsters.MBerserk
+                     , Game.Monsters.MBerserkGlobals
                      , Game.Monsters.MBoss2
+                     , Game.Monsters.MBoss2Globals
                      , Game.Monsters.MBoss3
                      , Game.Monsters.MBoss31
+                     , Game.Monsters.MBoss31Globals
+                     , Game.Monsters.MBoss32Globals
                      , Game.Monsters.MBrain
+                     , Game.Monsters.MBrainGlobals
                      , Game.Monsters.MChick
+                     , Game.Monsters.MChickGlobals
                      , Game.Monsters.MFlash
                      , Game.Monsters.MFlipper
+                     , Game.Monsters.MFlipperGlobals
                      , Game.Monsters.MFloat
+                     , Game.Monsters.MFloatGlobals
                      , Game.Monsters.MFlyer
+                     , Game.Monsters.MFlyerGlobals
                      , Game.Monsters.MGladiator
+                     , Game.Monsters.MGladiatorGlobals
                      , Game.Monsters.MGunner
+                     , Game.Monsters.MGunnerGlobals
                      , Game.Monsters.MHover
+                     , Game.Monsters.MHoverGlobals
                      , Game.Monsters.MInfantry
+                     , Game.Monsters.MInfantryGlobals
                      , Game.Monsters.MInsane
+                     , Game.Monsters.MInsaneGlobals
                      , Game.Monsters.MMedic
+                     , Game.Monsters.MMedicGlobals
                      , Game.Monsters.MMutant
+                     , Game.Monsters.MMutantGlobals
                      , Game.Monsters.MParasite
+                     , Game.Monsters.MParasiteGlobals
                      , Game.Monsters.MSoldier
+                     , Game.Monsters.MSoldierGlobals
                      , Game.Monsters.MSuperTank
+                     , Game.Monsters.MSuperTankGlobals
                      , Game.Monsters.MTank
+                     , Game.Monsters.MTankGlobals
                      , Game.MoveInfoT
                      , Game.PlayerClient
                      , Game.PlayerStateT
