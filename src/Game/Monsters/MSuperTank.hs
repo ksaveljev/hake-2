@@ -1,8 +1,12 @@
 module Game.Monsters.MSuperTank
-  ( spMonsterSuperTank
-  ) where
+    ( bossExplode
+    , spMonsterSuperTank
+    ) where
 
-import Types
+import           Types
+
+bossExplode :: EntThink
+bossExplode = undefined -- TODO
 
 spMonsterSuperTank :: EntThink
 spMonsterSuperTank = error "MSuperTank.spMonsterSuperTank" -- TODO

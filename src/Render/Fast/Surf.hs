@@ -9,7 +9,7 @@ module Render.Fast.Surf
     , rMarkLeaves
     ) where
 
-import           Control.Lens                 (use, (^.), (.=), (%=), (&), (.~))
+import           Control.Lens                 (use, (^.), (.=), (%=), (+=), (&), (.~))
 import           Control.Lens                 (_1, _2)
 import           Control.Monad                (when, unless)
 import           Control.Monad.ST             (runST)
@@ -111,7 +111,52 @@ glEndBuildingLightmaps = do
     Image.glEnableMultiTexture False
 
 lmUploadBlock :: Bool -> Quake ()
-lmUploadBlock = error "Surf.lmUploadBlock" -- TODO
+lmUploadBlock dynamic = do
+    lms <- use (fastRenderAPIGlobals.frGLLms)
+    glState <- use (fastRenderAPIGlobals.frGLState)
+    Image.glBind ((glState^.glsLightmapTextures) + (pickTexture lms))
+    request $ do
+        GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral GL.GL_LINEAR)
+        GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral GL.GL_LINEAR)
+        io (doUploadBlock dynamic lms)
+    fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture += 1
+    checkLightmaps =<< use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture)
+  where
+    pickTexture lms
+        | dynamic = 0
+        | otherwise = lms^.lmsCurrentLightmapTexture
+    checkLightmaps v
+        | v == 128 = -- TODO: 128 should be a constant here but there is some name clashing
+            Com.comError Constants.errDrop "LM_UploadBlock() - MAX_LIGHTMAPS exceeded\n"
+        | otherwise = return ()
+
+doUploadBlock :: Bool -> GLLightMapStateT -> IO ()
+doUploadBlock dynamic lms
+    | dynamic =
+        SV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+            GL.glTexSubImage2D GL.GL_TEXTURE_2D
+                               0
+                               0
+                               0
+                               (fromIntegral blockWidth)
+                               (fromIntegral height)
+                               glLightmapFormat
+                               GL.GL_UNSIGNED_BYTE
+                               ptr
+    | otherwise =
+        SV.unsafeWith (lms^.lmsLightmapBuffer) $ \ptr ->
+            GL.glTexImage2D GL.GL_TEXTURE_2D
+                            0
+                            (fromIntegral (lms^.lmsInternalFormat))
+                            (fromIntegral blockWidth)
+                            (fromIntegral blockHeight)
+                            0
+                            glLightmapFormat
+                            GL.GL_UNSIGNED_BYTE
+                            ptr
+  where
+    h = UV.maximum (lms^.lmsAllocated)
+    height = max 0 h
 
 glCreateSurfaceLightmap :: Ref MSurfaceT -> Maybe B.ByteString -> Quake ()
 glCreateSurfaceLightmap surfaceRef lightData = do

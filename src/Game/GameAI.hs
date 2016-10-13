@@ -5,6 +5,7 @@ module Game.GameAI
     , aiSetSightClient
     , aiStand
     , aiWalk
+    , flyMonsterStart
     , walkMonsterStart
     ) where
 
@@ -59,3 +60,7 @@ walkMonsterStart = error "GameAI.walkMonsterStart" -- TODO
 
 aiMove :: AI
 aiMove = error "GameAI.aiMove" -- TODO
+
+flyMonsterStart :: EntThink
+flyMonsterStart = EntThink "flymonster_start" $ \selfRef -> do
+    undefined -- TODO

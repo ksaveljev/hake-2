@@ -1,6 +1,13 @@
 module Render.Fast.Polygon
     ( create
     , reset
+    , getPolyS1
+    , getPolyS2
+    , getPolyT1
+    , getPolyT2
+    , getPolyX
+    , getPolyY
+    , getPolyZ
     , setPolyS1
     , setPolyS2
     , setPolyT1

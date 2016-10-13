@@ -1,23 +1,26 @@
 module Game.GameUtil
-  ( freeEdict
-  , freeEdictA
-  , megaHealthThink
-  , spawn
-  , validateSelectedItem
-  ) where
+    ( freeEdict
+    , freeEdictA
+    , inFront
+    , megaHealthThink
+    , spawn
+    , validateSelectedItem
+    ) where
 
-import Game.CVarT
-import Game.EdictT
-import Game.EntityStateT
-import Game.GameLocalsT
-import Game.LevelLocalsT
-import QCommon.CVarVariables
-import QuakeRef
-import QuakeState
-import Types
+import           Control.Lens          (use, (^.), (+=), (&), (.~))
+import           Control.Monad         (when)
+import           Linear                (dot, normalize)
 
-import Control.Lens (use, (^.), (+=), (&), (.~))
-import Control.Monad (when)
+import           Game.CVarT
+import           Game.EdictT
+import           Game.EntityStateT
+import           Game.GameLocalsT
+import           Game.LevelLocalsT
+import           QCommon.CVarVariables
+import           QuakeRef
+import           QuakeState
+import           Types
+import qualified Util.Math3D           as Math3D
 
 freeEdict :: Ref EdictT -> Quake ()
 freeEdict = error "GameUtil.freeEdict" -- TODO
@@ -66,3 +69,10 @@ initEdict edictRef@(Ref idx) =
                               & eClassName .~ "noclass"
                               & eGravity .~ 1.0
                               & eEntityState .~ (newEntityStateT (Just edictRef) & esNumber .~ idx))
+
+inFront :: EdictT -> EdictT -> Bool
+inFront self other =
+    let (forward, _, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True False False
+        vec = normalize ((other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
+        dot' = vec `dot` forward
+    in dot' > 0.3

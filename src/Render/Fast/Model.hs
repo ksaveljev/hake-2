@@ -1,11 +1,23 @@
 module Render.Fast.Model
-  ( freeAll
-  , modelListF
-  , modInit
-  , rBeginRegistration
-  , rRegisterModel
-  , rEndRegistration
-  ) where
+    ( freeAll
+    , modelListF
+    , modInit
+    , rBeginRegistration
+    , rRegisterModel
+    , rEndRegistration
+    ) where
+
+import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~), (%~), _1, _2)
+import           Control.Monad (when)
+import           Data.Binary.Get (runGet, getWord16le)
+import           Data.Bits ((.&.), (.|.))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as UV
+import           Linear (V3(..), V4(..))
+import           System.IO (Handle)
 
 import {-# SOURCE #-} qualified Client.VID as VID
 import qualified Constants
@@ -17,10 +29,10 @@ import           QCommon.LumpT
 import           QCommon.QFiles.BSP.DFaceT
 import           QCommon.QFiles.BSP.DHeaderT
 import           QCommon.QFiles.BSP.DPlaneT
+import           QCommon.QFiles.BSP.DVisT
 import           QCommon.QFiles.SP2.DSpriteT
 import           QCommon.QFiles.MD2.DMdlT
 import           QCommon.TexInfoT
-import           QuakeIOState
 import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Image as Image
@@ -35,21 +47,6 @@ import           Render.MVertexT
 import           Types
 import           Util.Binary (encode, getInt)
 import qualified Util.Lib as Lib
-
-import           Control.Monad.ST (ST, runST)
-
-import           Control.Lens (use, preuse, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~), _1, _2)
-import           Control.Monad (when, unless)
-import           Data.Binary.Get (runGet)
-import           Data.Bits ((.&.), (.|.))
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as MV
-import qualified Data.Vector.Unboxed as UV
-import           Linear (V3(..), V4(..))
-import           System.IO (Handle)
 
 modInit :: Quake ()
 modInit =
@@ -395,10 +392,29 @@ createPolygons surfaceRef =
        Surf.glBuildPolygonFromSurface surfaceRef
 
 loadMarkSurfaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadMarkSurfaces = error "Model.loadMarkSurfaces" -- TODO
+loadMarkSurfaces loadModelRef buf lump = do
+    checkLump
+    modifyRef loadModelRef (\v -> v & mNumMarkSurfaces .~ count
+                                    & mMarkSurfaces .~ V.map toMSurfaceRef getMarkSurfaces)
+  where
+    count = (lump^.lFileLen) `div` Constants.sizeOfShort
+    checkLump =
+        when ((lump^.lFileLen) `mod` Constants.sizeOfShort /= 0) $ do
+            model <- readRef loadModelRef
+            Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
+    getMarkSurfaces = runGet (V.replicateM count getWord16le) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
+    toMSurfaceRef idx = Ref (fromIntegral idx)
 
 loadVisibility :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadVisibility = error "Model.loadVisibility" -- TODO
+loadVisibility loadModelRef buf lump
+    | (lump^.lFileLen) == 0 =
+        modifyRef loadModelRef (\v -> v & mVis .~ Nothing)
+    | otherwise = do
+        let buffer = BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
+            buffer' = BL.toStrict buffer
+            vis = runGet getDVisT buffer
+        fastRenderAPIGlobals.frModelVisibility .= Just buffer'
+        modifyRef loadModelRef (\v -> v & mVis .~ Just vis)
 
 loadLeafs :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadLeafs = error "Model.loadLeafs" -- TODO
