@@ -1707,18 +1707,18 @@ data ModelT = ModelT
     , _mNumModelSurfaces     :: Int
     , _mLightmap             :: Int
     , _mNumSubModels         :: Int
-    , _mSubModels            :: V.Vector (IORef MModelT)
+    , _mSubModels            :: V.Vector MModelT
     , _mNumPlanes            :: Int
     , _mPlanes               :: V.Vector CPlaneT
     , _mNumLeafs             :: Int
-    , _mLeafs                :: V.Vector (IORef MLeafT)
+    , _mLeafs                :: V.Vector MLeafT
     , _mNumVertexes          :: Int
     , _mVertexes             :: V.Vector MVertexT
     , _mNumEdges             :: Int
     , _mEdges                :: V.Vector MEdgeT
     , _mNumNodes             :: Int
     , _mFirstNode            :: Int
-    , _mNodes                :: V.Vector (IORef MNodeT)
+    , _mNodes                :: V.Vector MNodeT
     , _mNumTexInfo           :: Int
     , _mTexInfo              :: V.Vector MTexInfoT
     , _mNumSurfaces          :: Int
@@ -1729,7 +1729,7 @@ data ModelT = ModelT
     , _mMarkSurfaces         :: V.Vector (Ref MSurfaceT)
     , _mVis                  :: Maybe DVisT
     , _mLightdata            :: Maybe B.ByteString
-    , _mSkins                :: V.Vector (Maybe (IORef ImageT))
+    , _mSkins                :: V.Vector (Maybe (Ref ImageT))
     , _mExtraDataSize        :: Int
     , _mExtraData            :: Maybe ModelExtra
     }
@@ -1807,16 +1807,16 @@ data MLeafT = MLeafT
     , _mlMarkIndex       :: Int
     }
 
-data MNodeChild = MNodeChildRef (IORef MNodeT)
-                | MLeafChildRef (IORef MLeafT)
+data MNodeChild = MNodeChildRef (Ref MNodeT)
+                | MLeafChildRef (Ref MLeafT)
 
 data MNodeT = MNodeT
     { _mnContents     :: Int
     , _mnVisFrame     :: Int
     , _mnMins         :: V3 Float
     , _mnMaxs         :: V3 Float
-    , _mnParent       :: Maybe (IORef MNodeT)
-    , _mnPlane        :: IORef CPlaneT
+    , _mnParent       :: Maybe (Ref MNodeT)
+    , _mnPlane        :: Ref CPlaneT
     , _mnChildren     :: (MNodeChild, MNodeChild)
     , _mnFirstSurface :: Int
     , _mnNumSurfaces  :: Int

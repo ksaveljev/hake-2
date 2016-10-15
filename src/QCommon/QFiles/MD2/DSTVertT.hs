@@ -1,10 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.QFiles.MD2.DSTVertT
-  ( module QCommon.QFiles.MD2.DSTVertT
-  ) where
+    ( module QCommon.QFiles.MD2.DSTVertT
+    ) where
 
-import Types
+import           Control.Lens (makeLenses)
+import           Data.Binary  (Get)
 
-import Control.Lens (makeLenses)
+import           Types
+import           Util.Binary  (getInt16)
 
 makeLenses ''DSTVertT
+
+getDSTVertT :: Get DSTVertT
+getDSTVertT = DSTVertT <$> getInt16
+                       <*> getInt16
