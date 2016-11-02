@@ -219,10 +219,9 @@ disconnectF = XCommandT "SVUser.disconnectF" disconnect
 disconnect :: Quake ()
 disconnect = do
     clientRef <- use (svGlobals.svClient)
-    maybe clientRefError doDisconnect clientRef
+    maybe clientRefError SVMain.dropClient clientRef
   where
     clientRefError = Com.fatalError "SVUser.disconnect clientRef is Nothing"
-    doDisconnect clientRef = SVMain.dropClient clientRef
 
 showServerInfoF :: XCommandT
 showServerInfoF = XCommandT "SVUser.showServerInfoF" (CVar.serverInfo >>= Info.printInfo)

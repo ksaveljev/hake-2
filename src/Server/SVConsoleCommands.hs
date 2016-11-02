@@ -100,7 +100,7 @@ statusF = XCommandT "SVConsoleCommands.statusF" $ do
 printClientStatus :: ClientT -> Quake ()
 printClientStatus client
     | (client^.cState) == 0 = return ()
-    | otherwise = do
+    | otherwise =
         error "SVConsoleCommands.printClientStatus" -- TODO
 
 {-

@@ -60,8 +60,6 @@ import qualified Pipes.Binary as PB
 import qualified Pipes.ByteString as PBS
 import           System.IO (Handle)
 
-import           Debug.Trace (trace)
-
 glSolidFormat :: Int
 glSolidFormat = 3
 
@@ -417,6 +415,7 @@ floodFillImage pic width height picType bits
   | picType == Constants.itSkin && bits == 8 =
       do d8to24table <- use (fastRenderAPIGlobals.frd8to24table)
          fifo <- request (use frFifo)
+         request (MV.set fifo (0, 0))
          request (io (rFloodFillSkin pic width height d8to24table fifo))
   | otherwise = return pic
 
@@ -439,7 +438,7 @@ floodFill skin skinWidth skinHeight fifo filledColor fillColor inpt outpt
 
 doFloodFill :: MSV.IOVector Word8 -> Int -> Int -> MV.IOVector (Int, Int) -> Word8 -> Word8 -> Int -> Int -> Int -> Int -> IO ()
 doFloodFill skin skinWidth skinHeight fifo filledColor fillColor inpt outpt x y =
-  trace ("doFlooFill: x = " ++ show x ++ " y = " ++ show y ++ " skinWidth = " ++ show skinWidth ++ " pos = " ++ show pos) $ step1 >>= step2 >>= step3 >>= step4 >>= writeAndProceed
+  step1 >>= step2 >>= step3 >>= step4 >>= writeAndProceed
   where pos = x + skinWidth * y
         step1
           | x > 0 = floodFillStep skin fifo inpt pos x y fillColor filledColor (-1) (-1) 0

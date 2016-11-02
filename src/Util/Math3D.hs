@@ -70,20 +70,20 @@ rotatePointAroundVector dir point degrees =
     let vf = dir
         vr = perpendicularVector dir
         vup = vr `cross` vf
-        m = UV.fromList [ (vr^._x), (vup^._x), (vf^._x)
-                        , (vr^._y), (vup^._y), (vf^._y)
-                        , (vr^._z), (vup^._z), (vf^._z)
+        m = UV.fromList [ vr^._x, vup^._x, vf^._x
+                        , vr^._y, vup^._y, vf^._y
+                        , vr^._z, vup^._z, vf^._z
                         ]
-        im = UV.fromList [ (m UV.! 0), (m UV.! 3), (m UV.! 6)
-                         , (m UV.! 1), (m UV.! 4), (m UV.! 7)
-                         , (m UV.! 2), (m UV.! 5), (m UV.! 8)
+        im = UV.fromList [ m UV.! 0, m UV.! 3, m UV.! 6
+                         , m UV.! 1, m UV.! 4, m UV.! 7
+                         , m UV.! 2, m UV.! 5, m UV.! 8
                          ]
         rDeg = degToRad degrees
         cosDeg = cos rDeg
         sinDeg = sin rDeg
-        zrot = UV.fromList [   cosDeg , sinDeg, 0
-                           , (-sinDeg), cosDeg, 0
-                           ,         0,      0, 1
+        zrot = UV.fromList [  cosDeg, sinDeg, 0
+                           , -sinDeg, cosDeg, 0
+                           ,       0,      0, 1
                            ]
         tmpmat = concatRotations m zrot
         zrot' = concatRotations tmpmat im

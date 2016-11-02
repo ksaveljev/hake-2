@@ -452,13 +452,13 @@ connectionlessPacket = do
 
 processConnectionlessPacket :: B.ByteString -> NetAdrT -> Quake ()
 processConnectionlessPacket "client_connect" from = clcClientConnect from
-processConnectionlessPacket "info" from = parseStatusMessage from
-processConnectionlessPacket "cmd" from = clcCmd from
-processConnectionlessPacket "print" _ = clcPrint
-processConnectionlessPacket "ping" from = clcPing from
-processConnectionlessPacket "challenge" _ = clcChallenge
-processConnectionlessPacket "echo" from = clcEcho from
-processConnectionlessPacket _ _ = Com.printf "Unknown command.\n"
+processConnectionlessPacket "info"           from = parseStatusMessage from
+processConnectionlessPacket "cmd"            from = clcCmd from
+processConnectionlessPacket "print"          _    = clcPrint
+processConnectionlessPacket "ping"           from = clcPing from
+processConnectionlessPacket "challenge"      _    = clcChallenge
+processConnectionlessPacket "echo"           from = clcEcho from
+processConnectionlessPacket _                _    = Com.printf "Unknown command.\n"
 
 clcClientConnect :: NetAdrT -> Quake ()
 clcClientConnect from =

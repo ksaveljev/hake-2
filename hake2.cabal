@@ -246,7 +246,11 @@ executable hake2
                      , QCommon.QFiles.BSP.DNodeT
                      , QCommon.QFiles.BSP.DPlaneT
                      , QCommon.QFiles.BSP.DVisT
+                     , QCommon.QFiles.MD2.DAliasFrameT
                      , QCommon.QFiles.MD2.DMdlT
+                     , QCommon.QFiles.MD2.DSTVertT
+                     , QCommon.QFiles.MD2.DTriangleT
+                     , QCommon.QFiles.SP2.DSprFrameT
                      , QCommon.QFiles.SP2.DSpriteT
                      , QCommon.QFiles.PcxT
                      , QCommon.SearchPathT
@@ -282,6 +286,7 @@ executable hake2
                      , Render.GLTModeT
                      , Render.ImageT
                      , Render.MEdgeT
+                     , Render.MModelT
                      , Render.ModelT
                      , Render.MSurfaceT
                      , Render.MTexInfoT

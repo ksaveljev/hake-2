@@ -20,7 +20,7 @@ import           Data.Maybe            (fromMaybe)
 import           Linear                (V3(..))
 import           System.IO             (Handle, IOMode)
 import           System.IO             (openFile, hClose, openBinaryFile)
-import           System.Random         (random)
+import           System.Random         (Random, random)
 import           Text.Read             (readMaybe)
 
 import           QuakeState
@@ -56,14 +56,13 @@ fClose :: Handle -> Quake ()
 fClose h = request (io (handle (\(_ :: IOException) -> return ()) (hClose h)))
 
 rand :: Quake Int16
-rand = do
-    g <- use (globals.gRnd)
-    let (result, newG) = random g
-    globals.gRnd .= newG
-    return (abs result)
+rand = fmap abs rnd
 
 randomF :: Quake Float
-randomF = do
+randomF = rnd
+
+rnd :: (Random a, Num a) => Quake a
+rnd = do
     g <- use (globals.gRnd)
     let (result, newG) = random g
     globals.gRnd .= newG

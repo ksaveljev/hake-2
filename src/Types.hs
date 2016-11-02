@@ -2074,11 +2074,11 @@ data SfxCacheT = SfxCacheT
 data ClientInfoT = ClientInfoT
     { _ciName        :: B.ByteString
     , _ciCInfo       :: B.ByteString
-    , _ciSkin        :: Maybe (IORef ImageT)
-    , _ciIcon        :: Maybe (IORef ImageT)
+    , _ciSkin        :: Maybe (Ref ImageT)
+    , _ciIcon        :: Maybe (Ref ImageT)
     , _ciIconName    :: B.ByteString
-    , _ciModel       :: Maybe (IORef ModelT)
-    , _ciWeaponModel :: V.Vector (Maybe (IORef ModelT))
+    , _ciModel       :: Maybe (Ref ModelT)
+    , _ciWeaponModel :: V.Vector (Maybe (Ref ModelT))
     }
 
 data GLPolyT = GLPolyT

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Sys.Timer where
 
 import QuakeIOState

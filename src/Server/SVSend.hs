@@ -188,7 +188,7 @@ sendClientMessage (clientRef, client)
 
 checkReliableMessageOverflow :: Ref ClientT -> ClientT -> Quake ()
 checkReliableMessageOverflow clientRef@(Ref idx) client
-    | (client^.cNetChan.ncMessage.sbOverflowed) = do -- reliable message overflowed, drop the client
+    | client^.cNetChan.ncMessage.sbOverflowed = do -- reliable message overflowed, drop the client
         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage)
         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cDatagram)
         broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " overflowed\n")

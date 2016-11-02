@@ -253,7 +253,19 @@ loadAliasModel modelRef buffer = do
             Com.comError Constants.errDrop (B.concat ["model ", modelName, " has no frames"])
 
 loadSpriteModel :: Ref ModelT -> BL.ByteString -> Quake ()
-loadSpriteModel = error "Model.loadSpriteModel" -- TODO
+loadSpriteModel modelRef buffer = do
+    when ((sprOut^.dsVersion) /= spriteVersion) $ do
+        model <- readRef modelRef
+        Com.comError Constants.errDrop (B.concat [model^.mName, " has wrong version number (", encode (sprOut^.dsVersion), " should be ", encode spriteVersion, ")"])
+    when ((sprOut^.dsNumFrames) > Constants.maxMd2Skins) $ do
+        model <- readRef modelRef
+        Com.comError Constants.errDrop (B.concat [model^.mName, " has too many frames (", encode (sprOut^.dsNumFrames), " > ", encode Constants.maxMd2Skins, ")"])
+    skins <- V.mapM (\frame -> Image.glFindImage (frame^.dsfName) Constants.itSprite) (sprOut^.dsFrames)
+    modifyRef modelRef (\v -> v & mSkins .~ skins
+                                & mType .~ Constants.modSprite
+                                & mExtraData .~ Just (SpriteModelExtra sprOut))
+  where
+    sprOut = runGet getDSpriteT buffer
 
 loadBrushModel :: Ref ModelT -> BL.ByteString -> Quake ()
 loadBrushModel modelRef buf = do
