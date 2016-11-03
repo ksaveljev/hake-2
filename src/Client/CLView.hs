@@ -1,7 +1,7 @@
 module Client.CLView
-  ( addNetGraph
-  , prepRefresh
-  ) where
+    ( addNetGraph
+    , prepRefresh
+    ) where
 
 import           Client.ClientStateT
 import           Client.ClientStaticT

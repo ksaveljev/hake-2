@@ -136,10 +136,18 @@ instance QuakeRef ImageT where
     readRef (Ref idx) = do
         images <- use (fastRenderAPIGlobals.frGLTextures)
         return (images V.! idx)
-    modifyRef (Ref idx) f =
-        fastRenderAPIGlobals.frGLTextures.ix idx %= f
-    writeRef (Ref idx) item =
-        fastRenderAPIGlobals.frGLTextures.ix idx .= item
+    modifyRef (Ref idx) f = do
+        images <- use (fastRenderAPIGlobals.frGLTextures)
+        seq (runST $ do
+            images' <- V.unsafeThaw images
+            MV.modify images' f idx
+            void (V.unsafeFreeze images')) (return ())
+    writeRef (Ref idx) item = do
+        images <- use (fastRenderAPIGlobals.frGLTextures)
+        seq (runST $ do
+            images' <- V.unsafeThaw images
+            MV.write images' idx item
+            void (V.unsafeFreeze images')) (return ())
 
 instance QuakeRef CAreaT where
     readRef (Ref idx) = do

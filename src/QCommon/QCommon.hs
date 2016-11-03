@@ -148,24 +148,25 @@ initialize args =
      CL.writeConfiguration
      
 reconfigure :: Bool -> Quake ()
-reconfigure clear =
-  do cdDirCVar <- CVar.get "cddir" B.empty Constants.cvarArchive
-     maybe (Com.fatalError "cddir cvar not set") proceed cdDirCVar
-  where proceed cdDir =
-          do CBuf.addText "exec default.cfg\n\
-                          \bind MWHEELUP weapnext\n\
-                          \bind MWHEELDOWN weapprev\n\
-                          \bind w +forward\n\
-                          \bind s +back\n\
-                          \bind a +moveleft\n\
-                          \bind d +moveright\n"
-             CBuf.execute
-             void (CVar.set "vid_fullscreen" "0")
-             CBuf.addText "exec config.cfg\n"
-             CBuf.addEarlyCommands clear
-             CBuf.execute
-             unless (B.null (cdDir^.cvString))
-               (void (CVar.set "cddir" (cdDir^.cvString)))
+reconfigure clear = do
+    cdDirCVar <- CVar.get "cddir" B.empty Constants.cvarArchive
+    maybe (Com.fatalError "cddir cvar not set") proceed cdDirCVar
+  where
+    proceed cdDir = do
+        CBuf.addText "exec default.cfg\n\
+                     \bind MWHEELUP weapnext\n\
+                     \bind MWHEELDOWN weapprev\n\
+                     \bind w +forward\n\
+                     \bind s +back\n\
+                     \bind a +moveleft\n\
+                     \bind d +moveright\n"
+        CBuf.execute
+        void (CVar.set "vid_fullscreen" "0")
+        CBuf.addText "exec config.cfg\n"
+        CBuf.addEarlyCommands clear
+        CBuf.execute
+        unless (B.null (cdDir^.cvString))
+            (void (CVar.set "cddir" (cdDir^.cvString)))
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars = [ ("host_speeds", "0", 0)

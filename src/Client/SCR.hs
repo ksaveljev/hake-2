@@ -1,19 +1,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Client.SCR
-  ( addDirtyPoint
-  , beginLoadingPlaque
-  , centerPrint
-  , debugGraph
-  , dirtyScreen
-  , endLoadingPlaque
-  , finishCinematic
-  , initialize
-  , playCinematic
-  , runCinematic
-  , runConsole
-  , touchPics
-  , updateScreen
-  ) where
+    ( addDirtyPoint
+    , beginLoadingPlaque
+    , centerPrint
+    , debugGraph
+    , dirtyScreen
+    , endLoadingPlaque
+    , finishCinematic
+    , initialize
+    , playCinematic
+    , runCinematic
+    , runConsole
+    , touchPics
+    , updateScreen
+    ) where
 
 import           Client.CinematicsT
 import           Client.ClientInfoT
