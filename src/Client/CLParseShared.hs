@@ -2,6 +2,8 @@
 module Client.CLParseShared
     ( loadClientInfo
     , parseClientInfo
+    , showNet
+    , svcStrings
     ) where
 
 import           Control.Lens          (Traversal', use, preuse, ix, (^.), (.=), (&), (.~))
@@ -19,9 +21,22 @@ import qualified Constants
 import           Game.CVarT
 import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
+import           QCommon.SizeBufT
 import           QuakeState
 import           Render.Renderer
 import           Types
+import           Util.Binary           (encode)
+
+svcStrings :: V.Vector B.ByteString
+svcStrings = V.fromList
+    [ "svc_bad", "svc_muzzleflash", "svc_muzzlflash2"
+    , "svc_temp_entity", "svc_layout", "svc_inventory"
+    , "svc_nop", "svc_disconnect", "svc_reconnect"
+    , "svc_sound", "svc_print", "svc_stufftext"
+    , "svc_serverdata", "svc_configstring", "svc_spawnbaseline"
+    , "svc_centerprint", "svc_download", "svc_playerinfo"
+    , "svc_packetentities", "svc_deltapacketentities", "svc_frame"
+    ]
 
 parseClientInfo :: Int -> Quake ()
 parseClientInfo player = do
@@ -105,39 +120,25 @@ loadWeaponModels renderer modelName = do
     doLoadWeaponModels :: Float -> V.Vector B.ByteString -> Quake (V.Vector (Maybe (Ref ModelT)))
     doLoadWeaponModels vwep clWeaponModels
         | vwep == 0 = do
-            error "HIHIHIHI" -- TODO
+            weaponModelRef <- (renderer^.rRefExport.reRegisterModel) (B.concat ["players/", modelName, "/", clWeaponModels V.! 0])
+            weaponModelRef' <- if isNothing weaponModelRef && (BC.map toLower modelName) == "cyborg"
+                                   then (renderer^.rRefExport.reRegisterModel) ("players/male/" `B.append` (clWeaponModels V.! 0))
+                                   else return weaponModelRef
+            return (V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef' else Nothing))
         | otherwise = do
             numWeaponModels <- use (clientGlobals.cgNumCLWeaponModels)
-            error "HIHIHI" -- TODO
-            {-
-            seq (runST $ do
-                weapons <- V.unsafeThaw (V.replicate Constants.maxClientWeaponModels Nothing)
-                loadWeapons clWeaponModels modelName 0 numWeaponModels
-                void (V.unsafeFreeze weapons)) (return ())
-                -}
+            loadedWeapons <- loadWeapons renderer clWeaponModels modelName 0 numWeaponModels []
+            return ((V.replicate Constants.maxClientWeaponModels Nothing) V.// loadedWeapons)
 
--- loadWeapons :: V.Vector B.ByteString -> B.ByteString -> Int -> Int -> Quake [(Int, Maybe (IORef ModelT))]
-loadWeapons clWeaponModels modelName idx maxIdx
-    | idx >= maxIdx = return ()
-    | otherwise = error "HIHIHI" -- TODO
-{-
-  where loadWeapons :: V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe (IORef ModelT))] -> Quake [(Int, Maybe (IORef ModelT))]
-        loadWeapons clWeaponModels modelName idx maxIdx acc
-          | idx >= maxIdx = return acc
-          | otherwise = do
-              Just renderer <- use $ globals.re
-              let weaponFileName = "players/" `B.append` modelName `B.append` "/" `B.append` (clWeaponModels V.! idx)
-              weaponModelRef <- (renderer^.rRefExport.reRegisterModel) weaponFileName
-              if isNothing weaponModelRef && (BC.map toLower modelName) == "cyborg"
-                then do
-                  -- try male
-                  let weaponFileName' = "players/male/" `B.append` (clWeaponModels V.! idx)
-                  weaponModelRef' <- (renderer^.rRefExport.reRegisterModel) weaponFileName'
-                  loadWeapons clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef') : acc)
-                else
-                  loadWeapons clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef) : acc)
--}
-
+loadWeapons :: Renderer -> V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe (Ref ModelT))] -> Quake [(Int, Maybe (Ref ModelT))]
+loadWeapons renderer clWeaponModels modelName idx maxIdx acc
+    | idx >= maxIdx = return acc
+    | otherwise = do
+        weaponModelRef <- (renderer^.rRefExport.reRegisterModel) (B.concat ["players/", modelName, "/", clWeaponModels V.! idx])
+        weaponModelRef' <- if isNothing weaponModelRef && (BC.map toLower modelName) == "cyborg"
+                               then (renderer^.rRefExport.reRegisterModel) ("players/male/" `B.append` (clWeaponModels V.! idx))
+                               else return weaponModelRef
+        loadWeapons renderer clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef') : acc)
 
 loadIcon :: Renderer -> B.ByteString -> B.ByteString -> Quake (B.ByteString, Maybe (Ref ImageT))
 loadIcon renderer modelName skinName = do
@@ -145,24 +146,6 @@ loadIcon renderer modelName skinName = do
     return (iconName, iconRef)
   where
     iconName = B.concat ["/players/", modelName, "/", skinName, "_i.pcx"]
-
-{-
-          -- weapon file
-          weaponModels <- if vwepValue == 0
-                            then do
-                              let weaponFileName = "players/" `B.append` modelName'' `B.append` "/" `B.append` (clWeaponModels V.! 0)
-                              weaponModelRef <- (renderer^.rRefExport.reRegisterModel) weaponFileName
-                              if isNothing weaponModelRef && (BC.map toLower modelName'') == "cyborg"
-                                then do
-                                  -- try male
-                                  let weaponFileName' = "players/male/" `B.append` (clWeaponModels V.! 0)
-                                  weaponModelRef' <- (renderer^.rRefExport.reRegisterModel) weaponFileName'
-                                  return $ V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef' else Nothing)
-                                else
-                                  return $ V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef else Nothing)
-                            else do
-                                DONE
-                  -}
 
 saveClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> B.ByteString -> Maybe (Ref ModelT) -> V.Vector (Maybe (Ref ModelT)) -> Maybe (Ref ImageT) -> B.ByteString -> Maybe (Ref ImageT) -> Quake ()
 saveClientInfo clientInfo name str modelRef weaponModels skinRef iconName iconRef
@@ -182,3 +165,10 @@ saveClientInfo clientInfo name str modelRef weaponModels skinRef iconName iconRe
                                      & ciIconName    .~ iconName
                                      & ciModel       .~ modelRef
                                      & ciWeaponModel .~ weaponModels)
+
+showNet :: B.ByteString -> CVarT -> Quake ()
+showNet str showNetVar
+    | (showNetVar^.cvValue) >= 2 = do
+        readCount <- use (globals.gNetMessage.sbReadCount)
+        Com.printf (B.concat [encode (readCount - 1), ":", str, "\n"])
+    | otherwise = return ()

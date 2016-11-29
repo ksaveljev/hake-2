@@ -1,7 +1,17 @@
 module Client.V
-  ( initialize
+  ( addEntity
+  , initialize
   , renderView
   ) where
+
+import           Control.Applicative (liftA2, liftA3)
+import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~), (+~))
+import           Control.Monad (when, unless, join)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Linear (V3(..), V4(..), _x, _y, _z)
+import           Text.Printf (printf)
+
 
 import qualified Client.CLEnts as CLEnts
 import           Client.ClientStateT
@@ -11,6 +21,7 @@ import           Client.RefDefT
 import           Client.RefExportT
 import qualified Client.SCRShared as SCR
 import           Client.VRectT
+import           Client.VShared
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import           Game.CVarT
@@ -24,14 +35,6 @@ import qualified Sys.Timer as Timer
 import           Types
 import           Util.Binary (encode)
 import qualified Util.Math3D as Math3D
-
-import           Control.Applicative (liftA2, liftA3)
-import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~), (+~))
-import           Control.Monad (when, unless, join)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import           Linear (V3(..), V4(..), _x, _y, _z)
-import           Text.Printf (printf)
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =

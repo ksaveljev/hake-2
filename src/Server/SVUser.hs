@@ -85,7 +85,6 @@ execute clientRef c moveIssued stringCmdCount
         lastFrame <- MSG.readByte (globals.gNetMessage)
         checkFrameLatency client lastFrame
         error "SVUser.execute" -- TODO
-        undefined -- TODO
     | c == Constants.clcStringCmd = do
         str <- MSG.readString (globals.gNetMessage)
         client <- readRef clientRef

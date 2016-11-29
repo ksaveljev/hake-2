@@ -3,7 +3,6 @@ module QCommon.CVar
   , forceSet
   , fullSet
   , get
-  , getExisting
   , getLatchedVars
   , initialize
   , initializeCVars
@@ -24,7 +23,7 @@ import qualified Game.Info as Info
 import           Game.CVarT
 import qualified QCommon.Com as Com
 import           QCommon.CVarShared
-import {-# SOURCE #-} qualified QCommon.Shared as FS
+import qualified QCommon.Shared as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib as Lib
@@ -35,11 +34,7 @@ import           Control.Monad (void, when, foldM)
 import           Data.Bits ((.&.))
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as HM
-import           Data.Maybe (fromMaybe)
 import           System.IO (Handle, IOMode(ReadWriteMode), hSeek, hFileSize, SeekMode(AbsoluteSeek))
-
-getExisting :: B.ByteString -> Quake CVarT
-getExisting = fmap (fromMaybe (error "CVar.getExisting returned Nothing")) . findVar
 
 initialize :: Quake ()
 initialize =

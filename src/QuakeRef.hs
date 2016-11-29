@@ -306,3 +306,95 @@ instance QuakeRef GLPolyT where
     writeRef (Ref idx) poly = request $ do
         polygonCache <- use frPolygonCache
         io (MV.write polygonCache idx poly)
+
+instance QuakeRef FrameT where
+    readRef (Ref idx) = do
+        frames <- use (globals.gCl.csFrames)
+        return (frames V.! idx)
+    modifyRef (Ref idx) f =
+        globals.gCl.csFrames.ix idx %= f
+    writeRef (Ref idx) item =
+        globals.gCl.csFrames.ix idx .= item
+
+instance QuakeRef CParticleT where
+    readRef (Ref idx) = request $ do
+        particles <- use cgParticles
+        io (MV.read particles idx)
+    modifyRef (Ref idx) f = request $ do
+        particles <- use cgParticles
+        io (MV.modify particles f idx)
+    writeRef (Ref idx) poly = request $ do
+        particles <- use cgParticles
+        io (MV.write particles idx poly)
+
+instance QuakeRef CEntityT where
+    readRef (Ref idx) = do
+        entities <- use (globals.gClEntities)
+        return (entities V.! idx)
+    modifyRef (Ref idx) f =
+        globals.gClEntities.ix idx %= f
+    writeRef (Ref idx) item =
+        globals.gClEntities.ix idx .= item
+
+instance QuakeRef LaserT where
+    readRef (Ref idx) = do
+        lasers <- use (clTEntGlobals.clteLasers)
+        return (lasers V.! idx)
+    modifyRef (Ref idx) f =
+        clTEntGlobals.clteLasers.ix idx %= f
+    writeRef (Ref idx) item =
+        clTEntGlobals.clteLasers.ix idx .= item
+
+instance QuakeRef CLSustainT where
+    readRef (Ref idx) = do
+        sustains <- use (clTEntGlobals.clteSustains)
+        return (sustains V.! idx)
+    modifyRef (Ref idx) f =
+        clTEntGlobals.clteSustains.ix idx %= f
+    writeRef (Ref idx) item =
+        clTEntGlobals.clteSustains.ix idx .= item
+
+instance QuakeRef ExplosionT where
+    readRef (Ref idx) = do
+        explosions <- use (clTEntGlobals.clteExplosions)
+        return (explosions V.! idx)
+    modifyRef (Ref idx) f =
+        clTEntGlobals.clteExplosions.ix idx %= f
+    writeRef (Ref idx) item =
+        clTEntGlobals.clteExplosions.ix idx .= item
+
+instance QuakeRef BeamT where
+    readRef (Ref idx) = do
+        beams <- use (clTEntGlobals.clteBeams)
+        return (beams V.! idx)
+    modifyRef (Ref idx) f =
+        clTEntGlobals.clteBeams.ix idx %= f
+    writeRef (Ref idx) item =
+        clTEntGlobals.clteBeams.ix idx .= item
+
+instance QuakeRef LightStyleT where
+    readRef (Ref idx) = do
+        lightStyles <- use (globals.gLightStyles)
+        return (lightStyles V.! idx)
+    modifyRef (Ref idx) f =
+        globals.gLightStyles.ix idx %= f
+    writeRef (Ref idx) item =
+        globals.gLightStyles.ix idx .= item
+
+instance QuakeRef CLightStyleT where
+    readRef (Ref idx) = do
+        lightStyles <- use (clientGlobals.cgLightStyle)
+        return (lightStyles V.! idx)
+    modifyRef (Ref idx) f =
+        clientGlobals.cgLightStyle.ix idx %= f
+    writeRef (Ref idx) item =
+        clientGlobals.cgLightStyle.ix idx .= item
+
+instance QuakeRef DLightT where
+    readRef (Ref idx) = do
+        lights <- use (globals.gDLights)
+        return (lights V.! idx)
+    modifyRef (Ref idx) f =
+        globals.gDLights.ix idx %= f
+    writeRef (Ref idx) item =
+        globals.gDLights.ix idx .= item

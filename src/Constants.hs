@@ -1612,6 +1612,14 @@ pmfNoPrediction  = 64 :: Int8
 -- move from FastRenderAPIGlobals
 maxModKnown = 512 :: Int
 
+-- move from GLPolyT
+stride     = 7 :: Int
+byteStride = 7 * 4 :: Int -- 4 = SIZEOF_FLOAT
+
+-- move from GLLightMapStateT
+blockWidth  = 128 :: Int
+blockHeight = 128 :: Int
+
 byteDirs :: V.Vector (V3 Float)
 byteDirs =
     V.fromList [ V3 (-0.525731)   0.000000    0.850651

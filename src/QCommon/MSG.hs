@@ -2,8 +2,11 @@
 module QCommon.MSG
   ( beginReading
   , readAngle
+  , readAngle16
   , readByte
+  , readChar
   , readCoord
+  , readData
   , readLong
   , readPos
   , readShort
@@ -24,8 +27,9 @@ import qualified QCommon.Com as Com
 import           QCommon.SizeBufT
 import qualified QCommon.SZ as SZ
 import           Types
+import qualified Util.Math3D as Math3D
 
-import           Control.Lens (Traversal', Lens', use, (^.), (.=), (+=))
+import           Control.Lens (Traversal', Lens', use, (^.), (.=), (+=), (%=))
 import           Control.Monad (when)
 import           Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
@@ -33,6 +37,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import           Data.Int (Int8, Int16, Int32)
+import qualified Data.Vector.Unboxed as UV
 import           Data.Word (Word8, Word16, Word32)
 import           Linear (V3(..), _x, _y, _z)
 
@@ -168,6 +173,9 @@ readCoord sizeBufLens = fmap ((* (1.0 / 8.0)) . fromIntegral) (readShort sizeBuf
 readAngle :: Lens' QuakeState SizeBufT -> Quake Float
 readAngle sizeBufLens = fmap ((* (360.0 / 256)) . fromIntegral) (readChar sizeBufLens)
 
+readAngle16 :: Lens' QuakeState SizeBufT -> Quake Float
+readAngle16 sizeBufLens = fmap Math3D.shortToAngle (readShort sizeBufLens)
+
 writeDeltaUserCmd :: Traversal' QuakeState SizeBufT -> UserCmdT -> UserCmdT -> Quake ()
 writeDeltaUserCmd sizeBufLens from cmd =
   do writeByteI sizeBufLens (fromIntegral bits)
@@ -199,3 +207,14 @@ writeDeltaUserCmd sizeBufLens from cmd =
         h = fromBool Constants.cmImpulse ((cmd^.ucImpulse) /= (from^.ucImpulse))
         bits = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h
         fromBool v p = if p then v else 0
+
+readData :: Lens' QuakeState SizeBufT -> Lens' QuakeState (UV.Vector Word8) -> Int -> Quake ()
+readData sizeBufLens bufLens len = do
+    updates <- collectUpdates 0 []
+    bufLens %= (UV.// updates)
+  where 
+    collectUpdates idx acc
+        | idx >= len = return acc
+        | otherwise = do
+            w <- readByte sizeBufLens
+            collectUpdates (idx + 1) ((idx, fromIntegral w) : acc)

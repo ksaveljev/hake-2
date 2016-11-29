@@ -2,6 +2,7 @@
 module Util.Lib
     ( atof
     , atoi
+    , crandom
     , fOpen
     , fOpenBinary
     , fClose
@@ -67,6 +68,12 @@ rnd = do
     let (result, newG) = random g
     globals.gRnd .= newG
     return result
+
+-- Like in libc
+crandom :: Quake Float
+crandom = do
+    f <- randomF
+    return ((f - 0.5) * 2)
 
 tokenise :: B.ByteString -> B.ByteString -> [B.ByteString]
 tokenise x y = let (h, t) = B.breakSubstring x y

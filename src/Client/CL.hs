@@ -520,7 +520,7 @@ fixCVarCheats = do
 
 fixCVar :: CheatVarT -> Quake ()
 fixCVar cheatVar = do
-    var <- CVar.getExisting (cheatVar^.chvName)
+    var <- getExisting (cheatVar^.chvName) -- from CVarVariables
     when ((var^.cvString) /= (cheatVar^.chvValue)) $
         void (CVar.set (cheatVar^.chvName) (cheatVar^.chvValue))
 

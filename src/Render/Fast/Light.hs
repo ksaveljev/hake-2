@@ -7,7 +7,7 @@ module Render.Fast.Light
     , rSetCacheState
     ) where
 
-import           Control.Lens                 (use, (^.), (.=), (%=), _1, _2)
+import           Control.Lens                 (use, ix, (^.), (.=), (%=), (&), (.~), (%~), _1, _2)
 import           Control.Monad                (void, when, unless)
 import           Control.Monad.ST             (ST, runST)
 import           Data.Bits                    (shiftL, shiftR, (.&.), (.|.))
@@ -20,22 +20,86 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed          as UV
 import qualified Data.Vector.Unboxed.Mutable  as MUV
 import           Data.Word                    (Word8)
-import           Linear                       (V3, _x, _y, _z)
+import           Linear                       (V3, dot, _x, _y, _z)
 
+import           Client.DLightT
 import           Client.LightStyleT
 import           Client.RefDefT
 import qualified Constants
+import           Game.CPlaneT
 import           Game.CVarT
 import qualified QCommon.Com                  as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
+import           Render.MNodeT
+import           Render.ModelT
 import           Render.MSurfaceT
 import           Render.MTexInfoT
 import           Types
 
+dLightCutoff :: Float
+dLightCutoff = 64
+
 rPushDLights :: Quake ()
-rPushDLights = error "Light.rPushDLights" -- TODO
+rPushDLights = do
+    flashBlend <- fmap (^.cvValue) glFlashBlendCVar
+    when (flashBlend == 0) $ do
+        frameCount <- use (fastRenderAPIGlobals.frFrameCount)
+        newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+        worldModelRef <- use (fastRenderAPIGlobals.frWorldModel)
+        fastRenderAPIGlobals.frDLightFrameCount .= frameCount + 1 -- because the count hasn't advanced yet for this frame
+        doPushDLights newRefDef worldModelRef
+  where
+    doPushDLights _ Nothing =
+        Com.fatalError "Light.rPushDLights worldModelRef is Nothing"
+    doPushDLights newRefDef (Just worldModelRef) = do
+        worldModel <- readRef worldModelRef
+        mapM_ (markLight newRefDef worldModelRef worldModel) [0..(newRefDef^.rdNumDLights)-1]
+    markLight newRefDef worldModelRef worldModel idx = do
+        light <- readRef ((newRefDef^.rdDLights) V.! idx)
+        rMarkLights worldModelRef worldModel light (1 `shiftL` idx) (MNodeChildRef (Ref 0))
+
+rMarkLights :: Ref ModelT -> ModelT -> DLightT -> Int -> MNodeChild -> Quake ()
+rMarkLights _ _ _ _ (MLeafChildRef _) = return ()
+rMarkLights worldModelRef worldModel light bit (MNodeChildRef (Ref idx)) = do
+    splitPlane <- readRef (node^.mnPlane)
+    doMarkLights ((light^.dlOrigin) `dot` (splitPlane^.cpNormal) - (splitPlane^.cpDist))
+  where
+    node = (worldModel^.mNodes) V.! idx
+    doMarkLights dist
+        | dist > (light^.dlIntensity) - dLightCutoff = rMarkLights worldModelRef worldModel light bit (node^.mnChildren._1)
+        | dist < dLightCutoff - (light^.dlIntensity) = rMarkLights worldModelRef worldModel light bit (node^.mnChildren._2)
+        | otherwise = do
+            mapM_ (markPolygon worldModelRef worldModel node light bit) [0..(node^.mnNumSurfaces)-1]
+            rMarkLights worldModelRef worldModel light bit (node^.mnChildren._1)
+            rMarkLights worldModelRef worldModel light bit (node^.mnChildren._2)
+
+markPolygon :: Ref ModelT -> ModelT -> MNodeT -> DLightT -> Int -> Int -> Quake ()
+markPolygon worldModelRef worldModel node light bit idx =
+    proceedMarkPolygon (surf^.msPlane)
+  where
+    surfIdx = ((node^.mnFirstSurface) + idx)
+    surf = (worldModel^.mSurfaces) V.! surfIdx
+    proceedMarkPolygon Nothing = Com.fatalError "Light.markPolygon surf^.msPlane is Nothing"
+    proceedMarkPolygon (Just planeRef) = do
+        plane <- readRef planeRef
+        doMarkPolygon worldModelRef surf surfIdx plane light bit
+
+doMarkPolygon :: Ref ModelT -> MSurfaceT -> Int -> CPlaneT -> DLightT -> Int -> Quake ()
+doMarkPolygon worldModelRef surf surfIdx plane light bit
+    | (surf^.msFlags) .&. Constants.surfPlaneBack /= sidebit =
+        return ()
+    | otherwise = do
+        dLightFrameCount <- use (fastRenderAPIGlobals.frDLightFrameCount)
+        when ((surf^.msDLightFrame) /= dLightFrameCount) $
+            modifyRef worldModelRef (\v -> v & mSurfaces.ix surfIdx %~ (\s -> s & msDLightBits .~ 0
+                                                                                & msDLightFrame .~ dLightFrameCount))
+        modifyRef worldModelRef (\v -> v & mSurfaces.ix surfIdx %~ (\s -> s & msDLightBits %~ (.|. bit)))
+  where
+    dist = (light^.dlOrigin) `dot` (plane^.cpNormal) - (plane^.cpDist)
+    sidebit | dist >= 0 = 0
+            | otherwise = Constants.surfPlaneBack
 
 rRenderDLights :: Quake ()
 rRenderDLights = error "Light.rRenderDLights" -- TODO
@@ -47,20 +111,23 @@ rSetCacheState :: Ref MSurfaceT -> Quake ()
 rSetCacheState surfRef = do
     surf <- readRef surfRef
     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+    lightStyles <- use (globals.gLightStyles)
     return $ runST $ do
         lights <- UV.unsafeThaw (surf^.msCachedLight)
-        cacheLights newRefDef surf lights 0 Constants.maxLightMaps
+        cacheLights newRefDef lightStyles surf lights 0 Constants.maxLightMaps
         void (UV.unsafeFreeze lights)
 
-cacheLights :: RefDefT -> MSurfaceT -> UV.MVector s Float -> Int -> Int -> ST s ()
-cacheLights newRefDef surf lights idx maxIdx
+cacheLights :: RefDefT -> V.Vector LightStyleT -> MSurfaceT -> UV.MVector s Float -> Int -> Int -> ST s ()
+cacheLights newRefDef lightStyles surf lights idx maxIdx
     | idx >= maxIdx = return ()
     | style == 255 = return ()
     | otherwise = do
-        MUV.write lights idx (((newRefDef^.rdLightStyles) V.! (fromIntegral style))^.lsWhite)
-        cacheLights newRefDef surf lights (idx + 1) maxIdx
+        MUV.write lights idx (lightStyle^.lsWhite)
+        cacheLights newRefDef lightStyles surf lights (idx + 1) maxIdx
   where
     style = (surf^.msStyles) `B.index` idx
+    Ref lightStyleIdx = (newRefDef^.rdLightStyles) V.! (fromIntegral style)
+    lightStyle = lightStyles V.! lightStyleIdx
 
 rBuildLightMap :: Ref MSurfaceT -> Maybe B.ByteString -> SV.Vector Word8 -> Int -> Int -> Quake ()
 rBuildLightMap surfRef lightData buffer offset stride = do
@@ -96,7 +163,8 @@ addUpdateLightMaps surf lightData size = do
     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
     glModulate <- fmap (^.cvValue) glModulateCVar
     blockLights <- use (fastRenderAPIGlobals.frBlockLights)
-    fastRenderAPIGlobals.frBlockLights .= doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
+    lightStyles <- use (globals.gLightStyles)
+    fastRenderAPIGlobals.frBlockLights .= doAddUpdateLightMaps blockLights lightStyles lightmap newRefDef glModulate
     frameCount <- use (fastRenderAPIGlobals.frFrameCount)
     when ((surf^.msDLightFrame) == frameCount) $
         rAddDynamicLights surf
@@ -109,39 +177,43 @@ addUpdateLightMaps surf lightData size = do
         Com.fatalError "Light.addUpdateLightMaps lightData cannot be Nothing"
         return B.empty
     getLightmap (Just offset) (Just lightmap) = return (B.drop offset lightmap)
-    doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
+    doAddUpdateLightMaps blockLights lightStyles lightmap newRefDef glModulate
         | numMaps == 1 =
-            addLightMaps surf blockLights lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
+            addLightMaps surf blockLights lightStyles lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
         | otherwise =
-            updateLightMaps surf (blockLights UV.// (zip [0..size * 3 - 1] (repeat 0))) lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
+            updateLightMaps surf (blockLights UV.// (zip [0..size * 3 - 1] (repeat 0))) lightStyles lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
 
-addLightMaps :: MSurfaceT -> UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
-addLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
+addLightMaps :: MSurfaceT -> UV.Vector Float -> V.Vector LightStyleT -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
+addLightMaps surf blockLights lightStyles lightmap lightmapIndex newRefDef glModulate size idx maxIdx
     | idx >= maxIdx = blockLights
     | (surf^.msStyles) `B.index` idx == 255 = blockLights
     | otherwise =
-        let rgb = ((newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx)))^.lsRGB
+        let (Ref lightStyleIdx) = (newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx))
+            lightStyle = lightStyles V.! lightStyleIdx
+            rgb = lightStyle^.lsRGB
             scale0 = glModulate * (rgb^._x)
             scale1 = glModulate * (rgb^._y)
             scale2 = glModulate * (rgb^._z)
             (lightmapIndex', updates) = if all (== 1) [scale0, scale1, scale2]
                                             then setLightmap lightmap lightmapIndex 0 size []
                                             else setLightmapScale lightmap lightmapIndex scale0 scale1 scale2 0 size []
-        in addLightMaps surf (blockLights UV.// updates) lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+        in addLightMaps surf (blockLights UV.// updates) lightStyles lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
 
-updateLightMaps :: MSurfaceT -> UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
-updateLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
+updateLightMaps :: MSurfaceT -> UV.Vector Float -> V.Vector LightStyleT -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
+updateLightMaps surf blockLights lightStyles lightmap lightmapIndex newRefDef glModulate size idx maxIdx
     | idx >= maxIdx = blockLights
     | (surf^.msStyles) `B.index` idx == 255 = blockLights
     | otherwise =
-        let rgb = ((newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx)))^.lsRGB
+        let (Ref lightStyleIdx) = (newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx))
+            lightStyle = lightStyles V.! lightStyleIdx
+            rgb = lightStyle^.lsRGB
             scale0 = glModulate * (rgb^._x)
             scale1 = glModulate * (rgb^._y)
             scale2 = glModulate * (rgb^._z)
             (lightmapIndex', updates) = if all (== 1) [scale0, scale1, scale2]
                                             then updateLightmap blockLights lightmap lightmapIndex 0 size []
                                             else updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size []
-        in updateLightMaps surf (blockLights UV.// updates) lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+        in updateLightMaps surf (blockLights UV.// updates) lightStyles lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
 
 setLightmap :: B.ByteString -> Int -> Int -> Int -> [(Int, Float)] -> (Int, [(Int, Float)])
 setLightmap lightmap lightmapIndex idx maxIdx acc

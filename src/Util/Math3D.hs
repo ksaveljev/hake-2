@@ -1,17 +1,25 @@
 module Util.Math3D
-  ( angleToShort
+  ( angleMod
+  , angleToShort
   , angleVectors
+  , boxOnPlaneSide
   , calcFov
+  , lerpAngles
   , projectSource
   , rotatePointAroundVector
   , shortToAngle
+  , v3Access
   ) where
 
-import           Control.Lens ((^.))
+import           Control.Lens (Const, (^.))
+import           Data.Bits ((.&.), (.|.))
 import           Data.Int (Int16)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..), dot, normalize, cross, _x, _y, _z)
+
+import           Game.CPlaneT
+import           Types
 
 piRatio :: Float
 piRatio = pi / 360
@@ -131,3 +139,70 @@ concatRotations in1 in2 =
               , (in1 UV.! 6) * (in2 UV.! 1) + (in1 UV.! 7) * (in2 UV.! 4) + (in1 UV.! 8) * (in2 UV.! 7)
               , (in1 UV.! 6) * (in2 UV.! 2) + (in1 UV.! 7) * (in2 UV.! 5) + (in1 UV.! 8) * (in2 UV.! 8)
               ]
+
+v3Access :: Int -> (a -> Const b a) -> V3 a -> Const b (V3 a)
+v3Access v = case v of
+                 0 -> _x
+                 1 -> _y
+                 2 -> _z
+                 _ -> error "Math3D.v3Access shouldn't happen"
+
+lerpAngles :: V3 Float -> V3 Float -> Float -> V3 Float
+lerpAngles (V3 a b c) (V3 a' b' c') frac =
+    V3 (lerpAngle a a' frac) (lerpAngle b b' frac) (lerpAngle c c' frac)
+
+lerpAngle :: Float -> Float -> Float -> Float
+lerpAngle a2 a1 frac =
+    let a1' = if a1 - a2 > 180 then a1 - 360 else a1
+        a1'' = if a1' - a2 < -180 then a1' + 360 else a1'
+    in a2 + frac * (a1'' - a2)
+
+angleMod :: Float -> Float
+angleMod a = let b = truncate (a / shortRatio) :: Int
+             in shortRatio * fromIntegral (b .&. 65535)
+
+boxOnPlaneSide :: V3 Float -> V3 Float -> CPlaneT -> Int
+boxOnPlaneSide emins emaxs p
+    | (p^.cpType) < 3 = fastAxialCase
+    | otherwise = -- general case
+        let V3 a b c = p^.cpNormal
+            V3 mina minb minc = emins
+            V3 maxa maxb maxc = emaxs
+            (dist1, dist2) =
+                case p^.cpSignBits of
+                    0 -> let d1 = a * maxa + b * maxb + c * maxc
+                             d2 = a * mina + b * minb + c * minc
+                         in (d1, d2)
+                    1 -> let d1 = a * mina + b * maxb + c * maxc
+                             d2 = a * maxa + b * minb + c * minc
+                         in (d1, d2)
+                    2 -> let d1 = a * maxa + b * minb + c * maxc
+                             d2 = a * mina + b * maxb + c * minc
+                         in (d1, d2)
+                    3 -> let d1 = a * mina + b * minb + c * maxc
+                             d2 = a * maxa + b * maxb + c * minc
+                         in (d1, d2)
+                    4 -> let d1 = a * maxa + b * maxb + c * minc
+                             d2 = a * mina + b * minb + c * maxc
+                         in (d1, d2)
+                    5 -> let d1 = a * mina + b * maxb + c * minc
+                             d2 = a * maxa + b * minb + c * maxc
+                         in (d1, d2)
+                    6 -> let d1 = a * maxa + b * minb + c * minc
+                             d2 = a * mina + b * maxb + c * maxc
+                         in (d1, d2)
+                    7 -> let d1 = a * mina + b * minb + c * minc
+                             d2 = a * maxa + b * maxb + c * maxc
+                         in (d1, d2)
+                    _ -> undefined -- TODO: throw error
+            sides = if dist1 >= (p^.cpDist) then 1 else 0
+            sides' = if dist2 < (p^.cpDist) then sides .|. 2 else sides
+        -- TODO: 
+        -- assert(sides != 0) : "BoxOnPlaneSide(): sides == 0 bug";
+        in sides'
+  where
+    ptype = v3Access (fromIntegral (p^.cpType))
+    fastAxialCase
+        | (p^.cpDist) <= (emins^.ptype) = 1
+        | (p^.cpDist) >= (emaxs^.ptype) = 2
+        | otherwise                     = 3

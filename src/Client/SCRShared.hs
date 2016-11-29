@@ -1,15 +1,15 @@
 module Client.SCRShared
-  ( addDirtyPoint
-  , dirtyScreen
-  , drawCrosshair
-  ) where
+    ( addDirtyPoint
+    , dirtyScreen
+    , drawCrosshair
+    ) where
 
-import Client.DirtyT
-import Client.VidDefT
-import QuakeState
-import Types
+import           Control.Lens (use, (^.), (%=), (&), (%~))
 
-import Control.Lens (use, (^.), (%=), (&), (%~))
+import           Client.DirtyT
+import           Client.VidDefT
+import           QuakeState
+import           Types
 
 addDirtyPoint :: Int -> Int -> Quake ()
 addDirtyPoint x y =

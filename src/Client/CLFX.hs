@@ -1,10 +1,23 @@
 module Client.CLFX
-    ( clearEffects
+    ( addDLights
+    , addLightStyles
+    , addParticles
+    , bfgParticles
+    , blasterTrail
+    , clearEffects
+    , diminishingTrail
+    , entityEvent
+    , flagTrail
+    , flyEffect
+    , ionRipperTrail
     , parseMuzzleFlash
     , parseMuzzleFlash2
+    , rocketTrail
     , runDLights
     , runLightStyles
     , setLightStyle
+    , teleporterParticles
+    , trapParticles
     ) where
 
 import           Control.Lens          (preuse, use, ix)
@@ -17,7 +30,7 @@ import           Data.Char             (ord)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
 import qualified Data.Vector.Mutable   as MV
-import           Linear                (V3(..), _x, _y, _z)
+import           Linear                (V3(..), normalize, _x, _y, _z)
 
 import           Client.CDLightT
 import           Client.CEntityT
@@ -25,10 +38,13 @@ import           Client.ClientStateT
 import           Client.CLightStyleT
 import qualified Client.CLTEnt         as CLTEnt
 import           Client.CParticleT
+import qualified Client.VShared        as ClientV
 import qualified Constants
+import           Game.CVarT
 import           Game.EntityStateT
 import qualified Game.Monsters.MFlash  as MFlash
 import qualified QCommon.Com           as Com
+import           QCommon.CVarVariables
 import qualified QCommon.MSG           as MSG
 import           QuakeIOState
 import           QuakeRef
@@ -38,6 +54,12 @@ import           Types
 import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
+
+particleGravity :: Float
+particleGravity = 40
+
+instantParticle :: Float
+instantParticle = -10000.0
 
 runDLights :: Quake ()
 runDLights = do
@@ -707,7 +729,288 @@ allocDLight key = do
                 False -> findAnyDLight time (idx + 1) maxIdx
 
 logoutEffect :: V3 Float -> Int -> Quake ()
-logoutEffect = error "CLFX.logoutEffect" -- TODO
+logoutEffect org pType = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addLogoutEffect org pType freeParticles 0 500
+
+addLogoutEffect :: V3 Float -> Int -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addLogoutEffect _ _ Nothing _ _ = return ()
+addLogoutEffect org pType (Just pRef) idx maxIdx
+    | idx >= maxIdx = return ()
+    | otherwise = do
+        p <- readRef pRef
+        activeParticles <- use (clientGlobals.cgActiveParticles)
+        clientGlobals.cgFreeParticles .= (p^.cpNext)
+        clientGlobals.cgActiveParticles .= Just pRef
+        time <- use (globals.gCl.csTime)
+        r <- Lib.rand
+        f <- Lib.randomF
+        o1 <- Lib.randomF
+        o2 <- Lib.randomF
+        o3 <- Lib.randomF
+        v1 <- Lib.crandom
+        v2 <- Lib.crandom
+        v3 <- Lib.crandom
+        modifyRef pRef (\v -> v & cpNext .~ activeParticles
+                                & cpTime .~ fromIntegral time
+                                & cpColor .~ pickColor (fromIntegral (r .&. 7))
+                                & cpOrg .~ V3 ((org^._x) - 16 + o1 * 32) ((org^._y) - 16 + o2 * 32) ((org^._z) - 24 + o3 * 56)
+                                & cpVel .~ fmap (* 20) (V3 v1 v2 v3)
+                                & cpAccel .~ V3 0 0 (- particleGravity)
+                                & cpAlpha .~ 1.0
+                                & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.3))
+        addLogoutEffect org pType (p^.cpNext) (idx + 1) maxIdx
+  where
+    pickColor r
+        | pType == Constants.mzLogin = 0xD0 + r -- green
+        | pType == Constants.mzLogout = 0x40 + r -- red
+        | otherwise = 0xE0 + r -- yellow
 
 particleEffect :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
-particleEffect = error "CLFX.particleEffect" -- TODO
+particleEffect org dir color count = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addParticleEffects org dir color count freeParticles 0
+
+addParticleEffects :: V3 Float -> V3 Float -> Int -> Int -> Maybe (Ref CParticleT) -> Int -> Quake ()
+addParticleEffects _ _ _ _ Nothing _ = return ()
+addParticleEffects org dir color count (Just pRef) idx
+    | idx >= count = return ()
+    | otherwise = do
+        p <- readRef pRef
+        activeParticles <- use (clientGlobals.cgActiveParticles)
+        clientGlobals.cgFreeParticles .= (p^.cpNext)
+        clientGlobals.cgActiveParticles .= Just pRef
+        time <- use (globals.gCl.csTime)
+        r <- Lib.rand
+        r' <- Lib.randomF
+        d <- fmap (fromIntegral . (.&. 31)) Lib.rand
+        o1 <- Lib.rand
+        v1 <- Lib.crandom
+        o2 <- Lib.rand
+        v2 <- Lib.crandom
+        o3 <- Lib.rand
+        v3 <- Lib.crandom
+        writeRef pRef (newCParticleT & cpNext .~ activeParticles
+                                     & cpTime .~ fromIntegral time
+                                     & cpColor .~ fromIntegral (color + fromIntegral (r .&. 7))
+                                     & cpOrg .~ org + fmap (fromIntegral . (subtract 4) . (.&. 7)) (V3 o1 o2 o3) + fmap (* d) dir
+                                     & cpVel .~ fmap (* 20) (V3 v1 v2 v3)
+                                     & cpAccel .~ V3 0 0 (- particleGravity)
+                                     & cpAlpha .~ 1.0
+                                     & cpAlphaVel .~ -1 / (0.5 + r' * 0.3))
+        addParticleEffects org dir color count (p^.cpNext) (idx + 1)
+
+entityEvent :: EntityStateT -> Quake ()
+entityEvent entityState
+    | (entityState^.esEvent) == Constants.evItemRespawn = do
+        sfx <- S.registerSound "items/respawn1.wav"
+        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+        itemRespawnParticles (entityState^.esOrigin)
+    | (entityState^.esEvent) == Constants.evPlayerTeleport = do
+        sfx <- S.registerSound "misc/tele1.wav"
+        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+        teleportParticles (entityState^.esOrigin)
+    | (entityState^.esEvent) == Constants.evFootstep = do
+        footsteps <- fmap (^.cvValue) clFootstepsCVar
+        when (footsteps /= 0) $ do
+          r <- Lib.rand
+          sfxFootsteps <- use (clTEntGlobals.clteSfxFootsteps)
+          S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanBody (sfxFootsteps V.! fromIntegral (r .&. 3)) 1 Constants.attnNorm 0
+    | (entityState^.esEvent) == Constants.evFallShort = do
+        sfx <- S.registerSound "player/land1.wav"
+        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+    | (entityState^.esEvent) == Constants.evFall = do
+        sfx <- S.registerSound "*fall2.wav"
+        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+    | (entityState^.esEvent) == Constants.evFallFar = do
+        sfx <- S.registerSound "*fall1.wav"
+        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+    | otherwise =
+        return () -- TODO: expected?
+
+teleporterParticles :: EntityStateT -> Quake ()
+teleporterParticles ent = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addTeleporterParticles ent freeParticles 0 8
+
+addTeleporterParticles :: EntityStateT -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addTeleporterParticles _ Nothing _ _ = return ()
+addTeleporterParticles ent (Just pRef) idx maxIdx
+    | idx >= maxIdx = return ()
+    | otherwise = do
+        p <- readRef pRef
+        activeParticles <- use (clientGlobals.cgActiveParticles)
+        clientGlobals.cgFreeParticles .= (p^.cpNext)
+        clientGlobals.cgActiveParticles .= Just pRef
+        time <- use (globals.gCl.csTime)
+        o1 <- Lib.rand
+        o2 <- Lib.rand
+        o3 <- Lib.rand
+        v1 <- Lib.crandom
+        v2 <- Lib.crandom
+        v3 <- Lib.rand
+        modifyRef pRef (\v -> v & cpNext .~ activeParticles
+                                & cpTime .~ fromIntegral time
+                                & cpColor .~ 0xDB
+                                & cpOrg .~ V3 ((ent^.esOrigin._x) - 16 + fromIntegral (o1 .&. 31)) ((ent^.esOrigin._y) - 16 + fromIntegral (o2 .&. 31)) ((ent^.esOrigin._z) - 8 + fromIntegral (o3 .&. 7))
+                                & cpVel .~ V3 (v1 * 14) (v2 * 14) (80 + fromIntegral (v3 .&. 3))
+                                & cpAccel .~ V3 0 0 (- particleGravity)
+                                & cpAlpha .~ 1.0
+                                & cpAlphaVel .~ -0.5)
+        addTeleporterParticles ent (p^.cpNext) (idx + 1) maxIdx
+
+itemRespawnParticles :: V3 Float -> Quake ()
+itemRespawnParticles org = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addItemRespawnParticles org freeParticles 0 64
+
+addItemRespawnParticles :: V3 Float -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addItemRespawnParticles _ Nothing _ _ = return ()
+addItemRespawnParticles org (Just pRef) idx maxIdx
+    | idx >= maxIdx = return ()
+    | otherwise = do
+        p <- readRef pRef
+        activeParticles <- use (clientGlobals.cgActiveParticles)
+        clientGlobals.cgFreeParticles .= (p^.cpNext)
+        clientGlobals.cgActiveParticles .= Just pRef
+        time <- use (globals.gCl.csTime)
+        color <- fmap (.&. 3) Lib.rand
+        o1 <- Lib.crandom
+        o2 <- Lib.crandom
+        o3 <- Lib.crandom
+        v1 <- Lib.crandom
+        v2 <- Lib.crandom
+        v3 <- Lib.crandom
+        f <- Lib.randomF
+        modifyRef pRef (\v -> v & cpNext .~ activeParticles
+                                & cpTime .~ fromIntegral time
+                                & cpColor .~ 0xD4 + fromIntegral color -- green
+                                & cpOrg .~ V3 ((org^._x) + o1 * 8) ((org^._y) + o2 * 8) ((org^._z) + o3 * 8)
+                                & cpVel .~ V3 (v1 * 8) (v2 * 8) (v3 * 8)
+                                & cpAccel .~ V3 0 0 ((-0.2) * particleGravity)
+                                & cpAlpha .~ 1.0
+                                & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.3))
+        addItemRespawnParticles org (p^.cpNext) (idx + 1) maxIdx
+
+teleportParticles :: V3 Float -> Quake ()
+teleportParticles org = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addTeleportParticles org freeParticles (-16) (-16) (-16)
+
+addTeleportParticles :: V3 Float -> Maybe (Ref CParticleT) -> Int -> Int -> Int -> Quake ()
+addTeleportParticles _ Nothing _ _ _ = return ()
+addTeleportParticles org (Just pRef) i j k
+    | i > 16 = return ()
+    | j > 16 = addTeleportParticles org (Just pRef) (i + 4) (-16) (-16)
+    | k > 32 = addTeleportParticles org (Just pRef) i (j + 4) (-16)
+    | otherwise = do
+        p <- readRef pRef
+        activeParticles <- use (clientGlobals.cgActiveParticles)
+        clientGlobals.cgFreeParticles .= (p^.cpNext)
+        clientGlobals.cgActiveParticles .= Just pRef
+        time <- use (globals.gCl.csTime)
+        color <- fmap (.&. 7) Lib.rand
+        av <- Lib.rand
+        o1 <- Lib.rand
+        o2 <- Lib.rand
+        o3 <- Lib.rand
+        vel <- fmap (\r -> 50 + fromIntegral (r .&. 63)) Lib.rand
+        modifyRef pRef (\v -> v & cpNext .~ activeParticles
+                                & cpTime .~ fromIntegral time
+                                & cpColor .~ 7 + fromIntegral color
+                                & cpAlpha .~ 1.0
+                                & cpAlphaVel .~ (-1.0) / (0.3 + fromIntegral (av .&. 7) * 0.02)
+                                & cpOrg .~ V3 ((org^._x) + fromIntegral i + fromIntegral (o1 .&. 3)) ((org^._y) + fromIntegral j + fromIntegral (o2 .&. 3)) ((org^._z) + fromIntegral k + fromIntegral (o3 .&. 3))
+                                & cpVel .~ fmap (* vel) (normalize (fmap fromIntegral (V3 (j * 8) (i * 8) (k * 8))))
+                                & cpAccel .~ V3 0 0 (- particleGravity))
+        addTeleportParticles org (p^.cpNext) i j (k + 4)
+
+addParticles :: Quake ()
+addParticles = do
+    cl <- use (globals.gCl)
+    activeParticles <- use (clientGlobals.cgActiveParticles)
+    doAddParticles cl activeParticles Nothing Nothing 0
+
+doAddParticles :: ClientStateT -> Maybe (Ref CParticleT) -> Maybe (Ref CParticleT) -> Maybe (Ref CParticleT) -> Float -> Quake ()
+doAddParticles _ Nothing activeRef _ _ = clientGlobals.cgActiveParticles .= activeRef
+doAddParticles cl (Just pRef) activeRef tailRef time = do
+    p <- readRef pRef
+    (done, time', alpha) <- checkInstantParticle p
+    proceedAddParticles p done time' alpha
+  where
+    checkInstantParticle p
+        | (p^.cpAlphaVel) /= instantParticle = do
+            let time' = (fromIntegral (cl^.csTime) - (p^.cpTime)) * 0.001
+                alpha = (p^.cpAlpha) + time' * (p^.cpAlphaVel)
+            checkFadedOut time' alpha
+        | otherwise =
+            return (False, time, p^.cpAlpha)
+    checkFadedOut time' alpha
+        | alpha <= 0 = do
+            freeParticles <- use (clientGlobals.cgFreeParticles)
+            modifyRef pRef (\v -> v & cpNext .~ freeParticles)
+            clientGlobals.cgFreeParticles .= Just pRef
+            return (True, time', alpha)
+        | otherwise =
+            return (False, time', alpha)
+    proceedAddParticles p done time' alpha
+        | done = doAddParticles cl (p^.cpNext) activeRef tailRef time'
+        | otherwise = do
+            modifyRef pRef (\v -> v & cpNext .~ Nothing)
+            (activeRef', tailRef') <- checkTailRef tailRef
+            let alpha' = min 1 alpha
+                color = truncate (p^.cpColor) :: Int
+                time2 = time' * time'
+                org = (p^.cpOrg) + fmap (* time') (p^.cpVel) + fmap (* time2) (p^.cpAccel)
+            ClientV.addParticle org color alpha'
+            when ((p^.cpAlphaVel) == instantParticle) $
+                modifyRef pRef (\v -> v & cpAlpha .~ 0
+                                        & cpAlphaVel .~ 0)
+            doAddParticles cl (p^.cpNext) activeRef' tailRef' time'
+    checkTailRef Nothing = return (Just pRef, Just pRef)
+    checkTailRef (Just ref) = do
+        modifyRef ref (\v -> v & cpNext .~ Just pRef)
+        return (activeRef, Just pRef)
+
+addDLights :: Quake ()
+addDLights =
+    -- TODO: currently simplified version... need to update it to reflect
+    -- jake2 version correctly
+    mapM_ addDLight (fmap Ref [0..Constants.maxDLights-1])
+  where
+    addDLight dlRef = doAddDLight =<< readRef dlRef
+    doAddDLight dl
+        | (dl^.cdlRadius) == 0 = return ()
+        | otherwise = ClientV.addLight (dl^.cdlOrigin) (dl^.cdlRadius) (dl^.cdlColor._x) (dl^.cdlColor._y) (dl^.cdlColor._z)
+
+addLightStyles :: Quake ()
+addLightStyles =
+    mapM_ addLightStyle (fmap Ref [0..Constants.maxLightStyles-1])
+  where
+    addLightStyle lsRef@(Ref idx) = do
+        ls <- readRef lsRef
+        ClientV.addLightStyle (Ref idx) (ls^.clsValue._x) (ls^.clsValue._y) (ls^.clsValue._z)
+
+rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
+rocketTrail = error "CLFX.rocketTrail" -- TODO
+
+blasterTrail :: V3 Float -> V3 Float -> Quake ()
+blasterTrail = error "CLFX.blasterTrail" -- TODO
+
+diminishingTrail :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+diminishingTrail = error "CLFX.diminishingTrail" -- TODO
+
+flyEffect :: Int -> V3 Float -> Quake ()
+flyEffect = error "CLFX.flyEffect" -- TODO
+
+flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
+flagTrail = error "CLFX.flagTrail" -- TODO
+
+bfgParticles :: EntityT -> Quake ()
+bfgParticles = error "CLFX.bfgParticles" -- TODO
+
+trapParticles :: EntityT -> Quake ()
+trapParticles = error "CLFX.trapParticles" -- TODO
+
+ionRipperTrail :: V3 Float -> V3 Float -> Quake ()
+ionRipperTrail = error "CLFX.ionRipperTrail" -- TODO

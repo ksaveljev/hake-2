@@ -1,7 +1,9 @@
 module Render.Fast.Model
-    ( freeAll
+    ( clusterPVS
+    , freeAll
     , modelListF
     , modInit
+    , pointInLeaf
     , rBeginRegistration
     , rRegisterModel
     , rEndRegistration
@@ -22,11 +24,12 @@ import qualified Data.Vector                     as V
 import qualified Data.Vector.Storable.Mutable    as MSV
 import qualified Data.Vector.Unboxed             as UV
 import           Data.Word                       (Word32)
-import           Linear                          (V3(..), V4(..), norm, _x, _y, _z)
+import           Linear                          (V3(..), V4(..), dot, norm, _x, _y, _z)
 import           System.IO                       (Handle)
 
 import {-# SOURCE #-} qualified Client.VID       as VID
 import qualified Constants
+import           Game.CPlaneT
 import           Game.CVarT
 import qualified QCommon.Com                     as Com
 import qualified QCommon.CVar                    as CVar
@@ -51,11 +54,13 @@ import           QuakeRef
 import           QuakeState
 import qualified Render.Fast.Image               as Image
 import qualified Render.Fast.Polygon             as Polygon
+import           Render.Fast.Shared
 import qualified Render.Fast.Surf                as Surf
 import qualified Render.Fast.Warp                as Warp
 import           Render.ImageT
 import           Render.MEdgeT
 import           Render.MModelT
+import           Render.MNodeT
 import           Render.ModelT
 import           Render.MSurfaceT
 import           Render.MTexInfoT
@@ -139,7 +144,24 @@ updateImageRegSeq regSeq texInfo =
         modifyRef imageRef (\v -> v & iRegistrationSequence .~ regSeq)
 
 rEndRegistration :: Quake ()
-rEndRegistration = error "Model.rEndRegistration" -- TODO
+rEndRegistration = do
+    modNumKnown <- use (fastRenderAPIGlobals.frModNumKnown)
+    regSeq <- use (fastRenderAPIGlobals.frRegistrationSequence)
+    mapM_ (checkModel regSeq) (fmap Ref [0..modNumKnown-1])
+    Image.glFreeUnusedImages
+  where
+    checkModel regSeq modelRef = do
+        model <- readRef modelRef
+        doCheckModel regSeq modelRef model
+    doCheckModel regSeq modelRef model
+        | B.null (model^.mName) = return ()
+        | (model^.mRegistrationSequence) /= regSeq = modFree modelRef
+        | (model^.mType) == Constants.modAlias = maybe (return ()) (processAliasHeader modelRef) (model^.mExtraData)
+        | otherwise = return ()
+    processAliasHeader modelRef (AliasModelExtra pheader) = do
+        pheader' <- precompileGLCmds pheader
+        modifyRef modelRef (\v -> v & mExtraData .~ Just (AliasModelExtra pheader'))
+    processAliasHeader _ _ = error "Model.rEndRegistration shouldn't happen"
 
 freeAll :: Quake ()
 freeAll = fastRenderAPIGlobals.frModKnown %= fmap freeModel
@@ -182,6 +204,7 @@ getInlineModel name = do
 
 loadModel :: V.Vector ModelT -> B.ByteString -> Bool -> Quake (Maybe (Ref ModelT))
 loadModel modKnown name crash = do
+    request $ io $ B.putStrLn ("LOAD MODEL FFS" `B.append` name)
     emptySpotRef <- maybe noEmptySpot (return . Ref) (findFree modKnown)
     modifyRef emptySpotRef (\v -> v & mName .~ name)
     fileHandle <- FS.fOpenFileWithLength name
@@ -700,3 +723,20 @@ collectIndexElements [] _ _ acc = V.fromList (reverse acc)
 collectIndexElements (x:xs) idx pos acc =
     let count = fromIntegral (if x < 0 then negate x else x)
     in collectIndexElements xs idx (pos + count) ((idx + pos, count) : acc)
+
+pointInLeaf :: V3 Float -> ModelT -> Quake MLeafT
+pointInLeaf p model =
+    findLeaf (MNodeChildRef (Ref 0))
+  where
+    findLeaf (MNodeChildRef (Ref idx)) = do
+        let node = (model^.mNodes) V.! idx
+        plane <- readRef (node^.mnPlane)
+        let d = p `dot` (plane^.cpNormal) - (plane^.cpDist)
+            childRef
+                | d > 0 = node^.mnChildren._1
+                | otherwise = node^.mnChildren._2
+        case childRef of
+            MLeafChildRef (Ref leafIdx) -> return ((model^.mLeafs) V.! leafIdx)
+            nodeChildRef -> findLeaf nodeChildRef
+    findLeaf (MLeafChildRef _) = do
+        error "Model.pointInLeaf should never happen!" -- TODO

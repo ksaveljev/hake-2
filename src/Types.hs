@@ -40,30 +40,30 @@ io :: MonadIO m => IO a -> m a
 io = liftIO
 
 data QuakeState = QuakeState
-    { _globals              :: Globals
-    , _comGlobals           :: ComGlobals
-    , _cmdGlobals           :: CmdGlobals
-    , _keyGlobals           :: KeyGlobals
-    , _fsGlobals            :: FSGlobals
-    , _svGlobals            :: SVGlobals
-    , _gameBaseGlobals      :: GameBaseGlobals
-    , _cmGlobals            :: CMGlobals
-    , _gameItemsGlobals     :: GameItemsGlobals
-    , _vidGlobals           :: VIDGlobals
-    , _inGlobals            :: INGlobals
-    , _fastRenderAPIGlobals :: FastRenderAPIGlobals
-    , _glfwbGlobals         :: GLFWbGlobals
-    , _clientGlobals        :: ClientGlobals
-    , _particleTGlobals     :: ParticleTGlobals
-    , _menuGlobals          :: MenuGlobals
-    , _pMoveGlobals         :: PMoveGlobals
-    , _kbdGlobals           :: KBDGlobals
-    , _scrGlobals           :: SCRGlobals
-    , _netGlobals           :: NETGlobals
-    , _playerTrailGlobals   :: PlayerTrailGlobals
-    , _vGlobals             :: VGlobals
-    , _netChannelGlobals    :: NetChannelGlobals
-    , _clTEntGlobals        :: CLTEntGlobals
+    { _globals               :: Globals
+    , _comGlobals            :: ComGlobals
+    , _cmdGlobals            :: CmdGlobals
+    , _keyGlobals            :: KeyGlobals
+    , _fsGlobals             :: FSGlobals
+    , _svGlobals             :: SVGlobals
+    , _gameBaseGlobals       :: GameBaseGlobals
+    , _cmGlobals             :: CMGlobals
+    , _gameItemsGlobals      :: GameItemsGlobals
+    , _vidGlobals            :: VIDGlobals
+    , _inGlobals             :: INGlobals
+    , _fastRenderAPIGlobals  :: FastRenderAPIGlobals
+    , _glfwbGlobals          :: GLFWbGlobals
+    , _clientGlobals         :: ClientGlobals
+    , _particleTGlobals      :: ParticleTGlobals
+    , _menuGlobals           :: MenuGlobals
+    , _pMoveGlobals          :: PMoveGlobals
+    , _kbdGlobals            :: KBDGlobals
+    , _scrGlobals            :: SCRGlobals
+    , _netGlobals            :: NETGlobals
+    , _playerTrailGlobals    :: PlayerTrailGlobals
+    , _vGlobals              :: VGlobals
+    , _netChannelGlobals     :: NetChannelGlobals
+    , _clTEntGlobals         :: CLTEntGlobals
     , _mBerserkGlobals       :: MBerserkGlobals
     , _mBoss2Globals         :: MBoss2Globals
     , _mBoss31Globals        :: MBoss31Globals
@@ -135,6 +135,7 @@ data Globals = Globals
     , _gCls              :: ClientStaticT
     , _gCl               :: ClientStateT
     , _gClEntities       :: V.Vector CEntityT
+    , _gClParseEntities  :: V.Vector EntityStateT
     , _gUserInfoModified :: Bool
     , _gCVars            :: HM.HashMap B.ByteString CVarT
     , _gCon              :: ConsoleT
@@ -152,6 +153,9 @@ data Globals = Globals
     , _gLogFile          :: Maybe Handle
     , _gVec3Origin       :: V3 Float
     , _gRnd              :: StdGen
+    , _gEntities         :: V.Vector EntityT     -- moved from VGlobals.vgEntities as it has to be shared with RefDefT.rdEntities
+    , _gLightStyles      :: V.Vector LightStyleT -- moved from VGlobals.vgLightStyles as it has to be shared with RefDefT.rdLightStyles
+    , _gDLights          :: V.Vector DLightT     -- moved from VGlobals.vgDLights as it has to be shared with RefDefT.rdDLights
     }
 
 data ComGlobals = ComGlobals
@@ -564,9 +568,9 @@ data VGlobals = VGlobals
     { _vgNumDLights   :: Int
     , _vgNumEntities  :: Int
     , _vgNumParticles :: Int
-    , _vgLightStyles  :: V.Vector LightStyleT
-    , _vgDLights      :: V.Vector DLightT
-    , _vgEntities     :: V.Vector EntityT
+    , _vgLightStyles  :: V.Vector (Ref LightStyleT)
+    , _vgDLights      :: V.Vector (Ref DLightT)
+    , _vgEntities     :: V.Vector (Ref EntityT)
     }
 
 data NetChannelGlobals = NetChannelGlobals
@@ -1743,7 +1747,7 @@ data ImageT = ImageT
     , _iUploadWidth          :: Int
     , _iUploadHeight         :: Int
     , _iRegistrationSequence :: Int
-    , _iTextureChain         :: Maybe (IORef MSurfaceT)
+    , _iTextureChain         :: Maybe (Ref MSurfaceT)
     , _iTexNum               :: Int
     , _iSL                   :: Float
     , _iTL                   :: Float
@@ -1767,11 +1771,11 @@ data RefDefT = RefDefT
     , _rdTime         :: Float
     , _rdRdFlags      :: Int
     , _rdAreaBits     :: UV.Vector Word8
-    , _rdLightStyles  :: V.Vector LightStyleT
+    , _rdLightStyles  :: V.Vector (Ref LightStyleT)
     , _rdNumEntities  :: Int
-    , _rdEntities     :: V.Vector EntityT
+    , _rdEntities     :: V.Vector (Ref EntityT)
     , _rdNumDLights   :: Int
-    , _rdDLights      :: V.Vector DLightT
+    , _rdDLights      :: V.Vector (Ref DLightT)
     , _rdNumParticles :: Int
     }
 
@@ -1800,7 +1804,7 @@ data MLeafT = MLeafT
     , _mlVisFrame        :: Int
     , _mlMins            :: V3 Float
     , _mlMaxs            :: V3 Float
-    , _mlParent          :: Maybe (IORef MNodeT)
+    , _mlParent          :: Maybe (Ref MNodeT)
     , _mlCluster         :: Int
     , _mlArea            :: Int
     , _mlNumMarkSurfaces :: Int
@@ -1844,8 +1848,8 @@ data MSurfaceT = MSurfaceT
     , _msDLightS            :: Int
     , _msDLightT            :: Int
     , _msPolys              :: Maybe (Ref GLPolyT)
-    , _msTextureChain       :: Maybe (IORef MSurfaceT)
-    , _msLightmapChain      :: Maybe (IORef MSurfaceT)
+    , _msTextureChain       :: Maybe (Ref MSurfaceT)
+    , _msLightmapChain      :: Maybe (Ref MSurfaceT)
     , _msTexInfo            :: Ref MTexInfoT
     , _msDLightFrame        :: Int
     , _msDLightBits         :: Int
@@ -1869,7 +1873,7 @@ data LightStyleT = LightStyleT
     }
 
 data EntityT = EntityT
-    { _eModel      :: Maybe (IORef ModelT)
+    { _eModel      :: Maybe (Ref ModelT)
     , _eAngles     :: V3 Float
     , _eOrigin     :: V3 Float
     , _eFrame      :: Int
@@ -1879,7 +1883,7 @@ data EntityT = EntityT
     , _eSkinNum    :: Int
     , _eLightStyle :: Int
     , _eAlpha      :: Float
-    , _eSkin       :: Maybe (IORef ImageT)
+    , _eSkin       :: Maybe (Ref ImageT)
     , _enFlags     :: Int -- name clash with EdictT._eFlags
     }
 
@@ -2237,6 +2241,22 @@ data PcxT = PcxT
     , _pcxPaletteType  :: Word16
     , _pcxFiller       :: B.ByteString -- size 58
     , _pcxData         :: B.ByteString -- unbounded
+    }
+
+data TgaT = TgaT
+    { _tgaIdLength       :: Word8
+    , _tgaColorMapType   :: Word8
+    , _tgaImageType      :: Word8
+    , _tgaColorMapIndex  :: Word16
+    , _tgaColorMapLength :: Word16
+    , _tgaColorMapSize   :: Word8
+    , _tgaXOrigin        :: Word16
+    , _tgaYOrigin        :: Word16
+    , _tgaWidth          :: Word16
+    , _tgaHeight         :: Word16
+    , _tgaPixelSize      :: Word8
+    , _tgaAttributes     :: Word8
+    , _tgaData           :: B.ByteString -- (un)compressed data
     }
 
 data PmlT = PmlT

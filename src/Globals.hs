@@ -1,27 +1,31 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Globals
-  ( module Globals
-  ) where
+    ( module Globals
+    ) where
+
+import           Control.Lens         (makeLenses)
+import qualified Data.ByteString      as B
+import qualified Data.HashMap.Lazy    as HM
+import qualified Data.Sequence        as Seq
+import qualified Data.Vector          as V
+import           Linear               (V3(..))
+import           Render.DummyRenderer (dummyRenderer)
+import           System.Random        (mkStdGen)
 
 import qualified Constants
-import           Client.CEntityT (newCEntityT)
-import           Client.ClientStateT (newClientStateT)
+import           Client.CEntityT      (newCEntityT)
+import           Client.ClientStateT  (newClientStateT)
 import           Client.ClientStaticT (newClientStaticT)
-import           Client.ConsoleT (newConsoleT)
-import           Client.VidDefT (newVidDefT)
-import           Client.VRectT (newVRectT)
-import           QCommon.NetAdrT (newNetAdrT)
-import           QCommon.SizeBufT (newSizeBufT)
+import           Client.ConsoleT      (newConsoleT)
+import           Client.DLightT       (newDLightT)
+import           Client.EntityT       (newEntityT)
+import           Client.LightStyleT   (newLightStyleT)
+import           Client.VidDefT       (newVidDefT)
+import           Client.VRectT        (newVRectT)
+import           Game.EntityStateT
+import           QCommon.NetAdrT      (newNetAdrT)
+import           QCommon.SizeBufT     (newSizeBufT)
 import           Types
-
-import           Control.Lens (makeLenses)
-import qualified Data.ByteString as B
-import qualified Data.HashMap.Lazy as HM
-import qualified Data.Sequence as Seq
-import qualified Data.Vector as V
-import           Linear (V3(..))
-import           Render.DummyRenderer (dummyRenderer)
-import           System.Random (mkStdGen)
 
 makeLenses ''Globals
 
@@ -43,6 +47,7 @@ initialGlobals =
           , _gCls              = newClientStaticT
           , _gCl               = newClientStateT
           , _gClEntities       = V.replicate Constants.maxEdicts newCEntityT
+          , _gClParseEntities  = V.replicate Constants.maxParseEntities (newEntityStateT Nothing)
           , _gUserInfoModified = False
           , _gCVars            = HM.empty
           , _gCon              = newConsoleT
@@ -60,4 +65,7 @@ initialGlobals =
           , _gLogFile          = Nothing
           , _gVec3Origin       = V3 0 0 0
           , _gRnd              = mkStdGen 0
+          , _gLightStyles      = V.replicate Constants.maxLightStyles newLightStyleT
+          , _gDLights          = V.replicate Constants.maxDLights newDLightT
+          , _gEntities         = V.replicate Constants.maxEntities newEntityT
           }

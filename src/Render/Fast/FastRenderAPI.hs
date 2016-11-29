@@ -27,13 +27,14 @@ import qualified Render.Fast.Warp as Warp
 import           Render.GLConfigT
 import           Render.GLStateT
 import           Render.ImageT
+import           Render.MLeafT
 import           Render.OpenGL.GLDriver
 import           Types
 import qualified Util.Math3D as Math3D
 
 import           Control.Applicative (liftA2)
 import           Control.Exception (handle, IOException)
-import           Control.Lens (use, (^.), (.=), (%=), (+=), (&), (.~))
+import           Control.Lens (use, (^.), (.=), (%=), (+=), (&), (.~), (+~), (-~))
 import           Control.Monad (void, when, unless, join)
 import           Data.Bits (shiftL, shiftR, (.|.), (.&.))
 import qualified Data.ByteString as B
@@ -826,7 +827,105 @@ rSetupGL =
           | otherwise = request (GL.glDisable GL.GL_CULL_FACE)
 
 rDrawEntitiesOnList :: Quake ()
-rDrawEntitiesOnList = error "FastRenderAPI.rDrawEntitiesOnList" -- TODO
+rDrawEntitiesOnList = do
+    drawEntities <- fmap (^.cvValue) drawEntitiesCVar
+    unless (drawEntities == 0) $ do
+        newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+        -- draw non-transparent first
+        mapM_ (drawNonTransparentEntity newRefDef) (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
+        -- draw transparent entities
+        -- we could sort these if it ever becomes a problem
+        request (GL.glDepthMask (fromIntegral GL.GL_FALSE)) -- no z writes
+        mapM_ (drawTransparentEntity newRefDef) (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
+        request (GL.glDepthMask (fromIntegral GL.GL_TRUE)) -- back to writing
+
+drawNonTransparentEntity :: RefDefT -> Ref EntityT -> Quake ()
+drawNonTransparentEntity newRefDef entityRef = do
+    error "FastRenderAPI.drawNonTransparentEntity" -- TODO
+
+{-
+  where drawNonTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
+        drawNonTransparentEntities newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let currentEntityRef = (newRefDef^.rdEntities) V.! idx
+              currentEntity <- io $ readIORef currentEntityRef
+              fastRenderAPIGlobals.frCurrentEntity .= Just currentEntityRef
+
+              if | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 ->
+                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
+
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 -> do
+                     rDrawBeam currentEntity
+
+                 | otherwise -> do
+                     let currentModel = currentEntity^.eModel
+                     fastRenderAPIGlobals.frCurrentModel .= currentModel
+
+                     case currentModel of
+                       Nothing ->
+                         rDrawNullModel
+                       Just modelRef -> do
+                         model <- io $ readIORef modelRef
+
+                         --io (print ("nontrans model: = " `B.append` (model^.mName)))
+
+                         if | (model^.mType) == RenderAPIConstants.modAlias ->
+                                Mesh.rDrawAliasModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modBrush ->
+                                Surf.rDrawBrushModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modSprite ->
+                                rDrawSpriteModel currentEntityRef
+
+                            | otherwise ->
+                                Com.comError Constants.errDrop "Bad modeltype"
+
+                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
+
+        drawTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
+        drawTransparentEntities newRefDef idx maxIdx
+          | idx >= maxIdx = return ()
+          | otherwise = do
+              let currentEntityRef = (newRefDef^.rdEntities) V.! idx
+              currentEntity <- io $ readIORef currentEntityRef
+              fastRenderAPIGlobals.frCurrentEntity .= Just currentEntityRef
+
+              if | (currentEntity^.enFlags) .&. Constants.rfTranslucent == 0 ->
+                     drawTransparentEntities newRefDef (idx + 1) maxIdx
+
+                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 -> do
+                     rDrawBeam currentEntity
+
+                 | otherwise -> do
+                     let currentModel = currentEntity^.eModel
+                     fastRenderAPIGlobals.frCurrentModel .= currentModel
+
+                     case currentModel of
+                       Nothing ->
+                         rDrawNullModel
+                       Just modelRef -> do
+                         model <- io $ readIORef modelRef
+
+                         --io (print ("trans model: = " `B.append` (model^.mName)))
+
+                         if | (model^.mType) == RenderAPIConstants.modAlias ->
+                                Mesh.rDrawAliasModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modBrush ->
+                                Surf.rDrawBrushModel currentEntityRef
+
+                            | (model^.mType) == RenderAPIConstants.modSprite ->
+                                rDrawSpriteModel currentEntityRef
+
+                            | otherwise ->
+                                Com.comError Constants.errDrop "Bad modeltype"
+
+                     drawTransparentEntities newRefDef (idx + 1) maxIdx
+                     -}
+        
+drawTransparentEntity newRefDef entityRef = error "FastRenderAPI.drawTransparentEntity" -- TODO
 
 rDrawParticles :: Quake ()
 rDrawParticles =
@@ -887,7 +986,60 @@ drawParticle sourceVertices sourceColors up right vpn origin idx =
   where j = idx * 3
 
 rSetupFrame :: Quake ()
-rSetupFrame = error "FastRenderAPI.rSetupFrame" -- TODO
+rSetupFrame = do
+    fastRenderAPIGlobals.frFrameCount += 1
+    newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+    setAngleVectors newRefDef
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel == 0) $ do
+        worldModelRef <- use (fastRenderAPIGlobals.frWorldModel)
+        setCurrentViewCluster newRefDef worldModelRef
+    fastRenderAPIGlobals %= (\v -> v & frVBlend .~ (newRefDef^.rdBlend)
+                                     & frCBrushPolys .~ 0
+                                     & frCAliasPolys .~ 0)
+    when ((newRefDef^.rdRdFlags) .&. Constants.rdfNoWorldModel /= 0) $ do
+        vid <- use (fastRenderAPIGlobals.frVid)
+        request $ do
+            GL.glEnable GL.GL_SCISSOR_TEST
+            GL.glClearColor 0.3 0.3 0.3 1.0
+            GL.glScissor (fromIntegral (newRefDef^.rdX))
+                         (fromIntegral ((vid^.vdHeight) - (newRefDef^.rdHeight) - (newRefDef^.rdY)))
+                         (fromIntegral (newRefDef^.rdWidth))
+                         (fromIntegral (newRefDef^.rdHeight))
+            GL.glClear (GL.GL_COLOR_BUFFER_BIT .|. GL.GL_DEPTH_BUFFER_BIT)
+            GL.glClearColor 1.0 0.0 0.5 0.5
+            GL.glDisable GL.GL_SCISSOR_TEST
+
+setAngleVectors :: RefDefT -> Quake ()
+setAngleVectors newRefDef =
+    fastRenderAPIGlobals %= (\v -> v & frOrigin .~ (newRefDef^.rdViewOrg)
+                                     & frVPn .~ vpn
+                                     & frVRight .~ vright
+                                     & frVUp .~ vup)
+  where
+    (vpn, vright, vup) = Math3D.angleVectors (newRefDef^.rdViewAngles) True True True
+
+setCurrentViewCluster :: RefDefT -> Maybe (Ref ModelT) -> Quake ()
+setCurrentViewCluster _ Nothing = Com.fatalError "FastRenderAPI.rSetupFrame worldModelRef is Nothing"
+setCurrentViewCluster newRefDef (Just worldModelRef) = do
+    viewCluster <- use (fastRenderAPIGlobals.frViewCluster)
+    viewCluster2 <- use (fastRenderAPIGlobals.frViewCluster2)
+    fastRenderAPIGlobals.frOldViewCluster .= viewCluster
+    fastRenderAPIGlobals.frOldViewCluster2 .= viewCluster2
+    worldModel <- readRef worldModelRef
+    leaf <- Model.pointInLeaf (newRefDef^.rdViewOrg) worldModel
+    fastRenderAPIGlobals.frViewCluster .= (leaf^.mlCluster)
+    fastRenderAPIGlobals.frViewCluster2 .= (leaf^.mlCluster)
+    proceedSetCurrentViewCluster worldModel leaf
+  where
+    proceedSetCurrentViewCluster worldModel leaf
+        | (leaf^.mlContents) == 0 = do
+            leaf' <- Model.pointInLeaf ((newRefDef^.rdViewOrg) & _z -~ 16) worldModel
+            when ((leaf'^.mlContents) .&. Constants.contentsSolid == 0 && (leaf'^.mlCluster) /= (leaf^.mlCluster)) $
+                fastRenderAPIGlobals.frViewCluster2 .= (leaf'^.mlCluster)
+        | otherwise = do
+            leaf' <- Model.pointInLeaf ((newRefDef^.rdViewOrg) & _z +~ 16) worldModel
+            when ((leaf'^.mlContents) .&. Constants.contentsSolid == 0 && (leaf'^.mlCluster) /= (leaf^.mlCluster)) $
+                fastRenderAPIGlobals.frViewCluster2 .= (leaf'^.mlCluster)
 
 particleTexture :: SV.Vector Word8
 particleTexture =

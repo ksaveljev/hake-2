@@ -28,12 +28,6 @@ maxPolys = 20000
 maxBufferVertices :: Int
 maxBufferVertices = 120000
 
-blockWidth :: Int
-blockWidth = 128
-
-blockHeight :: Int
-blockHeight = 128
-
 floodFillFifoSize :: Int
 floodFillFifoSize = 0x1000
 

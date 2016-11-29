@@ -1,35 +1,83 @@
 module Render.Fast.Warp
-    ( glSubdivideSurface
+    ( clearSkyBox
+    , drawSkyBox
+    , glSubdivideSurface
+    , rAddSkySurface
     , rSetSky
     ) where
 
-import           Control.Applicative (Const)
-import           Control.Lens        (use, (^.), (.=), (&), (.~), _1, _2)
-import           Control.Monad       (when, unless)
-import qualified Data.ByteString     as B
-import qualified Data.Vector         as V
-import qualified Data.Vector.Unboxed as UV
-import           Linear              (V3(..), V4, dot, _x, _y, _z, _xyz)
+import           Control.Applicative   (Const)
+import           Control.Lens          (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (-~), _1, _2)
+import           Control.Monad         (when, unless)
+import qualified Data.ByteString       as B
+import qualified Data.Vector           as V
+import qualified Data.Vector.Unboxed   as UV
+import qualified Graphics.GL           as GL
+import           Linear                (V3(..), V4, dot, _x, _y, _z, _xyz)
 
+import           Client.RefDefT
 import qualified Constants
-import qualified QCommon.Com         as Com
+import           Game.CVarT
+import qualified QCommon.Com           as Com
+import qualified QCommon.CVar          as CVar
+import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
-import qualified Render.Fast.Polygon as Polygon
+import qualified Render.Fast.Image     as Image
+import qualified Render.Fast.Polygon   as Polygon
 import           Render.GLPolyT
+import           Render.ImageT
 import           Render.MEdgeT
 import           Render.ModelT
 import           Render.MSurfaceT
 import           Render.MTexInfoT
 import           Render.MVertexT
 import           Types
-import           Util.Binary        (encode)
+import           Util.Binary           (encode)
 
 subdivideSize :: Float
 subdivideSize = 64
 
+skyTexOrder :: UV.Vector Int
+skyTexOrder = UV.fromList [0, 2, 1, 3, 4, 5]
+
+suf :: V.Vector B.ByteString
+suf = V.fromList ["rt", "bk", "lf", "ft", "up", "dn"]
+
 rSetSky :: B.ByteString -> Float -> V3 Float -> Quake ()
-rSetSky = error "Warp.rSetSky" -- TODO
+rSetSky name rotate axis = do
+    fastRenderAPIGlobals %= (\v -> v & frSkyName .~ name
+                                     & frSkyRotate .~ rotate
+                                     & frSkyAxis .~ axis)
+    glSkyMip <- fmap (^.cvValue) glSkyMipCVar
+    glExtPalettedTexture <- fmap (^.cvValue) glExtPalettedTextureCVar
+    colorTableEXT <- use (fastRenderAPIGlobals.frColorTableEXT)
+    (skyMin, skyMax) <- setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT 0 0 0 6
+    fastRenderAPIGlobals %= (\v -> v & frSkyMin .~ skyMin
+                                     & frSkyMax .~ skyMax)
+
+setSky :: B.ByteString -> Float -> Float -> Float -> Bool -> Float -> Float -> Int -> Int -> Quake (Float, Float)
+setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT skyMin skyMax idx maxIdx
+    | idx >= maxIdx = return (skyMin, skyMax)
+    | otherwise = do
+        when (glSkyMip /= 0 || rotate /= 0) $ do
+            glPicMip <- glPicMipCVar
+            CVar.update (glPicMip & cvValue +~ 1)
+        imageRef <- Image.glFindImage pathname Constants.itSky
+        imageRef' <- maybe (use (fastRenderAPIGlobals.frNoTexture)) return imageRef
+        fastRenderAPIGlobals.frSkyImages.ix idx .= Just imageRef'
+        proceedSetSky
+  where
+    pathname
+        | colorTableEXT && glExtPalettedTexture /= 0 = B.concat ["env/", name, suf V.! idx, ".pcx"]
+        | otherwise = B.concat ["env/", name, suf V.! idx, ".tga"]
+    proceedSetSky
+        | glSkyMip /= 0 || rotate /= 0 = do
+            glPicMip <- glPicMipCVar
+            CVar.update (glPicMip & cvValue -~ 1)
+            setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT (1.0 / 256.0) (255.0 / 256.0) (idx + 1) maxIdx
+        | otherwise =
+            setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT (1.0 / 512.0) (511.0 / 512.0) (idx + 1) maxIdx
 
 glSubdivideSurface :: Ref MSurfaceT -> Quake ()
 glSubdivideSurface surfRef = do
@@ -173,3 +221,99 @@ countTotals polyRef vecs verts numVerts total totalS totalT idx
         Polygon.setPolyS1 polyRef (idx + 1) s
         Polygon.setPolyT1 polyRef (idx + 1) t
         countTotals polyRef vecs verts numVerts (total + v) (totalS + s) (totalT + t) (idx + 1)
+
+clearSkyBox :: Quake ()
+clearSkyBox = do
+    fastRenderAPIGlobals.frSkyMins .= (UV.replicate 6 9999, UV.replicate 6 9999)
+    fastRenderAPIGlobals.frSkyMaxs .= (UV.replicate 6 (-9999), UV.replicate 6 (-9999))
+
+drawSkyBox :: Quake ()
+drawSkyBox = do
+    skyRotate <- use (fastRenderAPIGlobals.frSkyRotate)
+    nothingToDo <- checkIfNothingToDo skyRotate
+    unless nothingToDo $ do
+        origin <- fmap (fmap realToFrac) (use (fastRenderAPIGlobals.frOrigin))
+        skyAxis <- fmap (fmap realToFrac) (use (fastRenderAPIGlobals.frSkyAxis))
+        newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+        request $ do
+            GL.glPushMatrix
+            GL.glTranslatef (origin^._x) (origin^._y) (origin^._z)
+            GL.glRotatef (realToFrac ((newRefDef^.rdTime) * skyRotate)) (skyAxis^._x) (skyAxis^._y) (skyAxis^._z)
+        drawSky
+        request (GL.glPopMatrix)
+  where
+    checkIfNothingToDo skyRotate
+        | skyRotate /= 0 = fmap not checkIfSkyIsVisible
+        | otherwise = return False
+    checkIfSkyIsVisible = do
+        (skyMins0, skyMins1) <- use (fastRenderAPIGlobals.frSkyMins)
+        (skyMaxs0, skyMaxs1) <- use (fastRenderAPIGlobals.frSkyMaxs)
+        isSkyVisible skyMins0 skyMins1 skyMaxs0 skyMaxs1 0 6
+    isSkyVisible mins0 mins1 maxs0 maxs1 idx maxIdx
+        | idx >= maxIdx = return False
+        | (mins0 UV.! idx) < (maxs0 UV.! idx) && (mins1 UV.! idx) < (maxs1 UV.! idx) = return True
+        | otherwise = isSkyVisible mins0 mins1 maxs0 maxs1 (idx + 1) maxIdx
+    drawSky = do
+        skyRotate <- use (fastRenderAPIGlobals.frSkyRotate)
+        (skyMins0, skyMins1) <- use (fastRenderAPIGlobals.frSkyMins)
+        (skyMaxs0, skyMaxs1) <- use (fastRenderAPIGlobals.frSkyMaxs)
+        doDrawSky skyRotate skyMins0 skyMins1 skyMaxs0 skyMaxs1
+    doDrawSky skyRotate mins0 mins1 maxs0 maxs1
+        | skyRotate /= 0 = drawSkyPart (UV.replicate 6 (-1)) (UV.replicate 6 (-1)) (UV.replicate 6 1) (UV.replicate 6 1) 0 6 -- hack, forces full sky to draw when rotating
+        | otherwise = drawSkyPart mins0 mins1 maxs0 maxs1 0 6
+    drawSkyPart mins0 mins1 maxs0 maxs1 idx maxIdx
+        | idx >= maxIdx = return ()
+        | (mins0 UV.! idx) >= (maxs0 UV.! idx) || (mins1 UV.! idx) >= (maxs1 UV.! idx) =
+            drawSkyPart mins0 mins1 maxs0 maxs1 (idx + 1) maxIdx
+        | otherwise = do
+            skyImages <- use (fastRenderAPIGlobals.frSkyImages)
+            doDrawSkyPart mins0 mins1 maxs0 maxs1 idx (skyImages V.! (skyTexOrder UV.! idx))
+            drawSkyPart mins0 mins1 maxs0 maxs1 (idx + 1) maxIdx
+    doDrawSkyPart _ _ _ _ _ Nothing =
+        Com.fatalError "Warp.drawSkyBox one of the images in skyImages is Nothing"
+    doDrawSkyPart mins0 mins1 maxs0 maxs1 idx (Just imageRef) = do
+        image <- readRef imageRef
+        Image.glBind (fromIntegral (image^.iTexNum))
+        skyMin <- use (fastRenderAPIGlobals.frSkyMin)
+        skyMax <- use (fastRenderAPIGlobals.frSkyMax)
+        request $ do
+            GL.glBegin GL.GL_QUADS
+            makeSkyVec skyMin skyMax (mins0 UV.! idx) (mins1 UV.! idx) idx
+            makeSkyVec skyMin skyMax (mins0 UV.! idx) (maxs1 UV.! idx) idx
+            makeSkyVec skyMin skyMax (maxs0 UV.! idx) (maxs1 UV.! idx) idx
+            makeSkyVec skyMin skyMax (maxs0 UV.! idx) (mins1 UV.! idx) idx
+            GL.glEnd
+
+makeSkyVec :: Float -> Float -> Float -> Float -> Int -> QuakeIO ()
+makeSkyVec skyMin skyMax s t axis = do
+    GL.glTexCoord2f (realToFrac s'') (realToFrac t''')
+    GL.glVertex3f (v1^._x) (v1^._y) (v1^._z)
+  where
+    b = UV.fromList[ (s * 2300), (t * 2300), 2300 ]
+    vec = stToVec V.! axis
+    a' = if (vec^._x) < 0 then negate (b UV.! ((negate (vec^._x)) - 1)) else b UV.! ((vec^._x) - 1)
+    b' = if (vec^._y) < 0 then negate (b UV.! ((negate (vec^._y)) - 1)) else b UV.! ((vec^._y) - 1)
+    c' = if (vec^._z) < 0 then negate (b UV.! ((negate (vec^._z)) - 1)) else b UV.! ((vec^._z) - 1)
+    v1 = fmap realToFrac (V3 a' b' c')
+    -- avoid bilerp seam
+    s' = (s + 1) * 0.5
+    t' = (t + 1) * 0.5
+    s'' | s' < skyMin = skyMin
+        | s' > skyMax = skyMax
+        | otherwise = s'
+    t'' | t' < skyMin = skyMin
+        | t' > skyMax = skyMax
+        | otherwise = t'
+    t''' = 1 - t''
+
+stToVec :: V.Vector (V3 Int)
+stToVec = V.fromList [ V3   3  (-1)   2
+                     , V3 (-3)   1    2
+                     , V3   1    3    2
+                     , V3 (-1) (-3)   2
+                     , V3 (-2) (-1)   3
+                     , V3   2  (-1) (-3)
+                     ]
+
+rAddSkySurface :: Ref MSurfaceT -> Quake ()
+rAddSkySurface = error "Warp.rAddSkySurface" -- TODO

@@ -58,6 +58,7 @@ executable hake2
                      , Client.CLightStyleT
                      , Client.CLInput
                      , Client.CLInv
+                     , Client.CLNewFX
                      , Client.CLParse
                      , Client.CLParseShared
                      , Client.CLPred
@@ -104,6 +105,7 @@ executable hake2
                      , Client.VidModeT
                      , Client.VidModes
                      , Client.VRectT
+                     , Client.VShared
                      , Constants
                      , Game.ClientPersistantT
                      , Game.ClientRespawnT
@@ -253,6 +255,7 @@ executable hake2
                      , QCommon.QFiles.SP2.DSprFrameT
                      , QCommon.QFiles.SP2.DSpriteT
                      , QCommon.QFiles.PcxT
+                     , QCommon.QFiles.TgaT
                      , QCommon.SearchPathT
                      , QCommon.Shared
                      , QCommon.SizeBufT
