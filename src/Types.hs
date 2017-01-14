@@ -110,12 +110,13 @@ instance Functor IORequest where
 request :: Monad m => QuakeIO a -> Coroutine IORequest m a
 request x = suspend (RunIO x return)
 
-data Ref a = Ref Int deriving (Eq, Show, Ord)
+data Ref a b = Ref Int deriving (Eq, Show, Ord)
+type Ref' b = Ref () b
 
-dummyGClientRef :: Ref GClientT
+dummyGClientRef :: Ref' GClientT
 dummyGClientRef = Ref (-1)
 
-dummyGItemRef :: Ref GItemT
+dummyGItemRef :: Ref' GItemT
 dummyGItemRef = Ref (-1)
 
 data Globals = Globals
@@ -153,9 +154,6 @@ data Globals = Globals
     , _gLogFile          :: Maybe Handle
     , _gVec3Origin       :: V3 Float
     , _gRnd              :: StdGen
-    , _gEntities         :: V.Vector EntityT     -- moved from VGlobals.vgEntities as it has to be shared with RefDefT.rdEntities
-    , _gLightStyles      :: V.Vector LightStyleT -- moved from VGlobals.vgLightStyles as it has to be shared with RefDefT.rdLightStyles
-    , _gDLights          :: V.Vector DLightT     -- moved from VGlobals.vgDLights as it has to be shared with RefDefT.rdDLights
     }
 
 data ComGlobals = ComGlobals
@@ -568,9 +566,9 @@ data VGlobals = VGlobals
     { _vgNumDLights   :: Int
     , _vgNumEntities  :: Int
     , _vgNumParticles :: Int
-    , _vgLightStyles  :: V.Vector (Ref LightStyleT)
-    , _vgDLights      :: V.Vector (Ref DLightT)
-    , _vgEntities     :: V.Vector (Ref EntityT)
+    , _vgLightStyles  :: V.Vector LightStyleT
+    , _vgDLights      :: V.Vector DLightT
+    , _vgEntities     :: V.Vector EntityT
     }
 
 data NetChannelGlobals = NetChannelGlobals
@@ -1771,11 +1769,11 @@ data RefDefT = RefDefT
     , _rdTime         :: Float
     , _rdRdFlags      :: Int
     , _rdAreaBits     :: UV.Vector Word8
-    , _rdLightStyles  :: V.Vector (Ref LightStyleT)
+    , _rdLightStyles  :: V.Vector LightStyleT
     , _rdNumEntities  :: Int
-    , _rdEntities     :: V.Vector (Ref EntityT)
+    , _rdEntities     :: V.Vector EntityT
     , _rdNumDLights   :: Int
-    , _rdDLights      :: V.Vector (Ref DLightT)
+    , _rdDLights      :: V.Vector DLightT
     , _rdNumParticles :: Int
     }
 
@@ -1804,7 +1802,7 @@ data MLeafT = MLeafT
     , _mlVisFrame        :: Int
     , _mlMins            :: V3 Float
     , _mlMaxs            :: V3 Float
-    , _mlParent          :: Maybe (Ref MNodeT)
+    , _mlParent          :: Maybe (Ref' MNodeT)
     , _mlCluster         :: Int
     , _mlArea            :: Int
     , _mlNumMarkSurfaces :: Int

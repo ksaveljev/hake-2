@@ -65,7 +65,4 @@ initialGlobals =
           , _gLogFile          = Nothing
           , _gVec3Origin       = V3 0 0 0
           , _gRnd              = mkStdGen 0
-          , _gLightStyles      = V.replicate Constants.maxLightStyles newLightStyleT
-          , _gDLights          = V.replicate Constants.maxDLights newDLightT
-          , _gEntities         = V.replicate Constants.maxEntities newEntityT
           }

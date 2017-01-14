@@ -19,7 +19,7 @@ initialVGlobals =
   VGlobals { _vgNumDLights   = 0
            , _vgNumEntities  = 0
            , _vgNumParticles = 0
-           , _vgLightStyles  = V.generate Constants.maxLightStyles Ref
-           , _vgDLights      = V.generate Constants.maxDLights Ref
-           , _vgEntities     = V.generate Constants.maxEntities Ref
+           , _vgLightStyles  = V.replicate Constants.maxLightStyles newLightStyleT
+           , _vgDLights      = V.replicate Constants.maxDLights newDLightT
+           , _vgEntities     = V.replicate Constants.maxEntities newEntityT
            }

@@ -8,6 +8,7 @@ import qualified Data.Vector          as V
 import qualified Data.Vector.Mutable  as MV
 
 import           Client.ClientStateT
+import           Client.RefDefT
 import qualified Constants
 import           Game.GameLocalsT
 import           QuakeIOState
@@ -17,10 +18,10 @@ import           Render.MSurfaceT
 import           Server.ServerStaticT
 import           Types
 
-class QuakeRef a where
-    readRef :: Ref a -> Quake a
-    modifyRef :: Ref a -> (a -> a) -> Quake ()
-    writeRef :: Ref a -> a -> Quake ()
+class QuakeRef b where
+    readRef :: Ref a b -> Quake b
+    modifyRef :: Ref a b -> (b -> b) -> Quake ()
+    writeRef :: Ref a b -> b -> Quake ()
 
 instance QuakeRef EdictT where
     readRef (Ref idx) = request $ do
@@ -372,15 +373,6 @@ instance QuakeRef BeamT where
     writeRef (Ref idx) item =
         clTEntGlobals.clteBeams.ix idx .= item
 
-instance QuakeRef LightStyleT where
-    readRef (Ref idx) = do
-        lightStyles <- use (globals.gLightStyles)
-        return (lightStyles V.! idx)
-    modifyRef (Ref idx) f =
-        globals.gLightStyles.ix idx %= f
-    writeRef (Ref idx) item =
-        globals.gLightStyles.ix idx .= item
-
 instance QuakeRef CLightStyleT where
     readRef (Ref idx) = do
         lightStyles <- use (clientGlobals.cgLightStyle)
@@ -390,11 +382,12 @@ instance QuakeRef CLightStyleT where
     writeRef (Ref idx) item =
         clientGlobals.cgLightStyle.ix idx .= item
 
-instance QuakeRef DLightT where
+-- TODO: make sure EntityT is not used with vgEntities
+instance QuakeRef EntityT where
     readRef (Ref idx) = do
-        lights <- use (globals.gDLights)
-        return (lights V.! idx)
+        newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+        return ((newRefDef^.rdEntities) V.! idx)
     modifyRef (Ref idx) f =
-        globals.gDLights.ix idx %= f
+        fastRenderAPIGlobals.frNewRefDef.rdEntities.ix idx %= f
     writeRef (Ref idx) item =
-        globals.gDLights.ix idx .= item
+        fastRenderAPIGlobals.frNewRefDef.rdEntities.ix idx .= item
