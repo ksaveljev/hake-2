@@ -6,11 +6,11 @@ module Game.GameTurret
 
 import Types
 
-spTurretBase :: Ref EdictT -> Quake ()
+spTurretBase :: Ref' EdictT -> Quake ()
 spTurretBase = error "GameTurret.spTurretBase" -- TODO
 
-spTurretBreach :: Ref EdictT -> Quake ()
+spTurretBreach :: Ref' EdictT -> Quake ()
 spTurretBreach = error "GameTurret.spTurretBreach" -- TODO
 
-spTurretDriver :: Ref EdictT -> Quake ()
+spTurretDriver :: Ref' EdictT -> Quake ()
 spTurretDriver = error "GameTurret.spTurretDriver" -- TODO

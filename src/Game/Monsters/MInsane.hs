@@ -4,5 +4,5 @@ module Game.Monsters.MInsane
 
 import Types
 
-spMiscInsane :: Ref EdictT -> Quake ()
+spMiscInsane :: Ref' EdictT -> Quake ()
 spMiscInsane = error "MInsane.spMiscInsane" -- TODO

@@ -93,13 +93,13 @@ rBeginRegistration modelName = do
         fastRenderAPIGlobals.frWorldModel .= modelRef
         fastRenderAPIGlobals.frViewCluster .= (-1)
 
-rRegisterModel :: B.ByteString -> Quake (Maybe (Ref ModelT))
+rRegisterModel :: B.ByteString -> Quake (Maybe (Ref' ModelT))
 rRegisterModel name = do
     modelRef <- modForName name False
     registerModelImages modelRef
     return modelRef
 
-registerModelImages :: Maybe (Ref ModelT) -> Quake ()
+registerModelImages :: Maybe (Ref' ModelT) -> Quake ()
 registerModelImages Nothing = return ()
 registerModelImages (Just modelRef) = do
     model <- readRef modelRef
@@ -107,7 +107,7 @@ registerModelImages (Just modelRef) = do
     modifyRef modelRef (\v -> v & mRegistrationSequence .~ regSeq)
     doRegisterModelImages modelRef model regSeq
 
-doRegisterModelImages :: Ref ModelT -> ModelT -> Int -> Quake ()
+doRegisterModelImages :: Ref' ModelT -> ModelT -> Int -> Quake ()
 doRegisterModelImages modelRef model regSeq
     | (model^.mType) == Constants.modSprite =
         updateSpriteSkins modelRef (model^.mExtraData)
@@ -117,14 +117,14 @@ doRegisterModelImages modelRef model regSeq
         V.mapM_ (updateImageRegSeq regSeq) (model^.mTexInfo)
     | otherwise = return ()
 
-updateSpriteSkins :: Ref ModelT -> Maybe ModelExtra -> Quake ()
+updateSpriteSkins :: Ref' ModelT -> Maybe ModelExtra -> Quake ()
 updateSpriteSkins modelRef (Just (SpriteModelExtra sprOut)) = do
     skins <- V.mapM (\frame -> Image.glFindImage (frame^.dsfName) Constants.itSprite) (sprOut^.dsFrames)
     modifyRef modelRef (\v -> v & mSkins .~ skins )
 updateSpriteSkins _ _ =
     Com.fatalError "Model.updateSpriteSkins modelExtra is NOT SpriteModelExtra"
 
-updateAliasSkins :: Ref ModelT -> Maybe ModelExtra -> Quake ()
+updateAliasSkins :: Ref' ModelT -> Maybe ModelExtra -> Quake ()
 updateAliasSkins modelRef (Just (AliasModelExtra pheader)) = do
     maybe skinNamesError doUpdateAliasSkins (pheader^.dmSkinNames)
   where
@@ -172,10 +172,10 @@ freeModel model = maybe model (const newModelT) (model^.mExtraData)
 modelListF :: XCommandT
 modelListF = error "Model.modelListF" -- TODO
 
-modFree :: Ref ModelT -> Quake ()
+modFree :: Ref' ModelT -> Quake ()
 modFree modelRef = writeRef modelRef newModelT
 
-modForName :: B.ByteString -> Bool -> Quake (Maybe (Ref ModelT))
+modForName :: B.ByteString -> Bool -> Quake (Maybe (Ref' ModelT))
 modForName name crash
     | B.null name = do
         Com.comError Constants.errDrop "Mod_ForName: NULL name"
@@ -187,7 +187,7 @@ modForName name crash
   where
     findExisting = V.findIndex (\m -> (m^.mName) == name)
 
-getInlineModel :: B.ByteString -> Quake (Maybe (Ref ModelT))
+getInlineModel :: B.ByteString -> Quake (Maybe (Ref' ModelT))
 getInlineModel name = do
     worldModelRef <- use (fastRenderAPIGlobals.frWorldModel)
     err <- checkForError worldModelRef
@@ -202,7 +202,7 @@ getInlineModel name = do
             worldModel <- readRef worldModelRef
             return (idx >= (worldModel^.mNumSubModels))
 
-loadModel :: V.Vector ModelT -> B.ByteString -> Bool -> Quake (Maybe (Ref ModelT))
+loadModel :: V.Vector ModelT -> B.ByteString -> Bool -> Quake (Maybe (Ref' ModelT))
 loadModel modKnown name crash = do
     request $ io $ B.putStrLn ("LOAD MODEL FFS" `B.append` name)
     emptySpotRef <- maybe noEmptySpot (return . Ref) (findFree modKnown)
@@ -223,7 +223,7 @@ loadModel modKnown name crash = do
         modifyRef emptySpotRef (\v -> v & mName .~ B.empty)
         return Nothing
 
-doLoadModel :: B.ByteString -> Ref ModelT -> (Handle, Int) -> Quake (Maybe (Ref ModelT))
+doLoadModel :: B.ByteString -> Ref' ModelT -> (Handle, Int) -> Quake (Maybe (Ref' ModelT))
 doLoadModel name emptySpotRef (fileHandle, len) = do
     buf <- request (io (BL.hGet fileHandle len))
     fastRenderAPIGlobals.frLoadModel .= emptySpotRef
@@ -236,7 +236,7 @@ doLoadModel name emptySpotRef (fileHandle, len) = do
         | header == idBSPHeader = loadBrushModel emptySpotRef buf
         | otherwise = Com.comError Constants.errDrop ("Mod_NumForName: unknown fileid for " `B.append` name)
 
-loadAliasModel :: Ref ModelT -> BL.ByteString -> Quake ()
+loadAliasModel :: Ref' ModelT -> BL.ByteString -> Quake ()
 loadAliasModel modelRef buffer = do
     model <- readRef modelRef
     checkForErrors (model^.mName)
@@ -275,7 +275,7 @@ loadAliasModel modelRef buffer = do
         when ((pheader^.dmNumFrames) <= 0) $
             Com.comError Constants.errDrop (B.concat ["model ", modelName, " has no frames"])
 
-loadSpriteModel :: Ref ModelT -> BL.ByteString -> Quake ()
+loadSpriteModel :: Ref' ModelT -> BL.ByteString -> Quake ()
 loadSpriteModel modelRef buffer = do
     when ((sprOut^.dsVersion) /= spriteVersion) $ do
         model <- readRef modelRef
@@ -290,7 +290,7 @@ loadSpriteModel modelRef buffer = do
   where
     sprOut = runGet getDSpriteT buffer
 
-loadBrushModel :: Ref ModelT -> BL.ByteString -> Quake ()
+loadBrushModel :: Ref' ModelT -> BL.ByteString -> Quake ()
 loadBrushModel modelRef buf = do
     loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
     modifyRef loadModelRef (\v -> v & mType .~ Constants.modBrush)
@@ -327,7 +327,7 @@ resetModelArrays = do
     fastRenderAPIGlobals.frModelTextureCoordIdx .= 0
     fastRenderAPIGlobals.frModelVertexIndexIdx .= 0
 
-loadVertexes :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadVertexes :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadVertexes loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumVertexes .~ count
@@ -340,7 +340,7 @@ loadVertexes loadModelRef buf lump = do
     count = (lump^.lFileLen) `div` mVertexDiskSize
     readVertexes = runGet (V.replicateM count getMVertexT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-loadEdges :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadEdges :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadEdges loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumEdges .~ count
@@ -353,7 +353,7 @@ loadEdges loadModelRef buf lump = do
     count = (lump^.lFileLen) `div` mEdgeDiskSize
     readEdges = runGet (V.replicateM count getMEdgeT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-loadSurfEdges :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadSurfEdges :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadSurfEdges loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumSurfEdges .~ count
@@ -369,14 +369,14 @@ loadSurfEdges loadModelRef buf lump = do
             Com.comError Constants.errDrop (B.concat ["MOD_LoadBmodel bad surfedges count in ", model^.mName, ": ", encode count])
     readOffsets = runGet (UV.replicateM count getInt) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-loadLighting :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadLighting :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadLighting loadModelRef buf lump =
     modifyRef loadModelRef (\v -> v & mLightdata .~ lightData)
   where
     lightData | (lump^.lFileLen) == 0 = Nothing
               | otherwise = Just (BL.toStrict (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)))
 
-loadPlanes :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadPlanes :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadPlanes loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumPlanes .~ count
@@ -405,7 +405,7 @@ toCPlane dPlane = CPlaneT { _cpNormal   = dPlane^.dpNormal
         in a' .|. b' .|. c'
 
 -- TODO: optimize allocation rate / memory consumption using mutable vectors
-loadTexInfo :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadTexInfo :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadTexInfo loadModelRef buf lump = do
     checkLump
     texInfo <- V.mapM toMTexInfo readTexInfo
@@ -444,7 +444,7 @@ countAnimationFrames texInfo idx currentTexInfo =
         | currentRef == initialRef = count
         | otherwise = countFrames initialRef ((texInfo V.! currentIdx)^.mtiNext) (count + 1)
 
-loadFaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadFaces :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadFaces loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumSurfaces .~ count
@@ -461,7 +461,7 @@ loadFaces loadModelRef buf lump = do
     count = (lump^.lFileLen) `div` dFaceTSize
     dFaces = runGet (V.replicateM count getDFaceT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-constructMSurfaceT :: Ref ModelT -> Int -> DFaceT -> Quake ()
+constructMSurfaceT :: Ref' ModelT -> Int -> DFaceT -> Quake ()
 constructMSurfaceT loadModelRef idx dFace = do
     model <- readRef loadModelRef
     when (ti < 0 || ti >= (model^.mNumTexInfo)) $
@@ -482,7 +482,7 @@ constructMSurfaceT loadModelRef idx dFace = do
     surfaceRef = Ref idx
     ti = fromIntegral (dFace^.dfTexInfo)
 
-calcSurfaceExtents :: Ref ModelT -> Ref MSurfaceT -> Quake ()
+calcSurfaceExtents :: Ref' ModelT -> Ref' MSurfaceT -> Quake ()
 calcSurfaceExtents loadModelRef surfaceRef = do
     model <- readRef loadModelRef
     surface <- readRef surfaceRef
@@ -517,7 +517,7 @@ calcMinsMaxs model texInfo surface idx mins maxs
             let edge = (model^.mEdges) V.! (negate e)
             in (model^.mVertexes) V.! (fromIntegral (edge^.meV._2))
 
-createWarps :: Ref MSurfaceT -> Quake ()
+createWarps :: Ref' MSurfaceT -> Quake ()
 createWarps surfaceRef = do
     surface <- readRef surfaceRef
     texInfo <- readRef (surface^.msTexInfo)
@@ -527,21 +527,21 @@ createWarps surfaceRef = do
                                       & msTextureMins .~ (-8192, -8192))
         Warp.glSubdivideSurface surfaceRef
 
-createLightmaps :: Ref MSurfaceT -> Maybe B.ByteString -> Quake ()
+createLightmaps :: Ref' MSurfaceT -> Maybe B.ByteString -> Quake ()
 createLightmaps surfaceRef lightData = do
     surface <- readRef surfaceRef
     texInfo <- readRef (surface^.msTexInfo)
     when ((texInfo^.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0) $
         Surf.glCreateSurfaceLightmap surfaceRef lightData
 
-createPolygons :: Ref MSurfaceT -> Quake ()
+createPolygons :: Ref' MSurfaceT -> Quake ()
 createPolygons surfaceRef = do
     surface <- readRef surfaceRef
     texInfo <- readRef (surface^.msTexInfo)
     when ((texInfo^.mtiFlags) .&. Constants.surfWarp == 0) $
         Surf.glBuildPolygonFromSurface surfaceRef
 
-loadMarkSurfaces :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadMarkSurfaces :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadMarkSurfaces loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumMarkSurfaces .~ count
@@ -555,7 +555,7 @@ loadMarkSurfaces loadModelRef buf lump = do
     getMarkSurfaces = runGet (V.replicateM count getWord16le) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
     toMSurfaceRef idx = Ref (fromIntegral idx)
 
-loadVisibility :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadVisibility :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadVisibility loadModelRef buf lump
     | (lump^.lFileLen) == 0 =
         modifyRef loadModelRef (\v -> v & mVis .~ Nothing)
@@ -566,7 +566,7 @@ loadVisibility loadModelRef buf lump
         fastRenderAPIGlobals.frModelVisibility .= Just buffer'
         modifyRef loadModelRef (\v -> v & mVis .~ Just vis)
 
-loadLeafs :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadLeafs :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadLeafs loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumLeafs .~ count
@@ -591,7 +591,7 @@ toMLeaf dLeaf = MLeafT { _mlContents        = dLeaf^.dlContents
                        , _mlMarkIndex       = fromIntegral (dLeaf^.dlFirstLeafFace)
                        }
 
-loadNodes :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadNodes :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadNodes loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumNodes .~ count
@@ -626,7 +626,7 @@ getChildren (p1, p2) =
                     else MLeafChildRef (Ref ((-1) - p2))
           in (a, b)
 
-loadSubmodels :: Ref ModelT -> BL.ByteString -> LumpT -> Quake ()
+loadSubmodels :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadSubmodels loadModelRef buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumSubModels .~ count
@@ -660,7 +660,7 @@ radiusFromBounds mins maxs =
         c = if abs (mins^._z) > abs (maxs^._z) then abs (mins^._z) else abs (maxs^._z)
     in norm (V3 a b c)
 
-setupSubmodel :: Ref ModelT -> ModelT -> Int -> Quake ()
+setupSubmodel :: Ref' ModelT -> ModelT -> Int -> Quake ()
 setupSubmodel loadModelRef model idx = do
     loadModel' <- readRef loadModelRef
     writeRef starModRef (loadModel' & mFirstModelSurface .~ bm^.mmFirstFace

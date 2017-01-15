@@ -53,14 +53,14 @@ uCmds = V.fromList
     , UCmdT "nextdl" nextDownloadF
     ]
 
-executeClientMessage :: Ref ClientT -> Quake ()
+executeClientMessage :: Ref' ClientT -> Quake ()
 executeClientMessage clientRef = do
     svGlobals.svClient .= Just clientRef
     client <- readRef clientRef
     svGlobals.svPlayer .= (client^.cEdict)
     executeMessage clientRef False 0 =<< use (globals.gNetMessage)
 
-executeMessage :: Ref ClientT -> Bool -> Int -> SizeBufT -> Quake ()
+executeMessage :: Ref' ClientT -> Bool -> Int -> SizeBufT -> Quake ()
 executeMessage clientRef moveIssued stringCmdCount netMessage
     | (netMessage^.sbReadCount) > (netMessage^.sbCurSize) = do
         Com.printf "SV_ReadClientMessage: bad read:\n"
@@ -72,7 +72,7 @@ executeMessage clientRef moveIssued stringCmdCount netMessage
         unless done $
             executeMessage clientRef moveIssued' stringCmdCount' =<< use (globals.gNetMessage)
 
-execute :: Ref ClientT -> Int -> Bool -> Int -> Quake (Bool, Bool, Int)
+execute :: Ref' ClientT -> Int -> Bool -> Int -> Quake (Bool, Bool, Int)
 execute clientRef c moveIssued stringCmdCount
     | c == -1 = return (True, moveIssued, stringCmdCount)
     | c == Constants.clcNop = return (True, moveIssued, stringCmdCount)
@@ -107,7 +107,7 @@ executeUserCommand str = do
         client <- readRef clientRef
         maybe edictRefError doExecuteUserCommand (client^.cEdict)
 
-doExecuteUserCommand :: Ref EdictT -> Quake ()
+doExecuteUserCommand :: Ref' EdictT -> Quake ()
 doExecuteUserCommand edictRef = do
     svGlobals.svPlayer .= Just edictRef
     arg <- Cmd.argv 0
@@ -133,7 +133,7 @@ new = do
         Com.dprintf (B.concat ["New() from ", client^.cName, "\n"])
         doNew clientRef client state
 
-doNew :: Ref ClientT -> ClientT -> Int -> Quake ()
+doNew :: Ref' ClientT -> ClientT -> Int -> Quake ()
 doNew clientRef@(Ref clientIdx) client state
     | (client^.cState) /= Constants.csConnected = Com.printf "New not valid -- already spawned\n"
     | state == Constants.ssDemo = beginDemoServer =<< use (svGlobals.svServer.sName)

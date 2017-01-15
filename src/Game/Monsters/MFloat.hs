@@ -4,5 +4,5 @@ module Game.Monsters.MFloat
 
 import Types
 
-spMonsterFloater :: Ref EdictT -> Quake ()
+spMonsterFloater :: Ref' EdictT -> Quake ()
 spMonsterFloater = error "MFloat.spMonsterFloater" -- TODO

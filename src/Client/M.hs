@@ -4,5 +4,5 @@ module Client.M
 
 import Types
 
-checkGround :: Ref EdictT -> Quake ()
+checkGround :: Ref' EdictT -> Quake ()
 checkGround = error "M.checkGround" -- TODO

@@ -59,7 +59,7 @@ rPushDLights = do
     markLight newRefDef worldModelRef worldModel idx = do
         rMarkLights worldModelRef worldModel ((newRefDef^.rdDLights) V.! idx) (1 `shiftL` idx) (MNodeChildRef (Ref 0))
 
-rMarkLights :: Ref ModelT -> ModelT -> DLightT -> Int -> MNodeChild -> Quake ()
+rMarkLights :: Ref' ModelT -> ModelT -> DLightT -> Int -> MNodeChild -> Quake ()
 rMarkLights _ _ _ _ (MLeafChildRef _) = return ()
 rMarkLights worldModelRef worldModel light bit (MNodeChildRef (Ref idx)) = do
     splitPlane <- readRef (node^.mnPlane)
@@ -74,7 +74,7 @@ rMarkLights worldModelRef worldModel light bit (MNodeChildRef (Ref idx)) = do
             rMarkLights worldModelRef worldModel light bit (node^.mnChildren._1)
             rMarkLights worldModelRef worldModel light bit (node^.mnChildren._2)
 
-markPolygon :: Ref ModelT -> ModelT -> MNodeT -> DLightT -> Int -> Int -> Quake ()
+markPolygon :: Ref' ModelT -> ModelT -> MNodeT -> DLightT -> Int -> Int -> Quake ()
 markPolygon worldModelRef worldModel node light bit idx =
     proceedMarkPolygon (surf^.msPlane)
   where
@@ -85,7 +85,7 @@ markPolygon worldModelRef worldModel node light bit idx =
         plane <- readRef planeRef
         doMarkPolygon worldModelRef surf surfIdx plane light bit
 
-doMarkPolygon :: Ref ModelT -> MSurfaceT -> Int -> CPlaneT -> DLightT -> Int -> Quake ()
+doMarkPolygon :: Ref' ModelT -> MSurfaceT -> Int -> CPlaneT -> DLightT -> Int -> Quake ()
 doMarkPolygon worldModelRef surf surfIdx plane light bit
     | (surf^.msFlags) .&. Constants.surfPlaneBack /= sidebit =
         return ()
@@ -106,7 +106,7 @@ rRenderDLights = error "Light.rRenderDLights" -- TODO
 rLightPoint :: V3 Float -> Quake (V3 Float)
 rLightPoint = error "Light.rLightPoint" -- TODO
 
-rSetCacheState :: Ref MSurfaceT -> Quake ()
+rSetCacheState :: Ref' MSurfaceT -> Quake ()
 rSetCacheState surfRef = do
     surf <- readRef surfRef
     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
@@ -126,7 +126,7 @@ cacheLights newRefDef surf lights idx maxIdx
     style = (surf^.msStyles) `B.index` idx
     lightStyle = (newRefDef^.rdLightStyles) V.! (fromIntegral style)
 
-rBuildLightMap :: Ref MSurfaceT -> Maybe B.ByteString -> SV.Vector Word8 -> Int -> Int -> Quake ()
+rBuildLightMap :: Ref' MSurfaceT -> Maybe B.ByteString -> SV.Vector Word8 -> Int -> Int -> Quake ()
 rBuildLightMap surfRef lightData buffer offset stride = do
     surf <- readRef surfRef
     blockLights <- use (fastRenderAPIGlobals.frBlockLights)

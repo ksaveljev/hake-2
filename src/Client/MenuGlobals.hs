@@ -180,361 +180,361 @@ maxSaveGames = 15
 maxMenuDepth :: Int
 maxMenuDepth = 8
 
-openGLMenuRef :: Ref MenuFrameworkS
+openGLMenuRef :: Ref' MenuFrameworkS
 openGLMenuRef = Ref 0
 
-multiplayerMenuRef :: Ref MenuFrameworkS
+multiplayerMenuRef :: Ref' MenuFrameworkS
 multiplayerMenuRef = Ref 1
 
-keysMenuRef :: Ref MenuFrameworkS
+keysMenuRef :: Ref' MenuFrameworkS
 keysMenuRef = Ref 2
 
-optionsMenuRef :: Ref MenuFrameworkS
+optionsMenuRef :: Ref' MenuFrameworkS
 optionsMenuRef = Ref 3
 
-gameMenuRef :: Ref MenuFrameworkS
+gameMenuRef :: Ref' MenuFrameworkS
 gameMenuRef = Ref 4
 
-saveGameMenuRef :: Ref MenuFrameworkS
+saveGameMenuRef :: Ref' MenuFrameworkS
 saveGameMenuRef = Ref 5
 
-loadGameMenuRef :: Ref MenuFrameworkS
+loadGameMenuRef :: Ref' MenuFrameworkS
 loadGameMenuRef = Ref 6
 
-joinServerMenuRef :: Ref MenuFrameworkS
+joinServerMenuRef :: Ref' MenuFrameworkS
 joinServerMenuRef = Ref 7
 
-startServerMenuRef :: Ref MenuFrameworkS
+startServerMenuRef :: Ref' MenuFrameworkS
 startServerMenuRef = Ref 8
 
-dmOptionsMenuRef :: Ref MenuFrameworkS
+dmOptionsMenuRef :: Ref' MenuFrameworkS
 dmOptionsMenuRef = Ref 9
 
-downloadOptionsMenuRef :: Ref MenuFrameworkS
+downloadOptionsMenuRef :: Ref' MenuFrameworkS
 downloadOptionsMenuRef = Ref 10
 
-addressBookMenuRef :: Ref MenuFrameworkS
+addressBookMenuRef :: Ref' MenuFrameworkS
 addressBookMenuRef = Ref 11
 
-playerConfigMenuRef :: Ref MenuFrameworkS
+playerConfigMenuRef :: Ref' MenuFrameworkS
 playerConfigMenuRef = Ref 12
 
-tqSliderRef :: Ref MenuSliderS
+tqSliderRef :: Ref' MenuSliderS
 tqSliderRef = Ref 0
 
-screenSizeSliderRef :: Ref MenuSliderS
+screenSizeSliderRef :: Ref' MenuSliderS
 screenSizeSliderRef = Ref 1
 
-brightnessSliderRef :: Ref MenuSliderS
+brightnessSliderRef :: Ref' MenuSliderS
 brightnessSliderRef = Ref 2
 
-optionsSensitivitySliderRef :: Ref MenuSliderS
+optionsSensitivitySliderRef :: Ref' MenuSliderS
 optionsSensitivitySliderRef = Ref 3
 
-optionsSfxVolumeSliderRef :: Ref MenuSliderS
+optionsSfxVolumeSliderRef :: Ref' MenuSliderS
 optionsSfxVolumeSliderRef = Ref 4
 
-modeListRef :: Ref MenuListS
+modeListRef :: Ref' MenuListS
 modeListRef = Ref 0
 
-refListRef :: Ref MenuListS
+refListRef :: Ref' MenuListS
 refListRef = Ref 1
 
-fsBoxRef :: Ref MenuListS
+fsBoxRef :: Ref' MenuListS
 fsBoxRef = Ref 2
 
-stippleBoxRef :: Ref MenuListS
+stippleBoxRef :: Ref' MenuListS
 stippleBoxRef = Ref 3
 
-palettedTextureBoxRef :: Ref MenuListS
+palettedTextureBoxRef :: Ref' MenuListS
 palettedTextureBoxRef = Ref 4
 
-vSyncBoxRef :: Ref MenuListS
+vSyncBoxRef :: Ref' MenuListS
 vSyncBoxRef = Ref 5
 
-windowedMouseRef :: Ref MenuListS
+windowedMouseRef :: Ref' MenuListS
 windowedMouseRef = Ref 6
 
-optionsFreeLookBoxRef :: Ref MenuListS
+optionsFreeLookBoxRef :: Ref' MenuListS
 optionsFreeLookBoxRef = Ref 7
 
-optionsNoAltTabBoxRef :: Ref MenuListS
+optionsNoAltTabBoxRef :: Ref' MenuListS
 optionsNoAltTabBoxRef = Ref 8
 
-optionsAlwaysRunBoxRef :: Ref MenuListS
+optionsAlwaysRunBoxRef :: Ref' MenuListS
 optionsAlwaysRunBoxRef = Ref 9
 
-optionsInvertMouseBoxRef :: Ref MenuListS
+optionsInvertMouseBoxRef :: Ref' MenuListS
 optionsInvertMouseBoxRef = Ref 10
 
-optionsLookSpringBoxRef :: Ref MenuListS
+optionsLookSpringBoxRef :: Ref' MenuListS
 optionsLookSpringBoxRef = Ref 11
 
-optionsLookStrafeBoxRef :: Ref MenuListS
+optionsLookStrafeBoxRef :: Ref' MenuListS
 optionsLookStrafeBoxRef = Ref 12
 
-optionsCrosshairBoxRef :: Ref MenuListS
+optionsCrosshairBoxRef :: Ref' MenuListS
 optionsCrosshairBoxRef = Ref 13
 
-optionsJoystickBoxRef :: Ref MenuListS
+optionsJoystickBoxRef :: Ref' MenuListS
 optionsJoystickBoxRef = Ref 14
 
-optionsCdVolumeBoxRef :: Ref MenuListS
+optionsCdVolumeBoxRef :: Ref' MenuListS
 optionsCdVolumeBoxRef = Ref 15
 
-optionsQualityListRef :: Ref MenuListS
+optionsQualityListRef :: Ref' MenuListS
 optionsQualityListRef = Ref 16
 
-startMapListRef :: Ref MenuListS
+startMapListRef :: Ref' MenuListS
 startMapListRef = Ref 17
 
-rulesBoxRef :: Ref MenuListS
+rulesBoxRef :: Ref' MenuListS
 rulesBoxRef = Ref 18
 
-friendlyFireBoxRef :: Ref MenuListS
+friendlyFireBoxRef :: Ref' MenuListS
 friendlyFireBoxRef = Ref 19
 
-fallsBoxRef :: Ref MenuListS
+fallsBoxRef :: Ref' MenuListS
 fallsBoxRef = Ref 20
 
-weaponsStayBoxRef :: Ref MenuListS
+weaponsStayBoxRef :: Ref' MenuListS
 weaponsStayBoxRef = Ref 21
 
-instantPowerUpsBoxRef :: Ref MenuListS
+instantPowerUpsBoxRef :: Ref' MenuListS
 instantPowerUpsBoxRef = Ref 22
 
-powerUpsBoxRef :: Ref MenuListS
+powerUpsBoxRef :: Ref' MenuListS
 powerUpsBoxRef = Ref 23
 
-healthBoxRef :: Ref MenuListS
+healthBoxRef :: Ref' MenuListS
 healthBoxRef = Ref 24
 
-spawnFarthestBoxRef :: Ref MenuListS
+spawnFarthestBoxRef :: Ref' MenuListS
 spawnFarthestBoxRef = Ref 25
 
-teamPlayBoxRef :: Ref MenuListS
+teamPlayBoxRef :: Ref' MenuListS
 teamPlayBoxRef = Ref 26
 
-sameLevelBoxRef :: Ref MenuListS
+sameLevelBoxRef :: Ref' MenuListS
 sameLevelBoxRef = Ref 27
 
-forceRespawnBoxRef :: Ref MenuListS
+forceRespawnBoxRef :: Ref' MenuListS
 forceRespawnBoxRef = Ref 28
 
-armorBoxRef :: Ref MenuListS
+armorBoxRef :: Ref' MenuListS
 armorBoxRef = Ref 29
 
-allowExitBoxRef :: Ref MenuListS
+allowExitBoxRef :: Ref' MenuListS
 allowExitBoxRef = Ref 30
 
-infiniteAmmoBoxRef :: Ref MenuListS
+infiniteAmmoBoxRef :: Ref' MenuListS
 infiniteAmmoBoxRef = Ref 31
 
-fixedFovBoxRef :: Ref MenuListS
+fixedFovBoxRef :: Ref' MenuListS
 fixedFovBoxRef = Ref 32
 
-quadDropBoxRef :: Ref MenuListS
+quadDropBoxRef :: Ref' MenuListS
 quadDropBoxRef = Ref 33
 
-noMinesBoxRef :: Ref MenuListS
+noMinesBoxRef :: Ref' MenuListS
 noMinesBoxRef = Ref 34
 
-noNukesBoxRef :: Ref MenuListS
+noNukesBoxRef :: Ref' MenuListS
 noNukesBoxRef = Ref 35
 
-stackDoubleBoxRef :: Ref MenuListS
+stackDoubleBoxRef :: Ref' MenuListS
 stackDoubleBoxRef = Ref 36
 
-noSpheresBoxRef :: Ref MenuListS
+noSpheresBoxRef :: Ref' MenuListS
 noSpheresBoxRef = Ref 37
 
-allowDownloadBoxRef :: Ref MenuListS
+allowDownloadBoxRef :: Ref' MenuListS
 allowDownloadBoxRef = Ref 38
 
-allowDownloadMapsBoxRef :: Ref MenuListS
+allowDownloadMapsBoxRef :: Ref' MenuListS
 allowDownloadMapsBoxRef = Ref 39
 
-allowDownloadModelsBoxRef :: Ref MenuListS
+allowDownloadModelsBoxRef :: Ref' MenuListS
 allowDownloadModelsBoxRef = Ref 40
 
-allowDownloadPlayersBoxRef :: Ref MenuListS
+allowDownloadPlayersBoxRef :: Ref' MenuListS
 allowDownloadPlayersBoxRef = Ref 41
 
-allowDownloadSoundsBoxRef :: Ref MenuListS
+allowDownloadSoundsBoxRef :: Ref' MenuListS
 allowDownloadSoundsBoxRef = Ref 42
 
-playerModelBoxRef :: Ref MenuListS
+playerModelBoxRef :: Ref' MenuListS
 playerModelBoxRef = Ref 43
 
-playerSkinBoxRef :: Ref MenuListS
+playerSkinBoxRef :: Ref' MenuListS
 playerSkinBoxRef = Ref 44
 
-playerHandednessBoxRef :: Ref MenuListS
+playerHandednessBoxRef :: Ref' MenuListS
 playerHandednessBoxRef = Ref 45
 
-playerRateBoxRef :: Ref MenuListS
+playerRateBoxRef :: Ref' MenuListS
 playerRateBoxRef = Ref 46
 
-applyActionRef :: Ref MenuActionS
+applyActionRef :: Ref' MenuActionS
 applyActionRef = Ref 0
 
-defaultsActionRef :: Ref MenuActionS
+defaultsActionRef :: Ref' MenuActionS
 defaultsActionRef = Ref 1
 
-easyGameActionRef :: Ref MenuActionS
+easyGameActionRef :: Ref' MenuActionS
 easyGameActionRef = Ref 2
 
-mediumGameActionRef :: Ref MenuActionS
+mediumGameActionRef :: Ref' MenuActionS
 mediumGameActionRef = Ref 3
 
-hardGameActionRef :: Ref MenuActionS
+hardGameActionRef :: Ref' MenuActionS
 hardGameActionRef = Ref 4
 
-loadGameActionRef :: Ref MenuActionS
+loadGameActionRef :: Ref' MenuActionS
 loadGameActionRef = Ref 5
 
-saveGameActionRef :: Ref MenuActionS
+saveGameActionRef :: Ref' MenuActionS
 saveGameActionRef = Ref 6
 
-creditsActionRef :: Ref MenuActionS
+creditsActionRef :: Ref' MenuActionS
 creditsActionRef = Ref 7
 
-joinNetworkServerActionRef :: Ref MenuActionS
+joinNetworkServerActionRef :: Ref' MenuActionS
 joinNetworkServerActionRef = Ref 8
 
-startNetworkServerActionRef :: Ref MenuActionS
+startNetworkServerActionRef :: Ref' MenuActionS
 startNetworkServerActionRef = Ref 9
 
-playerSetupActionRef :: Ref MenuActionS
+playerSetupActionRef :: Ref' MenuActionS
 playerSetupActionRef = Ref 10
 
-keysAttackActionRef :: Ref MenuActionS
+keysAttackActionRef :: Ref' MenuActionS
 keysAttackActionRef = Ref 11
 
-keysChangeWeaponActionRef :: Ref MenuActionS
+keysChangeWeaponActionRef :: Ref' MenuActionS
 keysChangeWeaponActionRef = Ref 12
 
-keysWalkForwardActionRef :: Ref MenuActionS
+keysWalkForwardActionRef :: Ref' MenuActionS
 keysWalkForwardActionRef = Ref 13
 
-keysBackpedalActionRef :: Ref MenuActionS
+keysBackpedalActionRef :: Ref' MenuActionS
 keysBackpedalActionRef = Ref 14
 
-keysTurnLeftActionRef :: Ref MenuActionS
+keysTurnLeftActionRef :: Ref' MenuActionS
 keysTurnLeftActionRef = Ref 15
 
-keysTurnRightActionRef :: Ref MenuActionS
+keysTurnRightActionRef :: Ref' MenuActionS
 keysTurnRightActionRef = Ref 16
 
-keysRunActionRef :: Ref MenuActionS
+keysRunActionRef :: Ref' MenuActionS
 keysRunActionRef = Ref 17
 
-keysStepLeftActionRef :: Ref MenuActionS
+keysStepLeftActionRef :: Ref' MenuActionS
 keysStepLeftActionRef = Ref 18
 
-keysStepRightActionRef :: Ref MenuActionS
+keysStepRightActionRef :: Ref' MenuActionS
 keysStepRightActionRef = Ref 19
 
-keysSidestepActionRef :: Ref MenuActionS
+keysSidestepActionRef :: Ref' MenuActionS
 keysSidestepActionRef = Ref 20
 
-keysLookUpActionRef :: Ref MenuActionS
+keysLookUpActionRef :: Ref' MenuActionS
 keysLookUpActionRef = Ref 21
 
-keysLookDownActionRef :: Ref MenuActionS
+keysLookDownActionRef :: Ref' MenuActionS
 keysLookDownActionRef = Ref 22
 
-keysCenterViewActionRef :: Ref MenuActionS
+keysCenterViewActionRef :: Ref' MenuActionS
 keysCenterViewActionRef = Ref 23
 
-keysMouseLookActionRef :: Ref MenuActionS
+keysMouseLookActionRef :: Ref' MenuActionS
 keysMouseLookActionRef = Ref 24
 
-keysKeyboardLookActionRef :: Ref MenuActionS
+keysKeyboardLookActionRef :: Ref' MenuActionS
 keysKeyboardLookActionRef = Ref 25
 
-keysMoveUpActionRef :: Ref MenuActionS
+keysMoveUpActionRef :: Ref' MenuActionS
 keysMoveUpActionRef = Ref 26
 
-keysMoveDownActionRef :: Ref MenuActionS
+keysMoveDownActionRef :: Ref' MenuActionS
 keysMoveDownActionRef = Ref 27
 
-keysInventoryActionRef :: Ref MenuActionS
+keysInventoryActionRef :: Ref' MenuActionS
 keysInventoryActionRef = Ref 28
 
-keysInvUseActionRef :: Ref MenuActionS
+keysInvUseActionRef :: Ref' MenuActionS
 keysInvUseActionRef = Ref 29
 
-keysInvDropActionRef :: Ref MenuActionS
+keysInvDropActionRef :: Ref' MenuActionS
 keysInvDropActionRef = Ref 30
 
-keysInvPrevActionRef :: Ref MenuActionS
+keysInvPrevActionRef :: Ref' MenuActionS
 keysInvPrevActionRef = Ref 31
 
-keysInvNextActionRef :: Ref MenuActionS
+keysInvNextActionRef :: Ref' MenuActionS
 keysInvNextActionRef = Ref 32
 
-keysHelpComputerActionRef :: Ref MenuActionS
+keysHelpComputerActionRef :: Ref' MenuActionS
 keysHelpComputerActionRef = Ref 33
 
-optionsDefaultsActionRef :: Ref MenuActionS
+optionsDefaultsActionRef :: Ref' MenuActionS
 optionsDefaultsActionRef = Ref 34
 
-optionsCustomizeOptionsActionRef :: Ref MenuActionS
+optionsCustomizeOptionsActionRef :: Ref' MenuActionS
 optionsCustomizeOptionsActionRef = Ref 35
 
-optionsConsoleActionRef :: Ref MenuActionS
+optionsConsoleActionRef :: Ref' MenuActionS
 optionsConsoleActionRef = Ref 36
 
-joinServerSearchActionRef :: Ref MenuActionS
+joinServerSearchActionRef :: Ref' MenuActionS
 joinServerSearchActionRef = Ref 37
 
-joinServerAddressBookActionRef :: Ref MenuActionS
+joinServerAddressBookActionRef :: Ref' MenuActionS
 joinServerAddressBookActionRef = Ref 38
 
-startServerStartActionRef :: Ref MenuActionS
+startServerStartActionRef :: Ref' MenuActionS
 startServerStartActionRef = Ref 39
 
-startServerDMOptionsActionRef :: Ref MenuActionS
+startServerDMOptionsActionRef :: Ref' MenuActionS
 startServerDMOptionsActionRef = Ref 40
 
-playerDownloadActionRef :: Ref MenuActionS
+playerDownloadActionRef :: Ref' MenuActionS
 playerDownloadActionRef = Ref 41
 
-blankLineRef :: Ref MenuSeparatorS
+blankLineRef :: Ref' MenuSeparatorS
 blankLineRef = Ref 0
 
-joinServerServerTitleRef :: Ref MenuSeparatorS
+joinServerServerTitleRef :: Ref' MenuSeparatorS
 joinServerServerTitleRef = Ref 1
 
-downloadTitleRef :: Ref MenuSeparatorS
+downloadTitleRef :: Ref' MenuSeparatorS
 downloadTitleRef = Ref 2
 
-playerSkinTitleRef :: Ref MenuSeparatorS
+playerSkinTitleRef :: Ref' MenuSeparatorS
 playerSkinTitleRef = Ref 3
 
-playerModelTitleRef :: Ref MenuSeparatorS
+playerModelTitleRef :: Ref' MenuSeparatorS
 playerModelTitleRef = Ref 4
 
-playerHandTitleRef :: Ref MenuSeparatorS
+playerHandTitleRef :: Ref' MenuSeparatorS
 playerHandTitleRef = Ref 5
 
-playerRateTitleRef :: Ref MenuSeparatorS
+playerRateTitleRef :: Ref' MenuSeparatorS
 playerRateTitleRef = Ref 6
 
-timeLimitFieldRef :: Ref MenuFieldS
+timeLimitFieldRef :: Ref' MenuFieldS
 timeLimitFieldRef = Ref 0
 
-fragLimitFieldRef :: Ref MenuFieldS
+fragLimitFieldRef :: Ref' MenuFieldS
 fragLimitFieldRef = Ref 1
 
-maxClientsFieldRef :: Ref MenuFieldS
+maxClientsFieldRef :: Ref' MenuFieldS
 maxClientsFieldRef = Ref 2
 
-hostnameFieldRef :: Ref MenuFieldS
+hostnameFieldRef :: Ref' MenuFieldS
 hostnameFieldRef = Ref 3
 
-playerNameFieldRef :: Ref MenuFieldS
+playerNameFieldRef :: Ref' MenuFieldS
 playerNameFieldRef = Ref 4
 
 menuFields :: [MenuFieldS]
@@ -548,7 +548,7 @@ menuFields = [ newMenuFieldS -- 0 timeLimitField
 menuFieldsOffset :: Int
 menuFieldsOffset = length menuFields
              
-addressBookFields :: V.Vector (Ref MenuFieldS)
+addressBookFields :: V.Vector (Ref' MenuFieldS)
 addressBookFields = V.generate Constants.numAddressBookEntries (\idx -> Ref (idx + menuFieldsOffset))
 
 menuActions :: [MenuActionS]
@@ -596,13 +596,13 @@ menuActions = [ newMenuActionS --  0 applyAction
               , newMenuActionS -- 41 playerDownloadAction
               ]
 
-loadGameActions :: V.Vector (Ref MenuActionS)
+loadGameActions :: V.Vector (Ref' MenuActionS)
 loadGameActions = V.generate maxSaveGames (\idx -> Ref (idx + loadGameActionsOffset))
 
-saveGameActions :: V.Vector (Ref MenuActionS)
+saveGameActions :: V.Vector (Ref' MenuActionS)
 saveGameActions = V.generate maxSaveGames (\idx -> Ref (idx + saveGameActionsOffset))
 
-joinServerActions :: V.Vector (Ref MenuActionS)
+joinServerActions :: V.Vector (Ref' MenuActionS)
 joinServerActions = V.generate Constants.maxLocalServers (\idx -> Ref (idx + joinServerActionsOffset))
 
 loadGameActionsOffset :: Int

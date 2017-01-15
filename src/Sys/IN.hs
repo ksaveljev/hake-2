@@ -153,7 +153,7 @@ checkMouseButtonState kbd idx maxIdx
            (kbd^.kbdDoKeyEvent) (KeyConstants.kMouse1 + idx) False
          checkMouseButtonState kbd (idx + 1) maxIdx
 
-move :: Ref UserCmdT -> Quake ()
+move :: Ref' UserCmdT -> Quake ()
 move cmdRef =
   do checkFilter =<< mFilterCVar
      updateOldMouse
@@ -178,7 +178,7 @@ move cmdRef =
              kbdGlobals.kbdMx %= (\v -> truncate (fromIntegral v * (sensitivity^.cvValue)))
              kbdGlobals.kbdMy %= (\v -> truncate (fromIntegral v * (sensitivity^.cvValue)))
 
-applyMouseXYMovement :: Ref UserCmdT -> Quake ()
+applyMouseXYMovement :: Ref' UserCmdT -> Quake ()
 applyMouseXYMovement cmdRef =
   do inStrafe <- use (clientGlobals.cgInStrafe)
      looking <- use (inGlobals.inMLooking)
@@ -189,7 +189,7 @@ applyMouseXYMovement cmdRef =
      checkInStrafe cmdRef inStrafe looking lookStrafe mx
      checkFreeLook cmdRef inStrafe looking freeLook my
 
-checkInStrafe :: Ref UserCmdT -> KButtonT -> Bool -> CVarT -> Int -> Quake ()
+checkInStrafe :: Ref' UserCmdT -> KButtonT -> Bool -> CVarT -> Int -> Quake ()
 checkInStrafe cmdRef inStrafe looking lookStrafe mx
   | (inStrafe^.kbState) .&. 1 /= 0 || ((lookStrafe^.cvValue) /= 0 && looking) =
       do side <- mSideCVar
@@ -198,7 +198,7 @@ checkInStrafe cmdRef inStrafe looking lookStrafe mx
       do yaw <- mYawCVar
          globals.gCl.csViewAngles._y -= (yaw^.cvValue) * fromIntegral mx
 
-checkFreeLook :: Ref UserCmdT -> KButtonT -> Bool -> CVarT -> Int -> Quake ()
+checkFreeLook :: Ref' UserCmdT -> KButtonT -> Bool -> CVarT -> Int -> Quake ()
 checkFreeLook cmdRef inStrafe looking freeLook my
   | (inStrafe^.kbState) .&. 1 == 0 && ((freeLook^.cvValue) /= 0 && looking) =
       do pitch <- mPitchCVar

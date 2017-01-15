@@ -71,7 +71,7 @@ kick True = do
   where
     kickError = Com.fatalError "svGlobals.svClient is Nothing"
 
-proceedKicking :: Ref ClientT -> Quake ()
+proceedKicking :: Ref' ClientT -> Quake ()
 proceedKicking clientRef = do
     client <- readRef clientRef
     SVSend.broadcastPrintf Constants.printHigh ((client^.cName) `B.append` " was kicked\n")
@@ -164,7 +164,7 @@ dumpUser True = do
   where
     dumpUserError = Com.fatalError "svGlobals.svClient is Nothing"
 
-proceedDumpingUser :: Ref ClientT -> Quake ()
+proceedDumpingUser :: Ref' ClientT -> Quake ()
 proceedDumpingUser clientRef = do
     client <- readRef clientRef
     Info.printInfo (client^.cUserInfo)

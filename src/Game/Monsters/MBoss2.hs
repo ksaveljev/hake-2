@@ -83,13 +83,13 @@ frameDeath2 = 132
 frameDeath50 :: Int
 frameDeath50 = 180
 
-spMonsterBoss2 :: Ref EdictT -> Quake ()
+spMonsterBoss2 :: Ref' EdictT -> Quake ()
 spMonsterBoss2 selfRef = do
     deathmatch <- fmap (^.cvValue) deathmatchCVar
     gameImport <- use (gameBaseGlobals.gbGameImport)
     proceedSpawnMonsterBoss2 selfRef gameImport deathmatch
 
-proceedSpawnMonsterBoss2 :: Ref EdictT -> GameImportT -> Float -> Quake ()
+proceedSpawnMonsterBoss2 :: Ref' EdictT -> GameImportT -> Float -> Quake ()
 proceedSpawnMonsterBoss2 selfRef gameImport deathmatch
     | deathmatch /= 0 = GameUtil.freeEdict selfRef
     | otherwise = do

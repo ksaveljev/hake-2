@@ -4,5 +4,5 @@ module Game.Monsters.MMedic
 
 import Types
 
-spMonsterMedic :: Ref EdictT -> Quake ()
+spMonsterMedic :: Ref' EdictT -> Quake ()
 spMonsterMedic = error "MMedic.spMonsterMedic" -- TODO

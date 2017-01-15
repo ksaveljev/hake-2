@@ -191,7 +191,7 @@ sendCmd = do
     cmdRef <- saveCommandForPrediction =<< use (globals.gCls)
     doSendCmd cmdRef =<< use (globals.gCls.csState)
 
-doSendCmd :: Ref UserCmdT -> Int -> Quake ()
+doSendCmd :: Ref' UserCmdT -> Int -> Quake ()
 doSendCmd cmdRef state
     | state `elem` [Constants.caDisconnected, Constants.caConnecting] = return ()
     | state == Constants.caConnected = do
@@ -224,7 +224,7 @@ sendUserUpdate True = do
     MSG.writeByteI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcUserInfo)
     MSG.writeString (globals.gCls.csNetChan.ncMessage) =<< CVar.userInfo
 
-shouldSkipCinematic :: Ref UserCmdT -> Quake Bool
+shouldSkipCinematic :: Ref' UserCmdT -> Quake Bool
 shouldSkipCinematic cmdRef = do
     cmd <- readRef cmdRef
     realTime <- use (globals.gCls.csRealTime)
@@ -269,7 +269,7 @@ calculateChecksum checksumIndex = do
     crcByte <- Com.blockSequenceCRCByte (buf^.sbData) (checksumIndex + 1) ((buf^.sbCurSize) - checksumIndex - 1) outgoingSequence
     clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData)) -- IMPROVE?
 
-saveCommandForPrediction :: ClientStaticT -> Quake (Ref UserCmdT)
+saveCommandForPrediction :: ClientStaticT -> Quake (Ref' UserCmdT)
 saveCommandForPrediction cls = do
     globals.gCl.csCmdTime.ix idx .= (cls^.csRealTime)
     createCmd cmdRef
@@ -280,7 +280,7 @@ saveCommandForPrediction cls = do
     idx = (cls^.csNetChan.ncOutgoingSequence) .&. (Constants.cmdBackup - 1)
     cmdRef = Ref idx
 
-createCmd :: Ref UserCmdT -> Quake ()
+createCmd :: Ref' UserCmdT -> Quake ()
 createCmd cmdRef = do
     sysFrameTime <- use (globals.gSysFrameTime)
     oldSysFrameTime <- use (clientGlobals.cgOldSysFrameTime)
@@ -303,7 +303,7 @@ updateOldSysFrameTime = do
     sysFrameTime <- use (globals.gSysFrameTime)
     clientGlobals.cgOldSysFrameTime .= fromIntegral sysFrameTime
 
-baseMove :: Ref UserCmdT -> Quake ()
+baseMove :: Ref' UserCmdT -> Quake ()
 baseMove cmdRef = do
     adjustAngles
     resetCmdRef
@@ -351,7 +351,7 @@ baseMove cmdRef = do
                                       & ucUpMove *~ 2)
         | otherwise = return ()
 
-finishMove :: Ref UserCmdT -> Quake ()
+finishMove :: Ref' UserCmdT -> Quake ()
 finishMove cmdRef = do
     checkInAttack cmdRef
     checkInUse cmdRef
@@ -370,28 +370,28 @@ finishMove cmdRef = do
     updateLightLevel lightLevel =
         modifyRef cmdRef (\v -> v & ucLightLevel .~ truncate (lightLevel^.cvValue))
 
-checkInAttack :: Ref UserCmdT -> Quake ()
+checkInAttack :: Ref' UserCmdT -> Quake ()
 checkInAttack cmdRef = do
     inAttack <- use (clientGlobals.cgInAttack)
     when ((inAttack^.kbState) .&. 3 /= 0) $
         modifyRef cmdRef (\v -> v & ucButtons %~ (.|. (fromIntegral Constants.buttonAttack)))
     clientGlobals.cgInAttack.kbState %= (.&. (complement 2))
 
-checkInUse :: Ref UserCmdT -> Quake ()
+checkInUse :: Ref' UserCmdT -> Quake ()
 checkInUse cmdRef = do
     inUse <- use (clientGlobals.cgInUse)
     when ((inUse^.kbState) .&. 3 /= 0) $
         modifyRef cmdRef (\v -> v & ucButtons %~ (.|. (fromIntegral Constants.buttonUse)))
     clientGlobals.cgInUse.kbState %= (.&. (complement 2))
 
-checkKeyDown :: Ref UserCmdT -> Quake ()
+checkKeyDown :: Ref' UserCmdT -> Quake ()
 checkKeyDown cmdRef = do
     anyKeyDown <- use (keyGlobals.kgAnyKeyDown)
     keyDest <- use (globals.gCls.csKeyDest)
     when (anyKeyDown /= 0 && keyDest == Constants.keyGame) $
         modifyRef cmdRef (\v -> v & ucButtons %~ (.|. (fromIntegral Constants.buttonAny)))
 
-calcMs :: Ref UserCmdT -> Float -> Quake ()
+calcMs :: Ref' UserCmdT -> Float -> Quake ()
 calcMs cmdRef frameTime =
     modifyRef cmdRef (\v -> v & ucMsec .~ fromIntegral ms')
   where

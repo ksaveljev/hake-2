@@ -28,7 +28,7 @@ import           Server.MoveClipT
 import           Server.ServerT
 import           Types
 
-trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
+trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref' EdictT) -> Int -> Quake TraceT
 trace start maybeMins maybeMaxs end passEdictRef contentMask = do
     (mins, maxs) <- fmap getMinsAndMaxs (use (globals.gVec3Origin))
     boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
@@ -53,7 +53,7 @@ trace start maybeMins maybeMaxs end passEdictRef contentMask = do
                                    & mcMaxs2 .~ maxs
         (boxMins, boxMaxs) = traceBounds start mins maxs end
 
-unlinkEdict :: Ref EdictT -> Quake ()
+unlinkEdict :: Ref' EdictT -> Quake ()
 unlinkEdict edictRef = do
     edict <- readRef edictRef
     link <- readRef (edict^.eArea)
@@ -65,10 +65,10 @@ unlinkEdict edictRef = do
                                & lPrev .~ Nothing)
         
 
-linkEdict :: Ref EdictT -> Quake ()
+linkEdict :: Ref' EdictT -> Quake ()
 linkEdict = error "SVWorld.linkEdict" -- TODO
 
-areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
+areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref' EdictT)) -> Int -> Int -> Quake Int
 areaEdicts = error "SVWorld.areaEdicts" -- TODO
 
 clearWorld :: Quake ()
@@ -86,7 +86,7 @@ clearWorld = do
 pointContents :: V3 Float -> Quake Int
 pointContents = error "SVWorld.pointContents" -- TODO
 
-createAreaNode :: Int -> V3 Float -> V3 Float -> Quake (Ref AreaNodeT)
+createAreaNode :: Int -> V3 Float -> V3 Float -> Quake (Ref' AreaNodeT)
 createAreaNode depth mins maxs = do
     numAreaNodes <- use (svGlobals.svNumAreaNodes)
     svGlobals.svNumAreaNodes += 1
@@ -102,7 +102,7 @@ createAreaNode depth mins maxs = do
                                                   & anChildren .~ (Nothing, Nothing))
         | otherwise = createChildrenAreaNodes (Ref numAreaNodes) depth mins maxs
 
-createChildrenAreaNodes :: Ref AreaNodeT -> Int -> V3 Float -> V3 Float -> Quake ()
+createChildrenAreaNodes :: Ref' AreaNodeT -> Int -> V3 Float -> V3 Float -> Quake ()
 createChildrenAreaNodes areaNodeRef depth mins maxs = do
     child1 <- createAreaNode (depth + 1) mins2 maxs2
     child2 <- createAreaNode (depth + 1) mins1 maxs1
@@ -121,11 +121,11 @@ createChildrenAreaNodes areaNodeRef depth mins maxs = do
 initNodes :: Quake ()
 initNodes = svGlobals.svAreaNodes .= V.generate Constants.areaNodes newAreaNodeT
 
-clearLink :: Ref LinkT -> Quake ()
+clearLink :: Ref' LinkT -> Quake ()
 clearLink linkRef = modifyRef linkRef (\v -> v & lNext .~ Just linkRef
                                                & lPrev .~ Just linkRef)
 
-removeLink :: Ref LinkT -> Quake ()
+removeLink :: Ref' LinkT -> Quake ()
 removeLink linkRef = do
     link <- readRef linkRef
     unsetLink link (link^.lNext) (link^.lPrev)

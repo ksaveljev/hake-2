@@ -293,12 +293,12 @@ createBaseline =
   do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
      mapM_ (readEdict >=> edictBaseline) [1..numEdicts-1]
 
-readEdict :: Int -> Quake (Ref EdictT, EdictT)
+readEdict :: Int -> Quake (Ref' EdictT, EdictT)
 readEdict idx =
   do edict <- readRef (Ref idx)
      return (Ref idx, edict)
 
-edictBaseline :: (Ref EdictT, EdictT) -> Quake ()
+edictBaseline :: (Ref' EdictT, EdictT) -> Quake ()
 edictBaseline (edictRef@(Ref idx), edict)
   | not (edict^.eInUse) || ((edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0) =
       return ()
@@ -307,7 +307,7 @@ edictBaseline (edictRef@(Ref idx), edict)
                                      & eEntityState.esOldOrigin .~ (edict^.eEntityState.esOrigin))
          saveEdictEntityState edictRef
 
-saveEdictEntityState :: Ref EdictT -> Quake ()
+saveEdictEntityState :: Ref' EdictT -> Quake ()
 saveEdictEntityState edictRef@(Ref idx) =
   do edict <- readRef edictRef
      svGlobals.svServer.sBaselines.ix idx .= (edict^.eEntityState)

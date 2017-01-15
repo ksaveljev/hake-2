@@ -115,12 +115,12 @@ processToken entities mapName initial idx inhibited token =
           do err <- use (gameBaseGlobals.gbGameImport.giError)
              err (B.concat ["ED_LoadFromFile: found ", token, " when expecting {"])
 
-spawnEdict :: Bool -> Quake (Ref EdictT)
+spawnEdict :: Bool -> Quake (Ref' EdictT)
 spawnEdict initial
   | initial = return worldRef
   | otherwise = GameUtil.spawn
 
-printEdictInfo :: Ref EdictT -> Quake ()
+printEdictInfo :: Ref' EdictT -> Quake ()
 printEdictInfo edictRef =
   do edict <- readRef edictRef
      Com.dprintf (B.concat [ "spawning ent[", encode (edict^.eIndex)
@@ -128,7 +128,7 @@ printEdictInfo edictRef =
                            , ", flags=", encode (edict^.eSpawnFlags)
                            ])
 
-yetAnotherMapHack :: Ref EdictT -> B.ByteString -> Quake ()
+yetAnotherMapHack :: Ref' EdictT -> B.ByteString -> Quake ()
 yetAnotherMapHack edictRef mapName =
   do edict <- readRef edictRef
      when (shouldApplyHack edict (edict^.eiModel)) $
@@ -139,7 +139,7 @@ yetAnotherMapHack edictRef mapName =
           BC.map toLower (edict^.eClassName) == "trigger_once" &&
           BC.map toLower model == "*27"
 
-removeThingsBasedOnSkillAndDeathmatch :: Ref EdictT -> Quake Bool
+removeThingsBasedOnSkillAndDeathmatch :: Ref' EdictT -> Quake Bool
 removeThingsBasedOnSkillAndDeathmatch edictRef
   | edictRef == worldRef = return False
   | otherwise =
@@ -147,7 +147,7 @@ removeThingsBasedOnSkillAndDeathmatch edictRef
          freed <- checkDeathmatchAndSkill edictRef edict =<< deathmatchCVar
          checkFreed edictRef freed
 
-checkDeathmatchAndSkill :: Ref EdictT -> EdictT -> CVarT -> Quake Bool
+checkDeathmatchAndSkill :: Ref' EdictT -> EdictT -> CVarT -> Quake Bool
 checkDeathmatchAndSkill edictRef edict deathmatch
   | isDeathmatch && (edict^.eSpawnFlags) .&. Constants.spawnFlagNotDeathmatch /= 0 =
       inhibitEdict edictRef
@@ -155,7 +155,7 @@ checkDeathmatchAndSkill edictRef edict deathmatch
   | otherwise = checkSkill edictRef edict =<< skillCVar
   where isDeathmatch = (deathmatch^.cvValue) /= 0
 
-checkSkill :: Ref EdictT -> EdictT -> CVarT -> Quake Bool
+checkSkill :: Ref' EdictT -> EdictT -> CVarT -> Quake Bool
 checkSkill edictRef edict skill
   | wrongSkillLevel = inhibitEdict edictRef
   | otherwise = return False
@@ -164,13 +164,13 @@ checkSkill edictRef edict skill
           ((skill^.cvValue) == 1 && (edict^.eSpawnFlags .&. Constants.spawnFlagNotMedium) /= 0) ||
           (((skill^.cvValue) == 2 || (skill^.cvValue) == 3) && (edict^.eSpawnFlags .&. Constants.spawnFlagNotHard) /= 0)
 
-inhibitEdict :: Ref EdictT -> Quake Bool
+inhibitEdict :: Ref' EdictT -> Quake Bool
 inhibitEdict edictRef =
   do Com.dprintf "->inhibited.\n"
      GameUtil.freeEdict edictRef
      return True
 
-checkFreed :: Ref EdictT -> Bool -> Quake Bool
+checkFreed :: Ref' EdictT -> Bool -> Quake Bool
 checkFreed edictRef freed
   | freed =
       do modifyRef edictRef (\v -> v & eSpawnFlags %~ (.&. complement flags))
@@ -180,7 +180,7 @@ checkFreed edictRef freed
                 Constants.spawnFlagNotHard .|. Constants.spawnFlagNotCoop .|.
                 Constants.spawnFlagNotDeathmatch
 
-finishSpawn :: B.ByteString -> B.ByteString -> Int -> Int -> Ref EdictT -> Bool -> Quake Int
+finishSpawn :: B.ByteString -> B.ByteString -> Int -> Int -> Ref' EdictT -> Bool -> Quake Int
 finishSpawn entities mapName idx inhibited edictRef removed
   | removed = parseEntities entities mapName False idx (inhibited + 1)
   | otherwise =
@@ -210,7 +210,7 @@ findNextTeam c c2 idx maxIdx
                  c2' <- findTeamMembers team edictRef edictRef idx maxIdx c2
                  findNextTeam (c + 1) c2' (idx + 1) maxIdx
 
-findTeamMembers :: B.ByteString -> Ref EdictT -> Ref EdictT -> Int -> Int -> Int -> Quake Int
+findTeamMembers :: B.ByteString -> Ref' EdictT -> Ref' EdictT -> Int -> Int -> Int -> Quake Int
 findTeamMembers teamName master chainRef idx maxIdx c2
   | idx >= maxIdx = return c2
   | otherwise =
@@ -226,15 +226,15 @@ findTeamMembers teamName master chainRef idx maxIdx c2
                                              & eFlags %~ (.|. Constants.flTeamSlave))
                  findTeamMembers teamName master edictRef (idx + 1) maxIdx (c2 + 1)
 
-parseEdict :: Ref EdictT -> B.ByteString -> Int -> Quake Int
+parseEdict :: Ref' EdictT -> B.ByteString -> Int -> Quake Int
 parseEdict = error "GameSpawn.parseEdict" -- TODO
 
-callSpawn :: Ref EdictT -> Quake ()
+callSpawn :: Ref' EdictT -> Quake ()
 callSpawn edictRef =
   do edict <- readRef edictRef
      searchItems edictRef (BC.map toLower (edict^.eClassName))
 
-searchItems :: Ref EdictT -> B.ByteString -> Quake ()
+searchItems :: Ref' EdictT -> B.ByteString -> Quake ()
 searchItems edictRef className =
   do items <- use (gameBaseGlobals.gbItemList)
      case search (V.drop 1 items) of
@@ -243,7 +243,7 @@ searchItems edictRef className =
   where search items = fmap Ref (V.findIndex searchByName items)
         searchByName gItem = className == BC.map toLower (gItem^.giClassName)
 
-searchSpawns :: Ref EdictT -> B.ByteString -> Quake ()
+searchSpawns :: Ref' EdictT -> B.ByteString -> Quake ()
 searchSpawns edictRef className =
   case spawnIdx of
     Just idx -> void (entThink ((spawns V.! idx)^.spSpawn) edictRef)

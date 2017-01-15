@@ -88,13 +88,13 @@ frameDeathC1 = 236
 frameDeathC8 :: Int
 frameDeathC8 = 243
 
-spMonsterBerserk :: Ref EdictT -> Quake ()
+spMonsterBerserk :: Ref' EdictT -> Quake ()
 spMonsterBerserk selfRef = do
     deathmatch <- fmap (^.cvValue) deathmatchCVar
     gameImport <- use (gameBaseGlobals.gbGameImport)
     proceedSpawnMonsterBerserk selfRef gameImport deathmatch
 
-proceedSpawnMonsterBerserk :: Ref EdictT -> GameImportT -> Float -> Quake ()
+proceedSpawnMonsterBerserk :: Ref' EdictT -> GameImportT -> Float -> Quake ()
 proceedSpawnMonsterBerserk selfRef gameImport deathmatch
     | deathmatch /= 0 = GameUtil.freeEdict selfRef
     | otherwise = do
@@ -163,7 +163,7 @@ berserkDie = EntDie "berserk_die" $ \selfRef _ _ damage _ -> do
     gameImport <- use (gameBaseGlobals.gbGameImport)
     doBerserkDie selfRef self gameImport damage
 
-doBerserkDie :: Ref EdictT -> EdictT -> GameImportT -> Int -> Quake ()
+doBerserkDie :: Ref' EdictT -> EdictT -> GameImportT -> Int -> Quake ()
 doBerserkDie selfRef self gameImport damage
     | (self^.eHealth) < (self^.eGibHealth) = do
         soundIdx <- soundIndex (Just "misc/udeath.wav")

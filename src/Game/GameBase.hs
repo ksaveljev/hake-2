@@ -63,7 +63,7 @@ runFrame =
                  checkNeedPassword
                  clientEndServerFrames
 
-readEdict :: Int -> Quake (Ref EdictT, EdictT) -- TODO: duplicate with something in SVInit
+readEdict :: Int -> Quake (Ref' EdictT, EdictT) -- TODO: duplicate with something in SVInit
 readEdict idx =
   do edict <- readRef (Ref idx)
      return (Ref idx, edict)
@@ -74,7 +74,7 @@ updateLevelGlobals =
      gameBaseGlobals.gbLevel.llFrameNum += 1
      gameBaseGlobals.gbLevel.llTime .= (fromIntegral (level^.llFrameNum) + 1) * Constants.frameTime
 
-treatObject :: (Ref EdictT, EdictT) -> Quake ()
+treatObject :: (Ref' EdictT, EdictT) -> Quake ()
 treatObject (edictRef, edict)
   | not (edict^.eInUse) = return ()
   | otherwise =
@@ -83,7 +83,7 @@ treatObject (edictRef, edict)
          checkGroundEntity edictRef edict (edict^.eGroundEntity)
          treatClientOrEntity edictRef =<< fmap (truncate . (^.cvValue)) maxClientsCVar
 
-checkGroundEntity :: Ref EdictT -> EdictT -> Maybe (Ref EdictT) -> Quake ()
+checkGroundEntity :: Ref' EdictT -> EdictT -> Maybe (Ref' EdictT) -> Quake ()
 checkGroundEntity _ _ Nothing = return ()
 checkGroundEntity edictRef edict (Just groundRef) =
   do ground <- readRef groundRef
@@ -92,12 +92,12 @@ checkGroundEntity edictRef edict (Just groundRef) =
           when ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) == 0 && (edict^.eFlags) .&. Constants.svfMonster /= 0) $
             M.checkGround edictRef
 
-treatClientOrEntity :: Ref EdictT -> Int -> Quake ()
+treatClientOrEntity :: Ref' EdictT -> Int -> Quake ()
 treatClientOrEntity edictRef@(Ref idx) maxClients
   | idx > 0 && idx <= maxClients = PlayerClient.clientBeginServerFrame edictRef
   | otherwise = runEntity edictRef
 
-setMoveDir :: Ref EdictT -> EdictT -> Quake ()
+setMoveDir :: Ref' EdictT -> EdictT -> Quake ()
 setMoveDir edictRef edict =
   modifyRef edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
                               & eMoveDir .~ moveDir)
@@ -163,7 +163,7 @@ applyDMRules timeLimit fragLimit levelTime bprintf
               endDMLevel
   | otherwise = return ()
 
-checkScore :: Int -> (Ref EdictT, EdictT) -> Quake Bool
+checkScore :: Int -> (Ref' EdictT, EdictT) -> Quake Bool
 checkScore fragLimit (Ref idx, edict)
   | edict^.eInUse =
       do client <- readRef (Ref (idx - 1))
@@ -200,14 +200,14 @@ clientEndServerFrames =
               PlayerView.clientEndServerFrame edictRef
           | otherwise = return ()
 
-runEntity :: Ref EdictT -> Quake ()
+runEntity :: Ref' EdictT -> Quake ()
 runEntity edictRef =
   do edict <- readRef edictRef
      maybe (return ()) doPreThink (edict^.ePrethink)
      makeNextMove edictRef (edict^.eMoveType)
   where doPreThink e = void (entThink e edictRef)
 
-makeNextMove :: Ref EdictT -> Int -> Quake ()
+makeNextMove :: Ref' EdictT -> Int -> Quake ()
 makeNextMove edictRef moveType
   | any (== moveType) [Constants.moveTypePush, Constants.moveTypeStop] = SV.physicsPusher edictRef
   | moveType == Constants.moveTypeNone = SV.physicsNone edictRef

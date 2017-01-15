@@ -4,5 +4,5 @@ module Game.PlayerView
 
 import Types
 
-clientEndServerFrame :: Ref EdictT -> Quake ()
+clientEndServerFrame :: Ref' EdictT -> Quake ()
 clientEndServerFrame = error "PlayerView.clientEndServerFrame" -- TODO

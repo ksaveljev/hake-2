@@ -79,7 +79,7 @@ setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT skyMin skyMax idx
         | otherwise =
             setSky name rotate glSkyMip glExtPalettedTexture colorTableEXT (1.0 / 512.0) (511.0 / 512.0) (idx + 1) maxIdx
 
-glSubdivideSurface :: Ref MSurfaceT -> Quake ()
+glSubdivideSurface :: Ref' MSurfaceT -> Quake ()
 glSubdivideSurface surfRef = do
     loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
     surf <- readRef surfRef
@@ -114,7 +114,7 @@ subdividePolygon numVerts verts = do
     (mins, maxs) = boundPoly numVerts verts
     verts' = verts `V.snoc` (verts V.! 0)
 
-proceedWarp :: Ref GLPolyT -> Maybe (Ref MSurfaceT) -> V.Vector (V3 Float) -> Int -> Quake ()
+proceedWarp :: Ref' GLPolyT -> Maybe (Ref' MSurfaceT) -> V.Vector (V3 Float) -> Int -> Quake ()
 proceedWarp _ Nothing _ _ = Com.fatalError "Warp.proceedWarp surface is Nothing"
 proceedWarp polyRef (Just surfRef) verts numVerts = do
     surf <- readRef surfRef
@@ -208,7 +208,7 @@ buildFrontAndBack verts' dist front back idx maxIdx
                        else buildFrontAndBack verts' dist front' back' (idx + 1) maxIdx
 
 -- TODO: old implementation, could use some refactoring
-countTotals :: Ref GLPolyT -> (V4 Float, V4 Float) -> V.Vector (V3 Float) -> Int -> V3 Float -> Float -> Float -> Int -> Quake (V3 Float, Float, Float)
+countTotals :: Ref' GLPolyT -> (V4 Float, V4 Float) -> V.Vector (V3 Float) -> Int -> V3 Float -> Float -> Float -> Int -> Quake (V3 Float, Float, Float)
 countTotals polyRef vecs verts numVerts total totalS totalT idx
     | idx >= numVerts = return (total, totalS, totalT)
     | otherwise = do
@@ -315,5 +315,5 @@ stToVec = V.fromList [ V3   3  (-1)   2
                      , V3   2  (-1) (-3)
                      ]
 
-rAddSkySurface :: Ref MSurfaceT -> Quake ()
+rAddSkySurface :: Ref' MSurfaceT -> Quake ()
 rAddSkySurface = error "Warp.rAddSkySurface" -- TODO

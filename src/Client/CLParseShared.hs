@@ -61,12 +61,12 @@ proceedLoadClientInfo clientInfo (Just renderer) noSkins name str = do
     (modelRef, weaponModels, skinRef, iconName, iconRef) <- doLoadClientInfo renderer noSkins str
     saveClientInfo clientInfo name str modelRef weaponModels skinRef iconName iconRef
 
-doLoadClientInfo :: Renderer -> Float -> B.ByteString -> Quake (Maybe (Ref ModelT), V.Vector (Maybe (Ref ModelT)), Maybe (Ref ImageT), B.ByteString, Maybe (Ref ImageT))
+doLoadClientInfo :: Renderer -> Float -> B.ByteString -> Quake (Maybe (Ref' ModelT), V.Vector (Maybe (Ref' ModelT)), Maybe (Ref' ImageT), B.ByteString, Maybe (Ref' ImageT))
 doLoadClientInfo renderer noSkins str
     | noSkins /= 0 || B.null str = getDefaultClientInfo renderer
     | otherwise =  getClientInfo renderer str
 
-getDefaultClientInfo :: Renderer -> Quake (Maybe (Ref ModelT), V.Vector (Maybe (Ref ModelT)), Maybe (Ref ImageT), B.ByteString, Maybe (Ref ImageT))
+getDefaultClientInfo :: Renderer -> Quake (Maybe (Ref' ModelT), V.Vector (Maybe (Ref' ModelT)), Maybe (Ref' ImageT), B.ByteString, Maybe (Ref' ImageT))
 getDefaultClientInfo renderer = do
     modelRef <- (renderer^.rRefExport.reRegisterModel) "players/male/tris.md2"
     weaponModelRef <- (renderer^.rRefExport.reRegisterModel) "players/male/weapon.md2"
@@ -78,7 +78,7 @@ getDefaultClientInfo renderer = do
     defaultWeaponModels weaponModelRef =
         V.generate Constants.maxClientWeaponModels (\idx -> if idx == 0 then weaponModelRef else Nothing)
 
-getClientInfo :: Renderer -> B.ByteString -> Quake (Maybe (Ref ModelT), V.Vector (Maybe (Ref ModelT)), Maybe (Ref ImageT), B.ByteString, Maybe (Ref ImageT))
+getClientInfo :: Renderer -> B.ByteString -> Quake (Maybe (Ref' ModelT), V.Vector (Maybe (Ref' ModelT)), Maybe (Ref' ImageT), B.ByteString, Maybe (Ref' ImageT))
 getClientInfo renderer str = do
     when (isNothing nameIdx1 && isNothing nameIdx2) $
         Com.fatalError ("Invalid model name:" `B.append` str)
@@ -111,13 +111,13 @@ getClientInfo renderer str = do
         (renderer^.rRefExport.reRegisterSkin) (B.concat ["players/", modelName'', "/grunt.pcx"])
     recheckSkinRef skinRef _ = return skinRef
 
-loadWeaponModels :: Renderer -> B.ByteString -> Quake (V.Vector (Maybe (Ref ModelT)))
+loadWeaponModels :: Renderer -> B.ByteString -> Quake (V.Vector (Maybe (Ref' ModelT)))
 loadWeaponModels renderer modelName = do
     vwep <- fmap (^.cvValue) clVwepCVar
     clWeaponModels <- use (clientGlobals.cgWeaponModels)
     doLoadWeaponModels vwep clWeaponModels
   where
-    doLoadWeaponModels :: Float -> V.Vector B.ByteString -> Quake (V.Vector (Maybe (Ref ModelT)))
+    doLoadWeaponModels :: Float -> V.Vector B.ByteString -> Quake (V.Vector (Maybe (Ref' ModelT)))
     doLoadWeaponModels vwep clWeaponModels
         | vwep == 0 = do
             weaponModelRef <- (renderer^.rRefExport.reRegisterModel) (B.concat ["players/", modelName, "/", clWeaponModels V.! 0])
@@ -130,7 +130,7 @@ loadWeaponModels renderer modelName = do
             loadedWeapons <- loadWeapons renderer clWeaponModels modelName 0 numWeaponModels []
             return ((V.replicate Constants.maxClientWeaponModels Nothing) V.// loadedWeapons)
 
-loadWeapons :: Renderer -> V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe (Ref ModelT))] -> Quake [(Int, Maybe (Ref ModelT))]
+loadWeapons :: Renderer -> V.Vector B.ByteString -> B.ByteString -> Int -> Int -> [(Int, Maybe (Ref' ModelT))] -> Quake [(Int, Maybe (Ref' ModelT))]
 loadWeapons renderer clWeaponModels modelName idx maxIdx acc
     | idx >= maxIdx = return acc
     | otherwise = do
@@ -140,14 +140,14 @@ loadWeapons renderer clWeaponModels modelName idx maxIdx acc
                                else return weaponModelRef
         loadWeapons renderer clWeaponModels modelName (idx + 1) maxIdx ((idx, weaponModelRef') : acc)
 
-loadIcon :: Renderer -> B.ByteString -> B.ByteString -> Quake (B.ByteString, Maybe (Ref ImageT))
+loadIcon :: Renderer -> B.ByteString -> B.ByteString -> Quake (B.ByteString, Maybe (Ref' ImageT))
 loadIcon renderer modelName skinName = do
     iconRef <- (renderer^.rRefExport.reRegisterPic) iconName
     return (iconName, iconRef)
   where
     iconName = B.concat ["/players/", modelName, "/", skinName, "_i.pcx"]
 
-saveClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> B.ByteString -> Maybe (Ref ModelT) -> V.Vector (Maybe (Ref ModelT)) -> Maybe (Ref ImageT) -> B.ByteString -> Maybe (Ref ImageT) -> Quake ()
+saveClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> B.ByteString -> Maybe (Ref' ModelT) -> V.Vector (Maybe (Ref' ModelT)) -> Maybe (Ref' ImageT) -> B.ByteString -> Maybe (Ref' ImageT) -> Quake ()
 saveClientInfo clientInfo name str modelRef weaponModels skinRef iconName iconRef
     | isNothing skinRef || isNothing iconRef || isNothing modelRef || isNothing (weaponModels V.! 0) =
         clientInfo .= (newClientInfoT & ciName        .~ name

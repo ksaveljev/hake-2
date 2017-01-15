@@ -171,7 +171,7 @@ addBeams = do
     cl <- use (globals.gCl)
     mapM_ (addBeam cl) (fmap Ref [0..Constants.maxBeams-1])
 
-addBeam :: ClientStateT -> Ref BeamT -> Quake ()
+addBeam :: ClientStateT -> Ref' BeamT -> Quake ()
 addBeam cl beamRef = do
     beam <- readRef beamRef
     unless (isNothing (beam^.bModel) || (beam^.bEndTime) < (cl^.csTime)) $ do
@@ -207,7 +207,7 @@ addBeam cl beamRef = do
         modifyRef beamRef (\v -> v & bStart .~ start)
         doAddBeam beam modLightning org len pitch yaw d' dist' modelLength
 
-doAddBeam :: BeamT -> Maybe (Ref ModelT) -> V3 Float -> Float -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
+doAddBeam :: BeamT -> Maybe (Ref' ModelT) -> V3 Float -> Float -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
 doAddBeam beam modLightning org len pitch yaw d dist modelLength
     | (beam^.bModel) == modLightning && d <= modelLength = do
         r <- Lib.rand
@@ -218,7 +218,7 @@ doAddBeam beam modLightning org len pitch yaw d dist modelLength
     | otherwise =
         constructBeams beam org len modLightning pitch yaw d dist modelLength
 
-constructBeams :: BeamT -> V3 Float -> Float -> Maybe (Ref ModelT) -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
+constructBeams :: BeamT -> V3 Float -> Float -> Maybe (Ref' ModelT) -> Float -> Float -> Float -> V3 Float -> Float -> Quake ()
 constructBeams beam org len modLightning pitch yaw d dist modelLength
     | d <= 0 = return ()
     | otherwise = do
@@ -251,7 +251,7 @@ addPlayerBeams = do
         | (hand^.cvValue) == 1 = -1
         | otherwise = 1
 
-addPlayerBeam :: ClientStateT -> Float -> Ref BeamT -> Quake ()
+addPlayerBeam :: ClientStateT -> Float -> Ref' BeamT -> Quake ()
 addPlayerBeam cl handMultiplier beamRef = do
     beam <- readRef beamRef
     unless (isNothing (beam^.bModel) || (beam^.bEndTime) < (cl^.csTime)) $ do
@@ -415,7 +415,7 @@ addExplosions = do
     cl <- use (globals.gCl)
     mapM_ (addExplosion cl) (fmap Ref [0..Constants.maxExplosions-1])
 
-addExplosion :: ClientStateT -> Ref ExplosionT -> Quake ()
+addExplosion :: ClientStateT -> Ref' ExplosionT -> Quake ()
 addExplosion cl explosionRef = do
     explosion <- readRef explosionRef
     unless ((explosion^.eType) == exFree) $ do

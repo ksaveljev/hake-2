@@ -277,7 +277,7 @@ parseStartSoundPacket = do
     getPosition flags
         | flags .&. Constants.sndPos /= 0 = fmap Just (MSG.readPos (globals.gNetMessage))
         | otherwise = return Nothing
-    getSound :: Int -> Quake (Maybe (Ref SfxT))
+    getSound :: Int -> Quake (Maybe (Ref' SfxT))
     getSound soundNum = do
         precache <- use (globals.gCl.csSoundPrecache)
         return (precache V.! soundNum)

@@ -11,6 +11,7 @@ import           Control.Lens          (use, (^.), (+=), (&), (.~))
 import           Control.Monad         (when)
 import           Linear                (dot, normalize)
 
+import qualified Constants
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
@@ -22,19 +23,30 @@ import           QuakeState
 import           Types
 import qualified Util.Math3D           as Math3D
 
-freeEdict :: Ref EdictT -> Quake ()
-freeEdict = error "GameUtil.freeEdict" -- TODO
+freeEdict :: Ref' EdictT -> Quake ()
+freeEdict edictRef = do
+    edict <- readRef edictRef
+    unlinkEntity <- use (gameBaseGlobals.gbGameImport.giUnlinkEntity)
+    unlinkEntity edictRef
+    maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+    when ((edict^.eIndex) > maxClients + Constants.bodyQueueSize) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        writeRef edictRef ((newEdictT (edict^.eIndex)) & eClassName .~ "freed"
+                                                       & eFreeTime .~ levelTime
+                                                       & eInUse .~ False)
 
 freeEdictA :: EntThink
-freeEdictA = error "GameUtil.freeEdictA" -- TODO
+freeEdictA = EntThink "G_FreeEdictA" $ \edictRef -> do
+    freeEdict edictRef
+    return False
 
-validateSelectedItem :: Ref EdictT -> Quake ()
+validateSelectedItem :: Ref' EdictT -> Quake ()
 validateSelectedItem = error "GameUtil.validateSelectedItem" -- TODO
 
 megaHealthThink :: EntThink
 megaHealthThink = error "GameUtil.megaHealthThink" -- TODO
 
-spawn :: Quake (Ref EdictT)
+spawn :: Quake (Ref' EdictT)
 spawn =
   do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
      numEdicts <- use (gameBaseGlobals.gbNumEdicts)
@@ -55,7 +67,7 @@ spawn =
              initEdict edictRef
              return edictRef
 
-findFreeEdict :: Float -> Int -> Int -> Quake (Maybe (Ref EdictT))
+findFreeEdict :: Float -> Int -> Int -> Quake (Maybe (Ref' EdictT))
 findFreeEdict levelTime idx maxIdx
   | idx >= maxIdx = return Nothing
   | otherwise = checkFree =<< readRef (Ref idx)
@@ -63,7 +75,7 @@ findFreeEdict levelTime idx maxIdx
           | not (edict^.eInUse) && ((edict^.eFreeTime) < 2 || levelTime - (edict^.eFreeTime) > 0.5) = return (Just (Ref idx))
           | otherwise = findFreeEdict levelTime (idx + 1) maxIdx
 
-initEdict :: Ref EdictT -> Quake ()
+initEdict :: Ref' EdictT -> Quake ()
 initEdict edictRef@(Ref idx) =
   modifyRef edictRef (\v -> v & eInUse .~ True
                               & eClassName .~ "noclass"

@@ -92,7 +92,7 @@ rMarkLeaves = do
         worldModel <- readRef worldModelRef
         proceedMarkLeaves worldModelRef worldModel noVis viewCluster viewCluster2
 
-proceedMarkLeaves :: Ref ModelT -> ModelT -> Float -> Int -> Int -> Quake ()
+proceedMarkLeaves :: Ref' ModelT -> ModelT -> Float -> Int -> Int -> Quake ()
 proceedMarkLeaves worldModelRef worldModel noVis viewCluster viewCluster2
     | noVis /= 0 || viewCluster == -1 || isNothing (worldModel^.mVis) = do
         visFrameCount <- use (fastRenderAPIGlobals.frVisFrameCount)
@@ -122,7 +122,7 @@ combineClusters worldModel vis viewCluster2 = do
     c = (((worldModel^.mNumLeafs) + 31) `shiftR` 5) `shiftL` 2
 
 -- TODO: verify that worldModel doesn't need to be refreshed upon each call
-markLeaf :: Ref ModelT -> ModelT -> B.ByteString -> Int -> Int -> Quake ()
+markLeaf :: Ref' ModelT -> ModelT -> B.ByteString -> Int -> Int -> Quake ()
 markLeaf worldModelRef worldModel vis visFrameCount idx
     | cluster == -1 = return ()
     | (vis `B.index` (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) /= 0 = do
@@ -135,7 +135,7 @@ markLeaf worldModelRef worldModel vis visFrameCount idx
     cluster = leaf^.mlCluster
 
 -- TODO: verify that worldModel doesn't need to be refreshed upon each call
-markNode :: Ref ModelT -> ModelT -> Maybe (Ref MNodeT) -> Int -> Quake ()
+markNode :: Ref' ModelT -> ModelT -> Maybe (Ref' MNodeT) -> Int -> Quake ()
 markNode _ _ Nothing _ = return ()
 markNode worldModelRef worldModel (Just (Ref idx)) visFrameCount
     | node^.mnVisFrame == visFrameCount =
@@ -146,7 +146,7 @@ markNode worldModelRef worldModel (Just (Ref idx)) visFrameCount
   where
     node = (worldModel^.mNodes) V.! idx
 
-glBeginBuildingLightmaps :: Ref ModelT -> Quake ()
+glBeginBuildingLightmaps :: Ref' ModelT -> Quake ()
 glBeginBuildingLightmaps _ = do
     fastRenderAPIGlobals.frGLLms.lmsAllocated .= UV.replicate Constants.blockWidth 0
     fastRenderAPIGlobals.frFrameCount .= 1 -- no dlightcache
@@ -241,13 +241,13 @@ doUploadBlock dynamic lms
     h = UV.maximum (lms^.lmsAllocated)
     height = max 0 h
 
-glCreateSurfaceLightmap :: Ref MSurfaceT -> Maybe B.ByteString -> Quake ()
+glCreateSurfaceLightmap :: Ref' MSurfaceT -> Maybe B.ByteString -> Quake ()
 glCreateSurfaceLightmap surfaceRef lightData = do
     surface <- readRef surfaceRef
     when ((surface^.msFlags) .&. (Constants.surfDrawSky .|. Constants.surfDrawTurb) == 0) $
         doCreateSurfaceLightmap surfaceRef surface lightData
 
-doCreateSurfaceLightmap :: Ref MSurfaceT -> MSurfaceT -> Maybe B.ByteString -> Quake ()
+doCreateSurfaceLightmap :: Ref' MSurfaceT -> MSurfaceT -> Maybe B.ByteString -> Quake ()
 doCreateSurfaceLightmap surfaceRef surface lightData = do
     pos <- tryAllocBlock
     lightmapTexture <- use (fastRenderAPIGlobals.frGLLms.lmsCurrentLightmapTexture)
@@ -272,7 +272,7 @@ doCreateSurfaceLightmap surfaceRef surface lightData = do
             Com.fatalError (B.concat ["Consecutive calls to LM_AllocBlock(", encode smax, ",", encode tmax, ") failed\n"])
         return pos
 
-glBuildPolygonFromSurface :: Ref MSurfaceT -> Quake ()
+glBuildPolygonFromSurface :: Ref' MSurfaceT -> Quake ()
 glBuildPolygonFromSurface surfRef = do
     surf <- readRef surfRef
     model <- readCurrentModel
@@ -292,7 +292,7 @@ glBuildPolygonFromSurface surfRef = do
         Com.fatalError "Surf.glBuildPolygonFromSurface tex info image is Nothing"
         return (newImageT (-1))
 
-buildPolygonFromSurface :: Ref MSurfaceT -> MSurfaceT -> ModelT -> ImageT -> Quake ()
+buildPolygonFromSurface :: Ref' MSurfaceT -> MSurfaceT -> ModelT -> ImageT -> Quake ()
 buildPolygonFromSurface surfRef surf model image = do
     polyRef <- Polygon.create lNumVerts
     modifyRef polyRef (\v -> v & glpNext .~ (surf^.msPolys)
@@ -302,7 +302,7 @@ buildPolygonFromSurface surfRef surf model image = do
   where
     lNumVerts = surf^.msNumEdges
 
-doStuffWithVerts :: MSurfaceT -> ModelT -> ImageT -> Ref GLPolyT -> Int -> Int -> Quake ()
+doStuffWithVerts :: MSurfaceT -> ModelT -> ImageT -> Ref' GLPolyT -> Int -> Int -> Quake ()
 doStuffWithVerts surf model image polyRef idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = do
@@ -387,7 +387,7 @@ rDrawWorld = do
     worldModelRef <- use (fastRenderAPIGlobals.frWorldModel)
     proceedDrawWorld drawWorld newRefDef worldModelRef
 
-proceedDrawWorld :: Float -> RefDefT -> Maybe (Ref ModelT) -> Quake ()
+proceedDrawWorld :: Float -> RefDefT -> Maybe (Ref' ModelT) -> Quake ()
 proceedDrawWorld _ _ Nothing =
     Com.fatalError "Surf.rDrawWorld worldModelRef is Nothing"
 proceedDrawWorld drawWorld newRefDef (Just worldModelRef)
@@ -425,7 +425,7 @@ proceedDrawWorld drawWorld newRefDef (Just worldModelRef)
         | lightmap /= 0 = Image.glTexEnv GL.GL_REPLACE
         | otherwise = Image.glTexEnv GL.GL_MODULATE
 
-recursiveWorldNode :: Ref ModelT -> Ref MNodeT -> Quake ()
+recursiveWorldNode :: Ref' ModelT -> Ref' MNodeT -> Quake ()
 recursiveWorldNode worldModelRef (Ref nodeIdx) = do
     worldModel <- readRef worldModelRef
     let node = (worldModel^.mNodes) V.! nodeIdx
@@ -436,7 +436,7 @@ recursiveWorldNode worldModelRef (Ref nodeIdx) = do
         plane <- readRef (node^.mnPlane)
         drawNodesAndLeafs worldModelRef worldModel modelOrg plane node
 
-drawNodesAndLeafs :: Ref ModelT -> ModelT -> V3 Float -> CPlaneT -> MNodeT -> Quake ()
+drawNodesAndLeafs :: Ref' ModelT -> ModelT -> V3 Float -> CPlaneT -> MNodeT -> Quake ()
 drawNodesAndLeafs worldModelRef worldModel modelOrg plane node = do
     drawChild child1
     frameCount <- use (fastRenderAPIGlobals.frFrameCount)
@@ -456,7 +456,7 @@ drawNodesAndLeafs worldModelRef worldModel modelOrg plane node = do
     drawChild (MNodeChildRef nodeRef) = recursiveWorldNode worldModelRef nodeRef
     drawChild (MLeafChildRef leafRef) = drawLeafStuff worldModel leafRef
 
-drawLeafStuff :: ModelT -> Ref MLeafT -> Quake ()
+drawLeafStuff :: ModelT -> Ref' MLeafT -> Quake ()
 drawLeafStuff worldModel (Ref leafIdx) = do
     visFrameCount <- use (fastRenderAPIGlobals.frVisFrameCount)
     nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) visFrameCount (leaf^.mlMins) (leaf^.mlMaxs)
@@ -474,7 +474,7 @@ drawLeafStuff worldModel (Ref leafIdx) = do
             return ()
 
 -- TODO: try doing everything related to worldModel^.mSurfaces via QuakeRef (see if it is possible to use loadModelRef)
-drawNodeStuff :: Ref ModelT -> ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()
+drawNodeStuff :: Ref' ModelT -> ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()
 drawNodeStuff worldModelRef worldModel node sidebit frameCount idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = doDrawNodeStuff ((worldModel^.mSurfaces) V.! surfIdx)
@@ -565,7 +565,7 @@ rCullBox mins maxs =
         | Math3D.boxOnPlaneSide mins maxs (frustum V.! 3) == 2 = return True
         | otherwise                                             = return False
 
-rTextureAnimation :: MTexInfoT -> Quake (Ref ImageT)
+rTextureAnimation :: MTexInfoT -> Quake (Ref' ImageT)
 rTextureAnimation tex
     | isNothing (tex^.mtiNext) =
         maybe imageError return (tex^.mtiImage)
@@ -580,7 +580,8 @@ rTextureAnimation tex
     entityError = do
         Com.fatalError "Surf.rTextureAnimation fastRenderAPIGlobals.frCurrentEntity is Nothing"
         return newEntityT
-    getCurrentEntity (EntityRef entityRef) = readRef entityRef
+    getCurrentEntity (VEntityRef entityRef) = readRef entityRef
+    getCurrentEntity (RDEntityRef entityRef) = readRef entityRef
     getCurrentEntity (NewEntity entity) = return entity
     findFrame tex 0 = maybe imageError return (tex^.mtiImage)
     findFrame tex c = do
@@ -591,8 +592,8 @@ rTextureAnimation tex
         Com.fatalError "Surf.rTextureAnimation#findFrame tex^.mtiNext is Nothing"
         return (Ref (-1))
 
-glRenderLightmappedPoly :: Ref MSurfaceT -> Quake ()
+glRenderLightmappedPoly :: Ref' MSurfaceT -> Quake ()
 glRenderLightmappedPoly = error "Surf.glRenderLightmappedPoly" -- TODO
 
-rRenderBrushPoly :: Ref MSurfaceT -> Quake ()
+rRenderBrushPoly :: Ref' MSurfaceT -> Quake ()
 rRenderBrushPoly = error "Surf.rRenderBrushPoly" -- TODO

@@ -106,7 +106,7 @@ actorNames = V.fromList
     , "Adrianator", "Rambear", "Titus", "Bitterman"
     ]
 
-spMiscActor :: Ref EdictT -> Quake ()
+spMiscActor :: Ref' EdictT -> Quake ()
 spMiscActor selfRef = do
     self <- readRef selfRef
     gameImport <- use (gameBaseGlobals.gbGameImport)
@@ -144,7 +144,7 @@ spMiscActor selfRef = do
             void (entThink GameAI.walkMonsterStart selfRef)
             modifyRef selfRef (\v -> v & eUse .~ Just actorUse)
 
-spTargetActor :: Ref EdictT -> Quake ()
+spTargetActor :: Ref' EdictT -> Quake ()
 spTargetActor selfRef = do
     self <- readRef selfRef
     gameImport <- use (gameBaseGlobals.gbGameImport)
@@ -161,7 +161,7 @@ spTargetActor selfRef = do
         (gameImport^.giDprintf) (B.concat [self^.eClassName, " with no targetname at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
     checkTargetName _ _ _ = return ()
 
-checkTargetSpawnFlags :: Ref EdictT -> EdictT -> Quake ()
+checkTargetSpawnFlags :: Ref' EdictT -> EdictT -> Quake ()
 checkTargetSpawnFlags selfRef self
     | (self^.eSpawnFlags) .&. 1 /= 0 = do
         gameBaseGlobals.gbSpawnTemp.stHeight %= (\v -> if v == 0 then 200 else v)
@@ -189,7 +189,7 @@ actorDie = error "MActor.actorDie" -- TODO
 actorStand :: EntThink
 actorStand = EntThink "MActor.actorStand" doActorStand
 
-doActorStand :: Ref EdictT -> Quake Bool
+doActorStand :: Ref' EdictT -> Quake Bool
 doActorStand selfRef = do
     modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveStand)
     randomizeOnStartup =<< use (gameBaseGlobals.gbLevel.llTime)
@@ -227,7 +227,7 @@ actorFramesStand = V.replicate 40 (MFrameT (Just GameAI.aiStand) 0 Nothing)
 actorRun :: EntThink
 actorRun = EntThink "MActor.actorRun" doActorRun
 
-doActorRun :: Ref EdictT -> Quake Bool
+doActorRun :: Ref' EdictT -> Quake Bool
 doActorRun selfRef = do
     self <- readRef selfRef
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
@@ -247,7 +247,7 @@ doActorRun selfRef = do
 actorAttack :: EntThink
 actorAttack = EntThink "MActor.actorAttack" doActorAttack
 
-doActorAttack :: Ref EdictT -> Quake Bool
+doActorAttack :: Ref' EdictT -> Quake Bool
 doActorAttack selfRef = do
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
     r <- Lib.rand
@@ -278,7 +278,7 @@ actorFramesAttack = V.fromList
 actorFire :: EntThink
 actorFire = EntThink "MActor.actorFire" doActorFire
 
-doActorFire :: Ref EdictT -> Quake Bool
+doActorFire :: Ref' EdictT -> Quake Bool
 doActorFire selfRef = do
     actorMachineGun selfRef
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
@@ -292,5 +292,5 @@ doActorFire selfRef = do
         | otherwise =
             modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
-actorMachineGun :: Ref EdictT -> Quake ()
+actorMachineGun :: Ref' EdictT -> Quake ()
 actorMachineGun = error "MActor.actorMachineGun" -- TODO

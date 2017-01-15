@@ -130,7 +130,7 @@ initialize =
   do Cmd.addInitialCommands initialCommands
      menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
-menuAddItem :: Ref MenuFrameworkS -> MenuItemRef -> Quake ()
+menuAddItem :: Ref' MenuFrameworkS -> MenuItemRef -> Quake ()
 menuAddItem menuFrameworkRef menuItemRef =
   do menu <- readRef menuFrameworkRef
      checkEmptyMenu menu
@@ -147,14 +147,14 @@ menuAddItem menuFrameworkRef menuItemRef =
                  setParent menuFrameworkRef menuItemRef
           | otherwise = return ()
 
-setParent :: Ref MenuFrameworkS -> MenuItemRef -> Quake ()
+setParent :: Ref' MenuFrameworkS -> MenuItemRef -> Quake ()
 setParent parentRef (MenuActionRef ref) = modifyRef ref (\v -> v & maGeneric.mcParent .~ Just parentRef)
 setParent parentRef (MenuFieldRef ref) = modifyRef ref (\v -> v & mflGeneric.mcParent .~ Just parentRef)
 setParent parentRef (MenuListRef ref) = modifyRef ref (\v -> v & mlGeneric.mcParent .~ Just parentRef)
 setParent parentRef (MenuSeparatorRef ref) = modifyRef ref (\v -> v & mspGeneric.mcParent .~ Just parentRef)
 setParent parentRef (MenuSliderRef ref) = modifyRef ref (\v -> v & msGeneric.mcParent .~ Just parentRef)
 
-menuCenter :: Ref MenuFrameworkS -> Quake ()
+menuCenter :: Ref' MenuFrameworkS -> Quake ()
 menuCenter menuFrameworkRef =
   do menu <- readRef menuFrameworkRef
      height <- getMenuItemHeight (V.last (menu^.mfItems))
@@ -166,7 +166,7 @@ menuCenter menuFrameworkRef =
         getMenuItemHeight (MenuSeparatorRef ref) = fmap (^.mspGeneric.mcY) (readRef ref)
         getMenuItemHeight (MenuFieldRef ref) = fmap (^.mflGeneric.mcY) (readRef ref)
 
-menuTallySlots :: Ref MenuFrameworkS -> Quake Int
+menuTallySlots :: Ref' MenuFrameworkS -> Quake Int
 menuTallySlots menuFrameworkRef =
   do menu <- readRef menuFrameworkRef
      itemsNum <- V.mapM numberOfItems (menu^.mfItems)
@@ -1069,7 +1069,7 @@ multiplayerMenuKey = KeyFuncT "Menu.multiplayerMenuKey" (defaultMenuKey multipla
 playerConfigMenuInit :: Quake Bool
 playerConfigMenuInit = error "Menu.playerConfigMenuInit" -- TODO
 
-menuSetStatusBar :: Ref MenuFrameworkS -> Maybe B.ByteString -> Quake ()
+menuSetStatusBar :: Ref' MenuFrameworkS -> Maybe B.ByteString -> Quake ()
 menuSetStatusBar menuRef str = modifyRef menuRef (\v -> v & mfStatusBar .~ str)
 
 playerConfigMenuDrawF :: XCommandT
@@ -1384,13 +1384,13 @@ banner name =
         rendererError = Com.fatalError "Menu.banner renderer is Nothing"
         dimError = Com.fatalError "Menu.banner reDrawGetPicSize returned Nothing"
 
-defaultMenuKey :: Ref MenuFrameworkS -> Int -> Quake (Maybe B.ByteString)
+defaultMenuKey :: Ref' MenuFrameworkS -> Int -> Quake (Maybe B.ByteString)
 defaultMenuKey = error "Menu.defaultMenuKey" -- TODO
 
-menuDraw :: Ref MenuFrameworkS -> Quake ()
+menuDraw :: Ref' MenuFrameworkS -> Quake ()
 menuDraw = error "Menu.menuDraw" -- TODO
 
-menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
+menuAdjustCursor :: Ref' MenuFrameworkS -> Int -> Quake ()
 menuAdjustCursor = error "Menu.menuAdjustCursor" -- TODO
 
 popMenu :: Quake ()
@@ -1595,7 +1595,7 @@ findSaveGame gameDir idx =
           menuGlobals %= (\v -> v & mgSaveStrings.ix idx .~ saveName
                                   & mgSaveValid.ix idx .~ True)
 
-loadGameCallback :: Ref MenuActionS -> Quake ()
+loadGameCallback :: Ref' MenuActionS -> Quake ()
 loadGameCallback actionRef =
   do action <- readRef actionRef
      saveValid <- use (menuGlobals.mgSaveValid)
@@ -1603,7 +1603,7 @@ loadGameCallback actionRef =
        CBuf.addText (B.concat ["load save", encode (action^.maGeneric.mcLocalData._x), "\n"])
      forceMenuOff
 
-saveGameCallback :: Ref MenuActionS -> Quake ()
+saveGameCallback :: Ref' MenuActionS -> Quake ()
 saveGameCallback menuActionRef =
  do action <- readRef menuActionRef
     CBuf.addText (B.concat ["save save", encode (action^.maGeneric.mcLocalData._x), "\n"])
@@ -1623,7 +1623,7 @@ searchLocalGames =
              renderer^.rRefExport.reEndFrame
              runXCommandT CL.pingServersF
 
-joinServerFunc :: Ref MenuActionS -> Quake ()
+joinServerFunc :: Ref' MenuActionS -> Quake ()
 joinServerFunc actionRef =
   do action <- readRef actionRef
      localServerNames <- use (menuGlobals.mgLocalServerNames)
@@ -1725,13 +1725,13 @@ static void StartServerActionFunc(Object self) {
     }
     -}
 
-dmFlagCallback :: Maybe (Ref MenuListS) -> Quake ()
+dmFlagCallback :: Maybe (Ref' MenuListS) -> Quake ()
 dmFlagCallback = error "Menu.dmFlagCallback" -- TODO
 
-drawKeyBindingFunc :: Ref MenuActionS -> Quake ()
+drawKeyBindingFunc :: Ref' MenuActionS -> Quake ()
 drawKeyBindingFunc = error "Menu.drawKeyBindingFunc" -- TODO
 
-keyCursorDrawFunc :: Ref MenuFrameworkS -> Quake ()
+keyCursorDrawFunc :: Ref' MenuFrameworkS -> Quake ()
 keyCursorDrawFunc menuRef =
   do menu <- readRef menuRef
      bindGrab <- use (menuGlobals.mgBindGrab)
@@ -1746,7 +1746,7 @@ keyCursorDrawFunc menuRef =
         drawChar menu ch renderer = 
           (renderer^.rRefExport.reDrawChar) (menu^.mfX) ((menu^.mfY) + 9 * (menu^.mfCursor)) ch
 
-downloadCallback :: Ref MenuListS -> Quake ()
+downloadCallback :: Ref' MenuListS -> Quake ()
 downloadCallback menuListRef =
   processItem =<< readRef menuListRef
   where processItem item

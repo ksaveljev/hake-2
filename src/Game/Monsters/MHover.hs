@@ -4,5 +4,5 @@ module Game.Monsters.MHover
 
 import Types
 
-spMonsterHover :: Ref EdictT -> Quake ()
+spMonsterHover :: Ref' EdictT -> Quake ()
 spMonsterHover = error "MHover.spMonsterHover" -- TODO

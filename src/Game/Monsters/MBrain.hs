@@ -95,13 +95,13 @@ frameStand31 = 192
 frameStand60 :: Int
 frameStand60 = 221
 
-spMonsterBrain :: Ref EdictT -> Quake ()
+spMonsterBrain :: Ref' EdictT -> Quake ()
 spMonsterBrain selfRef = do
     deathmatch <- fmap (^.cvValue) deathmatchCVar
     gameImport <- use (gameBaseGlobals.gbGameImport)
     proceedSpawnMonsterBrain selfRef gameImport deathmatch
 
-proceedSpawnMonsterBrain :: Ref EdictT -> GameImportT -> Float -> Quake ()
+proceedSpawnMonsterBrain :: Ref' EdictT -> GameImportT -> Float -> Quake ()
 proceedSpawnMonsterBrain selfRef gameImport deathmatch
     | deathmatch /= 0 = GameUtil.freeEdict selfRef
     | otherwise = do
@@ -249,7 +249,7 @@ brainDie = EntDie "brain_die" $ \selfRef _ _ damage _ -> do
     gameImport <- use (gameBaseGlobals.gbGameImport)
     doBrainDie selfRef self gameImport damage
 
-doBrainDie :: Ref EdictT -> EdictT -> GameImportT -> Int -> Quake ()
+doBrainDie :: Ref' EdictT -> EdictT -> GameImportT -> Int -> Quake ()
 doBrainDie selfRef self gameImport damage
     | (self^.eHealth) <= (self^.eGibHealth) = do -- check for gib
         soundIdx <- soundIndex (Just "misc/udeath.wav")

@@ -66,7 +66,7 @@ runDLights = do
     time <- use (globals.gCl.csTime)
     mapM_ (runDLight time) (fmap Ref [0..Constants.maxDLights - 1])
 
-runDLight :: Int -> Ref CDLightT -> Quake ()
+runDLight :: Int -> Ref' CDLightT -> Quake ()
 runDLight time dLightRef = doRunDLight =<< readRef dLightRef
   where
     doRunDLight dl
@@ -132,7 +132,7 @@ proceedParseMuzzleFlash idx w pl = do
     volume | silenced /= 0 = 0.2
            | otherwise = 1
 
-muzzleFlashSound :: Ref CDLightT -> Ref EdictT -> CEntityT -> Int -> Float -> Quake ()
+muzzleFlashSound :: Ref' CDLightT -> Ref' EdictT -> CEntityT -> Int -> Float -> Quake ()
 muzzleFlashSound dLightRef edictRef pl weapon volume
     | weapon == Constants.mzBlaster = do
         modifyRef dLightRef (\v -> v & cdlColor .~ V3 1 1 0)
@@ -315,7 +315,7 @@ proceedParseMuzzleFlash2 idx flashNumber cent = do
     c = (cent^.ceCurrent.esOrigin._z) + (forward^._z) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._z) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y) + ((MFlash.monsterFlashOffset V.! flashNumber)^._z)
     origin = V3 a b c
 
-muzzleFlashSound2 :: Ref CDLightT -> Ref EdictT -> V3 Float -> Int -> Quake ()
+muzzleFlashSound2 :: Ref' CDLightT -> Ref' EdictT -> V3 Float -> Int -> Quake ()
 muzzleFlashSound2 dLightRef edictRef origin flashNumber
     | flashNumber `elem` [ Constants.mz2InfantryMachinegun1
                          , Constants.mz2InfantryMachinegun2
@@ -697,7 +697,7 @@ setLightStyle csIdx = do
         let a = fromIntegral (ord (str `BC.index` idx) - ord 'a') :: Float
         in Just (a / d, idx + 1)
 
-allocDLight :: Int -> Quake (Ref CDLightT)
+allocDLight :: Int -> Quake (Ref' CDLightT)
 allocDLight key = do
     exactMatch <- findExactMatch 0 Constants.maxDLights
     maybe searchForAnyDLight return exactMatch
@@ -733,7 +733,7 @@ logoutEffect org pType = do
     freeParticles <- use (clientGlobals.cgFreeParticles)
     addLogoutEffect org pType freeParticles 0 500
 
-addLogoutEffect :: V3 Float -> Int -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addLogoutEffect :: V3 Float -> Int -> Maybe (Ref' CParticleT) -> Int -> Int -> Quake ()
 addLogoutEffect _ _ Nothing _ _ = return ()
 addLogoutEffect org pType (Just pRef) idx maxIdx
     | idx >= maxIdx = return ()
@@ -771,7 +771,7 @@ particleEffect org dir color count = do
     freeParticles <- use (clientGlobals.cgFreeParticles)
     addParticleEffects org dir color count freeParticles 0
 
-addParticleEffects :: V3 Float -> V3 Float -> Int -> Int -> Maybe (Ref CParticleT) -> Int -> Quake ()
+addParticleEffects :: V3 Float -> V3 Float -> Int -> Int -> Maybe (Ref' CParticleT) -> Int -> Quake ()
 addParticleEffects _ _ _ _ Nothing _ = return ()
 addParticleEffects org dir color count (Just pRef) idx
     | idx >= count = return ()
@@ -833,7 +833,7 @@ teleporterParticles ent = do
     freeParticles <- use (clientGlobals.cgFreeParticles)
     addTeleporterParticles ent freeParticles 0 8
 
-addTeleporterParticles :: EntityStateT -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addTeleporterParticles :: EntityStateT -> Maybe (Ref' CParticleT) -> Int -> Int -> Quake ()
 addTeleporterParticles _ Nothing _ _ = return ()
 addTeleporterParticles ent (Just pRef) idx maxIdx
     | idx >= maxIdx = return ()
@@ -864,7 +864,7 @@ itemRespawnParticles org = do
     freeParticles <- use (clientGlobals.cgFreeParticles)
     addItemRespawnParticles org freeParticles 0 64
 
-addItemRespawnParticles :: V3 Float -> Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+addItemRespawnParticles :: V3 Float -> Maybe (Ref' CParticleT) -> Int -> Int -> Quake ()
 addItemRespawnParticles _ Nothing _ _ = return ()
 addItemRespawnParticles org (Just pRef) idx maxIdx
     | idx >= maxIdx = return ()
@@ -897,7 +897,7 @@ teleportParticles org = do
     freeParticles <- use (clientGlobals.cgFreeParticles)
     addTeleportParticles org freeParticles (-16) (-16) (-16)
 
-addTeleportParticles :: V3 Float -> Maybe (Ref CParticleT) -> Int -> Int -> Int -> Quake ()
+addTeleportParticles :: V3 Float -> Maybe (Ref' CParticleT) -> Int -> Int -> Int -> Quake ()
 addTeleportParticles _ Nothing _ _ _ = return ()
 addTeleportParticles org (Just pRef) i j k
     | i > 16 = return ()
@@ -931,7 +931,7 @@ addParticles = do
     activeParticles <- use (clientGlobals.cgActiveParticles)
     doAddParticles cl activeParticles Nothing Nothing 0
 
-doAddParticles :: ClientStateT -> Maybe (Ref CParticleT) -> Maybe (Ref CParticleT) -> Maybe (Ref CParticleT) -> Float -> Quake ()
+doAddParticles :: ClientStateT -> Maybe (Ref' CParticleT) -> Maybe (Ref' CParticleT) -> Maybe (Ref' CParticleT) -> Float -> Quake ()
 doAddParticles _ Nothing activeRef _ _ = clientGlobals.cgActiveParticles .= activeRef
 doAddParticles cl (Just pRef) activeRef tailRef time = do
     p <- readRef pRef

@@ -56,7 +56,7 @@ setAreaPortalState = error "CM.setAreaPortalState" -- TODO
 areasConnected :: Int -> Int -> Quake Bool
 areasConnected = error "CM.areasConnected" -- TODO
 
-loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Ref CModelT, [Int]) -- return model ref (cmGlobals.cmMapCModels) and checksum
+loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Ref' CModelT, [Int]) -- return model ref (cmGlobals.cmMapCModels) and checksum
 loadMap name clientLoad checksum =
   do Com.dprintf (B.concat ["CM_LoadMap(", name, ")...\n"])
      void (CVar.get "map_noareas" "0" 0)
@@ -64,7 +64,7 @@ loadMap name clientLoad checksum =
      flushMap <- CVar.variableValue "flushmap"
      proceedLoadMap name clientLoad checksum mapName flushMap
 
-proceedLoadMap :: B.ByteString -> Bool -> [Int] -> B.ByteString -> Float -> Quake (Ref CModelT, [Int])
+proceedLoadMap :: B.ByteString -> Bool -> [Int] -> B.ByteString -> Float -> Quake (Ref' CModelT, [Int])
 proceedLoadMap name clientLoad checksum mapName flushMap
   | mapName == name && (clientLoad || flushMap == 0) =
       do lastChecksum <- use (cmGlobals.cmLastChecksum)
@@ -95,12 +95,12 @@ proceedLoadMap name clientLoad checksum mapName flushMap
           do Com.comError Constants.errDrop ("Couldn't load " `B.append` name)
              return (Ref 0, 0 : tail checksum)
 
-doLoadMap :: B.ByteString -> [Int] -> (Handle, Int) -> Quake (Ref CModelT, [Int])
+doLoadMap :: B.ByteString -> [Int] -> (Handle, Int) -> Quake (Ref' CModelT, [Int])
 doLoadMap name checksum (fileHandle, len) =
   do buf <- request (io (BL.hGet fileHandle len))
      loadBSP name checksum buf len (runGet getDHeaderT buf)
 
-loadBSP :: B.ByteString -> [Int] -> BL.ByteString -> Int -> DHeaderT -> Quake (Ref CModelT, [Int])
+loadBSP :: B.ByteString -> [Int] -> BL.ByteString -> Int -> DHeaderT -> Quake (Ref' CModelT, [Int])
 loadBSP name checksum buf len header =
   do checkHeader
      cmGlobals.cmLastChecksum .= bufChecksum
@@ -130,7 +130,7 @@ loadBSP name checksum buf len header =
         updatedChecksum = bufChecksum : tail checksum
         lumps = header^.dhLumps
 
-inlineModel :: B.ByteString -> Quake (Ref CModelT)
+inlineModel :: B.ByteString -> Quake (Ref' CModelT)
 inlineModel name =
   do checkName
      checkNumCModels =<< numInlineModels
@@ -168,7 +168,7 @@ flood floodValid floodNum idx area
       do floodAreaR (Ref idx) floodValid (floodNum + 1)
          return (floodNum + 1)
 
-floodAreaR :: Ref CAreaT -> Int -> Int -> Quake ()
+floodAreaR :: Ref' CAreaT -> Int -> Int -> Quake ()
 floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
   where recFlood area
           | (area^.caFloodValid) == floodValid =

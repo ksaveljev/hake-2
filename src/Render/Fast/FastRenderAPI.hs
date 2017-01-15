@@ -839,7 +839,7 @@ rDrawEntitiesOnList = do
         mapM_ (drawTransparentEntity newRefDef) (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
         request (GL.glDepthMask (fromIntegral GL.GL_TRUE)) -- back to writing
 
-drawNonTransparentEntity :: RefDefT -> Ref EntityT -> Quake ()
+drawNonTransparentEntity :: RefDefT -> Ref' EntityT -> Quake ()
 drawNonTransparentEntity newRefDef entityRef = do
     error "FastRenderAPI.drawNonTransparentEntity" -- TODO
 
@@ -1018,7 +1018,7 @@ setAngleVectors newRefDef =
   where
     (vpn, vright, vup) = Math3D.angleVectors (newRefDef^.rdViewAngles) True True True
 
-setCurrentViewCluster :: RefDefT -> Maybe (Ref ModelT) -> Quake ()
+setCurrentViewCluster :: RefDefT -> Maybe (Ref' ModelT) -> Quake ()
 setCurrentViewCluster _ Nothing = Com.fatalError "FastRenderAPI.rSetupFrame worldModelRef is Nothing"
 setCurrentViewCluster newRefDef (Just worldModelRef) = do
     viewCluster <- use (fastRenderAPIGlobals.frViewCluster)

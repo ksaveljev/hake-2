@@ -20,7 +20,7 @@ import           Control.Monad (when, void, unless)
 import           Data.Bits ((.&.))
 import           Linear (V3, _x, _y, _z)
 
-physicsPusher :: Ref EdictT -> Quake ()
+physicsPusher :: Ref' EdictT -> Quake ()
 physicsPusher edictRef =
   do edict <- readRef edictRef
      -- if not a team captain, so movement will be handled elsewhere
@@ -35,11 +35,11 @@ physicsPusher edictRef =
        maybe (moveSucceeded edictRef) (moveFailed edictRef) part
        error "SV.physicsPusher" -- TODO
 
-pushTeamChain :: Maybe (Ref EdictT) -> Quake (Maybe (Ref EdictT))
+pushTeamChain :: Maybe (Ref' EdictT) -> Quake (Maybe (Ref' EdictT))
 pushTeamChain Nothing = return Nothing
 pushTeamChain (Just edictRef) = proceedPushTeamChain edictRef =<< readRef edictRef
 
-proceedPushTeamChain :: Ref EdictT -> EdictT -> Quake (Maybe (Ref EdictT))
+proceedPushTeamChain :: Ref' EdictT -> EdictT -> Quake (Maybe (Ref' EdictT))
 proceedPushTeamChain edictRef edict
   | isMoving = checkPushed =<< push edictRef move amove
   | otherwise = pushTeamChain (edict^.eTeamChain)
@@ -58,11 +58,11 @@ checkMemoryCorruption =
        do err <- use (gameBaseGlobals.gbGameImport.giError2)
           err Constants.errFatal "pushed_p > &pushed[MAX_EDICTS], memory corrupted"
 
-moveSucceeded :: Ref EdictT -> Quake ()
+moveSucceeded :: Ref' EdictT -> Quake ()
 moveSucceeded edictRef = thinkTeamChain (Just edictRef)
 
 -- the move failed, bump all nextthink times and back out moves
-moveFailed :: Ref EdictT -> Ref EdictT -> Quake ()
+moveFailed :: Ref' EdictT -> Ref' EdictT -> Quake ()
 moveFailed edictRef blockedRef =
   do backOutTeamChain (Just edictRef)
      blockedEdict <- readRef blockedRef
@@ -71,14 +71,14 @@ moveFailed edictRef blockedRef =
   where runBlocked Nothing _ = Com.fatalError "SV.moveFailed obstacle is Nothing"
         runBlocked (Just obstacle) edictBlockedF = entBlocked edictBlockedF blockedRef obstacle
 
-thinkTeamChain :: Maybe (Ref EdictT) -> Quake ()
+thinkTeamChain :: Maybe (Ref' EdictT) -> Quake ()
 thinkTeamChain Nothing = return ()
 thinkTeamChain (Just edictRef) =
   do edict <- readRef edictRef
      void (runThink edictRef)
      thinkTeamChain (edict^.eTeamChain)
 
-backOutTeamChain :: Maybe (Ref EdictT) -> Quake ()
+backOutTeamChain :: Maybe (Ref' EdictT) -> Quake ()
 backOutTeamChain Nothing = return ()
 backOutTeamChain (Just edictRef) =
   do edict <- readRef edictRef
@@ -86,11 +86,11 @@ backOutTeamChain (Just edictRef) =
        modifyRef edictRef (\v -> v & eNextThink +~ Constants.frameTime)
      backOutTeamChain (edict^.eTeamChain)
 
-physicsNone :: Ref EdictT -> Quake ()
+physicsNone :: Ref' EdictT -> Quake ()
 physicsNone = void . runThink -- regular thinking
 
 -- A moving object that doesn't obey physics.
-physicsNoClip :: Ref EdictT -> Quake ()
+physicsNoClip :: Ref' EdictT -> Quake ()
 physicsNoClip edictRef =
   do ok <- runThink edictRef
      when ok $
@@ -100,20 +100,20 @@ physicsNoClip edictRef =
           linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
           linkEntity edictRef
 
-physicsStep :: Ref EdictT -> Quake ()
+physicsStep :: Ref' EdictT -> Quake ()
 physicsStep = error "SV.physicsStep" -- TODO
 
-physicsToss :: Ref EdictT -> Quake ()
+physicsToss :: Ref' EdictT -> Quake ()
 physicsToss = error "SV.physicsToss" -- TODO
 
 -- Runs thinking code for this frame if necessary.
-runThink :: Ref EdictT -> Quake Bool
+runThink :: Ref' EdictT -> Quake Bool
 runThink edictRef =
   do edict <- readRef edictRef
      levelTime <- use (gameBaseGlobals.gbLevel.llTime)
      proceedRunThink edictRef edict levelTime
 
-proceedRunThink :: Ref EdictT -> EdictT -> Float -> Quake Bool
+proceedRunThink :: Ref' EdictT -> EdictT -> Float -> Quake Bool
 proceedRunThink edictRef edict levelTime
   | (edict^.eNextThink) <= 0 || (edict^.eNextThink) > levelTime + 0.001 = return True
   | otherwise =
@@ -123,5 +123,5 @@ proceedRunThink edictRef edict levelTime
   where thinkError = Com.fatalError "SV.proceedRunThink edict^.eThink is Nothing"
         doThink f = void (entThink f edictRef)
 
-push :: Ref EdictT -> V3 Float -> V3 Float -> Quake Bool
+push :: Ref' EdictT -> V3 Float -> V3 Float -> Quake Bool
 push = error "SV.push" -- TODO

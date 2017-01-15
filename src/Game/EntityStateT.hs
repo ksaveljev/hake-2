@@ -10,7 +10,7 @@ import Linear (V3(..))
 
 makeLenses ''EntityStateT
 
-newEntityStateT :: Maybe (Ref EdictT) -> EntityStateT
+newEntityStateT :: Maybe (Ref' EdictT) -> EntityStateT
 newEntityStateT edictRef =
   EntityStateT { _esNumber         = number edictRef
                , _esOrigin         = V3 0 0 0

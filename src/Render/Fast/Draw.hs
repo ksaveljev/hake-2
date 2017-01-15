@@ -44,7 +44,7 @@ initLocal =
           do GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MIN_FILTER (fromIntegral GL.GL_NEAREST)
              GL.glTexParameterf GL.GL_TEXTURE_2D GL.GL_TEXTURE_MAG_FILTER (fromIntegral GL.GL_NEAREST)
 
-findPic :: B.ByteString -> Quake (Maybe (Ref ImageT))
+findPic :: B.ByteString -> Quake (Maybe (Ref' ImageT))
 findPic name
   | BC.take 1 name == "/" || BC.take 1 name == "\\" = Image.glFindImage (B.drop 1 name) Constants.itPic
   | otherwise = Image.glFindImage name Constants.itPic

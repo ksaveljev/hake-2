@@ -4,5 +4,5 @@ module Game.Monsters.MBoss31
 
 import Types
 
-spMonsterJorg :: Ref EdictT -> Quake ()
+spMonsterJorg :: Ref' EdictT -> Quake ()
 spMonsterJorg = error "MBoss31.spMonsterJorg" -- TODO

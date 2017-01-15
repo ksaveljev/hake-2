@@ -4,5 +4,5 @@ module Game.Monsters.MInfantry
 
 import Types
 
-spMonsterInfantry :: Ref EdictT -> Quake ()
+spMonsterInfantry :: Ref' EdictT -> Quake ()
 spMonsterInfantry = error "MInfantry.spMonsterInfantry" -- TODO

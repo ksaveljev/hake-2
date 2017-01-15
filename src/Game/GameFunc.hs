@@ -33,19 +33,19 @@ spFuncDoorRotating = error "GameFunc.spFuncDoorRotating" -- TODO
 spFuncKillBox :: EntThink
 spFuncKillBox = error "GameFunc.spFuncKillBox" -- TODO
 
-spFuncPlat :: Ref EdictT -> Quake ()
+spFuncPlat :: Ref' EdictT -> Quake ()
 spFuncPlat = error "GameFunc.spFuncPlat" -- TODO
 
 spFuncRotating :: EntThink
 spFuncRotating = error "GameFunc.spFuncRotating" -- TODO
 
-spFuncTimer :: Ref EdictT -> Quake ()
+spFuncTimer :: Ref' EdictT -> Quake ()
 spFuncTimer = error "GameFunc.spFuncTimer" -- TODO
 
-spFuncTrain :: Ref EdictT -> Quake ()
+spFuncTrain :: Ref' EdictT -> Quake ()
 spFuncTrain = error "GameFunc.spFuncTrain" -- TODO
 
-spFuncWater :: Ref EdictT -> Quake ()
+spFuncWater :: Ref' EdictT -> Quake ()
 spFuncWater = error "GameFunc.spFuncWater" -- TODO
 
 spTriggerElevator :: EntThink

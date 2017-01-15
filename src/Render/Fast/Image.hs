@@ -100,7 +100,7 @@ glSolidModes = V.fromList
     , GLTModeT "GL_R3_G3_B2" (fromIntegral GL.GL_R3_G3_B2)
     ]
 
-rRegisterSkin :: B.ByteString -> Quake (Maybe (Ref ImageT))
+rRegisterSkin :: B.ByteString -> Quake (Maybe (Ref' ImageT))
 rRegisterSkin name = glFindImage name Constants.itSkin
 
 glShutdownImages :: Quake ()
@@ -378,7 +378,7 @@ bindImage glState texNum
         | glState^.glsCurrentTmu == 0 = fastRenderAPIGlobals.frGLState.glsCurrentTextures._1 .= texNum
         | otherwise = fastRenderAPIGlobals.frGLState.glsCurrentTextures._2 .= texNum
 
-glLoadPic :: B.ByteString -> SV.Vector Word8 -> Int -> Int -> Int -> Int -> Quake (Ref ImageT)
+glLoadPic :: B.ByteString -> SV.Vector Word8 -> Int -> Int -> Int -> Int -> Quake (Ref' ImageT)
 glLoadPic name pic width height picType bits = do
     numGLTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
     idx <- findFreeImage 0 numGLTextures
@@ -815,7 +815,7 @@ applyFilters mipmap = do
 glBuildPalettedTexture :: SV.Vector Word8 -> Int -> Int -> Quake (SV.Vector Word8)
 glBuildPalettedTexture = error "Image.glBuildPalettedTexture" -- TODO
 
-glFindImage :: B.ByteString -> Int -> Quake (Maybe (Ref ImageT))
+glFindImage :: B.ByteString -> Int -> Quake (Maybe (Ref' ImageT))
 glFindImage imageName imageType
     | B.length imageName < 1 = return Nothing
     | otherwise = do
@@ -823,7 +823,7 @@ glFindImage imageName imageType
         imageRef <- findImage imageName 0 numGLTextures
         maybe (loadFromDisk imageName imageType) updateAndReturn imageRef
 
-loadFromDisk :: B.ByteString -> Int -> Quake (Maybe (Ref ImageT))
+loadFromDisk :: B.ByteString -> Int -> Quake (Maybe (Ref' ImageT))
 loadFromDisk imageName imageType
     | ".pcx" `BC.isSuffixOf` imageName = do
         imageData <- loadPCX imageName False True
@@ -841,13 +841,13 @@ loadFromDisk imageName imageType
     loadTGAImage (pic, (width, height)) =
         fmap Just (glLoadPic imageName pic width height imageType 32)
 
-updateAndReturn :: Ref ImageT -> Quake (Maybe (Ref ImageT))
+updateAndReturn :: Ref' ImageT -> Quake (Maybe (Ref' ImageT))
 updateAndReturn imageRef = do
     rs <- use (fastRenderAPIGlobals.frRegistrationSequence)
     modifyRef imageRef (\v -> v & iRegistrationSequence .~ rs)
     return (Just imageRef)
 
-findImage :: B.ByteString -> Int -> Int -> Quake (Maybe (Ref ImageT))
+findImage :: B.ByteString -> Int -> Int -> Quake (Maybe (Ref' ImageT))
 findImage imageName idx maxIdx
     | idx >= maxIdx = return Nothing
     | otherwise = do
@@ -859,7 +859,7 @@ findImage imageName idx maxIdx
         | imageName == name = return (Just imageRef)
         | otherwise = findImage imageName (idx + 1) maxIdx
 
-glLoadWal :: B.ByteString -> Quake (Ref ImageT)
+glLoadWal :: B.ByteString -> Quake (Ref' ImageT)
 glLoadWal name = FS.fOpenFile name >>= loadMiptexT >>= uploadMiptexT name
 
 loadMiptexT :: Maybe Handle -> Quake (Maybe MiptexT)
@@ -870,7 +870,7 @@ loadMiptexT (Just fileHandle) = do
   where
     parseMiptexT = runStateT (PB.decodeGet getMiptexT) (PBS.fromHandle fileHandle)
 
-uploadMiptexT :: B.ByteString -> Maybe MiptexT -> Quake (Ref ImageT)
+uploadMiptexT :: B.ByteString -> Maybe MiptexT -> Quake (Ref' ImageT)
 uploadMiptexT name Nothing = do
     VID.printf Constants.printAll (B.concat ["GL_FindImage: can't load ", name, "\n"])
     use (fastRenderAPIGlobals.frNoTexture)

@@ -325,5 +325,5 @@ removeCommand name =
 removeCommands :: [B.ByteString] -> Quake ()
 removeCommands = mapM_ removeCommand
 
-clientCommand :: Ref EdictT -> Quake ()
+clientCommand :: Ref' EdictT -> Quake ()
 clientCommand = error "Cmd.clientCommand" -- TODO

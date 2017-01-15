@@ -4,5 +4,5 @@ module Game.Monsters.MFlyer
 
 import Types
 
-spMonsterFlyer :: Ref EdictT -> Quake ()
+spMonsterFlyer :: Ref' EdictT -> Quake ()
 spMonsterFlyer = error "MFlyer.spMonsterFlyer" -- TODO

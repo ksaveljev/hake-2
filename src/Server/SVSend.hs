@@ -55,7 +55,7 @@ broadcastCommand cmd = broadcast =<< use (svGlobals.svServer.sState)
 broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = error "SVSend.broadcastPrintf" -- TODO
 
-startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref' EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound = error "SVSend.startSound" -- TODO
 
 multicast :: V3 Float -> Int -> Quake ()
@@ -107,10 +107,10 @@ sendDataToRelevantClients area1 reliable mask = do
     SZ.clear (svGlobals.svServer.sMulticast)
   where
     readClient idx = do
-        client <- readRef (Ref idx)
+        client <- readRef (Ref idx) :: Quake ClientT
         return (Ref idx, client)
 
-sendDataToClient :: Int -> Bool -> Maybe B.ByteString -> (Ref ClientT, ClientT) -> Quake ()
+sendDataToClient :: Int -> Bool -> Maybe B.ByteString -> (Ref' ClientT, ClientT) -> Quake ()
 sendDataToClient area1 reliable mask (Ref idx, client) = do
     done <- checkClient
     unless done $ do
@@ -126,7 +126,7 @@ sendDataToClient area1 reliable mask (Ref idx, client) = do
         | reliable = SZ.write (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage) buf len
         | otherwise = SZ.write (svGlobals.svServerStatic.ssClients.ix idx.cDatagram) buf len
 
-checkMask :: Maybe (Ref EdictT) -> Int -> B.ByteString -> Quake Bool
+checkMask :: Maybe (Ref' EdictT) -> Int -> B.ByteString -> Quake Bool
 checkMask Nothing _ _ = error "SVSend.sendDataToClient client^.cEdict is Nothing"
 checkMask (Just edictRef) area1 mask = do
     edict <- readRef edictRef
@@ -176,17 +176,17 @@ sendClientMessages = do
         maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
         mapM_ (readClient >=> sendClientMessage) [0..maxClients-1]
     readClient idx = do
-        client <- readRef (Ref idx)
+        client <- readRef (Ref idx) :: Quake ClientT
         return (Ref idx, client)
 
-sendClientMessage :: (Ref ClientT, ClientT) -> Quake ()
+sendClientMessage :: (Ref' ClientT, ClientT) -> Quake ()
 sendClientMessage (clientRef, client)
     | (client^.cState) /= 0 = do
         checkReliableMessageOverflow clientRef client
         sendToClient clientRef client =<< use (svGlobals.svServer.sState)
     | otherwise = return ()
 
-checkReliableMessageOverflow :: Ref ClientT -> ClientT -> Quake ()
+checkReliableMessageOverflow :: Ref' ClientT -> ClientT -> Quake ()
 checkReliableMessageOverflow clientRef@(Ref idx) client
     | client^.cNetChan.ncMessage.sbOverflowed = do -- reliable message overflowed, drop the client
         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage)
@@ -195,7 +195,7 @@ checkReliableMessageOverflow clientRef@(Ref idx) client
         SVMain.dropClient clientRef
     | otherwise = return ()
 
-sendToClient :: Ref ClientT -> ClientT -> Int -> Quake ()
+sendToClient :: Ref' ClientT -> ClientT -> Int -> Quake ()
 sendToClient clientRef@(Ref idx) client state
     | state `elem` [Constants.ssCinematic, Constants.ssDemo, Constants.ssPic] = do
         msg <- use (svGlobals.svMsgBuf)
@@ -219,12 +219,12 @@ demoCompleted = do
         unless ok (Com.printf "IOError closing demo file") -- IMPROVE: show exception as well
         svGlobals.svServer.sDemoFile .= Nothing
 
-rateDrop :: Ref ClientT -> Quake Bool
+rateDrop :: Ref' ClientT -> Quake Bool
 rateDrop clientRef = doRateDrop =<< readRef clientRef
   where
     doRateDrop client
         | (client^.cNetChan.ncRemoteAddress.naType) == Constants.naLoopback = return False -- never drop the loopback
         | otherwise = error "SVSend.rateDrop" -- TODO
 
-sendClientDatagram :: Ref ClientT -> Quake Bool
+sendClientDatagram :: Ref' ClientT -> Quake Bool
 sendClientDatagram = error "SVSend.sendClientDatagram" -- TODO

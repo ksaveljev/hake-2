@@ -707,7 +707,7 @@ addViewWeapon ps ops = do
         modelDraw <- use (globals.gCl.csModelDraw)
         return (modelDraw V.! (ps^.psGunIndex))
 
-setUpGun :: Ref ModelT -> PlayerStateT -> PlayerStateT -> ClientStateT -> Quake ()
+setUpGun :: Ref' ModelT -> PlayerStateT -> PlayerStateT -> ClientStateT -> Quake ()
 setUpGun gunModelRef ps ops cl = do
     (frame, oldFrame) <- fmap getGunFrame (use (globals.gGunFrame))
     ClientV.addEntity (newEntityT & eModel .~ Just gunModelRef
@@ -837,7 +837,7 @@ calcOrigin cent renderfx lerpFrac
               + (fmap (* lerpFrac) ((cent^.ceCurrent.esOrigin) - (cent^.cePrev.esOrigin)))
         in (v, v)
 
-tweakBeamsColor :: ClientStateT -> EntityStateT -> EntityT -> Int -> Quake (Float, Int, Maybe (Ref ImageT), Maybe (Ref ModelT))
+tweakBeamsColor :: ClientStateT -> EntityStateT -> EntityT -> Int -> Quake (Float, Int, Maybe (Ref' ImageT), Maybe (Ref' ModelT))
 tweakBeamsColor cl s1 ent renderfx
     | renderfx .&. Constants.rfBeam /= 0 = do -- the four beam colors are encoded in 32 bits of skinnum (hack)
         r <- fmap (`mod` 4) Lib.rand
@@ -869,7 +869,7 @@ tweakBeamsColor cl s1 ent renderfx
         image <- readRef skinRef
         registerDisguise skin model image renderer
 
-registerDisguise :: Maybe (Ref ImageT) -> Maybe (Ref ModelT) -> ImageT -> Renderer -> Quake (Maybe (Ref ImageT), Maybe (Ref ModelT))
+registerDisguise :: Maybe (Ref' ImageT) -> Maybe (Ref' ModelT) -> ImageT -> Renderer -> Quake (Maybe (Ref' ImageT), Maybe (Ref' ModelT))
 registerDisguise skin model image renderer
     | "players/male" `BC.isPrefixOf` (image^.iName) = do
         s <- registerSkin "players/male/disguise.pcx"
@@ -1019,7 +1019,7 @@ checkModelIndex2 s1 ent
         | otherwise =
             ent & eModel .~ model
 
-getWeaponModel :: EntityStateT -> Quake (Maybe (Ref ModelT))
+getWeaponModel :: EntityStateT -> Quake (Maybe (Ref' ModelT))
 getWeaponModel s1
     | (s1^.esModelIndex2) == 255 = do -- custom weapon
         ci <- getClientInfo
@@ -1037,7 +1037,7 @@ getWeaponModel s1
         clientInfo <- use (globals.gCl.csClientInfo)
         return (clientInfo V.! ((s1^.esSkinNum) .&. 0xFF))
 
-doGetWeaponModel :: ClientInfoT -> Int -> Maybe (Ref ModelT) -> Quake (Maybe (Ref ModelT))
+doGetWeaponModel :: ClientInfoT -> Int -> Maybe (Ref' ModelT) -> Quake (Maybe (Ref' ModelT))
 doGetWeaponModel ci i' Nothing =
     maybe getBaseWeapon (\_ -> return m) m
   where

@@ -38,7 +38,7 @@ disableStreaming = request (io (putStrLn "S.disableStreaming IMPLEMENT ME!")) --
 shutdown :: Quake ()
 shutdown = request (io (putStrLn "S.shutdown IMPLEMENT ME!")) -- TODO
 
-registerSound :: B.ByteString -> Quake (Maybe (Ref SfxT))
+registerSound :: B.ByteString -> Quake (Maybe (Ref' SfxT))
 registerSound _ = request (io (putStrLn "S.registerSound IMPLEMENT ME!")) >> return Nothing -- TODO
 
 rawSamples :: Int -> Int -> Int -> Int -> Handle -> Quake ()
@@ -53,5 +53,5 @@ endRegistration = request (io (putStrLn "S.endRegistration IMPLEMENT ME!")) -- T
 getDriverNames :: Quake (V.Vector B.ByteString)
 getDriverNames = error "S.getDriverNames" -- TODO
 
-startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Maybe (Ref SfxT) -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref' EdictT -> Int -> Maybe (Ref' SfxT) -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = request (io (putStrLn "S.startSound IMPLEMENT ME!")) -- TODO

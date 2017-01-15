@@ -56,7 +56,7 @@ import Control.Lens (makeLenses)
 
 makeLenses ''QuakeState
 
-worldRef :: Ref EdictT
+worldRef :: Ref' EdictT
 worldRef = Ref 0
 
 initialQuakeState :: QuakeState

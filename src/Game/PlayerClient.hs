@@ -53,22 +53,22 @@ updateClient coop idx edict
           | (coop^.cvValue) /= 0 = client^.gcResp.crScore
           | otherwise = client^.gcPers.cpScore
 
-spInfoPlayerCoop :: Ref EdictT -> Quake ()
+spInfoPlayerCoop :: Ref' EdictT -> Quake ()
 spInfoPlayerCoop = error "PlayerClient.spInfoPlayerCoop" -- TODO
 
-spInfoPlayerDeathmatch :: Ref EdictT -> Quake ()
+spInfoPlayerDeathmatch :: Ref' EdictT -> Quake ()
 spInfoPlayerDeathmatch = error "PlayerClient.spInfoPlayerDeathmatch" -- TODO
 
 spInfoPlayerIntermission :: Quake ()
 spInfoPlayerIntermission = error "PlayerClient.spInfoPlayerIntermission" -- TODO
 
-spInfoPlayerStart :: Ref EdictT -> Quake ()
+spInfoPlayerStart :: Ref' EdictT -> Quake ()
 spInfoPlayerStart = error "PlayerClient.spInfoPlayerStart" -- TODO
 
-clientBeginServerFrame :: Ref EdictT -> Quake ()
+clientBeginServerFrame :: Ref' EdictT -> Quake ()
 clientBeginServerFrame = error "PlayerClient.clientBeginServerFrame" -- TODO
 
-clientConnect :: Ref EdictT -> B.ByteString -> Quake (Bool, B.ByteString)
+clientConnect :: Ref' EdictT -> B.ByteString -> Quake (Bool, B.ByteString)
 clientConnect edictRef userInfo =
   do value <- Info.valueForKey userInfo "ip"
      banned <- GameSVCmds.filterPacket value
@@ -95,7 +95,7 @@ clientConnect edictRef userInfo =
                  return (True, userInfo')
           | otherwise = return (False, userInfo)
 
-doClientConnect :: Ref EdictT -> B.ByteString -> Bool -> Quake (Bool, B.ByteString)
+doClientConnect :: Ref' EdictT -> B.ByteString -> Bool -> Quake (Bool, B.ByteString)
 doClientConnect _ userInfo True = return (False, userInfo)
 doClientConnect edictRef@(Ref idx) userInfo False =
   do edict <- readRef edictRef
@@ -127,7 +127,7 @@ passwordOK p1 p2
   | B.length p1 > 0 && p1 /= "none" && p1 /= p2 = False
   | otherwise = True
 
-initClientPersistant :: Ref GClientT -> Quake ()
+initClientPersistant :: Ref' GClientT -> Quake ()
 initClientPersistant gClientRef =
   do modifyRef gClientRef (\v -> v & gcPers .~ newClientPersistantT)
      itemRef <- GameItems.findItem "Blaster"
@@ -147,7 +147,7 @@ initClientPersistant gClientRef =
                                         & gcPers.cpMaxSlugs .~ 50
                                         & gcPers.cpConnected .~ True)
 
-clientUserInfoChanged :: Ref EdictT -> B.ByteString -> Quake B.ByteString
+clientUserInfoChanged :: Ref' EdictT -> B.ByteString -> Quake B.ByteString
 clientUserInfoChanged edictRef userInfo
   | not (Info.validate userInfo) = return badInfoString
   | otherwise =
@@ -188,12 +188,12 @@ clientUserInfoChanged edictRef userInfo
              when (B.length hand > 0) $
                modifyRef gClientRef (\v -> v & gcPers.cpHand .~ Lib.atoi hand)
 
-initClientResp :: Ref GClientT -> Quake ()
+initClientResp :: Ref' GClientT -> Quake ()
 initClientResp gClientRef =
   do frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
      gClient <- readRef gClientRef
      modifyRef gClientRef (\v -> v & gcResp .~ (newClientRespawnT & crEnterFrame .~ frameNum
                                                                   & crCoopRespawn .~ (gClient^.gcPers)))
 
-clientBegin :: Ref EdictT -> Quake ()
+clientBegin :: Ref' EdictT -> Quake ()
 clientBegin = error "PlayerClient.clientBegin" -- TODO

@@ -46,6 +46,6 @@ addParticle org color alpha = do
             MSV.write vertexArray (numParticles * 3 + 1) (org^._y)
             MSV.write vertexArray (numParticles * 3 + 2) (org^._z)
 
-addLightStyle :: Ref LightStyleT -> Float -> Float -> Float -> Quake ()
+addLightStyle :: Ref VGlobals LightStyleT -> Float -> Float -> Float -> Quake ()
 addLightStyle lightStyleRef r g b =
     writeRef lightStyleRef (LightStyleT (V3 r g b) (r + g + b)) -- TODO: jake2 has boundary check here, should we do it?

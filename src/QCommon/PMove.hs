@@ -160,7 +160,7 @@ deadMove = do
     pm <- use (pMoveGlobals.pmPM)
     proceedDeadMove (pm^.pmGroundEntity)
 
-proceedDeadMove :: Maybe (Ref EdictT) -> Quake ()
+proceedDeadMove :: Maybe (Ref' EdictT) -> Quake ()
 proceedDeadMove Nothing = return ()
 proceedDeadMove _ = do
     pml <- use (pMoveGlobals.pmPML)

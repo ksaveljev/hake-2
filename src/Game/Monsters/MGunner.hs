@@ -4,5 +4,5 @@ module Game.Monsters.MGunner
 
 import Types
 
-spMonsterGunner :: Ref EdictT -> Quake ()
+spMonsterGunner :: Ref' EdictT -> Quake ()
 spMonsterGunner = error "MGunner.spMonsterGunner" -- TODO

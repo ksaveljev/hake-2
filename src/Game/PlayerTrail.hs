@@ -27,7 +27,7 @@ initialize =
           playerTrailGlobals.ptTrailHead .= 0
           playerTrailGlobals.ptTrailActive .= True
 
-initTrail :: Quake (Ref EdictT)
+initTrail :: Quake (Ref' EdictT)
 initTrail =
   do edictRef <- GameUtil.spawn
      modifyRef edictRef (\v -> v & eClassName .~ "player_trail")

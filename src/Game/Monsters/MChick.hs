@@ -127,12 +127,12 @@ frameWalk11 = 191
 frameWalk20 :: Int
 frameWalk20 = 200
 
-spMonsterChick :: Ref EdictT -> Quake ()
+spMonsterChick :: Ref' EdictT -> Quake ()
 spMonsterChick selfRef = do
     gameImport <- use (gameBaseGlobals.gbGameImport)
     proceedSpawnMonsterChick selfRef gameImport
 
-proceedSpawnMonsterChick :: Ref EdictT -> GameImportT -> Quake ()
+proceedSpawnMonsterChick :: Ref' EdictT -> GameImportT -> Quake ()
 proceedSpawnMonsterChick selfRef gameImport = do
     soundIndex (Just "chick/chkatck1.wav") >>= (mChickGlobals.mChickSoundMissilePrelaunch .=)
     soundIndex (Just "chick/chkatck2.wav") >>= (mChickGlobals.mChickSoundMissileLaunch    .=)

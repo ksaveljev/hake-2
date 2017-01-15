@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module QuakeRef where
 
-import           Control.Lens         (use, ix, (^.), (%=), (.=), (&), (.~), (%~))
+import           Control.Lens         (use, ix, (^.), (%=), (.=))
 import           Control.Monad        (void)
 import           Control.Monad.ST     (runST)
 import qualified Data.Vector          as V
@@ -14,16 +15,15 @@ import           Game.GameLocalsT
 import           QuakeIOState
 import           QuakeState
 import           Render.ModelT
-import           Render.MSurfaceT
 import           Server.ServerStaticT
 import           Types
 
-class QuakeRef b where
+class QuakeRef a b where
     readRef :: Ref a b -> Quake b
     modifyRef :: Ref a b -> (b -> b) -> Quake ()
     writeRef :: Ref a b -> b -> Quake ()
 
-instance QuakeRef EdictT where
+instance QuakeRef a EdictT where
     readRef (Ref idx) = request $ do
         edicts <- use gbGEdicts
         io (MV.read edicts idx)
@@ -34,7 +34,7 @@ instance QuakeRef EdictT where
         edicts <- use gbGEdicts
         io (MV.write edicts idx edict)
 
-instance QuakeRef ClientT where
+instance QuakeRef a ClientT where
     readRef (Ref idx) = do
         clients <- use (svGlobals.svServerStatic.ssClients)
         return (clients V.! idx)
@@ -43,7 +43,7 @@ instance QuakeRef ClientT where
     writeRef (Ref idx) client =
         svGlobals.svServerStatic.ssClients.ix idx .= client
   
-instance QuakeRef GClientT where
+instance QuakeRef a GClientT where
     readRef (Ref idx) = do
         gClients <- use (gameBaseGlobals.gbGame.glClients)
         return (gClients V.! idx)
@@ -52,7 +52,7 @@ instance QuakeRef GClientT where
     writeRef (Ref idx) gClient =
         gameBaseGlobals.gbGame.glClients.ix idx .= gClient
   
-instance QuakeRef CModelT where
+instance QuakeRef a CModelT where
     readRef (Ref idx) = do
         cModels <- use (cmGlobals.cmMapCModels)
         return (cModels V.! idx)
@@ -61,7 +61,7 @@ instance QuakeRef CModelT where
     writeRef (Ref idx) cModel =
         cmGlobals.cmMapCModels.ix idx .= cModel
   
-instance QuakeRef LinkT where
+instance QuakeRef a LinkT where
     readRef (Ref idx) = do
         links <- use (svGlobals.svLinks)
         return (links V.! idx)
@@ -70,7 +70,7 @@ instance QuakeRef LinkT where
     writeRef (Ref idx) link =
         svGlobals.svLinks.ix idx .= link
 
-instance QuakeRef GItemT where
+instance QuakeRef a GItemT where
     readRef (Ref idx) = do
         items <- use (gameBaseGlobals.gbItemList)
         return (items V.! idx)
@@ -79,7 +79,7 @@ instance QuakeRef GItemT where
     writeRef (Ref idx) item =
         gameBaseGlobals.gbItemList.ix idx .= item
 
-instance QuakeRef MenuFrameworkS where
+instance QuakeRef a MenuFrameworkS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuFrameworks)
         return (menuItems V.! idx)
@@ -88,7 +88,7 @@ instance QuakeRef MenuFrameworkS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuFrameworks.ix idx .= item
 
-instance QuakeRef MenuListS where
+instance QuakeRef a MenuListS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuListSItems)
         return (menuItems V.! idx)
@@ -97,7 +97,7 @@ instance QuakeRef MenuListS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuListSItems.ix idx .= item
 
-instance QuakeRef MenuSliderS where
+instance QuakeRef a MenuSliderS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuSliderSItems)
         return (menuItems V.! idx)
@@ -106,7 +106,7 @@ instance QuakeRef MenuSliderS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuSliderSItems.ix idx .= item
 
-instance QuakeRef MenuActionS where
+instance QuakeRef a MenuActionS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuActionSItems)
         return (menuItems V.! idx)
@@ -115,7 +115,7 @@ instance QuakeRef MenuActionS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuActionSItems.ix idx .= item
 
-instance QuakeRef MenuFieldS where
+instance QuakeRef a MenuFieldS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuFieldSItems)
         return (menuItems V.! idx)
@@ -124,7 +124,7 @@ instance QuakeRef MenuFieldS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuFieldSItems.ix idx .= item
 
-instance QuakeRef MenuSeparatorS where
+instance QuakeRef a MenuSeparatorS where
     readRef (Ref idx) = do
         menuItems <- use (menuGlobals.mgMenuSeparatorSItems)
         return (menuItems V.! idx)
@@ -133,7 +133,7 @@ instance QuakeRef MenuSeparatorS where
     writeRef (Ref idx) item =
         menuGlobals.mgMenuSeparatorSItems.ix idx .= item
 
-instance QuakeRef ImageT where
+instance QuakeRef a ImageT where
     readRef (Ref idx) = do
         images <- use (fastRenderAPIGlobals.frGLTextures)
         return (images V.! idx)
@@ -150,7 +150,7 @@ instance QuakeRef ImageT where
             MV.write images' idx item
             void (V.unsafeFreeze images')) (return ())
 
-instance QuakeRef CAreaT where
+instance QuakeRef a CAreaT where
     readRef (Ref idx) = do
         areas <- use (cmGlobals.cmMapAreas)
         return (areas V.! idx)
@@ -159,7 +159,7 @@ instance QuakeRef CAreaT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapAreas.ix idx .= item
 
-instance QuakeRef DAreaPortalT where
+instance QuakeRef a DAreaPortalT where
     readRef (Ref idx) = do
         areaPortals <- use (cmGlobals.cmMapAreaPortals)
         return (areaPortals V.! idx)
@@ -168,7 +168,7 @@ instance QuakeRef DAreaPortalT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapAreaPortals.ix idx .= item
 
-instance QuakeRef AreaNodeT where
+instance QuakeRef a AreaNodeT where
     readRef (Ref idx) = do
         areaNodes <- use (svGlobals.svAreaNodes)
         return (areaNodes V.! idx)
@@ -177,7 +177,7 @@ instance QuakeRef AreaNodeT where
     writeRef (Ref idx) item =
         svGlobals.svAreaNodes.ix idx .= item
 
-instance QuakeRef CLeafT where
+instance QuakeRef a CLeafT where
     readRef (Ref idx) = do
         leafs <- use (cmGlobals.cmMapLeafs)
         return (leafs V.! idx)
@@ -186,7 +186,7 @@ instance QuakeRef CLeafT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapLeafs.ix idx .= item
 
-instance QuakeRef UserCmdT where
+instance QuakeRef a UserCmdT where
     readRef (Ref idx) = do
         cmds <- use (globals.gCl.csCmds)
         return (cmds V.! idx)
@@ -195,7 +195,7 @@ instance QuakeRef UserCmdT where
     writeRef (Ref idx) item =
         globals.gCl.csCmds.ix idx .= item
 
-instance QuakeRef CBrushT where
+instance QuakeRef a CBrushT where
     readRef (Ref idx) = do
         brushes <- use (cmGlobals.cmMapBrushes)
         return (brushes V.! idx)
@@ -204,7 +204,7 @@ instance QuakeRef CBrushT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapBrushes.ix idx .= item
 
-instance QuakeRef CBrushSideT where
+instance QuakeRef a CBrushSideT where
     readRef (Ref idx) = do
         brushSides <- use (cmGlobals.cmMapBrushSides)
         return (brushSides V.! idx)
@@ -213,7 +213,7 @@ instance QuakeRef CBrushSideT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapBrushSides.ix idx .= item
 
-instance QuakeRef CNodeT where
+instance QuakeRef a CNodeT where
     readRef (Ref idx) = do
         nodes <- use (cmGlobals.cmMapNodes)
         return (nodes V.! idx)
@@ -222,7 +222,7 @@ instance QuakeRef CNodeT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapNodes.ix idx .= item
 
-instance QuakeRef CPlaneT where
+instance QuakeRef a CPlaneT where
     readRef (Ref idx) = do
         planes <- use (cmGlobals.cmMapPlanes)
         return (planes V.! idx)
@@ -231,7 +231,7 @@ instance QuakeRef CPlaneT where
     writeRef (Ref idx) item =
         cmGlobals.cmMapPlanes.ix idx .= item
 
-instance QuakeRef ModelT where
+instance QuakeRef a ModelT where
     readRef (Ref idx)
         | idx < Constants.maxModKnown = do
             models <- use (fastRenderAPIGlobals.frModKnown)
@@ -246,7 +246,7 @@ instance QuakeRef ModelT where
         | idx < Constants.maxModKnown = fastRenderAPIGlobals.frModKnown.ix idx .= item
         | otherwise = fastRenderAPIGlobals.frModInline.ix (idx - Constants.maxModKnown) .= item
 
-instance QuakeRef MSurfaceT where
+instance QuakeRef a MSurfaceT where
     readRef (Ref idx) = do
         loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
         model <- readRef loadModelRef
@@ -266,7 +266,7 @@ instance QuakeRef MSurfaceT where
             MV.write surfaces idx item
             void (V.unsafeFreeze surfaces)) (return ())
 
-instance QuakeRef MTexInfoT where
+instance QuakeRef a MTexInfoT where
     readRef (Ref idx) = do
         loadModelRef <- use (fastRenderAPIGlobals.frLoadModel)
         model <- readRef loadModelRef
@@ -286,7 +286,7 @@ instance QuakeRef MTexInfoT where
             MV.write texInfo idx item
             void (V.unsafeFreeze texInfo)) (return ())
        
-instance QuakeRef CDLightT where
+instance QuakeRef a CDLightT where
   readRef (Ref idx) = request $ do
       dLights <- use cgDLights
       io (MV.read dLights idx)
@@ -297,7 +297,7 @@ instance QuakeRef CDLightT where
       dLights <- use cgDLights
       io (MV.write dLights idx dLight)
 
-instance QuakeRef GLPolyT where
+instance QuakeRef a GLPolyT where
     readRef (Ref idx) = request $ do
         polygonCache <- use frPolygonCache
         io (MV.read polygonCache idx)
@@ -308,7 +308,7 @@ instance QuakeRef GLPolyT where
         polygonCache <- use frPolygonCache
         io (MV.write polygonCache idx poly)
 
-instance QuakeRef FrameT where
+instance QuakeRef a FrameT where
     readRef (Ref idx) = do
         frames <- use (globals.gCl.csFrames)
         return (frames V.! idx)
@@ -317,7 +317,7 @@ instance QuakeRef FrameT where
     writeRef (Ref idx) item =
         globals.gCl.csFrames.ix idx .= item
 
-instance QuakeRef CParticleT where
+instance QuakeRef a CParticleT where
     readRef (Ref idx) = request $ do
         particles <- use cgParticles
         io (MV.read particles idx)
@@ -328,7 +328,7 @@ instance QuakeRef CParticleT where
         particles <- use cgParticles
         io (MV.write particles idx poly)
 
-instance QuakeRef CEntityT where
+instance QuakeRef a CEntityT where
     readRef (Ref idx) = do
         entities <- use (globals.gClEntities)
         return (entities V.! idx)
@@ -337,7 +337,7 @@ instance QuakeRef CEntityT where
     writeRef (Ref idx) item =
         globals.gClEntities.ix idx .= item
 
-instance QuakeRef LaserT where
+instance QuakeRef a LaserT where
     readRef (Ref idx) = do
         lasers <- use (clTEntGlobals.clteLasers)
         return (lasers V.! idx)
@@ -346,7 +346,7 @@ instance QuakeRef LaserT where
     writeRef (Ref idx) item =
         clTEntGlobals.clteLasers.ix idx .= item
 
-instance QuakeRef CLSustainT where
+instance QuakeRef a CLSustainT where
     readRef (Ref idx) = do
         sustains <- use (clTEntGlobals.clteSustains)
         return (sustains V.! idx)
@@ -355,7 +355,7 @@ instance QuakeRef CLSustainT where
     writeRef (Ref idx) item =
         clTEntGlobals.clteSustains.ix idx .= item
 
-instance QuakeRef ExplosionT where
+instance QuakeRef a ExplosionT where
     readRef (Ref idx) = do
         explosions <- use (clTEntGlobals.clteExplosions)
         return (explosions V.! idx)
@@ -364,7 +364,7 @@ instance QuakeRef ExplosionT where
     writeRef (Ref idx) item =
         clTEntGlobals.clteExplosions.ix idx .= item
 
-instance QuakeRef BeamT where
+instance QuakeRef a BeamT where
     readRef (Ref idx) = do
         beams <- use (clTEntGlobals.clteBeams)
         return (beams V.! idx)
@@ -373,7 +373,7 @@ instance QuakeRef BeamT where
     writeRef (Ref idx) item =
         clTEntGlobals.clteBeams.ix idx .= item
 
-instance QuakeRef CLightStyleT where
+instance QuakeRef a CLightStyleT where
     readRef (Ref idx) = do
         lightStyles <- use (clientGlobals.cgLightStyle)
         return (lightStyles V.! idx)
@@ -382,8 +382,16 @@ instance QuakeRef CLightStyleT where
     writeRef (Ref idx) item =
         clientGlobals.cgLightStyle.ix idx .= item
 
--- TODO: make sure EntityT is not used with vgEntities
-instance QuakeRef EntityT where
+instance QuakeRef VGlobals EntityT where
+    readRef (Ref idx) = do
+        entities <- use (vGlobals.vgEntities)
+        return (entities V.! idx)
+    modifyRef (Ref idx) f =
+        vGlobals.vgEntities.ix idx %= f
+    writeRef (Ref idx) item =
+        vGlobals.vgEntities.ix idx .= item
+
+instance QuakeRef RefDefT EntityT where
     readRef (Ref idx) = do
         newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
         return ((newRefDef^.rdEntities) V.! idx)
@@ -391,3 +399,12 @@ instance QuakeRef EntityT where
         fastRenderAPIGlobals.frNewRefDef.rdEntities.ix idx %= f
     writeRef (Ref idx) item =
         fastRenderAPIGlobals.frNewRefDef.rdEntities.ix idx .= item
+
+instance QuakeRef VGlobals LightStyleT where
+    readRef (Ref idx) = do
+        lightStyles <- use (vGlobals.vgLightStyles)
+        return (lightStyles V.! idx)
+    modifyRef (Ref idx) f =
+        vGlobals.vgLightStyles.ix idx %= f
+    writeRef (Ref idx) item =
+        vGlobals.vgLightStyles.ix idx .= item

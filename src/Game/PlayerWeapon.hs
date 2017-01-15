@@ -29,7 +29,7 @@ import           Data.Bits ((.&.))
 useWeapon :: ItemUse
 useWeapon = ItemUse "PlayerWeapon.useWeapon" useWeaponF
 
-useWeaponF :: Ref EdictT -> Ref GItemT -> Quake ()
+useWeaponF :: Ref' EdictT -> Ref' GItemT -> Quake ()
 useWeaponF = error "PlayerWeapon.useWeaponF"
 
 pickupWeapon :: EntInteract
