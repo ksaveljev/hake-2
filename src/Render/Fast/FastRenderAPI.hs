@@ -4,6 +4,7 @@ module Render.Fast.FastRenderAPI
   ( fastRenderAPI
   ) where
 
+import           Client.EntityT
 import           Client.RefDefT
 import           Client.VidDefT
 import {-# SOURCE #-} qualified Client.VID as VID
@@ -28,6 +29,7 @@ import           Render.GLConfigT
 import           Render.GLStateT
 import           Render.ImageT
 import           Render.MLeafT
+import           Render.ModelT
 import           Render.OpenGL.GLDriver
 import           Types
 import qualified Util.Math3D as Math3D
@@ -832,58 +834,39 @@ rDrawEntitiesOnList = do
     unless (drawEntities == 0) $ do
         newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
         -- draw non-transparent first
-        mapM_ (drawNonTransparentEntity newRefDef) (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
+        mapM_ drawNonTransparentEntity (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
         -- draw transparent entities
         -- we could sort these if it ever becomes a problem
         request (GL.glDepthMask (fromIntegral GL.GL_FALSE)) -- no z writes
         mapM_ (drawTransparentEntity newRefDef) (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
         request (GL.glDepthMask (fromIntegral GL.GL_TRUE)) -- back to writing
 
-drawNonTransparentEntity :: RefDefT -> Ref' EntityT -> Quake ()
-drawNonTransparentEntity newRefDef entityRef = do
-    error "FastRenderAPI.drawNonTransparentEntity" -- TODO
+drawNonTransparentEntity :: Ref RefDefT EntityT -> Quake ()
+drawNonTransparentEntity entityRef = do
+    currentEntity <- readRef entityRef
+    fastRenderAPIGlobals.frCurrentEntity .= Just (RDEntityRef entityRef)
+    doDraw currentEntity
+  where
+    doDraw currentEntity
+        | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 =
+            return ()
+        | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 =
+            rDrawBeam currentEntity
+        | otherwise = do
+            fastRenderAPIGlobals.frCurrentModel .= currentEntity^.eModel
+            drawCurrentModel (currentEntity^.eModel)
+    drawCurrentModel Nothing = rDrawNullModel
+    drawCurrentModel (Just modelRef) = do
+        model <- readRef modelRef
+        doDrawCurrentModel model
+    doDrawCurrentModel model
+        | (model^.mType) == Constants.modAlias = Mesh.rDrawAliasModel entityRef
+        | (model^.mType) == Constants.modBrush = Surf.rDrawBrushModel entityRef
+        | (model^.mType) == Constants.modSprite = rDrawSpriteModel entityRef
+        | otherwise = Com.comError Constants.errDrop "Bad modeltype"
 
-{-
-  where drawNonTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
-        drawNonTransparentEntities newRefDef idx maxIdx
-          | idx >= maxIdx = return ()
-          | otherwise = do
-              let currentEntityRef = (newRefDef^.rdEntities) V.! idx
-              currentEntity <- io $ readIORef currentEntityRef
-              fastRenderAPIGlobals.frCurrentEntity .= Just currentEntityRef
-
-              if | (currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0 ->
-                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
-
-                 | (currentEntity^.enFlags) .&. Constants.rfBeam /= 0 -> do
-                     rDrawBeam currentEntity
-
-                 | otherwise -> do
-                     let currentModel = currentEntity^.eModel
-                     fastRenderAPIGlobals.frCurrentModel .= currentModel
-
-                     case currentModel of
-                       Nothing ->
-                         rDrawNullModel
-                       Just modelRef -> do
-                         model <- io $ readIORef modelRef
-
-                         --io (print ("nontrans model: = " `B.append` (model^.mName)))
-
-                         if | (model^.mType) == RenderAPIConstants.modAlias ->
-                                Mesh.rDrawAliasModel currentEntityRef
-
-                            | (model^.mType) == RenderAPIConstants.modBrush ->
-                                Surf.rDrawBrushModel currentEntityRef
-
-                            | (model^.mType) == RenderAPIConstants.modSprite ->
-                                rDrawSpriteModel currentEntityRef
-
-                            | otherwise ->
-                                Com.comError Constants.errDrop "Bad modeltype"
-
-                     drawNonTransparentEntities newRefDef (idx + 1) maxIdx
-
+drawTransparentEntity newRefDef entityRef = error "FastRenderAPI.drawTransparentEntity" -- TODO
+                     {-
         drawTransparentEntities :: RefDefT -> Int -> Int -> Quake ()
         drawTransparentEntities newRefDef idx maxIdx
           | idx >= maxIdx = return ()
@@ -925,7 +908,6 @@ drawNonTransparentEntity newRefDef entityRef = do
                      drawTransparentEntities newRefDef (idx + 1) maxIdx
                      -}
         
-drawTransparentEntity newRefDef entityRef = error "FastRenderAPI.drawTransparentEntity" -- TODO
 
 rDrawParticles :: Quake ()
 rDrawParticles =
@@ -1040,6 +1022,15 @@ setCurrentViewCluster newRefDef (Just worldModelRef) = do
             leaf' <- Model.pointInLeaf ((newRefDef^.rdViewOrg) & _z +~ 16) worldModel
             when ((leaf'^.mlContents) .&. Constants.contentsSolid == 0 && (leaf'^.mlCluster) /= (leaf^.mlCluster)) $
                 fastRenderAPIGlobals.frViewCluster2 .= (leaf'^.mlCluster)
+
+rDrawBeam :: EntityT -> Quake ()
+rDrawBeam = error "FastRenderAPI.rDrawBeam" -- TODO
+
+rDrawSpriteModel :: Ref RefDefT EntityT -> Quake ()
+rDrawSpriteModel = error "FastRenderAPI.rDrawSpriteModel" -- TODO
+
+rDrawNullModel :: Quake ()
+rDrawNullModel = error "FastRenderAPI.rDrawNullModel" -- TODO
 
 particleTexture :: SV.Vector Word8
 particleTexture =

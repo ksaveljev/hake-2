@@ -1,5 +1,6 @@
 module Render.Fast.Mesh
     ( myGLUPerspective
+    , rDrawAliasModel
     ) where
 
 import           Control.Lens    (use, (^.))
@@ -30,3 +31,6 @@ setupPerspective glState fovY aspect zNear zFar =
     xmax = ymax * aspect
     xmin' = xmin - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
     xmax' = xmax - (2 * float2Double (glState^.glsCameraSeparation)) / zNear
+
+rDrawAliasModel :: Ref RefDefT EntityT -> Quake ()
+rDrawAliasModel = error "Mesh.rDrawAliasModel" -- TODO

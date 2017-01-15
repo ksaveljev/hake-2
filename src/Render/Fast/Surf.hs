@@ -5,6 +5,7 @@ module Render.Fast.Surf
     , glCreateSurfaceLightmap
     , glEndBuildingLightmaps
     , rDrawAlphaSurfaces
+    , rDrawBrushModel
     , rDrawWorld
     , rMarkLeaves
     ) where
@@ -597,3 +598,6 @@ glRenderLightmappedPoly = error "Surf.glRenderLightmappedPoly" -- TODO
 
 rRenderBrushPoly :: Ref' MSurfaceT -> Quake ()
 rRenderBrushPoly = error "Surf.rRenderBrushPoly" -- TODO
+
+rDrawBrushModel :: Ref RefDefT EntityT -> Quake ()
+rDrawBrushModel = error "Surf.rDrawBrushModel" -- TODO
