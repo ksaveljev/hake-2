@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Render.GLFWbRenderer
   ( glfwbRefExport
   , glfwbRenderer
@@ -152,7 +153,17 @@ cursorPositionEvent x' y' =
      kbdGlobals.kbdY .= y'
 
 glfwbKBDInstallGrabs :: Quake ()
-glfwbKBDInstallGrabs = error "GLFWbRenderer.glfwbKBDInstallGrabs" -- TODO
+glfwbKBDInstallGrabs = do
+    window <- use (glfwbGlobals.glfwbWindow)
+    maybe windowError installGrabs window
+  where
+    windowError = error "GLFWbRenderer.glfwbKBDInstallGrabs window is Nothing"
+    installGrabs window = do
+        (x, y) <- request $ io $ do
+            GLFW.setCursorInputMode window GLFW.CursorInputMode'Disabled
+            GLFW.getCursorPos window
+        kbdGlobals.kbdX .= truncate x
+        kbdGlobals.kbdY .= truncate y
 
 glfwbKBDUninstallGrabs :: Quake ()
 glfwbKBDUninstallGrabs = do
