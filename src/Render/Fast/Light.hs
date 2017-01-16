@@ -7,7 +7,7 @@ module Render.Fast.Light
     , rSetCacheState
     ) where
 
-import           Control.Lens                 (use, ix, (^.), (.=), (%=), (&), (.~), (%~), _1, _2)
+import           Control.Lens                 (use, ix, (^.), (.=), (&), (.~), (%~), _1, _2)
 import           Control.Monad                (void, when, unless)
 import           Control.Monad.ST             (ST, runST)
 import           Data.Bits                    (shiftL, shiftR, (.&.), (.|.))
@@ -150,7 +150,8 @@ buildLightMap surf lightData blockLights buffer offset stride = do
         when (size > ((UV.length blockLights) * Constants.sizeOfFloat) `shiftR` 4) $
             Com.comError Constants.errDrop "Bad s_blocklights size"
     checkLightData Nothing = do
-        fastRenderAPIGlobals.frBlockLights %= (UV.// (zip [0..size * 3 - 1] (repeat 255)))
+        -- fastRenderAPIGlobals.frBlockLights %= (UV.// (zip [0..size * 3 - 1] (repeat 255)))
+        fastRenderAPIGlobals.frBlockLights .= UV.replicate (34 * 34 * 3) 255
         return True
     checkLightData _ = return False
 
@@ -174,74 +175,94 @@ addUpdateLightMaps surf lightData size = do
         return B.empty
     getLightmap (Just offset) (Just lightmap) = return (B.drop offset lightmap)
     doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
-        | numMaps == 1 =
-            addLightMaps surf blockLights lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
-        | otherwise =
-            updateLightMaps surf (blockLights UV.// (zip [0..size * 3 - 1] (repeat 0))) lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
+        | numMaps == 1 = runST $ do
+            bl <- UV.thaw blockLights
+            addLightMaps surf bl lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
+            UV.unsafeFreeze bl
+        | otherwise = runST $ do
+            bl <- MUV.replicate (34 * 34 * 3) 0
+            updateLightMaps surf bl lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
+            UV.unsafeFreeze bl
 
-addLightMaps :: MSurfaceT -> UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
+addLightMaps :: MSurfaceT -> MUV.STVector s Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> ST s ()
 addLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
-    | idx >= maxIdx = blockLights
-    | (surf^.msStyles) `B.index` idx == 255 = blockLights
-    | otherwise =
+    | idx >= maxIdx = return ()
+    | (surf^.msStyles) `B.index` idx == 255 = return ()
+    | otherwise = do
         let rgb = ((newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx)))^.lsRGB
             scale0 = glModulate * (rgb^._x)
             scale1 = glModulate * (rgb^._y)
             scale2 = glModulate * (rgb^._z)
-            (lightmapIndex', updates) = if all (== 1) [scale0, scale1, scale2]
-                                            then setLightmap lightmap lightmapIndex 0 size []
-                                            else setLightmapScale lightmap lightmapIndex scale0 scale1 scale2 0 size []
-        in addLightMaps surf (blockLights UV.// updates) lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+        lightmapIndex' <- doSetLightmap scale0 scale1 scale2
+        addLightMaps surf blockLights lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+  where
+    doSetLightmap scale0 scale1 scale2
+        | all (== 1) [scale0, scale1, scale2] = setLightmap blockLights lightmap lightmapIndex 0 size
+        | otherwise = setLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size
 
-updateLightMaps :: MSurfaceT -> UV.Vector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> UV.Vector Float
+updateLightMaps :: MSurfaceT -> MUV.STVector s Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> ST s ()
 updateLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
-    | idx >= maxIdx = blockLights
-    | (surf^.msStyles) `B.index` idx == 255 = blockLights
-    | otherwise =
+    | idx >= maxIdx = return ()
+    | (surf^.msStyles) `B.index` idx == 255 = return ()
+    | otherwise = do
         let rgb = ((newRefDef^.rdLightStyles) V.! (fromIntegral ((surf^.msStyles) `B.index` idx)))^.lsRGB
             scale0 = glModulate * (rgb^._x)
             scale1 = glModulate * (rgb^._y)
             scale2 = glModulate * (rgb^._z)
-            (lightmapIndex', updates) = if all (== 1) [scale0, scale1, scale2]
-                                            then updateLightmap blockLights lightmap lightmapIndex 0 size []
-                                            else updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size []
-        in updateLightMaps surf (blockLights UV.// updates) lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+        lightmapIndex' <- doUpdateLightmap scale0 scale1 scale2
+        updateLightMaps surf blockLights lightmap lightmapIndex' newRefDef glModulate size (idx + 1) maxIdx
+  where
+    doUpdateLightmap scale0 scale1 scale2
+        | all (== 1) [scale0, scale1, scale2] = updateLightmap blockLights lightmap lightmapIndex 0 size
+        | otherwise = updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size
 
-setLightmap :: B.ByteString -> Int -> Int -> Int -> [(Int, Float)] -> (Int, [(Int, Float)])
-setLightmap lightmap lightmapIndex idx maxIdx acc
-    | idx >= maxIdx = (lightmapIndex, acc)
-    | otherwise =
+setLightmap :: MUV.STVector s Float -> B.ByteString -> Int -> Int -> Int -> ST s Int
+setLightmap blockLights lightmap lightmapIndex idx maxIdx
+    | idx >= maxIdx = return lightmapIndex
+    | otherwise = do
         let a = fromIntegral (lightmap `B.index` (lightmapIndex + 0))
             b = fromIntegral (lightmap `B.index` (lightmapIndex + 1))
             c = fromIntegral (lightmap `B.index` (lightmapIndex + 2))
-        in setLightmap lightmap (lightmapIndex + 3) (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
+        MUV.write blockLights (idx * 3 + 0) a
+        MUV.write blockLights (idx * 3 + 1) b
+        MUV.write blockLights (idx * 3 + 2) c
+        setLightmap blockLights lightmap (lightmapIndex + 3) (idx + 1) maxIdx
 
-setLightmapScale :: B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> [(Int, Float)] -> (Int, [(Int, Float)])
-setLightmapScale lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx acc
-    | idx >= maxIdx = (lightmapIndex, acc)
-    | otherwise =
+setLightmapScale :: MUV.STVector s Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> ST s Int
+setLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx
+    | idx >= maxIdx = return lightmapIndex
+    | otherwise = do
         let a = scale0 * (fromIntegral (lightmap `B.index` (lightmapIndex + 0)))
             b = scale1 * (fromIntegral (lightmap `B.index` (lightmapIndex + 1)))
             c = scale2 * (fromIntegral (lightmap `B.index` (lightmapIndex + 2)))
-        in setLightmapScale lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
+        MUV.write blockLights (idx * 3 + 0) a
+        MUV.write blockLights (idx * 3 + 1) b
+        MUV.write blockLights (idx * 3 + 2) c
+        setLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx
 
-updateLightmap :: UV.Vector Float -> B.ByteString -> Int -> Int -> Int -> [(Int, Float)] -> (Int, [(Int, Float)])
-updateLightmap blockLights lightmap lightmapIndex idx maxIdx acc
-    | idx >= maxIdx = (lightmapIndex, acc)
-    | otherwise =
-        let a = (blockLights UV.! (idx * 3 + 0)) + (fromIntegral (lightmap `B.index` (lightmapIndex + 0)))
-            b = (blockLights UV.! (idx * 3 + 1)) + (fromIntegral (lightmap `B.index` (lightmapIndex + 1)))
-            c = (blockLights UV.! (idx * 3 + 2)) + (fromIntegral (lightmap `B.index` (lightmapIndex + 2)))
-        in updateLightmap blockLights lightmap (lightmapIndex + 3) (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
+updateLightmap :: MUV.STVector s Float -> B.ByteString -> Int -> Int -> Int -> ST s Int
+updateLightmap blockLights lightmap lightmapIndex idx maxIdx
+    | idx >= maxIdx = return lightmapIndex
+    | otherwise = do
+        let a = fromIntegral (lightmap `B.index` (lightmapIndex + 0))
+            b = fromIntegral (lightmap `B.index` (lightmapIndex + 1))
+            c = fromIntegral (lightmap `B.index` (lightmapIndex + 2))
+        MUV.modify blockLights (a +) (idx * 3 + 0)
+        MUV.modify blockLights (b +) (idx * 3 + 1)
+        MUV.modify blockLights (c +) (idx * 3 + 2)
+        updateLightmap blockLights lightmap (lightmapIndex + 3) (idx + 1) maxIdx
 
-updateLightmapScale :: UV.Vector Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> [(Int, Float)] -> (Int, [(Int, Float)])
-updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx acc
-    | idx >= maxIdx = (lightmapIndex, acc)
-    | otherwise =
-        let a = (blockLights UV.! (idx * 3 + 0)) + scale0 * (fromIntegral (lightmap `B.index` (lightmapIndex + 0)))
-            b = (blockLights UV.! (idx * 3 + 1)) + scale1 * (fromIntegral (lightmap `B.index` (lightmapIndex + 1)))
-            c = (blockLights UV.! (idx * 3 + 2)) + scale2 * (fromIntegral (lightmap `B.index` (lightmapIndex + 2)))
-        in updateLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx ((idx * 3 + 0, a) : (idx * 3 + 1, b) : (idx * 3 + 2, c) : acc)
+updateLightmapScale :: MUV.STVector s Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> ST s Int
+updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx
+    | idx >= maxIdx = return lightmapIndex
+    | otherwise = do
+        let a = scale0 * (fromIntegral (lightmap `B.index` (lightmapIndex + 0)))
+            b = scale1 * (fromIntegral (lightmap `B.index` (lightmapIndex + 1)))
+            c = scale2 * (fromIntegral (lightmap `B.index` (lightmapIndex + 2)))
+        MUV.modify blockLights (a +) (idx * 3 + 0)
+        MUV.modify blockLights (b +) (idx * 3 + 1)
+        MUV.modify blockLights (c +) (idx * 3 + 2)
+        updateLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx
 
 rAddDynamicLights :: MSurfaceT -> Quake ()
 rAddDynamicLights = error "Light.rAddDynamicLights" -- TODO
