@@ -161,7 +161,9 @@ addUpdateLightMaps surf lightData size = do
     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
     glModulate <- fmap (^.cvValue) glModulateCVar
     blockLights <- use (fastRenderAPIGlobals.frBlockLights)
-    fastRenderAPIGlobals.frBlockLights .= doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
+    let !blockLights' = doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
+    -- fastRenderAPIGlobals.frBlockLights .= doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
+    fastRenderAPIGlobals.frBlockLights .= blockLights'
     frameCount <- use (fastRenderAPIGlobals.frFrameCount)
     when ((surf^.msDLightFrame) == frameCount) $
         rAddDynamicLights surf
