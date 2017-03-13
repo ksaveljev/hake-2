@@ -90,17 +90,17 @@ createAreaNode :: Int -> V3 Float -> V3 Float -> Quake (Ref' AreaNodeT)
 createAreaNode depth mins maxs = do
     numAreaNodes <- use (svGlobals.svNumAreaNodes)
     svGlobals.svNumAreaNodes += 1
-    areaNode <- readRef (Ref numAreaNodes)
+    areaNode <- readRef (Ref Constants.noParent numAreaNodes)
     clearLink (areaNode^.anTriggerEdicts)
     clearLink (areaNode^.anSolidEdicts)
     clearNode numAreaNodes
-    return (Ref numAreaNodes)
+    return (Ref Constants.noParent numAreaNodes)
   where
     clearNode numAreaNodes
         | depth == Constants.areaDepth =
-            modifyRef (Ref numAreaNodes) (\v -> v & anAxis .~ (-1)
-                                                  & anChildren .~ (Nothing, Nothing))
-        | otherwise = createChildrenAreaNodes (Ref numAreaNodes) depth mins maxs
+            modifyRef (Ref Constants.noParent numAreaNodes) (\v -> v & anAxis .~ (-1)
+                                                                     & anChildren .~ (Nothing, Nothing))
+        | otherwise = createChildrenAreaNodes (Ref Constants.noParent numAreaNodes) depth mins maxs
 
 createChildrenAreaNodes :: Ref' AreaNodeT -> Int -> V3 Float -> V3 Float -> Quake ()
 createChildrenAreaNodes areaNodeRef depth mins maxs = do

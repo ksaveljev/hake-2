@@ -30,4 +30,4 @@ newEntityStateT edictRef =
                , _esSurroundingEnt = edictRef
                }
   where number Nothing = 0
-        number (Just (Ref idx)) = idx
+        number (Just (Ref _ idx)) = idx

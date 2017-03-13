@@ -127,7 +127,7 @@ getOldFrame deltaFrame
         globals.gCls.csDemoWaiting .= False
         return Nothing
     | otherwise = do
-        old <- readRef (Ref (deltaFrame .&. Constants.updateMask))
+        old <- readRef (Ref Constants.noParent (deltaFrame .&. Constants.updateMask))
         unless (old^.fValid) $ -- should never happen
             Com.printf "Delta from invalid frame (not supposed to happen!).\n"
         parseEntities <- use (globals.gCl.csParseEntities)
@@ -172,7 +172,7 @@ saveFrame :: Int -> Quake FrameT
 saveFrame serverFrame = do
     -- save the frame off in the backup array for later delta comparisons
     frame <- use (globals.gCl.csFrame)
-    writeRef (Ref (serverFrame .&. Constants.updateMask)) frame
+    writeRef (Ref Constants.noParent (serverFrame .&. Constants.updateMask)) frame
     return frame
 
 endConnectionProcess :: FrameT -> Quake ()
@@ -514,7 +514,7 @@ doParsePacketEntities oldFrame newFrameLens oldNum oldState oldIndex bits = do
         | oldNum' > newNum = do
             when (showNet == 3) $
                 Com.printf (B.concat ["   baseline: ", encode newNum, "\n"])
-            entity <- readRef (Ref newNum)
+            entity <- readRef (Ref Constants.noParent newNum)
             deltaEntity newFrameLens newNum (Just (entity^.ceBaseline)) bits'
             return (oldIndex', oldNum', oldState')
         | otherwise =
@@ -596,7 +596,7 @@ deltaEntity frameLens newNum (Just old) bits = do
     modifyRef entityRef (\v -> v & ceServerFrame .~ serverFrame
                                  & ceCurrent .~ state) -- Copy !
   where
-    entityRef = Ref newNum
+    entityRef = Ref Constants.noParent newNum
     getEntityIndex = do
         parseEntities <- use (globals.gCl.csParseEntities)
         return (parseEntities .&. (Constants.maxParseEntities - 1))
@@ -742,7 +742,7 @@ doAddPacketEntities frame autoRotate autoAnim ent pNum maxPNum
     | otherwise = do
         cl <- use (globals.gCl)
         s1 <- getParseEntity
-        cent <- readRef (Ref (s1^.esNumber))
+        cent <- readRef (Ref Constants.noParent (s1^.esNumber))
         let entFrame = setFrame autoAnim s1 (cl^.csTime)
             (effects, renderfx) = calcEffectsAndRenderFx s1
             entOldFrame = cent^.cePrev.esFrame
@@ -1094,7 +1094,7 @@ checkPowerScreen effects ent
 addAutomaticParticleTrails :: Int -> EntityStateT -> EntityT -> Quake EntityT
 addAutomaticParticleTrails effects s1 ent
     | effects .&. (complement Constants.efRotate) /= 0 = do
-        cent <- readRef (Ref (s1^.esNumber))
+        cent <- readRef (Ref Constants.noParent (s1^.esNumber))
         doAddAutomaticParticleTrails cent
     | otherwise =
         return ent
@@ -1195,5 +1195,5 @@ addAutomaticParticleTrails effects s1 ent
 
 copyOrigin :: EntityStateT -> EntityT -> Quake EntityT
 copyOrigin s1 ent = do
-    modifyRef (Ref (s1^.esNumber)) (\v -> v & ceLerpOrigin .~ (ent^.eOrigin))
+    modifyRef (Ref Constants.noParent (s1^.esNumber)) (\v -> v & ceLerpOrigin .~ (ent^.eOrigin))
     return ent

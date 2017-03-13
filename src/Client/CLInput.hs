@@ -246,9 +246,9 @@ setCompressionInfo = do
 
 writeCommandsToBuf :: Int -> Quake ()
 writeCommandsToBuf outgoingSequence = do
-    cmdI <- readRef (Ref i)
-    cmdJ <- readRef (Ref j)
-    cmdK <- readRef (Ref k)
+    cmdI <- readRef (Ref Constants.noParent i)
+    cmdJ <- readRef (Ref Constants.noParent j)
+    cmdK <- readRef (Ref Constants.noParent k)
     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) nullcmd cmdI
     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) cmdI cmdJ
     MSG.writeDeltaUserCmd (clientGlobals.cgBuf) cmdJ cmdK
@@ -278,7 +278,7 @@ saveCommandForPrediction cls = do
     return cmdRef
   where
     idx = (cls^.csNetChan.ncOutgoingSequence) .&. (Constants.cmdBackup - 1)
-    cmdRef = Ref idx
+    cmdRef = Ref Constants.noParent idx
 
 createCmd :: Ref' UserCmdT -> Quake ()
 createCmd cmdRef = do

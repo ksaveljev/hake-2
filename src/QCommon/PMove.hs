@@ -45,7 +45,7 @@ proceedPMove pmove
         | (pmove^.pmState.pmsPMType) == Constants.pmFreeze =
             use (pMoveGlobals.pmPM)
         | otherwise = do
-            checkDuck
+            checkDuck =<< use (pMoveGlobals.pmPM)
             when (pmove^.pmSnapInitial) $
                 initialSnapPosition
             catagorizePosition
@@ -84,7 +84,7 @@ clampAngles = do
   where
     updatePM pm
       | (pm^.pmState.pmsPMFlags) .&. Constants.pmfTimeTeleport /= 0 =
-          -- TODO: think how to update it using Constants.yaw, Constants.pitch and Constants.roll
+          -- IMPROVE: think how to update it using Constants.yaw, Constants.pitch and Constants.roll
           pm & pmViewAngles .~ V3 0 (fromIntegral ((pm^.pmCmd.ucAngles._y) + (pm^.pmState.pmsDeltaAngles._y))) 0
       | otherwise =
           let V3 a b c = fmap Math3D.shortToAngle (fmap fromIntegral ((pm^.pmCmd.ucAngles) + (pm^.pmState.pmsDeltaAngles)))
@@ -96,8 +96,46 @@ clampAngles = do
         pm <- use (pMoveGlobals.pmPM)
         return (Math3D.angleVectors (pm^.pmViewAngles) True True True)
 
-checkDuck :: Quake ()
-checkDuck = error "PMove.checkDuck" -- TODO
+checkDuck :: PMoveT -> Quake ()
+checkDuck pm
+    | (pm^.pmState.pmsPMType) == Constants.pmGib =
+        pMoveGlobals.pmPM .= (pm & pmMins .~ V3 minsX minsY 0
+                                 & pmMaxs .~ V3 maxsX maxsY 16
+                                 & pmViewHeight .~ 8)
+    | otherwise =
+        duckOrStandUp >>= updatePMove
+  where
+    minsX = -16
+    minsY = -16
+    maxsX = 16
+    maxsY = 16
+    duckOrStandUp
+        | (pm^.pmState.pmsPMType) == Constants.pmDead =
+            return (pm & pmState.pmsPMFlags .~ (pm^.pmState.pmsPMFlags) .|. Constants.pmfDucked)
+        | (pm^.pmCmd.ucUpMove) < 0 && ((pm^.pmState.pmsPMFlags) .&. Constants.pmfOnGround /= 0) = -- duck
+            return (pm & pmState.pmsPMFlags .~ (pm^.pmState.pmsPMFlags) .|. Constants.pmfDucked)
+        | (pm^.pmState.pmsPMFlags) .&. Constants.pmfDucked /= 0 = do -- stand up if possible
+            pml <- use (pMoveGlobals.pmPML)
+            traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (V3 (-16) (-16) (-24)) (V3 16 16 32) (pml^.pmlOrigin)
+            maybe traceError standUp traceT
+        | otherwise =
+            return pm
+    traceError = do
+        Com.fatalError "PMove.checkDuck traceT is Nothing"
+        return pm
+    standUp traceT
+        | traceT^.tAllSolid = return pm
+        | otherwise = return (pm & pmState.pmsPMFlags .~ (pm^.pmState.pmsPMFlags) .&. (complement Constants.pmfDucked))
+    updatePMove :: PMoveT -> Quake ()
+    updatePMove updatedPM
+        | (updatedPM^.pmState.pmsPMFlags) .&. Constants.pmfDucked /= 0 =
+            pMoveGlobals.pmPM .= (updatedPM & pmMins .~ V3 minsX minsY (-24)
+                                            & pmMaxs .~ V3 maxsX maxsY 4
+                                            & pmViewHeight .~ -2)
+        | otherwise =
+            pMoveGlobals.pmPM .= (updatedPM & pmMins .~ V3 minsX minsY (-24)
+                                            & pmMaxs .~ V3 maxsX maxsY 32
+                                            & pmViewHeight .~ 22)
 
 -- Snaps the origin of the player move to 0.125 grid.
 initialSnapPosition :: Quake ()

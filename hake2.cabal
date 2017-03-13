@@ -121,6 +121,7 @@ executable hake2
                      , Game.GameAI
                      , Game.GameBase
                      , Game.GameBaseGlobals
+                     , Game.GameCombat
                      , Game.GameFunc
                      , Game.GameImportT
                      , Game.GameItems
@@ -267,6 +268,7 @@ executable hake2
                      , QuakeIOState
                      , QuakeRef
                      , QuakeState
+                     , Render.Anorms
                      , Render.Basic.BasicRenderAPI
                      , Render.DummyRenderer
                      , Render.Fast.Draw
@@ -278,6 +280,7 @@ executable hake2
                      , Render.Fast.Mesh
                      , Render.Fast.Model
                      , Render.Fast.Polygon
+                     , Render.Fast.Shared
                      , Render.Fast.Surf
                      , Render.Fast.Warp
                      , Render.GLConfigT
@@ -289,7 +292,9 @@ executable hake2
                      , Render.GLTModeT
                      , Render.ImageT
                      , Render.MEdgeT
+                     , Render.MLeafT
                      , Render.MModelT
+                     , Render.MNodeT
                      , Render.ModelT
                      , Render.MSurfaceT
                      , Render.MTexInfoT

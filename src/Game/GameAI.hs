@@ -33,18 +33,18 @@ aiSetSightClient = do
     lookThroughClients maxClients start start
   where
     calcStart Nothing = 1
-    calcStart (Just (Ref idx)) = idx
+    calcStart (Just (Ref _ idx)) = idx
 
 lookThroughClients :: Int -> Int -> Int -> Quake ()
 lookThroughClients maxClients start check = do
-    edict <- readRef (Ref check')
+    edict <- readRef (Ref Constants.noParent check')
     findSightClient edict
   where
     check' | check + 1 > maxClients = 1
            | otherwise = check + 1
     findSightClient edict
         | (edict^.eInUse) && (edict^.eHealth) > 0 && (edict^.eFlags) .&. Constants.flNoTarget == 0 =
-            gameBaseGlobals.gbLevel.llSightClient .= Just (Ref check')
+            gameBaseGlobals.gbLevel.llSightClient .= Just (Ref Constants.noParent check')
         | check' == start =
             gameBaseGlobals.gbLevel.llSightClient .= Nothing
         | otherwise = lookThroughClients maxClients start check'

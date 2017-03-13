@@ -64,7 +64,7 @@ instantParticle = -10000.0
 runDLights :: Quake ()
 runDLights = do
     time <- use (globals.gCl.csTime)
-    mapM_ (runDLight time) (fmap Ref [0..Constants.maxDLights - 1])
+    mapM_ (runDLight time) (fmap (Ref Constants.noParent) [0..Constants.maxDLights - 1])
 
 runDLight :: Int -> Ref' CDLightT -> Quake ()
 runDLight time dLightRef = doRunDLight =<< readRef dLightRef
@@ -121,7 +121,7 @@ proceedParseMuzzleFlash idx w pl = do
                                  & cdlRadius .~ radius r
                                  & cdlMinLight .~ 32
                                  & cdlDie .~ fromIntegral time)
-    muzzleFlashSound dLightRef (Ref idx) pl weapon volume
+    muzzleFlashSound dLightRef (Ref Constants.noParent idx) pl weapon volume
   where
     silenced = w .&. Constants.mzSilenced
     weapon = w .&. (complement Constants.mzSilenced)
@@ -307,7 +307,7 @@ proceedParseMuzzleFlash2 idx flashNumber cent = do
                                  & cdlRadius .~ 200 + fromIntegral (r .&. 31)
                                  & cdlMinLight .~ 32
                                  & cdlDie .~ fromIntegral time)
-    muzzleFlashSound2 dLightRef (Ref idx) origin flashNumber
+    muzzleFlashSound2 dLightRef (Ref Constants.noParent idx) origin flashNumber
   where
     (forward, right, _) = Math3D.angleVectors (cent^.ceCurrent.esAngles) True True False
     a = (cent^.ceCurrent.esOrigin._x) + (forward^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y)
@@ -654,7 +654,7 @@ clearEffects = do
 
 clearParticles :: Quake ()
 clearParticles = do
-    clientGlobals.cgFreeParticles .= Just (Ref 0)
+    clientGlobals.cgFreeParticles .= Just (Ref Constants.noParent 0)
     clientGlobals.cgActiveParticles .= Nothing
     request doClearParticles
 
@@ -667,7 +667,7 @@ doClearParticles = do
         | idx == MV.length particles - 1 =
             MV.modify particles (\v -> v & cpNext .~ Nothing) idx
         | otherwise =
-            MV.modify particles (\v -> v & cpNext .~ Just (Ref (idx + 1))) idx 
+            MV.modify particles (\v -> v & cpNext .~ Just (Ref Constants.noParent (idx + 1))) idx 
 
 clearDLights :: Quake ()
 clearDLights = request doClearDLights
@@ -705,27 +705,27 @@ allocDLight key = do
     findExactMatch idx maxIdx
         | idx >= maxIdx = return Nothing
         | otherwise = do
-            dLight <- readRef (Ref idx)
+            dLight <- readRef (Ref Constants.noParent idx)
             case (dLight^.cdlKey) == key of
                 True -> do
-                    writeRef (Ref idx) (newCDLightT & cdlKey .~ key)
-                    return (Just (Ref idx))
+                    writeRef (Ref Constants.noParent idx) (newCDLightT & cdlKey .~ key)
+                    return (Just (Ref Constants.noParent idx))
                 False -> findExactMatch (idx + 1) maxIdx
     searchForAnyDLight = do
         time <- use (globals.gCl.csTime)
         anyMatch <- findAnyDLight (fromIntegral time) 0 Constants.maxDLights
         maybe defaultDLight return anyMatch
     defaultDLight = do
-        writeRef (Ref 0) (newCDLightT & cdlKey .~ key)
-        return (Ref 0)
+        writeRef (Ref Constants.noParent 0) (newCDLightT & cdlKey .~ key)
+        return (Ref Constants.noParent 0)
     findAnyDLight time idx maxIdx
         | idx >= maxIdx = return Nothing
         | otherwise = do
-            dLight <- readRef (Ref idx)
+            dLight <- readRef (Ref Constants.noParent idx)
             case (dLight^.cdlDie) < time of
                 True -> do
-                    writeRef (Ref idx) (newCDLightT & cdlKey .~ key)
-                    return (Just (Ref idx))
+                    writeRef (Ref Constants.noParent idx) (newCDLightT & cdlKey .~ key)
+                    return (Just (Ref Constants.noParent idx))
                 False -> findAnyDLight time (idx + 1) maxIdx
 
 logoutEffect :: V3 Float -> Int -> Quake ()
@@ -804,27 +804,27 @@ entityEvent :: EntityStateT -> Quake ()
 entityEvent entityState
     | (entityState^.esEvent) == Constants.evItemRespawn = do
         sfx <- S.registerSound "items/respawn1.wav"
-        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+        S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
         itemRespawnParticles (entityState^.esOrigin)
     | (entityState^.esEvent) == Constants.evPlayerTeleport = do
         sfx <- S.registerSound "misc/tele1.wav"
-        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
+        S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanWeapon sfx 1 Constants.attnIdle 0
         teleportParticles (entityState^.esOrigin)
     | (entityState^.esEvent) == Constants.evFootstep = do
         footsteps <- fmap (^.cvValue) clFootstepsCVar
         when (footsteps /= 0) $ do
           r <- Lib.rand
           sfxFootsteps <- use (clTEntGlobals.clteSfxFootsteps)
-          S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanBody (sfxFootsteps V.! fromIntegral (r .&. 3)) 1 Constants.attnNorm 0
+          S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanBody (sfxFootsteps V.! fromIntegral (r .&. 3)) 1 Constants.attnNorm 0
     | (entityState^.esEvent) == Constants.evFallShort = do
         sfx <- S.registerSound "player/land1.wav"
-        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+        S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
     | (entityState^.esEvent) == Constants.evFall = do
         sfx <- S.registerSound "*fall2.wav"
-        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+        S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
     | (entityState^.esEvent) == Constants.evFallFar = do
         sfx <- S.registerSound "*fall1.wav"
-        S.startSound Nothing (Ref (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
+        S.startSound Nothing (Ref Constants.noParent (entityState^.esNumber)) Constants.chanAuto sfx 1 Constants.attnNorm 0
     | otherwise =
         return () -- TODO: expected?
 
@@ -976,7 +976,7 @@ addDLights :: Quake ()
 addDLights =
     -- TODO: currently simplified version... need to update it to reflect
     -- jake2 version correctly
-    mapM_ addDLight (fmap Ref [0..Constants.maxDLights-1])
+    mapM_ addDLight (fmap (Ref Constants.noParent) [0..Constants.maxDLights-1])
   where
     addDLight dlRef = doAddDLight =<< readRef dlRef
     doAddDLight dl
@@ -985,11 +985,11 @@ addDLights =
 
 addLightStyles :: Quake ()
 addLightStyles =
-    mapM_ addLightStyle (fmap Ref [0..Constants.maxLightStyles-1])
+    mapM_ addLightStyle (fmap (Ref Constants.noParent) [0..Constants.maxLightStyles-1])
   where
-    addLightStyle lsRef@(Ref idx) = do
+    addLightStyle lsRef@(Ref _ idx) = do
         ls <- readRef lsRef
-        ClientV.addLightStyle (Ref idx) (ls^.clsValue._x) (ls^.clsValue._y) (ls^.clsValue._z)
+        ClientV.addLightStyle (Ref Constants.noParent idx) (ls^.clsValue._x) (ls^.clsValue._y) (ls^.clsValue._z)
 
 rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
 rocketTrail = error "CLFX.rocketTrail" -- TODO

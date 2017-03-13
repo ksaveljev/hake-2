@@ -28,6 +28,8 @@ import           Network.Socket               (HostAddress)
 import           System.IO                    (Handle)
 import           System.Random                (StdGen)
 
+import qualified Constants
+
 type Quake = Coroutine IORequest (State QuakeState)
 
 instance (MonadState s m) => MonadState s (Coroutine IORequest m) where
@@ -90,7 +92,9 @@ data QuakeIOState = QuakeIOState
     { _gCurTime               :: IORef Int
     , _gbGEdicts              :: MV.IOVector EdictT
     , _cText                  :: MSV.IOVector Char
+    , _frTextureArrayBuf      :: MSV.IOVector Float
     , _frVertexArrayBuf       :: MSV.IOVector Float
+    , _frColorArrayBuf        :: MSV.IOVector Float
     , _frModelTextureCoordBuf :: MSV.IOVector Float
     , _frModelVertexIndexBuf  :: MSV.IOVector Int32
     , _frPolygonBuffer        :: MSV.IOVector Float
@@ -110,14 +114,17 @@ instance Functor IORequest where
 request :: Monad m => QuakeIO a -> Coroutine IORequest m a
 request x = suspend (RunIO x return)
 
-data Ref a b = Ref Int deriving (Eq, Show, Ord)
+-- Ref parentIdx idx
+-- most of the Refs do not use parentIdx but some
+-- require it as there is no direct ref to the entity
+data Ref a b = Ref Int Int deriving (Eq, Show, Ord)
 type Ref' b = Ref () b
 
 dummyGClientRef :: Ref' GClientT
-dummyGClientRef = Ref (-1)
+dummyGClientRef = Ref Constants.noParent (-1)
 
 dummyGItemRef :: Ref' GItemT
-dummyGItemRef = Ref (-1)
+dummyGItemRef = Ref Constants.noParent (-1)
 
 data Globals = Globals
     { _gCmdWait          :: Bool

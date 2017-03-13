@@ -1,5 +1,6 @@
 module Game.GameSpawn
-  ( spawnEntities
+  ( callSpawn
+  , spawnEntities
   ) where
 
 import qualified Constants
@@ -83,12 +84,12 @@ setSkill skill =
 initEntities :: Quake ()
 initEntities =
   do maxEntities <- use (gameBaseGlobals.gbGame.glMaxEntities)
-     mapM_ (\idx -> writeRef (Ref idx) (newEdictT idx)) [0..maxEntities-1]
+     mapM_ (\idx -> writeRef (Ref Constants.noParent idx) (newEdictT idx)) [0..maxEntities-1]
 
 initClients :: Quake ()
 initClients =
   do maxClients <- use (gameBaseGlobals.gbGame.glMaxClients)
-     mapM_ (\idx -> modifyRef (Ref idx) (\v -> v & eClient .~ Just (Ref (idx - 1)))) [1..maxClients]
+     mapM_ (\idx -> modifyRef (Ref Constants.noParent idx) (\v -> v & eClient .~ Just (Ref Constants.noParent (idx - 1)))) [1..maxClients]
 
 parseAndSpawnEntities :: B.ByteString -> B.ByteString -> Quake ()
 parseAndSpawnEntities entities mapName =
@@ -199,8 +200,8 @@ findNextTeam :: Int -> Int -> Int -> Int -> Quake (Int, Int)
 findNextTeam c c2 idx maxIdx
   | idx >= maxIdx = return (c, c2)
   | otherwise =
-      do edict <- readRef (Ref idx)
-         proceedFindNextTeam (Ref idx) edict (edict^.eTeam)
+      do edict <- readRef (Ref Constants.noParent idx)
+         proceedFindNextTeam (Ref Constants.noParent idx) edict (edict^.eTeam)
   where proceedFindNextTeam _ _ Nothing = findNextTeam c c2 (idx + 1) maxIdx
         proceedFindNextTeam edictRef edict (Just team)
           | not (edict^.eInUse) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 =
@@ -214,8 +215,8 @@ findTeamMembers :: B.ByteString -> Ref' EdictT -> Ref' EdictT -> Int -> Int -> I
 findTeamMembers teamName master chainRef idx maxIdx c2
   | idx >= maxIdx = return c2
   | otherwise =
-      do edict <- readRef (Ref idx)
-         proceedFindTeamMembers (Ref idx) edict (edict^.eTeam)
+      do edict <- readRef (Ref Constants.noParent idx)
+         proceedFindTeamMembers (Ref Constants.noParent idx) edict (edict^.eTeam)
   where proceedFindTeamMembers _ _ Nothing = findTeamMembers teamName master chainRef (idx + 1) maxIdx c2
         proceedFindTeamMembers edictRef edict (Just team)
           | not (edict^.eInUse) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= team =
@@ -240,7 +241,7 @@ searchItems edictRef className =
      case search (V.drop 1 items) of
        Just gItemRef -> GameItems.spawnItem edictRef gItemRef
        Nothing -> searchSpawns edictRef className
-  where search items = fmap Ref (V.findIndex searchByName items)
+  where search items = fmap (Ref Constants.noParent) (V.findIndex searchByName items)
         searchByName gItem = className == BC.map toLower (gItem^.giClassName)
 
 searchSpawns :: Ref' EdictT -> B.ByteString -> Quake ()

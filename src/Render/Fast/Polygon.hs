@@ -21,6 +21,7 @@ import           Control.Lens                 (use, (^.), (.=), (+=), (&), (.~))
 import qualified Data.Vector.Mutable          as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 
+import qualified Constants
 import           QuakeIOState
 import           QuakeRef
 import           QuakeState
@@ -42,7 +43,7 @@ create numVerts = do
                                                         & glpPos .~ bufferIndex))
     fastRenderAPIGlobals.frPolygonCount += 1
     fastRenderAPIGlobals.frPolygonBufferIndex += numVerts
-    return (Ref polyCount)
+    return (Ref Constants.noParent polyCount)
 
 getPolygonBufferValue :: Int -> Ref' GLPolyT -> Int -> Quake Float
 getPolygonBufferValue offset polyRef idx = do

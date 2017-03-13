@@ -1,9 +1,20 @@
 module Game.GameBase
-  ( getGameApi
-  , runFrame
-  , setMoveDir
-  , shutdownGame
-  ) where
+    ( findByClass
+    , getGameApi
+    , gFind
+    , runFrame
+    , setMoveDir
+    , shutdownGame
+    ) where
+
+import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~))
+import           Control.Monad (when, void, (>=>))
+import           Data.Bits ((.&.), (.|.))
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char (toLower)
+import           Data.Maybe (isJust)
+import           Linear (V3(..))
 
 import qualified Client.M as M
 import qualified Constants
@@ -27,15 +38,6 @@ import qualified Server.SVWorld as SVWorld
 import           Types
 import qualified Util.Math3D as Math3D
 import           Util.Binary (encode)
-
-import           Control.Lens (use, (^.), (.=), (+=), (%=), (&), (.~))
-import           Control.Monad (when, void, (>=>))
-import           Data.Bits ((.&.), (.|.))
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import           Data.Char (toLower)
-import           Data.Maybe (isJust)
-import           Linear (V3(..))
 
 vecUp :: V3 Float
 vecUp = V3 0 (-1) 0
@@ -65,8 +67,8 @@ runFrame =
 
 readEdict :: Int -> Quake (Ref' EdictT, EdictT) -- TODO: duplicate with something in SVInit
 readEdict idx =
-  do edict <- readRef (Ref idx)
-     return (Ref idx, edict)
+  do edict <- readRef (Ref Constants.noParent idx)
+     return (Ref Constants.noParent idx, edict)
 
 updateLevelGlobals :: Quake ()
 updateLevelGlobals =
@@ -93,7 +95,7 @@ checkGroundEntity edictRef edict (Just groundRef) =
             M.checkGround edictRef
 
 treatClientOrEntity :: Ref' EdictT -> Int -> Quake ()
-treatClientOrEntity edictRef@(Ref idx) maxClients
+treatClientOrEntity edictRef@(Ref _ idx) maxClients
   | idx > 0 && idx <= maxClients = PlayerClient.clientBeginServerFrame edictRef
   | otherwise = runEntity edictRef
 
@@ -164,9 +166,9 @@ applyDMRules timeLimit fragLimit levelTime bprintf
   | otherwise = return ()
 
 checkScore :: Int -> (Ref' EdictT, EdictT) -> Quake Bool
-checkScore fragLimit (Ref idx, edict)
+checkScore fragLimit (Ref _ idx, edict)
   | edict^.eInUse =
-      do client <- readRef (Ref (idx - 1))
+      do client <- readRef (Ref Constants.noParent (idx - 1))
          return ((client^.gcResp.crScore) >= fragLimit)
   | otherwise = return False
 
@@ -220,3 +222,9 @@ makeNextMove edictRef moveType
 
 endDMLevel :: Quake ()
 endDMLevel = error "GameBase.endDMLevel" -- TODO
+
+gFind :: Maybe (Ref' EdictT) -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe (Ref' EdictT))
+gFind = error "GameBase.gFind" -- TODO
+
+findByClass :: EdictT -> B.ByteString -> Bool
+findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s

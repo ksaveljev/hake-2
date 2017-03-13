@@ -8,6 +8,8 @@ module Util.Math3D
   , projectSource
   , rotatePointAroundVector
   , shortToAngle
+  , vectorAngles
+  , vectorYaw
   , v3Access
   ) where
 
@@ -18,6 +20,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import           Linear (V3(..), dot, normalize, cross, _x, _y, _z)
 
+import qualified Constants
 import           Game.CPlaneT
 import           Types
 
@@ -206,3 +209,32 @@ boxOnPlaneSide emins emaxs p
         | (p^.cpDist) <= (emins^.ptype) = 1
         | (p^.cpDist) >= (emaxs^.ptype) = 2
         | otherwise                     = 3
+
+vectorAngles :: V3 Float -> V3 Float
+vectorAngles value1
+    | (value1^._y) == 0 && (value1^._x) == 0 =
+        let pitch = if (value1^._z) > 0 then 90 else 270
+        in V3 (negate pitch) 0 0
+    | otherwise =
+        let yaw | (value1^._x) /= 0 = (atan2 (value1^._y) (value1^._x)) * 180 / pi
+                | (value1^._y) > 0  = 90
+                | otherwise         = (-90)
+            yaw' = if yaw < 0 then yaw + 360 else yaw
+            forward = sqrt ((value1^._x) * (value1^._x) + (value1^._y) * (value1^._y))
+            pitch = truncate ((atan2 (value1^._z) forward) * 180 / pi) :: Integer
+            pitch' = fromIntegral (if pitch < 0 then pitch + 360 else pitch)
+        in V3 (negate pitch') yaw' 0
+
+vectorYaw :: V3 Float -> Float
+vectorYaw vec
+    | vec^.pitchAccess == 0 =
+        let yaw | vec^.yawAccess > 0 = 90
+                | vec^.yawAccess < 0 = -90
+                | otherwise          = 0
+        in yaw
+    | otherwise =
+        let yaw = truncate ((atan2 (vec^.yawAccess) (vec^.pitchAccess)) * 180 / pi) :: Int
+        in fromIntegral (if yaw < 0 then yaw + 360 else yaw)
+  where
+    pitchAccess = v3Access Constants.pitch
+    yawAccess = v3Access Constants.yaw

@@ -200,7 +200,7 @@ initHeartbeat =
 resetClients :: Quake ()
 resetClients =
   svGlobals.svServerStatic.ssClients %= V.imap resetClient
-  where resetClient idx client = client & cEdict .~ Just (Ref (idx + 1))
+  where resetClient idx client = client & cEdict .~ Just (Ref Constants.noParent (idx + 1))
                                         & cLastCmd .~ newUserCmdT
 
 spawnServer :: B.ByteString -> B.ByteString -> Int -> Bool -> Bool -> Quake ()
@@ -295,11 +295,11 @@ createBaseline =
 
 readEdict :: Int -> Quake (Ref' EdictT, EdictT)
 readEdict idx =
-  do edict <- readRef (Ref idx)
-     return (Ref idx, edict)
+  do edict <- readRef (Ref Constants.noParent idx)
+     return (Ref Constants.noParent idx, edict)
 
 edictBaseline :: (Ref' EdictT, EdictT) -> Quake ()
-edictBaseline (edictRef@(Ref idx), edict)
+edictBaseline (edictRef@(Ref _ idx), edict)
   | not (edict^.eInUse) || ((edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0) =
       return ()
   | otherwise =
@@ -308,7 +308,7 @@ edictBaseline (edictRef@(Ref idx), edict)
          saveEdictEntityState edictRef
 
 saveEdictEntityState :: Ref' EdictT -> Quake ()
-saveEdictEntityState edictRef@(Ref idx) =
+saveEdictEntityState edictRef@(Ref _ idx) =
   do edict <- readRef edictRef
      svGlobals.svServer.sBaselines.ix idx .= (edict^.eEntityState)
 

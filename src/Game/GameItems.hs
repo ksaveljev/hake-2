@@ -121,7 +121,7 @@ pickupError msg = Com.fatalError msg >> return True
 
 handleArmor :: Ref' GClientT -> GItemT -> Ref' GItemT -> Int -> Maybe GItemArmorT -> Quake Bool
 handleArmor _ _ _ _ Nothing = pickupError "GameItems.pickupArmor gItem^.giInfo is Nothing"
-handleArmor gClientRef gItem (Ref jacketArmorIndex) oldArmorIndex (Just newInfo)
+handleArmor gClientRef gItem (Ref _ jacketArmorIndex) oldArmorIndex (Just newInfo)
   | isArmorShard && oldArmorIndex == 0 =
       updateGClient (\v -> v & gcPers.cpInventory.ix jacketArmorIndex .~ 2)
   | isArmorShard =
@@ -141,7 +141,7 @@ useBetterArmor gClientRef gItem oldArmorIndex newInfo =
           do jacketArmorIndex <- use (gameItemsGlobals.giJacketArmorIndex)
              combatArmorIndex <- use (gameItemsGlobals.giCombatArmorIndex)
              return (checkOldArmorIndex jacketArmorIndex combatArmorIndex)
-        checkOldArmorIndex (Ref jacketArmorIndex) (Ref combatArmorIndex)
+        checkOldArmorIndex (Ref _ jacketArmorIndex) (Ref _ combatArmorIndex)
           | oldArmorIndex == jacketArmorIndex = jacketArmorInfo
           | oldArmorIndex == combatArmorIndex = combatArmorInfo
           | otherwise = bodyArmorInfo
@@ -154,7 +154,7 @@ useBetterArmor gClientRef gItem oldArmorIndex newInfo =
 applyNewArmor :: Ref' GClientT -> GClientT -> GItemT -> GItemArmorT -> GItemArmorT -> Int -> Quake Bool
 applyNewArmor gClientRef gClient gItem oldInfo newInfo oldArmorIndex =
     do modifyRef gClientRef (\v -> v & gcPers.cpInventory.ix oldArmorIndex .~ 0
-                                & gcPers.cpInventory.ix (gItem^.giIndex) .~ newCount)
+                                     & gcPers.cpInventory.ix (gItem^.giIndex) .~ newCount)
        return True
   where salvage = (oldInfo^.giaNormalProtection) / (newInfo^.giaNormalProtection)
         salvageCount = truncate salvage * ((gClient^.gcPers.cpInventory) UV.! oldArmorIndex)
@@ -694,7 +694,7 @@ findItem pickupName =
        Nothing ->
          do Com.printf (B.concat ["Item not found:", pickupName, "\n"])
             return Nothing
-       Just idx -> return (Just (Ref idx))
+       Just idx -> return (Just (Ref Constants.noParent idx))
   where search items = V.findIndex searchByName (V.drop 1 items)
         name = BC.map toLower pickupName
         searchByName gItem
@@ -879,7 +879,7 @@ doRespawnF edictRef =
                  chooseTeamMember (ent^.eChain) (idx + 1) maxIdx
         chooseError =
           do Com.fatalError "GameItems.doRespawn ent^.eTeamMaster/ent^.eChain is Nothing"
-             return (Ref (-1))
+             return (Ref Constants.noParent (-1))
 
 dropTempTouch :: EntTouch
 dropTempTouch = EntTouch "dropTempTouch" dropTempTouchF

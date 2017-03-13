@@ -39,9 +39,9 @@ initialSVGlobals =
             , _svAreaType     = 0
             , _svLeafs        = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
             , _svClusters     = UV.replicate 128 0 -- 128 is MAX_TOTAL_ENT_LEAFS
-            , _svTouch        = V.replicate Constants.maxEdicts (Ref (-1))
-            , _svTouchList    = V.replicate Constants.maxEdicts (Ref (-1))
-            , _svLinks        = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (Ref (i - 2 * Constants.areaNodes)) } else newLinkT i)
+            , _svTouch        = V.replicate Constants.maxEdicts (Ref Constants.noParent (-1))
+            , _svTouchList    = V.replicate Constants.maxEdicts (Ref Constants.noParent (-1))
+            , _svLinks        = V.generate Constants.maxLinks (\i -> if i >= 2 * Constants.areaNodes then (newLinkT i) { _lEdict = Just (Ref Constants.noParent (i - 2 * Constants.areaNodes)) } else newLinkT i)
             , _svMsg          = newSizeBufT
             , _svLeafsTmp     = UV.replicate 64 0
             , _svFatPVS       = UV.replicate (65536 `div` 8) 0

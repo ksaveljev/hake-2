@@ -2,8 +2,10 @@ module Game.GameUtil
     ( freeEdict
     , freeEdictA
     , inFront
+    , killBox
     , megaHealthThink
     , spawn
+    , useTargets
     , validateSelectedItem
     ) where
 
@@ -58,11 +60,11 @@ spawn =
              when (numEdicts == maxEntities) $
                do err <- use (gameBaseGlobals.gbGameImport.giError)
                   err "ED_Alloc: no free edicts"
-             initRef (Ref numEdicts)
+             initRef (Ref Constants.noParent numEdicts)
         foundRef edictRef =
           do gameBaseGlobals.gbNumEdicts += 1
              initRef edictRef
-        initRef edictRef@(Ref idx) =
+        initRef edictRef@(Ref _ idx) =
           do writeRef edictRef (newEdictT idx)
              initEdict edictRef
              return edictRef
@@ -70,13 +72,13 @@ spawn =
 findFreeEdict :: Float -> Int -> Int -> Quake (Maybe (Ref' EdictT))
 findFreeEdict levelTime idx maxIdx
   | idx >= maxIdx = return Nothing
-  | otherwise = checkFree =<< readRef (Ref idx)
+  | otherwise = checkFree =<< readRef (Ref Constants.noParent idx)
   where checkFree edict
-          | not (edict^.eInUse) && ((edict^.eFreeTime) < 2 || levelTime - (edict^.eFreeTime) > 0.5) = return (Just (Ref idx))
+          | not (edict^.eInUse) && ((edict^.eFreeTime) < 2 || levelTime - (edict^.eFreeTime) > 0.5) = return (Just (Ref Constants.noParent idx))
           | otherwise = findFreeEdict levelTime (idx + 1) maxIdx
 
 initEdict :: Ref' EdictT -> Quake ()
-initEdict edictRef@(Ref idx) =
+initEdict edictRef@(Ref _ idx) =
   modifyRef edictRef (\v -> v & eInUse .~ True
                               & eClassName .~ "noclass"
                               & eGravity .~ 1.0
@@ -88,3 +90,9 @@ inFront self other =
         vec = normalize ((other^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
         dot' = vec `dot` forward
     in dot' > 0.3
+
+useTargets :: Ref' EdictT -> Maybe (Ref' EdictT) -> Quake ()
+useTargets = error "GameUtil.useTargets" -- TODO
+
+killBox :: Ref' EdictT -> Quake Bool
+killBox = error "GameUtil.killBox" -- TODO

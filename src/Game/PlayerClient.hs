@@ -38,16 +38,16 @@ saveClientData :: Quake ()
 saveClientData =
   do maxClients <- use (gameBaseGlobals.gbGame.glMaxClients)
      coop <- coopCVar
-     mapM_ (\idx -> updateClient coop idx =<< readRef (Ref (idx + 1))) [0..maxClients-1]
+     mapM_ (\idx -> updateClient coop idx =<< readRef (Ref Constants.noParent (idx + 1))) [0..maxClients-1]
 
 updateClient :: CVarT -> Int -> EdictT -> Quake ()
 updateClient coop idx edict
   | edict^.eInUse =
-      do score <- updateClientScore <$> readRef (Ref idx)
-         modifyRef (Ref idx) (\v -> v & gcPers.cpHealth .~ (edict^.eHealth)
-                                      & gcPers.cpMaxHealth .~ (edict^.eMaxHealth)
-                                      & gcPers.cpSavedFlags .~ (edict^.eFlags) .&. (Constants.flGodMode .|. Constants.flNoTarget .|. Constants.flPowerArmor)
-                                      & gcPers.cpScore .~ score)
+      do score <- updateClientScore <$> readRef (Ref Constants.noParent idx)
+         modifyRef (Ref Constants.noParent idx) (\v -> v & gcPers.cpHealth .~ (edict^.eHealth)
+                                                         & gcPers.cpMaxHealth .~ (edict^.eMaxHealth)
+                                                         & gcPers.cpSavedFlags .~ (edict^.eFlags) .&. (Constants.flGodMode .|. Constants.flNoTarget .|. Constants.flPowerArmor)
+                                                         & gcPers.cpScore .~ score)
   | otherwise = return ()
   where updateClientScore client
           | (coop^.cvValue) /= 0 = client^.gcResp.crScore
@@ -97,7 +97,7 @@ clientConnect edictRef userInfo =
 
 doClientConnect :: Ref' EdictT -> B.ByteString -> Bool -> Quake (Bool, B.ByteString)
 doClientConnect _ userInfo True = return (False, userInfo)
-doClientConnect edictRef@(Ref idx) userInfo False =
+doClientConnect edictRef@(Ref _ idx) userInfo False =
   do edict <- readRef edictRef
      modifyRef edictRef (\v -> v & eClient .~ Just gClientRef)
      gClient <- readRef gClientRef
@@ -108,7 +108,7 @@ doClientConnect edictRef@(Ref idx) userInfo False =
      modifyRef edictRef (\v -> v & eSvFlags .~ 0)
      modifyRef gClientRef (\v -> v & gcPers.cpConnected .~ True)
      return (True, userInfo')
-  where gClientRef = Ref (idx - 1)
+  where gClientRef = Ref Constants.noParent (idx - 1)
         checkEdictInUse _ True = return ()
         checkEdictInUse gClient False =
           do initClientResp gClientRef
@@ -133,7 +133,7 @@ initClientPersistant gClientRef =
      itemRef <- GameItems.findItem "Blaster"
      maybe itemRefError doInitClientPersistant itemRef
   where itemRefError = Com.fatalError "PlayerClient.initClientPersistant itemRef is Nothing"
-        doInitClientPersistant itemRef@(Ref itemIdx) =
+        doInitClientPersistant itemRef@(Ref _ itemIdx) =
           modifyRef gClientRef (\v -> v & gcPers.cpSelectedItem .~ itemIdx
                                         & gcPers.cpInventory.ix itemIdx .~ 1
                                         & gcPers.cpWeapon .~ Just itemRef

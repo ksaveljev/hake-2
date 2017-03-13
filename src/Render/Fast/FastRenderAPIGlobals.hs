@@ -99,7 +99,7 @@ initialFastRenderAPIGlobals =
                        , _frPointColor           = V3 0 0 0
                        , _frLightSpot            = V3 0 0 0
                        , _frRawPalette           = UV.replicate 0 256
-                       , _frLoadModel            = Ref (-1)
-                       , _frNoTexture            = Ref (-1)
-                       , _frParticleTexture      = Ref (-1)
+                       , _frLoadModel            = Ref Constants.noParent (-1)
+                       , _frNoTexture            = Ref Constants.noParent (-1)
+                       , _frParticleTexture      = Ref Constants.noParent (-1)
                        }

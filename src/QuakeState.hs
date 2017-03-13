@@ -52,12 +52,14 @@ import Sys.KBDGlobals                   as X
 import Sys.NETGlobals                   as X
 import Types
 
+import qualified Constants
+
 import Control.Lens (makeLenses)
 
 makeLenses ''QuakeState
 
 worldRef :: Ref' EdictT
-worldRef = Ref 0
+worldRef = Ref Constants.noParent 0
 
 initialQuakeState :: QuakeState
 initialQuakeState = QuakeState

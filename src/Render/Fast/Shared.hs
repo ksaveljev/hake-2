@@ -8,7 +8,7 @@ import qualified Data.ByteString          as B
 import qualified Data.ByteString.Builder  as BB
 import qualified Data.ByteString.Lazy     as BL
 import           Data.Maybe               (isNothing)
-import           Data.Monoid              ((<>), mempty)
+import           Data.Monoid              ((<>))
 import qualified Data.Vector              as V
 import           Data.Word                (Word8)
 

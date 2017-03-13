@@ -79,7 +79,7 @@ runFrames :: PMoveT -> Int -> Int -> Quake PMoveT
 runFrames pm ack current
     | ack >= current = return pm
     | otherwise = do
-        cmd <- readRef (Ref frame)
+        cmd <- readRef (Ref Constants.noParent frame)
         pm' <- PMove.pMove (pm & pmCmd .~ cmd)
         globals.gCl.csPredictedOrigins.ix frame .= (pm'^.pmState.pmsOrigin)
         runFrames pm' (ack + 1) current

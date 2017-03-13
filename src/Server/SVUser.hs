@@ -6,7 +6,6 @@ module Server.SVUser
 import           Control.Lens         (Traversal', preuse, use, ix)
 import           Control.Lens         ((^.), (.=), (&), (.~))
 import           Control.Monad        (when, unless, (>=>))
-import           Data.Bits            ((.&.))
 import qualified Data.ByteString      as B
 import qualified Data.Vector          as V
 
@@ -27,7 +26,6 @@ import           QCommon.SizeBufT
 import           QCommon.XCommandT
 import           QuakeRef
 import           QuakeState
-import           Server.ClientFrameT
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
@@ -134,7 +132,7 @@ new = do
         doNew clientRef client state
 
 doNew :: Ref' ClientT -> ClientT -> Int -> Quake ()
-doNew clientRef@(Ref clientIdx) client state
+doNew clientRef@(Ref _ clientIdx) client state
     | (client^.cState) /= Constants.csConnected = Com.printf "New not valid -- already spawned\n"
     | state == Constants.ssDemo = beginDemoServer =<< use (svGlobals.svServer.sName)
     | otherwise = do
@@ -149,8 +147,8 @@ doNew clientRef@(Ref clientIdx) client state
         MSG.writeShort messageLens playerNum
         sendFullLevelName =<< preuse (svGlobals.svServer.sConfigStrings.ix Constants.csName)
         when (state == Constants.ssGame) $ do
-            modifyRef (Ref (playerNum + 1)) (\v -> v & eEntityState.esNumber .~ playerNum + 1)
-            modifyRef clientRef (\v -> v & cEdict .~ Just (Ref (playerNum + 1))
+            modifyRef (Ref Constants.noParent (playerNum + 1)) (\v -> v & eEntityState.esNumber .~ playerNum + 1)
+            modifyRef clientRef (\v -> v & cEdict .~ Just (Ref Constants.noParent (playerNum + 1))
                                          & cLastCmd .~ newUserCmdT)
             MSG.writeByteI messageLens Constants.svcStuffText
             MSG.writeString messageLens (B.concat ["cmd configstrings ", encode spawnCount, " 0\n"])

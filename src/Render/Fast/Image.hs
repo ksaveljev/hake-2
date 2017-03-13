@@ -110,14 +110,14 @@ clearTextures :: Int -> Int -> Quake ()
 clearTextures idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = do
-        image <- readRef (Ref idx)
+        image <- readRef (Ref Constants.noParent idx)
         clearWithRegSeq (image^.iTexNum) (image^.iRegistrationSequence)
         clearTextures (idx + 1) maxIdx
   where
     clearWithRegSeq _ 0 = return ()
     clearWithRegSeq texNum _ = do
         request (deleteTexture texNum)
-        writeRef (Ref idx) (newImageT idx)
+        writeRef (Ref Constants.noParent idx) (newImageT idx)
 
 deleteTexture :: Int -> QuakeIO ()
 deleteTexture texNum = io (with (fromIntegral texNum) (GL.glDeleteTextures 1))
@@ -318,7 +318,7 @@ changeMipMap :: GLModeT -> Int -> Int -> Quake ()
 changeMipMap mode idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = do
-        image <- readRef (Ref idx)
+        image <- readRef (Ref Constants.noParent idx)
         textureSettings image
         changeMipMap mode (idx + 1) maxIdx
   where
@@ -348,7 +348,11 @@ glTextureSolidMode str =
     strUp = BC.map toUpper str
 
 glSetTexturePalette :: UV.Vector Int -> Quake ()
-glSetTexturePalette = error "Image.glSetTexturePalette" -- TODO
+glSetTexturePalette palette = do
+    colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
+    palettedTexture <- fmap (^.cvValue) glExtPalettedTextureCVar
+    when (colorTable && palettedTexture /= 0) $ do
+        error "Image.glSetTexturePalette" -- TODO
 
 glBind :: Int -> Quake ()
 glBind texNum = do
@@ -389,20 +393,20 @@ glLoadPic name pic width height picType bits = do
     glBind (Constants.texNumImages + idx)
     hasAlpha <- glUploadImage image
     updateImageInfo idx hasAlpha
-    return (Ref idx)
+    return (Ref Constants.noParent idx)
   where
     checkNameError
         | B.length name > Constants.maxQPath =
             Com.comError Constants.errDrop (B.concat ["Draw_LoadPic: \"", name, "\" is too long"])
         | otherwise = return ()
     setImageInfo idx rs =
-        modifyRef (Ref idx) (\v -> v & iName .~ name
-                                     & iRegistrationSequence .~ rs
-                                     & iWidth .~ width
-                                     & iHeight .~ height
-                                     & iType .~ picType
-                                     & iScrap .~ False
-                                     & iTexNum .~ Constants.texNumImages + idx)
+        modifyRef (Ref Constants.noParent idx) (\v -> v & iName .~ name
+                                                        & iRegistrationSequence .~ rs
+                                                        & iWidth .~ width
+                                                        & iHeight .~ height
+                                                        & iType .~ picType
+                                                        & iScrap .~ False
+                                                        & iTexNum .~ Constants.texNumImages + idx)
     glUploadImage image
         | bits == 8 = glUpload8 image width height (picType `notElem` [Constants.itPic, Constants.itSky]) (picType == Constants.itSky)
         | otherwise = glUpload32 image width height (picType `notElem` [Constants.itPic, Constants.itSky])
@@ -410,20 +414,20 @@ glLoadPic name pic width height picType bits = do
         uploadWidth <- use (fastRenderAPIGlobals.frUploadWidth)
         uploadHeight <- use (fastRenderAPIGlobals.frUploadHeight)
         uploadedPaletted <- use (fastRenderAPIGlobals.frUploadedPaletted)
-        modifyRef (Ref idx) (\v -> v & iHasAlpha .~ hasAlpha
-                                     & iUploadWidth .~ uploadWidth
-                                     & iUploadHeight .~ uploadHeight
-                                     & iPaletted .~ uploadedPaletted
-                                     & iSL .~ 0
-                                     & iSH .~ 1
-                                     & iTL .~ 0
-                                     & iTH .~ 1)
+        modifyRef (Ref Constants.noParent idx) (\v -> v & iHasAlpha .~ hasAlpha
+                                                        & iUploadWidth .~ uploadWidth
+                                                        & iUploadHeight .~ uploadHeight
+                                                        & iPaletted .~ uploadedPaletted
+                                                        & iSL .~ 0
+                                                        & iSH .~ 1
+                                                        & iTL .~ 0
+                                                        & iTH .~ 1)
 
 findFreeImage :: Int -> Int -> Quake Int
 findFreeImage idx numGLTextures
     | idx >= numGLTextures = return idx
     | otherwise = do
-        img <- readRef (Ref idx)
+        img <- readRef (Ref Constants.noParent idx)
         case img^.iTexNum of
             0 -> return idx
             _ -> findFreeImage (idx + 1) numGLTextures
@@ -539,7 +543,7 @@ constructTrans image width d8to24table idx sz = runST $ do
     doConstructTrans image v width d8to24table idx sz
 
 doConstructTrans :: SV.Vector Word8 -> MSV.STVector s Word8 -> Int -> UV.Vector Int -> Int -> Int -> ST s (SV.Vector Word8)
-doConstructTrans image v width d8to24table idx maxIdx
+doConstructTrans image !v width d8to24table idx maxIdx
     | idx >= maxIdx = SV.unsafeFreeze v
     | otherwise = do
         let !p = image SV.! idx
@@ -854,7 +858,7 @@ findImage imageName idx maxIdx
         image <- readRef imageRef
         checkAndProceed (image^.iName)
   where
-    imageRef = Ref idx
+    imageRef = Ref Constants.noParent idx
     checkAndProceed name
         | imageName == name = return (Just imageRef)
         | otherwise = findImage imageName (idx + 1) maxIdx
@@ -987,12 +991,12 @@ glFreeUnusedImages = do
     particleTextureRef <- use (fastRenderAPIGlobals.frParticleTexture)
     modifyRef noTextureRef (\v -> v & iRegistrationSequence .~ regSeq)
     modifyRef particleTextureRef (\v -> v & iRegistrationSequence .~ regSeq)
-    mapM_ (checkImage regSeq) (fmap Ref [0..numGLTextures-1])
+    mapM_ (checkImage regSeq) (fmap (Ref Constants.noParent) [0..numGLTextures-1])
   where
     checkImage regSeq imageRef = do
         image <- readRef imageRef
         doCheckImage regSeq imageRef image
-    doCheckImage regSeq imageRef@(Ref idx) image
+    doCheckImage regSeq imageRef@(Ref _ idx) image
         | (image^.iRegistrationSequence) == regSeq || (image^.iRegistrationSequence) == 0 || (image^.iType) == Constants.itPic =
             return ()
         | otherwise = do

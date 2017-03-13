@@ -71,14 +71,14 @@ proceedLoadMap name clientLoad checksum mapName flushMap
          unless clientLoad $
            do cmGlobals.cmPortalOpen %= UV.map (const False)
               floodAreaConnections
-         return (Ref 0, lastChecksum : tail checksum)
+         return (Ref Constants.noParent 0, lastChecksum : tail checksum)
   | B.null name =
       do resetCommonCMGlobals
          cmGlobals.cmNumNodes .= 0
          cmGlobals.cmNumLeafs .= 1
          cmGlobals.cmNumClusters .= 1
          cmGlobals.cmNumAreas .= 1
-         return (Ref 0, 0 : tail checksum)
+         return (Ref Constants.noParent 0, 0 : tail checksum)
   | otherwise =
       do resetCommonCMGlobals
          cmGlobals.cmNumNodes .= 0
@@ -93,7 +93,7 @@ proceedLoadMap name clientLoad checksum mapName flushMap
              cmGlobals.cmMapName .= B.empty
         loadMapError =
           do Com.comError Constants.errDrop ("Couldn't load " `B.append` name)
-             return (Ref 0, 0 : tail checksum)
+             return (Ref Constants.noParent 0, 0 : tail checksum)
 
 doLoadMap :: B.ByteString -> [Int] -> (Handle, Int) -> Quake (Ref' CModelT, [Int])
 doLoadMap name checksum (fileHandle, len) =
@@ -120,7 +120,7 @@ loadBSP name checksum buf len header =
      cmGlobals.cmPortalOpen %= UV.map (const False)
      floodAreaConnections
      cmGlobals.cmMapName .= name
-     return (Ref 0, updatedChecksum)
+     return (Ref Constants.noParent 0, updatedChecksum)
   where checkHeader =
           when (header^.dhVersion /= Constants.bspVersion) $
             Com.comError Constants.errDrop (B.concat
@@ -134,7 +134,7 @@ inlineModel :: B.ByteString -> Quake (Ref' CModelT)
 inlineModel name =
   do checkName
      checkNumCModels =<< numInlineModels
-     return (Ref num)
+     return (Ref Constants.noParent num)
   where checkName
           | B.null name || BC.head name /= '*' =
               Com.comError Constants.errDrop "CM_InlineModel: bad name"
@@ -165,7 +165,7 @@ flood floodValid floodNum idx area
   | idx == 0 = return floodNum -- area 0 is not used
   | (area^.caFloodValid) == floodValid = return floodNum
   | otherwise =
-      do floodAreaR (Ref idx) floodValid (floodNum + 1)
+      do floodAreaR (Ref Constants.noParent idx) floodValid (floodNum + 1)
          return (floodNum + 1)
 
 floodAreaR :: Ref' CAreaT -> Int -> Int -> Quake ()
@@ -182,9 +182,9 @@ floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
         floodPortals area portalOpen idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise =
-              do areaPortal <- readRef (Ref ((area^.caFirstAreaPortal) + idx))
+              do areaPortal <- readRef (Ref Constants.noParent ((area^.caFirstAreaPortal) + idx))
                  when (portalOpen UV.! (areaPortal^.dapPortalNum)) $
-                   floodAreaR (Ref (areaPortal^.dapOtherArea)) floodValid floodNum
+                   floodAreaR (Ref Constants.noParent (areaPortal^.dapOtherArea)) floodValid floodNum
                  floodPortals area portalOpen (idx + 1) maxIdx
 
 pointLeafNum :: V3 Float -> Quake Int
@@ -193,7 +193,7 @@ pointLeafNum = error "CM.pointLeafNum" -- TODO
 leafArea :: Int -> Quake Int
 leafArea leafNum =
   do verifyLeafNum leafNum "CM_LeafArea: bad number"
-     fmap (^.clArea) (readRef (Ref leafNum))
+     fmap (^.clArea) (readRef (Ref Constants.noParent leafNum))
 
 verifyLeafNum :: Int -> B.ByteString -> Quake ()
 verifyLeafNum leafNum errMsg =
@@ -204,7 +204,7 @@ verifyLeafNum leafNum errMsg =
 leafCluster :: Int -> Quake Int
 leafCluster leafNum =
   do verifyLeafNum leafNum "CM_LeafCluster: bad number"
-     fmap (^.clCluster) (readRef (Ref leafNum))
+     fmap (^.clCluster) (readRef (Ref Constants.noParent leafNum))
 
 clusterPHS :: Int -> Quake B.ByteString
 clusterPHS = error "CM.clusterPHS" -- TODO
@@ -381,9 +381,9 @@ toCBrushSide dBrushSide =
               , _cbsSurface = Just surfaceRef
               }
   where j = fromIntegral (dBrushSide^.dbsTexInfo)
-        planeRef = Ref (fromIntegral (dBrushSide^.dbsPlaneNum))
-        surfaceRef | j == -1 = Ref Constants.maxMapTexInfo
-                   | otherwise = Ref j
+        planeRef = Ref Constants.noParent (fromIntegral (dBrushSide^.dbsPlaneNum))
+        surfaceRef | j == -1 = Ref Constants.noParent Constants.maxMapTexInfo
+                   | otherwise = Ref Constants.noParent j
 
 loadSubmodels :: BL.ByteString -> LumpT -> Quake ()
 loadSubmodels buf lump =
@@ -429,7 +429,7 @@ loadNodes buf lump =
         readDNodes = runGet (V.replicateM count getDNodeT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
 toCNode :: DNodeT -> CNodeT
-toCNode dNode = CNodeT { _cnPlane    = Just (Ref (dNode^.dnPlaneNum))
+toCNode dNode = CNodeT { _cnPlane    = Just (Ref Constants.noParent (dNode^.dnPlaneNum))
                        , _cnChildren = dNode^.dnChildren
                        }
 
@@ -508,8 +508,8 @@ initBoxHull =
      numLeafs <- use (cmGlobals.cmNumLeafs)
      verifyModel numNodes numBrushes numLeafBrushes numBrushSides numPlanes
      cmGlobals.cmBoxHeadNode .= numNodes
-     writeRef (Ref numBrushes) (boxBrush numBrushSides)
-     writeRef (Ref numLeafs) (boxLeaf numLeafBrushes)
+     writeRef (Ref Constants.noParent numBrushes) (boxBrush numBrushSides)
+     writeRef (Ref Constants.noParent numLeafs) (boxLeaf numLeafBrushes)
      cmGlobals.cmMapLeafBrushes %= (UV.// [(numLeafBrushes, fromIntegral numBrushes)])
      mapM_ (setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs) [0..5]
   where boxBrush numBrushSides =
@@ -538,18 +538,18 @@ verifyModel numNodes numBrushes numLeafBrushes numBrushSides numPlanes =
 
 setBrushSidesNodesAndPlanes :: Int -> Int -> Int -> Int -> Quake ()
 setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx =
-  do writeRef (Ref (numBrushSides + idx)) s
+  do writeRef (Ref Constants.noParent (numBrushSides + idx)) s
      emptyLeaf <- use (cmGlobals.cmEmptyLeaf)
      boxHeadNode <- use (cmGlobals.cmBoxHeadNode)
-     writeRef (Ref (boxHeadNode + idx)) (buildNode emptyLeaf boxHeadNode)
-     writeRef (Ref (numPlanes + idx * 2)) p1
-     writeRef (Ref (numPlanes + idx * 2 + 1)) p2
+     writeRef (Ref Constants.noParent (boxHeadNode + idx)) (buildNode emptyLeaf boxHeadNode)
+     writeRef (Ref Constants.noParent (numPlanes + idx * 2)) p1
+     writeRef (Ref Constants.noParent (numPlanes + idx * 2 + 1)) p2
   where side = idx .&. 1
-        s = CBrushSideT { _cbsPlane   = Just (Ref (numPlanes + idx * 2 + side))
+        s = CBrushSideT { _cbsPlane   = Just (Ref Constants.noParent (numPlanes + idx * 2 + side))
                         , _cbsSurface = Nothing
                         }
         buildNode emptyLeaf boxHeadNode =
-          CNodeT { _cnPlane    = Just (Ref (numPlanes + idx * 2))
+          CNodeT { _cnPlane    = Just (Ref Constants.noParent (numPlanes + idx * 2))
                  , _cnChildren = calcChildren emptyLeaf boxHeadNode
                  }
         calcChildren emptyLeaf boxHeadNode =

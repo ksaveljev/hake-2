@@ -834,7 +834,7 @@ rDrawEntitiesOnList = do
     unless (drawEntities == 0) $ do
         newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
         -- draw non-transparent first
-        mapM_ drawNonTransparentEntity (fmap Ref [0..(newRefDef^.rdNumEntities)-1])
+        mapM_ drawNonTransparentEntity (fmap (Ref Constants.noParent) [0..(newRefDef^.rdNumEntities)-1])
         -- draw transparent entities
         -- we could sort these if it ever becomes a problem
         request (GL.glDepthMask (fromIntegral GL.GL_FALSE)) -- no z writes

@@ -29,6 +29,7 @@ import qualified Graphics.GL                  as GL
 import           Linear                       (V3(..), dot, _x, _y, _z, _xyz, _w)
 
 import           Client.EntityT
+import           Client.LightStyleT
 import           Client.RefDefT
 import qualified Constants
 import           Game.CPlaneT
@@ -38,6 +39,7 @@ import           QCommon.CVarVariables
 import           Render.Fast.GLLightMapStateT
 import qualified Render.Fast.Image            as Image
 import qualified Render.Fast.Light            as Light
+import qualified Render.Fast.Mesh             as Mesh
 import qualified Render.Fast.Shared           as Model
 import qualified Render.Fast.Polygon          as Polygon
 import qualified Render.Fast.Warp             as Warp
@@ -138,7 +140,7 @@ markLeaf worldModelRef worldModel vis visFrameCount idx
 -- TODO: verify that worldModel doesn't need to be refreshed upon each call
 markNode :: Ref' ModelT -> ModelT -> Maybe (Ref' MNodeT) -> Int -> Quake ()
 markNode _ _ Nothing _ = return ()
-markNode worldModelRef worldModel (Just (Ref idx)) visFrameCount
+markNode worldModelRef worldModel (Just (Ref _ idx)) visFrameCount
     | node^.mnVisFrame == visFrameCount =
         return ()
     | otherwise = do
@@ -412,7 +414,7 @@ proceedDrawWorld drawWorld newRefDef (Just worldModelRef)
             MSV.unsafeWith (MSV.drop (Constants.stride - 2) polygonBuffer) (GL.glTexCoordPointer 2 GL.GL_FLOAT (fromIntegral Constants.byteStride))
             GL.glEnableClientState GL.GL_TEXTURE_COORD_ARRAY
         checkLightmap =<< fmap (^.cvValue) glLightMapCVar
-        recursiveWorldNode worldModelRef (Ref 0) -- root node
+        recursiveWorldNode worldModelRef (Ref Constants.noParent 0) -- root node
         texture1 <- use (fastRenderAPIGlobals.frTexture1)
         request $ do
             GL.glClientActiveTextureARB (fromIntegral texture1)
@@ -427,7 +429,7 @@ proceedDrawWorld drawWorld newRefDef (Just worldModelRef)
         | otherwise = Image.glTexEnv GL.GL_MODULATE
 
 recursiveWorldNode :: Ref' ModelT -> Ref' MNodeT -> Quake ()
-recursiveWorldNode worldModelRef (Ref nodeIdx) = do
+recursiveWorldNode worldModelRef (Ref _ nodeIdx) = do
     worldModel <- readRef worldModelRef
     let node = (worldModel^.mNodes) V.! nodeIdx
     visFrameCount <- use (fastRenderAPIGlobals.frVisFrameCount)
@@ -458,7 +460,7 @@ drawNodesAndLeafs worldModelRef worldModel modelOrg plane node = do
     drawChild (MLeafChildRef leafRef) = drawLeafStuff worldModel leafRef
 
 drawLeafStuff :: ModelT -> Ref' MLeafT -> Quake ()
-drawLeafStuff worldModel (Ref leafIdx) = do
+drawLeafStuff worldModel (Ref _ leafIdx) = do
     visFrameCount <- use (fastRenderAPIGlobals.frVisFrameCount)
     nothingToDo <- checkIfNothingToDo (leaf^.mlContents) (leaf^.mlVisFrame) visFrameCount (leaf^.mlMins) (leaf^.mlMaxs)
     unless nothingToDo $ do
@@ -476,7 +478,7 @@ drawLeafStuff worldModel (Ref leafIdx) = do
 
 -- TODO: try doing everything related to worldModel^.mSurfaces via QuakeRef (see if it is possible to use loadModelRef)
 drawNodeStuff :: Ref' ModelT -> ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()
-drawNodeStuff worldModelRef worldModel node sidebit frameCount idx maxIdx
+drawNodeStuff worldModelRef@(Ref _ worldModelIdx) worldModel node sidebit frameCount idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = doDrawNodeStuff ((worldModel^.mSurfaces) V.! surfIdx)
   where
@@ -490,20 +492,20 @@ drawNodeStuff worldModelRef worldModel node sidebit frameCount idx maxIdx
             drawNodeStuff worldModelRef worldModel node sidebit frameCount (idx + 1) maxIdx
     processTextureInfo surf texInfo
         | (texInfo^.mtiFlags) .&. Constants.surfSky /= 0 =
-            Warp.rAddSkySurface (Ref surfIdx)
+            Warp.rAddSkySurface (Ref worldModelIdx surfIdx)
         | (texInfo^.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 = do
             alphaSurfaces <- use (fastRenderAPIGlobals.frAlphaSurfaces)
             modifyRef worldModelRef (\v -> v & mSurfaces.ix surfIdx.msTextureChain .~ alphaSurfaces)
-            fastRenderAPIGlobals.frAlphaSurfaces .= Just (Ref surfIdx)
+            fastRenderAPIGlobals.frAlphaSurfaces .= Just (Ref worldModelIdx surfIdx)
         | (surf^.msFlags) .&. Constants.surfDrawTurb == 0 =
-            glRenderLightmappedPoly (Ref surfIdx)
+            glRenderLightmappedPoly (Ref worldModelIdx surfIdx)
         | otherwise = do
             -- the polygon is visible, so add it to the texture sorted chain
             -- FIXME: this is a hack for animation
             imageRef <- rTextureAnimation =<< readRef (surf^.msTexInfo)
             image <- readRef imageRef
             modifyRef worldModelRef (\v -> v & mSurfaces.ix surfIdx.msTextureChain .~ image^.iTextureChain)
-            modifyRef imageRef (\v -> v & iTextureChain .~ Just (Ref surfIdx))
+            modifyRef imageRef (\v -> v & iTextureChain .~ Just (Ref worldModelIdx surfIdx))
 
 checkIfNothingToDo :: Int -> Int -> Int -> V3 Float -> V3 Float -> Quake Bool
 checkIfNothingToDo contents visFrame visFrameCount mins maxs
@@ -519,9 +521,9 @@ drawTextureChains :: Quake ()
 drawTextureChains = do
     -- TODO: c_visible_textures -- useless for us?
     numGLTextures <- use (fastRenderAPIGlobals.frNumGLTextures)
-    mapM_ renderTextureChain (fmap Ref [0..numGLTextures-1])
+    mapM_ renderTextureChain (fmap (Ref Constants.noParent) [0..numGLTextures-1])
     Image.glEnableMultiTexture False
-    mapM_ renderTextureChain2 (fmap Ref [0..numGLTextures-1])
+    mapM_ renderTextureChain2 (fmap (Ref Constants.noParent) [0..numGLTextures-1])
     Image.glTexEnv GL.GL_REPLACE
   where
     renderTextureChain imageRef = do
@@ -571,19 +573,16 @@ rTextureAnimation tex
     | isNothing (tex^.mtiNext) =
         maybe imageError return (tex^.mtiImage)
     | otherwise = do
-        currentEntityRef <- use (fastRenderAPIGlobals.frCurrentEntity)
-        currentEntity <- maybe entityError getCurrentEntity currentEntityRef
+        currentEntityRef <- maybe entityError return =<< use (fastRenderAPIGlobals.frCurrentEntity)
+        currentEntity <- readCurrentEntity currentEntityRef
         findFrame tex ((currentEntity^.eFrame) `mod` (tex^.mtiNumFrames))
   where
     imageError = do
         Com.fatalError "Surf.rTextureAnimation tex^.mtiImage is Nothing"
-        return (Ref (-1))
+        return (Ref Constants.noParent (-1))
     entityError = do
         Com.fatalError "Surf.rTextureAnimation fastRenderAPIGlobals.frCurrentEntity is Nothing"
-        return newEntityT
-    getCurrentEntity (VEntityRef entityRef) = readRef entityRef
-    getCurrentEntity (RDEntityRef entityRef) = readRef entityRef
-    getCurrentEntity (NewEntity entity) = return entity
+        return (NewEntity newEntityT)
     findFrame tex 0 = maybe imageError return (tex^.mtiImage)
     findFrame tex c = do
         texRef <- maybe texError return (tex^.mtiNext)
@@ -591,13 +590,299 @@ rTextureAnimation tex
         findFrame nextTex (c - 1)
     texError = do
         Com.fatalError "Surf.rTextureAnimation#findFrame tex^.mtiNext is Nothing"
-        return (Ref (-1))
+        return (Ref Constants.noParent (-1))
 
 glRenderLightmappedPoly :: Ref' MSurfaceT -> Quake ()
-glRenderLightmappedPoly = error "Surf.glRenderLightmappedPoly" -- TODO
+glRenderLightmappedPoly surfRef = do
+    surf <- readRef surfRef
+    newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+    frameCount <- use (fastRenderAPIGlobals.frFrameCount)
+    -- DEBUG
+    -- io $ print "SURF STYLES"
+    -- io $ putStrLn $ concatMap (printf "0x%02X ") $ B.unpack (surf^.msStyles)
+    -- io $ print "SURF CACHED LIGHT"
+    -- io $ UV.mapM_ (\v -> print v) (surf^.msCachedLight)
+    let (gotoDynamic, mapIdx) = calcGotoDynamic surf newRefDef 0 Constants.maxLightMaps
+        mapIdx' = if mapIdx == 4 then 3 else mapIdx -- this is a hack from cwei
+    -- DEBUG
+    -- io $ print ("gotoDynamic = " ++ show gotoDynamic)
+    -- io $ print ("map = " ++ show mapIdx')
+    isDynamic <- checkIfDynamic surf gotoDynamic frameCount
+    imageRef <- rTextureAnimation =<< readRef (surf^.msTexInfo)
+    -- DEBUG
+    -- io $ print ("isDynamic = " ++ show isDynamic)
+    image <- readRef imageRef
+    error "Surf.glRenderLightmappedPoly" -- TODO
+  where
+    calcGotoDynamic surf newRefDef idx maxIdx
+        | idx >= maxIdx = (False, maxIdx)
+        | (surf^.msStyles) `B.index` idx == 0xFF = (False, idx)
+        | otherwise =
+            let f = (surf^.msStyles) `B.index` idx
+                white = ((newRefDef^.rdLightStyles) V.! (fromIntegral f))^.lsWhite
+            in if white /= (surf^.msCachedLight) UV.! idx
+                 then (True, idx)
+                 else calcGotoDynamic surf newRefDef (idx + 1) maxIdx
+    checkIfDynamic surf gotoDynamic frameCount
+        | gotoDynamic || (surf^.msDLightFrame) == frameCount = do
+            dynamic <- fmap (^.cvValue) glDynamicCVar
+            doCheckIfDynamic surf dynamic
+        | otherwise = return False
+    doCheckIfDynamic surf dynamic
+        | dynamic /= 0 = do
+            texInfo <- readRef (surf^.msTexInfo)
+            return ((texInfo^.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) == 0)
+        | otherwise = return False
+{-
+    let lmtex = surf^.msLightmapTextureNum
+
+    if isDynamic
+      then do
+        let f = (surf^.msStyles) `B.index` mapIdx'
+        lmtex' <- if (f >= 32 || f == 0) && (surf^.msDLightFrame) /= frameCount
+                    then do
+                      let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+
+                      Light.rBuildLightMap surf temp 0 (smax * 4)
+                      -- io $ print "TEMPTEMPTEMP DYNAMIC"
+                      -- io $ print ("flags = " ++ show (surf^.msFlags) ++
+                      --             " fe = " ++ show (surf^.msFirstEdge) ++
+                      --             " nume = " ++ show (surf^.msNumEdges) ++
+                      --             " tex num = " ++ show (surf^.msLightmapTextureNum))
+                      -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      -- io $ print $ (concat . map (flip showHex "") . B.unpack) temp
+                      Light.rSetCacheState surfRef
+
+                      texture1 <- use $ fastRenderAPIGlobals.frTexture1
+                      glState <- use $ fastRenderAPIGlobals.frGLState
+                      Image.glMBind texture1 ((glState^.glsLightmapTextures) + (surf^.msLightmapTextureNum))
+
+                      io $ MSV.unsafeWith temp $ \ptr -> do
+                        GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                           0
+                                           (fromIntegral $ surf^.msLightS)
+                                           (fromIntegral $ surf^.msLightT)
+                                           (fromIntegral smax)
+                                           (fromIntegral tmax)
+                                           glLightmapFormat
+                                           GL.gl_UNSIGNED_BYTE
+                                           ptr
+
+                      return (surf^.msLightmapTextureNum)
+                    else do
+                      let smax = fromIntegral $ ((surf^.msExtents._1) `shiftR` 4) + 1
+                          tmax = fromIntegral $ ((surf^.msExtents._2) `shiftR` 4) + 1
+
+                      Light.rBuildLightMap surf temp 0 (smax * 4)
+                      -- io $ print "TEMPTEMPTEMP"
+                      -- io $ print ("smax = " ++ show smax ++ " tmax = " ++ show tmax)
+                      -- io $ print $ (concat . map (flip showHex "") . B.unpack) temp
+
+                      texture1 <- use $ fastRenderAPIGlobals.frTexture1
+                      glState <- use $ fastRenderAPIGlobals.frGLState
+                      Image.glMBind texture1 ((glState^.glsLightmapTextures) + 0)
+
+                      io $ MSV.unsafeWith temp $ \ptr -> do
+                        GL.glTexSubImage2D GL.gl_TEXTURE_2D
+                                           0
+                                           (fromIntegral $ surf^.msLightS)
+                                           (fromIntegral $ surf^.msLightT)
+                                           (fromIntegral $ smax)
+                                           (fromIntegral $ tmax)
+                                           glLightmapFormat
+                                           GL.gl_UNSIGNED_BYTE
+                                           ptr
+          
+                      return 0
+
+        fastRenderAPIGlobals.frCBrushPolys += 1
+
+        texture0 <- use $ fastRenderAPIGlobals.frTexture0
+        texture1 <- use $ fastRenderAPIGlobals.frTexture1
+        glState <- use $ fastRenderAPIGlobals.frGLState
+
+        Image.glMBind texture0 (image^.iTexNum)
+        Image.glMBind texture1 ((glState^.glsLightmapTextures) + lmtex')
+
+        if (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0
+          then do
+            let v = truncate ((newRefDef^.rdTime) / 40) :: Int
+                scroll = (-64) * ( ((newRefDef^.rdTime) / 40) - fromIntegral v)
+                scroll' = if scroll == 0 then -64 else scroll
+
+            drawScrollingArrays (surf^.msPolys) scroll
+
+          else
+            drawArrays (surf^.msPolys)
+
+      else do
+        fastRenderAPIGlobals.frCBrushPolys += 1
+
+        texture0 <- use $ fastRenderAPIGlobals.frTexture0
+        texture1 <- use $ fastRenderAPIGlobals.frTexture1
+        glState <- use $ fastRenderAPIGlobals.frGLState
+
+        Image.glMBind texture0 (image^.iTexNum)
+        Image.glMBind texture1 ((glState^.glsLightmapTextures) + lmtex)
+
+        if (surf^.msTexInfo.mtiFlags) .&. Constants.surfFlowing /= 0
+          then do
+            let v = truncate ((newRefDef^.rdTime) / 40) :: Int
+                scroll = (-64) * ( ((newRefDef^.rdTime) / 40) - fromIntegral v)
+                scroll' = if scroll == 0 then -64 else scroll
+
+            drawScrollingArrays (surf^.msPolys) scroll
+
+          else
+            drawArrays (surf^.msPolys)
+
+  where 
+
+        -- TODO: from Quake () to IO () ?
+        drawArrays :: Maybe GLPolyReference -> Quake ()
+        drawArrays Nothing = return ()
+        drawArrays (Just (GLPolyReference polyIdx)) = do
+          polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+          poly <- io $ MV.read polygonCache polyIdx
+          GL.glDrawArrays (fromIntegral $ QGLConstants.glPolygon)
+                          (fromIntegral $ poly^.glpPos)
+                          (fromIntegral $ poly^.glpNumVerts)
+          drawArrays (poly^.glpChain)
+
+        drawScrollingArrays :: Maybe GLPolyReference -> Float -> Quake ()
+        drawScrollingArrays Nothing _ = return ()
+        drawScrollingArrays (Just (GLPolyReference polyIdx)) scroll = do
+          polygonCache <- use $ fastRenderAPIGlobals.frPolygonCache
+          poly <- io $ MV.read polygonCache polyIdx
+          Polygon.beginScrolling poly scroll
+          GL.glDrawArrays (fromIntegral $ QGLConstants.glPolygon)
+                          (fromIntegral $ poly^.glpPos)
+                          (fromIntegral $ poly^.glpNumVerts)
+          Polygon.endScrolling poly
+          -}
 
 rRenderBrushPoly :: Ref' MSurfaceT -> Quake ()
 rRenderBrushPoly = error "Surf.rRenderBrushPoly" -- TODO
 
 rDrawBrushModel :: Ref RefDefT EntityT -> Quake ()
-rDrawBrushModel = error "Surf.rDrawBrushModel" -- TODO
+rDrawBrushModel entRef = do
+    currentModelRef <- use (fastRenderAPIGlobals.frCurrentModel)
+    maybe currentModelError (drawBrushModel entRef) currentModelRef
+  where
+    currentModelError = Com.fatalError "Surf.rDrawBrushModel currentModelRef is Nothing"
+
+drawBrushModel :: Ref RefDefT EntityT -> Ref' ModelT -> Quake ()
+drawBrushModel entRef currentModelRef = do
+    currentModel <- readRef currentModelRef
+    unless ((currentModel^.mNumModelSurfaces) == 0) $ do
+        fastRenderAPIGlobals.frCurrentEntity .= Just (RDEntityRef entRef)
+        fastRenderAPIGlobals.frGLState.glsCurrentTextures .= (-1, -1)
+        e <- readRef entRef
+        let (rotated, mins, maxs)
+                | (e^.eAngles._x) /= 0 || (e^.eAngles._y) /= 0 || (e^.eAngles._z) /= 0 =
+                    (True, fmap (subtract (currentModel^.mRadius)) (e^.eOrigin), fmap (+ (currentModel^.mRadius)) (e^.eOrigin))
+                | otherwise =
+                    (False, (e^.eOrigin) + (currentModel^.mMins), (e^.eOrigin) + (currentModel^.mMaxs))
+        ok <- rCullBox mins maxs
+        unless ok $ do
+            request (GL.glColor3f 1 1 1)
+            newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+            let modelOrg = (newRefDef^.rdViewOrg) - (e^.eOrigin)
+                modelOrg'
+                    | rotated =
+                        let org = modelOrg
+                            (forward, right, up) = Math3D.angleVectors (e^.eAngles) True True True
+                        in V3 (org `dot` forward) (negate $ org `dot` right) (org `dot` up)
+                    | otherwise = modelOrg
+            fastRenderAPIGlobals.frModelOrg .= modelOrg'
+            request (GL.glPushMatrix)
+            Mesh.rRotateForEntity (e & eAngles .~ (let V3 a b c = (e^.eAngles) in V3 (-a) b (-c)))
+            Image.glEnableMultiTexture True
+            Image.glSelectTexture =<< use (fastRenderAPIGlobals.frTexture0)
+            Image.glTexEnv GL.GL_REPLACE
+            request $ do
+                polygonBuffer <- use frPolygonBuffer
+                io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+                    GL.glInterleavedArrays GL.GL_T2F_V3F (fromIntegral Constants.byteStride) ptr
+            Image.glSelectTexture =<< use (fastRenderAPIGlobals.frTexture1)
+            Image.glTexEnv GL.GL_MODULATE
+            request $ do
+                polygonBuffer <- use frPolygonBuffer
+                io $ MSV.unsafeWith (MSV.drop (stride - 2) polygonBuffer) $ \ptr ->
+                    GL.glTexCoordPointer 2 GL.GL_FLOAT (fromIntegral Constants.byteStride) ptr
+                GL.glEnableClientState GL.GL_TEXTURE_COORD_ARRAY
+            rDrawInlineBModel
+            texture1 <- use (fastRenderAPIGlobals.frTexture1)
+            request $ do
+                GL.glClientActiveTextureARB (fromIntegral texture1)
+                GL.glDisableClientState GL.GL_TEXTURE_COORD_ARRAY
+            Image.glEnableMultiTexture False
+            request (GL.glPopMatrix)
+
+rDrawInlineBModel :: Quake ()
+rDrawInlineBModel = do
+    currentModelRef <- use (fastRenderAPIGlobals.frCurrentModel)
+    maybe currentModelError drawInlineBModel currentModelRef
+  where
+    currentModelError = Com.fatalError "Surf.rDrawInlineBModel currentModelRef is Nothing"
+
+drawInlineBModel :: Ref' ModelT -> Quake ()
+drawInlineBModel currentModelRef@(Ref _ modelIdx) = do
+    currentModel <- readRef currentModelRef
+    -- calculate dynamic lighting for bmodel
+    flashBlend <- fmap (^.cvValue) glFlashBlendCVar
+    when (flashBlend == 0) $ do
+        newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+        markLights currentModel newRefDef (Ref Constants.noParent (currentModel^.mFirstNode))
+    currentEntityRef <- maybe entityError return =<< use (fastRenderAPIGlobals.frCurrentEntity)
+    currentEntity <- readCurrentEntity currentEntityRef
+    when ((currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0) $ do
+        request $ do
+            GL.glEnable GL.GL_BLEND
+            GL.glColor4f 1 1 1 0.25
+        Image.glTexEnv GL.GL_MODULATE
+    -- draw texture
+    mapM_ (drawTexture currentModel) [0..(currentModel^.mNumModelSurfaces)-1]
+    when ((currentEntity^.enFlags) .&. Constants.rfTranslucent /= 0) $ do
+        request $ do
+            GL.glDisable GL.GL_BLEND
+            GL.glColor4f 1 1 1 1
+        Image.glTexEnv GL.GL_REPLACE
+  where
+    markLights currentModel newRefDef firstNodeRef = do
+        mapM_ (markLight currentModel (MNodeChildRef firstNodeRef) newRefDef) [0..(newRefDef^.rdNumDLights)-1]
+    markLight currentModel nodeChild newRefDef idx = do
+        Light.rMarkLights currentModelRef currentModel ((newRefDef^.rdDLights) V.! idx) (1 `shiftL` idx) nodeChild
+    entityError = do
+        Com.fatalError "Surf.drawInlineBModel fastRenderAPIGlobals.frCurrentEntity is Nothing"
+        return (NewEntity newEntityT)
+    drawTexture currentModel idx = do
+        let psurfIdx = (currentModel^.mFirstModelSurface) + idx
+            psurfRef = Ref modelIdx psurfIdx
+            psurf = (currentModel^.mSurfaces) V.! psurfIdx
+        dot' <- getDot (psurf^.msPlane)
+        -- draw the polygon
+        when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate Constants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > Constants.backfaceEpsilon) $ do
+            texInfo <- readRef (psurf^.msTexInfo)
+            doDrawTexture psurfRef psurf texInfo
+            undefined -- TODO
+    getDot Nothing = do
+        Com.fatalError "Surf.drawInlineBModel psurf^.msPlane is Nothing"
+        return 0
+    getDot (Just pplaneRef) = do
+        pplane <- readRef pplaneRef
+        modelOrg <- use (fastRenderAPIGlobals.frModelOrg)
+        return (modelOrg `dot` (pplane^.cpNormal) - (pplane^.cpDist))
+    doDrawTexture psurfRef psurf texInfo
+        | (texInfo^.mtiFlags) .&. (Constants.surfTrans33 .|. Constants.surfTrans66) /= 0 = do
+            -- add to the translucent chain
+            alphaSurfaces <- use (fastRenderAPIGlobals.frAlphaSurfaces)
+            modifyRef psurfRef (\v -> v & msTextureChain .~ alphaSurfaces)
+            fastRenderAPIGlobals.frAlphaSurfaces .= Just psurfRef
+        | (psurf^.msFlags) .&. Constants.surfDrawTurb == 0 =
+            glRenderLightmappedPoly psurfRef
+        | otherwise = do
+            Image.glEnableMultiTexture False
+            rRenderBrushPoly psurfRef
+            Image.glEnableMultiTexture True

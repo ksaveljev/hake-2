@@ -86,9 +86,9 @@ rBeginRegistration modelName = do
     fullName = B.concat ["maps/", modelName, ".bsp"]
     doBeginRegistration Nothing = Com.fatalError "Model.rBeginRegistration flushMap is Nothing"
     doBeginRegistration (Just flushMap) = do
-        model <- readRef (Ref 0)
+        model <- readRef (Ref Constants.noParent 0)
         when ((model^.mName) /= fullName || (flushMap^.cvValue) /= 0) $
-            modFree (Ref 0)
+            modFree (Ref Constants.noParent 0)
         modelRef <- modForName fullName True
         fastRenderAPIGlobals.frWorldModel .= modelRef
         fastRenderAPIGlobals.frViewCluster .= (-1)
@@ -147,7 +147,7 @@ rEndRegistration :: Quake ()
 rEndRegistration = do
     modNumKnown <- use (fastRenderAPIGlobals.frModNumKnown)
     regSeq <- use (fastRenderAPIGlobals.frRegistrationSequence)
-    mapM_ (checkModel regSeq) (fmap Ref [0..modNumKnown-1])
+    mapM_ (checkModel regSeq) (fmap (Ref Constants.noParent) [0..modNumKnown-1])
     Image.glFreeUnusedImages
   where
     checkModel regSeq modelRef = do
@@ -183,7 +183,7 @@ modForName name crash
     | BC.head name == '*' = getInlineModel name
     | otherwise = do
         modKnown <- use (fastRenderAPIGlobals.frModKnown)
-        maybe (loadModel modKnown name crash) (return . Just . Ref) (findExisting modKnown)
+        maybe (loadModel modKnown name crash) (return . Just . (Ref Constants.noParent)) (findExisting modKnown)
   where
     findExisting = V.findIndex (\m -> (m^.mName) == name)
 
@@ -192,7 +192,7 @@ getInlineModel name = do
     worldModelRef <- use (fastRenderAPIGlobals.frWorldModel)
     err <- checkForError worldModelRef
     when err $ Com.comError Constants.errDrop "bad inline model number"
-    return (Just (Ref (idx + Constants.maxModKnown)))
+    return (Just (Ref Constants.noParent (idx + Constants.maxModKnown)))
   where
     idx = Lib.atoi (B.drop 1 name)
     checkForError Nothing = return True
@@ -205,7 +205,7 @@ getInlineModel name = do
 loadModel :: V.Vector ModelT -> B.ByteString -> Bool -> Quake (Maybe (Ref' ModelT))
 loadModel modKnown name crash = do
     request $ io $ B.putStrLn ("LOAD MODEL FFS" `B.append` name)
-    emptySpotRef <- maybe noEmptySpot (return . Ref) (findFree modKnown)
+    emptySpotRef <- maybe noEmptySpot (return . (Ref Constants.noParent)) (findFree modKnown)
     modifyRef emptySpotRef (\v -> v & mName .~ name)
     fileHandle <- FS.fOpenFileWithLength name
     maybe (modelNotFound emptySpotRef) (doLoadModel name emptySpotRef) fileHandle
@@ -216,7 +216,7 @@ loadModel modKnown name crash = do
         when (modNumKnown == Constants.maxModKnown) $
             Com.comError Constants.errDrop "mod_numknown == MAX_MOD_KNOWN"
         fastRenderAPIGlobals.frModNumKnown += 1
-        return (Ref modNumKnown)
+        return (Ref Constants.noParent modNumKnown)
     modelNotFound emptySpotRef = do
         when crash $
             Com.comError Constants.errDrop (B.concat ["Mod_NumForName: ", name, " not found\n"])
@@ -315,7 +315,7 @@ loadBrushModel modelRef buf = do
     header = runGet getDHeaderT buf
     lumps = header^.dhLumps
     checkModelRef loadModelRef =
-        when (loadModelRef /= (Ref 0)) $
+        when (loadModelRef /= (Ref Constants.noParent 0)) $
             Com.comError Constants.errDrop "Loaded a brush model after the world"
     checkHeader =
       when ((header^.dhVersion) /= Constants.bspVersion) $ do
@@ -408,9 +408,9 @@ toCPlane dPlane = CPlaneT { _cpNormal   = dPlane^.dpNormal
 loadTexInfo :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadTexInfo loadModelRef buf lump = do
     checkLump
-    texInfo <- V.mapM toMTexInfo readTexInfo
+    texInfo <- V.mapM (toMTexInfo loadModelRef) readTexInfo
     modifyRef loadModelRef (\v -> v & mNumTexInfo .~ count
-                                    & mTexInfo .~ V.imap (countAnimationFrames texInfo) texInfo)
+                                    & mTexInfo .~ V.imap (countAnimationFrames loadModelRef texInfo) texInfo)
   where
     checkLump =
         when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $ do
@@ -419,14 +419,14 @@ loadTexInfo loadModelRef buf lump = do
     count = (lump^.lFileLen) `div` texInfoTSize
     readTexInfo = runGet (V.replicateM count getTexInfoT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-toMTexInfo :: TexInfoT -> Quake MTexInfoT
-toMTexInfo texInfo = do
+toMTexInfo :: Ref' ModelT -> TexInfoT -> Quake MTexInfoT
+toMTexInfo (Ref _ modelIdx) texInfo = do
     foundImage <- Image.glFindImage name Constants.itWall
     imageRef <- maybe returnNoTexture return foundImage
     return MTexInfoT { _mtiVecs = texInfo^.tiVecs
                      , _mtiFlags = texInfo^.tiFlags
                      , _mtiNumFrames = 1
-                     , _mtiNext = if (texInfo^.tiNextTexInfo) > 0 then Just (Ref (texInfo^.tiNextTexInfo)) else Nothing
+                     , _mtiNext = if (texInfo^.tiNextTexInfo) > 0 then Just (Ref modelIdx (texInfo^.tiNextTexInfo)) else Nothing
                      , _mtiImage = Just imageRef
                      }
   where
@@ -435,12 +435,12 @@ toMTexInfo texInfo = do
         VID.printf Constants.printAll (B.concat ["Couldn't load ", name, "\n"])
         use (fastRenderAPIGlobals.frNoTexture)
 
-countAnimationFrames :: V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
-countAnimationFrames texInfo idx currentTexInfo =
-    currentTexInfo & mtiNumFrames .~ countFrames (Ref idx) (currentTexInfo^.mtiNext) 1
+countAnimationFrames :: Ref' ModelT -> V.Vector MTexInfoT -> Int -> MTexInfoT -> MTexInfoT
+countAnimationFrames (Ref _ modelIdx) texInfo idx currentTexInfo =
+    currentTexInfo & mtiNumFrames .~ countFrames (Ref modelIdx idx) (currentTexInfo^.mtiNext) 1
   where
     countFrames _ Nothing count = count
-    countFrames initialRef (Just currentRef@(Ref currentIdx)) count
+    countFrames initialRef (Just currentRef@(Ref _ currentIdx)) count
         | currentRef == initialRef = count
         | otherwise = countFrames initialRef ((texInfo V.! currentIdx)^.mtiNext) (count + 1)
 
@@ -462,7 +462,7 @@ loadFaces loadModelRef buf lump = do
     dFaces = runGet (V.replicateM count getDFaceT) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
 constructMSurfaceT :: Ref' ModelT -> Int -> DFaceT -> Quake ()
-constructMSurfaceT loadModelRef idx dFace = do
+constructMSurfaceT loadModelRef@(Ref _ modelIdx) idx dFace = do
     model <- readRef loadModelRef
     when (ti < 0 || ti >= (model^.mNumTexInfo)) $
         Com.comError Constants.errDrop "MOD_LoadBmodel: bad texinfo number"
@@ -470,8 +470,8 @@ constructMSurfaceT loadModelRef idx dFace = do
                                   & msNumEdges .~ fromIntegral (dFace^.dfNumEdges)
                                   & msFlags .~ (if (dFace^.dfSide) /= 0 then Constants.surfPlaneBack else 0)
                                   & msPolys .~ Nothing
-                                  & msPlane .~ Just (Ref (fromIntegral (dFace^.dfPlaneNum)))
-                                  & msTexInfo .~ (Ref ti)
+                                  & msPlane .~ Just (Ref Constants.noParent (fromIntegral (dFace^.dfPlaneNum)))
+                                  & msTexInfo .~ (Ref modelIdx ti)
                                   & msStyles .~ dFace^.dfStyles -- TODO: should we limit it by Constants.maxLightMaps ?
                                   & msSamples .~ if (dFace^.dfLightOfs) == -1 then Nothing else Just (dFace^.dfLightOfs))
     calcSurfaceExtents loadModelRef surfaceRef
@@ -479,7 +479,7 @@ constructMSurfaceT loadModelRef idx dFace = do
     createLightmaps surfaceRef (model^.mLightdata)
     createPolygons surfaceRef
   where
-    surfaceRef = Ref idx
+    surfaceRef = Ref modelIdx idx
     ti = fromIntegral (dFace^.dfTexInfo)
 
 calcSurfaceExtents :: Ref' ModelT -> Ref' MSurfaceT -> Quake ()
@@ -542,7 +542,7 @@ createPolygons surfaceRef = do
         Surf.glBuildPolygonFromSurface surfaceRef
 
 loadMarkSurfaces :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
-loadMarkSurfaces loadModelRef buf lump = do
+loadMarkSurfaces loadModelRef@(Ref _ modelIdx) buf lump = do
     checkLump
     modifyRef loadModelRef (\v -> v & mNumMarkSurfaces .~ count
                                     & mMarkSurfaces .~ V.map toMSurfaceRef getMarkSurfaces)
@@ -553,7 +553,7 @@ loadMarkSurfaces loadModelRef buf lump = do
             model <- readRef loadModelRef
             Com.comError Constants.errDrop ("MOD_LoadBmodel: funny lump size in " `B.append` (model^.mName))
     getMarkSurfaces = runGet (V.replicateM count getWord16le) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
-    toMSurfaceRef idx = Ref (fromIntegral idx)
+    toMSurfaceRef idx = Ref modelIdx (fromIntegral idx)
 
 loadVisibility :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
 loadVisibility loadModelRef buf lump
@@ -610,7 +610,7 @@ toMNode dNode = MNodeT { _mnContents     = (-1) -- differentiate from leafs
                        , _mnMins         = fmap fromIntegral (dNode^.dnMins)
                        , _mnMaxs         = fmap fromIntegral (dNode^.dnMaxs)
                        , _mnParent       = Nothing
-                       , _mnPlane        = Ref (dNode^.dnPlaneNum)
+                       , _mnPlane        = Ref Constants.noParent (dNode^.dnPlaneNum)
                        , _mnChildren     = getChildren (dNode^.dnChildren)
                        , _mnFirstSurface = fromIntegral (dNode^.dnFirstFace)
                        , _mnNumSurfaces  = fromIntegral (dNode^.dnNumFaces)
@@ -619,11 +619,11 @@ toMNode dNode = MNodeT { _mnContents     = (-1) -- differentiate from leafs
 getChildren :: (Int, Int) -> (MNodeChild, MNodeChild)
 getChildren (p1, p2) =
           let a = if p1 >= 0
-                    then MNodeChildRef (Ref p1)
-                    else MLeafChildRef (Ref ((-1) - p1))
+                    then MNodeChildRef (Ref Constants.noParent p1)
+                    else MLeafChildRef (Ref Constants.noParent ((-1) - p1))
               b = if p2 >= 0
-                    then MNodeChildRef (Ref p2)
-                    else MLeafChildRef (Ref ((-1) - p2))
+                    then MNodeChildRef (Ref Constants.noParent p2)
+                    else MLeafChildRef (Ref Constants.noParent ((-1) - p2))
           in (a, b)
 
 loadSubmodels :: Ref' ModelT -> BL.ByteString -> LumpT -> Quake ()
@@ -676,7 +676,7 @@ setupSubmodel loadModelRef model idx = do
         writeRef loadModelRef starMod
     modifyRef starModRef (\v -> v & mNumLeafs .~ bm^.mmVisLeafs)
   where
-    starModRef = Ref (idx + Constants.maxModKnown)
+    starModRef = Ref Constants.noParent (idx + Constants.maxModKnown)
     bm = (model^.mSubModels) V.! idx
 
 -- TODO: old implemenation, needs some refactoring
@@ -726,9 +726,9 @@ collectIndexElements (x:xs) idx pos acc =
 
 pointInLeaf :: V3 Float -> ModelT -> Quake MLeafT
 pointInLeaf p model =
-    findLeaf (MNodeChildRef (Ref 0))
+    findLeaf (MNodeChildRef (Ref Constants.noParent 0))
   where
-    findLeaf (MNodeChildRef (Ref idx)) = do
+    findLeaf (MNodeChildRef (Ref _ idx)) = do
         let node = (model^.mNodes) V.! idx
         plane <- readRef (node^.mnPlane)
         let d = p `dot` (plane^.cpNormal) - (plane^.cpDist)
@@ -736,7 +736,7 @@ pointInLeaf p model =
                 | d > 0 = node^.mnChildren._1
                 | otherwise = node^.mnChildren._2
         case childRef of
-            MLeafChildRef (Ref leafIdx) -> return ((model^.mLeafs) V.! leafIdx)
+            MLeafChildRef (Ref _ leafIdx) -> return ((model^.mLeafs) V.! leafIdx)
             nodeChildRef -> findLeaf nodeChildRef
     findLeaf (MLeafChildRef _) = do
         error "Model.pointInLeaf should never happen!" -- TODO

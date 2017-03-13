@@ -14,6 +14,8 @@ __date__ = "2003" :: B.ByteString
 
 baseDirName = "baseq2" :: B.ByteString
 
+noParent = -1 :: Int
+
 weaponReady      = 0 :: Int
 weaponActivating = 1 :: Int
 weaponDropping   = 2 :: Int

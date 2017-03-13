@@ -107,11 +107,11 @@ sendDataToRelevantClients area1 reliable mask = do
     SZ.clear (svGlobals.svServer.sMulticast)
   where
     readClient idx = do
-        client <- readRef (Ref idx) :: Quake ClientT
-        return (Ref idx, client)
+        client <- readRef (Ref Constants.noParent idx) :: Quake ClientT
+        return (Ref Constants.noParent idx, client)
 
 sendDataToClient :: Int -> Bool -> Maybe B.ByteString -> (Ref' ClientT, ClientT) -> Quake ()
-sendDataToClient area1 reliable mask (Ref idx, client) = do
+sendDataToClient area1 reliable mask (Ref _ idx, client) = do
     done <- checkClient
     unless done $ do
         buf <- use (svGlobals.svServer.sMulticast.sbData)
@@ -176,8 +176,8 @@ sendClientMessages = do
         maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
         mapM_ (readClient >=> sendClientMessage) [0..maxClients-1]
     readClient idx = do
-        client <- readRef (Ref idx) :: Quake ClientT
-        return (Ref idx, client)
+        client <- readRef (Ref Constants.noParent idx) :: Quake ClientT
+        return (Ref Constants.noParent idx, client)
 
 sendClientMessage :: (Ref' ClientT, ClientT) -> Quake ()
 sendClientMessage (clientRef, client)
@@ -187,7 +187,7 @@ sendClientMessage (clientRef, client)
     | otherwise = return ()
 
 checkReliableMessageOverflow :: Ref' ClientT -> ClientT -> Quake ()
-checkReliableMessageOverflow clientRef@(Ref idx) client
+checkReliableMessageOverflow clientRef@(Ref _ idx) client
     | client^.cNetChan.ncMessage.sbOverflowed = do -- reliable message overflowed, drop the client
         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncMessage)
         SZ.clear (svGlobals.svServerStatic.ssClients.ix idx.cDatagram)
@@ -196,7 +196,7 @@ checkReliableMessageOverflow clientRef@(Ref idx) client
     | otherwise = return ()
 
 sendToClient :: Ref' ClientT -> ClientT -> Int -> Quake ()
-sendToClient clientRef@(Ref idx) client state
+sendToClient clientRef@(Ref _ idx) client state
     | state `elem` [Constants.ssCinematic, Constants.ssDemo, Constants.ssPic] = do
         msg <- use (svGlobals.svMsgBuf)
         NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) (B.length msg) msg

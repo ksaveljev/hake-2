@@ -169,7 +169,7 @@ addTEnts = do
 addBeams :: Quake ()
 addBeams = do
     cl <- use (globals.gCl)
-    mapM_ (addBeam cl) (fmap Ref [0..Constants.maxBeams-1])
+    mapM_ (addBeam cl) (fmap (Ref Constants.noParent) [0..Constants.maxBeams-1])
 
 addBeam :: ClientStateT -> Ref' BeamT -> Quake ()
 addBeam cl beamRef = do
@@ -241,7 +241,7 @@ addPlayerBeams :: Quake ()
 addPlayerBeams = do
     cl <- use (globals.gCl)
     handMultiplier <- getHandMultiplier
-    mapM_ (addPlayerBeam cl handMultiplier) (fmap Ref [0..Constants.maxBeams-1])
+    mapM_ (addPlayerBeam cl handMultiplier) (fmap (Ref Constants.noParent) [0..Constants.maxBeams-1])
   where
     getHandMultiplier = do
         hand <- CVar.findVar "hand"
@@ -413,7 +413,7 @@ addPlayerBeam cl handMultiplier beamRef = do
 addExplosions :: Quake ()
 addExplosions = do
     cl <- use (globals.gCl)
-    mapM_ (addExplosion cl) (fmap Ref [0..Constants.maxExplosions-1])
+    mapM_ (addExplosion cl) (fmap (Ref Constants.noParent) [0..Constants.maxExplosions-1])
 
 addExplosion :: ClientStateT -> Ref' ExplosionT -> Quake ()
 addExplosion cl explosionRef = do
@@ -474,7 +474,7 @@ addExplosion cl explosionRef = do
 addLasers :: Quake ()
 addLasers = do
     time <- use (globals.gCl.csTime)
-    mapM_ (addLaser time) (fmap Ref [0..Constants.maxLasers-1])
+    mapM_ (addLaser time) (fmap (Ref Constants.noParent) [0..Constants.maxLasers-1])
   where
     addLaser time laserRef = do
         laser <- readRef laserRef
@@ -484,7 +484,7 @@ addLasers = do
 processSustain :: Quake ()
 processSustain = do
     time <- use (globals.gCl.csTime)
-    mapM_ (process time) (fmap Ref [0..Constants.maxSustains-1])
+    mapM_ (process time) (fmap (Ref Constants.noParent) [0..Constants.maxSustains-1])
   where
     process time sustainRef = do
         sustain <- readRef sustainRef

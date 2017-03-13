@@ -248,7 +248,7 @@ parseStartSoundPacket = do
     -- TODO: research if we need this:
     -- if (null == Globals.cl.sound_precache[sound_num])
     --      return;
-    S.startSound pos (Ref ent) channel sound volume attenuation ofs
+    S.startSound pos (Ref Constants.noParent ent) channel sound volume attenuation ofs
   where
     getVolume flags
         | flags .&. Constants.sndVolume /= 0 =

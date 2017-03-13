@@ -140,7 +140,7 @@ checkTimeouts =
 proceedCheckTimeouts :: Int -> CVarT -> CVarT -> Quake ()
 proceedCheckTimeouts realTime timeout zombieTime =
   do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
-     mapM_ (checkClientTimeout realTime dropPoint zombiePoint . Ref) [0..maxClients-1]
+     mapM_ (checkClientTimeout realTime dropPoint zombiePoint . (Ref Constants.noParent)) [0..maxClients-1]
   where dropPoint = realTime - truncate (1000 * (timeout^.cvValue))
         zombiePoint = realTime - truncate (1000 * (zombieTime^.cvValue))
 
@@ -185,7 +185,7 @@ checkClientPackets :: Int -> Int -> Int -> Quake Int
 checkClientPackets qport idx maxIdx
   | idx >= maxIdx = return idx
   | otherwise =
-      do client <- readRef (Ref idx)
+      do client <- readRef (Ref Constants.noParent idx)
          netAdr <- use (globals.gNetFrom)
          checkClientPacket client netAdr qport idx maxIdx
 
@@ -205,15 +205,15 @@ checkClientPacket client netAdr qport idx maxIdx
               modifyRef clientRef (\v -> v & cLastMessage .~ realTime)
               SVUser.executeClientMessage clientRef
          return idx
-  where clientRef = Ref idx :: Ref' ClientT
+  where clientRef = Ref Constants.noParent idx :: Ref' ClientT
 
 calcPings :: Quake ()
 calcPings =
   do maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
      mapM_ (readClient >=> updateClientPing) [0..maxClients-1]
   where readClient idx =
-          do client <- readRef (Ref idx) :: Quake ClientT
-             return (Ref idx, client)
+          do client <- readRef (Ref Constants.noParent idx) :: Quake ClientT
+             return (Ref Constants.noParent idx, client)
 
 updateClientPing :: (Ref' ClientT, ClientT) -> Quake ()
 updateClientPing (clientRef, client)
@@ -313,7 +313,7 @@ prepWorldFrame =
   do numEdicts <- use (gameBaseGlobals.gbNumEdicts)
      mapM_ resetEdictEvent [0..numEdicts-1]
   where resetEdictEvent idx =
-          modifyRef (Ref idx) (\v -> v & eEntityState.esEvent .~ 0)
+          modifyRef (Ref Constants.noParent idx) (\v -> v & eEntityState.esEvent .~ 0)
 
 statusString :: Quake B.ByteString
 statusString =
@@ -335,10 +335,10 @@ collectStatusString acc client
              readRef =<< maybe gClientError return (edict^.eClient)
         edictError =
           do Com.fatalError "SVMain.collectStatusString client^.cEdict is Nothing"
-             return (Ref (-1))
+             return (Ref Constants.noParent (-1))
         gClientError =
           do Com.fatalError "SVMain.collectStatusString edict^.eClient is Nothing"
-             return (Ref (-1))
+             return (Ref Constants.noParent (-1))
 
 appendClientInfo :: B.ByteString -> ClientT -> GClientT -> B.ByteString
 appendClientInfo acc client gClient
@@ -439,7 +439,7 @@ doDirectConnect adr qport challenge attractLoop userInfo
         serverFull =
           do NetChannel.outOfBandPrint Constants.nsServer adr "print\nServer is full.\n"
              Com.dprintf "Rejected a connection.\n"
-        foundEmptySlot idx = gotNewClient (Ref idx) challenge userInfo adr qport
+        foundEmptySlot idx = gotNewClient (Ref Constants.noParent idx) challenge userInfo adr qport
 
 findAndReuseIPSlot :: V.Vector ClientT -> NetAdrT -> Int -> Int -> B.ByteString -> Int -> Int -> Quake Bool
 findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
@@ -460,23 +460,23 @@ findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
                  return True
           | otherwise =
               do Com.printf (NET.adrToString adr `B.append` ":reconnect\n")
-                 gotNewClient (Ref idx) challenge userInfo adr qport
+                 gotNewClient (Ref Constants.noParent idx) challenge userInfo adr qport
                  return True
 
 svcRemoteCommand :: Quake ()
 svcRemoteCommand = error "SVMain.svcRemoteCommand" -- TODO
 
 gotNewClient :: Ref' ClientT -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
-gotNewClient clientRef@(Ref idx) challenge userInfo adr qport =
+gotNewClient clientRef@(Ref _ idx) challenge userInfo adr qport =
   do svGlobals.svClient .= Just clientRef
      modifyRef clientRef (\v -> v & cEdict .~ Just edictRef
                                   & cChallenge .~ challenge)
      (allowed, userInfo') <- PlayerClient.clientConnect edictRef userInfo
      checkConnectionAllowed clientRef adr qport allowed userInfo'
-  where edictRef = Ref (idx + 1)
+  where edictRef = Ref Constants.noParent (idx + 1)
 
 checkConnectionAllowed :: Ref' ClientT -> NetAdrT -> Int -> Bool -> B.ByteString -> Quake ()
-checkConnectionAllowed clientRef@(Ref idx) adr qport allowed userInfo
+checkConnectionAllowed clientRef@(Ref _ idx) adr qport allowed userInfo
   | not allowed =
       do value <- Info.valueForKey userInfo "rejmsg"
          printRefusedMessage value
@@ -493,7 +493,7 @@ checkConnectionAllowed clientRef@(Ref idx) adr qport allowed userInfo
           | otherwise = NetChannel.outOfBandPrint Constants.nsServer adr (B.concat ["print\n", str, "\nConnection refused.\n"])
 
 initAndAddClient :: Ref' ClientT -> Quake ()
-initAndAddClient clientRef@(Ref idx) =
+initAndAddClient clientRef@(Ref _ idx) =
   do SZ.initialize (svGlobals.svServerStatic.ssClients.ix idx.cDatagram) B.empty Constants.maxMsgLen
      realTime <- use (svGlobals.svServerStatic.ssRealTime)
      modifyRef clientRef (\v -> v & cDatagram.sbAllowOverflow .~ True
