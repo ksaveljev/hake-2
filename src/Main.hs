@@ -1,4 +1,10 @@
 module Main where
 
+import           System.IO (hSetBuffering, stdout, BufferMode(NoBuffering))
+
+import           Quake     (runQuake)
+
 main :: IO ()
-main = error "main" -- TODO
+main =
+  do hSetBuffering stdout NoBuffering
+     runQuake
