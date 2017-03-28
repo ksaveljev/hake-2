@@ -31,10 +31,6 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.UI.GLFW as GLFW
 import qualified Graphics.GL as GL
 
-import Client.ClientStaticT
-import Client.ConsoleT
-import Client.DirtyT
-import Client.DLightT
 import Client.FrameT
 import Client.KButtonT
 import Client.LightStyleT
@@ -2015,6 +2011,58 @@ data ExplosionT =
              , _eStart      :: Float
              , _eBaseFrame  :: !Int
              }
+
+data ClientStaticT = ClientStaticT
+    { _csState              :: Int
+    , _csKeyDest            :: Int
+    , _csFrameCount         :: Int
+    , _csRealTime           :: Int
+    , _csFrameTime          :: Float
+    , _csDisableScreen      :: Float
+    , _csDisableServerCount :: Int
+    , _csServerName         :: B.ByteString
+    , _csConnectTime        :: Float
+    , _csQuakePort          :: Int
+    , _csNetChan            :: NetChanT
+    , _csServerProtocol     :: Int
+    , _csChallenge          :: Int
+    , _csDownload           :: Maybe Handle
+    , _csDownloadTempName   :: B.ByteString
+    , _csDownloadName       :: B.ByteString
+    , _csDownloadNumber     :: Int
+    , _csDownloadType       :: Int
+    , _csDownloadPercent    :: Int
+    , _csDemoRecording      :: Bool
+    , _csDemoWaiting        :: Bool
+    , _csDemoFile           :: Maybe Handle
+    }
+
+data ConsoleT = ConsoleT
+    { _cInitialized :: Bool
+    , _cText        :: MSV.IOVector Char
+    , _cCurrent     :: Int
+    , _cX           :: Int
+    , _cDisplay     :: Int
+    , _cOrMask      :: Int
+    , _cLineWidth   :: Int
+    , _cTotalLines  :: Int
+    , _cCursorSpeed :: Float
+    , _cVisLines    :: Int
+    , _cTimes       :: UV.Vector Float
+    }
+
+data DirtyT = DirtyT
+    { _x1 :: Int
+    , _x2 :: Int
+    , _y1 :: Int
+    , _y2 :: Int
+    }
+
+data DLightT = DLightT
+    { _dlOrigin    :: V3 Float
+    , _dlColor     :: V3 Float
+    , _dlIntensity :: Float
+    }
 
 data CLTEntGlobals =
   CLTEntGlobals { _clteExplosions         :: V.Vector (IORef ExplosionT)

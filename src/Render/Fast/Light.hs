@@ -19,6 +19,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.GL as GL
 
+import Internal
 import Quake
 import QuakeState
 import CVarVariables

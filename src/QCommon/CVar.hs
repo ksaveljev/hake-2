@@ -76,7 +76,6 @@ variableString varName = do
 
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar varName = do
-    liftIO (B.putStrLn $ "varName = " `B.append` varName)
     vars <- use $ globals.cvarVars
     return $ Map.lookup varName vars
 

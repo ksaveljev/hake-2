@@ -1,20 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.DLightT where
+module Client.DLightT
+    ( module Client.DLightT
+    ) where
 
-import Linear (V3(..))
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
+import           Linear       (V3(..))
 
-data DLightT =
-  DLightT { _dlOrigin    :: V3 Float
-          , _dlColor     :: V3 Float
-          , _dlIntensity :: Float
-          }
+import           Internal
 
 makeLenses ''DLightT
 
 newDLightT :: DLightT
-newDLightT =
-  DLightT { _dlOrigin    = V3 0 0 0
-          , _dlColor     = V3 0 0 0
-          , _dlIntensity = 0
-          }
+newDLightT = DLightT
+    { _dlOrigin    = V3 0 0 0
+    , _dlColor     = V3 0 0 0
+    , _dlIntensity = 0
+    }
