@@ -54,6 +54,7 @@ data QuakeState = QuakeState
     , _clTEntGlobals         :: CLTEntGlobals
     , _kbdGlobals            :: KBDGlobals
     , _netChannelGlobals     :: NetChannelGlobals
+    , _glfwbGlobals          :: GLFWbGlobals
     }
 
 data Globals = Globals
@@ -553,6 +554,14 @@ data KBDGlobals = KBDGlobals
 
 data NetChannelGlobals = NetChannelGlobals
     { _ncSend :: SizeBufT
+    }
+
+data GLFWbGlobals = GLFWbGlobals
+    { _glfwbOldDisplayMode :: Maybe GLFW.VideoMode
+    , _glfwbWindow         :: Maybe GLFW.Window
+    , _glfwbWindowXPos     :: Int
+    , _glfwbWindowYPos     :: Int
+    , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
     }
 
 data CinematicsT = CinematicsT
@@ -2190,6 +2199,14 @@ data MenuItemRef = MenuListRef (Ref MenuListS)
                  | MenuSeparatorRef (Ref MenuSeparatorS)
                  | MenuFieldRef (Ref MenuFieldS)
                  deriving Eq
+
+data GLFWKBDEvent = KeyPress GLFW.Key
+                  | KeyRelease GLFW.Key
+                  | CursorPosition Double Double
+                  | MouseButtonPress GLFW.MouseButton
+                  | MouseButtonRelease GLFW.MouseButton
+                  | MouseWheelScroll Double
+                  | ConfigureNotify
 
 data KeyFuncT = KeyFuncT
     { _kfName :: B.ByteString

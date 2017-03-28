@@ -47,6 +47,7 @@ import qualified Sound.S               as S
 import qualified Sys.IN                as IN
 import           Sys.KBD
 import           Types
+import           Util.Binary           (encode)
 
 resolutions :: V.Vector B.ByteString
 resolutions = V.fromList
@@ -184,7 +185,59 @@ tryMode vidRef (Just glMode)
     fallBackError = Com.fatalError (B.concat ["Couldn't fall back to ", vidRef^.cvString, " refresh!"])
 
 getModeInfo :: Int -> Quake (Maybe (Int, Int))
-getModeInfo = error "VID.getModeInfo" -- TODO
+getModeInfo mode = do
+    maybe initModeList (const (return ())) =<< use (vidGlobals.vgFSModes)
+    modes <- getModes =<< fullScreenValue
+    return (modeInfo modes mode)
+  where
+    fullScreenValue = fmap (^.cvValue) vidFullScreenCVar
+    getModes fullScreen
+        | fullScreen /= 0 = maybe vidModesError return =<< use (vidGlobals.vgFSModes)
+        | otherwise = use (vidGlobals.vgVidModes)
+    vidModesError = do
+        Com.fatalError "VID.getModeInfo vidGlobals.vgFSModes is Nothing"
+        return V.empty
+
+initModeList :: Quake ()
+initModeList = do
+    renderer <- use (globals.gRenderer)
+    updateModes =<< renderer^.rRefExport.reGetModeList
+
+updateModes :: V.Vector VideoMode -> Quake ()
+updateModes modes = do
+    vidGlobals.vgFSModes .= Just fsModes
+    vidGlobals.vgFSResolutions .= fsResolutions
+  where
+    (fsResolutions, fsModes) = V.unzip (V.imap parseMode modes)
+
+parseMode :: Int -> VideoMode -> (B.ByteString, VidModeT)
+parseMode idx mode = (res', VidModeT m width height idx)
+  where
+    width = getVideoModeWidth mode
+    height = getVideoModeHeight mode
+    widthS = encode width
+    heightS = encode height
+    res = B.concat ["[", widthS, " ", heightS]
+    len = B.length res
+    resLine | len < 10 = res `B.append` BC.replicate (10 - len) ' '
+            | otherwise = res
+    res' = resLine `B.append` "]"
+    m = B.concat ["Mode ", encode idx, widthS, "x", heightS]
+
+modeInfo :: V.Vector VidModeT -> Int -> Maybe (Int, Int)
+modeInfo modes mode
+    | mode < 0 || mode > V.length modes = Nothing
+    | otherwise = Just (m^.vmWidth, m^.vmHeight)
+  where
+    m = modes V.! mode
+
+getVideoModeWidth :: VideoMode -> Int
+getVideoModeWidth (GLFWbVideoMode mode) = GLFW.videoModeWidth mode
+getVideoModeWidth DummyVideoMode = 640
+
+getVideoModeHeight :: VideoMode -> Int
+getVideoModeHeight (GLFWbVideoMode mode) = GLFW.videoModeHeight mode
+getVideoModeHeight DummyVideoMode = 480
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
@@ -444,7 +497,9 @@ menuKeyF :: KeyFuncT
 menuKeyF = error "VID.menuKeyF" -- TODO
 
 newWindow :: Int -> Int -> Quake ()
-newWindow = error "VID.newWindow" -- TODO
+newWindow width height = do
+    globals.gVidDef.vdNewWidth .= width
+    globals.gVidDef.vdNewHeight .= height
 
 printf :: Int -> B.ByteString -> Quake ()
 printf printLevel str
@@ -455,4 +510,13 @@ restartF :: XCommandT
 restartF = error "VID.restartF" -- TODO
 
 shutdown :: Quake ()
-shutdown = error "VID.shutdown" -- TODO
+shutdown =
+    proceedShutdown =<< use (vidGlobals.vgRefLibActive)
+  where
+    proceedShutdown False = return ()
+    proceedShutdown True = do
+        renderer <- use (globals.gRenderer)
+        renderer^.rRefExport.reGetKeyboardHandler.kbdClose
+        IN.shutdown
+        renderer^.rRefExport.reShutDown
+        freeRefLib

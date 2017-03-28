@@ -2,6 +2,7 @@ module Game.PlayerClient
     ( clientBegin
     , clientBeginServerFrame
     , clientConnect
+    , clientThink
     , clientUserInfoChanged
     , saveClientData
     , spInfoPlayerCoop
@@ -202,3 +203,6 @@ initClientResp gClientRef = do
 
 clientBegin :: Ref EdictT -> Quake ()
 clientBegin = error "PlayerClient.clientBegin" -- TODO
+
+clientThink :: Ref EdictT -> UserCmdT -> Quake ()
+clientThink = error "PlayerClient.clientThink" -- TODO

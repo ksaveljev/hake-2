@@ -27,6 +27,7 @@ import           QCommon.FSGlobals                as X
 import           QCommon.NetChannelGlobals        as X
 import           QCommon.PMoveGlobals             as X
 import           Render.Fast.FastRenderAPIGlobals as X
+import           Render.GLFWbGlobals              as X
 import           Server.SVGlobals                 as X
 import           Sys.INGlobals                    as X
 import           Sys.KBDGlobals                   as X
@@ -63,4 +64,5 @@ initialQuakeState = QuakeState
     , _clTEntGlobals        = initialCLTEntGlobals
     , _kbdGlobals           = initialKBDGlobals
     , _netChannelGlobals    = initialNetChannelGlobals
+    , _glfwbGlobals         = initialGLFWbGlobals
     }

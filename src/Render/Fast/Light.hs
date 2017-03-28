@@ -8,6 +8,8 @@ module Render.Fast.Light
     , rSetCacheState
     ) where
 
+import           Debug.Trace (trace)
+
 import           Control.Lens                 (use, ix, (^.), (.=), (&), (.~), (%~), _1, _2)
 import           Control.Monad                (void, when, unless)
 import           Control.Monad.ST             (ST, runST)

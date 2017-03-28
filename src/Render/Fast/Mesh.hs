@@ -5,6 +5,8 @@ module Render.Fast.Mesh
     , rRotateForEntity
     ) where
 
+import Text.Printf (printf)
+
 import           Control.Lens                    (use, (^.), (+=), (&), (.~))
 import           Control.Monad                   (unless, when)
 import           Data.Bits                       (complement, shiftL, shiftR, (.&.), (.|.))
@@ -402,6 +404,12 @@ glDrawAliasFrameLerp pAliasHdr backLerp shadeLight shadeDots = do
         MSV.unsafeWith textureArrayBuf $ \ptr ->
             GL.glTexCoordPointer 2 GL.GL_FLOAT 0 ptr
         GL.glEnableClientState GL.GL_TEXTURE_COORD_ARRAY -- TODO? jake2 has this commented out?
+        -- DEBUG
+        -- putStrLn "ksaveljev drawAlias"
+        -- mapM_ (\i -> do
+        --           v <- MSV.read srcTextureCoords i
+        --           putStr $ printf "%.2f " v) [0..100]
+        -- putStrLn ""
         drawElements textureArrayBuf vertexIndexBuf srcTextureCoords 0 0 (UV.length (pAliasHdr^.dmCounts))
         when ((currentEntity^.enFlags) .&. (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue .|. Constants.rfShellDouble .|. Constants.rfShellHalfDam) /= 0) $
             GL.glEnable GL.GL_TEXTURE_2D

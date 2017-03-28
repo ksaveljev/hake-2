@@ -2,21 +2,31 @@ module Client.CLFX
     ( addDLights
     , addLightStyles
     , addParticles
+    , bfgExplosionParticles
     , bfgParticles
+    , bigTeleportParticles
+    , blasterParticles
     , blasterTrail
+    , bubbleTrail
     , clearEffects
     , diminishingTrail
     , entityEvent
+    , explosionParticles
     , flagTrail
     , flyEffect
     , ionRipperTrail
     , parseMuzzleFlash
     , parseMuzzleFlash2
+    , particleEffect
+    , particleEffect2
+    , particleEffect3
+    , railTrail
     , rocketTrail
     , runDLights
     , runLightStyles
     , setLightStyle
     , teleporterParticles
+    , teleportParticles
     , trapParticles
     ) where
 
@@ -36,7 +46,7 @@ import           Client.CDLightT
 import           Client.CEntityT
 import           Client.ClientStateT
 import           Client.CLightStyleT
-import qualified Client.CLTEnt         as CLTEnt
+import qualified Client.CLTEntShared   as CLTEnt
 import           Client.CParticleT
 import qualified Client.VShared        as ClientV
 import qualified Constants
@@ -1012,3 +1022,27 @@ trapParticles = error "CLFX.trapParticles" -- TODO
 
 ionRipperTrail :: V3 Float -> V3 Float -> Quake ()
 ionRipperTrail = error "CLFX.ionRipperTrail" -- TODO
+
+particleEffect2 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+particleEffect2 = error "CLFX.particleEffect2" -- TODO
+
+particleEffect3 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
+particleEffect3 = error "CLFX.particleEffect3" -- TODO
+
+blasterParticles :: V3 Float -> V3 Float -> Quake ()
+blasterParticles = error "CLFX.blasterParticles" -- TODO
+
+railTrail :: V3 Float -> V3 Float -> Quake ()
+railTrail = error "CLFX.railTrail" -- TODO
+
+explosionParticles :: V3 Float -> Quake ()
+explosionParticles = error "CLFX.explosionParticles" -- TODO
+
+bfgExplosionParticles :: V3 Float -> Quake ()
+bfgExplosionParticles = error "CLFX.bfgExplosionParticles" -- TODO
+
+bubbleTrail :: V3 Float -> V3 Float -> Quake ()
+bubbleTrail = error "CLFX.bubbleTrail" -- TODO
+
+bigTeleportParticles :: V3 Float -> Quake ()
+bigTeleportParticles = error "CLFX.bigTeleportParticles" -- TODO

@@ -1,6 +1,7 @@
 module Render.Fast.Warp
     ( clearSkyBox
     , drawSkyBox
+    , emitWaterPolys
     , glSubdivideSurface
     , rAddSkySurface
     , rSetSky
@@ -37,6 +38,7 @@ import           Render.MTexInfoT
 import           Render.MVertexT
 import           Types
 import           Util.Binary           (encode)
+import qualified Util.Math3D           as Math3D
 
 sideFront :: Int
 sideFront = 0
@@ -49,7 +51,7 @@ sideOn = 2
 
 onEpsilon :: Float
 onEpsilon = 0.1 -- point on plane side epsilon
-	
+
 subdivideSize :: Float
 subdivideSize = 64
 
@@ -396,7 +398,6 @@ clipSkyPolygon nump vecs stage
         checkMaxClipVertsError
         (front, back) <- io (checkFrontAndBack vecs (skyClip V.! stage) False False 0 nump)
         proceedClipSkyPolygon front back
-        error "Warp.clipSkyPolygon" -- TODO
   where
     checkMaxClipVertsError =
         when (nump > maxClipVerts - 2) $
@@ -477,4 +478,45 @@ clipStuff vecs newc0 newc1 idx maxIdx
 
 drawSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Quake ()
 drawSkyPolygon nump vecs = do
-    error "Warp.drawSkyPolygon" -- TODO
+    vecsSum <- io (calcVecsSum (V3 0 0 0) 0 nump)
+    v <- fmap (+ vecsSum) (use (globals.gVec3Origin))
+    let axis = findAxis v (fmap abs v)
+    mapM_ (projectCoords axis) [0..nump-1]
+  where
+    calcVecsSum :: V3 Float -> Int -> Int -> IO (V3 Float)
+    calcVecsSum acc idx maxIdx
+        | idx >= maxIdx = return acc
+        | otherwise = do
+            vec <- MV.read vecs idx
+            calcVecsSum (acc + vec) (idx + 1) maxIdx
+    findAxis :: V3 Float -> V3 Float -> Int
+    findAxis v av
+        | (av^._x) > (av^._y) && (av^._x) > (av^._z) = if (v^._x) < 0 then 1 else 0
+        | (av^._y) > (av^._z) && (av^._y) > (av^._x) = if (v^._y) < 0 then 3 else 2
+        | otherwise                                  = if (v^._z) < 0 then 5 else 4
+    projectCoords :: Int -> Int -> Quake ()
+    projectCoords axis idx = do
+        vec <- io (MV.read vecs idx)
+        let j = vecToSt V.! axis
+            dv | (j^._z) > 0 = vec^.(Math3D.v3Access ((j^._z) - 1))
+               | otherwise   = negate (vec^.(Math3D.v3Access (negate (j^._z) - 1)))
+        unless (dv < 0.001) $ do
+            let s | (j^._x) < 0 = (negate (vec^.(Math3D.v3Access (negate (j^._x) - 1)))) / dv
+                  | otherwise   = (vec^.(Math3D.v3Access ((j^._x) - 1))) / dv
+                t | (j^._y) < 0 = (negate (vec^.(Math3D.v3Access (negate (j^._y) - 1)))) / dv
+                  | otherwise   = (vec^.(Math3D.v3Access ((j^._y) - 1))) / dv
+            (skyMins0, skyMins1) <- use (fastRenderAPIGlobals.frSkyMins)
+            (skyMaxs0, skyMaxs1) <- use (fastRenderAPIGlobals.frSkyMaxs)
+            let skyMins0' | s < skyMins0 UV.! axis = skyMins0 UV.// [(axis, s)]
+                          | otherwise              = skyMins0
+                skyMins1' | t < skyMins1 UV.! axis = skyMins1 UV.// [(axis, t)]
+                          | otherwise              = skyMins1
+                skyMaxs0' | s > skyMaxs0 UV.! axis = skyMaxs0 UV.// [(axis, s)]
+                          | otherwise              = skyMaxs0
+                skyMaxs1' | t > skyMaxs1 UV.! axis = skyMaxs1 UV.// [(axis, t)]
+                          | otherwise              = skyMaxs1
+            fastRenderAPIGlobals.frSkyMins .= (skyMins0', skyMins1')
+            fastRenderAPIGlobals.frSkyMaxs .= (skyMaxs0', skyMaxs1')
+
+emitWaterPolys :: IORef MSurfaceT -> Quake ()
+emitWaterPolys surfRef = error "Warp.emitWaterPolys" -- TODO

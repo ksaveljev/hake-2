@@ -7,6 +7,8 @@ module QCommon.MSG
     , readChar
     , readCoord
     , readData
+    , readDeltaUserCmd
+    , readDir
     , readLong
     , readPos
     , readShort
@@ -29,6 +31,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8   as BC
 import qualified Data.ByteString.Lazy    as BL
 import           Data.Int                (Int8, Int16, Int32)
+import qualified Data.Vector             as V
 import qualified Data.Vector.Unboxed     as UV
 import           Data.Word               (Word8, Word16, Word32)
 import           Linear                  (V3(..), _x, _y, _z)
@@ -227,3 +230,38 @@ readData sizeBufLens bufLens len = do
         | otherwise = do
             w <- readByte sizeBufLens
             collectUpdates (idx + 1) ((idx, fromIntegral w) : acc)
+
+readDeltaUserCmd :: Lens' QuakeState SizeBufT -> UserCmdT -> Quake UserCmdT
+readDeltaUserCmd sizeBufLens from = do
+    bits <- fmap fromIntegral (readByte sizeBufLens)
+    -- read current angles
+    a1 <- if bits .&. Constants.cmAngle1 /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._x)
+    a2 <- if bits .&. Constants.cmAngle2 /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._y)
+    a3 <- if bits .&. Constants.cmAngle3 /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucAngles._z)
+    -- read movement
+    forward <- if bits .&. Constants.cmForward /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucForwardMove)
+    side <- if bits .&. Constants.cmSide /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucSideMove)
+    up <- if bits .&. Constants.cmUp /= 0 then fmap fromIntegral (readShort sizeBufLens) else return (from^.ucUpMove)
+    -- read buttons
+    buttons <- if bits .&. Constants.cmButtons /= 0 then fmap fromIntegral (readByte sizeBufLens) else return (from^.ucButtons)
+    impulse <- if bits .&. Constants.cmImpulse /= 0 then fmap fromIntegral (readByte sizeBufLens) else return (from^.ucImpulse)
+    -- read time to run command
+    msec <- readByte sizeBufLens
+    -- read the light level
+    lightLevel <- readByte sizeBufLens
+    return from { _ucAngles      = V3 a1 a2 a3
+                , _ucForwardMove = forward
+                , _ucSideMove    = side
+                , _ucUpMove      = up
+                , _ucButtons     = buttons
+                , _ucImpulse     = impulse
+                , _ucMsec        = fromIntegral msec
+                , _ucLightLevel  = fromIntegral lightLevel
+                }
+
+readDir :: Lens' QuakeState SizeBufT -> Quake (V3 Float)
+readDir sizeBufLens = do
+    b <- readByte sizeBufLens
+    when (b >= Constants.numVertexNormals) $
+        Com.comError Constants.errDrop "MSG_ReadDir: out of range"
+    return (Constants.byteDirs V.! b)

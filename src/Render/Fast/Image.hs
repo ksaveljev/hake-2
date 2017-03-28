@@ -139,7 +139,7 @@ buildPalette palette = do
     particleTGlobals.pColorTable .= UV.map ((.&. 0x00FFFFFF) . fromIntegral) d8to24table
   where
     table = UV.fromList $! map (constructPalette palette) [0..255]
-    lastElem = constructPalette palette 255 .&. 0x00FFFFFF -- 255 is transparent
+    lastElem = (constructPalette palette 255) .&. 0x00FFFFFF -- 255 is transparent
     d8to24table = table UV.// [(255, lastElem)]
 
 constructPalette :: B.ByteString -> Int -> Int
@@ -505,6 +505,10 @@ floodFillStep skin fifo inpt pos x y fillColor fdc off dx dy =
 
 glUpload8 :: SV.Vector Word8 -> Int -> Int -> Bool -> Bool -> Quake Bool
 glUpload8 image width height mipmap isSky = do
+    -- DEBUG
+    -- io $ putStrLn "ksaveljev glUpload8"
+    -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+    -- io $ putStrLn ""
     checkDimensions
     colorTable <- use (fastRenderAPIGlobals.frColorTableEXT)
     palettedTexture <- glExtPalettedTextureCVar
@@ -570,6 +574,10 @@ doConstructTrans image !v width d8to24table idx maxIdx
 
 glUpload32 :: SV.Vector Word8 -> Int -> Int -> Bool -> Quake Bool
 glUpload32 image width height mipmap = do
+    -- DEBUG
+    -- io $ putStrLn "ksaveljev glUpload32"
+    -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+    -- io $ putStrLn ""
     scaledWidth <- calcScaledValue width mipmap
     scaledHeight <- calcScaledValue height mipmap
     fastRenderAPIGlobals %= (\v -> v & frUploadedPaletted .~ False
@@ -628,6 +636,10 @@ getTextureComponents samples
 uploadOrResample :: SV.Vector Word8 -> Int -> Int -> Bool -> Int -> Int -> Int -> Int -> Quake (Maybe (SV.Vector Word8))
 uploadOrResample image width height mipmap scaledWidth scaledHeight samples comp
     | sameDimensions && not mipmap = do
+        -- DEBUG
+        -- io $ putStrLn "ksaveljev uploadOrResample"
+        -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+        -- io $ putStrLn ""
         uploadImage image scaledWidth scaledHeight 0 samples comp
         return Nothing
     | sameDimensions = return (Just image)
@@ -659,6 +671,7 @@ glResampleTexture image width height scaledWidth scaledHeight =
     buildRow !v !p1 !p2 !inRow !inRow2 !outIdx !idx !maxIdx
         | idx >= maxIdx = return outIdx
         | otherwise = do
+          {- TODO: this doesn't work, try fixing it?
             let !pix1 = inRow + (p1 UV.! idx)
                 !pix2 = inRow + (p2 UV.! idx)
                 !pix3 = inRow2 + (p1 UV.! idx)
@@ -668,8 +681,7 @@ glResampleTexture image width height scaledWidth scaledHeight =
             MSV.write v (outIdx + 2) ((image SV.! (pix1 + 2) + image SV.! (pix2 + 2) + image SV.! (pix3 + 2) + image SV.! (pix4 + 2)) `shiftR` 2)
             MSV.write v (outIdx + 3) ((image SV.! (pix1 + 3) + image SV.! (pix2 + 3) + image SV.! (pix3 + 3) + image SV.! (pix4 + 3)) `shiftR` 2)
             buildRow v p1 p2 inRow inRow2 (outIdx + 4) (idx + 1) maxIdx
-            -- TODO: make sure the implementation is ok
-          {-
+            -}
             do let pix1 = inRow  + (p1 UV.! idx)
                    pix2 = inRow  + (p2 UV.! idx)
                    pix3 = inRow2 + (p1 UV.! idx)
@@ -687,7 +699,6 @@ glResampleTexture image width height scaledWidth scaledHeight =
                MSV.write v (outIdx + 2) b
                MSV.write v (outIdx + 3) a
                buildRow v p1 p2 inRow inRow2 (outIdx + 4) (idx + 1) maxIdx
-               -}
 
 uploadImage :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadImage image scaledWidth scaledHeight mipLevel samples comp = do
@@ -699,8 +710,16 @@ uploadImage image scaledWidth scaledHeight mipLevel samples comp = do
         | colorTable && palettedTextureValue /= 0 && samples == glSolidFormat = do
             fastRenderAPIGlobals.frUploadedPaletted .= True
             palettedTexture <- glBuildPalettedTexture image scaledWidth scaledHeight
+            -- DEBUG
+            -- io $ putStrLn "ksaveljev uploadImage#palettedTexture"
+            -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+            -- io $ putStrLn ""
             io (SV.unsafeWith palettedTexture (upload GL.GL_COLOR_INDEX8_EXT GL.GL_COLOR_INDEX))
-        | otherwise =
+        | otherwise = do
+            -- DEBUG
+            -- io $ putStrLn "ksaveljev uploadImage#image"
+            -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+            -- io $ putStrLn ""
             io (SV.unsafeWith image (upload comp GL.GL_RGBA))
     upload internalFormat format =
         GL.glTexImage2D GL.GL_TEXTURE_2D
@@ -716,6 +735,10 @@ uploadResampled :: Maybe (SV.Vector Word8) -> Int -> Int -> Bool -> Int -> Int -
 uploadResampled Nothing _ _ _ _ _ = return ()
 uploadResampled (Just image) scaledWidth scaledHeight mipmap samples comp = do
     scaled <- glLightScaleTexture image scaledWidth scaledHeight (not mipmap)
+    -- DEBUG
+    -- io $ putStrLn "ksaveljev lightscale"
+    -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) scaled
+    -- io $ putStrLn ""
     uploadImage scaled scaledWidth scaledHeight 0 samples comp
     when mipmap $
         uploadMipMaps scaled scaledWidth scaledHeight 0 samples comp
@@ -772,6 +795,16 @@ uploadMipMaps :: SV.Vector Word8 -> Int -> Int -> Int -> Int -> Int -> Quake ()
 uploadMipMaps image scaledWidth scaledHeight mipLevel samples comp
     | scaledWidth <= 1 && scaledHeight <= 1 = return ()
     | otherwise = do
+        -- DEBUG
+        -- io $ putStrLn "ksaveljev image"
+        -- io $ putStrLn ("w = " ++ show scaledWidth ++ " h = " ++ show scaledHeight)
+        -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) image
+        -- io $ putStrLn ""
+        -- DEBUG
+        -- io $ putStrLn "ksaveljev mipmap"
+        -- io $ putStrLn ("w = " ++ show scaledWidth ++ " h = " ++ show scaledHeight)
+        -- io $ SV.mapM_ (\v -> putStr $ printf "%02X" v) scaled
+        -- io $ putStrLn ""
         uploadImage scaled scaledWidth' scaledHeight' mipLevel' samples comp
         uploadMipMaps scaled scaledWidth' scaledHeight' mipLevel' samples comp
   where
@@ -787,9 +820,30 @@ glMipMap image width height = runST $ do
     v <- SV.unsafeThaw image
     generateMipMap v 0 0 0 0
   where
+    w = 4 * width
     generateMipMap v inIdx outIdx i j
         | i >= height = SV.unsafeFreeze v
-        | j >= width = generateMipMap v (inIdx + width) outIdx (i + 1) 0
+        | j >= w      = generateMipMap v (inIdx + w) outIdx (i + 2) 0
+        | otherwise = do
+            let a = (fromIntegral (image SV.! (inIdx + 0)) + fromIntegral (image SV.! (inIdx + 4)) + fromIntegral (image SV.! (inIdx + w + 0)) + fromIntegral (image SV.! (inIdx + w + 4))) `shiftR` 2 :: Int
+                b = (fromIntegral (image SV.! (inIdx + 1)) + fromIntegral (image SV.! (inIdx + 5)) + fromIntegral (image SV.! (inIdx + w + 1)) + fromIntegral (image SV.! (inIdx + w + 5))) `shiftR` 2 :: Int
+                c = (fromIntegral (image SV.! (inIdx + 2)) + fromIntegral (image SV.! (inIdx + 6)) + fromIntegral (image SV.! (inIdx + w + 2)) + fromIntegral (image SV.! (inIdx + w + 6))) `shiftR` 2 :: Int
+                d = (fromIntegral (image SV.! (inIdx + 3)) + fromIntegral (image SV.! (inIdx + 7)) + fromIntegral (image SV.! (inIdx + w + 3)) + fromIntegral (image SV.! (inIdx + w + 7))) `shiftR` 2 :: Int
+            MSV.write v (outIdx + 0) (fromIntegral a)
+            MSV.write v (outIdx + 1) (fromIntegral b)
+            MSV.write v (outIdx + 2) (fromIntegral c)
+            MSV.write v (outIdx + 3) (fromIntegral d)
+            generateMipMap v (inIdx + 8) (outIdx + 4) i (j + 8)
+
+{-
+glMipMap :: SV.Vector Word8 -> Int -> Int -> SV.Vector Word8
+glMipMap image width height = runST $ do
+    v <- SV.unsafeThaw image
+    generateMipMap v 0 0 0 0
+  where
+    generateMipMap v inIdx outIdx i j
+        | i >= height = SV.unsafeFreeze v
+        | j >= width = generateMipMap v (inIdx + width) outIdx (i + 2) 0
         | otherwise = do
             let w = width `shiftL` 2
                 a = ((image SV.! (inIdx + 0)) + (image SV.! (inIdx + 4)) + (image SV.! (inIdx + w + 0)) + (image SV.! (inIdx + w + 4))) `shiftR` 2
@@ -801,6 +855,7 @@ glMipMap image width height = runST $ do
             MSV.write v (outIdx + 2) c
             MSV.write v (outIdx + 3) d
             generateMipMap v (inIdx + 8) (outIdx + 4) i (j + 8)
+-}
 
 applyFilters :: Bool -> Quake ()
 applyFilters mipmap = do

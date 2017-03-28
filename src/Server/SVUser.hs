@@ -3,40 +3,47 @@ module Server.SVUser
     , nextServer
     ) where
 
-import           Control.Lens         (Traversal', preuse, use, ix)
-import           Control.Lens         ((^.), (.=), (&), (.~))
-import           Control.Monad        (when, unless, (>=>))
-import qualified Data.ByteString      as B
-import qualified Data.Vector          as V
+import           Control.Lens          (Traversal', preuse, use, ix)
+import           Control.Lens          ((^.), (.=), (&), (.~), (-~))
+import           Control.Monad         (when, unless, (>=>))
+import           Data.Bits             ((.&.))
+import qualified Data.ByteString       as B
+import qualified Data.Vector           as V
 
 import qualified Constants
-import qualified Game.Cmd             as Cmd
+import qualified Game.Cmd              as Cmd
+import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
-import qualified Game.Info            as Info
-import qualified Game.PlayerClient    as PlayerClient
+import qualified Game.Info             as Info
+import qualified Game.PlayerClient     as PlayerClient
 import           Game.UserCmdT
-import qualified QCommon.CBuf         as CBuf
-import qualified QCommon.Com          as Com
-import qualified QCommon.CVar         as CVar
-import qualified QCommon.FS           as FS
-import qualified QCommon.MSG          as MSG
+import qualified QCommon.CBuf          as CBuf
+import qualified QCommon.Com           as Com
+import qualified QCommon.CVar          as CVar
+import           QCommon.CVarVariables
+import qualified QCommon.FS            as FS
+import qualified QCommon.MSG           as MSG
 import           QCommon.NetChanT
 import           QCommon.SizeBufT
 import           QCommon.XCommandT
 import           QuakeRef
 import           QuakeState
+import           Server.ClientFrameT
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
-import qualified Server.SVMainShared  as SVMain
+import qualified Server.SVMainShared   as SVMain
 import           Server.UCmdT
 import           Types
-import           Util.Binary          (encode)
-import qualified Util.Lib             as Lib
+import           Util.Binary           (encode)
+import qualified Util.Lib              as Lib
 
 maxStringCmds :: Int
 maxStringCmds = 8
+
+nullCmd :: UserCmdT
+nullCmd = newUserCmdT
 
 uCmds :: V.Vector UCmdT
 uCmds = V.fromList
@@ -80,9 +87,12 @@ execute clientRef c moveIssued stringCmdCount
         client <- readRef clientRef
         checksumIndex <- use (globals.gNetMessage.sbReadCount)
         checksum <- MSG.readByte (globals.gNetMessage)
-        lastFrame <- MSG.readByte (globals.gNetMessage)
+        lastFrame <- MSG.readLong (globals.gNetMessage)
         checkFrameLatency client lastFrame
-        error "SVUser.execute" -- TODO
+        oldest <- MSG.readDeltaUserCmd (globals.gNetMessage) nullCmd
+        oldcmd <- MSG.readDeltaUserCmd (globals.gNetMessage) oldest
+        newcmd <- MSG.readDeltaUserCmd (globals.gNetMessage) oldcmd
+        executeMove clientRef client oldest oldcmd newcmd stringCmdCount checksumIndex checksum
     | c == Constants.clcStringCmd = do
         str <- MSG.readString (globals.gNetMessage)
         client <- readRef clientRef
@@ -90,7 +100,47 @@ execute clientRef c moveIssued stringCmdCount
         return ((client^.cState) == Constants.csZombie, moveIssued, stringCmdCount + 1)
     | otherwise = error "SVUser.execute otherwise" -- TODO
   where
-    checkFrameLatency client lastFrame = error "SVUser.execute#checkFrameLatency"
+    checkFrameLatency client lastFrame
+        | lastFrame /= (client^.cLastFrame) = do
+            modifyRef clientRef (\v -> v & cLastFrame .~ lastFrame)
+            when (lastFrame > 0) $ do
+                realTime <- use (svGlobals.svServerStatic.ssRealTime)
+                let idx = lastFrame .&. (Constants.latencyCounts - 1)
+                modifyRef clientRef (\v -> v & cFrameLatency.ix idx .~ realTime - (((client^.cFrames) V.! (lastFrame .&. Constants.updateMask))^.cfSentTime))
+        | otherwise = return ()
+
+executeMove :: Ref ClientT -> ClientT -> UserCmdT -> UserCmdT -> UserCmdT -> Int -> Int -> Int -> Quake (Bool, Bool, Int)
+executeMove clientRef client oldest oldcmd newcmd stringCmdCount checksumIndex checksum
+    | (client^.cState) /= Constants.csSpawned = do
+        modifyRef clientRef (\v -> v & cLastFrame .~ (-1))
+        return (False, True, stringCmdCount)
+    | otherwise = do
+        -- if the checksum fails, ignore the rest of the packet
+        nm <- use (globals.gNetMessage)
+        calculatedChecksum <- Com.blockSequenceCRCByte (nm^.sbData) (checksumIndex + 1) ((nm^.sbReadCount) - checksumIndex - 1) (client^.cNetChan.ncIncomingSequence)
+        doExecuteMove calculatedChecksum
+  where
+    doExecuteMove calculatedChecksum
+        | fromIntegral (calculatedChecksum .&. 0xFF) /= checksum = do
+            Com.dprintf "Failed checksum for ..." -- TODO: add more info
+            return (True, True, stringCmdCount)
+        | otherwise = do
+            paused <- fmap (^.cvValue) pausedCVar
+            when (paused == 0) $ do
+                when ((client^.cNetChan.ncDropped) < 20) $ do
+                    netDrop <- execCmd (client^.cLastCmd) (client^.cNetChan.ncDropped)
+                    when (netDrop > 1) $
+                        clientThink clientRef oldest
+                    when (netDrop > 0) $
+                        clientThink clientRef oldcmd
+                clientThink clientRef newcmd
+            modifyRef clientRef (\v -> v & cLastCmd .~ newcmd)
+            return (False, True, stringCmdCount)
+    execCmd lastcmd netDrop
+        | netDrop > 2 = do
+            clientThink clientRef lastcmd
+            execCmd lastcmd (netDrop - 1)
+        | otherwise = return netDrop
 
 executeUserCommand :: B.ByteString -> Quake ()
 executeUserCommand str = do
@@ -241,3 +291,18 @@ nextServer = do
     state <- use (svGlobals.svServer.sState)
     coopValue <- CVar.variableValue "coop"
     error "SVUser.nextServer" -- TODO
+
+clientThink :: Ref ClientT -> UserCmdT -> Quake ()
+clientThink clientRef cmd = do
+    modifyRef clientRef (\v -> v & cCommandMsec -~ (fromIntegral (cmd^.ucMsec) .&. 0xFF))
+    client <- readRef clientRef
+    enforceTime <- fmap (^.cvValue) svEnforceTimeCVar
+    doClientThink client enforceTime
+  where
+    doClientThink client enforceTime
+        | (client^.cCommandMsec) < 0 && enforceTime /= 0 =
+            Com.dprintf ("commandMsec underflow from " `B.append` (client^.cName) `B.append` "\n")
+        | otherwise = do
+            maybe edictError (\edictRef -> PlayerClient.clientThink edictRef cmd) (client^.cEdict)
+    edictError =
+        Com.fatalError "SVUser.clientThink client^.cEdict is Nothing"

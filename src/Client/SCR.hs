@@ -69,14 +69,6 @@ import           Types
 import           Util.Binary                 (encode, getInt)
 import qualified Util.Lib                    as Lib
 
-sbNums1 :: V.Vector B.ByteString
-sbNums1 = V.fromList
-    [ "num_0" , "num_1" , "num_2"
-    , "num_3" , "num_4" , "num_5"
-    , "num_6" , "num_7" , "num_8"
-    , "num_9" , "num_minus"
-    ]
-
 sbNums2 :: V.Vector B.ByteString
 sbNums2 = V.fromList
     [ "anum_0" , "anum_1" , "anum_2"
@@ -822,7 +814,7 @@ processToken str x y width idx token
         (mToken, newIdx) <- Com.parse str (B.length str) idx
         stats <- use (globals.gCl.csFrame.fPlayerState.psStats)
         processIfToken str stats x y width newIdx mToken -- TODO: make sure we pass arguments in the same order for all functions here (like stats)
-    | otherwise = error "ohno" >> undefined -- TODO
+    | otherwise = return (x, y, width, idx)
   where
     tokenError tkn = do
         Com.fatalError ("SCR.processToken Com.parse returned Nothing for token " `B.append` tkn)
@@ -1235,36 +1227,6 @@ processByte hNodes numHNodes nodeNum inByte outIdx out index count idx maxIdx
     | otherwise = do
         let nodeNum' = hNodes UV.! (index + nodeNum * 2 + fromIntegral (inByte .&. 1))
         processByte hNodes numHNodes nodeNum' (inByte `shiftR` 1) outIdx out index count (idx + 1) maxIdx
-
-touchPics :: Renderer -> Quake ()
-touchPics renderer = do
-    V.mapM_ (renderer^.rRefExport.reRegisterPic) sbNums1
-    processCrosshair renderer =<< crosshairCVar
-
-processCrosshair :: Renderer -> CVarT -> Quake ()
-processCrosshair renderer crosshair
-    | (crosshair^.cvValue) == 0 = return ()
-    | otherwise = join (liftA (updateCrosshair renderer) crossHairValue)
-  where
-    crossHairValue
-        | (crosshair^.cvValue) > 3 || (crosshair^.cvValue) < 0 = do
-            CVar.update (crosshair & cvValue .~ 3)
-            return 3
-        | otherwise = return (crosshair^.cvValue)
-
-updateCrosshair :: Renderer -> Float -> Quake ()
-updateCrosshair renderer v = do
-    scrGlobals.scrCrosshairPic .= pic
-    dim <- (renderer^.rRefExport.reDrawGetPicSize) pic
-    maybe updateCrosshairError setDimensions dim
-  where
-    i = truncate v :: Int
-    pic = "ch" `B.append` (encode i)
-    updateCrosshairError = Com.fatalError "SCR.updateCrosshair pic size is Nothing"
-    setDimensions (width, height) = do
-        scrGlobals.scrCrosshairWidth .= width
-        scrGlobals.scrCrosshairHeight .= height
-        when (width == 0) $ scrGlobals.scrCrosshairPic .= ""
 
 drawField :: Int -> Int -> Int -> Int -> Int -> Quake ()
 drawField x y color width value

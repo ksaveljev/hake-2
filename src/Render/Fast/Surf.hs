@@ -26,6 +26,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed          as UV
 import qualified Data.Vector.Unboxed.Mutable  as MUV
 import           Data.Word                    (Word8)
+import           Foreign.Marshal.Array        (withArray)
 import qualified Graphics.GL                  as GL
 import           Linear                       (V3(..), dot, _x, _y, _z, _xyz, _w)
 import           System.IO.Unsafe             (unsafePerformIO)
@@ -75,7 +76,50 @@ glLightmapFormat :: GL.GLenum
 glLightmapFormat = GL.GL_RGBA
 
 rDrawAlphaSurfaces :: Quake ()
-rDrawAlphaSurfaces = error "Surf.rDrawAlphaSurfaces" -- TODO
+rDrawAlphaSurfaces = do
+    worldMatrix <- use (fastRenderAPIGlobals.frWorldMatrix)
+    io $ withArray worldMatrix $ \ptr -> GL.glLoadMatrixf ptr
+    GL.glEnable GL.GL_BLEND
+    Image.glTexEnv GL.GL_MODULATE
+    glState <- use (fastRenderAPIGlobals.frGLState)
+    polygonBuffer <- use (fastRenderAPIGlobals.frPolygonBuffer)
+    io $ MSV.unsafeWith polygonBuffer $ \ptr ->
+        GL.glInterleavedArrays GL.GL_T2F_V3F (fromIntegral Constants.byteStride) ptr
+    alphaSurfaces <- use (fastRenderAPIGlobals.frAlphaSurfaces)
+    drawSurfaces (realToFrac (glState^.glsInverseIntensity)) alphaSurfaces
+    Image.glTexEnv GL.GL_REPLACE
+    GL.glColor4f 1 1 1 1
+    GL.glDisable GL.GL_BLEND
+    fastRenderAPIGlobals.frAlphaSurfaces .= Nothing
+  where
+    drawSurfaces _ Nothing = return ()
+    drawSurfaces intens (Just surfRef) = do
+        surf <- io (readIORef surfRef)
+        texInfo <- io (readIORef (surf^.msTexInfo))
+        bindImage (texInfo^.mtiImage)
+        fastRenderAPIGlobals.frCBrushPolys += 1
+        setColors texInfo intens
+        drawPolys surfRef surf texInfo
+        drawSurfaces intens (surf^.msTextureChain)
+    bindImage Nothing =
+        Com.fatalError "Surf.rDrawAlphaSurfaces surf^.msTexInfo.mtiImage is Nothing"
+    bindImage (Just imageRef) = do
+        image <- readRef imageRef
+        Image.glBind (image^.iTexNum)
+    setColors texInfo intens
+        | (texInfo^.mtiFlags) .&. Constants.surfTrans33 /= 0 =
+            GL.glColor4f intens intens intens 0.33
+        | (texInfo^.mtiFlags) .&. Constants.surfTrans66 /= 0 =
+            GL.glColor4f intens intens intens 0.66
+        | otherwise =
+            GL.glColor4f intens intens intens 1
+    drawPolys surfRef surf texInfo
+        | (surf^.msFlags) .&. Constants.surfDrawTurb /= 0 =
+            Warp.emitWaterPolys surfRef
+        | (texInfo^.mtiFlags) .&. Constants.surfFlowing /= 0 =
+            drawGLFlowingPoly (surf^.msPolys)
+        | otherwise =
+            drawGLPoly (surf^.msPolys)
 
 rMarkLeaves :: Quake ()
 rMarkLeaves = do
@@ -477,13 +521,12 @@ drawLeafStuff worldModel leafRef = do
         newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
         unless (((newRefDef^.rdAreaBits) UV.! ((leaf^.mlArea) `shiftR` 3)) .&. (1 `shiftL` ((leaf^.mlArea) .&. 7)) == 0) $ do -- unless not visible
             frameCount <- use (fastRenderAPIGlobals.frFrameCount)
-            V.imapM_ (updateSurfaceFrameCount leaf frameCount) (worldModel^.mMarkSurfaces)
+            io (V.imapM_ (updateSurfaceFrameCount leaf frameCount) (worldModel^.mMarkSurfaces))
   where
     updateSurfaceFrameCount leaf frameCount i surfRef
-        | i >= (leaf^.mlMarkIndex) + (leaf^.mlNumMarkSurfaces) =
-            io $ modifyIORef' surfRef (\v -> v & msVisFrame .~ frameCount)
-        | otherwise =
-            return ()
+        | i >= (leaf^.mlMarkIndex) && i < (leaf^.mlMarkIndex) + (leaf^.mlNumMarkSurfaces) = do
+            modifyIORef' surfRef (\v -> v & msVisFrame .~ frameCount)
+        | otherwise = return ()
 
 -- TODO: try doing everything related to worldModel^.mSurfaces via QuakeRef (see if it is possible to use loadModelRef)
 drawNodeStuff :: Ref ModelT -> ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()
@@ -525,10 +568,6 @@ checkIfNothingToDo contents visFrame visFrameCount mins maxs
     | visFrame /= visFrameCount = return True
     | otherwise = rCullBox mins maxs
 
--- TODO: WARNING: this is incorrect, relies on QuakeRef MSurfaceT which uses
---                loadModelRef to get the MSurfaceT but that reference IS NOT
---                set to world model, need to set it beforehand for all the methods
---                and refactor everything
 drawTextureChains :: Quake ()
 drawTextureChains = do
     -- TODO: c_visible_textures -- useless for us?
@@ -948,7 +987,6 @@ drawInlineBModel currentModelRef@(Ref modelIdx) = do
         when ((psurf^.msFlags) .&. Constants.surfPlaneBack /= 0 && dot' < (negate Constants.backfaceEpsilon) || (psurf^.msFlags) .&. Constants.surfPlaneBack == 0 && dot' > Constants.backfaceEpsilon) $ do
             texInfo <- io (readIORef (psurf^.msTexInfo))
             doDrawTexture psurfRef psurf texInfo
-            undefined -- TODO
     getDot Nothing = do
         Com.fatalError "Surf.drawInlineBModel psurf^.msPlane is Nothing"
         return 0
@@ -968,3 +1006,12 @@ drawInlineBModel currentModelRef@(Ref modelIdx) = do
             Image.glEnableMultiTexture False
             rRenderBrushPoly psurfRef
             Image.glEnableMultiTexture True
+
+drawGLFlowingPoly :: Maybe (Ref GLPolyT) -> Quake ()
+drawGLFlowingPoly = error "Surf.drawGLFlowingPoly" -- TODO
+
+drawGLPoly :: Maybe (Ref GLPolyT) -> Quake ()
+drawGLPoly Nothing = Com.fatalError "Surf.drawGLPoly polyRef is Nothing"
+drawGLPoly (Just polyRef) = do
+    poly <- readRef polyRef
+    GL.glDrawArrays GL.GL_POLYGON (fromIntegral (poly^.glpPos)) (fromIntegral (poly^.glpNumVerts))
