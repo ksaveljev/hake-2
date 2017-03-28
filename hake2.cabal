@@ -22,9 +22,11 @@ executable hake2
                      , cryptohash
                      , data-binary-ieee754
                      , directory
+                     , filepath
                      , GLFW-b
                      , lens
                      , linear
+                     , mmap
                      , mtl
                      , monad-coroutine
                      , network
@@ -43,255 +45,250 @@ executable hake2
   default-extensions:  OverloadedStrings
                      , BangPatterns
   ghc-options:         -O0 -rtsopts -Wall
-  other-modules:     Client.CEntityT
-                     Client.CL
-                     Client.ClientInfoT
-                     Client.ClientStateT
-                     Client.ClientStaticT
-                     Client.ConsoleT
-                     Client.DLightT
-                     Client.EntityT
-                     Client.FrameT
-                     Client.Key
-                     Client.LightStyleT
-                     Client.RefDefT
-                     Client.VRectT
-                     Client.VidDefT
-                     Constants
-                     Game.CVarT
-                     Game.Cmd
-                     Game.EntityStateT
-                     Game.PMoveStateT
-                     Game.PlayerStateT
-                     Game.UserCmdT
-                     Globals
-                     QCommon.CBuf
-                     QCommon.CVar
-                     QCommon.CVarShared
-                     QCommon.Com
-                     QCommon.ComGlobals
-                     QCommon.FS
-                     QCommon.NetAdrT
-                     QCommon.NetChanT
-                     QCommon.NetChannel
-                     QCommon.QCommon
-                     QCommon.SizeBufT
-                     QCommon.XCommandT
-                     Quake
-                     QuakeState
-                     Render.DummyRenderer
-                     Render.RenderAPI
-                     Server.SVMain
-                     Sys.NET
-                     Sys.Timer
-                     Types
-                     Util.Lib
-                     Client.KeyConstants
-                     Client.KeyGlobals
-                     Game.CPlaneT
-                     Game.CmdAliasT
-                     Game.CmdGlobals
-                     QCommon.CBufShared
-                     QCommon.CVarVariables
-                     QCommon.CmdFunctionT
-                     QCommon.DPackHeaderT
-                     QCommon.FSGlobals
-                     QCommon.FSShared
-                     QCommon.FileLinkT
-                     QCommon.MSG
-                     QCommon.PackFileT
-                     QCommon.PackT
-                     QCommon.SZ
-                     QCommon.SearchPathT
-                     QCommon.Shared
-                     Util.Binary
-                     Util.Math3D
-                     Client.BeamT
-                     Client.CDLightT
-                     Client.CLEnts
-                     Client.CLFX
-                     Client.CLInput
-                     Client.CLInv
-                     Client.CLNewFX
-                     Client.CLParse
-                     Client.CLParseShared
-                     Client.CLPred
-                     Client.CLSustainT
-                     Client.CLTEnt
-                     Client.CLTEntGlobals
-                     Client.CLView
-                     Client.CLightStyleT
-                     Client.CParticleT
-                     Client.CheatVarT
-                     Client.CinematicsT
-                     Client.ClientGlobals
-                     Client.Console
-                     Client.DirtyT
-                     Client.ExplosionT
-                     Client.KButtonT
-                     Client.LaserT
-                     Client.M
-                     Client.Menu
-                     Client.MenuActionS
-                     Client.MenuCommonS
-                     Client.MenuFieldS
-                     Client.MenuFrameworkS
-                     Client.MenuGlobals
-                     Client.MenuLayerT
-                     Client.MenuListS
-                     Client.MenuSeparatorS
-                     Client.MenuSliderS
-                     Client.ParticleTGlobals
-                     Client.RefExportT
-                     Client.SCR
-                     Client.SCRGlobals
-                     Client.SCRShared
-                     Client.V
-                     Client.VGlobals
-                     Client.VID
-                     Client.VIDGlobals
-                     Client.VShared
-                     Client.VidModeT
-                     Client.VidModes
-                     Game.CModelT
-                     Game.CSurfaceT
-                     Game.ClientPersistantT
-                     Game.ClientRespawnT
-                     Game.EdictT
-                     Game.GClientT
-                     Game.GItemArmorT
-                     Game.GItemT
-                     Game.GameAI
-                     Game.GameBase
-                     Game.GameBaseGlobals
-                     Game.GameCombat
-                     Game.GameFunc
-                     Game.GameImportT
-                     Game.GameItems
-                     Game.GameItemsGlobals
-                     Game.GameItemsList
-                     Game.GameLocalsT
-                     Game.GameMisc
-                     Game.GameSVCmds
-                     Game.GameSave
-                     Game.GameSpawn
-                     Game.GameTarget
-                     Game.GameTrigger
-                     Game.GameTurret
-                     Game.GameUtil
-                     Game.GameWeapon
-                     Game.Info
-                     Game.LevelLocalsT
-                     Game.LinkT
-                     Game.MapSurfaceT
-                     Game.MonsterInfoT
-                     Game.Monsters.MFlash
-                     Game.MoveInfoT
-                     Game.PMoveT
-                     Game.PlayerClient
-                     Game.PlayerTrail
-                     Game.PlayerTrailGlobals
-                     Game.PlayerView
-                     Game.PushedT
-                     Game.SpawnT
-                     Game.SpawnTempT
-                     Game.TraceT
-                     QCommon.CAreaT
-                     QCommon.CBrushSideT
-                     QCommon.CBrushT
-                     QCommon.CLeafT
-                     QCommon.CM
-                     QCommon.CMGlobals
-                     QCommon.CNodeT
-                     QCommon.LumpT
-                     QCommon.MD4
-                     QCommon.MiptexT
-                     QCommon.NetChannelGlobals
-                     QCommon.PMove
-                     QCommon.PMoveGlobals
-                     QCommon.PmlT
-                     QCommon.QFiles.BSP.DAreaPortalT
-                     QCommon.QFiles.BSP.DAreaT
-                     QCommon.QFiles.BSP.DBrushSideT
-                     QCommon.QFiles.BSP.DBrushT
-                     QCommon.QFiles.BSP.DFaceT
-                     QCommon.QFiles.BSP.DHeaderT
-                     QCommon.QFiles.BSP.DLeafT
-                     QCommon.QFiles.BSP.DModelT
-                     QCommon.QFiles.BSP.DNodeT
-                     QCommon.QFiles.BSP.DPlaneT
-                     QCommon.QFiles.BSP.DVisT
-                     QCommon.QFiles.MD2.DAliasFrameT
-                     QCommon.QFiles.MD2.DMdlT
-                     QCommon.QFiles.MD2.DSTVertT
-                     QCommon.QFiles.MD2.DTriangleT
-                     QCommon.QFiles.PcxT
-                     QCommon.QFiles.SP2.DSprFrameT
-                     QCommon.QFiles.SP2.DSpriteT
-                     QCommon.QFiles.TgaT
-                     QCommon.TexInfoT
-                     QuakeRef
-                     Render.Anorms
-                     Render.Basic.BasicRenderAPI
-                     Render.Fast.Draw
-                     Render.Fast.FastRenderAPI
-                     Render.Fast.FastRenderAPIGlobals
-                     Render.Fast.GLLightMapStateT
-                     Render.Fast.Image
-                     Render.Fast.Light
-                     Render.Fast.Mesh
-                     Render.Fast.Model
-                     Render.Fast.Polygon
-                     Render.Fast.Shared
-                     Render.Fast.Surf
-                     Render.Fast.Warp
-                     Render.GLConfigT
-                     Render.GLFWbRenderer
-                     Render.GLModeT
-                     Render.GLPolyT
-                     Render.GLStateT
-                     Render.GLTModeT
-                     Render.ImageT
-                     Render.MEdgeT
-                     Render.MLeafT
-                     Render.MModelT
-                     Render.MNodeT
-                     Render.MSurfaceT
-                     Render.MTexInfoT
-                     Render.MVertexT
-                     Render.ModelT
-                     Render.OpenGL.GLDriver
-                     Render.OpenGL.GLFWbGLDriver
-                     Render.QRenderer
-                     Render.Renderer
-                     Server.AreaNodeT
-                     Server.ChallengeT
-                     Server.ClientFrameT
-                     Server.ClientT
-                     Server.MoveClipT
-                     Server.SV
-                     Server.SVConsoleCommands
-                     Server.SVEnts
-                     Server.SVGame
-                     Server.SVGlobals
-                     Server.SVInit
-                     Server.SVMainShared
-                     Server.SVSend
-                     Server.SVUser
-                     Server.SVWorld
-                     Server.ServerStaticT
-                     Server.ServerT
-                     Server.UCmdT
-                     Sound.S
-                     Sys.IN
-                     Sys.INGlobals
-                     Sys.KBD
-                     Sys.KBDGlobals
-                     Sys.LoopMsgT
-                     Sys.LoopbackT
-                     Sys.NETGlobals
-                     Sys.Socket
-                     Sys.Sys
-                     Util.QuakeFile
-                     Util.Unsafe
-                     Render.GLFWbGlobals
+  other-modules:       CVarVariables
+                     , Client.BeamT
+                     , Client.CDLightT
+                     , Client.CEntityT
+                     , Client.CL
+                     , Client.CLEnts
+                     , Client.CLFX
+                     , Client.CLInput
+                     , Client.CLInv
+                     , Client.CLNewFX
+                     , Client.CLParse
+                     , Client.CLPred
+                     , Client.CLSustainT
+                     , Client.CLTEnt
+                     , Client.CLTEntGlobals
+                     , Client.CLView
+                     , Client.CLightStyleT
+                     , Client.CParticleT
+                     , Client.CheatVarT
+                     , Client.CinematicsT
+                     , Client.ClientGlobals
+                     , Client.ClientInfoT
+                     , Client.ClientStateT
+                     , Client.ClientStaticT
+                     , Client.Console
+                     , Client.ConsoleT
+                     , Client.DLightT
+                     , Client.DirtyT
+                     , Client.EntityT
+                     , Client.ExplosionT
+                     , Client.FrameT
+                     , Client.KButtonT
+                     , Client.Key
+                     , Client.KeyConstants
+                     , Client.KeyFuncT
+                     , Client.KeyGlobals
+                     , Client.LaserT
+                     , Client.LightStyleT
+                     , Client.M
+                     , Client.Menu
+                     , Client.MenuCommonS
+                     , Client.MenuFrameworkS
+                     , Client.MenuGlobals
+                     , Client.MenuItem
+                     , Client.MenuLayerT
+                     , Client.ParticleTGlobals
+                     , Client.RefDefT
+                     , Client.RefExportT
+                     , Client.SCR
+                     , Client.SCRGlobals
+                     , Client.V
+                     , Client.VGlobals
+                     , Client.VID
+                     , Client.VIDGlobals
+                     , Client.VRectT
+                     , Client.VidDefT
+                     , Client.VidModeT
+                     , Client.VidModes
+                     , Constants
+                     , Game.Adapters
+                     , Game.CModelT
+                     , Game.CPlaneT
+                     , Game.CSurfaceT
+                     , Game.CVarT
+                     , Game.ClientPersistantT
+                     , Game.ClientRespawnT
+                     , Game.Cmd
+                     , Game.CmdAliasT
+                     , Game.CmdGlobals
+                     , Game.EdictT
+                     , Game.EntityStateT
+                     , Game.GClientT
+                     , Game.GItemArmorT
+                     , Game.GItemT
+                     , Game.GameAI
+                     , Game.GameBase
+                     , Game.GameBaseGlobals
+                     , Game.GameChase
+                     , Game.GameCombat
+                     , Game.GameFunc
+                     , Game.GameImportT
+                     , Game.GameItemList
+                     , Game.GameItems
+                     , Game.GameItemsGlobals
+                     , Game.GameLocalsT
+                     , Game.GameMisc
+                     , Game.GameSVCmds
+                     , Game.GameSave
+                     , Game.GameUtil
+                     , Game.GameWeapon
+                     , Game.Info
+                     , Game.LevelLocalsT
+                     , Game.LinkT
+                     , Game.MFrameT
+                     , Game.MMoveT
+                     , Game.MapSurfaceT
+                     , Game.Monster
+                     , Game.MonsterInfoT
+                     , Game.Monsters.MBerserkGlobals
+                     , Game.Monsters.MBoss2Globals
+                     , Game.Monsters.MBoss31Globals
+                     , Game.Monsters.MBoss32Globals
+                     , Game.Monsters.MBrainGlobals
+                     , Game.Monsters.MChickGlobals
+                     , Game.Monsters.MFlash
+                     , Game.Monsters.MFlipperGlobals
+                     , Game.Monsters.MFloatGlobals
+                     , Game.Monsters.MFlyerGlobals
+                     , Game.Monsters.MGladiatorGlobals
+                     , Game.Monsters.MGunnerGlobals
+                     , Game.Monsters.MHoverGlobals
+                     , Game.Monsters.MInfantryGlobals
+                     , Game.Monsters.MInsaneGlobals
+                     , Game.Monsters.MMedicGlobals
+                     , Game.Monsters.MMutantGlobals
+                     , Game.Monsters.MParasiteGlobals
+                     , Game.Monsters.MPlayer
+                     , Game.Monsters.MSoldierGlobals
+                     , Game.Monsters.MSuperTankGlobals
+                     , Game.Monsters.MTankGlobals
+                     , Game.MoveInfoT
+                     , Game.PMoveStateT
+                     , Game.PMoveT
+                     , Game.PlayerClient
+                     , Game.PlayerHud
+                     , Game.PlayerStateT
+                     , Game.PlayerTrail
+                     , Game.PlayerTrailGlobals
+                     , Game.PlayerView
+                     , Game.PlayerWeapon
+                     , Game.PushedT
+                     , Game.SpawnTempT
+                     , Game.TraceT
+                     , Game.UserCmdT
+                     , Globals
+                     , Internal
+                     , QCommon.CAreaT
+                     , QCommon.CBrushSideT
+                     , QCommon.CBrushT
+                     , QCommon.CBuf
+                     , QCommon.CLeafT
+                     , QCommon.CM
+                     , QCommon.CMGlobals
+                     , QCommon.CNodeT
+                     , QCommon.CVar
+                     , QCommon.CmdFunctionT
+                     , QCommon.Com
+                     , QCommon.ComGlobals
+                     , QCommon.DPackHeaderT
+                     , QCommon.FS
+                     , QCommon.FSConstants
+                     , QCommon.FSGlobals
+                     , QCommon.FileLinkT
+                     , QCommon.LumpT
+                     , QCommon.MD4
+                     , QCommon.MSG
+                     , QCommon.NetAdrT
+                     , QCommon.NetChanT
+                     , QCommon.NetChannel
+                     , QCommon.NetChannelGlobals
+                     , QCommon.PMove
+                     , QCommon.PMoveGlobals
+                     , QCommon.PackFileT
+                     , QCommon.PackT
+                     , QCommon.PmlT
+                     , QCommon.QCommon
+                     , QCommon.QFiles.BSP.DAreaPortalT
+                     , QCommon.QFiles.BSP.DAreaT
+                     , QCommon.QFiles.BSP.DBrushSideT
+                     , QCommon.QFiles.BSP.DBrushT
+                     , QCommon.QFiles.BSP.DHeaderT
+                     , QCommon.QFiles.BSP.DLeafT
+                     , QCommon.QFiles.BSP.DModelT
+                     , QCommon.QFiles.BSP.DNodeT
+                     , QCommon.QFiles.BSP.DPlaneT
+                     , QCommon.QFiles.BSP.DVisT
+                     , QCommon.QFiles.MD2.DAliasFrameT
+                     , QCommon.QFiles.MD2.DMdlT
+                     , QCommon.QFiles.MD2.DSTVertT
+                     , QCommon.QFiles.MD2.DTriangleT
+                     , QCommon.QFiles.SP2.DSprFrameT
+                     , QCommon.QFiles.SP2.DSpriteT
+                     , QCommon.SZ
+                     , QCommon.SearchPathT
+                     , QCommon.SizeBufT
+                     , QCommon.TexInfoT
+                     , QCommon.XCommandT
+                     , Quake
+                     , QuakeState
+                     , Render.Basic.BasicRenderAPIGlobals
+                     , Render.DummyRenderer
+                     , Render.Fast.FastRenderAPIGlobals
+                     , Render.Fast.GLLightMapStateT
+                     , Render.GLConfigT
+                     , Render.GLFWbGlobals
+                     , Render.GLPolyT
+                     , Render.GLStateT
+                     , Render.ImageT
+                     , Render.MEdgeT
+                     , Render.MLeafT
+                     , Render.MModelT
+                     , Render.MNodeT
+                     , Render.MSurfaceT
+                     , Render.MTexInfoT
+                     , Render.MVertexT
+                     , Render.ModelT
+                     , Render.OpenGL.QGLConstants
+                     , Render.QRenderer
+                     , Render.RenderAPI
+                     , Render.RenderAPIConstants
+                     , Render.Renderer
+                     , Render.VideoMode
+                     , Server.AreaNodeT
+                     , Server.ChallengeT
+                     , Server.ClientFrameT
+                     , Server.ClientT
+                     , Server.MoveClipT
+                     , Server.SV
+                     , Server.SVConsoleCommands
+                     , Server.SVEnts
+                     , Server.SVGame
+                     , Server.SVGlobals
+                     , Server.SVInit
+                     , Server.SVMain
+                     , Server.SVSend
+                     , Server.SVUser
+                     , Server.SVWorld
+                     , Server.ServerStaticT
+                     , Server.ServerT
+                     , Sound.S
+                     , Sound.SfxCacheT
+                     , Sound.SfxT
+                     , Sys.IN
+                     , Sys.INGlobals
+                     , Sys.KBD
+                     , Sys.KBDGlobals
+                     , Sys.LoopMsgT
+                     , Sys.LoopbackT
+                     , Sys.NET
+                     , Sys.NETGlobals
+                     , Sys.Socket
+                     , Sys.Sys
+                     , Sys.Timer
+                     , Util.Binary
+                     , Util.Lib
+                     , Util.Math3D
+                     , Util.QuakeFile

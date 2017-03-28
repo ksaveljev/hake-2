@@ -1,0 +1,58 @@
+{-# LANGUAGE TemplateHaskell #-}
+module Game.PMoveT ( PMoveT(..)
+                   , module Game.PMoveT
+                   , module Game.TraceT
+                   , module Game.UserCmdT
+                   ) where
+  
+import Control.Lens (makeLenses)
+import Data.Int (Int8)
+import Linear (V3(..))
+import qualified Data.Vector as V
+
+import Internal
+import Game.PMoveStateT
+import Game.TraceT
+import Game.UserCmdT
+import qualified Constants
+
+pmfDucked :: Int8
+pmfDucked = 1
+
+pmfJumpHeld :: Int8
+pmfJumpHeld = 2
+
+pmfOnGround :: Int8
+pmfOnGround = 4
+
+pmfTimeWaterJump :: Int8
+pmfTimeWaterJump = 8
+
+pmfTimeLand :: Int8
+pmfTimeLand = 16
+
+pmfTimeTeleport :: Int8
+pmfTimeTeleport = 32
+
+pmfNoPrediction :: Int8
+pmfNoPrediction = 64
+
+makeLenses ''PMoveT
+
+newPMoveT :: PMoveT
+newPMoveT =
+  PMoveT { _pmState         = newPMoveStateT
+         , _pmCmd           = newUserCmdT
+         , _pmSnapInitial   = False
+         , _pmNumTouch      = 0
+         , _pmTouchEnts     = V.replicate Constants.maxTouch (EdictReference (-1))
+         , _pmViewAngles    = V3 0 0 0
+         , _pmViewHeight    = 0
+         , _pmMins          = V3 0 0 0
+         , _pmMaxs          = V3 0 0 0
+         , _pmGroundEntity  = Nothing
+         , _pmWaterType     = 0
+         , _pmWaterLevel    = 0
+         , _pmTrace         = \_ _ _ _ -> return Nothing
+         , _pmPointContents = \_ -> return 0
+         }
