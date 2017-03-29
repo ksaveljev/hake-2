@@ -11,6 +11,11 @@ import Linear (V3(..), _x, _y, _z, dot, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Game.GClientT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import Game.PMoveStateT
 import QuakeState

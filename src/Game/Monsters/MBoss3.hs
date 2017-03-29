@@ -5,6 +5,12 @@ import Control.Lens (preuse, use, ix, (^.), (.=), (+=), zoom, (&), (.~), (%~), (
 import Control.Monad (liftM, void)
 import Linear (V3(..))
 
+import Game.GClientT
+import Game.MoveInfoT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import QuakeState
 import CVarVariables

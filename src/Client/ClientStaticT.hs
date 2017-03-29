@@ -1,13 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.ClientStaticT
-    ( module Client.ClientStaticT
-    ) where
+module Client.ClientStaticT where
 
 import           Control.Lens     (makeLenses)
 import qualified Data.ByteString  as B
 
-import           Types
 import           QCommon.NetChanT
+import           Types
 
 makeLenses ''ClientStaticT
 

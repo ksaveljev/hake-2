@@ -12,6 +12,10 @@ import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import Game.GClientT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
 import Types
 import QuakeState
 import CVarVariables

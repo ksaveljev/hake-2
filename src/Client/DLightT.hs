@@ -1,7 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.DLightT
-    ( module Client.DLightT
-    ) where
+module Client.DLightT where
 
 import           Control.Lens (makeLenses)
 import           Linear       (V3(..))

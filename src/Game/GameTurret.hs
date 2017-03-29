@@ -11,6 +11,12 @@ import Data.Maybe (fromJust)
 import Linear (V3(..), _x, _y, _z, norm)
 import qualified Data.ByteString as B
 
+import Game.GClientT
+import Game.MoveInfoT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import QuakeState
 import CVarVariables

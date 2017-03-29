@@ -1,16 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.RefExportT ( RefExportT(..)
-                         , module Client.RefExportT
-                         , module Render.ImageT
-                         , module Render.ModelT
-                         , module Sys.KBD
-                         ) where
+module Client.RefExportT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
-import Render.ImageT
-import Render.ModelT
-import Sys.KBD
+import           Types
 
 makeLenses ''RefExportT

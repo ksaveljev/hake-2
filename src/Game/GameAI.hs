@@ -20,6 +20,11 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
+import Game.GClientT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import QuakeState
 import CVarVariables

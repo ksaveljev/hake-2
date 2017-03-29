@@ -8,6 +8,12 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
+import Game.GClientT
+import Game.MoveInfoT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import QuakeState
 import CVarVariables

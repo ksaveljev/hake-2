@@ -14,6 +14,9 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
+import Game.PlayerStateT
+import Client.ClientInfoT
+import Client.FrameT
 import Types
 import QuakeState
 import CVarVariables

@@ -1,13 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Client.CheatVarT where
 
-import Control.Lens (makeLenses)
-import qualified Data.ByteString as B
+import           Control.Lens (makeLenses)
 
-data CheatVarT =
-  CheatVarT { _chvName  :: B.ByteString
-            , _chvValue :: B.ByteString
-            }
+import           Types
 
 makeLenses ''CheatVarT

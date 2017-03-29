@@ -1,7 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.DirtyT
-    ( module Client.DirtyT
-    ) where
+module Client.DirtyT where
 
 import           Control.Lens (makeLenses)
 

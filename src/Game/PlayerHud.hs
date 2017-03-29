@@ -9,6 +9,10 @@ import Data.Maybe (isJust)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.PlayerStateT
+import Game.GClientT
+import Game.ClientRespawnT
+import Game.ClientPersistantT
 import Types
 import QuakeState
 import CVarVariables

@@ -7,6 +7,7 @@ import Data.Maybe (isJust, fromJust)
 import System.Exit (exitSuccess)
 import qualified Data.ByteString as B
 
+import Sys.KBD
 import Types
 import QuakeState
 import qualified Client.CL as CL

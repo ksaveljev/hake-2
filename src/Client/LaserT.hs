@@ -1,20 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.LaserT ( LaserT(..)
-                     , module Client.LaserT
-                     , module Client.EntityT
-                     ) where
+module Client.LaserT where
 
-import Control.Lens (makeLenses)
-import Data.IORef (newIORef)
-import System.IO.Unsafe (unsafePerformIO)
+import           Control.Lens     (makeLenses)
+import           Data.IORef       (newIORef)
+import           System.IO.Unsafe (unsafePerformIO)
 
-import Types
-import Client.EntityT
+import           Client.EntityT
+import           Types
 
 makeLenses ''LaserT
 
 newLaserT :: LaserT
-newLaserT =
-  LaserT { _lEnt     = unsafePerformIO $ newIORef newEntityT
-         , _lEndTime = 0
-         }
+newLaserT = LaserT
+    { _lEnt     = unsafePerformIO (newIORef newEntityT)
+    , _lEndTime = 0
+    }

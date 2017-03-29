@@ -11,6 +11,7 @@ import qualified Data.Vector as V
 
 import Types
 import Client.MenuFrameworkS
+import Client.MenuItem
 import Client.MenuLayerT
 import QCommon.NetAdrT
 import qualified Constants

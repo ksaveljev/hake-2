@@ -1,18 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.MenuLayerT ( MenuLayerT(..)
-                         , module Client.MenuLayerT
-                         , module Client.KeyFuncT
-                         ) where
+module Client.MenuLayerT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
-import Client.KeyFuncT
+import           Types
 
 makeLenses ''MenuLayerT
 
 newMenuLayerT :: MenuLayerT
-newMenuLayerT =
-  MenuLayerT { _mlDraw = Nothing
-             , _mlKey  = Nothing
-             }
+newMenuLayerT = MenuLayerT
+    { _mlDraw = Nothing
+    , _mlKey  = Nothing
+    }

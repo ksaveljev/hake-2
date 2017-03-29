@@ -8,6 +8,12 @@ import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
+import Game.GClientT
+import Game.MoveInfoT
+import Game.ClientPersistantT
+import Game.ClientRespawnT
+import Game.MonsterInfoT
+import Game.PlayerStateT
 import Types
 import QuakeState
 import CVarVariables

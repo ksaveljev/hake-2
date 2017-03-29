@@ -2683,3 +2683,8 @@ data SfxCacheT = SfxCacheT
     }
 
 data Socket -- = Socket Int
+
+data CheatVarT = CheatVarT
+    { _chvName  :: B.ByteString
+    , _chvValue :: B.ByteString
+    }

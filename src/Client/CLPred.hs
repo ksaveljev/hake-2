@@ -6,6 +6,8 @@ import Control.Monad (liftM, unless, when)
 import Data.Bits ((.&.), shiftR, (.|.))
 import Linear (V3(..), _x, _y, _z)
 
+import Game.PlayerStateT
+import Client.FrameT
 import Types
 import Game.PMoveStateT
 import QuakeState

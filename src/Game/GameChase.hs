@@ -6,6 +6,9 @@ import Control.Monad (unless, liftM)
 import Data.Bits ((.&.), complement)
 import Linear (_x, _z, normalize)
 
+import Game.PlayerStateT
+import Game.GClientT
+import Game.ClientRespawnT
 import Types
 import Game.PMoveStateT
 import QuakeState

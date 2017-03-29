@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Game.CModelT where
 
-import Control.Lens (makeLenses)
-import Linear.V3    (V3(..))
+import           Control.Lens (makeLenses)
+import           Linear.V3    (V3(..))
 
-import              Types
+import           Types
 
 makeLenses ''CModelT
 

@@ -11,6 +11,10 @@ import Linear (V3(..), _x, _y)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import Game.GClientT
+import Game.PlayerStateT
+import Game.MonsterInfoT
+import Game.ClientPersistantT
 import Types
 import Game.PMoveStateT
 import QuakeState

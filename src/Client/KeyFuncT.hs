@@ -1,10 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.KeyFuncT ( KeyFuncT(..)
-                       , module Client.KeyFuncT
-                       ) where
+module Client.KeyFuncT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''KeyFuncT

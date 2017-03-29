@@ -1,7 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.ConsoleT
-    ( module Client.ConsoleT
-    ) where
+module Client.ConsoleT where
 
 import           Control.Lens                 (makeLenses)
 import qualified Data.Vector.Unboxed          as UV

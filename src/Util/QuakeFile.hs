@@ -31,6 +31,14 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.MFrameT
+import Game.MMoveT
+import Game.MonsterInfoT
+import Game.MoveInfoT
+import Game.ClientRespawnT
+import Game.ClientPersistantT
+import Game.GClientT
+import Game.PlayerStateT
 import Types
 import Game.PMoveStateT
 import QuakeState

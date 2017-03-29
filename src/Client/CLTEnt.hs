@@ -11,6 +11,8 @@ import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.PlayerStateT
+import Client.FrameT
 import Types
 import QuakeState
 import qualified Constants

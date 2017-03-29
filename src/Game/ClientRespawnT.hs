@@ -1,22 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.ClientRespawnT ( ClientRespawnT(..)
-                           , module Game.ClientRespawnT
-                           , module Game.ClientPersistantT
-                           ) where
+module Game.ClientRespawnT where
 
-import Control.Lens (makeLenses)
-import Linear (V3(..))
+import           Control.Lens (makeLenses)
+import           Linear       (V3(..))
 
-import Types
-import Game.ClientPersistantT
+import           Game.ClientPersistantT
+import           Types
 
 makeLenses ''ClientRespawnT
 
 newClientRespawnT :: ClientRespawnT
-newClientRespawnT =
-  ClientRespawnT { _crCoopRespawn = newClientPersistantT
-                 , _crEnterFrame  = 0
-                 , _crScore       = 0
-                 , _crCmdAngles   = V3 0 0 0
-                 , _crSpectator   = False
-                 }
+newClientRespawnT = ClientRespawnT
+    { _crCoopRespawn = newClientPersistantT
+    , _crEnterFrame  = 0
+    , _crScore       = 0
+    , _crCmdAngles   = V3 0 0 0
+    , _crSpectator   = False
+    }
