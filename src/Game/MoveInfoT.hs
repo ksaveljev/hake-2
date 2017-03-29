@@ -4,7 +4,7 @@ module Game.MoveInfoT where
 import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MoveInfoT
 

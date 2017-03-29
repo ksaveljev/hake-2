@@ -1,18 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-module QCommon.SearchPathT ( module QCommon.SearchPathT
-                           , module QCommon.PackT
-                           ) where
+module QCommon.SearchPathT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
 import qualified Data.ByteString as B
 
-import QCommon.PackT
-
-data SearchPathT =
-  SearchPathT { _spFilename :: B.ByteString
-              , _spPack     :: Maybe PackT
-              } deriving (Eq)
+import           Types
 
 makeLenses ''SearchPathT
 

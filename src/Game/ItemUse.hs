@@ -1,4 +1,4 @@
 module Game.ItemUse ( ItemUse(..)
                     ) where
 
-import Internal
+import Types

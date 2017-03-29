@@ -9,7 +9,7 @@ import Data.Maybe (isJust)
 import Linear (V3(..), norm, normalize, _x, _y, _z)
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

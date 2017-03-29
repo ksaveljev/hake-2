@@ -8,7 +8,7 @@ import Control.Lens (makeLenses)
 import Data.IORef (newIORef)
 import System.IO.Unsafe (unsafePerformIO)
 
-import Internal
+import Types
 import Client.EntityT
 
 makeLenses ''LaserT

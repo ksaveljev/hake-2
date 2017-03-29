@@ -24,7 +24,8 @@ import qualified Graphics.GL as GL
 import Numeric (showHex)
 import Text.Printf (printf)
 
-import Quake
+import Client.LightStyleT
+import Types
 import QuakeState
 import CVarVariables
 import Client.LightStyleT

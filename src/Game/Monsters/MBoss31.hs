@@ -8,7 +8,7 @@ import Data.Bits ((.&.))
 import Linear (norm, normalize, _z)
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

@@ -8,7 +8,7 @@ import Control.Monad (when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified QCommon.Com as Com

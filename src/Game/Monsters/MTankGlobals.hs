@@ -3,7 +3,7 @@ module Game.Monsters.MTankGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MTankGlobals
 

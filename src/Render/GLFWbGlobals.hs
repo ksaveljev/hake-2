@@ -4,7 +4,7 @@ module Render.GLFWbGlobals ( GLFWKBDEvent(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''GLFWbGlobals
 

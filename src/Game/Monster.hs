@@ -8,7 +8,7 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3, _x, _y, _z)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

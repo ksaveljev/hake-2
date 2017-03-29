@@ -6,7 +6,7 @@ module Game.GItemT ( GItemT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Game.GItemArmorT
 
 makeLenses ''GItemT

@@ -19,7 +19,9 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.GL as GL
 
-import Quake
+import Types
+import QCommon.QFiles.MD2.DAliasFrameT
+import Game.CPlaneT
 import QuakeState
 import CVarVariables
 import Render.Anorms

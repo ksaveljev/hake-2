@@ -12,7 +12,7 @@ import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''CmdGlobals

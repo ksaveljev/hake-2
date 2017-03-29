@@ -7,7 +7,7 @@ module Render.Renderer ( Renderer(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Client.RefExportT
 import Render.RenderAPI
 

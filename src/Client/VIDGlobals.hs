@@ -8,7 +8,7 @@ module Client.VIDGlobals ( module Client.VIDGlobals
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Client.MenuFrameworkS
 import Client.MenuItem
 import Client.VidModeT

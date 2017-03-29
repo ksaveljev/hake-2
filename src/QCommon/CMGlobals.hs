@@ -20,7 +20,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Game.CModelT
 import Game.CPlaneT
 import Game.MapSurfaceT

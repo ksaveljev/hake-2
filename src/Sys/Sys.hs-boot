@@ -2,7 +2,7 @@ module Sys.Sys where
 
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 
 sysError :: B.ByteString -> Quake ()
 

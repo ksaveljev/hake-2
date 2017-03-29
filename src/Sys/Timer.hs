@@ -1,14 +1,19 @@
 module Sys.Timer where
 
-import Control.Lens
-import Data.Functor ((<$>))
-import Data.Time.Clock.POSIX
+import           Control.Lens          (use)
+import           Data.IORef            (readIORef, writeIORef)
+import           Data.Time.Clock.POSIX (getPOSIXTime)
 
-import Quake
-import QuakeState
+import           QuakeState
+import           Types
 
 milliseconds :: Quake Int
 milliseconds = do
-    t <- io $ round . (* 1000) <$> getPOSIXTime
-    globals.curtime .= t
-    return t
+    curTime <- use (globals.gCurTime)
+    io $ do
+        t <- round . (* 1000) <$> getPOSIXTime
+        curTime `writeIORef` t
+        return t
+
+getCurTime :: Quake Int
+getCurTime = use (globals.gCurTime) >>= io . readIORef

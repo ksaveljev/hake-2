@@ -4,7 +4,7 @@ module Game.GameCombat ( damage
 
 import Linear (V3)
 
-import Quake
+import Types
 import QuakeState
 
 radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()

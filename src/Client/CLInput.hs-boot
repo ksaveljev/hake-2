@@ -1,6 +1,6 @@
 module Client.CLInput where
 
-import Quake
+import Types
 import QuakeState
 
 initInput :: Quake()

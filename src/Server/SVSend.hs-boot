@@ -3,7 +3,7 @@ module Server.SVSend where
 import Linear.V3 (V3)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 
 clientPrintf :: ClientT -> Int -> B.ByteString -> Quake ()

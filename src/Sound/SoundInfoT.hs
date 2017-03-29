@@ -3,6 +3,8 @@ module Sound.SoundInfoT where
 
 import Control.Lens (makeLenses)
 
+import Types
+
 data SoundInfoT =
   SoundInfoT { _siChannels        :: Int
              , _siSamples         :: Int

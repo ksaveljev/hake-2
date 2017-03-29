@@ -14,7 +14,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 import QCommon.CmdFunctionT

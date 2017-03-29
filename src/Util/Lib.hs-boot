@@ -5,7 +5,7 @@ import Linear (V3)
 import System.IO (Handle, IOMode)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 
 atof :: B.ByteString -> Float
 

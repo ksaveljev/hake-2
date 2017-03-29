@@ -26,7 +26,7 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Graphics.GL as GL
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import QCommon.MiptexT

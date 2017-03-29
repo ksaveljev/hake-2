@@ -18,7 +18,8 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.GL as GL
 
-import Quake
+import Types
+import Game.CVarT
 import QuakeState
 import CVarVariables
 import qualified Constants

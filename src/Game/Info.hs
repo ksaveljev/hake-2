@@ -7,7 +7,7 @@ import Data.Maybe (isJust, fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import qualified Constants
 import {-# SOURCE #-} qualified QCommon.Com as Com
 

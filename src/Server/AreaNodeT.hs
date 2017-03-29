@@ -5,7 +5,7 @@ module Server.AreaNodeT ( AreaNodeT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''AreaNodeT

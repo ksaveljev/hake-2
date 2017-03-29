@@ -6,7 +6,7 @@ module Render.ImageT ( ImageT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''ImageT
 

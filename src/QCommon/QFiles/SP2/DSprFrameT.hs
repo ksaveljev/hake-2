@@ -9,16 +9,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 import qualified Constants
-
-data DSprFrameT =
-  DSprFrameT { _dsfWidth   :: Int
-             , _dsfHeight  :: Int
-             , _dsfOriginX :: Int
-             , _dsfOriginY :: Int
-             , _dsfName    :: B.ByteString
-             }
 
 makeLenses ''DSprFrameT
 

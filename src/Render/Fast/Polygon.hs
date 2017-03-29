@@ -4,7 +4,7 @@ import Control.Lens (use, (.=), (+=), ix, (^.), preuse)
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 
-import Quake
+import Types
 import QuakeState
 
 getPolygonBufferValue :: Int -> GLPolyReference -> Int -> Quake Float

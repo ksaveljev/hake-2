@@ -11,6 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
+import Types
 import QCommon.LumpT
 import Util.Binary
 import qualified Constants

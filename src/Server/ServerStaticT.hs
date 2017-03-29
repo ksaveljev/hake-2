@@ -10,7 +10,7 @@ module Server.ServerStaticT ( ServerStaticT(..)
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.EntityStateT
 import Server.ChallengeT
 import Server.ClientT

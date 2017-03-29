@@ -5,6 +5,8 @@ import Data.Int (Int8)
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
+import Types
+
 data ParticleT =
   ParticleT { _pColors :: UV.Vector Int8
             , _pVertexArray :: UV.Vector Float

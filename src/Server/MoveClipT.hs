@@ -5,6 +5,7 @@ import Control.Lens (makeLenses)
 import Linear (V3(..))
 
 import QuakeState
+import Types
 
 data MoveClipT =
   MoveClipT { _mcBoxMins     :: V3 Float

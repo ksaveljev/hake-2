@@ -7,7 +7,7 @@ module Game.ClientRespawnT ( ClientRespawnT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 import Game.ClientPersistantT
 
 makeLenses ''ClientRespawnT

@@ -10,7 +10,7 @@ import Control.Monad.Except
 import Network.Socket (HostAddress)
 import qualified Data.ByteString as B
 
-data Socket -- = Socket Int
+import Types
 
 socket :: IO (Maybe Socket)
 socket = liftIO (putStrLn "SOCKET STUB! DO NOT FORGET TO REPLACE ME WITH IMPLEMENTATION") >> undefined

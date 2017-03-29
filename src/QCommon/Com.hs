@@ -11,7 +11,7 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 import qualified Constants
@@ -294,3 +294,6 @@ quit = do
     globals.logFile .= Nothing
 
     Sys.quit
+
+fatalError :: B.ByteString -> Quake ()
+fatalError = error "Com.fatalError" -- TODO

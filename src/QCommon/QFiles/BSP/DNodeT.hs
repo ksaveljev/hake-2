@@ -9,6 +9,7 @@ import Data.Word (Word16)
 import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 dNodeTSize :: Int

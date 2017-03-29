@@ -10,10 +10,11 @@ import Control.Lens (makeLenses)
 import Linear (V3(..))
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.PlayerStateT
+import Game.PMoveStateT
 
 makeLenses ''GClientT
 

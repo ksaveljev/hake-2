@@ -5,6 +5,6 @@ module Sys.KBD ( KBD(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''KBD

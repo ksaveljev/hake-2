@@ -14,7 +14,7 @@ import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Client.CDLightT
 import Client.CLightStyleT
 import Client.CParticleT

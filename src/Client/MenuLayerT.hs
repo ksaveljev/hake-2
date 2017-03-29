@@ -6,7 +6,7 @@ module Client.MenuLayerT ( MenuLayerT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Client.KeyFuncT
 
 makeLenses ''MenuLayerT

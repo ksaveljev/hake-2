@@ -18,7 +18,7 @@ import Control.Lens (makeLenses)
 import Linear (V3(..))
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.CPlaneT
 import QCommon.QFiles.BSP.DVisT
 import QCommon.QFiles.MD2.DMdlT

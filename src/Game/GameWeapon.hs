@@ -8,7 +8,8 @@ import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3(..), normalize, norm, _x, _y, _z)
 
-import Quake
+import Types
+import Game.CSurfaceT
 import QuakeState
 import CVarVariables
 import Game.Adapters

@@ -8,7 +8,7 @@ module Client.RefExportT ( RefExportT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Render.ImageT
 import Render.ModelT
 import Sys.KBD

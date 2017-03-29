@@ -6,13 +6,8 @@ module Sys.LoopbackT ( module Sys.LoopbackT
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
+import Types
 import Sys.LoopMsgT
-
-data LoopbackT =
-  LoopbackT { _lMsgs :: V.Vector LoopMsgT
-            , _lGet  :: Int
-            , _lSend :: Int
-            }
 
 makeLenses ''LoopbackT
 

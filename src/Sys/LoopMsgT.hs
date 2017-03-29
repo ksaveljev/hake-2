@@ -5,10 +5,7 @@ module Sys.LoopMsgT where
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 
-data LoopMsgT =
-  LoopMsgT { _lmData    :: B.ByteString -- max len is Constants.maxMsgLen
-           , _lmDataLen :: Int
-           }
+import Types
 
 makeLenses ''LoopMsgT
 

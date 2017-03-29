@@ -6,7 +6,7 @@ module Render.MTexInfoT ( MTexInfoT(..)
 import Control.Lens (makeLenses)
 import Linear (V4(..))
 
-import Internal
+import Types
 
 makeLenses ''MTexInfoT
 

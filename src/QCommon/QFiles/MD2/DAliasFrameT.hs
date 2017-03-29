@@ -9,14 +9,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Unboxed as UV
 
+import Types
 import Util.Binary
-
-data DAliasFrameT =
-  DAliasFrameT { _dafScale     :: V3 Float
-               , _dafTranslate :: V3 Float
-               , _dafName      :: B.ByteString
-               , _dafVerts     :: UV.Vector Int
-               } deriving Eq
 
 makeLenses ''DAliasFrameT
 

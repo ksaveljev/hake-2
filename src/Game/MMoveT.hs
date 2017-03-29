@@ -6,7 +6,7 @@ module Game.MMoveT ( MMoveT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Game.MFrameT
 
 makeLenses ''MMoveT

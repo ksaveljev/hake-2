@@ -3,7 +3,7 @@ module Game.Monsters.MBrainGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MBrainGlobals
 

@@ -3,7 +3,7 @@ module Game.GameItemsGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Game.GItemArmorT
 import qualified Constants
 

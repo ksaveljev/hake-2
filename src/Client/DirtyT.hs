@@ -5,7 +5,7 @@ module Client.DirtyT
 
 import           Control.Lens (makeLenses)
 
-import           Internal
+import           Types
 
 makeLenses ''DirtyT
 

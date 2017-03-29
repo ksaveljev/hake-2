@@ -10,7 +10,7 @@ import Linear (V3(..), _x, _z)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

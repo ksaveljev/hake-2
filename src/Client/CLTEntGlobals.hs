@@ -13,7 +13,7 @@ import Data.IORef (newIORef)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Client.BeamT
 import Client.CLSustainT
 import Client.EntityT

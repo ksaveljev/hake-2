@@ -5,6 +5,6 @@ module Render.RenderAPI ( RenderAPI(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''RenderAPI

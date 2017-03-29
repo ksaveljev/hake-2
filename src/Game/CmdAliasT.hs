@@ -1,19 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Game.CmdAliasT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
 import qualified Data.ByteString as B
 
-data CmdAliasT =
-  CmdAliasT { _caName  :: B.ByteString
-            , _caValue :: B.ByteString
-            } deriving (Eq)
+import           Types
 
 makeLenses ''CmdAliasT
 
 newCmdAliasT :: CmdAliasT
-newCmdAliasT =
-  CmdAliasT { _caName  = ""
-            , _caValue = ""
-            }
+newCmdAliasT = CmdAliasT
+    { _caName  = ""
+    , _caValue = ""
+    }

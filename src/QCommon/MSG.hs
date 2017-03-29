@@ -18,7 +18,8 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
+import Game.UserCmdT
 import QuakeState
 import qualified Constants
 import {-# SOURCE #-} qualified QCommon.Com as Com

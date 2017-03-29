@@ -7,12 +7,8 @@ import Data.Functor ((<$>))
 import Data.Int (Int16)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
-
-data DSTVertT =
-  DSTVertT { _dstvS :: Int16
-           , _dstvT :: Int16
-           }
 
 makeLenses ''DSTVertT
 

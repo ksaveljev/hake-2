@@ -5,6 +5,7 @@ import Control.Lens ((^.))
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import Types
 import Render.Basic.BasicRenderAPI
 import Render.Fast.FastRenderAPI
 import Render.GLFWbRenderer

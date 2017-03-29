@@ -20,7 +20,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.CSurfaceT
@@ -174,7 +174,7 @@ loadSubmodels lump = do
 
     cmGlobals.cmNumCModels .= count
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "submodles(headnode, <origin>, <mins>, <maxs>)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -192,7 +192,7 @@ loadSubmodels lump = do
                                , _cmHeadNode = model^.dmHeadNode
                                }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             io (putStrLn "CM.loadSubmodels#readMapCModel") >> undefined -- TODO
 
           return (idx, cmodel)
@@ -215,7 +215,7 @@ loadSurfaces lump = do
     cmGlobals.cmNumTexInfo .= count
     Com.dprintf $ " numtexinfo=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "surfaces:\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -232,7 +232,7 @@ loadSurfaces lump = do
                                    , _csValue = tex^.tiValue
                                    }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` (tex^.tiTexture) `B.append`
                           "| " `B.append` (tex^.tiTexture) `B.append`
                           "| " `B.append` BC.pack (show (tex^.tiValue)) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
@@ -260,7 +260,7 @@ loadNodes lump = do
 
     Com.dprintf $ " numnodes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "nodes(planenum, child[0], child[1])\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -276,7 +276,7 @@ loadNodes lump = do
                              , _cnChildren = node^.dnChildren
                              }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             io (putStrLn "CM.loadNodes#readMapNode") >> undefined -- TODO
 
           return (idx, cnode)
@@ -297,7 +297,7 @@ loadBrushes lump = do
 
     Com.dprintf $ " numbrushes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "brushes:(firstbrushside, numsides, contents)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -313,7 +313,7 @@ loadBrushes lump = do
                                , _cbCheckCount     = 0
                                }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` BC.pack (show $ brush^.dbFirstSide) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show $ brush^.dbNumSides) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show $ brush^.dbContents) `B.append` -- IMPROVE ?
@@ -342,7 +342,7 @@ loadLeafs lump = do
     cmGlobals.cmNumLeafs .= count
     cmGlobals.cmNumClusters .= 0
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "cleaf-list:(contents, cluster, area, firstleafbrush, numleafbrushes)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -383,7 +383,7 @@ loadLeafs lump = do
           when (fromIntegral (leaf^.dlCluster) >= numClusters) $
             cmGlobals.cmNumClusters .= fromIntegral (leaf^.dlCluster) + 1
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` BC.pack (show (leaf^.dlContents)) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show (leaf^.dlCluster)) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show (leaf^.dlFirstLeafBrush)) `B.append` -- IMPROVE ?
@@ -412,7 +412,7 @@ loadPlanes lump = do
 
     cmGlobals.cmNumPlanes .= count
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "cplanes(normal[0],normal[1],normal[2], dist, type, signbits)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -429,7 +429,7 @@ loadPlanes lump = do
                                , _cpPad      = (0, 0)
                                }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` BC.pack (show $ cplane^.cpNormal._x) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show $ cplane^.cpNormal._y) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show $ cplane^.cpNormal._z) `B.append` -- IMPROVE ?
@@ -467,7 +467,7 @@ loadLeafBrushes lump = do
 
     cmGlobals.cmNumLeafBrushes .= count
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "map_brushes:\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -480,7 +480,7 @@ loadLeafBrushes lump = do
           let offset = fromIntegral $ (lump^.lFileOfs) + idx * 2
               val = runGet getWord16le (BL.drop offset buf)
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` BC.pack (show idx) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show val) `B.append` -- IMPROVE ?
                           "|\n"
@@ -503,7 +503,7 @@ loadBrushSides lump = do
 
     Com.dprintf $ " numbrushsides=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "brushside(planenum, surfacenum):\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -529,7 +529,7 @@ loadBrushSides lump = do
                                        , _cbsSurface = Just (if j == -1 then Constants.maxMapTexInfo else j)
                                        }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             Com.dprintf $ "| " `B.append` BC.pack (show num) `B.append` -- IMPROVE ?
                           "| " `B.append` BC.pack (show j) `B.append` -- IMPROVE ?
                           "|\n"
@@ -552,7 +552,7 @@ loadAreas lump = do
 
     cmGlobals.cmNumAreas .= count
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "areas(numportals, firstportal)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -570,7 +570,7 @@ loadAreas lump = do
                              , _caFloodValid      = 0
                              }
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             io (putStrLn "CM.loadAreas#readMapArea") >> undefined -- TODO
 
           return (idx, carea)
@@ -591,7 +591,7 @@ loadAreaPortals lump = do
 
     Com.dprintf $ " numareaportals=" `B.append` BC.pack (show count) `B.append` "\n"
 
-    whenQ (use $ cmGlobals.cmDebugLoadMap) $
+    whenM (use $ cmGlobals.cmDebugLoadMap) $
       Com.dprintf "areaportals(portalnum, otherarea)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
@@ -604,7 +604,7 @@ loadAreaPortals lump = do
           let offset = fromIntegral $ (lump^.lFileOfs) + idx * dAreaPortalTSize
               areaPortal = newDAreaPortalT (BL.drop offset buf)
 
-          whenQ (use $ cmGlobals.cmDebugLoadMap) $
+          whenM (use $ cmGlobals.cmDebugLoadMap) $
             io (putStrLn "CM.loadAreaPortals#readMapAreaPortal") >> undefined -- TODO
 
           return (idx, areaPortal)

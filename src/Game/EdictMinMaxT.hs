@@ -6,7 +6,7 @@ module Game.EdictMinMaxT ( EdictMinMaxT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''EdictMinMaxT
 

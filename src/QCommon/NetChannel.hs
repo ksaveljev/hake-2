@@ -12,7 +12,7 @@ import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -81,7 +81,7 @@ transmit netChanLens len buf = do
             w2 = fromIntegral $ (fromIntegral (chan^.ncIncomingSequence) .&. mask) .|. (fromIntegral (chan^.ncIncomingReliableSequence) `shiftL` 31)
 
         netChanLens.ncOutgoingSequence += 1
-        curTime <- use $ globals.curtime
+        curTime <- Timer.getCurTime
         netChanLens.ncLastSent .= curTime
 
         MSG.writeInt (netChannelGlobals.ncSend) w1
@@ -206,7 +206,7 @@ process netChanLens msgLens = do
           netChanLens.ncIncomingReliableSequence %= (`xor` 1)
 
         -- the message can now be read from the current message pointer
-        curTime <- use $ globals.curtime
+        curTime <- Timer.getCurTime
         netChanLens.ncLastReceived .= curTime
 
         return True
@@ -214,7 +214,7 @@ process netChanLens msgLens = do
 -- Netchan_Setup is called to open a channel to a remote system.
 setup :: Int -> Traversal' QuakeState NetChanT -> NetAdrT -> Int -> Quake ()
 setup sock netChanLens adr qport = do
-    curTime <- use $ globals.curtime
+    curTime <- Timer.getCurTime
 
     netChanLens .= newNetChanT { _ncSock = sock
                                , _ncRemoteAddress = adr

@@ -8,7 +8,7 @@ import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''ComGlobals

@@ -5,6 +5,6 @@ module Render.MLeafT ( MLeafT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MLeafT

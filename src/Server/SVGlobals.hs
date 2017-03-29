@@ -16,7 +16,7 @@ import Linear (V3(..))
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Game.EdictT
 import Game.LinkT
 import QCommon.NetAdrT

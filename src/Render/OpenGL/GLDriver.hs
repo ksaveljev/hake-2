@@ -5,6 +5,6 @@ module Render.OpenGL.GLDriver ( GLDriver(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''GLDriver

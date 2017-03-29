@@ -10,7 +10,7 @@ import Linear.V3 (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import qualified Constants

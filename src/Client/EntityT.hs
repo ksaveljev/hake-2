@@ -6,7 +6,7 @@ module Client.EntityT ( EntityT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''EntityT
 

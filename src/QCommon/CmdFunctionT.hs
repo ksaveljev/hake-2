@@ -6,6 +6,6 @@ module QCommon.CmdFunctionT ( CmdFunctionT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''CmdFunctionT

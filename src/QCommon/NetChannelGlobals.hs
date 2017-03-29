@@ -6,7 +6,7 @@ module QCommon.NetChannelGlobals ( module QCommon.NetChannelGlobals
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import QCommon.SizeBufT
 
 makeLenses ''NetChannelGlobals

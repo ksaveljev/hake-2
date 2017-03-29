@@ -2,7 +2,7 @@ module Game.GameWeapon where
 
 import Linear (V3)
 
-import Quake
+import Types
 import QuakeState
 
 fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool

@@ -3,7 +3,7 @@ module Game.Monsters.MFlyerGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MFlyerGlobals
 

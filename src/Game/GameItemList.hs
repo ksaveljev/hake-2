@@ -6,6 +6,7 @@ module Game.GameItemList ( itemList
 import Data.Bits ((.|.))
 import qualified Data.Vector as V
 
+import Types
 import Game.GItemT
 import qualified Constants
 import qualified Game.GameItems as GameItems

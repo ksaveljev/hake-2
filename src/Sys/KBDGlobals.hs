@@ -4,7 +4,7 @@ module Sys.KBDGlobals ( module Sys.KBDGlobals
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''KBDGlobals
 

@@ -4,7 +4,7 @@ module Sys.INGlobals ( module Sys.INGlobals
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''INGlobals
 

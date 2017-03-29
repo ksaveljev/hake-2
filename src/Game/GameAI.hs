@@ -20,7 +20,7 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

@@ -8,6 +8,7 @@ import Data.Int (Int16)
 import Data.Word (Word16)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 dBrushSideTSize :: Int

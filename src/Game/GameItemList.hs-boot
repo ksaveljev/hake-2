@@ -4,6 +4,7 @@ module Game.GameItemList ( itemList
 
 import qualified Data.Vector as V
 
+import Types
 import Game.GItemT
 
 itemList :: V.Vector GItemT

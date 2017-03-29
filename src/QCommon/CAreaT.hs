@@ -1,14 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.CAreaT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-data CAreaT =
-  CAreaT { _caNumAreaPortals  :: Int
-         , _caFirstAreaPortal :: Int
-         , _caFloodNum        :: Int
-         , _caFloodValid      :: Int
-         }
+import           Types
 
 makeLenses ''CAreaT
 

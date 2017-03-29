@@ -5,7 +5,7 @@ module Game.EdictStatusT ( EdictStatusT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''EdictStatusT
 

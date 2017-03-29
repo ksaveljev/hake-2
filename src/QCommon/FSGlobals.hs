@@ -8,7 +8,7 @@ module QCommon.FSGlobals ( module QCommon.FSGlobals
 import Control.Lens (makeLenses)
 import qualified Data.Sequence as Seq
 
-import Internal
+import Types
 import QCommon.SearchPathT
 import QCommon.FileLinkT
 

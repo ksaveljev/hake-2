@@ -21,7 +21,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Graphics.UI.GLFW as GLFW
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 import Render.OpenGL.GLDriver

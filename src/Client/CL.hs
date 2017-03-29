@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as Vec
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Client.CheatVarT
@@ -271,7 +271,7 @@ frame msec = do
 
         -- decide the simulation time
         extraTime <- use $ clientGlobals.cgExtraTime
-        time <- use $ globals.curtime
+        time <- Timer.getCurTime
         let frameTime = fromIntegral extraTime / 1000
         globals.cls.csFrameTime .= frameTime
         globals.cl.csTime += extraTime

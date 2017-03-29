@@ -8,7 +8,7 @@ import Control.Lens (makeLenses)
 import Linear.V3 (V3(..))
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.PMoveT
 import QCommon.PmlT
 import qualified Constants

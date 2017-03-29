@@ -11,4 +11,4 @@ module Game.Adapters ( EntThink(..)
                      , AI(..)
                      ) where
 
-import Internal
+import Types

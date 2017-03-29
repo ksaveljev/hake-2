@@ -5,7 +5,7 @@ module Render.GLPolyT ( GLPolyT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''GLPolyT
 

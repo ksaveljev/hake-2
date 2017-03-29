@@ -9,7 +9,7 @@ import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Render.MTexInfoT
 import qualified Constants
 

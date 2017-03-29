@@ -8,7 +8,7 @@ module Client.MenuFrameworkS ( MenuFrameworkS(..)
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Client.MenuItem
 
 makeLenses ''MenuFrameworkS

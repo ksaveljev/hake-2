@@ -1,14 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Client.VidModeT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
 import qualified Data.ByteString as B
 
-data VidModeT =
-  VidModeT { _vmDescription :: B.ByteString
-           , _vmWidth       :: Int
-           , _vmHeight      :: Int
-           , _vmMode        :: Int
-           }
+import           Types
 
 makeLenses ''VidModeT

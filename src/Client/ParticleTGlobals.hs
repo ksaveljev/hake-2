@@ -7,7 +7,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''ParticleTGlobals

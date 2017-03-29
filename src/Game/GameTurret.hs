@@ -11,7 +11,7 @@ import Data.Maybe (fromJust)
 import Linear (V3(..), _x, _y, _z, norm)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

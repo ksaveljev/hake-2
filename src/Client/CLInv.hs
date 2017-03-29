@@ -2,7 +2,7 @@ module Client.CLInv where
 
 import Control.Lens ((.=), ix)
 
-import Quake
+import Types
 import QuakeState
 import qualified Constants
 import qualified QCommon.MSG as MSG

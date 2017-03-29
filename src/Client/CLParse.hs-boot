@@ -5,7 +5,7 @@ import Control.Lens (Traversal')
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 

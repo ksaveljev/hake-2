@@ -15,8 +15,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Storable.Mutable as MSV
 
-import Internal
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

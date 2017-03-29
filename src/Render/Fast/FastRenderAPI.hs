@@ -25,7 +25,8 @@ import qualified Debug.Trace as DT
 import qualified Graphics.GL as GL
 import qualified Graphics.UI.GLFW as GLFW
 
-import Quake
+import Types
+import Game.CPlaneT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

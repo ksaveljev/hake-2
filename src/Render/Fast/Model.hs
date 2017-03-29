@@ -24,7 +24,9 @@ import qualified Data.Vector.Unboxed as UV
 
 import Text.Printf (printf)
 
-import Quake
+import QCommon.QFiles.SP2.DSprFrameT
+import Types
+import Game.CPlaneT
 import QuakeState
 import QCommon.QFiles.BSP.DFaceT
 import QCommon.QFiles.BSP.DHeaderT

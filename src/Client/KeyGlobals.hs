@@ -17,7 +17,7 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Client.KeyConstants
 
 makeLenses ''KeyGlobals

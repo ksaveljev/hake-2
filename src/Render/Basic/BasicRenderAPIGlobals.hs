@@ -1,6 +1,6 @@
 module Render.Basic.BasicRenderAPIGlobals where
 
-import Internal
+import Types
 
 initialBasicRenderAPIGlobals :: BasicRenderAPIGlobals
 initialBasicRenderAPIGlobals =

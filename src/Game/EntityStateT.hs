@@ -7,7 +7,7 @@ import Control.Lens (makeLenses)
 import Data.Maybe (isJust)
 import Linear.V3 (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''EntityStateT
 

@@ -3,6 +3,7 @@ module Render.QRenderer where
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import Types
 import Render.Renderer
 
 drivers :: V.Vector Renderer

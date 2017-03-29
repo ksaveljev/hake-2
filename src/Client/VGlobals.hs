@@ -10,7 +10,7 @@ import Data.IORef (newIORef)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Client.DLightT
 import Client.EntityT
 import Client.LightStyleT

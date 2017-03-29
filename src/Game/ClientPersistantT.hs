@@ -7,7 +7,7 @@ module Game.ClientPersistantT ( ClientPersistantT(..)
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''ClientPersistantT

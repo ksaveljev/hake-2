@@ -4,7 +4,7 @@ module Game.PushedT where
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''PushedT
 

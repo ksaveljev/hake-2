@@ -13,7 +13,7 @@ import Text.Read (readMaybe)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import {-# SOURCE #-} qualified QCommon.Com as Com
 
@@ -64,16 +64,16 @@ fClose h = io $ handle (\(_ :: IOException) -> return ()) (hClose h)
 
 rand :: Quake Int16
 rand = do
-    g <- use $ globals.rnd
+    g <- use $ globals.gRnd
     let (result, newG) = random g
-    globals.rnd .= newG
+    globals.gRnd .= newG
     return $ if result < 0 then -result else result -- TODO: ugly hack, find different approach?
 
 randomF :: Quake Float
 randomF = do
-    g <- use $ globals.rnd
+    g <- use $ globals.gRnd
     let (result, newG) = random g
-    globals.rnd .= newG
+    globals.gRnd .= newG
     return result
 
 -- Like in libc

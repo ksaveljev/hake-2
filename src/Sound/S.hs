@@ -6,7 +6,7 @@ import System.IO (Handle)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-import Quake
+import Types
 import QuakeState
 
 init :: Quake ()

@@ -15,7 +15,7 @@ import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.CVarT
 import Game.CPlaneT
 import Game.EdictT

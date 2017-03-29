@@ -45,7 +45,7 @@ import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.CVarT
 
 newGameImportT       :: GameImportT

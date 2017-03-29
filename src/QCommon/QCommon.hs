@@ -11,7 +11,8 @@ import System.IO (Handle, hSeek, hSetFileSize, SeekMode(AbsoluteSeek), IOMode(Wr
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
+import Game.CVarT
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -29,8 +30,8 @@ import qualified Sys.NET as NET
 import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 
-init :: [String] -> Quake ()
-init args = do
+initialize :: [String] -> Quake ()
+initialize args = do
     Com.initArgv args >> CBuf.init >> Cmd.init >> CVar.init >> Key.init
 
     -- we need to add the early commands twice, because

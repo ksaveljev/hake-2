@@ -8,7 +8,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Storable.Mutable as MSV
 
-import Internal
+import Types
 import Render.MSurfaceT
 import qualified Constants
 

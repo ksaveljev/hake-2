@@ -16,7 +16,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Util.Binary
@@ -29,6 +29,7 @@ import qualified QCommon.SZ as SZ
 import qualified Server.SVEnts as SVEnts
 import qualified Server.SVMain as SVMain
 import qualified Server.SVUser as SVUser
+import qualified Sys.Timer as Timer
 
 {-
 =============================================================================
@@ -446,7 +447,7 @@ sendClientMessages = do
                      void $ sendClientDatagram clientRef
                | otherwise -> do
                    Just netChan <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan
-                   curTime <- use $ globals.curtime
+                   curTime <- Timer.getCurTime
                    -- just update reliable if needed
                    when ((netChan^.ncMessage.sbCurSize) /= 0 || curTime - (netChan^.ncLastSent) > 1000) $ do
                      io $ print "SVSend.sendClientMessages #2"

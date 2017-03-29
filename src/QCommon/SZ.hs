@@ -7,7 +7,7 @@ import Control.Lens (Lens', (^.), use, (.=), ASetter', Traversal', preuse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import qualified Constants
 import {-# SOURCE #-} qualified QCommon.Com as Com

@@ -9,7 +9,7 @@ import qualified Data.Vector.Storable.Mutable as MSV
 import           System.IO.Unsafe             (unsafePerformIO)
 
 import qualified Constants
-import           Internal
+import           Types
 
 makeLenses ''ConsoleT
 

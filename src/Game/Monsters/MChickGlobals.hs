@@ -3,7 +3,7 @@ module Game.Monsters.MChickGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MChickGlobals
 

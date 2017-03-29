@@ -7,6 +7,7 @@ import Data.Functor ((<$>))
 import Data.Word (Word8, Word16)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 data TgaT =

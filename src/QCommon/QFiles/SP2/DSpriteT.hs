@@ -1,14 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-module QCommon.QFiles.SP2.DSpriteT ( module QCommon.QFiles.SP2.DSpriteT
-                                   , module QCommon.QFiles.SP2.DSprFrameT
-                                   ) where
+module QCommon.QFiles.SP2.DSpriteT where
 
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
+import Types
 import QCommon.QFiles.SP2.DSprFrameT
 import Util.Binary
 
@@ -17,13 +15,6 @@ idSpriteHeader = "IDS2"
 
 spriteVersion :: Int
 spriteVersion = 2
-
-data DSpriteT =
-  DSpriteT { _dsIdent     :: Int
-           , _dsVersion   :: Int
-           , _dsNumFrames :: Int
-           , _dsFrames    :: V.Vector DSprFrameT
-           }
 
 makeLenses ''DSpriteT
 

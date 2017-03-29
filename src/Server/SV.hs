@@ -11,7 +11,8 @@ import Linear (V3(..), _x, _y, _z, dot, cross)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
 
-import Quake
+import Types
+import Game.PMoveStateT
 import QuakeState
 import CVarVariables
 import qualified Constants

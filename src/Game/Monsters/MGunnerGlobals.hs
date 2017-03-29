@@ -3,7 +3,7 @@ module Game.Monsters.MGunnerGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MGunnerGlobals
 

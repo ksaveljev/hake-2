@@ -3,7 +3,7 @@ module Game.Monsters.MBoss31Globals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MBoss31Globals
 

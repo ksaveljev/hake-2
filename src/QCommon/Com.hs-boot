@@ -4,7 +4,7 @@ import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
 import QCommon.XCommandT
 
 initArgv :: [String] -> Quake ()
@@ -34,3 +34,5 @@ blockSequenceCRCByte :: B.ByteString -> Int -> Int -> Int -> Quake Word8
 stripExtension :: B.ByteString -> B.ByteString
 
 quit :: Quake ()
+
+fatalError :: B.ByteString -> Quake ()

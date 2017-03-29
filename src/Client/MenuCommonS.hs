@@ -7,7 +7,7 @@ module Client.MenuCommonS ( MenuCommonS(..)
 import Control.Lens (makeLenses)
 import Linear (V4(..))
 
-import Internal
+import Types
 
 makeLenses ''MenuCommonS
 

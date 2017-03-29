@@ -6,7 +6,7 @@ module Game.TraceT ( TraceT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 import Game.CPlaneT
 
 makeLenses ''TraceT

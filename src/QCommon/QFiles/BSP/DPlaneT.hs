@@ -7,6 +7,7 @@ import Data.Functor ((<$>))
 import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 dPlaneTSize :: Int

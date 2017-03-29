@@ -180,7 +180,6 @@ executable hake2
                      , Game.TraceT
                      , Game.UserCmdT
                      , Globals
-                     , Internal
                      , QCommon.CAreaT
                      , QCommon.CBrushSideT
                      , QCommon.CBrushT
@@ -288,6 +287,7 @@ executable hake2
                      , Sys.Socket
                      , Sys.Sys
                      , Sys.Timer
+                     , Types
                      , Util.Binary
                      , Util.Lib
                      , Util.Math3D

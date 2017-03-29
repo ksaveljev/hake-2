@@ -6,7 +6,7 @@ module Client.ClientStaticT
 import           Control.Lens     (makeLenses)
 import qualified Data.ByteString  as B
 
-import           Internal
+import           Types
 import           QCommon.NetChanT
 
 makeLenses ''ClientStaticT

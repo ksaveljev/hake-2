@@ -7,7 +7,7 @@ module Game.MonsterInfoT ( MonsterInfoT(..)
 import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import Game.MMoveT
 
 makeLenses ''MonsterInfoT

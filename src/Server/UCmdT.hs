@@ -4,6 +4,7 @@ module Server.UCmdT where
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 
+import Types
 import QCommon.XCommandT
 
 data UCmdT =

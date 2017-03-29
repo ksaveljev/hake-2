@@ -10,7 +10,7 @@ import Data.Int (Int8)
 import Linear (V3(..))
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.PMoveStateT
 import Game.TraceT
 import Game.UserCmdT

@@ -1,6 +1,6 @@
 module Game.GameTarget where
 
-import Quake
+import Types
 import QuakeState
 import Game.Adapters
 

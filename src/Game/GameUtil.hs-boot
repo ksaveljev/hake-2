@@ -2,7 +2,7 @@ module Game.GameUtil where
 
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import Game.Adapters
 

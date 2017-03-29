@@ -5,16 +5,12 @@ import Data.Word (Word16)
 import Control.Lens (makeLenses)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 import qualified Constants
 
 mEdgeDiskSize :: Int
 mEdgeDiskSize = 2 * Constants.sizeOfShort
-
-data MEdgeT =
-  MEdgeT { _meV                :: (Word16, Word16)
-         , _meCachedEdgeOffset :: Int
-         }
 
 makeLenses ''MEdgeT
 

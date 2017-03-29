@@ -3,7 +3,7 @@ module Game.GameMisc where
 import Linear (V3)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 import Game.Adapters
 

@@ -9,6 +9,7 @@ import Data.Word (Word16)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 {-

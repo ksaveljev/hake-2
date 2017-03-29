@@ -1,17 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.QFiles.BSP.DVisT where
 
-import Control.Lens (makeLenses)
-import Data.Functor ((<$>))
+import           Control.Lens         (makeLenses)
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
+import           Data.Functor         ((<$>))
+import qualified Data.Vector          as V
 
-import Util.Binary
-
-data DVisT =
-  DVisT { _dvNumClusters :: Int
-        , _dvBitOfs      :: V.Vector (Int, Int)
-        }
+import           Types
+import           Util.Binary
 
 emptyDVisT :: DVisT
 emptyDVisT = DVisT 0 V.empty

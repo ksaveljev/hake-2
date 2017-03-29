@@ -14,7 +14,7 @@ import Linear (V3)
 import qualified Data.ByteString as B
 import qualified Graphics.UI.GLFW as GLFW
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 import Render.Basic.BasicRenderAPI

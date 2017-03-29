@@ -2,7 +2,7 @@ module QCommon.FS where
 
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 
 execAutoexec :: Quake ()
 

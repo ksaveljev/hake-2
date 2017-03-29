@@ -10,6 +10,7 @@ import Linear (V3(..), _x, _y, _z, dot, normalize, cross)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Types
 import QuakeState
 import qualified Constants
 

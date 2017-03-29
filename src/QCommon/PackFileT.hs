@@ -4,16 +4,12 @@ module QCommon.PackFileT where
 import Control.Lens (makeLenses)
 import qualified Data.ByteString as B
 
+import Types
+
 packFileSize :: Int
 packFileSize = 64
 
 packFileNameSize :: Int
 packFileNameSize = 56
-
-data PackFileT =
-  PackFileT { _pfName    :: B.ByteString
-            , _pfFilePos :: Int
-            , _pfFileLen :: Int
-            } deriving (Eq)
 
 makeLenses ''PackFileT

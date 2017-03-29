@@ -1,5 +1,5 @@
 module Server.SVConsoleCommands where
 
-import Quake
+import Types
 
 initOperatorCommands :: Quake ()

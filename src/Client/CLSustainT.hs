@@ -6,7 +6,7 @@ module Client.CLSustainT ( CLSustainT(..)
 import Linear.V3 (V3(..))
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''CLSustainT
 

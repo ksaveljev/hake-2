@@ -12,7 +12,7 @@ import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import qualified Constants

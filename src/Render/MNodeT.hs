@@ -5,6 +5,6 @@ module Render.MNodeT ( MNodeT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MNodeT

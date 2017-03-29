@@ -1,6 +1,6 @@
 module Server.SVUser where
 
-import Quake
+import Types
 import QuakeState
 
 nextServer :: Quake ()

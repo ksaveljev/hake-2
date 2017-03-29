@@ -5,6 +5,6 @@ module Client.KeyFuncT ( KeyFuncT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''KeyFuncT

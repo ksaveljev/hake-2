@@ -6,7 +6,7 @@ module Game.EdictInfoT ( EdictInfoT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''EdictInfoT
 

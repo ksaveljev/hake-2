@@ -5,7 +5,7 @@ module Game.EdictTimingT ( EdictTimingT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''EdictTimingT
 

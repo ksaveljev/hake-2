@@ -9,6 +9,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector.Unboxed as UV
 
+import Types
+
 mipLevels :: Int
 mipLevels = 4
 

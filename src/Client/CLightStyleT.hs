@@ -7,7 +7,7 @@ import Control.Lens (makeLenses)
 import Linear (V3(..))
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''CLightStyleT

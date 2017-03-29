@@ -14,7 +14,7 @@ import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector.Unboxed as UV
 import qualified Graphics.GL as GL
 
-import Quake
+import Types
 import QuakeState
 import qualified Constants
 import qualified Client.VID as VID

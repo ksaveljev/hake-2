@@ -5,6 +5,6 @@ module Game.SpawnT ( SpawnT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''SpawnT

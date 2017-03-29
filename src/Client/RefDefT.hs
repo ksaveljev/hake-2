@@ -8,7 +8,7 @@ import Linear (V3(..), V4(..))
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 
 makeLenses ''RefDefT
 

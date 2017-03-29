@@ -23,7 +23,9 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Map as M
 
-import Quake
+import Types
+import QCommon.PackFileT
+import QCommon.PackT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

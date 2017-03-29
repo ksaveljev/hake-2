@@ -5,7 +5,7 @@ module Sys.NETGlobals ( module Sys.NETGlobals
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import QCommon.SizeBufT
 import Sys.LoopbackT
 

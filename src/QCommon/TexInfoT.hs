@@ -8,6 +8,7 @@ import Linear.V4 (V4)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 texInfoTSize :: Int

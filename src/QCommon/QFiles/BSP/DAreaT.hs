@@ -6,6 +6,7 @@ import Control.Lens (makeLenses)
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 
 dAreaTSize :: Int

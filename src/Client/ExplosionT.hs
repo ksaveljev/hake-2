@@ -8,7 +8,7 @@ import Data.IORef (newIORef)
 import Linear (V3(..))
 import System.IO.Unsafe (unsafePerformIO)
 
-import Internal
+import Types
 import Client.EntityT
 
 makeLenses ''ExplosionT

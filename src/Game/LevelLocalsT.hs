@@ -7,7 +7,7 @@ module Game.LevelLocalsT ( LevelLocalsT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''LevelLocalsT
 

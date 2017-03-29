@@ -14,8 +14,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

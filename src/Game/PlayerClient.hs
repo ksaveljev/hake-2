@@ -16,7 +16,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
+import Game.PMoveStateT
 import QuakeState
 import CVarVariables
 import Game.Adapters

@@ -8,12 +8,8 @@ import Data.Int (Int16)
 import Linear (V3)
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
-
-data DTriangleT =
-  DTriangleT { _dtIndexXYZ :: V3 Int16
-             , _dtIndexST  :: V3 Int16
-             }
 
 makeLenses ''DTriangleT
 

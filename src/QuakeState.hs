@@ -164,7 +164,7 @@ import Control.Lens (use, makeLenses, ix, preuse, (%=), (.=))
 import Control.Monad.State.Strict (liftIO)
 import qualified Data.Vector.Mutable as MV
 
-import Internal
+import Types
 import Globals
 import Client.ClientGlobals
 import Client.CLTEntGlobals

@@ -25,7 +25,7 @@ import Linear (V3(..), _x, _y, _z, normalize, quadrance, dot, norm)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters

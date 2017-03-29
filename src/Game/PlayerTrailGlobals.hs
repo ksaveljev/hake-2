@@ -4,7 +4,7 @@ module Game.PlayerTrailGlobals where
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 
 makeLenses ''PlayerTrailGlobals
 

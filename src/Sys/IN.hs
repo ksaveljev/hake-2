@@ -6,7 +6,8 @@ import Control.Monad (void, when, liftM)
 import Data.Bits ((.&.), shiftL)
 import Linear (_x, _y, _z)
 
-import Quake
+import Types
+import Game.PMoveStateT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

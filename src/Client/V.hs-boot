@@ -3,7 +3,7 @@ module Client.V where
 import Data.IORef (IORef)
 import Linear (V3)
 
-import Quake
+import Types
 import QuakeState
 import QCommon.XCommandT
 

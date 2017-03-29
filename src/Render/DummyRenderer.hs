@@ -4,6 +4,7 @@ module Render.DummyRenderer (dummyRenderer) where
 import Control.Lens ((^.))
 import qualified Data.Vector as V
 
+import Types
 import Client.RefExportT
 import QCommon.XCommandT
 import Render.RenderAPI

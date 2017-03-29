@@ -1,14 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.CBrushT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-data CBrushT =
-  CBrushT { _cbContents       :: Int
-          , _cbNumSides       :: Int
-          , _cbFirstBrushSide :: Int
-          , _cbCheckCount     :: Int
-          }
+import           Types
 
 makeLenses ''CBrushT
 

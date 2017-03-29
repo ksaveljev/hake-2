@@ -6,7 +6,7 @@ module Game.EdictPhysicsT ( EdictPhysicsT(..)
 import Control.Lens (makeLenses)
 import Linear (V3(..))
 
-import Internal
+import Types
 
 makeLenses ''EdictPhysicsT
 

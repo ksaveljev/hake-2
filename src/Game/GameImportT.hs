@@ -7,7 +7,7 @@ module Game.GameImportT ( GameImportT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 import qualified Constants
 import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf

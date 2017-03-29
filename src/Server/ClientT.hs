@@ -13,7 +13,7 @@ import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Game.UserCmdT
 import Game.EdictT
 import QCommon.SizeBufT

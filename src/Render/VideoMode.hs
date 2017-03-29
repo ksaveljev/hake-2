@@ -4,7 +4,7 @@ module Render.VideoMode ( VideoMode(..)
 
 import qualified Graphics.UI.GLFW as GLFW
 
-import Internal
+import Types
 
 getVideoModeWidth :: VideoMode -> Int
 getVideoModeWidth (GLFWbVideoMode mode) = GLFW.videoModeWidth mode

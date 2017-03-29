@@ -1,6 +1,6 @@
 module Game.Monsters.MMedic where
 
-import Quake
+import Types
 import QuakeState
 
 spMonsterMedic :: EdictReference -> Quake ()

@@ -7,7 +7,7 @@ module Client.ClientInfoT ( ClientInfoT(..)
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import qualified Constants
 
 makeLenses ''ClientInfoT

@@ -11,7 +11,8 @@ import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
-import Quake
+import Types
+import Game.PMoveStateT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
@@ -25,6 +26,7 @@ import qualified QCommon.MSG as MSG
 import qualified QCommon.NetChannel as NetChannel
 import qualified QCommon.SZ as SZ
 import qualified Sys.IN as IN
+import qualified Sys.Timer as Timer
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
@@ -177,7 +179,7 @@ sendCmd = do
     unless (state == Constants.caDisconnected || state == Constants.caConnecting) $ do
       curSize <- use $ globals.cls.csNetChan.ncMessage.sbCurSize
       lastSent <- use $ globals.cls.csNetChan.ncLastSent
-      curTime <- use $ globals.curtime
+      curTime <- Timer.getCurTime
 
       if state == Constants.caConnected
         then

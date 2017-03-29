@@ -2,7 +2,7 @@ module Server.SV where
 
 import Linear (V3)
 
-import Quake
+import Types
 import QuakeState
 
 physicsPusher :: EdictReference -> Quake ()

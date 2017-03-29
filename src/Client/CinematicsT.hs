@@ -6,7 +6,7 @@ module Client.CinematicsT ( CinematicsT
 import Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 
 makeLenses ''CinematicsT
 

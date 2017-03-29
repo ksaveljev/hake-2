@@ -4,7 +4,7 @@ module Game.GameBase where
 import Linear (V3)
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QuakeState
 
 shutdownGame :: Quake ()

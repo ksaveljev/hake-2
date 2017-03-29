@@ -14,7 +14,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -562,7 +562,7 @@ svcGetChallenge = do
       then do
         -- overwrite the oldest
         r <- Lib.rand
-        curTime' <- use $ globals.curtime
+        curTime' <- Timer.getCurTime
         svGlobals.svServerStatic.ssChallenges.ix oldest .= ChallengeT adr (fromIntegral r .&. 0x7FFFF) curTime'
 
         -- send it back

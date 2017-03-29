@@ -2,7 +2,7 @@ module Render.Fast.Surf where
 
 import Data.IORef (IORef)
 
-import Quake
+import Types
 import QuakeState
 
 glBeginBuildingLightmaps :: IORef ModelT -> Quake ()

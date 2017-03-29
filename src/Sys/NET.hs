@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
 
-import Quake
+import Types
 import QuakeState
 import CVarVariables
 import qualified Constants

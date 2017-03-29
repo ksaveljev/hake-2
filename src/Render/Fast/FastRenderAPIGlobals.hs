@@ -22,7 +22,7 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
-import Internal
+import Types
 import Client.EntityT
 import Client.RefDefT
 import Client.VidDefT

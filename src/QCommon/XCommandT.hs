@@ -5,6 +5,6 @@ module QCommon.XCommandT ( XCommandT(..)
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''XCommandT

@@ -2,7 +2,7 @@ module Client.SCR where
 
 import qualified Data.ByteString as B
 
-import Quake
+import Types
 import QCommon.XCommandT
 
 init :: Quake ()

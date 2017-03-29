@@ -10,7 +10,7 @@ module Server.ServerT ( ServerT(..)
 import Control.Lens (makeLenses)
 import qualified Data.Vector as V
 
-import Internal
+import Types
 import Game.CModelT
 import Game.EntityStateT
 import QCommon.SizeBufT

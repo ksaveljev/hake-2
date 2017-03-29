@@ -12,7 +12,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
-import Quake
+import Types
+import Game.UserCmdT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT

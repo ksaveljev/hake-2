@@ -3,6 +3,8 @@ module Sound.WavInfoT where
 
 import Control.Lens (makeLenses)
 
+import Types
+
 data WavInfoT =
   WavInfoT { _wiRate      :: Int
            , _wiWidth     :: Int

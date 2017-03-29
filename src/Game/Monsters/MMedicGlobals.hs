@@ -3,7 +3,7 @@ module Game.Monsters.MMedicGlobals where
 
 import Control.Lens (makeLenses)
 
-import Internal
+import Types
 
 makeLenses ''MMedicGlobals
 

@@ -6,6 +6,7 @@ import Data.Functor ((<$>))
 import Linear (V3(..))
 import qualified Data.ByteString.Lazy as BL
 
+import Types
 import Util.Binary
 import qualified Constants
 
@@ -14,10 +15,6 @@ mVertexDiskSize = 3 * Constants.sizeOfFloat
 
 memSize :: Int
 memSize = 3 * Constants.sizeOfFloat
-
-data MVertexT =
-  MVertexT { _mvPosition :: V3 Float
-           }
 
 makeLenses ''MVertexT
 
