@@ -1,12 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.GItemT ( GItemT(..)
-                   , module Game.GItemT
-                   , module Game.GItemArmorT
-                   ) where
+module Game.GItemT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
-import Game.GItemArmorT
+import           Types
 
 makeLenses ''GItemT

@@ -1,10 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Game.MFrameT ( MFrameT(..)
-                    , module Game.MFrameT
-                    ) where
+module Game.MFrameT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''MFrameT

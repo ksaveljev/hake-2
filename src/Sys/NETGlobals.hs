@@ -1,21 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Sys.NETGlobals ( module Sys.NETGlobals
-                      , module Sys.LoopbackT
-                      ) where
+module Sys.NETGlobals where
 
-import Control.Lens (makeLenses)
+import           Control.Lens     (makeLenses)
 
-import Types
-import QCommon.SizeBufT
-import Sys.LoopbackT
+import           Types
+import           QCommon.SizeBufT
+import           Sys.LoopbackT
 
 makeLenses ''NETGlobals
 
 initialNETGlobals :: NETGlobals
-initialNETGlobals =
-  NETGlobals { _ngLoopbackClient = newLoopbackT
-             , _ngLoopbackServer = newLoopbackT
-             , _ngIpSocketClient = Nothing
-             , _ngIpSocketServer = Nothing
-             , _ngSend           = newSizeBufT
-             }
+initialNETGlobals = NETGlobals
+    { _ngLoopbackClient = newLoopbackT
+    , _ngLoopbackServer = newLoopbackT
+    , _ngIpSocketClient = Nothing
+    , _ngIpSocketServer = Nothing
+    , _ngSend           = newSizeBufT
+    }

@@ -16,6 +16,8 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
 
+import Sys.LoopbackT
+import Sys.LoopMsgT
 import Types
 import QuakeState
 import CVarVariables
