@@ -19,12 +19,12 @@ sysError _ = io (putStrLn "Sys.sysError") >> undefined -- TODO
 
 sendKeyEvents :: Quake ()
 sendKeyEvents = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     renderer^.rRefExport.reGetKeyboardHandler.kbdUpdate
 
     -- grab frame time
     time <- Timer.milliseconds
-    globals.sysFrameTime .= time
+    globals.gSysFrameTime .= time
 
 consoleOutput :: B.ByteString -> Quake ()
 consoleOutput msg = do

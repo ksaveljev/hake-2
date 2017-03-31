@@ -183,47 +183,47 @@ data QuakeState =
 
 data Globals =
   Globals { _gCurTime           :: IORef Int
-          , _cmdWait            :: Bool
-          , _aliasCount         :: Int
-          , _cTraces            :: Int
-          , _cBrushTraces       :: Int
-          , _cPointContents     :: Int
-          , _serverState        :: Int
-          , _netMessage         :: SizeBufT
-          , _netMessageBuffer   :: B.ByteString
-          , _cmdText            :: SizeBufT
-          , _deferTextBuf       :: B.ByteString -- length 8192
-          , _cmdTextBuf         :: B.ByteString -- length 8192
-          , _cmdAlias           :: Seq CmdAliasT
-          , _timeBeforeGame     :: Int
-          , _timeAfterGame      :: Int
-          , _timeBeforeRef      :: Int
-          , _timeAfterRef       :: Int
-          , _logStatsFile       :: Maybe Handle
-          , _cls                :: ClientStaticT
-          , _cl                 :: ClientStateT
-          , _clEntities         :: V.Vector CEntityT
-          , _clParseEntities    :: V.Vector EntityStateT
-          , _userInfoModified   :: Bool
-          , _cvarVars           :: M.Map B.ByteString CVarT
-          , _con                :: ConsoleT
-          , _vidDef             :: VidDefT
-          , _re                 :: Maybe Renderer
-          , _keyBindings        :: V.Vector (Maybe B.ByteString)
-          , _keyDown            :: UV.Vector Bool
-          , _chatTeam           :: Bool
-          , _chatBuffer         :: B.ByteString
-          , _keyLines           :: V.Vector B.ByteString
-          , _keyLinePos         :: Int
-          , _editLine           :: Int
-          , _scrVRect           :: VRectT
-          , _sysFrameTime       :: Int
-          , _chatBufferLen      :: Int
-          , _gunFrame           :: Int
-          , _gunModel           :: Maybe (IORef ModelT)
-          , _netFrom            :: NetAdrT
-          , _logFile            :: Maybe Handle
-          , _vec3Origin         :: V3 Float
+          , _gCmdWait            :: Bool
+          , _gAliasCount         :: Int
+          , _gCTraces            :: Int
+          , _gCBrushTraces       :: Int
+          , _gCPointContents     :: Int
+          , _gServerState        :: Int
+          , _gNetMessage         :: SizeBufT
+          , _gNetMessageBuffer   :: B.ByteString
+          , _gCmdText            :: SizeBufT
+          , _gDeferTextBuf       :: B.ByteString -- length 8192
+          , _gCmdTextBuf         :: B.ByteString -- length 8192
+          , _gCmdAlias           :: Seq CmdAliasT
+          , _gTimeBeforeGame     :: Int
+          , _gTimeAfterGame      :: Int
+          , _gTimeBeforeRef      :: Int
+          , _gTimeAfterRef       :: Int
+          , _gLogStatsFile       :: Maybe Handle
+          , _gCls                :: ClientStaticT
+          , _gCl                 :: ClientStateT
+          , _gClEntities         :: V.Vector CEntityT
+          , _gClParseEntities    :: V.Vector EntityStateT
+          , _gUserInfoModified   :: Bool
+          , _gCvarVars           :: M.Map B.ByteString CVarT
+          , _gCon                :: ConsoleT
+          , _gVidDef             :: VidDefT
+          , _gRenderer           :: Maybe Renderer
+          , _gKeyBindings        :: V.Vector (Maybe B.ByteString)
+          , _gKeyDown            :: UV.Vector Bool
+          , _gChatTeam           :: Bool
+          , _gChatBuffer         :: B.ByteString
+          , _gKeyLines           :: V.Vector B.ByteString
+          , _gKeyLinePos         :: Int
+          , _gEditLine           :: Int
+          , _gScrVRect           :: VRectT
+          , _gSysFrameTime       :: Int
+          , _gChatBufferLen      :: Int
+          , _gGunFrame           :: Int
+          , _gGunModel           :: Maybe (IORef ModelT)
+          , _gNetFrom            :: NetAdrT
+          , _gLogFile            :: Maybe Handle
+          , _gVec3Origin         :: V3 Float
           , _gRnd               :: StdGen
           }
 

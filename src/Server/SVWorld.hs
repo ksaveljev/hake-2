@@ -359,7 +359,7 @@ areaEdicts mins maxs listLens maxCount areaType = do
 -}
 trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictReference -> Int -> Quake TraceT
 trace start maybeMins maybeMaxs end passEdict contentMask = do
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     let clip = newMoveClipT
 
@@ -452,7 +452,7 @@ clipMoveToEntities initialClip = do
                     else do
                       -- might intersect, so do an exact clip
                       headNode <- hullForEntity touchEdict
-                      v3o <- use $ globals.vec3Origin
+                      v3o <- use $ globals.gVec3Origin
                       let angles = if (touchEdict^.eSolid) /= Constants.solidBsp
                                      then v3o -- boxes don't rotate
                                      else touchEdict^.eEntityState.esAngles

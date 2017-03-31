@@ -190,7 +190,7 @@ flyMove doClip = do
 
     if speed < 1
       then do
-        v3o <- use $ globals.vec3Origin
+        v3o <- use $ globals.gVec3Origin
         pMoveGlobals.pmPML.pmlVelocity .= v3o
 
       else do
@@ -630,7 +630,7 @@ stepSlideMove_ = do
                       if numPlanes' >= Constants.maxClipPlanes
                         then do
                           -- this shouldn't really happen
-                          v3o <- use $ globals.vec3Origin
+                          v3o <- use $ globals.gVec3Origin
                           pMoveGlobals.pmPML.pmlVelocity .= v3o
                           return False
                         else do
@@ -647,7 +647,7 @@ stepSlideMove_ = do
                               -- go along the crease
                               if numPlanes'' /= 2
                                 then do
-                                  v3o <- use $ globals.vec3Origin
+                                  v3o <- use $ globals.gVec3Origin
                                   pMoveGlobals.pmPML.pmlVelocity .= v3o
                                   return True
                                 else do
@@ -666,7 +666,7 @@ stepSlideMove_ = do
                               velocity <- use $ pMoveGlobals.pmPML.pmlVelocity
                               if velocity `dot` primalVelocity <= 0
                                 then do
-                                  v3o <- use $ globals.vec3Origin
+                                  v3o <- use $ globals.gVec3Origin
                                   pMoveGlobals.pmPML.pmlVelocity .= v3o
                                   return False
                                 else

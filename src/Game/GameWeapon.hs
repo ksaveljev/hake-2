@@ -127,7 +127,7 @@ fireHit selfRef aim damage kick = do
                 dir' = point' - enemy^.eEntityState.esOrigin
             
             -- do the damage
-            v3o <- use $ globals.vec3Origin
+            v3o <- use $ globals.gVec3Origin
             let Just traceEntRef = traceT'^.tEnt
             GameCombat.damage traceEntRef selfRef selfRef dir' point' v3o damage (kick `div` 2) Constants.damageNoKnockback Constants.modHit
             

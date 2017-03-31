@@ -105,7 +105,7 @@ aliasF =
     if c == 1
       then do
         Com.printf "Current alias commands:\n"
-        aliases <- use $ globals.cmdAlias
+        aliases <- use $ globals.gCmdAlias
         void $ traverse (\alias -> Com.printf $ (alias^.caName)
                                     `B.append` " : "
                                     `B.append` (alias^.caValue)
@@ -118,7 +118,7 @@ aliasF =
           then Com.printf "Alias name is too long\n"
           else do
             -- if the alias already exists, reuse it
-            aliases <- use $ globals.cmdAlias
+            aliases <- use $ globals.gCmdAlias
             let foundAlias = find (\a -> BC.map toUpper (a^.caName) == sUp) aliases
                 (alias, existing) = case foundAlias of
                                       Nothing -> (newCmdAliasT, False)
@@ -128,8 +128,8 @@ aliasF =
             let updatedAlias = alias { _caName = s, _caValue = cmd }
 
             if existing
-              then globals.cmdAlias %= fmap (\a -> if a == alias then updatedAlias else a)
-              else globals.cmdAlias %= (updatedAlias Seq.<|)
+              then globals.gCmdAlias %= fmap (\a -> if a == alias then updatedAlias else a)
+              else globals.gCmdAlias %= (updatedAlias Seq.<|)
   )
 
   where restOfCommandLine :: Int -> Int -> B.ByteString -> Quake B.ByteString
@@ -143,7 +143,7 @@ aliasF =
               restOfCommandLine (idx + 1) count (accum `B.append` vi `B.append` " ")
 
 waitF :: XCommandT
-waitF = XCommandT "Cmd.waitF" (globals.cmdWait .= True)
+waitF = XCommandT "Cmd.waitF" (globals.gCmdWait .= True)
 
 argc :: Quake Int
 argc = use $ cmdGlobals.cgCmdArgc
@@ -183,11 +183,11 @@ executeString text = do
             Just cmd -> cmd^.xcCmd
 
         Nothing -> do
-          cmdAliases <- use $ globals.cmdAlias
+          cmdAliases <- use $ globals.gCmdAlias
           case find (sameAliasNameAs name) cmdAliases of
             Just alias -> do
-              count <- use $ globals.aliasCount
-              globals.aliasCount .= count + 1
+              count <- use $ globals.gAliasCount
+              globals.gAliasCount .= count + 1
 
               if count + 1 >= aliasLoopCount
                 then do
@@ -315,21 +315,21 @@ forwardToServer :: Quake ()
 forwardToServer = do
     cmd <- argv 0
 
-    clientStatic <- use $ globals.cls
+    clientStatic <- use $ globals.gCls
     let ch = cmd `BC.index` 0
 
     if (clientStatic^.csState) <= Constants.caConnected || ch == '-' || ch == '+'
       then Com.printf $ "Unknown command \"" `B.append` cmd `B.append` "\"\n"
       else do 
-        MSG.writeByteI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
-        SZ.print (globals.cls.csNetChan.ncMessage) cmd
+        MSG.writeByteI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
+        SZ.print (globals.gCls.csNetChan.ncMessage) cmd
 
         c <- argc
 
         when (c > 1) $ do
           cmdArgs <- args
-          SZ.print (globals.cls.csNetChan.ncMessage) " "
-          SZ.print (globals.cls.csNetChan.ncMessage) cmdArgs
+          SZ.print (globals.gCls.csNetChan.ncMessage) " "
+          SZ.print (globals.gCls.csNetChan.ncMessage) cmdArgs
 
 clientCommand :: EdictReference -> Quake ()
 clientCommand _ = do

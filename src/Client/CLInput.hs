@@ -181,26 +181,26 @@ sendCmd = do
     -- save this command off for prediction
     cmdRef <- saveCommandForPrediction
 
-    state <- use $ globals.cls.csState
+    state <- use $ globals.gCls.csState
 
     unless (state == Constants.caDisconnected || state == Constants.caConnecting) $ do
-      curSize <- use $ globals.cls.csNetChan.ncMessage.sbCurSize
-      lastSent <- use $ globals.cls.csNetChan.ncLastSent
+      curSize <- use $ globals.gCls.csNetChan.ncMessage.sbCurSize
+      lastSent <- use $ globals.gCls.csNetChan.ncLastSent
       curTime <- Timer.getCurTime
 
       if state == Constants.caConnected
         then
           when (curSize /= 0 || (curTime - lastSent) > 1000) $
-            NetChannel.transmit (globals.cls.csNetChan) 0 ""
+            NetChannel.transmit (globals.gCls.csNetChan) 0 ""
         else do
           -- send a userinfo update if needed
-          use (globals.userInfoModified) >>= \modified ->
+          use (globals.gUserInfoModified) >>= \modified ->
             when modified $ do
               CL.fixUpGender
-              globals.userInfoModified .= False
-              MSG.writeByteI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcUserInfo)
+              globals.gUserInfoModified .= False
+              MSG.writeByteI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcUserInfo)
               userInfo <- CVar.userInfo
-              MSG.writeString (globals.cls.csNetChan.ncMessage) userInfo
+              MSG.writeString (globals.gCls.csNetChan.ncMessage) userInfo
 
           SZ.init (clientGlobals.cgBuf) "" 128
 
@@ -232,26 +232,26 @@ sendCmd = do
 
   where saveCommandForPrediction :: Quake UserCmdReference
         saveCommandForPrediction = do
-          cls' <- use $ globals.cls
+          cls' <- use $ globals.gCls
           let i = (cls'^.csNetChan.ncOutgoingSequence) .&. (Constants.cmdBackup - 1)
               cmdRef = UserCmdReference i
-          realTime <- use $ globals.cls.csRealTime
-          globals.cl.csCmdTime.ix i .= realTime -- for netgraph ping calculation
+          realTime <- use $ globals.gCls.csRealTime
+          globals.gCl.csCmdTime.ix i .= realTime -- for netgraph ping calculation
 
           -- fill the cmd
           createCmd cmdRef
 
-          Just cmd <- preuse $ globals.cl.csCmds.ix i
-          globals.cl.csCmd .= cmd
+          Just cmd <- preuse $ globals.gCl.csCmds.ix i
+          globals.gCl.csCmd .= cmd
 
           return cmdRef
 
         shouldSkipCinematic :: UserCmdReference -> Quake Bool
         shouldSkipCinematic (UserCmdReference idx) = do
-          Just cmd <- preuse $ globals.cl.csCmds.ix idx
+          Just cmd <- preuse $ globals.gCl.csCmds.ix idx
 
-          realTime <- use $ globals.cls.csRealTime
-          cl' <- use $ globals.cl
+          realTime <- use $ globals.gCls.csRealTime
+          cl' <- use $ globals.gCl
 
           return $ if (cmd^.ucButtons) /= 0 && (cl'^.csCinematicTime) > 0 &&
                       not (cl'^.csAttractLoop) && realTime - (cl'^.csCinematicTime) > 1000
@@ -261,20 +261,20 @@ sendCmd = do
         setCompressionInfo :: Quake ()
         setCompressionInfo = do
           noDeltaValue <- liftM (^.cvValue) clNoDeltaCVar
-          validFrame <- use $ globals.cl.csFrame.fValid
-          demoWaiting <- use $ globals.cls.csDemoWaiting
+          validFrame <- use $ globals.gCl.csFrame.fValid
+          demoWaiting <- use $ globals.gCls.csDemoWaiting
 
           if noDeltaValue /= 0 || not validFrame || demoWaiting
             then 
               MSG.writeLong (clientGlobals.cgBuf) (-1) -- no compression
             else do
-              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+              serverFrame <- use $ globals.gCl.csFrame.fServerFrame
               MSG.writeLong (clientGlobals.cgBuf) serverFrame
 
         writeCommandsToBuf :: Quake ()
         writeCommandsToBuf = do
-          outgoingSequence <- use $ globals.cls.csNetChan.ncOutgoingSequence
-          cmds <- use $ globals.cl.csCmds
+          outgoingSequence <- use $ globals.gCls.csNetChan.ncOutgoingSequence
+          cmds <- use $ globals.gCl.csCmds
 
           let i = (outgoingSequence - 2) .&. (Constants.cmdBackup - 1)
           MSG.writeDeltaUserCmd (clientGlobals.cgBuf) nullcmd (cmds V.! i)
@@ -289,18 +289,18 @@ sendCmd = do
         deliverMessage = do
           buf <- use $ clientGlobals.cgBuf
           io $ print "CLInput.sendCmd"
-          NetChannel.transmit (globals.cls.csNetChan) (buf^.sbCurSize) (buf^.sbData)
+          NetChannel.transmit (globals.gCls.csNetChan) (buf^.sbCurSize) (buf^.sbData)
 
         calculateChecksum :: Int -> Quake ()
         calculateChecksum checksumIndex = do
           buf <- use $ clientGlobals.cgBuf
-          outgoingSequence <- use $ globals.cls.csNetChan.ncOutgoingSequence
+          outgoingSequence <- use $ globals.gCls.csNetChan.ncOutgoingSequence
           crcByte <- Com.blockSequenceCRCByte (buf^.sbData) (checksumIndex + 1) ((buf^.sbCurSize) - checksumIndex - 1) outgoingSequence
           clientGlobals.cgBuf.sbData .= ((B.take checksumIndex (buf^.sbData)) `B.snoc` crcByte) `B.append` (B.drop (checksumIndex + 1) (buf^.sbData))
 
 createCmd :: UserCmdReference -> Quake ()
 createCmd cmdRef = do
-    sysFrameTime' <- use $ globals.sysFrameTime
+    sysFrameTime' <- use $ globals.gSysFrameTime
     oldSysFrameTime <- use $ clientGlobals.cgOldSysFrameTime
 
     let diff = fromIntegral sysFrameTime' - oldSysFrameTime
@@ -318,7 +318,7 @@ createCmd cmdRef = do
 
     finishMove cmdRef
 
-    use (globals.sysFrameTime) >>= \v ->
+    use (globals.gSysFrameTime) >>= \v ->
       clientGlobals.cgOldSysFrameTime .= fromIntegral v
 
 {-
@@ -330,10 +330,10 @@ baseMove :: UserCmdReference -> Quake ()
 baseMove (UserCmdReference cmdIdx) = do
     adjustAngles
 
-    globals.cl.csCmds.ix cmdIdx .= newUserCmdT
+    globals.gCl.csCmds.ix cmdIdx .= newUserCmdT
 
-    use (globals.cl.csViewAngles) >>= \angles ->
-      globals.cl.csCmds.ix cmdIdx.ucAngles .= fmap truncate angles
+    use (globals.gCl.csViewAngles) >>= \angles ->
+      globals.gCl.csCmds.ix cmdIdx.ucAngles .= fmap truncate angles
 
     inStrafe <- use $ clientGlobals.cgInStrafe
     inKLook <- use $ clientGlobals.cgInKLook
@@ -347,32 +347,32 @@ baseMove (UserCmdReference cmdIdx) = do
     when ((inStrafe^.kbState) .&. 1 /= 0) $ do
       rightValue <- keyState (clientGlobals.cgInRight)
       leftValue <- keyState (clientGlobals.cgInLeft)
-      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+      zoom (globals.gCl.csCmds.ix cmdIdx) $ do
         ucSideMove += truncate (sideSpeedValue * rightValue)
         ucSideMove -= truncate (sideSpeedValue * leftValue)
 
     moveRightValue <- keyState (clientGlobals.cgInMoveRight)
     moveLeftValue <- keyState (clientGlobals.cgInMoveLeft)
-    zoom (globals.cl.csCmds.ix cmdIdx) $ do
+    zoom (globals.gCl.csCmds.ix cmdIdx) $ do
       ucSideMove += truncate (sideSpeedValue * moveRightValue)
       ucSideMove -= truncate (sideSpeedValue * moveLeftValue)
 
     upValue <- keyState (clientGlobals.cgInUp)
     downValue <- keyState (clientGlobals.cgInDown)
-    zoom (globals.cl.csCmds.ix cmdIdx) $ do
+    zoom (globals.gCl.csCmds.ix cmdIdx) $ do
       ucUpMove += truncate (upSpeedValue * upValue)
       ucUpMove -= truncate (upSpeedValue * downValue)
 
     when ((inKLook^.kbState) .&. 1 == 0) $ do
       forwardValue <- keyState (clientGlobals.cgInForward)
       backValue <- keyState (clientGlobals.cgInBack)
-      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+      zoom (globals.gCl.csCmds.ix cmdIdx) $ do
         ucForwardMove += truncate (forwardSpeedValue * forwardValue)
         ucForwardMove -= truncate (forwardSpeedValue * backValue)
 
     -- adjust for speed key / running
     when (((inSpeed^.kbState) .&. 1) `xor` (truncate runValue) /= 0) $ do
-      zoom (globals.cl.csCmds.ix cmdIdx) $ do
+      zoom (globals.gCl.csCmds.ix cmdIdx) $ do
         ucForwardMove *= 2
         ucSideMove *= 2
         ucUpMove *= 2
@@ -382,43 +382,43 @@ finishMove (UserCmdReference cmdIdx) = do
     -- figure button bits
     use (clientGlobals.cgInAttack.kbState) >>= \v ->
       when (v .&. 3 /= 0) $
-        globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAttack))
+        globals.gCl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAttack))
 
     clientGlobals.cgInAttack.kbState %= (.&. (complement 2))
 
     use (clientGlobals.cgInUse.kbState) >>= \v ->
       when (v .&. 3 /= 0) $
-        globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonUse))
+        globals.gCl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonUse))
 
     clientGlobals.cgInUse.kbState %= (.&. (complement 2))
 
     anyKeyDown <- use $ keyGlobals.kgAnyKeyDown
-    keyDest <- use $ globals.cls.csKeyDest
+    keyDest <- use $ globals.gCls.csKeyDest
 
     when (anyKeyDown /= 0 && keyDest == Constants.keyGame) $
-      globals.cl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAny))
+      globals.gCl.csCmds.ix cmdIdx.ucButtons %= (.|. (fromIntegral Constants.buttonAny))
 
     -- send milliseconds of time to apply the move
-    frameTime <- use $ globals.cls.csFrameTime
+    frameTime <- use $ globals.gCls.csFrameTime
     let ms :: Int = truncate (frameTime * 1000)
         ms' = if ms > 250
                 then 100 -- time was unreasonable
                 else ms
 
-    globals.cl.csCmds.ix cmdIdx.ucMsec .= fromIntegral ms'
+    globals.gCl.csCmds.ix cmdIdx.ucMsec .= fromIntegral ms'
 
     clampPitch
 
-    viewAngles <- use $ globals.cl.csViewAngles
-    globals.cl.csCmds.ix cmdIdx.ucAngles .= fmap Math3D.angleToShort viewAngles
+    viewAngles <- use $ globals.gCl.csViewAngles
+    globals.gCl.csCmds.ix cmdIdx.ucAngles .= fmap Math3D.angleToShort viewAngles
 
     inImpulse <- use $ clientGlobals.cgInImpulse
-    globals.cl.csCmds.ix cmdIdx.ucImpulse .= fromIntegral inImpulse
+    globals.gCl.csCmds.ix cmdIdx.ucImpulse .= fromIntegral inImpulse
     clientGlobals.cgInImpulse .= 0
 
     -- send the ambient light level at the player's current position
     lightLevelValue <- liftM (^.cvValue) clLightLevelCVar
-    globals.cl.csCmds.ix cmdIdx.ucLightLevel .= truncate lightLevelValue
+    globals.gCl.csCmds.ix cmdIdx.ucLightLevel .= truncate lightLevelValue
 
 {-
 - ================ CL_AdjustAngles ================
@@ -430,7 +430,7 @@ adjustAngles = do
     inSpeed <- use $ clientGlobals.cgInSpeed
     inStrafe <- use $ clientGlobals.cgInStrafe
     inKLook <- use $ clientGlobals.cgInKLook
-    frameTime <- use $ globals.cls.csFrameTime
+    frameTime <- use $ globals.gCls.csFrameTime
     pitchSpeed <- liftM (^.cvValue) clPitchSpeedCVar
 
     speed <- if (inSpeed^.kbState) .&. 1 /= 0
@@ -449,8 +449,8 @@ adjustAngles = do
                      1 -> _y
                      2 -> _z
                      _ -> undefined -- shouldn't happen
-      globals.cl.csViewAngles.access -= speed * yawSpeed * rightValue
-      globals.cl.csViewAngles.access += speed * yawSpeed * leftValue
+      globals.gCl.csViewAngles.access -= speed * yawSpeed * rightValue
+      globals.gCl.csViewAngles.access += speed * yawSpeed * leftValue
 
     when ((inKLook^.kbState) .&. 1 /= 0) $ do
       forwardValue <- keyState (clientGlobals.cgInForward)
@@ -460,8 +460,8 @@ adjustAngles = do
                      1 -> _y
                      2 -> _z
                      _ -> undefined -- shouldn't happen
-      globals.cl.csViewAngles.access -= speed * pitchSpeed * forwardValue
-      globals.cl.csViewAngles.access += speed * pitchSpeed * backValue
+      globals.gCl.csViewAngles.access -= speed * pitchSpeed * forwardValue
+      globals.gCl.csViewAngles.access += speed * pitchSpeed * backValue
 
     upValue <- keyState (clientGlobals.cgInLookUp)
     downValue <- keyState (clientGlobals.cgInLookDown)
@@ -470,8 +470,8 @@ adjustAngles = do
                    1 -> _y
                    2 -> _z
                    _ -> undefined -- shouldn't happen
-    globals.cl.csViewAngles.access -= speed * pitchSpeed * upValue
-    globals.cl.csViewAngles.access += speed * pitchSpeed * downValue
+    globals.gCl.csViewAngles.access -= speed * pitchSpeed * upValue
+    globals.gCl.csViewAngles.access += speed * pitchSpeed * downValue
 
 keyState :: Lens' QuakeState KButtonT -> Quake Float
 keyState keyLens = do
@@ -486,7 +486,7 @@ keyState keyLens = do
     msec' <- if (key^.kbState) /= 0
                then do
                  -- still down
-                 sysFrameTime' <- liftM fromIntegral (use $ globals.sysFrameTime)
+                 sysFrameTime' <- liftM fromIntegral (use $ globals.gSysFrameTime)
 
                  let ms = msec + sysFrameTime' - (key^.kbDownTime)
                  keyLens.kbDownTime .= sysFrameTime'
@@ -509,7 +509,7 @@ clampPitch = do
                    2 -> _z
                    _ -> undefined -- shouldn't happen
 
-    angle <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.access
+    angle <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.access
     let p = Math3D.shortToAngle (fromIntegral angle)
         pitch = if p > 180
                   then p - 360
@@ -521,21 +521,21 @@ clampPitch = do
                     2 -> _z
                     _ -> undefined -- shouldn't happen
 
-    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+    use (globals.gCl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
       when (v + pitch < (-360)) $
-        globals.cl.csViewAngles.access2 += 360 -- wrapped
+        globals.gCl.csViewAngles.access2 += 360 -- wrapped
 
-    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+    use (globals.gCl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
       when (v + pitch > 360) $
-        globals.cl.csViewAngles.access2 -= 360 -- wrapped
+        globals.gCl.csViewAngles.access2 -= 360 -- wrapped
 
-    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+    use (globals.gCl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
       when (v + pitch > 89) $
-        globals.cl.csViewAngles.access2 .= 89 - pitch
+        globals.gCl.csViewAngles.access2 .= 89 - pitch
 
-    use (globals.cl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
+    use (globals.gCl.csViewAngles.(Math3D.v3Access Constants.pitch)) >>= \v ->
       when (v + pitch < (-89)) $
-        globals.cl.csViewAngles.access2 .= (-89) - pitch
+        globals.gCl.csViewAngles.access2 .= (-89) - pitch
 
 inputKeyDown :: Lens' QuakeState KButtonT -> Quake ()
 inputKeyDown buttonLens = do
@@ -565,7 +565,7 @@ inputKeyDown buttonLens = do
           buttonLens.kbDownTime .= fromIntegral downtime
 
           when (downtime == 0) $ do
-            frameTime <- use $ globals.sysFrameTime
+            frameTime <- use $ globals.gSysFrameTime
             buttonLens.kbDownTime .= fromIntegral (frameTime - 100)
 
           buttonLens.kbState %= (.|. 3) -- down + impulse down

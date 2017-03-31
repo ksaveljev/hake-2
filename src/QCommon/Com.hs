@@ -285,13 +285,13 @@ quit = do
     SVMain.shutdown "Server quit\n" False
     CL.shutdown
 
-    logFile' <- use $ globals.logFile
+    logFile' <- use $ globals.gLogFile
 
     case logFile' of
       Nothing -> return ()
       Just h -> Lib.fClose h
 
-    globals.logFile .= Nothing
+    globals.gLogFile .= Nothing
 
     Sys.quit
 

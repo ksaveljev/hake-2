@@ -163,7 +163,7 @@ turretBlocked =
                           Nothing -> teamMasterRef
                           Just ownerRef -> ownerRef
       
-      v3o <- use $ globals.vec3Origin
+      v3o <- use $ globals.gVec3Origin
       
       GameCombat.damage otherRef selfRef attackerRef v3o (other^.eEntityState.esOrigin) v3o (teamMaster^.eDmg) 10 0 Constants.modCrush
 

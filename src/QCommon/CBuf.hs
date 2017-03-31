@@ -16,8 +16,8 @@ import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
 init :: Quake ()
 init = do
-    bufData <- use $ globals.cmdTextBuf
-    SZ.init (globals.cmdText) bufData 8192
+    bufData <- use $ globals.gCmdTextBuf
+    SZ.init (globals.gCmdText) bufData 8192
 
 addEarlyCommands :: Bool -> Quake ()
 addEarlyCommands clear = do
@@ -69,23 +69,23 @@ addLateCommands = do
 
 execute :: Quake ()
 execute = do
-    globals.aliasCount .= 0
+    globals.gAliasCount .= 0
 
-    curSize <- use $ globals.cmdText.sbCurSize
-    text <- use $ globals.cmdText.sbData
+    curSize <- use $ globals.gCmdText.sbCurSize
+    text <- use $ globals.gCmdText.sbData
 
     when (curSize /= 0) $ doStuff text curSize 0 0
 
   where doStuff :: B.ByteString -> Int -> Int -> Int -> Quake ()
         doStuff text curSize idx quotes =
           if | idx == curSize -> do
-                 globals.cmdText.sbCurSize .= 0
+                 globals.gCmdText.sbCurSize .= 0
 
                  Cmd.executeString text
 
-                 wait <- use $ globals.cmdWait
+                 wait <- use $ globals.gCmdWait
 
-                 when wait $ globals.cmdWait .= False
+                 when wait $ globals.gCmdWait .= False
 
              | BC.index text idx == '"' ->
                  doStuff text curSize (idx + 1) (quotes + 1)
@@ -94,22 +94,22 @@ execute = do
                  let line = B.take idx text -- do not include ';' or '\n'
 
                  if idx == curSize
-                   then globals.cmdText.sbCurSize .= 0
+                   then globals.gCmdText.sbCurSize .= 0
                    else do
-                     globals.cmdText.sbCurSize -= idx + 1
-                     globals.cmdText.sbData %= B.drop (idx + 1)
+                     globals.gCmdText.sbCurSize -= idx + 1
+                     globals.gCmdText.sbData %= B.drop (idx + 1)
 
                  Cmd.executeString line
 
-                 wait <- use $ globals.cmdWait
+                 wait <- use $ globals.gCmdWait
 
                  if wait
                    -- skip out while text still remains in buffer, leaving
                    -- it for next frame
-                   then globals.cmdWait .= False
+                   then globals.gCmdWait .= False
                    else do
-                     newText <- use $ globals.cmdText.sbData
-                     newCurSize <- use $ globals.cmdText.sbCurSize
+                     newText <- use $ globals.gCmdText.sbData
+                     newCurSize <- use $ globals.gCmdText.sbCurSize
                      when (newCurSize /= 0) $ doStuff newText newCurSize 0 0
 
              | otherwise -> doStuff text curSize (idx + 1) quotes
@@ -118,43 +118,43 @@ addText :: B.ByteString -> Quake ()
 addText text = do
     let len = B.length text
 
-    curSize <- use $ globals.cmdText.sbCurSize
-    maxSize <- use $ globals.cmdText.sbMaxSize
+    curSize <- use $ globals.gCmdText.sbCurSize
+    maxSize <- use $ globals.gCmdText.sbMaxSize
 
     if curSize + len >= maxSize
       then Com.printf "Cbuf.addText: overflow\n"
-      else SZ.write (globals.cmdText) text (B.length text)
+      else SZ.write (globals.gCmdText) text (B.length text)
 
 insertText :: B.ByteString -> Quake ()
 insertText text = do
-    templen <- use $ globals.cmdText.sbCurSize
+    templen <- use $ globals.gCmdText.sbCurSize
 
     -- copy off an commands still remaining in the exec buffer
     tmp <- if templen /= 0
              then do
-               txt <- use $ globals.cmdText.sbData
-               SZ.clear (globals.cmdText)
+               txt <- use $ globals.gCmdText.sbData
+               SZ.clear (globals.gCmdText)
                return $ B.take templen txt
              else return ""
 
     -- add the entire text of the file
     addText text
 
-    when (templen /= 0) $ SZ.write (globals.cmdText) tmp templen
+    when (templen /= 0) $ SZ.write (globals.gCmdText) tmp templen
 
 copyToDefer :: Quake ()
 copyToDefer = do
-    buf <- use $ globals.cmdTextBuf
-    curSize <- use $ globals.cmdText.sbCurSize
+    buf <- use $ globals.gCmdTextBuf
+    curSize <- use $ globals.gCmdText.sbCurSize
 
-    globals.deferTextBuf .= B.take curSize buf
-    globals.cmdText.sbCurSize .= 0
+    globals.gDeferTextBuf .= B.take curSize buf
+    globals.gCmdText.sbCurSize .= 0
 
 executeText :: Int -> B.ByteString -> Quake ()
 executeText _ _ = io (putStrLn "CBuf.executeText") >> undefined -- TODO
 
 insertFromDefer :: Quake ()
 insertFromDefer = do
-    buf <- use $ globals.deferTextBuf
+    buf <- use $ globals.gDeferTextBuf
     insertText buf
-    globals.deferTextBuf .= ""
+    globals.gDeferTextBuf .= ""

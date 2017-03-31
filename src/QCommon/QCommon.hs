@@ -131,17 +131,17 @@ frame msec = do
     stv <- liftM (^.cvValue) showTraceCVar
 
     when (stv /= 0.0) $ do
-      ct <- use $ globals.cTraces
-      cpc <- use $ globals.cPointContents
+      ct <- use $ globals.gCTraces
+      cpc <- use $ globals.gCPointContents
 
       Com.printf $ BC.pack (show ct)
         `B.append` " traces "
         `B.append` BC.pack (show cpc)
         `B.append` " points\n" -- IMPROVE: use binary to convert int to bytestring? OR printf with Text and Text.printf ?
 
-      globals.cTraces .= 0
-      globals.cBrushTraces .= 0
-      globals.cPointContents .= 0
+      globals.gCTraces .= 0
+      globals.gCBrushTraces .= 0
+      globals.gCPointContents .= 0
 
     CBuf.execute
 
@@ -173,12 +173,12 @@ frame msec = do
 
   where closeLogStatsFile :: Quake ()
         closeLogStatsFile = do
-          statsFile <- use $ globals.logStatsFile
+          statsFile <- use $ globals.gLogStatsFile
           case statsFile of
             Nothing -> return ()
             Just h -> do
               Lib.fClose h
-              globals.logStatsFile .= Nothing
+              globals.gLogStatsFile .= Nothing
 
         openLogStatsFile :: B.ByteString -> Quake (Maybe Handle)
         openLogStatsFile name = do

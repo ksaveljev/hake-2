@@ -592,7 +592,7 @@ clipSkyPolygon nump vecs stage = do
 
 drawSkyPolygon :: Int -> MV.IOVector (V3 Float) -> Quake ()
 drawSkyPolygon nump vecs = do
-    v <- use $ globals.vec3Origin
+    v <- use $ globals.gVec3Origin
     v' <- io $ addVecs v 0 nump
     let av = fmap abs v'
         axis = if | (av^._x) > (av^._y) && (av^._x) > (av^._z) ->

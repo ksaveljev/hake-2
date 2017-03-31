@@ -968,7 +968,7 @@ makronSpawn =
       Just playerRef -> do
         self <- readEdictT selfRef
         player <- readEdictT playerRef
-        v3o <- use $ globals.vec3Origin
+        v3o <- use $ globals.gVec3Origin
         
         let vec = (player^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
             vec' = normalize vec

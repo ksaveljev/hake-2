@@ -386,7 +386,7 @@ worldEffects = do
 
                   modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime)
 
-                  v3o <- use $ globals.vec3Origin
+                  v3o <- use $ globals.gVec3Origin
                   readEdictT edictRef >>= \ent ->
                     GameCombat.damage edictRef
                                       worldRef
@@ -448,7 +448,7 @@ worldEffects = do
 
                 modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
-              v3o <- use $ globals.vec3Origin
+              v3o <- use $ globals.gVec3Origin
 
               if enviroSuit -- take 1/3 damage with envirosuit
                 then GameCombat.damage edictRef
@@ -474,7 +474,7 @@ worldEffects = do
 
             when ((edict^.eWaterType) .&. Constants.contentsSlime /= 0) $ do
               unless enviroSuit $ do -- no damage from slime with envirosuit
-                v3o <- use $ globals.vec3Origin
+                v3o <- use $ globals.gVec3Origin
                 GameCombat.damage edictRef
                                   worldRef
                                   worldRef
@@ -548,7 +548,7 @@ fallingDamage edictRef = do
                   dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
 
                   when (deathmatchValue == 0 || dmFlagsValue .&. Constants.dfNoFalling == 0) $ do
-                    v3o <- use $ globals.vec3Origin
+                    v3o <- use $ globals.gVec3Origin
                     GameCombat.damage edictRef
                                       worldRef
                                       worldRef

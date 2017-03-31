@@ -54,12 +54,12 @@ get varName varValue flags = do
                                             , _cvFlags    = flags
                                             }
 
-               globals.cvarVars %= Map.insert varName newCVar
+               globals.gCvarVars %= Map.insert varName newCVar
 
                return $ Just newCVar
 
 update :: CVarT -> Quake ()
-update cvar = globals.cvarVars %= Map.insert (cvar^.cvName) cvar
+update cvar = globals.gCvarVars %= Map.insert (cvar^.cvName) cvar
 
 init :: Quake ()
 init = do
@@ -76,7 +76,7 @@ variableString varName = do
 
 findVar :: B.ByteString -> Quake (Maybe CVarT)
 findVar varName = do
-    vars <- use $ globals.cvarVars
+    vars <- use $ globals.gCvarVars
     return $ Map.lookup varName vars
 
 getExisting :: B.ByteString -> Quake CVarT
@@ -94,7 +94,7 @@ fullSet varName value flags = do
 
       Just cvar -> do
         when (((cvar^.cvFlags) .&. Constants.cvarUserInfo) /= 0) $
-          globals.userInfoModified .= True
+          globals.gUserInfoModified .= True
 
         let updatedCVar = cvar { _cvModified = True
                                , _cvString = value
@@ -136,7 +136,7 @@ set2 varName value force = do
                return cvar
            | not force && latchFlag /= 0 -> do
                let latchedString = cvar^.cvLatchedString
-               state <- use $ globals.serverState
+               state <- use $ globals.gServerState
 
                if | isJust latchedString && value == fromJust latchedString -> return cvar
                   | isNothing latchedString && value == (cvar^.cvString) -> return cvar
@@ -167,7 +167,7 @@ set2 varName value force = do
                then return updatedCVar -- not changed
                else do
                  when (((updatedCVar^.cvFlags) .&. Constants.cvarUserInfo) /= 0) $
-                   globals.userInfoModified .= True -- transmit at next oportunity
+                   globals.gUserInfoModified .= True -- transmit at next oportunity
 
                  let finalCVar = updatedCVar { _cvModified = True
                                              , _cvString = value
@@ -202,7 +202,7 @@ setF =
 listF :: XCommandT
 listF =
   XCommandT "CVar.listF" (do
-    vars <- use $ globals.cvarVars
+    vars <- use $ globals.gCvarVars
 
     _ <- traverse printCVar vars
 
@@ -271,7 +271,7 @@ command = do
 
 bitInfo :: Int -> Quake B.ByteString
 bitInfo bit = do
-    cvars <- liftM (filter (\e -> (e^.cvFlags) .&. bit /= 0) . Map.elems) (use $ globals.cvarVars)
+    cvars <- liftM (filter (\e -> (e^.cvFlags) .&. bit /= 0) . Map.elems) (use $ globals.gCvarVars)
     collectInfo cvars ""
 
   where collectInfo :: [CVarT] -> B.ByteString -> Quake B.ByteString
@@ -286,11 +286,11 @@ serverInfo = bitInfo Constants.cvarServerInfo
 -- Any variables with latched values will be updated.
 getLatchedVars :: Quake ()
 getLatchedVars = do
-    cvars <- use $ globals.cvarVars
+    cvars <- use $ globals.gCvarVars
     let updatedCVars = Map.map updateLatchedVar cvars
         gameVarBefore = Map.lookup "game" cvars
         gameVarAfter = Map.lookup "game" updatedCVars
-    globals.cvarVars .= updatedCVars
+    globals.gCvarVars .= updatedCVars
 
     when (gameVarBefore /= gameVarAfter) $ do
       case gameVarAfter of
@@ -325,7 +325,7 @@ writeVariables path = do
         fileSize <- io $ hFileSize h
         io $ hSeek h AbsoluteSeek fileSize
 
-        vars <- use $ globals.cvarVars
+        vars <- use $ globals.gCvarVars
         void $ traverse (writeVar h) vars
         Lib.fClose h
 

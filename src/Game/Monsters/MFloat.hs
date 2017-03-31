@@ -420,7 +420,7 @@ floaterZap =
     multicast origin Constants.multicastPvs
 
     r <- Lib.rand
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     GameCombat.damage enemyRef selfRef selfRef dir (enemy^.eEntityState.esOrigin) v3o (5 + fromIntegral (r `mod` 6)) (-10) Constants.damageEnergy Constants.modUnknown
 
     return True

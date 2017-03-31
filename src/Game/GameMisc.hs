@@ -1641,7 +1641,7 @@ funcExplosiveUse :: EntUse
 funcExplosiveUse =
   FuncExplosiveUse "func_explosive_use" $ \selfRef otherRef _ -> do
     self <- readEdictT selfRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     die funcExplosiveExplode selfRef selfRef (fromJust otherRef) (self^.eHealth) v3o
 
@@ -1899,7 +1899,7 @@ funcObjectTouch =
     other <- readEdictT otherRef
 
     unless ((plane^.cpNormal._z) < 1.0 || (other^.eTakeDamage) == Constants.damageNo) $ do
-      v3o <- use $ globals.vec3Origin
+      v3o <- use $ globals.gVec3Origin
       GameCombat.damage otherRef selfRef selfRef v3o (self^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 {-

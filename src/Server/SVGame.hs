@@ -146,7 +146,7 @@ configString index val = do
       MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral index)
       MSG.writeString (svGlobals.svServer.sMulticast) val
 
-      origin <- use $ globals.vec3Origin
+      origin <- use $ globals.gVec3Origin
       SVSend.multicast origin Constants.multicastAllR
 
 writeChar :: Int -> Quake ()

@@ -28,8 +28,8 @@ import {-# SOURCE #-} qualified QCommon.Com as Com
 init :: Quake ()
 init = do
     let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']'
-    globals.keyLines .= kl
-    globals.keyLinePos .= 1
+    globals.gKeyLines .= kl
+    globals.gKeyLinePos .= 1
 
     keyGlobals.kgConsoleKeys %= (UV.// (([32..127] `zip` repeat True) ++ 
             ([kEnter, kKpEnter, kTab, kLeftArrow, kKpLeftArrow,
@@ -61,7 +61,7 @@ bindF =
 
         if | b == -1 -> Com.printf $ "\"" `B.append` v `B.append` "\" isn't a valid key\n"
            | c == 2 -> do
-               keybindings <- use $ globals.keyBindings
+               keybindings <- use $ globals.gKeyBindings
                case keybindings V.! b of
                  Just binding -> Com.printf $ "\"" `B.append` v `B.append` "\" = \"" `B.append` binding `B.append` "\"\n"
                  Nothing -> Com.printf $ "\"" `B.append` v `B.append` "\" is not bound\n"
@@ -87,12 +87,12 @@ unbindF =
   )
 
 unbindAllF :: XCommandT
-unbindAllF = XCommandT "Key.unbindAllF" (globals.keyBindings .= V.replicate 256 Nothing)
+unbindAllF = XCommandT "Key.unbindAllF" (globals.gKeyBindings .= V.replicate 256 Nothing)
 
 bindListF :: XCommandT
 bindListF =
   XCommandT "Key.bindListF" (do
-    bindings <- use $ globals.keyBindings
+    bindings <- use $ globals.gKeyBindings
     void $ V.sequence $ V.imap printBinding bindings
   )
 
@@ -134,11 +134,11 @@ keynumToString keynum = do
 
 setBinding :: Int -> Maybe B.ByteString -> Quake ()
 setBinding keyNum binding =
-    unless (keyNum == -1) $ globals.keyBindings %= (V.// [(keyNum, binding)])
+    unless (keyNum == -1) $ globals.gKeyBindings %= (V.// [(keyNum, binding)])
 
 writeBindings :: Handle -> Quake ()
 writeBindings h = do
-    kb <- use $ globals.keyBindings
+    kb <- use $ globals.gKeyBindings
     void $ V.sequence $ V.imap (writeKeyBinding h) kb
 
   where writeKeyBinding :: Handle -> Int -> Maybe B.ByteString -> Quake ()
@@ -158,7 +158,7 @@ event key down time = do
     --     return;
     -- }
     
-    cls' <- use $ globals.cls
+    cls' <- use $ globals.gCls
 
     -- update auto-repeat status
     done <- if down
@@ -166,7 +166,7 @@ event key down time = do
                 keyGlobals.kgKeyRepeats.ix key += 1
 
                 keyRepeats <- use $ keyGlobals.kgKeyRepeats
-                keyBindings' <- use $ globals.keyBindings
+                keyBindings' <- use $ globals.gKeyBindings
 
                 if | keyRepeats UV.! key > 1 && (cls'^.csKeyDest) == Constants.keyGame && not ((cls'^.csState) == Constants.caDisconnected) -> -- ignore most autorepeats
                        return True
@@ -199,7 +199,7 @@ event key down time = do
 
       unless done' $ do
         -- any key during the attract mode will bring up the menu
-        cl' <- use $ globals.cl
+        cl' <- use $ globals.gCl
 
         let key' = if (cl'^.csAttractLoop) && (cls'^.csKeyDest) /= Constants.keyMenu && not (key >= kF1 && key <= kF12)
                      then kEscape
@@ -226,7 +226,7 @@ event key down time = do
                          Com.comError Constants.errFatal "Bad cls.key_dest"
           else do
             -- track if any key is down for BUTTON_ANY
-            globals.keyDown.ix key' .= down
+            globals.gKeyDown.ix key' .= down
 
             if down
               then do
@@ -245,7 +245,7 @@ event key down time = do
             -- downs can be matched with ups
             if not down
               then do
-                Just kb <- preuse $ globals.keyBindings.ix key'
+                Just kb <- preuse $ globals.gKeyBindings.ix key'
                 case kb of
                   Nothing -> return ()
                   Just binding ->
@@ -260,7 +260,7 @@ event key down time = do
                    ((cls'^.csKeyDest) == Constants.keyConsole && not consoleKey) ||
                    ((cls'^.csKeyDest) == Constants.keyGame && ((cls'^.csState) == Constants.caActive || not consoleKey))
                    then do
-                     Just kb <- preuse $ globals.keyBindings.ix key'
+                     Just kb <- preuse $ globals.gKeyBindings.ix key'
                      case kb of
                        Nothing -> return ()
                        Just binding ->
@@ -285,42 +285,42 @@ event key down time = do
 message :: Int -> Quake ()
 message key = do
     if | key `elem` [kEnter, kKpEnter] -> do
-           chatTeam' <- use $ globals.chatTeam
+           chatTeam' <- use $ globals.gChatTeam
            if chatTeam'
              then CBuf.addText "say_team \""
              else CBuf.addText "say \""
 
-           chatBuffer' <- use $ globals.chatBuffer
+           chatBuffer' <- use $ globals.gChatBuffer
 
            CBuf.addText chatBuffer'
            CBuf.addText "\"\n"
 
            zoom globals $ do
-             cls.csKeyDest .= Constants.keyGame
-             chatBuffer .= ""
+             gCls.csKeyDest .= Constants.keyGame
+             gChatBuffer .= ""
 
        | key == kEscape ->
            zoom globals $ do
-             cls.csKeyDest .= Constants.keyGame
-             chatBuffer .= ""
+             gCls.csKeyDest .= Constants.keyGame
+             gChatBuffer .= ""
 
        | key < 32 || key > 127 ->
            return () -- non printable
 
        | key == kBackspace -> do
-           chatBuffer' <- use $ globals.chatBuffer
+           chatBuffer' <- use $ globals.gChatBuffer
 
            if B.length chatBuffer' > 2
              then
-               globals.chatBuffer .= B.init chatBuffer'
+               globals.gChatBuffer .= B.init chatBuffer'
              else
-               globals.chatBuffer .= ""
+               globals.gChatBuffer .= ""
 
        | otherwise -> do
-           chatBuffer' <- use $ globals.chatBuffer
+           chatBuffer' <- use $ globals.gChatBuffer
 
            unless (B.length chatBuffer' > Constants.maxCmdLine) $
-             globals.chatBuffer %= (\v -> v `B.append` BC.pack (show key)) -- IMPROVE?
+             globals.gChatBuffer %= (\v -> v `B.append` BC.pack (show key)) -- IMPROVE?
 
 -- Interactive line editing and console scrollback
 console :: Int -> Quake ()
@@ -340,22 +340,22 @@ console k = do
                  | k == kKpIns -> '0'
                  | k == kKpDel -> '.'
 
-    keyDown' <- use $ globals.keyDown
+    keyDown' <- use $ globals.gKeyDown
 
     if | key == 'l' && (keyDown' UV.! kCtrl) ->
            CBuf.addText "clear\n"
 
        | k `elem` [kEnter, kKpEnter] -> do
            -- backslash text are commands, else chat
-           editLine' <- use $ globals.editLine
-           Just keyLine <- preuse $ globals.keyLines.ix editLine'
+           editLine' <- use $ globals.gEditLine
+           Just keyLine <- preuse $ globals.gKeyLines.ix editLine'
            io (putStrLn "Key.console # enter") >> undefined -- TODO
 
        | k == kTab ->
            completeCommand -- command completion
 
        | k `elem` [kBackspace, kLeftArrow, kKpLeftArrow] || (key == 'h' && (keyDown' UV.! kCtrl)) ->
-           globals.keyLinePos %= (\v -> if v > 1 then v - 1 else v)
+           globals.gKeyLinePos %= (\v -> if v > 1 then v - 1 else v)
 
        | k `elem` [kUpArrow, kKpUpArrow] || (key == 'p' && (keyDown' UV.! kCtrl)) -> do
            io (putStrLn "Key.console # up arrow") >> undefined -- TODO
@@ -364,25 +364,25 @@ console k = do
            io (putStrLn "Key.console # down arrow") >> undefined -- TODO
 
        | k `elem` [kPgUp, kKpPgUp] ->
-           globals.con.cDisplay -= 2
+           globals.gCon.cDisplay -= 2
 
        | k `elem` [kPgDn, kKpPgDn] -> do
-           console <- use $ globals.con
-           globals.con.cDisplay %= (\v -> if (v + 2) > (console^.cCurrent) then console^.cCurrent else v + 2)
+           console <- use $ globals.gCon
+           globals.gCon.cDisplay %= (\v -> if (v + 2) > (console^.cCurrent) then console^.cCurrent else v + 2)
 
        | k `elem` [kHome, kKpHome] -> do
-           console <- use $ globals.con
-           globals.con.cDisplay .= (console^.cCurrent) - (console^.cTotalLines) + 10
+           console <- use $ globals.gCon
+           globals.gCon.cDisplay .= (console^.cCurrent) - (console^.cTotalLines) + 10
 
        | k `elem` [kEnd, kKpEnd] -> do
-           console <- use $ globals.con
-           globals.con.cDisplay .= (console^.cCurrent)
+           console <- use $ globals.gCon
+           globals.gCon.cDisplay .= (console^.cCurrent)
 
        | k < 32 || k > 127 ->
            return () -- non printable
 
        | otherwise -> do
-           keyLinePos' <- use $ globals.keyLinePos
+           keyLinePos' <- use $ globals.gKeyLinePos
            
            when (keyLinePos' > Constants.maxCmdLine - 1) $ do
              io (putStrLn "Key.console") >> undefined -- TODO
@@ -396,22 +396,22 @@ clearStates = do
         keyDownEvents idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              keyDown' <- use $ globals.keyDown
+              keyDown' <- use $ globals.gKeyDown
               keyRepeats <- use $ keyGlobals.kgKeyRepeats
 
               when ((keyDown' UV.! idx) || (keyRepeats UV.! idx) /= 0) $
                 event idx False 0
 
-              globals.keyDown.ix idx .= False
+              globals.gKeyDown.ix idx .= False
               keyGlobals.kgKeyRepeats.ix idx .= 0
 
               keyDownEvents (idx + 1) maxIdx
 
 clearTyping :: Quake ()
 clearTyping = do
-    editLine' <- use $ globals.editLine
-    globals.keyLines.ix editLine' .= B.pack [93, 0] -- clear any typing
-    globals.keyLinePos .= 1
+    editLine' <- use $ globals.gEditLine
+    globals.gKeyLines.ix editLine' .= B.pack [93, 0] -- clear any typing
+    globals.gKeyLinePos .= 1
 
 completeCommand :: Quake ()
 completeCommand = do

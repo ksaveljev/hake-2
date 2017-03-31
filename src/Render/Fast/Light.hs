@@ -170,7 +170,7 @@ rLightPoint p@(V3 a b c) = do
         r <- recursiveLightPoint (MNodeChildReference $ (worldModel^.mNodes) V.! 0) p end
 
         color <- if r == -1
-                   then use $ globals.vec3Origin
+                   then use $ globals.gVec3Origin
                    else use $ fastRenderAPIGlobals.frPointColor
 
         -- add dynamic lights
@@ -568,7 +568,7 @@ recursiveLightPoint (MNodeChildReference nodeRef) start end = do
                                  dt' = dt `shiftR` 4
                                  lightmap = fromJust (surf^.msSamples)
 
-                             v3o <- use $ globals.vec3Origin
+                             v3o <- use $ globals.gVec3Origin
                              newRefDef <- use $ fastRenderAPIGlobals.frNewRefDef
                              modulateValue <- liftM (^.cvValue) glModulateCVar
                              let lightmapIndex = 3 * (dt' * ((fromIntegral (surf^.msExtents._1) `shiftR` 4) + 1) + ds')

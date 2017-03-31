@@ -89,9 +89,9 @@ init = do
     unless (dedicatedValue /= 0) $ do
       Console.init >> S.init >> VID.init >> V.init
 
-      bufData <- use $ globals.netMessageBuffer
-      globals.netMessage.sbData .= bufData
-      globals.netMessage.sbMaxSize .= B.length bufData
+      bufData <- use $ globals.gNetMessageBuffer
+      globals.gNetMessage.sbData .= bufData
+      globals.gNetMessage.sbMaxSize .= B.length bufData
 
       Menu.init >> SCR.init >> initLocal >> IN.init
 
@@ -100,9 +100,9 @@ init = do
 
 initLocal :: Quake ()
 initLocal = do
-    globals.cls.csState .= Constants.caDisconnected
+    globals.gCls.csState .= Constants.caDisconnected
     msec <- Timer.milliseconds
-    globals.cls.csRealTime .= msec
+    globals.gCls.csRealTime .= msec
 
     CLInput.initInput
 
@@ -273,19 +273,19 @@ frame msec = do
         extraTime <- use $ clientGlobals.cgExtraTime
         time <- Timer.getCurTime
         let frameTime = fromIntegral extraTime / 1000
-        globals.cls.csFrameTime .= frameTime
-        globals.cl.csTime += extraTime
-        globals.cls.csRealTime .= time
+        globals.gCls.csFrameTime .= frameTime
+        globals.gCl.csTime += extraTime
+        globals.gCls.csRealTime .= time
 
         clientGlobals.cgExtraTime .= 0
 
         when (frameTime > (1 / 5)) $
-          globals.cls.csFrameTime .= 1 / 5
+          globals.gCls.csFrameTime .= 1 / 5
 
         -- if in the debugger last frame, don't timeout
         when (msec > 5000) $ do
           millis <- Timer.milliseconds
-          globals.cls.csNetChan.ncLastReceived .= millis
+          globals.gCls.csNetChan.ncLastReceived .= millis
           
         -- fetch results from server
         readPackets
@@ -298,13 +298,13 @@ frame msec = do
 
         -- allow rendering DLL change
         VID.checkChanges
-        state <- use $ globals.cls.csState
-        refreshPrepped <- use $ globals.cl.csRefreshPrepped
+        state <- use $ globals.gCls.csState
+        refreshPrepped <- use $ globals.gCl.csRefreshPrepped
         when (not refreshPrepped && state == Constants.caActive) $ do
           CLView.prepRefresh
           -- force GC after level loading
           -- but not on playing a cinematic
-          cinematicTime <- use $ globals.cl.csCinematicTime
+          cinematicTime <- use $ globals.gCl.csCinematicTime
           when (cinematicTime == 0) $
             io performGC -- TODO: do we really need this?
 
@@ -319,9 +319,9 @@ frame msec = do
         SCR.runCinematic
         SCR.runConsole
 
-        globals.cls.csFrameCount += 1
+        globals.gCls.csFrameCount += 1
 
-        keyDest <- use $ globals.cls.csKeyDest
+        keyDest <- use $ globals.gCls.csKeyDest
 
         when (state /= Constants.caActive || keyDest /= Constants.keyGame) $
           io (threadDelay $ 20 * 1000)
@@ -330,7 +330,7 @@ frame msec = do
         shouldSkip = do
           timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
           maxFpsValue <- liftM (^.cvValue) clMaxFPSCVar
-          state <- use $ globals.cls.csState
+          state <- use $ globals.gCls.csState
           extraTime <- use $ clientGlobals.cgExtraTime
 
           if timeDemoValue == 0
@@ -342,14 +342,14 @@ frame msec = do
 
         updateAudio :: Quake ()
         updateAudio = do
-          cl' <- use $ globals.cl
+          cl' <- use $ globals.gCl
           S.update (cl'^.csRefDef.rdViewOrg) (cl'^.csVForward) (cl'^.csVRight) (cl'^.csVUp)
 
 
 -- Called after an ERR_DROP was thrown.
 drop :: Quake ()
 drop = do
-    clientStatic <- use $ globals.cls
+    clientStatic <- use $ globals.gCls
     let state = clientStatic^.csState
 
     when (state /= Constants.caUninitialized && state /= Constants.caDisconnected) $ do
@@ -368,8 +368,8 @@ drop = do
 -}
 disconnect :: Quake ()
 disconnect = do
-    cl' <- use $ globals.cl
-    cls' <- use $ globals.cls
+    cl' <- use $ globals.gCl
+    cls' <- use $ globals.gCls
 
     unless ((cls'^.csState) == Constants.caDisconnected) $ do
       timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
@@ -382,14 +382,14 @@ disconnect = do
         when (time > 0) $
           Com.printf (BC.pack (show (cl'^.csTimeDemoFrames)) `B.append` " frames, " `B.append` BC.pack (show (time / 1000.0)) `B.append` " seconds: " `B.append` BC.pack (show (fromIntegral (cl'^.csTimeDemoFrames) * 1000.0 / time)) `B.append` " fps\n") -- IMPROVE?
 
-      globals.cl.csRefDef.rdBlend .= V4 0 0 0 0
+      globals.gCl.csRefDef.rdBlend .= V4 0 0 0 0
       
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
       (renderer^.rRefExport.reCinematicSetPalette) Nothing
 
       Menu.forceMenuOff
 
-      globals.cls.csConnectTime .= 0
+      globals.gCls.csConnectTime .= 0
 
       SCR.stopCinematic
 
@@ -398,9 +398,9 @@ disconnect = do
 
       -- send a disconnect message to the server
       let fin = B.pack [fromIntegral Constants.clcStringCmd] `B.append` "disconnect"
-      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
-      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
-      NetChannel.transmit (globals.cls.csNetChan) (B.length fin) fin
+      NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
+      NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
+      NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
 
       clearState
 
@@ -409,14 +409,14 @@ disconnect = do
         Nothing -> return ()
         Just handle -> do
           Lib.fClose handle
-          globals.cls.csDownload .= Nothing
+          globals.gCls.csDownload .= Nothing
 
-      globals.cls.csState .= Constants.caDisconnected
+      globals.gCls.csState .= Constants.caDisconnected
 
 forwardToServerF :: XCommandT
 forwardToServerF =
   XCommandT "CL.forwardToServerF" (do
-    state <- use $ globals.cls.csState
+    state <- use $ globals.gCls.csState
 
     if state /= Constants.caConnected && state /= Constants.caActive
       then do
@@ -427,15 +427,15 @@ forwardToServerF =
         c <- Cmd.argc
         when (c > 1) $ do
           args <- Cmd.args
-          MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-          SZ.print (globals.cls.csNetChan.ncMessage) args
+          MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+          SZ.print (globals.gCls.csNetChan.ncMessage) args
   )
 
 pauseF :: XCommandT
 pauseF =
   XCommandT "CL.pauseF" (do
     maxClientsValue <- CVar.variableValue "maxclients"
-    state <- use $ globals.serverState
+    state <- use $ globals.gServerState
 
     if maxClientsValue > 1 || state == 0
       then
@@ -528,7 +528,7 @@ pingServersF =
 skinsF :: XCommandT
 skinsF =
   XCommandT "CL.skinsF" (do
-    configStrings <- use $ globals.cl.csConfigStrings
+    configStrings <- use $ globals.gCl.csConfigStrings
     loadOrDownload configStrings 0 Constants.maxClients
   )
 
@@ -573,11 +573,11 @@ changingF =
   XCommandT "CL.changingF" (do
     -- if we are downloading, we don't change!
     -- This is so we don't suddenly stop downloading a map
-    download <- use $ globals.cls.csDownload
+    download <- use $ globals.gCls.csDownload
 
     when (isNothing download) $ do
       SCR.beginLoadingPlaque
-      globals.cls.csState .= Constants.caConnected -- not active anymore, but not disconnected
+      globals.gCls.csState .= Constants.caConnected -- not active anymore, but not disconnected
 
       Com.printf "\nChanging map...\n"
   )
@@ -613,7 +613,7 @@ connectF =
       then
         Com.printf "usage: connect <server>\n"
       else do
-        ss <- use $ globals.serverState
+        ss <- use $ globals.gServerState
 
         if ss /= 0
           then SVMain.shutdown "Server quit\n" False -- if running a local server, kill it and reissue
@@ -625,7 +625,7 @@ connectF =
 
         disconnect
 
-        zoom (globals.cls) $ do
+        zoom (globals.gCls) $ do
           csState .= Constants.caConnecting
           csServerName .= server
           csConnectTime .= -99999
@@ -640,7 +640,7 @@ reconnectF =
     -- ZOID
     -- if we are downloading, we dont' change! This so we don't suddenly
     -- stop downloading a map
-    cls' <- use $ globals.cls
+    cls' <- use $ globals.gCls
 
     case cls'^.csDownload of
       Just _ ->
@@ -651,20 +651,20 @@ reconnectF =
 
         if | (cls'^.csState) == Constants.caConnected -> do
                Com.printf "reconnecting...\n"
-               globals.cls.csState .= Constants.caConnected
-               MSG.writeCharI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-               MSG.writeString (globals.cls.csNetChan.ncMessage) "new"
+               globals.gCls.csState .= Constants.caConnected
+               MSG.writeCharI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+               MSG.writeString (globals.gCls.csNetChan.ncMessage) "new"
 
            | not (B.null (cls'^.csServerName)) -> do
                if (cls'^.csState) >= Constants.caConnected
                  then do
                    disconnect
-                   globals.cls.csConnectTime .= fromIntegral (cls'^.csRealTime) - 1500
+                   globals.gCls.csConnectTime .= fromIntegral (cls'^.csRealTime) - 1500
 
                  else
-                   globals.cls.csConnectTime .= (-99999) -- fire immediately
+                   globals.gCls.csConnectTime .= (-99999) -- fire immediately
 
-               globals.cls.csState .= Constants.caConnecting
+               globals.gCls.csState .= Constants.caConnecting
                Com.printf "reconnecting...\n"
 
            | otherwise ->
@@ -688,11 +688,11 @@ rconF =
         c <- Cmd.argc
         message' <- buildMessage message 1 c
 
-        cls' <- use $ globals.cls
+        cls' <- use $ globals.gCls
 
         adr <- if (cls'^.csState) >= Constants.caConnected
                  then do
-                   adr <- use $ globals.cls.csNetChan.ncRemoteAddress
+                   adr <- use $ globals.gCls.csNetChan.ncRemoteAddress
                    return (Just adr)
 
                  else do
@@ -736,7 +736,7 @@ precacheF =
     -- Yet another hack to let old demos work the old precache sequence
     if c < 2
       then do
-        Just name <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + 1)
+        Just name <- preuse $ globals.gCl.csConfigStrings.ix (Constants.csModels + 1)
         void $ CM.loadMap name True [0]
 
         CLParse.registerSounds
@@ -762,27 +762,27 @@ readPackets = do
     nextPacket
 
     -- check timeout
-    cls' <- use $ globals.cls
+    cls' <- use $ globals.gCls
     timeoutValue <- liftM (^.cvValue) clTimeoutCVar
     if (cls'^.csState) >= Constants.caConnected && (cls'^.csRealTime) - (cls'^.csNetChan.ncLastReceived) > (truncate timeoutValue) * 1000
       then do
-        globals.cl.csTimeOutCount += 1
-        use (globals.cl.csTimeOutCount) >>= \v ->
+        globals.gCl.csTimeOutCount += 1
+        use (globals.gCl.csTimeOutCount) >>= \v ->
           when (v > 5) $ do -- timeoutcount saves debugger
             Com.printf "\nServer connection timed out.\n"
             disconnect
       else
-        globals.cl.csTimeOutCount .= 0
+        globals.gCl.csTimeOutCount .= 0
 
   where nextPacket :: Quake ()
         nextPacket = do
           io $ print "nextPacket"
-          gotPacket <- NET.getPacket Constants.nsClient (globals.netFrom) (globals.netMessage)
-          cls' <- use $ globals.cls
+          gotPacket <- NET.getPacket Constants.nsClient (globals.gNetFrom) (globals.gNetMessage)
+          cls' <- use $ globals.gCls
 
           when gotPacket $ do
             io $ print "gotPacket"
-            netMsg <- use $ globals.netMessage
+            netMsg <- use $ globals.gNetMessage
 
             if | B.take 4 (netMsg^.sbData) == remoteCommandHeader -> do
                    connectionlessPacket
@@ -790,18 +790,18 @@ readPackets = do
                    -- dump it if not connected
                    return ()
                | (netMsg^.sbCurSize) < 8 -> do
-                   from <- use $ globals.netFrom
+                   from <- use $ globals.gNetFrom
                    Com.printf $ (NET.adrToString from) `B.append` ": Runt packet\n"
                | otherwise -> do
                    -- packet from server
-                   from <- use $ globals.netFrom
-                   remote <- use $ globals.cls.csNetChan.ncRemoteAddress
+                   from <- use $ globals.gNetFrom
+                   remote <- use $ globals.gCls.csNetChan.ncRemoteAddress
                    let same = NET.compareAdr from remote
 
                    if not same
                      then Com.dprintf $ (NET.adrToString from) `B.append` ":sequenced packet without connection\n"
                      else do
-                       ok <- NetChannel.process (globals.cls.csNetChan) (globals.netMessage)
+                       ok <- NetChannel.process (globals.gCls.csNetChan) (globals.gNetMessage)
                        -- might not be accepted for some reason
                        when ok $
                          CLParse.parseServerMessage
@@ -830,7 +830,7 @@ sendCommand = do
 
 fixCVarCheats :: Quake ()
 fixCVarCheats = do
-    Just maxClients <- preuse $ globals.cl.csConfigStrings.ix Constants.csMaxClients
+    Just maxClients <- preuse $ globals.gCl.csConfigStrings.ix Constants.csMaxClients
 
     -- single player can cheat
     unless (maxClients == "1" || B.length maxClients == 0) $ do
@@ -861,35 +861,35 @@ fixCVarCheats = do
 checkForResend :: Quake ()
 checkForResend = do
     -- if the local server is running and we aren't then connect
-    state <- use $ globals.cls.csState
-    serverState' <- use $ globals.serverState
+    state <- use $ globals.gCls.csState
+    serverState' <- use $ globals.gServerState
 
     if state == Constants.caDisconnected && serverState' /= 0
       then do
-        globals.cls.csState .= Constants.caConnecting
-        globals.cls.csServerName .= "localhost"
+        globals.gCls.csState .= Constants.caConnecting
+        globals.gCls.csServerName .= "localhost"
         -- we don't need a challenge on the localhost
         sendConnectPacket
       else do
-        realTime <- use $ globals.cls.csRealTime
-        connectTime <- use $ globals.cls.csConnectTime
+        realTime <- use $ globals.gCls.csRealTime
+        connectTime <- use $ globals.gCls.csConnectTime
 
         -- resend if we haven't gotten a reply yet
         unless (state /= Constants.caConnecting || (fromIntegral realTime - connectTime) < 3000) $ do
-          serverName <- use $ globals.cls.csServerName
+          serverName <- use $ globals.gCls.csServerName
           adrMaybe <- NET.stringToAdr serverName
 
           case adrMaybe of
             Nothing -> do
               Com.printf "Bad server address\n"
-              globals.cls.csState .= Constants.caDisconnected
+              globals.gCls.csState .= Constants.caDisconnected
             Just adr -> do
               let adr' = if (adr^.naPort) == 0
                            then adr { _naPort = Constants.portServer }
                            else adr
 
               -- for retransmit requests
-              globals.cls.csConnectTime .= fromIntegral realTime
+              globals.gCls.csConnectTime .= fromIntegral realTime
 
               Com.printf $ "Connecting to " `B.append` serverName `B.append` "...\n"
 
@@ -928,23 +928,23 @@ fixUpGender = do
 -}
 sendConnectPacket :: Quake ()
 sendConnectPacket = do
-    serverName <- use $ globals.cls.csServerName
+    serverName <- use $ globals.gCls.csServerName
 
     maybeAdr <- NET.stringToAdr serverName
 
     case maybeAdr of
       Nothing -> do
         Com.printf "Bad server address\n"
-        globals.cls.csConnectTime .= 0
+        globals.gCls.csConnectTime .= 0
       Just adr -> do
         let adr' = if (adr^.naPort) == 0
                      then adr { _naPort = Constants.portServer }
                      else adr
 
         port :: Int <- liftM truncate (CVar.variableValue "qport")
-        globals.userInfoModified .= False
+        globals.gUserInfoModified .= False
 
-        challenge <- use $ globals.cls.csChallenge
+        challenge <- use $ globals.gCls.csChallenge
         userInfo <- CVar.userInfo
 
         let str = "connect " `B.append` (BC.pack $ show Constants.protocolVersion) `B.append` -- IMPROVE?
@@ -955,32 +955,32 @@ sendConnectPacket = do
 
 connectionlessPacket :: Quake ()
 connectionlessPacket = do
-    MSG.beginReading (globals.netMessage)
-    _ <- MSG.readLong (globals.netMessage) -- skip the -1
+    MSG.beginReading (globals.gNetMessage)
+    _ <- MSG.readLong (globals.gNetMessage) -- skip the -1
 
-    s <- MSG.readStringLine (globals.netMessage)
+    s <- MSG.readStringLine (globals.gNetMessage)
 
     Cmd.tokenizeString s False
 
     c <- Cmd.argv 0
 
-    use (globals.netFrom) >>= \from ->
+    use (globals.gNetFrom) >>= \from ->
       Com.println $ NET.adrToString from `B.append` ": " `B.append` c
 
     case c of
       -- server connection
       "client_connect" -> do
-        state <- use $ globals.cls.csState
+        state <- use $ globals.gCls.csState
         if state == Constants.caConnected
           then 
             Com.printf "Dup connect received.  Ignored.\n"
           else do
-            from <- use $ globals.netFrom
-            qport <- use $ globals.cls.csQuakePort
-            NetChannel.setup Constants.nsClient (globals.cls.csNetChan) from qport
-            MSG.writeCharI (globals.cls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
-            MSG.writeString (globals.cls.csNetChan.ncMessage) "new"
-            globals.cls.csState .= Constants.caConnected
+            from <- use $ globals.gNetFrom
+            qport <- use $ globals.gCls.csQuakePort
+            NetChannel.setup Constants.nsClient (globals.gCls.csNetChan) from qport
+            MSG.writeCharI (globals.gCls.csNetChan.ncMessage) (fromIntegral Constants.clcStringCmd)
+            MSG.writeString (globals.gCls.csNetChan.ncMessage) "new"
+            globals.gCls.csState .= Constants.caConnected
 
       -- server responding to a status broadcast
       "info" ->
@@ -988,37 +988,37 @@ connectionlessPacket = do
 
       -- remote command from gui front end
       "cmd" -> do
-        from <- use $ globals.netFrom
+        from <- use $ globals.gNetFrom
 
         if not (NET.isLocalAddress from)
           then
             Com.printf "Command packet from remote host.  Ignored.\n"
           else do
-            cmd <- MSG.readString (globals.netMessage)
+            cmd <- MSG.readString (globals.gNetMessage)
             CBuf.addText cmd
             CBuf.addText "\n"
 
       -- print command from somewhere
       "print" -> do
-        msg <- MSG.readString (globals.netMessage)
+        msg <- MSG.readString (globals.gNetMessage)
         when (B.length msg > 0) $
           Com.printf msg
 
       -- ping from somewhere
       "ping" -> do
-        from <- use $ globals.netFrom
+        from <- use $ globals.gNetFrom
         NetChannel.outOfBandPrint Constants.nsClient from "ack"
 
       -- challenge from the server we are connecting to
       "challenge" -> do
         v1 <- Cmd.argv 1
-        globals.cls.csChallenge .= Lib.atoi v1
+        globals.gCls.csChallenge .= Lib.atoi v1
         sendConnectPacket
 
       -- echo request from server
       "echo" -> do
         v1 <- Cmd.argv 1
-        from <- use $ globals.netFrom
+        from <- use $ globals.gNetFrom
         NetChannel.outOfBandPrint Constants.nsClient from v1
 
       _ -> Com.printf "Unknown command.\n"
@@ -1026,9 +1026,9 @@ connectionlessPacket = do
 -- Handle a reply from a ping.
 parseStatusMessage :: Quake ()
 parseStatusMessage = do
-    s <- MSG.readString (globals.netMessage)
+    s <- MSG.readString (globals.gNetMessage)
     Com.printf (s `B.append` "\n")
-    adr <- use $ globals.netFrom
+    adr <- use $ globals.gNetFrom
     Menu.addToServerList adr s
 
 writeDemoMessage :: Quake ()
@@ -1041,14 +1041,14 @@ clearState = do
     CLTEnt.clearTEnts
 
     -- wipe the entire cl structure
-    globals.cl .= newClientStateT
-    globals.clEntities .= Vec.replicate Constants.maxEdicts newCEntityT
+    globals.gCl .= newClientStateT
+    globals.gClEntities .= Vec.replicate Constants.maxEdicts newCEntityT
 
-    SZ.clear (globals.cls.csNetChan.ncMessage)
+    SZ.clear (globals.gCls.csNetChan.ncMessage)
 
 requestNextDownload :: Quake ()
 requestNextDownload = do
-    state <- use $ globals.cls.csState
+    state <- use $ globals.gCls.csState
 
     when (state == Constants.caConnected) $ do
       updatePrecacheCheck
@@ -1085,7 +1085,7 @@ requestNextDownload = do
 
               if allowDownloadMapsValue /= 0
                 then do
-                  Just str <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + 1)
+                  Just str <- preuse $ globals.gCl.csConfigStrings.ix (Constants.csModels + 1)
                   fileExists <- CLParse.checkOrDownloadFile str
                   return $ if fileExists
                              then False
@@ -1108,7 +1108,7 @@ requestNextDownload = do
 
               if allowDownloadModelsValue /= 0
                 then do
-                  configStrings <- use $ globals.cl.csConfigStrings
+                  configStrings <- use $ globals.gCl.csConfigStrings
                   done <- downloadModels configStrings
 
                   if done
@@ -1273,7 +1273,7 @@ requestNextDownload = do
                   when (precacheCheck == Constants.csSounds) $
                     clientGlobals.cgPrecacheCheck += 1 -- zero is blank
 
-                  configStrings <- use $ globals.cl.csConfigStrings
+                  configStrings <- use $ globals.gCl.csConfigStrings
                   done <- downloadSounds configStrings
 
                   if done
@@ -1326,7 +1326,7 @@ requestNextDownload = do
               when (precacheCheck == Constants.csImages) $
                 clientGlobals.cgPrecacheCheck += 1 -- zero is blank
 
-              configStrings <- use $ globals.cl.csConfigStrings
+              configStrings <- use $ globals.gCl.csConfigStrings
               done <- downloadImages configStrings
 
               if done
@@ -1374,7 +1374,7 @@ requestNextDownload = do
 
               if allowDownloadPlayersValue /= 0
                 then do
-                  configStrings <- use $ globals.cl.csConfigStrings
+                  configStrings <- use $ globals.gCl.csConfigStrings
                   done <- downloadSkin configStrings
 
                   if done
@@ -1511,7 +1511,7 @@ requestNextDownload = do
           if precacheCheck == envCnt
             then do
               clientGlobals.cgPrecacheCheck += 1
-              configStrings <- use $ globals.cl.csConfigStrings
+              configStrings <- use $ globals.gCl.csConfigStrings
 
               let str = configStrings Vec.! (Constants.csModels + 1)
                   chk = configStrings Vec.! Constants.csMapChecksum
@@ -1545,7 +1545,7 @@ requestNextDownload = do
 
               if allowDownloadValue /= 0 && allowDownloadMapsValue /= 0
                 then do
-                  configStrings <- use $ globals.cl.csConfigStrings
+                  configStrings <- use $ globals.gCl.csConfigStrings
                   done <- getSkyPic (configStrings Vec.! Constants.csSky)
 
                   if done
@@ -1650,8 +1650,8 @@ requestNextDownload = do
 
           precacheSpawnCount <- use $ clientGlobals.cgPrecacheSpawnCount
 
-          MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-          MSG.writeString (globals.cls.csNetChan.ncMessage) ("begin " `B.append` BC.pack (show precacheSpawnCount) `B.append` "\n") -- IMPROVE?
+          MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+          MSG.writeString (globals.gCls.csNetChan.ncMessage) ("begin " `B.append` BC.pack (show precacheSpawnCount) `B.append` "\n") -- IMPROVE?
 
 shutdown :: Quake ()
 shutdown = do

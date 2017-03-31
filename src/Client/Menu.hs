@@ -165,7 +165,7 @@ menuCenter menuFrameworkRef = do
                 MenuActionRef ref -> do
                   menuItem <- readMenuActionSReference ref
                   return (menuItem^.maGeneric.mcY)
-    h <- use $ globals.vidDef.vdHeight
+    h <- use $ globals.gVidDef.vdHeight
 
     modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
 
@@ -186,7 +186,7 @@ menuTallySlots menuFrameworkRef = do
 pushMenu :: XCommandT -> KeyFuncT -> Quake ()
 pushMenu draw key = do
     maxClients <- CVar.variableValue "maxclients"
-    serverState <- use $ globals.serverState
+    serverState <- use $ globals.gServerState
 
     when (maxClients == 1 && serverState /= 0) $
       void $ CVar.set "paused" "1"
@@ -221,7 +221,7 @@ pushMenu draw key = do
       mgKeyFunc .= Just key
       mgEnterSound .= True
     
-    globals.cls.csKeyDest .= Constants.keyMenu
+    globals.gCls.csKeyDest .= Constants.keyMenu
 
 menuMainF :: XCommandT
 menuMainF = XCommandT "Menu.menuMainF" (pushMenu mainDrawF mainKeyF)
@@ -236,9 +236,9 @@ mainDrawF =
                            , "m_main_quit"
                            ]
     (widest, totalHeight) <- calcWidthHeight names (-1) 0 0 (V.length names)
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
     mainCursor <- use $ menuGlobals.mgMainCursor
-    realTime <- use $ globals.cls.csRealTime
+    realTime <- use $ globals.gCls.csRealTime
 
     let yStart = (vidDef'^.vdHeight) `div` 2 - 110
         xOffset = ((vidDef'^.vdWidth) - widest + 70) `div` 2
@@ -247,7 +247,7 @@ mainDrawF =
 
     let litName = (names V.! mainCursor) `B.append` "_sel"
 
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reDrawPic) xOffset (yStart + mainCursor * 40 + 13) litName
 
     drawCursor (xOffset - 25) (yStart + mainCursor * 40 + 11) ((realTime `div` 100) `mod` numCursorFrames)
@@ -261,7 +261,7 @@ mainDrawF =
         calcWidthHeight names widest totalHeight idx maxIdx
           | idx >= maxIdx = return (widest, totalHeight)
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) (names V.! idx)
               let widest' = if w > widest then w else widest
               calcWidthHeight names widest' (totalHeight + (h + 12)) (idx + 1) maxIdx
@@ -271,7 +271,7 @@ mainDrawF =
           | idx >= maxIdx = return ()
           | otherwise = do
               when (idx /= mainCursor) $ do
-                Just renderer <- use $ globals.re
+                Just renderer <- use $ globals.gRenderer
                 (renderer^.rRefExport.reDrawPic) xOffset (yStart + idx * 40 + 13) (names V.! idx)
 
               drawMenuPics names mainCursor yStart xOffset (idx + 1) maxIdx
@@ -319,7 +319,7 @@ menuGameF =
 
 gameMenuInit :: Quake ()
 gameMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference gameMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                        & mfNItems .~ 0
@@ -410,7 +410,7 @@ menuLoadGameF =
 
 loadGameMenuInit :: Quake ()
 loadGameMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference loadGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                            & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
@@ -501,7 +501,7 @@ loadGameMenuKeyF =
 menuSaveGameF :: XCommandT
 menuSaveGameF =
   XCommandT "Menu.saveGameF" (do
-    serverState' <- use $ globals.serverState
+    serverState' <- use $ globals.gServerState
 
     unless (serverState' == 0) $ do -- only when playing a game
       saveGameMenuInit
@@ -525,7 +525,7 @@ menuCreditsF =
                  Just contents ->
                    return (V.fromList (tokenise "\r\n" contents))
                    
-    realTime <- use $ globals.cls.csRealTime
+    realTime <- use $ globals.gCls.csRealTime
     
     zoom menuGlobals $ do
       mgCreditsStartTime .= realTime
@@ -541,7 +541,7 @@ menuCreditsF =
 startGame :: Quake ()
 startGame = do
     -- disable updates and start the cinematic going
-    globals.cl.csServerCount .= -1
+    globals.gCl.csServerCount .= -1
     forceMenuOff
     CVar.setValueI "deathmatch" 0
     CVar.setValueI "coop" 0
@@ -549,7 +549,7 @@ startGame = do
     CVar.setValueI "gamerules" 0
 
     CBuf.addText "loading ; killserver ; wait ; newgame\n"
-    globals.cls.csKeyDest .= Constants.keyGame
+    globals.gCls.csKeyDest .= Constants.keyGame
 
 gameMenuDrawF :: XCommandT
 gameMenuDrawF =
@@ -574,7 +574,7 @@ menuJoinServerF =
 
 joinServerMenuInit :: Quake ()
 joinServerMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                              & mfNItems .~ 0
@@ -727,8 +727,8 @@ menuQuitF =
 quitDrawF :: XCommandT
 quitDrawF =
   XCommandT "Menu.quitDrawF" (do
-    Just renderer <- use $ globals.re
-    vidDef' <- use $ globals.vidDef
+    Just renderer <- use $ globals.gRenderer
+    vidDef' <- use $ globals.gVidDef
     Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) "quit"
     (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - w) `div` 2) (((vidDef'^.vdHeight) - h) `div` 2) "quit"
   )
@@ -740,7 +740,7 @@ quitKeyF =
            popMenu
 
        | key `elem` [ ord 'Y', ord 'y' ] -> do
-           globals.cls.csKeyDest .= Constants.keyConsole
+           globals.gCls.csKeyDest .= Constants.keyConsole
            (CL.quitF)^.xcCmd
 
        | otherwise ->
@@ -751,16 +751,16 @@ quitKeyF =
 
 draw :: Quake ()
 draw = do
-    keyDest <- use $ globals.cls.csKeyDest
+    keyDest <- use $ globals.gCls.csKeyDest
 
     when (keyDest == Constants.keyMenu) $ do
       -- repaint everything next frame
       SCR.dirtyScreen
 
       -- dim everything behind it down
-      cinematicTime <- use $ globals.cl.csCinematicTime
-      Just renderer <- use $ globals.re
-      vidDef' <- use $ globals.vidDef
+      cinematicTime <- use $ globals.gCl.csCinematicTime
+      Just renderer <- use $ globals.gRenderer
+      vidDef' <- use $ globals.gVidDef
 
       if cinematicTime > 0
         then (renderer^.rRefExport.reDrawFill) 0 0 (vidDef'^.vdWidth) (vidDef'^.vdHeight) 0
@@ -835,14 +835,14 @@ drawCursor x y f = do
       registerCursorPics 0 numCursorFrames
       menuGlobals.mgCached .= True
 
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reDrawPic) x y ("m_cursor" `B.append` BC.pack (show f))
 
   where registerCursorPics :: Int -> Int -> Quake ()
         registerCursorPics idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reRegisterPic) ("m_cursor" `B.append` BC.pack (show idx))
               registerCursorPics (idx + 1) maxIdx
 
@@ -872,14 +872,14 @@ forceMenuOff = do
       mgKeyFunc .= Nothing
       mgMenuDepth .= 0
 
-    globals.cls.csKeyDest .= Constants.keyGame
+    globals.gCls.csKeyDest .= Constants.keyGame
     Key.clearStates
     void $ CVar.set "paused" "0"
 
 banner :: B.ByteString -> Quake ()
 banner name = do
-    Just renderer <- use $ globals.re
-    vidDef' <- use $ globals.vidDef
+    Just renderer <- use $ globals.gRenderer
+    vidDef' <- use $ globals.gVidDef
     Just (w, h) <- (renderer^.rRefExport.reDrawGetPicSize) name
     (renderer^.rRefExport.reDrawPic) ((vidDef'^.vdWidth) `div` 2 - w `div` 2) ((vidDef'^.vdHeight) `div` 2 - 110) name
 
@@ -952,7 +952,7 @@ menuDraw menuRef = do
                          Just f -> f
                          Nothing ->
                            when ((item^.mcType) /= Constants.mtypeField) $ do
-                             Just renderer <- use $ globals.re
+                             Just renderer <- use $ globals.gRenderer
                              ms <- Timer.milliseconds
                              
                              if (item^.mcFlags) .&. Constants.qmfLeftJustify /= 0
@@ -1148,7 +1148,7 @@ joinServerFunc _ = do
 
 addressBookMenuInit :: Quake ()
 addressBookMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference addressBookMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 142
                                                               & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
@@ -1245,7 +1245,7 @@ startServerMenuInit = do
         menuGlobals.mgMapNames .= Just mapNames'
         
         -- initialize the menu stuff
-        vidDef' <- use $ globals.vidDef
+        vidDef' <- use $ globals.gVidDef
 
         modifyMenuFrameworkSReference startServerMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                                   & mfNItems .~ 0
@@ -1390,7 +1390,7 @@ startServerMenuKey =
 
 saveGameMenuInit :: Quake ()
 saveGameMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                            & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
@@ -1459,7 +1459,7 @@ playerConfigMenuKey =
   
 downloadOptionsMenuInit :: Quake ()
 downloadOptionsMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2)
                                                                   & mfNItems .~ 0
@@ -1550,7 +1550,7 @@ downloadOptionsMenuKey =
 
 multiplayerMenuInit :: Quake ()
 multiplayerMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference multiplayerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 64
                                                               & mfNItems .~ 0
@@ -1609,7 +1609,7 @@ optionsMenuInit = do
     
     winNoAltTab <- CVar.get "win_noalttab" "0" Constants.cvarArchive
     
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference optionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                           & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
@@ -1766,7 +1766,7 @@ optionsMenuKey =
   
 keysMenuInit :: Quake ()
 keysMenuInit = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference keysMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                        & mfNItems .~ 0
@@ -2051,7 +2051,7 @@ keysMenuKeyF =
 dmOptionsMenuInit :: Quake ()
 dmOptionsMenuInit = do
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     modifyMenuFrameworkSReference dmOptionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                             & mfNItems .~ 0
@@ -2267,7 +2267,7 @@ saveGameCallback menuActionRef = do
 
 fieldDraw :: MenuFieldSReference -> Quake ()
 fieldDraw fieldRef = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     field <- readMenuFieldSReference fieldRef
     let Just menuRef = field^.mflGeneric.mcParent
     menu <- readMenuFrameworkSReference menuRef
@@ -2312,7 +2312,7 @@ fieldDraw fieldRef = do
 menuDrawString :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawString _ _ Nothing = return ()
 menuDrawString x y (Just str) = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     drawString renderer 0 (B.length str)
 
   where drawString :: Renderer -> Int -> Int -> Quake ()
@@ -2326,7 +2326,7 @@ menuDrawString x y (Just str) = do
 menuDrawStringDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringDark _ _ Nothing = return ()
 menuDrawStringDark x y (Just str) = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     drawString renderer 0 (B.length str)
 
   where drawString :: Renderer -> Int -> Int -> Quake ()
@@ -2340,7 +2340,7 @@ menuDrawStringDark x y (Just str) = do
 menuDrawStringR2L :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringR2L _ _ Nothing = return ()
 menuDrawStringR2L x y (Just str) = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     drawString renderer 0 (B.length str)
 
   where drawString :: Renderer -> Int -> Int -> Quake ()
@@ -2354,7 +2354,7 @@ menuDrawStringR2L x y (Just str) = do
 menuDrawStringR2LDark :: Int -> Int -> Maybe B.ByteString -> Quake ()
 menuDrawStringR2LDark _ _ Nothing = return ()
 menuDrawStringR2LDark x y (Just str) = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     drawString renderer 0 (B.length str)
     
   where drawString :: Renderer -> Int -> Int -> Quake ()
@@ -2378,7 +2378,7 @@ sliderDraw sliderRef = do
                    | r > 1 -> 1
                    | otherwise -> r
 
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
 
     (renderer^.rRefExport.reDrawChar) ((slider^.msGeneric.mcX) + (menu^.mfX) + Constants.rColumnOffset) ((slider^.msGeneric.mcY) + (menu^.mfY)) 128
 
@@ -2402,7 +2402,7 @@ menuListDraw menuListRef = do
 
     menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (menuList^.mlGeneric.mcName)
 
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reDrawFill) ((menuList^.mlGeneric.mcX) - 112 + (menu^.mfX)) ((menu^.mfY) + (menuList^.mlGeneric.mcY) + 10 * (menuList^.mlCurValue) + 10) 128 10 16
 
     V.imapM_ (drawListItem menu menuList) (menuList^.mlItemNames)
@@ -2501,7 +2501,7 @@ updateSoundQualityFunc = do
     qualityList <- readMenuListSReference optionsQualityListRef
     let selectedDriver = drivers V.! (qualityList^.mlCurValue)
     currentDriver <- S.getDriverName
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     
     if selectedDriver == currentDriver
       then
@@ -2574,7 +2574,7 @@ consoleFunc :: Quake ()
 consoleFunc = do
     -- the proper way to do this is probably to have ToggleConsole_f
     -- accept a parameter
-    attractLoop <- use $ globals.cl.csAttractLoop
+    attractLoop <- use $ globals.gCl.csAttractLoop
     
     if attractLoop
       then
@@ -2585,7 +2585,7 @@ consoleFunc = do
         Console.clearNotify
         
         forceMenuOff
-        globals.cls.csKeyDest .= Constants.keyConsole
+        globals.gCls.csKeyDest .= Constants.keyConsole
 
 controlsSetMenuItemValues :: Quake ()
 controlsSetMenuItemValues = do
@@ -2603,7 +2603,7 @@ keyCursorDrawFunc menuRef = do
               ms <- Timer.milliseconds
               return (12 + ((ms `div` 250) .&. 1))
     
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reDrawChar) (menu^.mfX) ((menu^.mfY) + 9 * (menu^.mfCursor)) ch
 
 drawKeyBindingFunc :: MenuActionSReference -> Quake ()
@@ -2659,7 +2659,7 @@ keyBindingFunc actionRef = do
 
 findKeysForCommand :: B.ByteString -> Quake (Int, Int)
 findKeysForCommand command = do
-    kb <- use $ globals.keyBindings
+    kb <- use $ globals.gKeyBindings
     return $ findKeyBindings kb (-1) 0 256
     
   where findKeyBindings :: V.Vector (Maybe B.ByteString) -> Int -> Int -> Int -> (Int, Int)
@@ -2675,7 +2675,7 @@ findKeysForCommand command = do
 
 unbindCommand :: B.ByteString -> Quake ()
 unbindCommand command = do
-    kb <- use $ globals.keyBindings
+    kb <- use $ globals.gKeyBindings
     unbind kb 0 256
     
   where unbind :: V.Vector (Maybe B.ByteString) -> Int -> Int -> Quake ()
@@ -2728,8 +2728,8 @@ menuPrint cx cy str =
 -}
 drawCharacter :: Int -> Int -> Int -> Quake ()
 drawCharacter cx cy num = do
-    Just renderer <- use $ globals.re
-    vidDef' <- use $ globals.vidDef
+    Just renderer <- use $ globals.gRenderer
+    vidDef' <- use $ globals.gVidDef
     (renderer^.rRefExport.reDrawChar) (cx + (((vidDef'^.vdWidth) - 320) `shiftR` 1)) (cy + (((vidDef'^.vdHeight) - 240) `shiftR` 1)) num
 
 menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
@@ -2834,8 +2834,8 @@ actionDoEnter actionRef = do
 
 menuDrawStatusBar :: Maybe B.ByteString -> Quake ()
 menuDrawStatusBar mStatusBar = do
-    Just renderer <- use $ globals.re
-    vidDef' <- use $ globals.vidDef
+    Just renderer <- use $ globals.gRenderer
+    vidDef' <- use $ globals.gVidDef
 
     case mStatusBar of
       Just statusBar -> do

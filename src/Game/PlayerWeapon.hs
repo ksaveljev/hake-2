@@ -83,7 +83,7 @@ weaponBlasterFire =
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     let damage = if deathmatchValue /= 0 then 15 else 10
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     blasterFire edictRef v3o damage False Constants.efBlaster
 

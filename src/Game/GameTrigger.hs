@@ -76,7 +76,7 @@ spTriggerMultiple edictRef = do
         modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidTrigger
                                        & eUse .~ Just useMulti)
 
-    origin <- use $ globals.vec3Origin
+    origin <- use $ globals.gVec3Origin
 
     unless ((edict^.eEntityState.esAngles) == origin) $
       GameBase.setMoveDir edictRef
@@ -262,7 +262,7 @@ touchMulti =
     unless done $ do
       edict <- readEdictT edictRef
       other <- readEdictT otherRef
-      vec3origin <- use $ globals.vec3Origin
+      vec3origin <- use $ globals.gVec3Origin
 
       done' <- if (edict^.eMoveDir) /= vec3origin
                  then do
@@ -335,7 +335,7 @@ multiTrigger edictRef = do
 
 initTrigger :: EdictReference -> Quake ()
 initTrigger selfRef = do
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     self <- readEdictT selfRef
 
     unless ((self^.eEntityState.esAngles) == v3o) $
@@ -564,7 +564,7 @@ hurtTouch =
                      then Constants.damageNoProtection
                      else 0
       
-      v3o <- use $ globals.vec3Origin
+      v3o <- use $ globals.gVec3Origin
       
       GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) (self^.eDmg) dFlags Constants.modTriggerHurt
       

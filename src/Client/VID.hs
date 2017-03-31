@@ -105,8 +105,8 @@ update the rendering DLL and/or video mode to match.
 -}
 checkChanges :: Quake ()
 checkChanges = do
-    vd <- use $ globals.vidDef
-    globals.vidDef .= vd { _vdWidth = (vd^.vdNewWidth), _vdHeight = (vd^.vdNewHeight) }
+    vd <- use $ globals.gVidDef
+    globals.gVidDef .= vd { _vdWidth = (vd^.vdNewWidth), _vdHeight = (vd^.vdNewHeight) }
 
     vidRef <- vidRefCVar
 
@@ -125,8 +125,8 @@ checkChanges = do
           CVar.update vidRef { _cvModified = False }
           CVar.update vidFullScreen { _cvModified = True }
 
-          globals.cl.csRefreshPrepped .= False
-          globals.cls.csDisableScreen .= 1 -- True
+          globals.gCl.csRefreshPrepped .= False
+          globals.gCls.csDisableScreen .= 1 -- True
 
           loaded <- loadRefresh (vidRef^.cvString) True
 
@@ -160,18 +160,18 @@ checkChanges = do
             void $ CVar.set "vid_ref" renderer'
 
             -- drop the console if we fail to load a refresh
-            keyDest <- use $ globals.cls.csKeyDest
+            keyDest <- use $ globals.gCls.csKeyDest
             when (keyDest /= Constants.keyConsole) $
               (Console.toggleConsoleF)^.xcCmd -- IMPROVE: catch exception?
 
-          globals.cls.csDisableScreen .= 0 -- False
+          globals.gCls.csDisableScreen .= 0 -- False
 
 loadRefresh :: B.ByteString -> Bool -> Quake Bool
 loadRefresh name fast = do
     refLibActive <- use $ vidGlobals.vgRefLibActive
 
     when refLibActive $ do
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
       renderer^.rRefExport.reGetKeyboardHandler.kbdClose
 
       IN.shutdown
@@ -191,7 +191,7 @@ loadRefresh name fast = do
       else do
         Com.printf $ "LoadLibrary(\"" `B.append` name `B.append` "\")\n"
         let r = QRenderer.getDriver name fast
-        globals.re .= r
+        globals.gRenderer .= r
 
         when (isNothing r) $
           Com.comError Constants.errFatal (name `B.append` " can't load but registered")
@@ -223,14 +223,14 @@ loadRefresh name fast = do
 
 freeRefLib :: Quake ()
 freeRefLib = do
-    r <- use $ globals.re
+    r <- use $ globals.gRenderer
 
     when (isJust r) $ do
       let Just renderer = r
       renderer^.rRefExport.reGetKeyboardHandler.kbdClose
       IN.shutdown
 
-    globals.re .= Nothing
+    globals.gRenderer .= Nothing
     vidGlobals.vgRefLibActive .= False
 
 printf :: Int -> B.ByteString -> Quake ()
@@ -295,7 +295,7 @@ menuInit = do
         Nothing -> return ()
         Just idx -> modifyMenuListSReference refListRef (\v -> v & mlCurValue .~ idx)
 
-    use (globals.vidDef.vdWidth) >>= \width -> do
+    use (globals.gVidDef.vdWidth) >>= \width -> do
       let widthF = fromIntegral width :: Float
       modifyMenuFrameworkSReference openGLMenuRef (\v -> v & mfX .~ truncate (widthF * 0.5)
                                                            & mfNItems .~ 0
@@ -498,7 +498,7 @@ getModeInfo mode = do
 
 initModeList :: Quake ()
 initModeList = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
 
     modes <- renderer^.rRefExport.reGetModeList
 
@@ -521,7 +521,7 @@ initModeList = do
 
 newWindow :: Int -> Int -> Quake ()
 newWindow width height =
-    zoom (globals.vidDef) $ do
+    zoom (globals.gVidDef) $ do
       vdNewWidth .= width
       vdNewHeight .= height
 
@@ -530,7 +530,7 @@ shutdown = do
     refLibActive <- use $ vidGlobals.vgRefLibActive
 
     when refLibActive $ do
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
 
       renderer^.rRefExport.reGetKeyboardHandler.kbdClose
       IN.shutdown
@@ -544,8 +544,8 @@ menuDraw =
     vidGlobals.vgCurrentMenu .= Just openGLMenuRef
 
     -- draw the banner
-    Just renderer <- use $ globals.re
-    vidDef' <- use $ globals.vidDef
+    Just renderer <- use $ globals.gRenderer
+    vidDef' <- use $ globals.gVidDef
     Just (width, _) <- (renderer^.rRefExport.reDrawGetPicSize) "m_banner_video"
     (renderer^.rRefExport.reDrawPic) ((vidDef'^.vdWidth) `div` 2 - width `div` 2) ((vidDef'^.vdHeight) `div` 2 - 110) "m_banner_video"
 

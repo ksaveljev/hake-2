@@ -83,8 +83,8 @@ init = do
     void $ CVar.get "public" "0" 0
     void $ CVar.get "sv_reconnect_limit" "3" Constants.cvarArchive
 
-    bufData <- use $ globals.netMessageBuffer
-    SZ.init (globals.netMessage) bufData Constants.maxMsgLen
+    bufData <- use $ globals.gNetMessageBuffer
+    SZ.init (globals.gNetMessage) bufData Constants.maxMsgLen
 
 -- Called when each game quits, before Sys_Quit or Sys_Error.
 shutdown :: B.ByteString -> Bool -> Quake ()
@@ -106,7 +106,7 @@ shutdown finalmsg reconnect = do
 
     let newServer = newServerT
     svGlobals.svServer .= newServer
-    globals.serverState .= (newServer^.sState)
+    globals.gServerState .= (newServer^.sState)
 
     ssDemofile <- use $ svGlobals.svServerStatic.ssDemoFile
     when (isJust ssDemofile) $ do
@@ -197,8 +197,8 @@ statusString = do
 
 frame :: Int -> Quake ()
 frame msec = do
-    globals.timeBeforeGame .= 0
-    globals.timeAfterGame .= 0
+    globals.gTimeBeforeGame .= 0
+    globals.gTimeAfterGame .= 0
 
     -- if server is not active, do nothing
     initialized <- use $ svGlobals.svServerStatic.ssInitialized
@@ -305,11 +305,11 @@ remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
 -- Reads packets from the network or loopback
 readPackets :: Quake ()
 readPackets = do
-    readSomething <- NET.getPacket Constants.nsServer (globals.netFrom) (globals.netMessage)
+    readSomething <- NET.getPacket Constants.nsServer (globals.gNetFrom) (globals.gNetMessage)
 
     when readSomething $ do
       -- check for connectionless packet (0xffffffff) first
-      netMessageHeader <- liftM (B.take 4) (use $ globals.netMessage.sbData)
+      netMessageHeader <- liftM (B.take 4) (use $ globals.gNetMessage.sbData)
       if netMessageHeader == remoteCommandHeader
         then do
           connectionlessPacket
@@ -317,10 +317,10 @@ readPackets = do
         else do
           -- read the qport out of the message so we can fix up
           -- stupid address translating routers
-          MSG.beginReading (globals.netMessage)
-          void $ MSG.readLong (globals.netMessage) -- sequence number
-          void $ MSG.readLong (globals.netMessage) -- sequence number
-          qport <- liftM (.&. 0xFFFF) (MSG.readShort (globals.netMessage))
+          MSG.beginReading (globals.gNetMessage)
+          void $ MSG.readLong (globals.gNetMessage) -- sequence number
+          void $ MSG.readLong (globals.gNetMessage) -- sequence number
+          qport <- liftM (.&. 0xFFFF) (MSG.readShort (globals.gNetMessage))
 
           -- check for packets from connected clients
           maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
@@ -334,7 +334,7 @@ readPackets = do
           | idx >= maxIdx = return idx
           | otherwise = do
               Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix idx
-              netAdr <- use $ globals.netFrom
+              netAdr <- use $ globals.gNetFrom
 
               -- IMPROVE: first 3 statements can be squashed into one?
               if | (client^.cState) == Constants.csFree -> checkClientPackets qport (idx + 1) maxIdx
@@ -345,7 +345,7 @@ readPackets = do
                        Com.printf "SV_ReadPackets: fixing up a translated port\n"
                        svGlobals.svServerStatic.ssClients.ix idx.cNetChan.ncRemoteAddress.naPort .= (netAdr^.naPort)
 
-                     ok <- NetChannel.process (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) (globals.netMessage)
+                     ok <- NetChannel.process (svGlobals.svServerStatic.ssClients.ix idx.cNetChan) (globals.gNetMessage)
                      when ok $
                        -- this is a valid, sequenced packet, so process it
                        when ((client^.cState) /= Constants.csZombie) $ do
@@ -444,7 +444,7 @@ runGameFrame = do
 
           when (hostSpeedsValue /= 0) $ do
             t <- Timer.milliseconds
-            globals.timeBeforeGame .= t
+            globals.gTimeBeforeGame .= t
 
         setTimeAfterGame :: Quake ()
         setTimeAfterGame = do
@@ -452,7 +452,7 @@ runGameFrame = do
 
           when (hostSpeedsValue /= 0) $ do
             t <- Timer.milliseconds
-            globals.timeAfterGame .= t
+            globals.gTimeAfterGame .= t
 
 masterHeartbeat :: Quake ()
 masterHeartbeat = do
@@ -508,16 +508,16 @@ prepWorldFrame = do
 -}
 connectionlessPacket :: Quake ()
 connectionlessPacket = do
-    MSG.beginReading (globals.netMessage)
-    _ <- MSG.readLong (globals.netMessage) -- skip the -1 marker
+    MSG.beginReading (globals.gNetMessage)
+    _ <- MSG.readLong (globals.gNetMessage) -- skip the -1 marker
 
-    s <- MSG.readStringLine (globals.netMessage)
+    s <- MSG.readStringLine (globals.gNetMessage)
 
     Cmd.tokenizeString s False
 
     c <- Cmd.argv 0
     
-    from <- use $ globals.netFrom
+    from <- use $ globals.gNetFrom
 
     case c of
       "ping" -> svcPing
@@ -534,18 +534,18 @@ connectionlessPacket = do
 
 svcPing :: Quake ()
 svcPing = do
-    from <- use $ globals.netFrom
+    from <- use $ globals.gNetFrom
     NetChannel.outOfBandPrint Constants.nsServer from "ack"
 
 svcAck :: Quake ()
 svcAck = do
-    from <- use $ globals.netFrom
+    from <- use $ globals.gNetFrom
     Com.printf $ "Ping acknowledge from " `B.append` NET.adrToString from `B.append` "\n"
 
 svcStatus :: Quake ()
 svcStatus = do
     status <- statusString
-    from <- use $ globals.netFrom
+    from <- use $ globals.gNetFrom
     NetChannel.outOfBandPrint Constants.nsServer from ("print\n" `B.append` status)
 
 svcInfo :: Quake ()
@@ -560,7 +560,7 @@ svcInfo = io (putStrLn "SVMain.svcInfo") >> undefined -- TODO
 svcGetChallenge :: Quake ()
 svcGetChallenge = do
     -- see if we already have a challenge for this ip
-    adr <- use $ globals.netFrom
+    adr <- use $ globals.gNetFrom
     challenges <- use $ svGlobals.svServerStatic.ssChallenges
     (i, oldest) <- challengeExists adr challenges 0 0x7FFFFFFF 0 Constants.maxChallenges
 
@@ -594,7 +594,7 @@ svcGetChallenge = do
 -- A connection request that did not come from the master.
 svcDirectConnect :: Quake ()
 svcDirectConnect = do
-    adr <- use $ globals.netFrom
+    adr <- use $ globals.gNetFrom
 
     Com.printf "SVC_DirectConnect ()\n"
 

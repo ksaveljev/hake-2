@@ -85,7 +85,7 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
 
   where executeMessage :: Bool -> Int -> Quake ()
         executeMessage moveIssued stringCmdCount = do
-          nm <- use $ globals.netMessage
+          nm <- use $ globals.gNetMessage
 
           if (nm^.sbReadCount) > (nm^.sbCurSize)
             then do
@@ -93,7 +93,7 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
               -- Com.Printf(Lib.hexDump(Globals.net_message.data, 32, false));
               SVMain.dropClient clientRef
             else do
-              c <- liftM fromIntegral $ MSG.readByte (globals.netMessage)
+              c <- liftM fromIntegral $ MSG.readByte (globals.gNetMessage)
 
               (done, moveIssued', stringCmdCount') <- execute c moveIssued stringCmdCount
 
@@ -116,9 +116,9 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                        else do
                          Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
-                         checksumIndex <- use $ globals.netMessage.sbReadCount
-                         checksum <- MSG.readByte (globals.netMessage)
-                         lastFrame <- MSG.readLong (globals.netMessage)
+                         checksumIndex <- use $ globals.gNetMessage.sbReadCount
+                         checksum <- MSG.readByte (globals.gNetMessage)
+                         lastFrame <- MSG.readLong (globals.gNetMessage)
 
                          when (lastFrame /= (client^.cLastFrame)) $ do
                            svGlobals.svServerStatic.ssClients.ix clientIdx.cLastFrame .= lastFrame
@@ -127,9 +127,9 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                              let idx = lastFrame .&. (Constants.latencyCounts - 1)
                              svGlobals.svServerStatic.ssClients.ix clientIdx.cFrameLatency.ix idx .= realTime - (((client^.cFrames) V.! (lastFrame .&. Constants.updateMask))^.cfSentTime)
 
-                         oldest <- MSG.readDeltaUserCmd (globals.netMessage) nullCmd
-                         oldcmd <- MSG.readDeltaUserCmd (globals.netMessage) oldest
-                         newcmd <- MSG.readDeltaUserCmd (globals.netMessage) oldcmd
+                         oldest <- MSG.readDeltaUserCmd (globals.gNetMessage) nullCmd
+                         oldcmd <- MSG.readDeltaUserCmd (globals.gNetMessage) oldest
+                         newcmd <- MSG.readDeltaUserCmd (globals.gNetMessage) oldcmd
 
                          if (client^.cState) /= Constants.csSpawned
                            then do
@@ -137,7 +137,7 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                              return (False, True, stringCmdCount)
                            else do
                              -- if the checksum fails, ignore the rest of the packet
-                             nm <- use $ globals.netMessage
+                             nm <- use $ globals.gNetMessage
                              calculatedChecksum <- Com.blockSequenceCRCByte (nm^.sbData) (checksumIndex + 1) ((nm^.sbReadCount) - checksumIndex - 1) (client^.cNetChan.ncIncomingSequence)
 
                              if fromIntegral (calculatedChecksum .&. 0xFF) /= checksum
@@ -165,7 +165,7 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                                  return (False, True, stringCmdCount)
 
                  | c == Constants.clcStringCmd -> do
-                     s <- MSG.readString (globals.netMessage)
+                     s <- MSG.readString (globals.gNetMessage)
 
                      -- malicious users may try using too many string commands
                      let stringCmdCount' = stringCmdCount + 1

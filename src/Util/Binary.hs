@@ -4,6 +4,8 @@ module Util.Binary ( module Util.Binary
                    , module Data.Binary.IEEE754
                    ) where
 
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Binary.IEEE754
@@ -12,6 +14,9 @@ import Data.Int
 import Data.Word (Word16)
 import Control.Applicative ((<*>))
 import Linear (V3(..), V4(..))
+
+encode :: Show a => a -> B.ByteString
+encode = BC.pack . show
 
 getInt :: Get Int
 getInt = let x :: Get Int32 = fromIntegral <$> getWord32le

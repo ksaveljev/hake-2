@@ -58,7 +58,7 @@ findIndex name start maxIdx create =
                   MSG.writeCharI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcConfigString)
                   MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral (start + idx))
                   MSG.writeString (svGlobals.svServer.sMulticast) (fromJust name)
-                  origin <- use $ globals.vec3Origin
+                  origin <- use $ globals.gVec3Origin
                   SVSend.multicast origin Constants.multicastAllR
 
                 return idx
@@ -153,7 +153,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     svGlobals.svServerStatic.ssSpawnCount += 1
 
     svGlobals.svServer.sState .= Constants.ssDead
-    globals.serverState .= Constants.ssDead
+    globals.gServerState .= Constants.ssDead
 
     -- wipe the entire per-level structure
     svGlobals.svServer .= newServerT
@@ -218,7 +218,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     -- map initialization
 
     svGlobals.svServer.sState .= Constants.ssLoading
-    globals.serverState .= Constants.ssLoading
+    globals.gServerState .= Constants.ssLoading
 
     -- load and spawn all other entities
     es <- CM.entityString
@@ -230,7 +230,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
 
     -- all precaches are complete
     svGlobals.svServer.sState .= srvState
-    globals.serverState .= srvState
+    globals.gServerState .= srvState
 
     -- create a baseline for more efficient communications
     createBaseline

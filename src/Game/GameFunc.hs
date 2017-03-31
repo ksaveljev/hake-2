@@ -396,7 +396,7 @@ doorSecretBlocked =
     self <- readEdictT selfRef
     other <- readEdictT otherRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     if | (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient) -> do
            -- give it a chance to go away on it's own terms (like gibs)
@@ -418,7 +418,7 @@ doorSecretUse :: EntUse
 doorSecretUse =
   GenericEntUse "door_secret_use" $ \selfRef _ _ -> do
     self <- readEdictT selfRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     -- make sure we're not already moving
     if not ((self^.eEntityState.esOrigin) == v3o)
@@ -475,7 +475,7 @@ doorSecretMove5 =
 doorSecretMove6 :: EntThink
 doorSecretMove6 =
   GenericEntThink "door_secret_move6" $ \selfRef -> do
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     moveCalc selfRef v3o doorSecretDone
     return True
 
@@ -860,7 +860,7 @@ platBlocked =
   GenericEntBlocked "plat_blocked" $ \selfRef otherRef -> do
     self <- readEdictT selfRef
     other <- readEdictT otherRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
       then do
@@ -1224,7 +1224,7 @@ trainBlocked =
     self <- readEdictT selfRef
     other <- readEdictT otherRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     if | (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient) -> do
            -- give it a chance to go away on it's own terms (like gibs)
@@ -1341,7 +1341,7 @@ doorBlocked =
   GenericEntBlocked "door_blocked" $ \selfRef otherRef -> do
     self <- readEdictT selfRef
     other <- readEdictT otherRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
       then do
@@ -1919,7 +1919,7 @@ angleMoveFinal :: EntThink
 angleMoveFinal =
   GenericEntThink "angle_move_final" $ \edictRef -> do
     edict <- readEdictT edictRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     let move = if (edict^.eMoveInfo.miState) == stateUp
@@ -2119,7 +2119,7 @@ rotatingUse :: EntUse
 rotatingUse =
   GenericEntUse "rotating_use" $ \selfRef _ _ -> do
     self <- readEdictT selfRef
-    vec3origin <- use $ globals.vec3Origin
+    vec3origin <- use $ globals.gVec3Origin
 
     if (self^.eAVelocity) /= vec3origin
       then
@@ -2139,7 +2139,7 @@ rotatingBlocked =
   GenericEntBlocked "rotating_blocked" $ \selfRef otherRef -> do
     self <- readEdictT selfRef
     other <- readEdictT otherRef
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
 
     GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
@@ -2150,7 +2150,7 @@ rotatingTouch =
 
     when ((self^.eAVelocity._x) /= 0 || (self^.eAVelocity._y) /= 0 || (self^.eAVelocity._z) /= 0) $ do
       other <- readEdictT otherRef
-      v3o <- use $ globals.vec3Origin
+      v3o <- use $ globals.gVec3Origin
 
       GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 

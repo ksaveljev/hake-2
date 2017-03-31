@@ -103,7 +103,7 @@ registerTEntSounds = do
 
 registerTEntModels :: Quake ()
 registerTEntModels = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     let registerModel = renderer^.rRefExport.reRegisterModel
         registerPic = renderer^.rRefExport.reRegisterPic
 
@@ -165,7 +165,7 @@ addTEnts = do
 addBeams :: Quake ()
 addBeams = do
     beams <- use $ clTEntGlobals.clteBeams
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
     addBeam beams cl' 0 Constants.maxBeams
 
   where addBeam :: V.Vector BeamT -> ClientStateT -> Int -> Int -> Quake ()
@@ -254,7 +254,7 @@ addPlayerBeams :: Quake ()
 addPlayerBeams = do
     handMultiplier <- getHandMultiplier
     beams <- use $ clTEntGlobals.cltePlayerBeams
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
 
     addPlayerBeam beams cl' handMultiplier 0 Constants.maxBeams
   
@@ -349,7 +349,7 @@ addPlayerBeams = do
                                              then do
                                                let angles = V3 (-pitch) (yaw + 180) 0
                                                    (Just f', Just r', Just u') = Math3D.angleVectors angles True True True
-                                               v3o <- use $ globals.vec3Origin
+                                               v3o <- use $ globals.gVec3Origin
          
                                                -- if it's a non-origin offset, it's a player,
                                                -- so use the hardcoded player offset
@@ -432,7 +432,7 @@ addPlayerBeams = do
 addExplosions :: Quake ()
 addExplosions = do
     explosions <- use $ clTEntGlobals.clteExplosions
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
     addExplosion explosions cl' 0 Constants.maxExplosions
 
   where addExplosion :: V.Vector (IORef ExplosionT) -> ClientStateT -> Int -> Int -> Quake ()
@@ -530,7 +530,7 @@ addExplosions = do
 addLasers :: Quake ()
 addLasers = do
     lasers <- use $ clTEntGlobals.clteLasers
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     addLaser lasers time 0 Constants.maxLasers
 
   where addLaser :: V.Vector LaserT -> Int -> Int -> Int -> Quake ()
@@ -547,7 +547,7 @@ addLasers = do
 processSustain :: Quake ()
 processSustain = do
     sustains <- use $ clTEntGlobals.clteSustains
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     process sustains time 0 Constants.maxSustains
 
   where process :: V.Vector CLSustainT -> Int -> Int -> Int -> Quake ()
@@ -566,18 +566,18 @@ processSustain = do
 
 parseTEnt :: Quake ()
 parseTEnt = do
-    entType <- MSG.readByte (globals.netMessage)
+    entType <- MSG.readByte (globals.gNetMessage)
 
          -- bullet hitting flesh
     if | entType == Constants.teBlood -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            CLFX.particleEffect pos dir 0xE8 60
 
          -- bullet hitting wall
        | any (== entType) [Constants.teGunshot, Constants.teSparks, Constants.teBulletSparks] -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
 
            if entType == Constants.teGunshot
              then CLFX.particleEffect pos dir 0x00 40
@@ -604,8 +604,8 @@ parseTEnt = do
                  return ()
 
        | any (== entType) [Constants.teScreenSparks, Constants.teShieldSparks] -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
 
            if entType == Constants.teScreenSparks
              then CLFX.particleEffect pos dir 0xD0 40
@@ -617,8 +617,8 @@ parseTEnt = do
 
          -- bullet hitting wall
        | entType == Constants.teShotgun -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
 
            CLFX.particleEffect pos dir 0 20
 
@@ -626,10 +626,10 @@ parseTEnt = do
 
          -- bullet hitting water
        | entType == Constants.teSplash -> do
-           cnt <- MSG.readByte (globals.netMessage)
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
-           r <- MSG.readByte (globals.netMessage)
+           cnt <- MSG.readByte (globals.gNetMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
+           r <- MSG.readByte (globals.gNetMessage)
            let color = if r > 6 then 0x00 else splashColor UV.! r
 
            CLFX.particleEffect pos dir color cnt
@@ -642,21 +642,21 @@ parseTEnt = do
              S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnStatic 0
 
        | entType == Constants.teLaserSparks -> do
-           cnt <- MSG.readByte (globals.netMessage)
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
-           color <- MSG.readByte (globals.netMessage)
+           cnt <- MSG.readByte (globals.gNetMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
+           color <- MSG.readByte (globals.gNetMessage)
            CLFX.particleEffect2 pos dir color cnt
 
        | entType == Constants.teBlueHyperblaster -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readPos (globals.netMessage) -- yes jake2 and original source has readPos here
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readPos (globals.gNetMessage) -- yes jake2 and original source has readPos here
            CLFX.blasterParticles pos dir
 
          -- blaster hitting wall
        | entType == Constants.teBlaster -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            CLFX.blasterParticles pos dir
 
            exRef <- allocExplosion
@@ -674,7 +674,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
 
            let ex = newExplosionT { _eType       = exMisc
                                   , _eEnt        = entRef
@@ -691,14 +691,14 @@ parseTEnt = do
 
          -- railgun effect
        | entType == Constants.teRailTrail -> do
-           pos <- MSG.readPos (globals.netMessage)
-           pos2 <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           pos2 <- MSG.readPos (globals.gNetMessage)
            CLFX.railTrail pos pos2
            sfxRef <- use $ clTEntGlobals.clteSfxRailg
            S.startSound (Just pos2) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion2, Constants.teGrenadeExplosion, Constants.teGrenadeExplosionWater] -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            exRef <- allocExplosion
 
@@ -712,7 +712,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
 
            let ex = ExplosionT { _eType       = exPoly
                                , _eEnt        = entRef
@@ -734,7 +734,7 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.tePlasmaExplosion -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            exRef <- allocExplosion
 
@@ -748,7 +748,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
            f <- Lib.randomF
            let baseFrame = if f < 0.5 then 15 else 0
 
@@ -769,7 +769,7 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teExplosion1, Constants.teExplosion1Big, Constants.teRocketExplosion, Constants.teRocketExplosionWater, Constants.teExplosion1Np] -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            exRef <- allocExplosion
 
@@ -785,7 +785,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
            f <- Lib.randomF
            let baseFrame = if f < 0.5 then 15 else 0
 
@@ -810,7 +810,7 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxRef 1 Constants.attnNorm 0
 
        | entType == Constants.teBfgExplosion -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            exRef <- allocExplosion
 
@@ -823,7 +823,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
 
            let ex = newExplosionT { _eType       = exPoly
                                   , _eEnt        = entRef
@@ -836,15 +836,15 @@ parseTEnt = do
            io $ writeIORef exRef ex
 
        | entType == Constants.teBfgBigExplosion -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
            CLFX.bfgExplosionParticles pos
 
        | entType == Constants.teBfgLaser ->
            parseLaser 0xD0D1D2D3
 
        | entType == Constants.teBubbleTrail -> do
-           pos <- MSG.readPos (globals.netMessage)
-           pos2 <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           pos2 <- MSG.readPos (globals.gNetMessage)
            CLFX.bubbleTrail pos pos2
 
        | any (== entType) [Constants.teParasiteAttack, Constants.teMedicCableAttack] -> do
@@ -853,7 +853,7 @@ parseTEnt = do
 
          -- boss teleporting to station
        | entType == Constants.teBossTPort -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
            CLFX.bigTeleportParticles pos
            soundIdx <- S.registerSound "misc/bigtele.wav"
            S.startSound (Just pos) worldRef 0 soundIdx 1 Constants.attnNone 0
@@ -863,10 +863,10 @@ parseTEnt = do
            void $ parseBeam2 modGrappleCable
 
        | entType == Constants.teWeldingSparks -> do
-           cnt <- MSG.readByte (globals.netMessage)
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
-           color <- MSG.readByte (globals.netMessage)
+           cnt <- MSG.readByte (globals.gNetMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
+           color <- MSG.readByte (globals.gNetMessage)
 
            CLFX.particleEffect2 pos dir color cnt
 
@@ -880,7 +880,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
            r <- Lib.rand
 
            let ex = newExplosionT { _eType       = exFlash
@@ -894,20 +894,20 @@ parseTEnt = do
            io $ writeIORef exRef ex
 
        | entType == Constants.teGreenBlood -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            CLFX.particleEffect2 pos dir 0xDF 30
 
        | entType == Constants.teTunnelSparks -> do
-           cnt <- MSG.readByte (globals.netMessage)
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
-           color <- MSG.readByte (globals.netMessage)
+           cnt <- MSG.readByte (globals.gNetMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
+           color <- MSG.readByte (globals.gNetMessage)
            CLFX.particleEffect3 pos dir color cnt
 
        | any (== entType) [Constants.teBlaster2, Constants.teFlechette] -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
 
            if entType == Constants.teBlaster2
              then CLNewFX.blasterParticles2 pos dir 0xD0
@@ -930,7 +930,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
 
            let ex = newExplosionT { _eType       = exMisc
                                   , _eEnt        = entRef
@@ -953,12 +953,12 @@ parseTEnt = do
            S.startSound Nothing (newEdictReference ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
 
        | entType == Constants.teDebugTrail -> do
-           pos <- MSG.readPos (globals.netMessage)
-           pos2 <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           pos2 <- MSG.readPos (globals.gNetMessage)
            CLNewFX.debugTrail pos pos2
 
        | entType == Constants.tePlainExplosion -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            exRef <- allocExplosion
 
@@ -973,7 +973,7 @@ parseTEnt = do
                                 }
 
            entRef <- io $ newIORef ent
-           serverTime <- use $ globals.cl.csFrame.fServerTime
+           serverTime <- use $ globals.gCl.csFrame.fServerTime
 
            let ex = newExplosionT { _eType       = exPoly
                                   , _eEnt        = entRef
@@ -993,14 +993,14 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfx 1 Constants.attnNorm 0
 
        | entType == Constants.teFlashlight -> do
-           pos <- MSG.readPos (globals.netMessage)
-           ent <- MSG.readShort (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           ent <- MSG.readShort (globals.gNetMessage)
            CLNewFX.flashlight ent pos
 
        | entType == Constants.teForceWall -> do
-           pos <- MSG.readPos (globals.netMessage)
-           pos2 <- MSG.readPos (globals.netMessage)
-           color <- MSG.readByte (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           pos2 <- MSG.readPos (globals.gNetMessage)
+           color <- MSG.readByte (globals.gNetMessage)
            CLNewFX.forceWall pos pos2 color
 
        | entType == Constants.teHeatBeam -> do
@@ -1012,8 +1012,8 @@ parseTEnt = do
            void $ parsePlayerBeam modMonsterHeatBeam
 
        | entType == Constants.teHeatBeamSparks -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            let cnt = 50
                r = 8
                magnitude = 60
@@ -1025,8 +1025,8 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teHeatBeamSteam -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
 
            let cnt = 20
                color = 0xE0
@@ -1041,8 +1041,8 @@ parseTEnt = do
            parseSteam
 
        | entType == Constants.teBubbleTrail2 -> do
-           pos <- MSG.readPos (globals.netMessage)
-           pos2 <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           pos2 <- MSG.readPos (globals.gNetMessage)
 
            CLNewFX.bubbleTrail2 pos pos2 8
 
@@ -1050,24 +1050,24 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teMoreBlood -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            CLFX.particleEffect pos dir 0xE8 250
 
        | entType == Constants.teChainFistSmoke -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
            CLNewFX.particleSmokeEffect pos (V3 0 0 1) 0 20 20
 
        | entType == Constants.teElectricSparks -> do
-           pos <- MSG.readPos (globals.netMessage)
-           dir <- MSG.readDir (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
+           dir <- MSG.readDir (globals.gNetMessage)
            CLFX.particleEffect pos dir 0x75 40
 
            sfxLashIt <- use $ clTEntGlobals.clteSfxLashIt
            S.startSound (Just pos) worldRef 0 sfxLashIt 1 Constants.attnNorm 0
 
        | entType == Constants.teTrackerExplosion -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
 
            CLNewFX.colorFlash pos 0 150 (-1) (-1) (-1)
            CLNewFX.colorExplosionParticles pos 0 1
@@ -1076,7 +1076,7 @@ parseTEnt = do
            S.startSound (Just pos) worldRef 0 sfxDisrExp 1 Constants.attnNorm 0
 
        | any (== entType) [Constants.teTeleportEffect, Constants.teDBallGoal] -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
            CLFX.teleportParticles pos
 
        | entType == Constants.teWidowBeamOut -> do
@@ -1086,7 +1086,7 @@ parseTEnt = do
            parseNuke
 
        | entType == Constants.teWidowSplash -> do
-           pos <- MSG.readPos (globals.netMessage)
+           pos <- MSG.readPos (globals.gNetMessage)
            CLNewFX.widowSplash pos
 
        | otherwise -> do
@@ -1103,7 +1103,7 @@ allocExplosion = do
         return ref
       Nothing -> do
         -- find the oldest explosion
-        time <- use $ globals.cl.csTime
+        time <- use $ globals.gCl.csTime
         exRef <- findOldestExplosion explosions (fromIntegral time) 0 0 Constants.maxExplosions
         io $ writeIORef exRef newExplosionT
         return exRef
@@ -1143,7 +1143,7 @@ smokeAndFlash origin = do
                                }
 
           entRef <- io $ newIORef ent
-          serverTime <- use $ globals.cl.csFrame.fServerTime
+          serverTime <- use $ globals.gCl.csFrame.fServerTime
 
           let ex = newExplosionT { _eType       = exMisc
                                  , _eEnt        = entRef
@@ -1165,7 +1165,7 @@ smokeAndFlash origin = do
                                }
 
           entRef <- io $ newIORef ent
-          serverTime <- use $ globals.cl.csFrame.fServerTime
+          serverTime <- use $ globals.gCl.csFrame.fServerTime
 
           let ex = newExplosionT { _eType       = exFlash
                                  , _eEnt        = entRef
@@ -1177,10 +1177,10 @@ smokeAndFlash origin = do
 
 parseLaser :: Int -> Quake ()
 parseLaser colors = do
-    start <- MSG.readPos (globals.netMessage)
-    end <- MSG.readPos (globals.netMessage)
+    start <- MSG.readPos (globals.gNetMessage)
+    end <- MSG.readPos (globals.gNetMessage)
 
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     updateLaser time start end 0 Constants.maxLasers
   
   where updateLaser :: Int -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
@@ -1208,9 +1208,9 @@ parseLaser colors = do
 
 parseBeam :: IORef ModelT -> Quake Int
 parseBeam modelRef = do
-    ent <- MSG.readShort (globals.netMessage)
-    start <- MSG.readPos (globals.netMessage)
-    end <- MSG.readPos (globals.netMessage)
+    ent <- MSG.readShort (globals.gNetMessage)
+    start <- MSG.readPos (globals.gNetMessage)
+    end <- MSG.readPos (globals.gNetMessage)
 
     ok <- updateBeam ent start end 0 Constants.maxBeams
 
@@ -1227,7 +1227,7 @@ parseBeam modelRef = do
 
               if (beam^.bEntity) == ent
                 then do
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
 
                   zoom (clTEntGlobals.clteBeams.ix idx) $ do
                     bEntity .= ent
@@ -1247,7 +1247,7 @@ parseBeam modelRef = do
           | idx >= maxIdx = return False
           | otherwise = do
               Just beam <- preuse $ clTEntGlobals.clteBeams.ix idx
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
 
               if isNothing (beam^.bModel) || (beam^.bEndTime) < time
                 then do
@@ -1266,10 +1266,10 @@ parseBeam modelRef = do
 
 parseBeam2 :: IORef ModelT -> Quake Int
 parseBeam2 modelRef = do
-    ent <- MSG.readShort (globals.netMessage)
-    start <- MSG.readPos (globals.netMessage)
-    end <- MSG.readPos (globals.netMessage)
-    offset <- MSG.readPos (globals.netMessage)
+    ent <- MSG.readShort (globals.gNetMessage)
+    start <- MSG.readPos (globals.gNetMessage)
+    end <- MSG.readPos (globals.gNetMessage)
+    offset <- MSG.readPos (globals.gNetMessage)
 
     ok <- updateBeam ent start end offset 0 Constants.maxBeams
 

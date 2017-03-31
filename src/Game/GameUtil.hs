@@ -422,7 +422,7 @@ killBox edictRef = do
 
       else do
         -- nail it
-        v3o <- use $ globals.vec3Origin
+        v3o <- use $ globals.gVec3Origin
         let Just traceEntRef = traceT^.tEnt
 
         GameCombat.damage traceEntRef
@@ -452,7 +452,7 @@ visible selfRef otherRef = do
     let spot1 = (self^.eEntityState.esOrigin) & _z +~ fromIntegral (self^.eViewHeight)
         spot2 = (other^.eEntityState.esOrigin) & _z +~ fromIntegral (other^.eViewHeight)
 
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
     traceT <- trace spot1 (Just v3o) (Just v3o) spot2 (Just selfRef) Constants.maskOpaque
 

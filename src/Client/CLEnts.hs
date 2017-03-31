@@ -48,8 +48,8 @@ bfgLightRamp =
 -}
 addEntities :: Quake ()
 addEntities = do
-    cl' <- use $ globals.cl
-    cls' <- use $ globals.cls
+    cl' <- use $ globals.gCl
+    cls' <- use $ globals.gCls
 
     showClampValue <- liftM (^.cvValue) clShowClampCVar
 
@@ -58,23 +58,23 @@ addEntities = do
              when (showClampValue /= 0) $
                Com.printf ("high clamp " `B.append` BC.pack (show ((cl'^.csTime) - (cl'^.csFrame.fServerTime))) `B.append` "\n") -- IMPROVE?
 
-             globals.cl.csTime .= (cl'^.csFrame.fServerTime)
-             globals.cl.csLerpFrac .= 1
+             globals.gCl.csTime .= (cl'^.csFrame.fServerTime)
+             globals.gCl.csLerpFrac .= 1
 
          | (cl'^.csTime) < (cl'^.csFrame.fServerTime) - 100 -> do
              when (showClampValue /= 0) $
                Com.printf ("low clamp " `B.append` BC.pack (show ((cl'^.csFrame.fServerTime) - 100 - (cl'^.csTime))) `B.append` "\n") -- IMPROVE?
 
-             globals.cl.csTime .= (cl'^.csFrame.fServerTime) - 100
-             globals.cl.csLerpFrac .= 0
+             globals.gCl.csTime .= (cl'^.csFrame.fServerTime) - 100
+             globals.gCl.csLerpFrac .= 0
              
          | otherwise -> do
-             globals.cl.csLerpFrac .= 1 - fromIntegral ((cl'^.csFrame.fServerTime) - (cl'^.csTime)) * 0.01
+             globals.gCl.csLerpFrac .= 1 - fromIntegral ((cl'^.csFrame.fServerTime) - (cl'^.csTime)) * 0.01
 
       timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
 
       when (timeDemoValue /= 0) $ do
-        globals.cl.csLerpFrac .= 1
+        globals.gCl.csLerpFrac .= 1
 
       -- is ok.. CL_AddPacketEntities (cl.frame); CL_AddTEnts ();
       -- CL_AddParticles (); CL_AddDLights (); CL_AddLightStyles ();
@@ -82,7 +82,7 @@ addEntities = do
       calcViewValues
       -- PMM - moved this here so the heat beam has the right values for
       -- the vieworg, and can lock the beam to the gun
-      use (globals.cl.csFrame) >>= \f -> addPacketEntities f
+      use (globals.gCl.csFrame) >>= \f -> addPacketEntities f
 
       CLTEnt.addTEnts
       CLFX.addParticles
@@ -96,32 +96,32 @@ addEntities = do
 -}
 parseEntityBits :: [Int] -> Quake (Int, [Int])
 parseEntityBits bits = do
-    total <- MSG.readByte (globals.netMessage)
+    total <- MSG.readByte (globals.gNetMessage)
 
     total' <- if total .&. Constants.uMoreBits1 /= 0
                 then do
-                  b <- MSG.readByte (globals.netMessage)
+                  b <- MSG.readByte (globals.gNetMessage)
                   return (total .|. (b `shiftL` 8))
                 else
                   return total
 
     total'' <- if total' .&. Constants.uMoreBits2 /= 0
                  then do
-                   b <- MSG.readByte (globals.netMessage)
+                   b <- MSG.readByte (globals.gNetMessage)
                    return (total' .|. (b `shiftL` 16))
                  else
                    return total'
 
     total''' <- if total'' .&. Constants.uMoreBits3 /= 0
                   then do
-                    b <- MSG.readByte (globals.netMessage)
+                    b <- MSG.readByte (globals.gNetMessage)
                     return (total'' .|. (b `shiftL` 24))
                   else
                     return total''
 
     number <- if total''' .&. Constants.uNumber16 /= 0
-                then MSG.readShort (globals.netMessage)
-                else MSG.readByte (globals.netMessage)
+                then MSG.readShort (globals.gNetMessage)
+                else MSG.readByte (globals.gNetMessage)
 
     -- io (print "YEYEYE")
     -- io (print total''')
@@ -138,92 +138,92 @@ parseEntityBits bits = do
 parseDelta :: EntityStateT -> Traversal' QuakeState EntityStateT -> Int -> Int -> Quake ()
 parseDelta from to number bits = do
     modelIndex <- if bits .&. Constants.uModel /= 0
-                    then MSG.readByte (globals.netMessage)
+                    then MSG.readByte (globals.gNetMessage)
                     else return (from^.esModelIndex)
 
     modelIndex2 <- if bits .&. Constants.uModel2 /= 0
-                     then MSG.readByte (globals.netMessage)
+                     then MSG.readByte (globals.gNetMessage)
                      else return (from^.esModelIndex2)
 
     modelIndex3 <- if bits .&. Constants.uModel3 /= 0
-                     then MSG.readByte (globals.netMessage)
+                     then MSG.readByte (globals.gNetMessage)
                      else return (from^.esModelIndex3)
 
     modelIndex4 <- if bits .&. Constants.uModel4 /= 0
-                     then MSG.readByte (globals.netMessage)
+                     then MSG.readByte (globals.gNetMessage)
                      else return (from^.esModelIndex4)
 
     frame <- if bits .&. Constants.uFrame8 /= 0
-               then MSG.readByte (globals.netMessage)
+               then MSG.readByte (globals.gNetMessage)
                else return (from^.esFrame)
 
     frame' <- if bits .&. Constants.uFrame16 /= 0
-                then MSG.readShort (globals.netMessage)
+                then MSG.readShort (globals.gNetMessage)
                 else return frame
 
     skinNum <- if | bits .&. Constants.uSkin8 /= 0 && bits .&. Constants.uSkin16 /= 0 ->
-                      MSG.readLong (globals.netMessage)
+                      MSG.readLong (globals.gNetMessage)
                   | bits .&. Constants.uSkin8 /= 0 ->
-                      MSG.readByte (globals.netMessage)
+                      MSG.readByte (globals.gNetMessage)
                   | bits .&. Constants.uSkin16 /= 0 ->
-                      MSG.readShort (globals.netMessage)
+                      MSG.readShort (globals.gNetMessage)
                   | otherwise -> return (from^.esSkinNum)
 
     effects <- if | bits .&. (Constants.uEffects8 .|. Constants.uEffects16) == (Constants.uEffects8 .|. Constants.uEffects16) ->
-                      MSG.readLong (globals.netMessage)
+                      MSG.readLong (globals.gNetMessage)
                   | bits .&. Constants.uEffects8 /= 0 ->
-                      MSG.readByte (globals.netMessage)
+                      MSG.readByte (globals.gNetMessage)
                   | bits .&. Constants.uEffects16 /= 0 ->
-                      MSG.readShort (globals.netMessage)
+                      MSG.readShort (globals.gNetMessage)
                   | otherwise ->
                       return (from^.esEffects)
 
     renderFx <- if | bits .&. (Constants.uRenderFx8 .|. Constants.uRenderFx16) == (Constants.uRenderFx8 .|. Constants.uRenderFx16) ->
-                       MSG.readLong (globals.netMessage)
+                       MSG.readLong (globals.gNetMessage)
                    | bits .&. Constants.uRenderFx8 /= 0 ->
-                       MSG.readByte (globals.netMessage)
+                       MSG.readByte (globals.gNetMessage)
                    | bits .&. Constants.uRenderFx16 /= 0 ->
-                       MSG.readShort (globals.netMessage)
+                       MSG.readShort (globals.gNetMessage)
                    | otherwise -> return (from^.esRenderFx)
 
     originX <- if bits .&. Constants.uOrigin1 /= 0
-                 then MSG.readCoord (globals.netMessage)
+                 then MSG.readCoord (globals.gNetMessage)
                  else return (from^.esOrigin._x)
 
     originY <- if bits .&. Constants.uOrigin2 /= 0
-                 then MSG.readCoord (globals.netMessage)
+                 then MSG.readCoord (globals.gNetMessage)
                  else return (from^.esOrigin._y)
 
     originZ <- if bits .&. Constants.uOrigin3 /= 0
-                 then MSG.readCoord (globals.netMessage)
+                 then MSG.readCoord (globals.gNetMessage)
                  else return (from^.esOrigin._z)
 
     anglesX <- if bits .&. Constants.uAngle1 /= 0
-                 then MSG.readAngle (globals.netMessage)
+                 then MSG.readAngle (globals.gNetMessage)
                  else return (from^.esAngles._x)
 
     anglesY <- if bits .&. Constants.uAngle2 /= 0
-                 then MSG.readAngle (globals.netMessage)
+                 then MSG.readAngle (globals.gNetMessage)
                  else return (from^.esAngles._y)
 
     anglesZ <- if bits .&. Constants.uAngle3 /= 0
-                 then MSG.readAngle (globals.netMessage)
+                 then MSG.readAngle (globals.gNetMessage)
                  else return (from^.esAngles._z)
 
     oldOrigin <- if bits .&. Constants.uOldOrigin /= 0
-                   then MSG.readPos (globals.netMessage)
+                   then MSG.readPos (globals.gNetMessage)
                    else return (from^.esOrigin)
 
     sound <- if bits .&. Constants.uSound /= 0
-               then MSG.readByte (globals.netMessage)
+               then MSG.readByte (globals.gNetMessage)
                else return (from^.esSound)
 
     event <- if bits .&. Constants.uEvent /= 0
-               then MSG.readByte (globals.netMessage)
+               then MSG.readByte (globals.gNetMessage)
                else return 0
 
     solid <- if bits .&. Constants.uSolid /= 0
-               then MSG.readShort (globals.netMessage)
+               then MSG.readShort (globals.gNetMessage)
                else return (from^.esSolid)
 
     to .= from { _esNumber      = number
@@ -266,16 +266,16 @@ parseDelta from to number bits = do
 
 parseFrame :: Quake ()
 parseFrame = do
-    globals.cl.csFrame .= newFrameT
+    globals.gCl.csFrame .= newFrameT
 
-    serverFrame <- MSG.readLong (globals.netMessage)
-    globals.cl.csFrame.fServerFrame .= serverFrame
+    serverFrame <- MSG.readLong (globals.gNetMessage)
+    globals.gCl.csFrame.fServerFrame .= serverFrame
 
-    deltaFrame <- MSG.readLong (globals.netMessage)
-    globals.cl.csFrame.fDeltaFrame .= deltaFrame
+    deltaFrame <- MSG.readLong (globals.gNetMessage)
+    globals.gCl.csFrame.fDeltaFrame .= deltaFrame
 
     let serverTime = serverFrame * 100
-    globals.cl.csFrame.fServerTime .= serverTime
+    globals.gCl.csFrame.fServerTime .= serverTime
 
     -- io (print "SERVER FRAME")
     -- io (print serverFrame)
@@ -283,10 +283,10 @@ parseFrame = do
     -- io (print deltaFrame)
 
     -- BIG HACK to let old demos continue to work
-    serverProtocol <- use $ globals.cls.csServerProtocol
+    serverProtocol <- use $ globals.gCls.csServerProtocol
     when (serverProtocol /= 26) $ do
-      surpressCount <- MSG.readByte (globals.netMessage)
-      globals.cl.csSurpressCount .= surpressCount
+      surpressCount <- MSG.readByte (globals.gNetMessage)
+      globals.gCl.csSurpressCount .= surpressCount
 
     showNetValue <- liftM (^.cvValue) clShowNetCVar
     when (showNetValue == 3) $
@@ -298,84 +298,84 @@ parseFrame = do
     -- message
     old <- if deltaFrame <= 0
              then do
-               globals.cl.csFrame.fValid .= True -- uncompressed frame
-               globals.cls.csDemoWaiting .= False -- we can start recording now
+               globals.gCl.csFrame.fValid .= True -- uncompressed frame
+               globals.gCls.csDemoWaiting .= False -- we can start recording now
                return Nothing
              else do
                let idx = deltaFrame .&. Constants.updateMask
-               Just old <- preuse $ globals.cl.csFrames.ix idx
+               Just old <- preuse $ globals.gCl.csFrames.ix idx
 
                unless (old^.fValid) $ -- should never happen
                  Com.printf "Delta from invalid frame (not supposed to happen!).\n"
 
-               parseEntities <- use $ globals.cl.csParseEntities
+               parseEntities <- use $ globals.gCl.csParseEntities
 
                if | (old^.fServerFrame) /= deltaFrame -> -- The frame is too old, so we can't reconstruct it properly.
                       Com.printf "Delta frame too old.\n"
                   | parseEntities - (old^.fParseEntities) > Constants.maxParseEntities - 128 ->
                       Com.printf "Delta parse_entities too old.\n"
                   | otherwise ->
-                      globals.cl.csFrame.fValid .= True -- valid delta parse
+                      globals.gCl.csFrame.fValid .= True -- valid delta parse
 
                return (Just old)
 
     -- clamp time
-    use (globals.cl.csTime) >>= \time ->
+    use (globals.gCl.csTime) >>= \time ->
       if | time > serverTime ->
-             globals.cl.csTime .= serverTime
+             globals.gCl.csTime .= serverTime
          | time < serverTime - 100 ->
-             globals.cl.csTime .= serverTime - 100
+             globals.gCl.csTime .= serverTime - 100
          | otherwise ->
              return ()
 
 
     -- read areabits
-    len <- MSG.readByte (globals.netMessage)
-    MSG.readData (globals.netMessage) (globals.cl.csFrame.fAreaBits) len
+    len <- MSG.readByte (globals.gNetMessage)
+    MSG.readData (globals.gNetMessage) (globals.gCl.csFrame.fAreaBits) len
 
     -- read playerinfo
-    cmd <- MSG.readByte (globals.netMessage)
+    cmd <- MSG.readByte (globals.gNetMessage)
     CLParse.showNet (CLParse.svcStrings V.! cmd)
 
     when (cmd /= Constants.svcPlayerInfo) $
       Com.comError Constants.errDrop "CL_ParseFrame: not playerinfo"
 
-    parsePlayerState old (globals.cl.csFrame)
+    parsePlayerState old (globals.gCl.csFrame)
 
     -- read packet entities
-    cmd' <- MSG.readByte (globals.netMessage)
+    cmd' <- MSG.readByte (globals.gNetMessage)
     CLParse.showNet (CLParse.svcStrings V.! cmd')
 
     when (cmd' /= Constants.svcPacketEntities) $
       Com.comError Constants.errDrop "CL_ParseFrame: not packetentities"
 
-    parsePacketEntities old (globals.cl.csFrame)
+    parsePacketEntities old (globals.gCl.csFrame)
 
     -- save the frame off in the backup array for later delta comparisons
-    frame <- use $ globals.cl.csFrame
+    frame <- use $ globals.gCl.csFrame
 
     let idx = serverFrame .&. Constants.updateMask
-    globals.cl.csFrames.ix idx .= frame
+    globals.gCl.csFrames.ix idx .= frame
 
     when (frame^.fValid) $ do
       -- getting a valid frame message ends the connection process
-      clientStatic <- use $ globals.cls
-      clientState <- use $ globals.cl
+      clientStatic <- use $ globals.gCls
+      clientState <- use $ globals.gCl
 
       when ((clientStatic^.csState) /= Constants.caActive) $ do
-        globals.cls.csState .= Constants.caActive
-        globals.cl.csForceRefDef .= True
+        globals.gCls.csState .= Constants.caActive
+        globals.gCl.csForceRefDef .= True
 
         -- io $ print "PARSE FRAME"
         -- io $ print (frame^.fPlayerState.psViewAngles)
 
-        globals.cl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (frame^.fPlayerState.psPMoveState.pmsOrigin)
-        globals.cl.csPredictedAngles .= (frame^.fPlayerState.psViewAngles)
+        globals.gCl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (frame^.fPlayerState.psPMoveState.pmsOrigin)
+        globals.gCl.csPredictedAngles .= (frame^.fPlayerState.psViewAngles)
 
         when ((clientStatic^.csDisableServerCount) /= (clientState^.csServerCount) && (clientState^.csRefreshPrepped)) $
           SCR.endLoadingPlaque -- get rid of loading plaque
 
-      globals.cl.csSoundPrepped .= True -- can start mixing ambient sounds
+      globals.gCl.csSoundPrepped .= True -- can start mixing ambient sounds
 
       -- fire entity events
       fireEntityEvents frame
@@ -387,53 +387,53 @@ parsePlayerState oldFrame newFrameLens = do
                   Nothing -> newPlayerStateT
                   Just frame -> frame^.fPlayerState
 
-    flags <- MSG.readShort (globals.netMessage)
+    flags <- MSG.readShort (globals.gNetMessage)
 
     -- parse the pmove_state_t
     pmType <- if flags .&. Constants.psMType /= 0
-                then MSG.readByte (globals.netMessage)
+                then MSG.readByte (globals.gNetMessage)
                 else return (state^.psPMoveState.pmsPMType)
 
     origin <- if flags .&. Constants.psMOrigin /= 0
                 then do
-                  x <- MSG.readShort (globals.netMessage)
-                  y <- MSG.readShort (globals.netMessage)
-                  z <- MSG.readShort (globals.netMessage)
+                  x <- MSG.readShort (globals.gNetMessage)
+                  y <- MSG.readShort (globals.gNetMessage)
+                  z <- MSG.readShort (globals.gNetMessage)
                   return $ fmap fromIntegral (V3 x y z)
                 else
                   return (state^.psPMoveState.pmsOrigin)
 
     velocity <- if flags .&. Constants.psMVelocity /= 0
                   then do
-                    x <- MSG.readShort (globals.netMessage)
-                    y <- MSG.readShort (globals.netMessage)
-                    z <- MSG.readShort (globals.netMessage)
+                    x <- MSG.readShort (globals.gNetMessage)
+                    y <- MSG.readShort (globals.gNetMessage)
+                    z <- MSG.readShort (globals.gNetMessage)
                     return $ fmap fromIntegral (V3 x y z)
                   else
                     return (state^.psPMoveState.pmsVelocity)
 
     pmTime <- if flags .&. Constants.psMTime /= 0
-                then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+                then liftM fromIntegral $ MSG.readByte (globals.gNetMessage)
                 else return (state^.psPMoveState.pmsPMTime)
 
     pmFlags <- if flags .&. Constants.psMFlags /= 0
-                 then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+                 then liftM fromIntegral $ MSG.readByte (globals.gNetMessage)
                  else return (state^.psPMoveState.pmsPMFlags)
 
     gravity <- if flags .&. Constants.psMGravity /= 0
-                 then liftM fromIntegral $ MSG.readShort (globals.netMessage)
+                 then liftM fromIntegral $ MSG.readShort (globals.gNetMessage)
                  else return (state^.psPMoveState.pmsGravity)
 
     deltaAngles <- if flags .&. Constants.psMDeltaAngles /= 0
                      then do
-                       x <- MSG.readShort (globals.netMessage)
-                       y <- MSG.readShort (globals.netMessage)
-                       z <- MSG.readShort (globals.netMessage)
+                       x <- MSG.readShort (globals.gNetMessage)
+                       y <- MSG.readShort (globals.gNetMessage)
+                       z <- MSG.readShort (globals.gNetMessage)
                        return $ fmap fromIntegral (V3 x y z)
                      else
                        return (state^.psPMoveState.pmsDeltaAngles)
 
-    attractLoop <- use $ globals.cl.csAttractLoop
+    attractLoop <- use $ globals.gCl.csAttractLoop
     let pmType' = if attractLoop
                     then Constants.pmFreeze -- demo playback
                     else pmType
@@ -441,46 +441,46 @@ parsePlayerState oldFrame newFrameLens = do
     -- parse the rest of the player_state_t
     viewOffset <- if flags .&. Constants.psViewOffset /= 0
                     then do
-                      x <- MSG.readChar (globals.netMessage)
-                      y <- MSG.readChar (globals.netMessage)
-                      z <- MSG.readChar (globals.netMessage)
+                      x <- MSG.readChar (globals.gNetMessage)
+                      y <- MSG.readChar (globals.gNetMessage)
+                      z <- MSG.readChar (globals.gNetMessage)
                       return $ fmap ((* 0.25) . fromIntegral) (V3 x y z)
                     else
                       return (state^.psViewOffset)
 
     viewAngles <- if flags .&. Constants.psViewAngles /= 0
                     then do
-                      x <- MSG.readAngle16 (globals.netMessage)
-                      y <- MSG.readAngle16 (globals.netMessage)
-                      z <- MSG.readAngle16 (globals.netMessage)
+                      x <- MSG.readAngle16 (globals.gNetMessage)
+                      y <- MSG.readAngle16 (globals.gNetMessage)
+                      z <- MSG.readAngle16 (globals.gNetMessage)
                       return (V3 x y z)
                     else
                       return (state^.psViewAngles)
 
     kickAngles <- if flags .&. Constants.psKickAngles /= 0
                     then do
-                      x <- MSG.readChar (globals.netMessage)
-                      y <- MSG.readChar (globals.netMessage)
-                      z <- MSG.readChar (globals.netMessage)
+                      x <- MSG.readChar (globals.gNetMessage)
+                      y <- MSG.readChar (globals.gNetMessage)
+                      z <- MSG.readChar (globals.gNetMessage)
                       return $ fmap ((* 0.25) . fromIntegral) (V3 x y z)
                     else
                       return (state^.psKickAngles)
 
     gunIndex <- if flags .&. Constants.psWeaponIndex /= 0
-                  then MSG.readByte (globals.netMessage)
+                  then MSG.readByte (globals.gNetMessage)
                   else return (state^.psGunIndex)
 
     (gunFrame, gunOffset, gunAngles) <- if flags .&. Constants.psWeaponFrame /= 0
                                           then do
-                                            gunFrame <- MSG.readByte (globals.netMessage)
+                                            gunFrame <- MSG.readByte (globals.gNetMessage)
 
-                                            x <- MSG.readChar (globals.netMessage)
-                                            y <- MSG.readChar (globals.netMessage)
-                                            z <- MSG.readChar (globals.netMessage)
+                                            x <- MSG.readChar (globals.gNetMessage)
+                                            y <- MSG.readChar (globals.gNetMessage)
+                                            z <- MSG.readChar (globals.gNetMessage)
 
-                                            x' <- MSG.readChar (globals.netMessage)
-                                            y' <- MSG.readChar (globals.netMessage)
-                                            z' <- MSG.readChar (globals.netMessage)
+                                            x' <- MSG.readChar (globals.gNetMessage)
+                                            y' <- MSG.readChar (globals.gNetMessage)
+                                            z' <- MSG.readChar (globals.gNetMessage)
 
                                             return (gunFrame, fmap ((* 0.25) . fromIntegral) (V3 x y z), fmap ((* 0.25) . fromIntegral) (V3 x' y' z'))
                                           else
@@ -488,24 +488,24 @@ parsePlayerState oldFrame newFrameLens = do
 
     blend <- if flags .&. Constants.psBlend /= 0
                then do
-                 x <- MSG.readByte (globals.netMessage)
-                 y <- MSG.readByte (globals.netMessage)
-                 z <- MSG.readByte (globals.netMessage)
-                 w <- MSG.readByte (globals.netMessage)
+                 x <- MSG.readByte (globals.gNetMessage)
+                 y <- MSG.readByte (globals.gNetMessage)
+                 z <- MSG.readByte (globals.gNetMessage)
+                 w <- MSG.readByte (globals.gNetMessage)
                  return $ fmap ((/ 255) . fromIntegral) (V4 x y z w)
                else
                  return (state^.psBlend)
 
     fov <- if flags .&. Constants.psFov /= 0
-             then liftM fromIntegral $ MSG.readByte (globals.netMessage)
+             then liftM fromIntegral $ MSG.readByte (globals.gNetMessage)
              else return (state^.psFOV)
 
     rdFlags <- if flags .&. Constants.psRdFlags /= 0
-                 then MSG.readByte (globals.netMessage)
+                 then MSG.readByte (globals.gNetMessage)
                  else return (state^.psRDFlags)
 
     -- parse stats
-    statbits <- MSG.readLong (globals.netMessage)
+    statbits <- MSG.readLong (globals.gNetMessage)
     updates <- readStats statbits 0 Constants.maxStats []
 
     newFrameLens.fPlayerState .=
@@ -536,7 +536,7 @@ parsePlayerState oldFrame newFrameLens = do
           | otherwise = do
               if statbits .&. (1 `shiftL` idx) /= 0
                 then do
-                  v <- MSG.readShort (globals.netMessage)
+                  v <- MSG.readShort (globals.gNetMessage)
                   readStats statbits (idx + 1) maxIdx ((idx, fromIntegral v) : acc)
                 else
                   readStats statbits (idx + 1) maxIdx acc
@@ -549,12 +549,12 @@ parsePlayerState oldFrame newFrameLens = do
 -}
 parsePacketEntities :: Maybe FrameT -> Lens' QuakeState FrameT -> Quake ()
 parsePacketEntities oldFrame newFrameLens = do
-    use (globals.cl.csParseEntities) >>= \parseEntities -> do
+    use (globals.gCl.csParseEntities) >>= \parseEntities -> do
       newFrameLens.fParseEntities .= parseEntities
       newFrameLens.fNumEntities .= 0
 
     -- delta from the entities present in oldframe
-    parseEntities <- use $ globals.clParseEntities
+    parseEntities <- use $ globals.gClParseEntities
     let (oldNum, oldState) = case oldFrame of
                                Nothing -> (99999, Nothing)
                                Just frame -> let idx = (frame^.fParseEntities) .&. (Constants.maxParseEntities - 1)
@@ -571,7 +571,7 @@ parsePacketEntities oldFrame newFrameLens = do
           when (newNum >= Constants.maxEdicts) $
             Com.comError Constants.errDrop ("CL_ParsePacketEntities: bad number:" `B.append` (BC.pack $ show newNum)) -- IMPROVE?
 
-          use (globals.netMessage) >>= \netMsg ->
+          use (globals.gNetMessage) >>= \netMsg ->
             when ((netMsg^.sbReadCount) > (netMsg^.sbCurSize)) $
               Com.comError Constants.errDrop "CL_ParsePacketEntities: end of message"
 
@@ -603,7 +603,7 @@ parsePacketEntities oldFrame newFrameLens = do
                            return (oldIndex' + 1, 99999, oldState')
                          else do
                            let idx = ((oldFrame'^.fParseEntities) + oldIndex' + 1) .&. (Constants.maxParseEntities - 1)
-                           Just oldState'' <- preuse $ globals.clParseEntities.ix idx
+                           Just oldState'' <- preuse $ globals.gClParseEntities.ix idx
                            return (oldIndex' + 1, oldState''^.esNumber, Just oldState'')
 
                    | oldNum' == newNum -> do -- delta from previous state
@@ -618,14 +618,14 @@ parsePacketEntities oldFrame newFrameLens = do
                            return (oldIndex' + 1, 99999, oldState')
                          else do
                            let idx = ((oldFrame'^.fParseEntities) + oldIndex' + 1) .&. (Constants.maxParseEntities - 1)
-                           Just oldState'' <- preuse $ globals.clParseEntities.ix idx
+                           Just oldState'' <- preuse $ globals.gClParseEntities.ix idx
                            return (oldIndex' + 1, oldState''^.esNumber, Just oldState'')
 
                    | oldNum' > newNum -> do -- delta from baseline
                        when (showNetValue == 3) $
                          Com.printf ("   baseline: " `B.append` BC.pack (show newNum) `B.append` "\n") -- IMPROVE ?
 
-                       Just baseline <- preuse $ globals.clEntities.ix newNum.ceBaseline
+                       Just baseline <- preuse $ globals.gClEntities.ix newNum.ceBaseline
                        deltaEntity newFrameLens newNum baseline bits'
 
                        return (oldIndex', oldNum', oldState')
@@ -647,7 +647,7 @@ parsePacketEntities oldFrame newFrameLens = do
                   deltaEntityPackets showNetValue 99999 newNum oldState (oldIndex + 1)
                 else do
                   let idx = ((oldFrame'^.fParseEntities) + (oldIndex + 1)) .&. (Constants.maxParseEntities - 1)
-                  Just oldState' <- preuse $ globals.clParseEntities.ix idx
+                  Just oldState' <- preuse $ globals.gClParseEntities.ix idx
                   deltaEntityPackets showNetValue (oldState'^.esNumber) newNum (Just oldState') (oldIndex + 1)
 
         copyRemainingEntities :: Float -> Int -> Maybe EntityStateT -> Int -> Quake ()
@@ -666,12 +666,12 @@ parsePacketEntities oldFrame newFrameLens = do
                   copyRemainingEntities showNetValue 99999 oldState (oldIndex + 1)
                 else do
                   let idx = ((oldFrame'^.fParseEntities) + oldIndex + 1) .&. (Constants.maxParseEntities - 1)
-                  Just oldState' <- preuse $ globals.clParseEntities.ix idx
+                  Just oldState' <- preuse $ globals.gClParseEntities.ix idx
                   copyRemainingEntities showNetValue (oldState'^.esNumber) (Just oldState') (oldIndex + 1)
 
 fireEntityEvents :: FrameT -> Quake ()
 fireEntityEvents frame = do
-    parseEntities <- use $ globals.clParseEntities
+    parseEntities <- use $ globals.gClParseEntities
     goThrouhEntities parseEntities 0 (frame^.fNumEntities)
 
   where goThrouhEntities :: V.Vector EntityStateT -> Int -> Int -> Quake ()
@@ -698,9 +698,9 @@ fireEntityEvents frame = do
 -}
 deltaEntity :: Traversal' QuakeState FrameT -> Int -> EntityStateT -> Int -> Quake ()
 deltaEntity frameLens newNum old bits = do
-    parseEntities <- use $ globals.cl.csParseEntities
+    parseEntities <- use $ globals.gCl.csParseEntities
     let idx = parseEntities .&. (Constants.maxParseEntities - 1)
-    globals.cl.csParseEntities += 1
+    globals.gCl.csParseEntities += 1
     frameLens.fNumEntities += 1
 
     --io (print "DELTA ENTITY")
@@ -708,11 +708,11 @@ deltaEntity frameLens newNum old bits = do
     --io (print ("old number = " ++ show (old^.esNumber)))
     --io (print ("modelindex = " ++ show (old^.esModelIndex)))
 
-    parseDelta old (globals.clParseEntities.ix idx) newNum bits
+    parseDelta old (globals.gClParseEntities.ix idx) newNum bits
 
-    Just state <- preuse $ globals.clParseEntities.ix idx
+    Just state <- preuse $ globals.gClParseEntities.ix idx
 
-    preuse (globals.clEntities.ix newNum) >>= \(Just ent) ->
+    preuse (globals.gClEntities.ix newNum) >>= \(Just ent) ->
       when ((state^.esModelIndex) /= (ent^.ceCurrent.esModelIndex) ||
             (state^.esModelIndex2) /= (ent^.ceCurrent.esModelIndex2) ||
             (state^.esModelIndex3) /= (ent^.ceCurrent.esModelIndex3) ||
@@ -722,30 +722,30 @@ deltaEntity frameLens newNum old bits = do
             abs((state^.esOrigin._z) - (ent^.ceCurrent.esOrigin._z)) > 512 ||
             (state^.esEvent) == Constants.evPlayerTeleport ||
             (state^.esEvent) == Constants.evOtherTeleport) $
-        globals.clEntities.ix newNum.ceServerFrame .= -99
+        globals.gClEntities.ix newNum.ceServerFrame .= -99
 
-    Just ent <- preuse $ globals.clEntities.ix newNum
-    serverFrame <- use $ globals.cl.csFrame.fServerFrame
+    Just ent <- preuse $ globals.gClEntities.ix newNum
+    serverFrame <- use $ globals.gCl.csFrame.fServerFrame
 
     if (ent^.ceServerFrame) /= serverFrame - 1
       then do -- wasn't in last update, so initialize some things
-        globals.clEntities.ix newNum.ceTrailCount .= 1024 -- for diminishing rocket / grenade trails
+        globals.gClEntities.ix newNum.ceTrailCount .= 1024 -- for diminishing rocket / grenade trails
         -- duplicate the current state so lerping doesn't hurt anything
-        globals.clEntities.ix newNum.cePrev .= state
+        globals.gClEntities.ix newNum.cePrev .= state
 
         if (state^.esEvent) == Constants.evOtherTeleport
           then do
-            globals.clEntities.ix newNum.cePrev.esOrigin .= (state^.esOrigin)
-            globals.clEntities.ix newNum.ceLerpOrigin .= (state^.esOrigin)
+            globals.gClEntities.ix newNum.cePrev.esOrigin .= (state^.esOrigin)
+            globals.gClEntities.ix newNum.ceLerpOrigin .= (state^.esOrigin)
           else do
-            globals.clEntities.ix newNum.cePrev.esOrigin .= (state^.esOldOrigin)
-            globals.clEntities.ix newNum.ceLerpOrigin .= (state^.esOldOrigin)
+            globals.gClEntities.ix newNum.cePrev.esOrigin .= (state^.esOldOrigin)
+            globals.gClEntities.ix newNum.ceLerpOrigin .= (state^.esOldOrigin)
       else -- shuffle the last state to previous Copy !
-        globals.clEntities.ix newNum.cePrev .= (ent^.ceCurrent)
+        globals.gClEntities.ix newNum.cePrev .= (ent^.ceCurrent)
 
-    globals.clEntities.ix newNum.ceServerFrame .= serverFrame
+    globals.gClEntities.ix newNum.ceServerFrame .= serverFrame
     -- Copy !
-    globals.clEntities.ix newNum.ceCurrent .= state
+    globals.gClEntities.ix newNum.ceCurrent .= state
 
 {-
 - =============== CL_CalcViewValues ===============
@@ -755,7 +755,7 @@ deltaEntity frameLens newNum old bits = do
 calcViewValues :: Quake ()
 calcViewValues = do
     -- find the previous frame to interpolate from
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
     let ps = cl'^.csFrame.fPlayerState
         i = ((cl'^.csFrame.fServerFrame) - 1) .&. Constants.updateMask
         oldFrame = (cl'^.csFrames) V.! i
@@ -778,22 +778,22 @@ calcViewValues = do
     if predictValue /= 0 && (cl'^.csFrame.fPlayerState.psPMoveState.pmsPMFlags) .&. pmfNoPrediction == 0 -- use predicted values
       then do
         let backlerp = 1 - lerp
-        globals.cl.csRefDef.rdViewOrg .= (cl'^.csPredictedOrigin)
+        globals.gCl.csRefDef.rdViewOrg .= (cl'^.csPredictedOrigin)
                                        + (ops'^.psViewOffset)
                                        + (fmap (* (cl'^.csLerpFrac)) ((ps^.psViewOffset) - (ops'^.psViewOffset)))
                                        - (fmap (* backlerp) (cl'^.csPredictionError))
 
         -- smooth out stair climbing
-        realTime <- use $ globals.cls.csRealTime
+        realTime <- use $ globals.gCls.csRealTime
         let delta = (realTime - (cl'^.csPredictedStepTime))
         when (delta < 100) $
-          globals.cl.csRefDef.rdViewOrg._z -= (cl'^.csPredictedStep) * fromIntegral (100 - delta) * 0.01
+          globals.gCl.csRefDef.rdViewOrg._z -= (cl'^.csPredictedStep) * fromIntegral (100 - delta) * 0.01
 
       else do -- juse use interpolated values
         let v = (fmap ((* 0.125) . fromIntegral) (ps^.psPMoveState.pmsOrigin))
               + (ps^.psViewOffset)
               - ((fmap ((* 0.125) . fromIntegral) (ops'^.psPMoveState.pmsOrigin)) + (ops'^.psViewOffset))
-        globals.cl.csRefDef.rdViewOrg .= (fmap ((* 0.125) . fromIntegral) (ops'^.psPMoveState.pmsOrigin))
+        globals.gCl.csRefDef.rdViewOrg .= (fmap ((* 0.125) . fromIntegral) (ops'^.psPMoveState.pmsOrigin))
                                        + (ops'^.psViewOffset)
                                        + (fmap (* lerp) v)
 
@@ -804,28 +804,28 @@ calcViewValues = do
         -- io $ print "USE PREDICTED VALUES"
         -- io $ print (cl'^.csPredictedAngles)
 
-        globals.cl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
+        globals.gCl.csRefDef.rdViewAngles .= (cl'^.csPredictedAngles) -- use predicted values
       else do
         -- io $ print "USE INTERPOLATED VALUES"
         -- io $ print ("ops.viewangles = " ++ show (ops'^.psViewAngles))
         -- io $ print ("ps.viewangles = " ++ show (ps^.psViewAngles))
         -- io $ print ("lerp = " ++ show lerp)
 
-        globals.cl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
+        globals.gCl.csRefDef.rdViewAngles .= Math3D.lerpAngles (ops'^.psViewAngles) (ps^.psViewAngles) lerp -- just use interpolated values
 
-    globals.cl.csRefDef.rdViewAngles += Math3D.lerpAngles (ops'^.psKickAngles) (ps^.psKickAngles) lerp
+    globals.gCl.csRefDef.rdViewAngles += Math3D.lerpAngles (ops'^.psKickAngles) (ps^.psKickAngles) lerp
 
-    rd <- use $ globals.cl.csRefDef
+    rd <- use $ globals.gCl.csRefDef
     let (Just f, Just r, Just u) = Math3D.angleVectors (rd^.rdViewAngles) True True True
-    globals.cl.csVForward .= f
-    globals.cl.csVRight .= r
-    globals.cl.csVUp .= u
+    globals.gCl.csVForward .= f
+    globals.gCl.csVRight .= r
+    globals.gCl.csVUp .= u
 
     -- interpolate field of view
-    globals.cl.csRefDef.rdFovX .= (ops'^.psFOV) + lerp * ((ps^.psFOV) - (ops'^.psFOV))
+    globals.gCl.csRefDef.rdFovX .= (ops'^.psFOV) + lerp * ((ps^.psFOV) - (ops'^.psFOV))
 
     -- don't interpolate blend color
-    globals.cl.csRefDef.rdBlend .= (ps^.psBlend)
+    globals.gCl.csRefDef.rdBlend .= (ps^.psBlend)
 
     -- add the weapon
     addViewWeapon ps ops'
@@ -837,17 +837,17 @@ addViewWeapon ps ops = do
     -- allow the gun to be completely removed
     -- don't draw gun if in wide angle view
     unless (clGunValue == 0 || (ps^.psFOV) > 90) $ do
-      gunModel' <- use $ globals.gunModel
+      gunModel' <- use $ globals.gGunModel
 
       model <- case gunModel' of
-                 Nothing -> preuse (globals.cl.csModelDraw.ix (ps^.psGunIndex)) >>= \(Just m) -> return m
+                 Nothing -> preuse (globals.gCl.csModelDraw.ix (ps^.psGunIndex)) >>= \(Just m) -> return m
                  Just m -> return gunModel' -- development tool
 
       case model of
         Nothing -> return ()
         Just _ -> do
           -- set up gun position
-          cl' <- use $ globals.cl
+          cl' <- use $ globals.gCl
           let origin = (cl'^.csRefDef.rdViewOrg)
                      + (ops^.psGunOffset)
                      + (fmap (* (cl'^.csLerpFrac)) ((ps^.psGunOffset) - (ops^.psGunOffset)))
@@ -855,7 +855,7 @@ addViewWeapon ps ops = do
               angles = (cl'^.csRefDef.rdViewAngles)
                      + (Math3D.lerpAngles (ops^.psGunAngles) (ps^.psGunAngles) (cl'^.csLerpFrac))
 
-          gunFrame' <- use $ globals.gunFrame
+          gunFrame' <- use $ globals.gGunFrame
           let (frame, oldFrame) = if gunFrame' /= 0
                                     then (gunFrame', gunFrame') -- development tool
                                     else if (ps^.psGunFrame) == 0
@@ -876,7 +876,7 @@ addViewWeapon ps ops = do
 
 addPacketEntities :: FrameT -> Quake ()
 addPacketEntities frame = do
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
         -- bonus items rotate at a fixed rate
     let autoRotate = Math3D.angleMod (fromIntegral (cl'^.csTime) / 10)
         -- brush models can auto animate their frames
@@ -888,10 +888,10 @@ addPacketEntities frame = do
         addEntity autoRotate autoAnim ent pNum maxPNum
           | pNum >= maxPNum = return ()
           | otherwise = do
-              Just s1 <- preuse $ globals.clParseEntities.ix (((frame^.fParseEntities) + pNum) .&. (Constants.maxParseEntities - 1))
-              Just cent <- preuse $ globals.clEntities.ix (s1^.esNumber)
+              Just s1 <- preuse $ globals.gClParseEntities.ix (((frame^.fParseEntities) + pNum) .&. (Constants.maxParseEntities - 1))
+              Just cent <- preuse $ globals.gClEntities.ix (s1^.esNumber)
 
-              cl' <- use $ globals.cl
+              cl' <- use $ globals.gCl
               let entFrame = setFrame autoAnim s1 (cl'^.csTime)
                   (effects, renderfx) = calcEffectsAndRenderFx s1
                   entOldFrame = cent^.cePrev.esFrame
@@ -1038,7 +1038,7 @@ addPacketEntities frame = do
 
                   (skin', model') <- if renderfx .&. Constants.rfUseDisguise /= 0
                                        then do
-                                         Just renderer <- use $ globals.re
+                                         Just renderer <- use $ globals.gRenderer
                                          let registerSkin = renderer^.rRefExport.reRegisterSkin
                                              registerModel = renderer^.rRefExport.reRegisterModel
 
@@ -1164,7 +1164,7 @@ addPacketEntities frame = do
             then do
               model <- if (s1^.esModelIndex2) == 255 -- custom weapon
                          then do
-                           Just ci <- preuse $ globals.cl.csClientInfo.ix ((s1^.esSkinNum) .&. 0xFF)
+                           Just ci <- preuse $ globals.gCl.csClientInfo.ix ((s1^.esSkinNum) .&. 0xFF)
                            let i = (s1^.esSkinNum) `shiftR` 8 -- 0 is default weapon model
                            clVwepValue <- liftM (^.cvValue) clVwepCVar
                            let i' = if clVwepValue == 0 || i > Constants.maxClientWeaponModels - 1
@@ -1178,20 +1178,20 @@ addPacketEntities frame = do
                                          else model
                                if isNothing m
                                  then do
-                                   Just m' <- preuse $ globals.cl.csBaseClientInfo.ciWeaponModel.ix 0
+                                   Just m' <- preuse $ globals.gCl.csBaseClientInfo.ciWeaponModel.ix 0
                                    return m'
                                  else return m
                              else
                                return model
 
                          else do
-                           Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex2)
+                           Just model <- preuse $ globals.gCl.csModelDraw.ix (s1^.esModelIndex2)
                            return model
 
               -- PMM - check for the defender sphere shell .. make it translucent
               -- replaces the previous version which used the high bit on
               -- modelindex2 to determine transparency
-              Just configString <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + (s1^.esModelIndex2))
+              Just configString <- preuse $ globals.gCl.csConfigStrings.ix (Constants.csModels + (s1^.esModelIndex2))
               entRef <- io $ if BC.map toLower configString == "models/items/shell/tris.md2"
                                then newIORef ent { _eModel  = model
                                                  , _eAlpha  = 0.32
@@ -1212,7 +1212,7 @@ addPacketEntities frame = do
         checkModelIndex3 s1 ent = do
           if (s1^.esModelIndex3) /= 0
             then do
-              Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex3)
+              Just model <- preuse $ globals.gCl.csModelDraw.ix (s1^.esModelIndex3)
               let ent' = ent { _eModel = model }
               entRef <- io $ newIORef ent'
               ClientV.addEntity entRef
@@ -1224,7 +1224,7 @@ addPacketEntities frame = do
         checkModelIndex4 s1 ent = do
           if (s1^.esModelIndex4) /= 0
             then do
-              Just model <- preuse $ globals.cl.csModelDraw.ix (s1^.esModelIndex4)
+              Just model <- preuse $ globals.gCl.csModelDraw.ix (s1^.esModelIndex4)
               let ent' = ent { _eModel = model }
               entRef <- io $ newIORef ent'
               ClientV.addEntity entRef
@@ -1252,7 +1252,7 @@ addPacketEntities frame = do
 
         addAutomaticParticleTrails :: Int -> EntityStateT -> EntityT -> Quake EntityT
         addAutomaticParticleTrails effects s1 ent = do
-          Just cent <- preuse $ globals.clEntities.ix (s1^.esNumber)
+          Just cent <- preuse $ globals.gClEntities.ix (s1^.esNumber)
 
           if effects .&. (complement Constants.efRotate) /= 0
             then do
@@ -1330,7 +1330,7 @@ addPacketEntities frame = do
                  | effects .&. Constants.efTrackerTrail /= 0 ->
                      if effects .&. Constants.efTracker /= 0
                        then do
-                         time <- use $ globals.cl.csTime
+                         time <- use $ globals.gCl.csTime
                          let intensity = 50 + (500 * (sin (fromIntegral time / 500.0) + 1.0))
                          -- FIXME: check out this effect in rendition
                          -- TODO: there is an extra check in jake2 that we skipped
@@ -1376,5 +1376,5 @@ addPacketEntities frame = do
 
         copyOrigin :: EntityStateT -> EntityT -> Quake EntityT
         copyOrigin s1 ent = do
-          globals.clEntities.ix (s1^.esNumber).ceLerpOrigin .= (ent^.eOrigin)
+          globals.gClEntities.ix (s1^.esNumber).ceLerpOrigin .= (ent^.eOrigin)
           return ent

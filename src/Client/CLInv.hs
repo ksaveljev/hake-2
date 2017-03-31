@@ -20,5 +20,5 @@ parseInventory =
         readInventory idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              v <- MSG.readShort (globals.netMessage)
-              globals.cl.csInventory.ix idx .= v
+              v <- MSG.readShort (globals.gNetMessage)
+              globals.gCl.csInventory.ix idx .= v

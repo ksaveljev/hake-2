@@ -114,9 +114,9 @@ init = do
 beginLoadingPlaque :: Quake ()
 beginLoadingPlaque = do
     S.stopAllSounds
-    globals.cl.csSoundPrepped .= False
+    globals.gCl.csSoundPrepped .= False
 
-    clientStatic <- use $ globals.cls
+    clientStatic <- use $ globals.gCls
     developerValue <- liftM (^.cvValue) developerCVar
 
     when ((clientStatic^.csDisableScreen) == 0 &&
@@ -124,7 +124,7 @@ beginLoadingPlaque = do
           (clientStatic^.csState) /= Constants.caDisconnected &&
           (clientStatic^.csKeyDest) /= Constants.keyConsole) $ do
       
-      cinematicTime <- use $ globals.cl.csCinematicTime
+      cinematicTime <- use $ globals.gCl.csCinematicTime
       if cinematicTime > 0
         then scrGlobals.scrDrawLoading .= 2
         else scrGlobals.scrDrawLoading .= 1
@@ -132,14 +132,14 @@ beginLoadingPlaque = do
       updateScreen
 
       msec <- Timer.milliseconds
-      serverCount <- use $ globals.cl.csServerCount
+      serverCount <- use $ globals.gCl.csServerCount
 
-      globals.cls.csDisableScreen .= fromIntegral msec
-      globals.cls.csDisableServerCount .= serverCount
+      globals.gCls.csDisableScreen .= fromIntegral msec
+      globals.gCls.csDisableServerCount .= serverCount
 
 endLoadingPlaque :: Quake ()
 endLoadingPlaque = do
-    globals.cls.csDisableScreen .= 0
+    globals.gCls.csDisableScreen .= 0
     Console.clearNotify
 
 updateScreenF :: XCommandT
@@ -148,7 +148,7 @@ updateScreenF =
 
 updateScreen :: Quake ()
 updateScreen = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reUpdateScreen) updateScreenF
 
 {-
@@ -169,21 +169,21 @@ updateScreen2 = do
 
       runFrames separation 0 numFrames
 
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
       renderer^.rRefExport.reEndFrame
 
   where shouldUpdate :: Quake Bool
         shouldUpdate = do
-          disableScreen <- use $ globals.cls.csDisableScreen
+          disableScreen <- use $ globals.gCls.csDisableScreen
           initialized <- use $ scrGlobals.scrInitialized
-          conInitialized <- use $ globals.con.cInitialized
+          conInitialized <- use $ globals.gCon.cInitialized
 
           -- if the screen is disabled (loading plaque is up, or vid mode
           -- changing) do nothing at all
           if | disableScreen /= 0 -> do
                  msec <- Timer.milliseconds
                  when (msec - truncate disableScreen > 120000) $ do
-                   globals.cls.csDisableScreen .= 0
+                   globals.gCls.csDisableScreen .= 0
                    Com.printf "Loading plaque timed out.\n"
                  return False
                -- not initialized yet
@@ -215,12 +215,12 @@ updateScreen2 = do
           | otherwise = do
               let access = if idx == 0 then _1 else _2
 
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reBeginFrame) (separation^.access)
 
               scrDrawLoading' <- use $ scrGlobals.scrDrawLoading
-              cinematicTime <- use $ globals.cl.csCinematicTime
-              cinematicPaletteActive <- use $ globals.cl.csCinematicPaletteActive
+              cinematicTime <- use $ globals.gCl.csCinematicTime
+              cinematicPaletteActive <- use $ globals.gCl.csCinematicPaletteActive
 
                    -- loading plaque over black screen
               if | scrDrawLoading' == 2 -> do
@@ -228,25 +228,25 @@ updateScreen2 = do
                      scrGlobals.scrDrawLoading .= 0 -- false
                      Just (width, height) <- (renderer^.rRefExport.reDrawGetPicSize) "loading"
 
-                     vidDef' <- use $ globals.vidDef
+                     vidDef' <- use $ globals.gVidDef
                      (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) (((vidDef'^.vdHeight) - height) `div` 2) "loading"
 
                    -- if a cinematic is supposed to be running, handle
                    -- menus and console specially
                  | cinematicTime > 0 -> do
-                     keyDest <- use $ globals.cls.csKeyDest
+                     keyDest <- use $ globals.gCls.csKeyDest
 
                      if | keyDest == Constants.keyMenu -> do
                             when cinematicPaletteActive $ do
                               (renderer^.rRefExport.reCinematicSetPalette) Nothing
-                              globals.cl.csCinematicPaletteActive .= False
+                              globals.gCl.csCinematicPaletteActive .= False
 
                             Menu.draw
 
                         | keyDest == Constants.keyConsole -> do
                             when cinematicPaletteActive $ do
                               (renderer^.rRefExport.reCinematicSetPalette) Nothing
-                              globals.cl.csCinematicPaletteActive .= False
+                              globals.gCl.csCinematicPaletteActive .= False
 
                             drawConsole
 
@@ -258,7 +258,7 @@ updateScreen2 = do
                      -- make sure the game palette is active
                      when cinematicPaletteActive $ do
                        (renderer^.rRefExport.reCinematicSetPalette) Nothing
-                       globals.cl.csCinematicPaletteActive .= False
+                       globals.gCl.csCinematicPaletteActive .= False
 
                      -- do 3D refresh drawing, and then update the screen
                      calcVrect
@@ -270,7 +270,7 @@ updateScreen2 = do
 
                      drawStats
 
-                     Just statLayout <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statLayouts
+                     Just statLayout <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statLayouts
                      when (statLayout .&. 1 /= 0) $
                        drawLayout
                      when (statLayout .&. 2 /= 0) $
@@ -288,30 +288,30 @@ updateScreen2 = do
 timeRefreshF :: XCommandT
 timeRefreshF =
   XCommandT "SCR.timeRefreshF" (do
-    state <- use $ globals.cls.csState
+    state <- use $ globals.gCls.csState
 
     when (state == Constants.caActive) $ do
       start <- Timer.milliseconds
 
       c <- Cmd.argc
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
 
       if c == 2
         then do -- run without page flipping
           (renderer^.rRefExport.reBeginFrame) 0
 
           mapM_ (\i -> do
-                        globals.cl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
-                        use (globals.cl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
+                        globals.gCl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
+                        use (globals.gCl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
                 ) [0..127]
 
           renderer^.rRefExport.reEndFrame
 
         else do
           mapM_ (\i -> do
-                        globals.cl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
+                        globals.gCl.csRefDef.rdViewAngles._y .= i / 128.0 * 360.0
                         (renderer^.rRefExport.reBeginFrame) 0
-                        use (globals.cl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
+                        use (globals.gCl.csRefDef) >>= (renderer^.rRefExport.reRenderFrame) 
                         renderer^.rRefExport.reEndFrame
                 ) [0..127]
 
@@ -369,18 +369,18 @@ skyF =
                     return (V3 0 0 1)
 
         v <- Cmd.argv 1
-        Just renderer <- use $ globals.re
+        Just renderer <- use $ globals.gRenderer
         (renderer^.rRefExport.reSetSky) v rotate axis
   )
 
 runCinematic :: Quake ()
 runCinematic = do
-    cl' <- use $ globals.cl
-    cls' <- use $ globals.cls
+    cl' <- use $ globals.gCl
+    cls' <- use $ globals.gCls
 
     if | cl'^.csCinematicTime <= 0 -> stopCinematic
        | cl'^.csCinematicFrame == -1 -> return () -- static image
-       | cls'^.csKeyDest /= Constants.keyGame -> globals.cl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14 -- pause if menu or console is up
+       | cls'^.csKeyDest /= Constants.keyGame -> globals.gCl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14 -- pause if menu or console is up
        | otherwise -> do
            let frameF :: Float = fromIntegral (cls'^.csRealTime) - fromIntegral (cl'^.csCinematicTime) * 14 / 1000
                frame :: Int = truncate frameF
@@ -389,7 +389,7 @@ runCinematic = do
              when (frame > (cl'^.csCinematicFrame) + 1) $ do
                Com.println $ "Dropped frame: " `B.append` BC.pack (show frame) `B.append` -- IMPROVE ?
                              " > " `B.append` BC.pack (show $ (cl'^.csCinematicTime) + 1)  -- IMPROVE ?
-               globals.cl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14
+               globals.gCl.csCinematicTime .= (cls'^.csRealTime) - (cl'^.csCinematicFrame) * 1000 `div` 14
 
              use (scrGlobals.scrCin.cPicPending) >>= \v ->
                scrGlobals.scrCin.cPic .= v
@@ -401,9 +401,9 @@ runCinematic = do
                stopCinematic
                finishCinematic
                -- hack to get the black screen behind loading
-               globals.cl.csCinematicTime .= 1
+               globals.gCl.csCinematicTime .= 1
                beginLoadingPlaque
-               globals.cl.csCinematicTime .= 0
+               globals.gCl.csCinematicTime .= 0
 
 stopCinematic :: Quake ()
 stopCinematic = do
@@ -411,19 +411,19 @@ stopCinematic = do
 
     when restartSound $ do
       -- done
-      globals.cl.csCinematicTime .= 0
+      globals.gCl.csCinematicTime .= 0
       scrGlobals.scrCin.cPic .= Nothing
       scrGlobals.scrCin.cPicPending .= Nothing
 
-      use (globals.cl.csCinematicPaletteActive) >>= \active ->
+      use (globals.gCl.csCinematicPaletteActive) >>= \active ->
         when active $ do
-          Just renderer <- use $ globals.re
+          Just renderer <- use $ globals.gRenderer
           (renderer^.rRefExport.reCinematicSetPalette) Nothing
-          globals.cl.csCinematicPaletteActive .= False
+          globals.gCl.csCinematicPaletteActive .= False
 
-      use (globals.cl.csCinematicFile) >>= \f ->
+      use (globals.gCl.csCinematicFile) >>= \f ->
         when (isJust f) $
-          globals.cl.csCinematicFile .= Nothing
+          globals.gCl.csCinematicFile .= Nothing
 
       use (scrGlobals.scrCin.cHNodes1) >>= \v ->
         when (isJust v) $
@@ -440,14 +440,14 @@ stopCinematic = do
 finishCinematic :: Quake ()
 finishCinematic = do
     -- tell the server to advance to the next map / cinematic
-    MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-    serverCount <- use $ globals.cl.csServerCount
-    SZ.print (globals.cls.csNetChan.ncMessage) ("nextserver " `B.append` BC.pack (show serverCount) `B.append` "\n") -- IMPROVE?
+    MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+    serverCount <- use $ globals.gCl.csServerCount
+    SZ.print (globals.gCls.csNetChan.ncMessage) ("nextserver " `B.append` BC.pack (show serverCount) `B.append` "\n") -- IMPROVE?
 
 runConsole :: Quake ()
 runConsole = do
     -- decide one the height of the console
-    keyDest <- use $ globals.cls.csKeyDest
+    keyDest <- use $ globals.gCls.csKeyDest
 
     let conLines = if keyDest == Constants.keyConsole
                      then 0.5 -- half screen
@@ -455,7 +455,7 @@ runConsole = do
 
     scrGlobals.scrConLines .= conLines
     conCurrent <- use $ scrGlobals.scrConCurrent
-    frameTime <- use $ globals.cls.csFrameTime
+    frameTime <- use $ globals.gCls.csFrameTime
     conSpeedValue <- liftM (^.cvValue) scrConSpeedCVar
 
     if | conLines < conCurrent -> do
@@ -485,12 +485,12 @@ calcVrect = do
         void $ CVar.set "viewsize" "100"
 
     size :: Int <- liftM (truncate . (^.cvValue)) viewSizeCVar
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     let w = ((vidDef'^.vdWidth) * size `div` 100) .&. (complement 7)
         h = ((vidDef'^.vdHeight) * size `div` 100) .&. (complement 1)
 
-    zoom (globals.scrVRect) $ do
+    zoom (globals.gScrVRect) $ do
       vrWidth .= w
       vrHeight .= h
       vrX .= ((vidDef'^.vdWidth) - w) `div` 2
@@ -511,7 +511,7 @@ tileClear = do
 
     scrConCurrent' <- use $ scrGlobals.scrConCurrent
     viewSizeValue <- liftM (^.cvValue) viewSizeCVar
-    cinematicTime <- use $ globals.cl.csCinematicTime
+    cinematicTime <- use $ globals.gCl.csCinematicTime
         -- full screen console | full screen rendering | full screen cinematic
     unless (scrConCurrent' == 1 || viewSizeValue == 100 || cinematicTime > 0) $ do
       -- erase rect will be the union of the past three frames
@@ -529,7 +529,7 @@ tileClear = do
         y2 .= (-9999)
 
       -- don't bother with anything covered by the console
-      vidDef' <- use $ globals.vidDef
+      vidDef' <- use $ globals.gVidDef
       let tmp :: Int = truncate $ scrConCurrent' * fromIntegral (vidDef'^.vdHeight)
           clear = if tmp >= (tmpClear^.y1)
                     then tmpClear { _y1 = tmp }
@@ -537,7 +537,7 @@ tileClear = do
 
       -- nothing disturbed
       unless ((clear^.y2) <= (clear^.y1)) $ do
-        vrect <- use $ globals.scrVRect
+        vrect <- use $ globals.gScrVRect
         let top = vrect^.vrY
             bottom = top + (vrect^.vrHeight) - 1
             left = vrect^.vrX
@@ -565,7 +565,7 @@ tileClear = do
           if (clear^.y1) < top -- clear above view screen
             then do
               let i = if (clear^.y2) < (top - 1) then clear^.y2 else top - 1
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawTileClear) (clear^.x1) (clear^.y1) ((clear^.x2) - (clear^.x1) + 1) (i - (clear^.y1) + 1) "backtile"
               return $ clear { _y1 = top }
             else
@@ -576,7 +576,7 @@ tileClear = do
           if (clear^.y2) > bottom -- clear below view screen
             then do
               let i = if (clear^.y1) > bottom + 1 then clear^.y1 else bottom + 1
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawTileClear) (clear^.x1) i ((clear^.x2) - (clear^.x1) + 1) ((clear^.y2) - i + 1) "backtile"
               return $ clear { _y2 = bottom }
             else
@@ -587,7 +587,7 @@ tileClear = do
           if (clear^.x1) < left -- clear left of view screen
             then do
               let i = if (clear^.x2) < left - 1 then clear^.x2 else left - 1
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawTileClear) (clear^.x1) (clear^.y1) (i - (clear^.x1) + 1) ((clear^.y2) - (clear^.y1) + 1) "backtile"
               return $ clear { _x1 = left }
             else
@@ -598,7 +598,7 @@ tileClear = do
           if (clear^.x2) > right -- clear right of view screen
             then do
               let i = if (clear^.x1) > right + 1 then clear^.x1 else right + 1
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawTileClear) i (clear^.y1) ((clear^.x2) - i + 1) ((clear^.y2) - (clear^.y1) + 1) "backtile"
               return $ clear { _x2 = right }
             else
@@ -612,27 +612,27 @@ tileClear = do
 -}
 drawStats :: Quake ()
 drawStats = do
-    Just str <- preuse $ globals.cl.csConfigStrings.ix Constants.csStatusBar
+    Just str <- preuse $ globals.gCl.csConfigStrings.ix Constants.csStatusBar
     executeLayoutString str
 
 drawLayout :: Quake ()
 drawLayout = do
-    Just v <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix statLayouts
+    Just v <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix statLayouts
     when (v /= 0) $ do
-      layout <- use $ globals.cl.csLayout
+      layout <- use $ globals.gCl.csLayout
       executeLayoutString layout
 
 drawNet :: Quake ()
 drawNet = do
-    nc <- use $ globals.cls.csNetChan
+    nc <- use $ globals.gCls.csNetChan
     unless ((nc^.ncOutgoingSequence) - (nc^.ncIncomingAcknowledged) < Constants.cmdBackup - 1) $ do
-      vrect <- use $ globals.scrVRect
-      Just renderer <- use $ globals.re
+      vrect <- use $ globals.gScrVRect
+      Just renderer <- use $ globals.gRenderer
       (renderer^.rRefExport.reDrawPic) ((vrect^.vrX) + 64) (vrect^.vrY) "net"
 
 checkDrawCenterString :: Quake ()
 checkDrawCenterString = do
-    frameTime <- use $ globals.cls.csFrameTime
+    frameTime <- use $ globals.gCls.csFrameTime
     scrGlobals.scrCenterTimeOff -= frameTime
 
     use (scrGlobals.scrCenterTimeOff) >>= \v ->
@@ -648,12 +648,12 @@ drawFPS = do
              CVar.update fps { _cvModified = False }
              CVar.setValueI "cl_maxfps" 1000
 
-           realTime <- use $ globals.cls.csRealTime
+           realTime <- use $ globals.gCls.csRealTime
            lastTime <- use $ scrGlobals.scrLastTime
            let diff = realTime - lastTime
 
            when (diff > truncate ((fps^.cvValue) * 1000)) $ do
-             frameCount <- use $ globals.cls.csFrameCount
+             frameCount <- use $ globals.gCls.csFrameCount
              lastFrames <- use $ scrGlobals.scrLastFrames
              let fpsvalue :: Float = fromIntegral (frameCount - lastFrames) * 100000 / fromIntegral diff / 100.0
                  fpsStr = BC.pack (show fpsvalue) `B.append` " fps"
@@ -662,7 +662,7 @@ drawFPS = do
              scrGlobals.scrLastTime .= realTime
              scrGlobals.scrFPSValue .= fpsStr
 
-           vidDef' <- use $ globals.vidDef
+           vidDef' <- use $ globals.gVidDef
            fpsValue <- use $ scrGlobals.scrFPSValue
            let x = (vidDef'^.vdWidth) - 8 * (B.length fpsValue) - 2
            drawFPSByChar x 0 fpsValue
@@ -677,7 +677,7 @@ drawFPS = do
         drawFPSByChar x idx str
           | idx >= B.length str = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) x 2 (ord $ BC.index str idx)
               drawFPSByChar (x + 8) (idx + 1) str
 
@@ -688,8 +688,8 @@ drawPause = do
 
     -- turn off for screenshots
     unless (showPauseValue == 0 || pausedValue == 0) $ do
-      vidDef' <- use $ globals.vidDef
-      Just renderer <- use $ globals.re
+      vidDef' <- use $ globals.gVidDef
+      Just renderer <- use $ globals.gRenderer
       Just (width, _) <- (renderer^.rRefExport.reDrawGetPicSize) "pause"
       (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) ((vidDef'^.vdHeight) `div` 2 + 8) "pause"
 
@@ -697,8 +697,8 @@ drawConsole :: Quake ()
 drawConsole = do
     Console.checkResize
 
-    state <- use $ globals.cls.csState
-    refreshPrepped <- use $ globals.cl.csRefreshPrepped
+    state <- use $ globals.gCls.csState
+    refreshPrepped <- use $ globals.gCl.csRefreshPrepped
 
          -- forced full screen console
     if | state == Constants.caDisconnected || state == Constants.caConnecting ->
@@ -708,8 +708,8 @@ drawConsole = do
        | state /= Constants.caActive || not refreshPrepped -> do
            Console.drawConsole 0.5
 
-           vidDef' <- use $ globals.vidDef
-           Just renderer <- use $ globals.re
+           vidDef' <- use $ globals.gVidDef
+           Just renderer <- use $ globals.gRenderer
            (renderer^.rRefExport.reDrawFill) 0 ((vidDef'^.vdHeight) `div` 2) (vidDef'^.vdWidth) ((vidDef'^.vdHeight) `div` 2) 0
 
        | otherwise -> do
@@ -717,7 +717,7 @@ drawConsole = do
            if conCurrent /= 0
              then Console.drawConsole conCurrent
              else do
-               keyDest <- use $ globals.cls.csKeyDest
+               keyDest <- use $ globals.gCls.csKeyDest
                when (keyDest == Constants.keyGame || keyDest == Constants.keyMessage) $
                  Console.drawNotify -- only draw notify in game
            
@@ -729,9 +729,9 @@ drawConsole = do
 -}
 drawCinematic :: Quake Bool
 drawCinematic = do
-    cinematicTime <- use $ globals.cl.csCinematicTime
-    keyDest <- use $ globals.cls.csKeyDest
-    Just renderer <- use $ globals.re
+    cinematicTime <- use $ globals.gCl.csCinematicTime
+    keyDest <- use $ globals.gCls.csKeyDest
+    Just renderer <- use $ globals.gRenderer
 
     if | cinematicTime <= 0 ->
            return False
@@ -739,23 +739,23 @@ drawCinematic = do
        | keyDest == Constants.keyMenu -> do
            -- blank screen and pause if menu is up
            (renderer^.rRefExport.reCinematicSetPalette) Nothing
-           globals.cl.csCinematicPaletteActive .= False
+           globals.gCl.csCinematicPaletteActive .= False
            return True
 
        | otherwise -> do
-           cinematicPaletteActive <- use $ globals.cl.csCinematicPaletteActive
+           cinematicPaletteActive <- use $ globals.gCl.csCinematicPaletteActive
 
            unless cinematicPaletteActive $ do
-             cinematicPalette <- use $ globals.cl.csCinematicPalette
+             cinematicPalette <- use $ globals.gCl.csCinematicPalette
              (renderer^.rRefExport.reCinematicSetPalette) (Just cinematicPalette)
-             globals.cl.csCinematicPaletteActive .= True
+             globals.gCl.csCinematicPaletteActive .= True
 
            cin <- use $ scrGlobals.scrCin
 
            case cin^.cPic of
              Nothing -> return True
              Just picture -> do
-               vidDef' <- use $ globals.vidDef
+               vidDef' <- use $ globals.gVidDef
                (renderer^.rRefExport.reDrawStretchRaw) 0 0 (vidDef'^.vdWidth) (vidDef'^.vdHeight) (cin^.cWidth) (cin^.cHeight) picture
                return True
 
@@ -765,15 +765,15 @@ drawLoading = do
 
     unless (loading == 0) $ do
       scrGlobals.scrDrawLoading .= 0
-      vidDef' <- use $ globals.vidDef
-      Just renderer <- use $ globals.re
+      vidDef' <- use $ globals.gVidDef
+      Just renderer <- use $ globals.gRenderer
 
       Just (width, height) <- (renderer^.rRefExport.reDrawGetPicSize) "loading"
       (renderer^.rRefExport.reDrawPic) (((vidDef'^.vdWidth) - width) `div` 2) (((vidDef'^.vdHeight) - height) `div` 2) "loading"
 
 dirtyScreen :: Quake ()
 dirtyScreen = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     addDirtyPoint 0 0
     addDirtyPoint ((vidDef'^.vdWidth) - 1) ((vidDef'^.vdHeight) - 1)
@@ -806,8 +806,8 @@ drawCrosshair = do
       crosshairPic <- use $ scrGlobals.scrCrosshairPic
 
       unless (B.null crosshairPic) $ do
-        vrect <- use $ globals.scrVRect
-        Just renderer <- use $ globals.re
+        vrect <- use $ globals.gScrVRect
+        Just renderer <- use $ globals.gRenderer
         crosshairWidth <- use $ scrGlobals.scrCrosshairWidth
         crosshairHeight <- use $ scrGlobals.scrCrosshairHeight
 
@@ -824,8 +824,8 @@ executeLayoutString str = do
 
   where checkIfShouldSkip :: Quake Bool
         checkIfShouldSkip = do
-          state <- use $ globals.cls.csState
-          refreshPrepped <- use $ globals.cl.csRefreshPrepped
+          state <- use $ globals.gCls.csState
+          refreshPrepped <- use $ globals.gCl.csRefreshPrepped
 
           return $ if state /= Constants.caActive || not refreshPrepped || B.length str == 0
                      then True
@@ -853,13 +853,13 @@ executeLayoutString str = do
 
             "xr" -> do
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              w <- use $ globals.vidDef.vdWidth
+              w <- use $ globals.gVidDef.vdWidth
               let x' = w + Lib.atoi tkn
               return (x', y, width, newIdx)
 
             "xv" -> do
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              w <- use $ globals.vidDef.vdWidth
+              w <- use $ globals.gVidDef.vdWidth
               let x' = w `div` 2 - 160 + Lib.atoi tkn
               return (x', y, width, newIdx)
 
@@ -870,36 +870,36 @@ executeLayoutString str = do
 
             "yb" -> do
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              h <- use $ globals.vidDef.vdHeight
+              h <- use $ globals.gVidDef.vdHeight
               let y' = h + Lib.atoi tkn
               return (x, y', width, newIdx)
 
             "yv" -> do
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              h <- use $ globals.vidDef.vdHeight
+              h <- use $ globals.gVidDef.vdHeight
               let y' = h `div` 2 - 120 + Lib.atoi tkn
               return (x, y', width, newIdx)
 
             "pic" -> do
               -- draw a pick from a stat number
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
               let value' = fromIntegral value
               when (value' >= Constants.maxImages) $
                 Com.comError Constants.errDrop "Pic >= MAX_IMAGES"
 
-              Just cs <- preuse $ globals.cl.csConfigStrings.ix (Constants.csImages + value')
+              Just cs <- preuse $ globals.gCl.csConfigStrings.ix (Constants.csImages + value')
               when (B.length cs > 0) $ do -- IMPROVE: do we need to introduce Maybe ByteString in csConfigStrings ?
                 addDirtyPoint x y
                 addDirtyPoint (x + 23) (y + 23)
-                Just renderer <- use $ globals.re
+                Just renderer <- use $ globals.gRenderer
                 (renderer^.rRefExport.reDrawPic) x y cs
 
               return (x, y, width, newIdx)
 
             "client" -> do
               -- draw a deathmatch client block
-              vidDef' <- use $ globals.vidDef
+              vidDef' <- use $ globals.gVidDef
 
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
               let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
@@ -915,7 +915,7 @@ executeLayoutString str = do
               when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
                 Com.comError Constants.errDrop "client >= MAX_CLIENTS"
 
-              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
+              Just clientInfo <- preuse $ globals.gCl.csClientInfo.ix clientInfoIdx
               
               (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
               let score = Lib.atoi tkn4
@@ -932,11 +932,11 @@ executeLayoutString str = do
               Console.drawString (x' + 32) (y' + 16) ("Ping:  " `B.append` BC.pack (show ping)) -- IMPROVE?
               Console.drawString (x' + 32) (y' + 24) ("Time:  " `B.append` BC.pack (show time)) -- IMPROVE?
 
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
 
               if isNothing (clientInfo^.ciIcon)
                 then do
-                  iconName <- use $ globals.cl.csBaseClientInfo.ciIconName
+                  iconName <- use $ globals.gCl.csBaseClientInfo.ciIconName
                   (renderer^.rRefExport.reDrawPic) x' y' iconName
                 else
                   (renderer^.rRefExport.reDrawPic) x' y' (clientInfo^.ciIconName)
@@ -945,7 +945,7 @@ executeLayoutString str = do
               
             "ctf" -> do
               -- draw a ctf client block
-              vidDef' <- use $ globals.vidDef
+              vidDef' <- use $ globals.gVidDef
 
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
               let x' = (vidDef'^.vdWidth) `div` 2 - 160 + Lib.atoi tkn
@@ -961,7 +961,7 @@ executeLayoutString str = do
               when (clientInfoIdx >= Constants.maxClients || clientInfoIdx < 0) $
                 Com.comError Constants.errDrop "client >= MAX_CLIENTS"
 
-              Just clientInfo <- preuse $ globals.cl.csClientInfo.ix clientInfoIdx
+              Just clientInfo <- preuse $ globals.gCl.csClientInfo.ix clientInfoIdx
 
               (Just tkn4, newIdx4) <- Com.parse str (B.length str) newIdx3
               let score = Lib.atoi tkn4
@@ -972,7 +972,7 @@ executeLayoutString str = do
 
               let block = BC.pack $ printf "%3d %3d %-12.12s" score ping (BC.unpack $ clientInfo^.ciName)
 
-              playerNum <- use $ globals.cl.csPlayerNum
+              playerNum <- use $ globals.gCl.csPlayerNum
               if clientInfoIdx == playerNum
                 then Console.drawAltString x' y' block
                 else Console.drawString x' y' block
@@ -985,7 +985,7 @@ executeLayoutString str = do
               addDirtyPoint x y
               addDirtyPoint (x + 23) (y + 23)
 
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawPic) x y tkn
 
               return (x, y, width, newIdx)
@@ -998,7 +998,7 @@ executeLayoutString str = do
               (Just tkn2, newIdx2) <- Com.parse str (B.length str) newIdx
               let statsIdx = Lib.atoi tkn2
 
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix statsIdx
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix statsIdx
               drawField x y 0 width' (fromIntegral value)
 
               return (x, y, width', newIdx2)
@@ -1006,17 +1006,17 @@ executeLayoutString str = do
             "hnum" -> do
               -- health number
               let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statHealth
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statHealth
 
               color <- if | value > 25 -> return 0 -- green
                           | value > 0 -> do
-                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+                              serverFrame <- use $ globals.gCl.csFrame.fServerFrame
                               return $ (serverFrame `shiftR` 2) .&. 1
                           | otherwise -> return 1
 
-              Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+              Just sf <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
               when (sf .&. 1 /= 0) $ do
-                Just renderer <- use $ globals.re
+                Just renderer <- use $ globals.gRenderer
                 (renderer^.rRefExport.reDrawPic) x y "field_3"
 
               drawField x y color width' (fromIntegral value)
@@ -1026,19 +1026,19 @@ executeLayoutString str = do
             "anum" -> do
               -- ammo number
               let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statAmmo
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statAmmo
 
               color <- if | value > 5 -> return 0 -- green
                           | value >= 0 -> do
-                              serverFrame <- use $ globals.cl.csFrame.fServerFrame
+                              serverFrame <- use $ globals.gCl.csFrame.fServerFrame
                               return $ (serverFrame `shiftR` 2) .&. 1
                           | otherwise -> return (-1)
               
               -- negative number = don't show
               unless (color == -1) $ do
-                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+                Just sf <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
                 when (sf .&. 4 /= 0) $ do
-                  Just renderer <- use $ globals.re
+                  Just renderer <- use $ globals.gRenderer
                   (renderer^.rRefExport.reDrawPic) x y "field_3"
 
                 drawField x y color width' (fromIntegral value)
@@ -1048,12 +1048,12 @@ executeLayoutString str = do
             "rnum" -> do
               -- armor number
               let width' = 3
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statArmor
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statArmor
 
               unless (value < 1) $ do
-                Just sf <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
+                Just sf <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix Constants.statFlashes
                 when (sf .&. 2 /= 0) $ do
-                  Just renderer <- use $ globals.re
+                  Just renderer <- use $ globals.gRenderer
                   (renderer^.rRefExport.reDrawPic) x y "field_3"
 
                 drawField x y 0 width' (fromIntegral value)
@@ -1067,13 +1067,13 @@ executeLayoutString str = do
               when (index < 0 || index >= Constants.maxConfigStrings) $
                 Com.comError Constants.errDrop "Bad stat_string index"
 
-              Just csIndexTmp <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix index
+              Just csIndexTmp <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix index
               let csIndex = fromIntegral csIndexTmp
 
               when (csIndex < 0 || csIndex >= Constants.maxConfigStrings) $
                 Com.comError Constants.errDrop "Bad stat_string index"
 
-              Just configStr <- preuse $ globals.cl.csConfigStrings.ix csIndex
+              Just configStr <- preuse $ globals.gCl.csConfigStrings.ix csIndex
 
               Console.drawString x y configStr
 
@@ -1102,7 +1102,7 @@ executeLayoutString str = do
             "if" -> do
               -- draw a number
               (Just tkn, newIdx) <- Com.parse str (B.length str) idx
-              Just value <- preuse $ globals.cl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
+              Just value <- preuse $ globals.gCl.csFrame.fPlayerState.psStats.ix (Lib.atoi tkn)
 
               if value == 0
                 then do
@@ -1151,7 +1151,7 @@ drawField x y color width value = do
                   pic = if color == 0
                           then sbNums1 V.! frame
                           else sbNums2 V.! frame
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawPic) x' y pic
               draw num (x' + charWidth) (idx + 1) maxIdx
 
@@ -1165,7 +1165,7 @@ drawCenterString = do
 
     unless (B.null str) $ do
       centerLines <- use $ scrGlobals.scrCenterLines
-      vidDef' <- use $ globals.vidDef
+      vidDef' <- use $ globals.gVidDef
 
       -- the finale prints the characters one at a time
       let y = if centerLines <= 4
@@ -1204,7 +1204,7 @@ drawCenterString = do
         drawLine str remaining start x y idx maxIdx
           | idx >= maxIdx = return (remaining, x)
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) x y (ord (str `BC.index` (start + idx)))
               if remaining == 0
                 then return (0, x)
@@ -1217,7 +1217,7 @@ drawCenterString = do
 
 readNextFrame :: Quake (Maybe B.ByteString)
 readNextFrame = do
-    Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
+    Just cinematicFileHandle <- use $ globals.gCl.csCinematicFile
 
     -- read the next frame
     command <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
@@ -1230,9 +1230,9 @@ readNextFrame = do
       else do
         when (command == 1) $ do
           -- read palette
-          io (B.hGet cinematicFileHandle 768) >>= (globals.cl.csCinematicPalette .=)
+          io (B.hGet cinematicFileHandle 768) >>= (globals.gCl.csCinematicPalette .=)
           -- dubious... exposes an edge case
-          globals.cl.csCinematicPaletteActive .= False
+          globals.gCl.csCinematicPaletteActive .= False
 
         -- decompress the next frame
         size <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
@@ -1244,7 +1244,7 @@ readNextFrame = do
         let compressed' = compressed `B.append` (B.replicate (0x20000 - size) 0)
 
         -- read sound
-        cinematicFrame <- use $ globals.cl.csCinematicFrame
+        cinematicFrame <- use $ globals.gCl.csCinematicFrame
         cin <- use $ scrGlobals.scrCin
         let start = cinematicFrame * (cin^.cSRate) `div` 14
             end = (cinematicFrame + 1) * (cin^.cSRate) `div` 14
@@ -1256,7 +1256,7 @@ readNextFrame = do
         io $ hSeek cinematicFileHandle AbsoluteSeek (fromIntegral (fromIntegral position + count * (cin^.cSWidth) * (cin^.cSChannels)))
         
         pic <- huff1Decompress compressed' size
-        globals.cl.csCinematicFrame += 1
+        globals.gCl.csCinematicFrame += 1
 
         return (Just pic)
 
@@ -1316,7 +1316,7 @@ debugGraph _ _ = return () -- IMPLEMENT ME!
 
 playCinematic :: B.ByteString -> Quake ()
 playCinematic arg = do
-    globals.cl.csCinematicFrame .= 0
+    globals.gCl.csCinematicFrame .= 0
 
     if ".pcx" `BC.isSuffixOf` arg
       then do
@@ -1326,34 +1326,34 @@ playCinematic arg = do
         (picSize, Just palette, Just cinematics') <- loadPCX name True (Just cinematics)
         scrGlobals.scrCin .= cinematics'
 
-        zoom (globals.cl) $ do
+        zoom (globals.gCl) $ do
           csCinematicFrame .= -1
           csCinematicTime .= 1
 
         endLoadingPlaque
 
-        globals.cls.csState .= Constants.caActive
+        globals.gCls.csState .= Constants.caActive
 
         when (picSize == 0 || isNothing (cinematics'^.cPic)) $ do
           Com.println (name `B.append` " not found.")
-          globals.cl.csCinematicTime .= 0
+          globals.gCl.csCinematicTime .= 0
         
       else do
         let name = "video/" `B.append` arg
         -- cinematicFile <- FS.loadMappedFile name
         cinematicFile <- FS.fOpenFile name
-        globals.cl.csCinematicFile .= cinematicFile
+        globals.gCl.csCinematicFile .= cinematicFile
         
         case cinematicFile of
           Nothing -> do
             -- Com.comError Constants.errDrop ("Cinematic " `B.append` name `B.append` " not found.\n")
             finishCinematic
-            globals.cl.csCinematicTime .= 0
+            globals.gCl.csCinematicTime .= 0
 
           Just cinematicFileHandle -> do
             endLoadingPlaque
 
-            globals.cls.csState .= Constants.caActive
+            globals.gCls.csState .= Constants.caActive
 
             width     <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
             height    <- io $ BL.hGet cinematicFileHandle 4 >>= return . (runGet getInt)
@@ -1371,9 +1371,9 @@ playCinematic arg = do
             huff1TableInit
 
             scrGlobals.scrCin.cRestartSound .= True
-            globals.cl.csCinematicFrame .= 0
+            globals.gCl.csCinematicFrame .= 0
             readNextFrame >>= (scrGlobals.scrCin.cPic .=)
-            Timer.milliseconds >>= \ms -> globals.cl.csCinematicTime .= ms
+            Timer.milliseconds >>= \ms -> globals.gCl.csCinematicTime .= ms
 
 loadPCX :: B.ByteString -> Bool -> Maybe CinematicsT -> Quake (Int, Maybe B.ByteString, Maybe CinematicsT)
 loadPCX fileName loadPalette cinematics = do
@@ -1386,7 +1386,7 @@ loadPCX fileName loadPalette cinematics = do
 -}
 touchPics :: Quake ()
 touchPics = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     void $ V.mapM (renderer^.rRefExport.reRegisterPic) sbNums1
 
     crosshairCVar >>= \crosshair ->
@@ -1418,7 +1418,7 @@ touchPics = do
 centerPrint :: B.ByteString -> Quake ()
 centerPrint str = do
     centerTimeValue <- liftM (^.cvValue) scrCenterTimeCVar
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
 
     zoom scrGlobals $ do
       scrCenterString .= str
@@ -1475,7 +1475,7 @@ centerPrint str = do
 
 huff1TableInit :: Quake ()
 huff1TableInit = do
-    Just cinematicFileHandle <- use $ globals.cl.csCinematicFile
+    Just cinematicFileHandle <- use $ globals.gCl.csCinematicFile
     hNodes <- io $ MV.replicate (256 * 256 * 2) 0
     scrGlobals.scrCin.cHNodes1 .= Just hNodes
     tableInit cinematicFileHandle 0 256

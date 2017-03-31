@@ -33,16 +33,16 @@ import qualified Util.Math3D as Math3D
 gunNextF :: XCommandT
 gunNextF =
   XCommandT "V.gunNextF" (do
-    globals.gunFrame += 1
-    gunFrame' <- use $ globals.gunFrame
+    globals.gGunFrame += 1
+    gunFrame' <- use $ globals.gGunFrame
     Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
   )
 
 gunPrevF :: XCommandT
 gunPrevF =
   XCommandT "V.gunPrevF" (do
-    globals.gunFrame %= (\v -> if v - 1 < 0 then 0 else v - 1)
-    gunFrame' <- use $ globals.gunFrame
+    globals.gGunFrame %= (\v -> if v - 1 < 0 then 0 else v - 1)
+    gunFrame' <- use $ globals.gGunFrame
     Com.printf ("frame " `B.append` BC.pack (show gunFrame') `B.append` "\n") -- IMPROVE
   )
 
@@ -53,22 +53,22 @@ gunModelF =
 
     if c /= 2
       then
-        globals.gunModel .= Nothing
+        globals.gGunModel .= Nothing
 
       else do
         v <- Cmd.argv 1
-        Just renderer <- use $ globals.re
+        Just renderer <- use $ globals.gRenderer
 
         let name = "models/" `B.append` v `B.append` "/tris.md2"
             registerModel = renderer^.rRefExport.reRegisterModel
 
-        registerModel name >>= (globals.gunModel .=)
+        registerModel name >>= (globals.gGunModel .=)
   )
 
 viewPosF :: XCommandT
 viewPosF =
   XCommandT "V.viewPosF" (do
-    refDef <- use $ globals.cl.csRefDef
+    refDef <- use $ globals.gCl.csRefDef
     let line = printf "(%i %i %i) : %i\n" (truncate $ refDef^.rdViewOrg._x :: Int) (truncate $ refDef^.rdViewOrg._y :: Int) (truncate $ refDef^.rdViewOrg._z :: Int) (truncate $ refDef^.rdViewAngles._y :: Int) -- IMPROVE: use yaw instead of _y
     Com.printf (BC.pack line)
   )
@@ -99,12 +99,12 @@ renderView stereoSeparation = do
 
       -- an invalid frame will just use the exact previous refdef
       -- we can't use the old frame if the video mode has changed, though...
-      frameValid <- use $ globals.cl.csFrame.fValid
-      forceRefDef <- use $ globals.cl.csForceRefDef
+      frameValid <- use $ globals.gCl.csFrame.fValid
+      forceRefDef <- use $ globals.gCl.csForceRefDef
       pausedValue <- liftM (^.cvValue) clPausedCVar
 
       when (frameValid && (forceRefDef || pausedValue == 0)) $ do
-        globals.cl.csForceRefDef .= False
+        globals.gCl.csForceRefDef .= False
 
         clearScene
 
@@ -127,22 +127,22 @@ renderView stereoSeparation = do
 
         clTestBlendCVar >>= \c ->
           when ((c^.cvValue) /= 0) $
-            globals.cl.csRefDef.rdBlend .= V4 1.0 0.5 0.25 0.5
+            globals.gCl.csRefDef.rdBlend .= V4 1.0 0.5 0.25 0.5
 
         -- offset vieworg appropriately if we're doing stereo separation
         when (stereoSeparation /= 0) $ do
-          vright <- use $ globals.cl.csVRight
+          vright <- use $ globals.gCl.csVRight
           let tmp = fmap (* stereoSeparation) vright
-          globals.cl.csRefDef.rdViewOrg += tmp
+          globals.gCl.csRefDef.rdViewOrg += tmp
 
         -- never let it sit exactly on a node line, because a water plane
         -- can dissapear when viewed with the eye exactly on it.
         -- the server protocol only specifies to 1/8 pixel, so add 1/16 in
         -- each axis
-        vrect <- use $ globals.scrVRect
-        cl' <- use $ globals.cl
+        vrect <- use $ globals.gScrVRect
+        cl' <- use $ globals.gCl
 
-        zoom (globals.cl.csRefDef) $ do
+        zoom (globals.gCl.csRefDef) $ do
           rdViewOrg += (V3 (1.0 / 16) (1.0 / 16) (1.0 / 16))
 
           rdX .= (vrect^.vrX)
@@ -168,37 +168,37 @@ renderView stereoSeparation = do
 
         clAddBlendCVar >>= \c ->
           when ((c^.cvValue) == 0) $
-            globals.cl.csRefDef.rdBlend .= V4 0 0 0 0
+            globals.gCl.csRefDef.rdBlend .= V4 0 0 0 0
 
         use (vGlobals.vgNumEntities) >>= \v ->
-          globals.cl.csRefDef.rdNumEntities .= v
+          globals.gCl.csRefDef.rdNumEntities .= v
 
         use (vGlobals.vgNumParticles) >>= \v ->
-          globals.cl.csRefDef.rdNumParticles .= v
+          globals.gCl.csRefDef.rdNumParticles .= v
 
         use (vGlobals.vgNumDLights) >>= \v ->
-          globals.cl.csRefDef.rdNumDLights .= v
+          globals.gCl.csRefDef.rdNumDLights .= v
 
         use (vGlobals.vgEntities) >>= \v ->
-          globals.cl.csRefDef.rdEntities .= v
+          globals.gCl.csRefDef.rdEntities .= v
 
         use (vGlobals.vgDLights) >>= \v ->
-          globals.cl.csRefDef.rdDLights .= v
+          globals.gCl.csRefDef.rdDLights .= v
 
         use (vGlobals.vgLightStyles) >>= \v ->
-          globals.cl.csRefDef.rdLightStyles .= v
+          globals.gCl.csRefDef.rdLightStyles .= v
 
-        globals.cl.csRefDef.rdRdFlags .= (cl'^.csFrame.fPlayerState.psRDFlags)
+        globals.gCl.csRefDef.rdRdFlags .= (cl'^.csFrame.fPlayerState.psRDFlags)
 
-      Just renderer <- use $ globals.re
-      use (globals.cl.csRefDef) >>= \rd ->
+      Just renderer <- use $ globals.gRenderer
+      use (globals.gCl.csRefDef) >>= \rd ->
         (renderer^.rRefExport.reRenderFrame) rd
 
       clStatsCVar >>= \c ->
         when ((c^.cvValue) /= 0) $
           Com.printf $ "ent: ??? lt: ??? part: ???" -- TODO: add info here!
 
-      logFile <- use $ globals.logStatsFile
+      logFile <- use $ globals.gLogStatsFile
       logStatsCVar >>= \c ->
         when ((c^.cvValue) /= 0 && isJust logFile) $
           io (putStrLn "V.renderView: implement me!")
@@ -207,8 +207,8 @@ renderView stereoSeparation = do
     
   where checkIfShouldSkip :: Quake Bool
         checkIfShouldSkip = do
-          state <- use $ globals.cls.csState
-          refreshPrepped <- use $ globals.cl.csRefreshPrepped
+          state <- use $ globals.gCls.csState
+          refreshPrepped <- use $ globals.gCl.csRefreshPrepped
                                                   -- still loading
           return $ state /= Constants.caActive || not refreshPrepped
 
@@ -217,17 +217,17 @@ renderView stereoSeparation = do
           timeDemoValue <- liftM (^.cvValue) clTimeDemoCVar
 
           when (timeDemoValue /= 0) $ do
-            timeDemoStart <- use $ globals.cl.csTimeDemoStart
+            timeDemoStart <- use $ globals.gCl.csTimeDemoStart
 
             when (timeDemoStart == 0) $ do
               ms <- Timer.milliseconds
-              globals.cl.csTimeDemoStart .= ms
+              globals.gCl.csTimeDemoStart .= ms
 
-            globals.cl.csTimeDemoFrames += 1
+            globals.gCl.csTimeDemoFrames += 1
 
         finishRenderView :: Quake ()
         finishRenderView = do
-          vrect <- use $ globals.scrVRect
+          vrect <- use $ globals.gScrVRect
           SCR.addDirtyPoint (vrect^.vrX) (vrect^.vrY)
           SCR.addDirtyPoint ((vrect^.vrX) + (vrect^.vrWidth) - 1) ((vrect^.vrY) + (vrect^.vrHeight) - 1)
           SCR.drawCrosshair
@@ -259,7 +259,7 @@ testParticles = do
         addTestParticles testParticlesValue idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              cl' <- use $ globals.cl
+              cl' <- use $ globals.gCl
 
               let d = fromIntegral idx * 0.25
                   r = 4 * (fromIntegral (idx .&. 7) - 3.5)
@@ -286,7 +286,7 @@ testEntities = do
         addTestEntities entities idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              cl' <- use $ globals.cl
+              cl' <- use $ globals.gCl
 
               let ref = entities V.! idx
                   r = 64 * (fromIntegral (idx `mod` 4) - 1.5)
@@ -316,7 +316,7 @@ testLights = do
         addTestLights idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              cl' <- use $ globals.cl
+              cl' <- use $ globals.gCl
 
               let r = 64 * (fromIntegral (idx `mod` 4) - 1.5)
                   f = 64 * (fromIntegral idx / 4) + 128

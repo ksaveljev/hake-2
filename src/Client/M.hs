@@ -183,7 +183,7 @@ checkBottom edictRef = do
                       start' = V3 a' b' (mins^._z)
                       stop' = V3 a' b' ((mins^._z) - 2 * (fromIntegral Constants.stepSize))
 
-                  v3o <- use $ globals.vec3Origin
+                  v3o <- use $ globals.gVec3Origin
                   traceT <- trace start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
 
                   if (traceT^.tFraction) == 1
@@ -217,7 +217,7 @@ checkBottom edictRef = do
                   start' = V3 a b (start^._z)
                   stop' = V3 a b (stop^._z)
 
-              v3o <- use $ globals.vec3Origin
+              v3o <- use $ globals.gVec3Origin
               trace <- use $ gameBaseGlobals.gbGameImport.giTrace
               traceT <- trace start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
 
@@ -396,7 +396,7 @@ worldEffects edictRef = do
                             let dmg :: Int = 2 + 2 * floor (levelTime - (edict^.eAirFinished))
                                 dmg' = if dmg > 15 then 15 else dmg
 
-                            v3o <- use $ globals.vec3Origin
+                            v3o <- use $ globals.gVec3Origin
                             GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
 
                             modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
@@ -412,7 +412,7 @@ worldEffects edictRef = do
                             let dmg :: Int = 2 + 2 * floor (levelTime - (edict^.eAirFinished))
                                 dmg' = if dmg > 15 then 15 else dmg
 
-                            v3o <- use $ globals.vec3Origin
+                            v3o <- use $ globals.gVec3Origin
                             GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
 
                             modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
@@ -427,7 +427,7 @@ worldEffects edictRef = do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
             when ((edict^.eDamageDebounceTime) < levelTime) $ do
-              v3o <- use $ globals.vec3Origin
+              v3o <- use $ globals.gVec3Origin
               GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (10 * (edict^.eWaterLevel)) 0 0 Constants.modLava
 
         checkSlime :: Quake ()
@@ -438,7 +438,7 @@ worldEffects edictRef = do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
             when ((edict^.eDamageDebounceTime) < levelTime) $ do
-              v3o <- use $ globals.vec3Origin
+              v3o <- use $ globals.gVec3Origin
               GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (4 * (edict^.eWaterLevel)) 0 0 Constants.modSlime
 
         checkInWater :: Quake ()

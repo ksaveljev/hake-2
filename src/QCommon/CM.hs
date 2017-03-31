@@ -947,7 +947,7 @@ boxTrace start end mins maxs headNode brushMask = do
     cmGlobals.cmCheckCount += 1
 
     -- for statistics, may be zeroed
-    globals.cTraces += 1
+    globals.gCTraces += 1
 
     -- fill in a default trace
     -- was: memset(& trace_trace, 0, sizeof(trace_trace));
@@ -1189,7 +1189,7 @@ traceToLeaf leafNum = do
 clipBoxToBrush :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
 clipBoxToBrush mins maxs p1 p2 traceLens brush = do
     unless ((brush^.cbNumSides) == 0) $ do
-      globals.cBrushTraces += 1
+      globals.gCBrushTraces += 1
 
       (done, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide) <- findIntersections (-1) 1 Nothing False False Nothing 0 (brush^.cbNumSides)
 
@@ -1382,7 +1382,7 @@ pointLeafNum p = do
 pointLeafNumR :: V3 Float -> Int -> Quake Int
 pointLeafNumR p num = do
     num' <- findNum num
-    globals.cPointContents += 1 -- optimize counter
+    globals.gCPointContents += 1 -- optimize counter
 
     return $ (-1) - num'
 

@@ -40,7 +40,7 @@ colorTable = UV.fromList [ 2 * 8, 13 * 8, 21 * 8, 18 * 8 ]
 
 runDLights :: Quake ()
 runDLights = do
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     dLights <- use $ clientGlobals.cgDLights
     io $ runDLight dLights (fromIntegral time) 0 Constants.maxDLights
 
@@ -59,7 +59,7 @@ runDLights = do
 
 runLightStyles :: Quake ()
 runLightStyles = do
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     lastOfs <- use $ clientGlobals.cgLastOfs
     let ofs = time `div` 100
 
@@ -123,7 +123,7 @@ clearLightStyles = do
 -- Int is reference to globals.cl.csConfigStrings
 setLightStyle :: Int -> Quake () 
 setLightStyle csIdx = do
-    Just str <- preuse $ globals.cl.csConfigStrings.ix (csIdx + Constants.csLights)
+    Just str <- preuse $ globals.gCl.csConfigStrings.ix (csIdx + Constants.csLights)
     let len = B.length str
 
     when (len >= Constants.maxQPath) $
@@ -158,7 +158,7 @@ teleporterParticles ent = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
 
               o1 <- Lib.rand
               o2 <- Lib.rand
@@ -195,7 +195,7 @@ bigTeleportParticles org = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               color <- Lib.rand >>= \r -> return $ fromIntegral (colorTable UV.! (fromIntegral r .&. 3))
               angle <- Lib.rand >>= \r -> return $ pi * 2 * fromIntegral (r .&. 1023) / 1023.0
               dist <- Lib.rand >>= \r -> return $ fromIntegral (r .&. 31)
@@ -263,7 +263,7 @@ entityEvent entityState = do
 addParticles :: Quake ()
 addParticles = do
     activeParticles <- use $ clientGlobals.cgActiveParticles
-    cl' <- use $ globals.cl
+    cl' <- use $ globals.gCl
     addParticle cl' activeParticles Nothing Nothing 0
 
   where addParticle :: ClientStateT -> Maybe (IORef CParticleT) -> Maybe (IORef CParticleT) -> Maybe (IORef CParticleT) -> Float -> Quake ()
@@ -364,7 +364,7 @@ itemRespawnParticles org = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               color <- Lib.rand >>= \r -> return (r .&. 3)
 
               o1 <- Lib.crandom
@@ -404,7 +404,7 @@ teleportParticles org = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               color <- Lib.rand >>= \r -> return $ fromIntegral (r .&. 7)
 
               av <- Lib.rand
@@ -447,7 +447,7 @@ particleEffect org dir color count = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              pTime <- use $ globals.cl.csTime
+              pTime <- use $ globals.gCl.csTime
               r <- Lib.rand
               let pColor = color + fromIntegral (r .&. 7)
               d <- liftM (fromIntegral . (.&. 31)) Lib.rand
@@ -496,7 +496,7 @@ particleEffect2 org dir color count = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
 
               d <- Lib.rand >>= \r -> return (fromIntegral (r .&. 7))
               o1 <- Lib.rand
@@ -534,7 +534,7 @@ particleEffect3 org dir color count = do
               clientGlobals.cgFreeParticles .= (p^.cpNext)
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               d <- Lib.rand >>= \r -> return (fromIntegral (r .&. 7))
               o1 <- Lib.rand
               o2 <- Lib.rand
@@ -571,7 +571,7 @@ explosionParticles org = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              pTime <- use $ globals.cl.csTime
+              pTime <- use $ globals.gCl.csTime
               r <- Lib.rand
               let pColor = 0xE0 + fromIntegral (r .&. 7)
 
@@ -631,7 +631,7 @@ blasterParticles org dir = do
                   io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles })
                   clientGlobals.cgActiveParticles .= Just pRef
 
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
                   r <- Lib.rand
                   d <- liftM (fromIntegral . (.&. 15)) Lib.rand
                   o1 <- Lib.rand
@@ -684,7 +684,7 @@ railTrail start end = do
                   s = sin d
                   dir = fmap (* c) right + fmap (* s) up
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               r <- Lib.rand
 
@@ -710,7 +710,7 @@ railTrail start end = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               r <- Lib.rand
 
@@ -748,7 +748,7 @@ bfgExplosionParticles org = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
               o1 <- Lib.rand
               o2 <- Lib.rand
@@ -790,7 +790,7 @@ bubbleTrail start end = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
               f <- Lib.randomF
               o1 <- Lib.crandom
@@ -814,19 +814,19 @@ bubbleTrail start end = do
 
 parseMuzzleFlash :: Quake ()
 parseMuzzleFlash = do
-    i <- MSG.readShort (globals.netMessage)
+    i <- MSG.readShort (globals.gNetMessage)
 
     when (i < 1 || i >= Constants.maxEdicts) $
       Com.comError Constants.errDrop "CL_ParseMuzzleFlash: bad entity"
 
-    w <- MSG.readByte (globals.netMessage)
+    w <- MSG.readByte (globals.gNetMessage)
     let silenced = w .&. Constants.mzSilenced
         weapon = w .&. (complement Constants.mzSilenced)
 
-    Just pl <- preuse $ globals.clEntities.ix i
+    Just pl <- preuse $ globals.gClEntities.ix i
     dlRef <- allocDLight i
     r <- Lib.rand
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
 
     let (Just fv, Just rv, _) = Math3D.angleVectors (pl^.ceCurrent.esAngles) True True False
         origin = (pl^.ceCurrent.esOrigin)
@@ -891,7 +891,7 @@ parseMuzzleFlash = do
 
        | weapon == Constants.mzChaingun2 -> do
            r <- Lib.rand
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlRadius = 225 + fromIntegral (r .&. 31)
                                             , _cdlColor = V3 1 0.5 0
                                             , _cdlDie = fromIntegral time + 0.1 -- long delay
@@ -908,7 +908,7 @@ parseMuzzleFlash = do
 
        | weapon == Constants.mzChaingun3 -> do
            r <- Lib.rand
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlRadius = 250 + fromIntegral (r .&. 31)
                                             , _cdlColor = V3 1 1 0
                                             , _cdlDie = fromIntegral time + 0.1 -- long delay
@@ -953,7 +953,7 @@ parseMuzzleFlash = do
            S.startSound Nothing (newEdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
 
        | weapon == Constants.mzLogin -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 0
                                             , _cdlDie = fromIntegral time + 1.0
                                             })
@@ -962,7 +962,7 @@ parseMuzzleFlash = do
            logoutEffect (pl^.ceCurrent.esOrigin) weapon
 
        | weapon == Constants.mzLogout -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0 0
                                             , _cdlDie = fromIntegral time + 1.0
                                             })
@@ -971,7 +971,7 @@ parseMuzzleFlash = do
            logoutEffect (pl^.ceCurrent.esOrigin) weapon
 
        | weapon == Constants.mzRespawn -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
                                             , _cdlDie = fromIntegral time + 1.0
                                             })
@@ -1000,7 +1000,7 @@ parseMuzzleFlash = do
            S.startSound Nothing (newEdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
 
        | weapon == Constants.mzHeatBeam -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
                                             , _cdlDie = fromIntegral time + 100
                                             })
@@ -1018,25 +1018,25 @@ parseMuzzleFlash = do
            S.startSound Nothing (newEdictReference i) Constants.chanWeapon soundIdx volume Constants.attnNorm 0
 
        | weapon == Constants.mzNuke1 -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 0 0
                                             , _cdlDie = fromIntegral time + 100
                                             })
 
        | weapon == Constants.mzNuke2 -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
                                             , _cdlDie = fromIntegral time + 100
                                             })
 
        | weapon == Constants.mzNuke4 -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 0 1
                                             , _cdlDie = fromIntegral time + 100
                                             })
 
        | weapon == Constants.mzNuke8 -> do
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 0 1 1
                                             , _cdlDie = fromIntegral time + 100
                                             })
@@ -1045,15 +1045,15 @@ parseMuzzleFlash = do
 
 parseMuzzleFlash2 :: Quake ()
 parseMuzzleFlash2 = do
-    ent <- MSG.readShort (globals.netMessage)
+    ent <- MSG.readShort (globals.gNetMessage)
 
     when (ent < 1 || ent >= Constants.maxEdicts) $
       Com.comError Constants.errDrop "CL_ParseMuzzleFlash2: bad entity"
 
-    flashNumber <- MSG.readByte (globals.netMessage)
+    flashNumber <- MSG.readByte (globals.gNetMessage)
 
     -- locate the origin
-    Just cent <- preuse $ globals.clEntities.ix ent
+    Just cent <- preuse $ globals.gClEntities.ix ent
     let (Just forward, Just right, _) = Math3D.angleVectors (cent^.ceCurrent.esAngles) True True False
         a = (cent^.ceCurrent.esOrigin._x) + (forward^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._x) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y)
         b = (cent^.ceCurrent.esOrigin._y) + (forward^._y) * ((MFlash.monsterFlashOffset V.! flashNumber)^._x) + (right^._y) * ((MFlash.monsterFlashOffset V.! flashNumber)^._y)
@@ -1062,7 +1062,7 @@ parseMuzzleFlash2 = do
 
     dlRef <- allocDLight ent
     r <- Lib.rand
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
 
     io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = origin
                                      , _cdlRadius = 200 + fromIntegral (r .&. 31)
@@ -1085,7 +1085,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2InfantryMachinegun13
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "infantry/infatck1.wav"
@@ -1101,7 +1101,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2SoldierMachinegun8
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "soldier/solatck3.wav"
@@ -1117,7 +1117,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2GunnerMachinegun8
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "gunner/gunatck2.wav"
@@ -1133,7 +1133,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2TurretMachinegun
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "infantry/infatck1.wav"
@@ -1148,7 +1148,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2CarrierMachinegunL2
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "infantry/infatck1.wav"
@@ -1233,7 +1233,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2TankMachinegun19
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            r <- Lib.rand
@@ -1317,7 +1317,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2JorgMachinegunL6
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
            soundIdx <- S.registerSound "boss3/xfire.wav"
@@ -1331,7 +1331,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2JorgMachinegunR6
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
 
@@ -1347,7 +1347,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2CarrierMachinegunR2
                             ] -> do
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0 })
-           v3o <- use $ globals.vec3Origin
+           v3o <- use $ globals.gVec3Origin
            particleEffect origin v3o 0 40
            CLTEnt.smokeAndFlash origin
 
@@ -1419,7 +1419,7 @@ parseMuzzleFlash2 = do
                             , Constants.mz2Widow2BeamSweep11
                             ] -> do
            r <- Lib.rand
-           time <- use $ globals.cl.csTime
+           time <- use $ globals.gCl.csTime
            io $ modifyIORef' dlRef (\v -> v { _cdlColor = V3 1 1 0
                                             , _cdlRadius = 300 + fromIntegral (r .&. 100)
                                             , _cdlDie = fromIntegral time + 200
@@ -1440,7 +1440,7 @@ allocDLight key = do
 
       Nothing -> do
         -- then look for anything else
-        time <- use $ globals.cl.csTime
+        time <- use $ globals.gCl.csTime
         anyMatch <- io $ findAnyDLight (fromIntegral time) dLights 0 Constants.maxDLights
 
         case anyMatch of
@@ -1493,7 +1493,7 @@ logoutEffect org pType = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
               f <- Lib.randomF
               o1 <- Lib.randomF
@@ -1548,7 +1548,7 @@ rocketTrail start end oldIdx = do
                   activeParticles <- use $ clientGlobals.cgActiveParticles
                   clientGlobals.cgActiveParticles .= Just pRef
 
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
                   r <- Lib.rand
                   f <- Lib.randomF
                   o1 <- Lib.crandom
@@ -1594,7 +1594,7 @@ blasterTrail start end = do
 
                 Just pRef -> do
                   activeParticles <- use $ clientGlobals.cgActiveParticles
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
 
                   p <- io $ readIORef pRef
                   clientGlobals.cgFreeParticles .= (p^.cpNext)
@@ -1628,7 +1628,7 @@ diminishingTrail start end oldIdx flags= do
         len = norm vec
         vec' = fmap (* 0.5) (normalize vec)
 
-    Just old <- preuse $ globals.clEntities.ix oldIdx
+    Just old <- preuse $ globals.gClEntities.ix oldIdx
 
     let (orgScale, velScale) = if | (old^.ceTrailCount) > 900 -> (4, 15)
                                   | (old^.ceTrailCount) > 800 -> (2, 10)
@@ -1643,7 +1643,7 @@ diminishingTrail start end oldIdx flags= do
           | len <= 0 = return ()
           | otherwise = do
               r <- Lib.rand
-              Just old <- preuse $ globals.clEntities.ix oldIdx
+              Just old <- preuse $ globals.gClEntities.ix oldIdx
 
               -- drop less particles as it flies
               if fromIntegral (r .&. 1023) < (old^.ceTrailCount)
@@ -1653,7 +1653,7 @@ diminishingTrail start end oldIdx flags= do
                   activeParticles <- use $ clientGlobals.cgActiveParticles
                   clientGlobals.cgActiveParticles .= Just pRef
                   
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
                   f <- Lib.randomF
                   color' <- Lib.rand
                   o1 <- Lib.crandom
@@ -1696,18 +1696,18 @@ diminishingTrail start end oldIdx flags= do
                                                          , _cpVel = fmap (* velScale) (V3 v1 v2 v3)
                                                          })
 
-                  globals.clEntities.ix oldIdx.ceTrailCount %= (\v -> if v - 5 < 100 then 100 else v - 5)
+                  globals.gClEntities.ix oldIdx.ceTrailCount %= (\v -> if v - 5 < 100 then 100 else v - 5)
                   addDiminishingTrail (p^.cpNext) vec (move + vec) orgScale velScale (len - 0.5)
 
                 else do
-                  globals.clEntities.ix oldIdx.ceTrailCount %= (\v -> if v - 5 < 100 then 100 else v - 5)
+                  globals.gClEntities.ix oldIdx.ceTrailCount %= (\v -> if v - 5 < 100 then 100 else v - 5)
                   addDiminishingTrail (Just pRef) vec (move + vec) orgScale velScale (len - 0.5)
 
 -- TODO: entIdx should be CEntityReference
 flyEffect :: Int -> V3 Float -> Quake ()
 flyEffect entIdx origin = do
-    Just ent <- preuse $ globals.clEntities.ix entIdx
-    time <- use $ globals.cl.csTime
+    Just ent <- preuse $ globals.gClEntities.ix entIdx
+    time <- use $ globals.gCl.csTime
 
     let (startTime, flyStopTime) = if (ent^.ceFlyStopTime) < time
                                      then (time, time + 60000)
@@ -1720,7 +1720,7 @@ flyEffect entIdx origin = do
                             then (n' * 162) `div` 20000
                             else 162
 
-    globals.clEntities.ix entIdx.ceFlyStopTime .= flyStopTime
+    globals.gClEntities.ix entIdx.ceFlyStopTime .= flyStopTime
 
     flyParticles origin count
 
@@ -1736,7 +1736,7 @@ flyParticles origin count = do
       aVelocities <- V.replicateM Constants.numVertexNormals genAVelocity
       clientGlobals.cgAVelocities .= aVelocities
 
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     let lTime  = fromIntegral time / 1000
 
     freeParticles <- use $ clientGlobals.cgFreeParticles
@@ -1776,7 +1776,7 @@ flagTrail start end color = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               o1 <- Lib.crandom
               o2 <- Lib.crandom

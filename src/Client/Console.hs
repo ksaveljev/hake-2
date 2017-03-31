@@ -27,7 +27,7 @@ import qualified QCommon.CVar as CVar
 
 init :: Quake ()
 init = do
-    globals.con.cLineWidth .= -1
+    globals.gCon.cLineWidth .= -1
 
     checkResize
 
@@ -43,37 +43,37 @@ init = do
     Cmd.addCommand "clear" (Just clearF)
     Cmd.addCommand "condump" (Just dumpF)
 
-    globals.con.cInitialized .= True
+    globals.gCon.cInitialized .= True
 
 -- If the line width has changed, reformat the buffer.
 checkResize :: Quake ()
 checkResize = do
-    vidDefWidth <- use $ globals.vidDef.vdWidth
+    vidDefWidth <- use $ globals.gVidDef.vdWidth
 
     let w = (vidDefWidth `shiftR` 3) - 2
         width = if w > Constants.maxCmdLine
                   then Constants.maxCmdLine
                   else w
 
-    lineWidth <- use $ globals.con.cLineWidth
+    lineWidth <- use $ globals.gCon.cLineWidth
 
     unless (width == lineWidth) $ do
       if width < 1 -- video hasn't been initialized yet
         then do
-          zoom (globals.con) $ do
+          zoom (globals.gCon) $ do
             cLineWidth .= 38
             cTotalLines .= Constants.conTextSize `div` 38
 
-          use (globals.con.cText) >>= \text ->
+          use (globals.gCon.cText) >>= \text ->
             io $ text `MSV.set` ' '
 
         else do
-          oldWidth <- use $ globals.con.cLineWidth
-          globals.con.cLineWidth .= width
+          oldWidth <- use $ globals.gCon.cLineWidth
+          globals.gCon.cLineWidth .= width
 
           let totalLines = Constants.conTextSize `div` width
-          oldTotalLines <- use $ globals.con.cTotalLines
-          globals.con.cTotalLines .= totalLines
+          oldTotalLines <- use $ globals.gCon.cTotalLines
+          globals.gCon.cTotalLines .= totalLines
 
           let numLines = if totalLines < oldTotalLines
                            then totalLines
@@ -83,16 +83,16 @@ checkResize = do
                            then width
                            else oldWidth
 
-          currentLine <- use $ globals.con.cCurrent
-          use (globals.con.cText) >>= \text -> do
+          currentLine <- use $ globals.gCon.cCurrent
+          use (globals.gCon.cText) >>= \text -> do
             tbuf <- io $ MSV.clone text
             fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines width 0 0 numLines numChars
 
           clearNotify
 
-      totalLines <- use $ globals.con.cTotalLines
-      globals.con.cCurrent .= totalLines - 1
-      globals.con.cDisplay .= totalLines - 1
+      totalLines <- use $ globals.gCon.cTotalLines
+      globals.gCon.cCurrent .= totalLines - 1
+      globals.gCon.cDisplay .= totalLines - 1
 
   where fillInBuf :: MSV.IOVector Char -> MSV.IOVector Char -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
         fillInBuf text tbuf oldTotalLines oldWidth currentLine totalLines lineWidth i j maxI maxJ
@@ -119,22 +119,22 @@ toggleChatF =
 messageModeF :: XCommandT
 messageModeF =
   XCommandT "Console.messageModeF" (do
-    globals.chatTeam .= False
-    globals.cls.csKeyDest .= Constants.keyMessage
+    globals.gChatTeam .= False
+    globals.gCls.csKeyDest .= Constants.keyMessage
   )
 
 messageMode2F :: XCommandT
 messageMode2F =
   XCommandT "Console.messageMode2F" (do
-    globals.chatTeam .= True
-    globals.cls.csKeyDest .= Constants.keyMessage
+    globals.gChatTeam .= True
+    globals.gCls.csKeyDest .= Constants.keyMessage
   )
 
 clearF :: XCommandT
 clearF =
   XCommandT "Console.clearF" (do
     text <- io $ MSV.replicate Constants.conTextSize ' '
-    globals.con.cText .= text
+    globals.gCon.cText .= text
   )
 
 dumpF :: XCommandT
@@ -144,7 +144,7 @@ dumpF =
   )
 
 clearNotify :: Quake ()
-clearNotify = globals.con.cTimes .= UV.replicate Constants.numConTimes 0
+clearNotify = globals.gCon.cTimes .= UV.replicate Constants.numConTimes 0
 
 drawAltString :: Int -> Int -> B.ByteString -> Quake ()
 drawAltString x y s = do
@@ -154,7 +154,7 @@ drawAltString x y s = do
         draw x' idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) x' y ((ord $ s `BC.index` idx) `xor` 0x80)
               draw (x' + 8) (idx + 1) maxIdx
 
@@ -166,7 +166,7 @@ drawString x y s =
         draw x' idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) x' y (ord $ s `BC.index` idx)
               draw (x' + 8) (idx + 1) maxIdx
 
@@ -177,7 +177,7 @@ drawString x y s =
 -}
 drawConsole :: Float -> Quake ()
 drawConsole frac = do
-    vidDef' <- use $ globals.vidDef
+    vidDef' <- use $ globals.gVidDef
 
     let width = vidDef'^.vdWidth
         height = vidDef'^.vdHeight
@@ -189,7 +189,7 @@ drawConsole frac = do
                        else tmpLinesNum
 
       -- draw the background
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
       (renderer^.rRefExport.reDrawStretchPic) 0 (-height + linesNum) width height "conback"
       SCR.addDirtyPoint 0 0
       SCR.addDirtyPoint (width - 1) (linesNum - 1)
@@ -198,8 +198,8 @@ drawConsole frac = do
       drawVersion version width linesNum 0 5
 
       -- draw the text
-      globals.con.cVisLines .= linesNum
-      console <- use $ globals.con
+      globals.gCon.cVisLines .= linesNum
+      console <- use $ globals.gCon
 
       (rows, y) <- do
         let rows = (linesNum - 22) `shiftR` 3 -- rows of text to draw
@@ -217,7 +217,7 @@ drawConsole frac = do
       let row = console^.cDisplay
       drawText console row y 0 rows
 
-      download <- use $ globals.cls.csDownload
+      download <- use $ globals.gCls.csDownload
 
       when (isJust download) $ do
         io (putStrLn "Console.drawConsole") >> undefined -- TODO
@@ -229,7 +229,7 @@ drawConsole frac = do
         drawVersion version width linesNum idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) (width - 44 + idx * 8) (linesNum - 12) (128 + ord (BC.index version idx))
               drawVersion version width linesNum (idx + 1) maxIdx
 
@@ -237,7 +237,7 @@ drawConsole frac = do
         drawArrows x maxX y
           | x >= maxX = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) ((x + 1) `shiftL` 3) y (ord '^')
               drawArrows (x + 4) maxX y
 
@@ -245,7 +245,7 @@ drawConsole frac = do
         drawText console row y idx maxIdx
           | idx >= maxIdx || row < 0 || (console^.cCurrent) - row >= (console^.cTotalLines) = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               let first = (row `mod` (console^.cTotalLines)) * (console^.cLineWidth)
                   drawChar = renderer^.rRefExport.reDrawChar
               drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
@@ -266,15 +266,15 @@ drawConsole frac = do
 -}
 drawNotify :: Quake ()
 drawNotify = do
-    console <- use $ globals.con
-    vidDefWidth <- use $ globals.vidDef.vdWidth
-    cls' <- use $ globals.cls
+    console <- use $ globals.gCon
+    vidDefWidth <- use $ globals.gVidDef.vdWidth
+    cls' <- use $ globals.gCls
 
     v <- draw cls' console 0 ((console^.cCurrent) - Constants.numConTimes + 1) (console^.cCurrent)
 
     v' <- if (cls'^.csKeyDest) == Constants.keyMessage
             then do
-              chatTeam' <- use $ globals.chatTeam
+              chatTeam' <- use $ globals.gChatTeam
               skip <- if chatTeam'
                         then do
                           drawString 8 v "say_team:"
@@ -283,8 +283,8 @@ drawNotify = do
                           drawString 8 v "say:"
                           return 5
 
-              s <- use $ globals.chatBuffer
-              chatLen <- use $ globals.chatBufferLen
+              s <- use $ globals.gChatBuffer
+              chatLen <- use $ globals.gChatBufferLen
               let s' = if chatLen > (vidDefWidth `shiftR` 3) - (skip + 1)
                          then B.drop (chatLen - ((vidDefWidth `shiftR` 3) - (skip + 1))) s 
                          else s
@@ -320,7 +320,7 @@ drawNotify = do
         drawText console v text idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               c <- io $ MSV.read (console^.cText) (text + idx)
               (renderer^.rRefExport.reDrawChar) ((idx + 1) `shiftL` 3) v (ord c)
               drawText console v text (idx + 1) maxIdx
@@ -328,11 +328,11 @@ drawNotify = do
         drawChat :: B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
         drawChat s skip v idx maxIdx
           | idx >= maxIdx = do
-              realTime <- use $ globals.cls.csRealTime
-              Just renderer <- use $ globals.re
+              realTime <- use $ globals.gCls.csRealTime
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) ((idx + skip) `shiftL` 3) v (10 + ((realTime `shiftR` 8) .&. 1))
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               (renderer^.rRefExport.reDrawChar) ((idx + skip) `shiftL` 3) v (ord $ s `BC.index` idx)
               drawChat s skip v (idx + 1) maxIdx
               
@@ -345,17 +345,17 @@ drawNotify = do
 -}
 drawInput :: Quake ()
 drawInput = do
-    keyDest <- use $ globals.cls.csKeyDest
-    state <- use $ globals.cls.csState
+    keyDest <- use $ globals.gCls.csKeyDest
+    state <- use $ globals.gCls.csState
                                             -- don't draw anything (always draw if not active)
     unless (keyDest == Constants.keyMenu || (keyDest /= Constants.keyConsole && state == Constants.caActive)) $ do
-      editLine' <- use $ globals.editLine
-      Just text <- preuse $ globals.keyLines.ix editLine'
-      linePos <- use $ globals.keyLinePos
-      lineWidth <- use $ globals.con.cLineWidth
+      editLine' <- use $ globals.gEditLine
+      Just text <- preuse $ globals.gKeyLines.ix editLine'
+      linePos <- use $ globals.gKeyLinePos
+      lineWidth <- use $ globals.gCon.cLineWidth
 
       -- add the cursor frame and fill out remainder with spaces
-      realTime <- use $ globals.cls.csRealTime
+      realTime <- use $ globals.gCls.csRealTime
       let cursorFrame :: Word8 = fromIntegral $ 10 + ((realTime `shiftR` 8) .&. 1)
           fullLine = text `B.append` B.unfoldr (\i -> if i == 0 
                                                         then Just (cursorFrame, 1) 
@@ -369,8 +369,8 @@ drawInput = do
                     else 0
 
       -- draw it
-      visLines <- use $ globals.con.cVisLines
-      Just renderer <- use $ globals.re
+      visLines <- use $ globals.gCon.cVisLines
+      Just renderer <- use $ globals.gRenderer
       let drawChar = renderer^.rRefExport.reDrawChar
       drawInputLine drawChar fullLine (visLines - 22) start lineWidth -- TODO: make sure start is here (jake2 bug with not using start?)
 
@@ -390,7 +390,7 @@ drawInput = do
 -}
 print :: B.ByteString -> Quake ()
 print txt = do
-    initialized <- use $ globals.con.cInitialized
+    initialized <- use $ globals.gCon.cInitialized
 
     when initialized $ do
       let (mask, txtpos) = if txt `B.index` 0 == 1 || txt `B.index` 0 == 2
@@ -403,47 +403,47 @@ print txt = do
         printTxt txtpos mask
           | txtpos >= B.length txt = return ()
           | otherwise = do
-              console <- use $ globals.con
+              console <- use $ globals.gCon
 
               let c = txt `BC.index` txtpos
                   len = findWordLen (console^.cLineWidth) txtpos 0
 
               -- word wrap
               when (len /= (console^.cLineWidth) && (console^.cX) + len > (console^.cLineWidth)) $
-                globals.con.cX .= 0
+                globals.gCon.cX .= 0
 
               use (clientGlobals.cgCR) >>= \v ->
                 when (v /= 0) $ do
-                  globals.con.cCurrent -= 1
+                  globals.gCon.cCurrent -= 1
                   clientGlobals.cgCR .= 0
 
-              use (globals.con) >>= \console' ->
+              use (globals.gCon) >>= \console' ->
                 when ((console'^.cX) == 0) $ do
                   lineFeed
                   -- mark time for transparent overlay
                   when ((console'^.cCurrent) >= 0) $ do
-                    realTime <- use $ globals.cls.csRealTime
-                    globals.con.cTimes.ix ((console'^.cCurrent) `mod` Constants.numConTimes) .= fromIntegral realTime
+                    realTime <- use $ globals.gCls.csRealTime
+                    globals.gCon.cTimes.ix ((console'^.cCurrent) `mod` Constants.numConTimes) .= fromIntegral realTime
 
               case c of
                 '\n' -> do
-                  globals.con.cX .= 0
+                  globals.gCon.cX .= 0
                   printTxt (txtpos + 1) mask
 
                 '\r' -> do
-                  globals.con.cX .= 0
+                  globals.gCon.cX .= 0
                   clientGlobals.cgCR .= 1
                   printTxt (txtpos + 1) mask
 
                 _ -> -- display character and advance
-                  use (globals.con) >>= \console' -> do
+                  use (globals.gCon) >>= \console' -> do
                     let y = (console'^.cCurrent) `mod` (console'^.cTotalLines)
                         idx = y * (console'^.cLineWidth) + (console'^.cX)
                         b = (ord c) .|. mask .|. (console'^.cOrMask)
                     io $ MSV.write (console'^.cText) idx (chr b)
-                    globals.con.cX += 1
+                    globals.gCon.cX += 1
                     when ((console'^.cX) + 1 >= (console'^.cLineWidth)) $
-                      globals.con.cX .= 0
+                      globals.gCon.cX .= 0
                     printTxt (txtpos + 1) mask
 
         findWordLen :: Int -> Int -> Int -> Int
@@ -456,15 +456,15 @@ print txt = do
 
 lineFeed :: Quake ()
 lineFeed = do
-    globals.con.cX .= 0
+    globals.gCon.cX .= 0
 
-    use (globals.con) >>= \console ->
+    use (globals.gCon) >>= \console ->
       when ((console^.cDisplay) == (console^.cCurrent)) $
-        globals.con.cDisplay += 1
+        globals.gCon.cDisplay += 1
 
-    globals.con.cCurrent += 1
+    globals.gCon.cCurrent += 1
 
-    use (globals.con) >>= \console -> do
+    use (globals.gCon) >>= \console -> do
       let i = ((console^.cCurrent) `mod` (console^.cTotalLines)) * (console^.cLineWidth)
           e = i + (console^.cLineWidth)
       fillSpaces (console^.cText) i e

@@ -27,24 +27,24 @@ import qualified Util.Math3D as Math3D
 -}
 predictMovement :: Quake ()
 predictMovement = do
-    state <- use $ globals.cls.csState
+    state <- use $ globals.gCls.csState
     pausedValue <- liftM (^.cvValue) clPausedCVar
 
     unless (state /= Constants.caActive || pausedValue /= 0) $ do
       -- io $ print "PREDICT MOVEMENT"
       predictValue <- liftM (^.cvValue) clPredictCVar
-      flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
+      flags <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
 
       if predictValue == 0 || (flags .&. PMoveT.pmfNoPrediction) /= 0
         then do
           -- just set angles
           -- io $ print "JUST SET ANGLES"
-          viewAngles <- use $ globals.cl.csViewAngles
-          deltaAngles <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles
-          globals.cl.csPredictedAngles .= viewAngles + (fmap (Math3D.shortToAngle. fromIntegral) deltaAngles)
+          viewAngles <- use $ globals.gCl.csViewAngles
+          deltaAngles <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles
+          globals.gCl.csPredictedAngles .= viewAngles + (fmap (Math3D.shortToAngle. fromIntegral) deltaAngles)
         else do
-          ack <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
-          current <- use $ globals.cls.csNetChan.ncOutgoingSequence
+          ack <- use $ globals.gCls.csNetChan.ncIncomingAcknowledged
+          current <- use $ globals.gCls.csNetChan.ncOutgoingSequence
           
           -- if we are too far out of date, just freeze
           if current - ack >= Constants.cmdBackup
@@ -55,7 +55,7 @@ predictMovement = do
             else do
               -- io $ print "CALC ANGLES"
               -- copy current state to pmove
-              playerPMove <- use $ globals.cl.csFrame.fPlayerState.psPMoveState
+              playerPMove <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState
               
               let pm = newPMoveT { _pmTrace = predPMTrace
                                  , _pmPointContents = predPMPointContents
@@ -64,7 +64,7 @@ predictMovement = do
 
               -- io $ print ("viewangles1 = " ++ show (pm^.pmViewAngles))
 
-              Just airAccel <- preuse $ globals.cl.csConfigStrings.ix Constants.csAirAccel
+              Just airAccel <- preuse $ globals.gCl.csConfigStrings.ix Constants.csAirAccel
               pMoveGlobals.pmAirAccelerate .= Lib.atof airAccel
               
               -- run frames
@@ -73,30 +73,30 @@ predictMovement = do
               -- io $ print ("viewangles2 = " ++ show (pm'^.pmViewAngles))
 
               let oldFrame = (current - 2) .&. (Constants.cmdBackup - 1)
-              Just oldZ <- preuse $ globals.cl.csPredictedOrigins.ix oldFrame._z
+              Just oldZ <- preuse $ globals.gCl.csPredictedOrigins.ix oldFrame._z
               let step = (pm'^.pmState.pmsOrigin._z) - oldZ
 
               when (step > 63 && step < 160 && ((pm'^.pmState.pmsPMFlags) .&. pmfOnGround /= 0)) $ do
-                realTime <- use $ globals.cls.csRealTime
-                frameTime <- use $ globals.cls.csFrameTime
-                globals.cl.csPredictedStep .= fromIntegral step * 0.125
-                globals.cl.csPredictedStepTime .= truncate (fromIntegral realTime - frameTime * 500)
+                realTime <- use $ globals.gCls.csRealTime
+                frameTime <- use $ globals.gCls.csFrameTime
+                globals.gCl.csPredictedStep .= fromIntegral step * 0.125
+                globals.gCl.csPredictedStepTime .= truncate (fromIntegral realTime - frameTime * 500)
 
               -- copy results out for rendering
-              globals.cl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
-              globals.cl.csPredictedAngles .= (pm'^.pmViewAngles)
+              globals.gCl.csPredictedOrigin .= fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
+              globals.gCl.csPredictedAngles .= (pm'^.pmViewAngles)
 
   where runFrames :: PMoveT -> Int -> Int -> Quake PMoveT
         runFrames pm ack current
           | ack >= current = return pm
           | otherwise = do
               let frame = ack .&. (Constants.cmdBackup - 1)
-              Just cmd <- preuse $ globals.cl.csCmds.ix frame
+              Just cmd <- preuse $ globals.gCl.csCmds.ix frame
 
               pm' <- PMove.pMove pm { _pmCmd = cmd }
 
               -- save for debug checking
-              globals.cl.csPredictedOrigins.ix frame .= (pm'^.pmState.pmsOrigin)
+              globals.gCl.csPredictedOrigins.ix frame .= (pm'^.pmState.pmsOrigin)
 
               runFrames pm' (ack + 1) current
 
@@ -115,17 +115,17 @@ predPMTrace start mins maxs end = do
 
 clipMoveToEntities :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> TraceT -> Quake TraceT
 clipMoveToEntities start mins maxs end tr = do
-    numEntities <- use $ globals.cl.csFrame.fNumEntities
+    numEntities <- use $ globals.gCl.csFrame.fNumEntities
     clipMoveToEntity tr 0 numEntities
 
   where clipMoveToEntity :: TraceT -> Int -> Int -> Quake TraceT
         clipMoveToEntity traceT idx maxIdx
           | idx >= maxIdx = return traceT
           | otherwise = do
-              parseEntities <- use $ globals.cl.csFrame.fParseEntities
+              parseEntities <- use $ globals.gCl.csFrame.fParseEntities
               let num = (parseEntities + idx) .&. (Constants.maxParseEntities - 1)
-              Just ent <- preuse $ globals.clParseEntities.ix num
-              playerNum <- use $ globals.cl.csPlayerNum
+              Just ent <- preuse $ globals.gClParseEntities.ix num
+              playerNum <- use $ globals.gCl.csPlayerNum
 
               if (ent^.esSolid) == 0 || (ent^.esNumber) == playerNum + 1
                 then
@@ -133,7 +133,7 @@ clipMoveToEntities start mins maxs end tr = do
                 else do
                   result <- if (ent^.esSolid) == 31 -- special value for bmodel
                               then do
-                                Just maybeCModel <- preuse $ globals.cl.csModelClip.ix (ent^.esModelIndex)
+                                Just maybeCModel <- preuse $ globals.gCl.csModelClip.ix (ent^.esModelIndex)
 
                                 case maybeCModel of
                                   Nothing -> return Nothing
@@ -149,7 +149,7 @@ clipMoveToEntities start mins maxs end tr = do
                                     bmaxs = V3 x x zu
 
                                 headNode <- CM.headnodeForBox (fmap fromIntegral bmins) (fmap fromIntegral bmaxs)
-                                angles <- use $ globals.vec3Origin -- boxes don't rotate
+                                angles <- use $ globals.gVec3Origin -- boxes don't rotate
                                 return (Just (headNode, angles))
 
                   case result of
@@ -181,7 +181,7 @@ predPMPointContents :: V3 Float -> Quake Int
 predPMPointContents point = do
     contents <- CM.pointContents point 0
 
-    numEntities <- use $ globals.cl.csFrame.fNumEntities
+    numEntities <- use $ globals.gCl.csFrame.fNumEntities
 
     calcContents contents 0 numEntities
 
@@ -189,15 +189,15 @@ predPMPointContents point = do
         calcContents contents idx maxIdx
           | idx >= maxIdx = return contents
           | otherwise = do
-              parseEntities <- use $ globals.cl.csFrame.fParseEntities
+              parseEntities <- use $ globals.gCl.csFrame.fParseEntities
               let num = (parseEntities + idx) .&. (Constants.maxParseEntities - 1)
-              Just ent <- preuse $ globals.clParseEntities.ix num
+              Just ent <- preuse $ globals.gClParseEntities.ix num
 
               if (ent^.esSolid) /= 31 -- special value for bmodel
                 then
                   calcContents contents (idx + 1) maxIdx
                 else do
-                  Just maybeCModel <- preuse $ globals.cl.csModelClip.ix (ent^.esModelIndex)
+                  Just maybeCModel <- preuse $ globals.gCl.csModelClip.ix (ent^.esModelIndex)
 
                   case maybeCModel of
                     Nothing -> calcContents contents (idx + 1) maxIdx
@@ -209,16 +209,16 @@ predPMPointContents point = do
 checkPredictionError :: Quake ()
 checkPredictionError = do
     predictValue <- liftM (^.cvValue) clPredictCVar
-    flags <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
+    flags <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsPMFlags
 
     unless (predictValue == 0 || (flags .&. pmfNoPrediction) /= 0) $ do
       -- calculate the last usercmd_t we sent that the server has processed
-      incomingAcknowledged <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
+      incomingAcknowledged <- use $ globals.gCls.csNetChan.ncIncomingAcknowledged
       let frame = incomingAcknowledged .&. (Constants.cmdBackup - 1)
 
       -- compare what the server returned with what we had predicted it to be
-      origin <- use $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsOrigin
-      Just predictedOrigin <- preuse $ globals.cl.csPredictedOrigins.ix frame
+      origin <- use $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsOrigin
+      Just predictedOrigin <- preuse $ globals.gCl.csPredictedOrigins.ix frame
       let delta = origin - predictedOrigin
 
       -- save the prediction error for interpolation
@@ -226,11 +226,11 @@ checkPredictionError = do
 
       if len > 640 -- 80 world units
         then -- a teleport or something
-          globals.cl.csPredictionError .= V3 0 0 0
+          globals.gCl.csPredictionError .= V3 0 0 0
         else do
           -- TODO: show prediction miss here! (not implemented)
 
-          globals.cl.csPredictedOrigins.ix frame .= origin
+          globals.gCl.csPredictedOrigins.ix frame .= origin
 
           -- save for error interpolation
-          globals.cl.csPredictionError .= fmap ((* 0.125) . fromIntegral) delta
+          globals.gCl.csPredictionError .= fmap ((* 0.125) . fromIntegral) delta

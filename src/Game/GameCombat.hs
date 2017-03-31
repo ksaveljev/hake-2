@@ -58,7 +58,7 @@ radiusDamage inflictorRef attackerRef dmg ignoreRef radius mod' = do
                        doDamage <- canDamage entRef inflictorRef
                        when doDamage $ do
                          let dir = (ent^.eEntityState.esOrigin) - (inflictor^.eEntityState.esOrigin)
-                         v3o <- use $ globals.vec3Origin
+                         v3o <- use $ globals.gVec3Origin
                          damage entRef inflictorRef attackerRef dir (inflictor^.eEntityState.esOrigin) v3o (truncate points') (truncate points') Constants.damageRadius mod'
 
                      radiusDamage' edictit
@@ -245,7 +245,7 @@ canDamage targRef inflictorRef = do
     targ <- readEdictT targRef
     inflictor <- readEdictT inflictorRef
 
-    v3o <- use $ globals.vec3Origin
+    v3o <- use $ globals.gVec3Origin
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
 
     -- bmodels need special checking because their origin is 0,0,0

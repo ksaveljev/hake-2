@@ -75,25 +75,25 @@ downloadF =
                 Com.printf "File already exists.\n"
 
               Nothing -> do
-                globals.cls.csDownloadName .= fileName
+                globals.gCls.csDownloadName .= fileName
                 Com.printf ("Downloading " `B.append` fileName `B.append` "\n")
 
                 -- download to a temp name, and only rename
                 -- to the real name when done, so if interrupted
                 -- a runt file wont be left
-                globals.cls.csDownloadTempName .= (Com.stripExtension fileName) `B.append` ".tmp"
+                globals.gCls.csDownloadTempName .= (Com.stripExtension fileName) `B.append` ".tmp"
 
-                MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-                MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName)
+                MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+                MSG.writeString (globals.gCls.csNetChan.ncMessage) ("download " `B.append` fileName)
 
-                globals.cls.csDownloadNumber += 1
+                globals.gCls.csDownloadNumber += 1
   )
 
 showNet :: B.ByteString -> Quake ()
 showNet str = do
     showNetValue <- liftM (^.cvValue) clShowNetCVar
     when (showNetValue >= 2) $ do
-      readCount <- use $ globals.netMessage.sbReadCount
+      readCount <- use $ globals.gNetMessage.sbReadCount
       Com.printf $ BC.pack (show (readCount - 1)) `B.append` ":" `B.append` str `B.append` "\n"
 
 parseServerMessage :: Quake ()
@@ -104,19 +104,19 @@ parseServerMessage = do
 
     -- we don't know if it is ok to save a demo message until
     -- after we have parsed the frame
-    demoRecording <- use $ globals.cls.csDemoRecording
-    demoWaiting <- use $ globals.cls.csDemoWaiting
+    demoRecording <- use $ globals.gCls.csDemoRecording
+    demoWaiting <- use $ globals.gCls.csDemoWaiting
     when (demoRecording && not demoWaiting) $
       CL.writeDemoMessage
 
   where parseMessage :: Quake ()
         parseMessage = do
-          nm <- use $ globals.netMessage
+          nm <- use $ globals.gNetMessage
 
           if (nm^.sbReadCount) > (nm^.sbCurSize)
             then Com.comError Constants.errFatal "CL_ParseServerMessage: Bad server message:"
             else do
-              cmd <- MSG.readByte (globals.netMessage)
+              cmd <- MSG.readByte (globals.gNetMessage)
 
               if cmd == -1
                 then showNet "END OF MESSAGE"
@@ -133,7 +133,7 @@ parseServerMessage = do
                      | cmd == Constants.svcReconnect -> do
                          Com.printf "Server disconnected, reconnecting\n"
 
-                         download <- use $ globals.cls.csDownload
+                         download <- use $ globals.gCls.csDownload
 
                          case download of
                            Nothing ->
@@ -142,30 +142,30 @@ parseServerMessage = do
                            Just downloadFile -> do
                              -- ZOID, close download
                              io $ handle (\(e :: IOException) -> return ()) (hClose downloadFile)
-                             globals.cls.csDownload .= Nothing
+                             globals.gCls.csDownload .= Nothing
 
-                         globals.cls.csState .= Constants.caConnecting
-                         globals.cls.csConnectTime .= (-99999)
+                         globals.gCls.csState .= Constants.caConnecting
+                         globals.gCls.csConnectTime .= (-99999)
                          -- fire immediately
 
                      | cmd == Constants.svcPrint -> do
-                         i <- MSG.readByte (globals.netMessage)
+                         i <- MSG.readByte (globals.gNetMessage)
 
                          when (i == Constants.printChat) $ do
                            S.startLocalSound "misc/talk.wav"
-                           globals.con.cOrMask .= 128
+                           globals.gCon.cOrMask .= 128
 
-                         str <- MSG.readString (globals.netMessage)
+                         str <- MSG.readString (globals.gNetMessage)
                          Com.printf str
 
-                         globals.con.cOrMask .= 0
+                         globals.gCon.cOrMask .= 0
 
                      | cmd == Constants.svcCenterPrint -> do
-                         str <- MSG.readString (globals.netMessage)
+                         str <- MSG.readString (globals.gNetMessage)
                          SCR.centerPrint str
 
                      | cmd == Constants.svcStuffText -> do
-                         str <- MSG.readString (globals.netMessage)
+                         str <- MSG.readString (globals.gNetMessage)
                          Com.dprintf $ "stufftext: " `B.append` str `B.append` "\n"
                          CBuf.addText str
 
@@ -192,8 +192,8 @@ parseServerMessage = do
                      | cmd == Constants.svcInventory -> CLInv.parseInventory
 
                      | cmd == Constants.svcLayout -> do
-                         layout <- MSG.readString (globals.netMessage)
-                         globals.cl.csLayout .= layout
+                         layout <- MSG.readString (globals.gNetMessage)
+                         globals.gCl.csLayout .= layout
 
                      | cmd == Constants.svcPlayerInfo || cmd == Constants.svcPacketEntities || cmd == Constants.svcDeltaPacketEntities ->
                          Com.comError Constants.errDrop "Out of place frame data"
@@ -206,14 +206,14 @@ parseServerData :: Quake ()
 parseServerData = do
     -- wite the client_state_t struct
     CL.clearState
-    globals.cls.csState .= Constants.caConnected
+    globals.gCls.csState .= Constants.caConnected
 
     -- parse protocol version number
-    version <- MSG.readLong (globals.netMessage)
-    globals.cls.csServerProtocol .= version
+    version <- MSG.readLong (globals.gNetMessage)
+    globals.gCls.csServerProtocol .= version
 
     -- BIG HACK to let demos from release work with the 3.0x patch!!
-    use (globals.serverState) >>= \state ->
+    use (globals.gServerState) >>= \state ->
       if state /= 0 && Constants.protocolVersion == 34
         then return ()
         else if version /= Constants.protocolVersion
@@ -221,14 +221,14 @@ parseServerData = do
                                                      ", not " `B.append` BC.pack (show Constants.protocolVersion)
                else return ()
 
-    serverCount <- MSG.readLong (globals.netMessage)
-    attractLoop <- MSG.readByte (globals.netMessage)
-    globals.cl.csServerCount .= serverCount
-    globals.cl.csAttractLoop .= if attractLoop /= 0 then True else False
+    serverCount <- MSG.readLong (globals.gNetMessage)
+    attractLoop <- MSG.readByte (globals.gNetMessage)
+    globals.gCl.csServerCount .= serverCount
+    globals.gCl.csAttractLoop .= if attractLoop /= 0 then True else False
 
     -- game directory
-    str <- MSG.readString (globals.netMessage)
-    globals.cl.csGameDir .= str
+    str <- MSG.readString (globals.gNetMessage)
+    globals.gCl.csGameDir .= str
     Com.dprintf ("gamedir=" `B.append` str `B.append` "\n")
 
     -- set gamedir
@@ -237,59 +237,59 @@ parseServerData = do
       void $ CVar.set "game" str
 
     -- parse player entity number
-    playerNum <- MSG.readShort (globals.netMessage)
-    globals.cl.csPlayerNum .= playerNum
+    playerNum <- MSG.readShort (globals.gNetMessage)
+    globals.gCl.csPlayerNum .= playerNum
     Com.dprintf $ "numplayers=" `B.append` BC.pack (show playerNum) `B.append` "\n"
     -- get the full level name
-    levelName <- MSG.readString (globals.netMessage)
+    levelName <- MSG.readString (globals.gNetMessage)
     Com.dprintf $ "levelname=" `B.append` levelName `B.append` "\n"
 
     if playerNum == -1 -- playing a cinematic or showing a pic, not a level
       then SCR.playCinematic levelName
       else do
         Com.printf $ "Levelname:" `B.append` levelName `B.append` "\n"
-        globals.cl.csRefreshPrepped .= False
+        globals.gCl.csRefreshPrepped .= False
 
 parseConfigString :: Quake ()
 parseConfigString = do
-    i <- MSG.readShort (globals.netMessage)
+    i <- MSG.readShort (globals.gNetMessage)
 
     when (i < 0 || i >= Constants.maxConfigStrings) $
       Com.comError Constants.errDrop "configstring > MAX_CONFIGSTRINGS"
 
-    str <- MSG.readString (globals.netMessage)
+    str <- MSG.readString (globals.gNetMessage)
 
-    Just oldStr <- preuse $ globals.cl.csConfigStrings.ix i
-    globals.cl.csConfigStrings.ix i .= str
+    Just oldStr <- preuse $ globals.gCl.csConfigStrings.ix i
+    globals.gCl.csConfigStrings.ix i .= str
 
-    refreshPrepped <- use $ globals.cl.csRefreshPrepped
+    refreshPrepped <- use $ globals.gCl.csRefreshPrepped
 
     if | i >= Constants.csLights && i < Constants.csLights + Constants.maxLightStyles ->
            CLFX.setLightStyle (i - Constants.csLights)
 
        | i >= Constants.csModels && i < Constants.csModels + Constants.maxModels -> do
            when refreshPrepped $ do
-             Just renderer <- use $ globals.re
+             Just renderer <- use $ globals.gRenderer
              model <- (renderer^.rRefExport.reRegisterModel) str
-             globals.cl.csModelDraw.ix (i - Constants.csModels) .= model
+             globals.gCl.csModelDraw.ix (i - Constants.csModels) .= model
 
              if B.take 1 str == "*"
                then do
                  idx <- CM.inlineModel str
-                 globals.cl.csModelClip.ix (i - Constants.csModels) .= Just idx
+                 globals.gCl.csModelClip.ix (i - Constants.csModels) .= Just idx
                else
-                 globals.cl.csModelClip.ix (i - Constants.csModels) .= Nothing
+                 globals.gCl.csModelClip.ix (i - Constants.csModels) .= Nothing
 
        | i >= Constants.csSounds && i < Constants.csSounds + Constants.maxSounds -> do
            when refreshPrepped $ do
              sound <- S.registerSound str
-             globals.cl.csSoundPrecache.ix (i - Constants.csSounds) .= sound
+             globals.gCl.csSoundPrecache.ix (i - Constants.csSounds) .= sound
 
        | i >= Constants.csImages && i < Constants.csImages + Constants.maxImages -> do
            when refreshPrepped $ do
-             Just renderer <- use $ globals.re
+             Just renderer <- use $ globals.gRenderer
              image <- (renderer^.rRefExport.reRegisterPic) str
-             globals.cl.csImagePrecache.ix (i - Constants.csImages) .= image
+             globals.gCl.csImagePrecache.ix (i - Constants.csImages) .= image
 
        | i >= Constants.csPlayerSkins && i < Constants.csPlayerSkins + Constants.maxClients -> do
            when (refreshPrepped && not (oldStr == str)) $
@@ -304,8 +304,8 @@ parseConfigString = do
 -}
 parseClientInfo :: Int -> Quake ()
 parseClientInfo player = do
-    Just str <- preuse $ globals.cl.csConfigStrings.ix (player + Constants.csPlayerSkins)
-    loadClientInfo (globals.cl.csClientInfo.ix player) str
+    Just str <- preuse $ globals.gCl.csConfigStrings.ix (player + Constants.csPlayerSkins)
+    loadClientInfo (globals.gCl.csClientInfo.ix player) str
 
 loadClientInfo :: Traversal' QuakeState ClientInfoT -> B.ByteString -> Quake ()
 loadClientInfo clientInfoLens str = do
@@ -314,7 +314,7 @@ loadClientInfo clientInfoLens str = do
                          Nothing -> (str, str)
                          Just idx -> (B.take idx str, B.drop (idx + 1) str)
 
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     noSkinsValue <- liftM (^.cvValue) clNoSkinsCVar
 
     (modelRef, weaponModels, skinRef, iconName, iconRef) <-
@@ -430,7 +430,7 @@ loadClientInfo clientInfoLens str = do
         loadWeapons clWeaponModels modelName idx maxIdx acc
           | idx >= maxIdx = return acc
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               let weaponFileName = "players/" `B.append` modelName `B.append` "/" `B.append` (clWeaponModels V.! idx)
               weaponModelRef <- (renderer^.rRefExport.reRegisterModel) weaponFileName
               if isNothing weaponModelRef && (BC.map toLower modelName) == "cyborg"
@@ -457,7 +457,7 @@ checkOrDownloadFile fileName = do
       else do
         let tmpFileName = (Com.stripExtension fileName) `B.append` ".tmp"
 
-        zoom (globals.cls) $ do
+        zoom (globals.gCls) $ do
           csDownloadName .= fileName
           -- download to a temp name, and only rename
           -- to the real name when done, so if interrupted
@@ -474,19 +474,19 @@ checkOrDownloadFile fileName = do
             -- it exists
             len <- io (handle (\(_ :: IOException) -> return 0) $ hFileSize h)
 
-            globals.cls.csDownload .= Just h
+            globals.gCls.csDownload .= Just h
 
             -- give the server an offset to start the download
             Com.printf $ "Resuming " `B.append` fileName `B.append` "\n"
-            MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-            MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName `B.append` " " `B.append` BC.pack (show len)) -- IMPROVE?
+            MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.gCls.csNetChan.ncMessage) ("download " `B.append` fileName `B.append` " " `B.append` BC.pack (show len)) -- IMPROVE?
 
           Nothing -> do
             Com.printf $ "Downloading " `B.append` fileName `B.append` "\n"
-            MSG.writeByteI (globals.cls.csNetChan.ncMessage) Constants.clcStringCmd
-            MSG.writeString (globals.cls.csNetChan.ncMessage) ("download " `B.append` fileName)
+            MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.gCls.csNetChan.ncMessage) ("download " `B.append` fileName)
 
-        globals.cls.csDownloadNumber += 1
+        globals.gCls.csDownloadNumber += 1
 
         return False
 
@@ -511,7 +511,7 @@ registerSounds = do
     S.beginRegistration
     CLTEnt.registerTEntSounds
 
-    configStrings <- use $ globals.cl.csConfigStrings
+    configStrings <- use $ globals.gCl.csConfigStrings
     precacheSounds configStrings 1 Constants.maxSounds
 
     S.endRegistration
@@ -524,7 +524,7 @@ registerSounds = do
 
               unless (cs == "" || cs == "\0") $ do
                   sfxRef <- S.registerSound cs
-                  globals.cl.csSoundPrecache.ix idx .= sfxRef
+                  globals.gCl.csSoundPrecache.ix idx .= sfxRef
                   Sys.sendKeyEvents -- pump message loop
                   precacheSounds configSrings (idx + 1) maxIdx
 
@@ -532,28 +532,28 @@ parseBaseline :: Quake ()
 parseBaseline = do
     let nullState = newEntityStateT Nothing
     (newNum, bits) <- CLEnts.parseEntityBits [0]
-    CLEnts.parseDelta nullState (globals.clEntities.ix newNum.ceBaseline) newNum (head bits)
+    CLEnts.parseDelta nullState (globals.gClEntities.ix newNum.ceBaseline) newNum (head bits)
 
 parseStartSoundPacket :: Quake ()
 parseStartSoundPacket = do
-    flags <- MSG.readByte (globals.netMessage)
-    soundNum <- MSG.readByte (globals.netMessage)
+    flags <- MSG.readByte (globals.gNetMessage)
+    soundNum <- MSG.readByte (globals.gNetMessage)
 
     volume <- if flags .&. Constants.sndVolume /= 0
-                then liftM ((/ 255) . fromIntegral) (MSG.readByte (globals.netMessage))
+                then liftM ((/ 255) . fromIntegral) (MSG.readByte (globals.gNetMessage))
                 else return Constants.defaultSoundPacketVolume
 
     attenuation <- if flags .&. Constants.sndAttenuation /= 0
-                     then liftM ((/ 64) . fromIntegral) (MSG.readByte (globals.netMessage))
+                     then liftM ((/ 64) . fromIntegral) (MSG.readByte (globals.gNetMessage))
                      else return Constants.defaultSoundPacketAttenuation
 
     ofs <- if flags .&. Constants.sndOffset /= 0
-             then liftM ((/ 1000) . fromIntegral) (MSG.readByte (globals.netMessage))
+             then liftM ((/ 1000) . fromIntegral) (MSG.readByte (globals.gNetMessage))
              else return 0
 
     (channel, ent) <- if flags .&. Constants.sndEnt /= 0 -- entity reletive
                         then do
-                          channel <- MSG.readShort (globals.netMessage)
+                          channel <- MSG.readShort (globals.gNetMessage)
                           let ent = channel `shiftR` 3
 
                           when (ent > Constants.maxEdicts) $
@@ -564,10 +564,10 @@ parseStartSoundPacket = do
                           return (0, 0)
 
     pos <- if flags .&. Constants.sndPos /= 0 -- positioned in space
-             then liftM Just (MSG.readPos (globals.netMessage))
+             then liftM Just (MSG.readPos (globals.gNetMessage))
              else return Nothing
 
-    Just sound <- preuse $ globals.cl.csSoundPrecache.ix soundNum
+    Just sound <- preuse $ globals.gCl.csSoundPrecache.ix soundNum
 
     -- TODO: research if we need this:
     -- if (null == Globals.cl.sound_precache[sound_num])

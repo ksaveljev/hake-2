@@ -379,7 +379,7 @@ physicsToss edictRef = do
             when ((velocity^._z) < 60 || moveType /= Constants.moveTypeBounce) $ do
               let Just traceRef = trace^.tEnt
               linkCount <- readEdictT traceRef >>= \e -> return (e^.eLinkCount)
-              origin <- use $ globals.vec3Origin
+              origin <- use $ globals.gVec3Origin
 
               modifyEdictT edictRef (\v -> v & eGroundEntity .~ (trace^.tEnt)
                                              & eGroundEntityLinkCount .~ linkCount
@@ -442,7 +442,7 @@ push pusherRef move amove = do
     (mins, maxs) <- findPusherBoundingBox updatedMove
 
     -- we need this for pushing things later
-    vec3origin <- use $ globals.vec3Origin
+    vec3origin <- use $ globals.gVec3Origin
     let org = vec3origin - amove
         (Just forward, Just right, Just up) = Math3D.angleVectors org True True True
 
@@ -867,7 +867,7 @@ flyMove edictRef time mask = do
 
               if (traceT^.tAllSolid) -- entity is trapped in another solid
                 then do
-                  use (globals.vec3Origin) >>= \v3o ->
+                  use (globals.gVec3Origin) >>= \v3o ->
                     modifyEdictT edictRef (\v -> v & eVelocity .~ v3o)
                   return 3
                 else do
@@ -912,7 +912,7 @@ flyMove edictRef time mask = do
                           -- cliped to another plane
                           if numPlanes' >= maxClipPlanes -- this shouldn't really happen
                             then do
-                              use (globals.vec3Origin) >>= \v3o ->
+                              use (globals.gVec3Origin) >>= \v3o ->
                                 modifyEdictT edictRef (\v -> v & eVelocity .~ v3o)
                               return 3
 
@@ -931,7 +931,7 @@ flyMove edictRef time mask = do
                                   -- to avoid tiny occilations in sloping corners
                                   if newVelocity `dot` primalVelocity <= 0
                                     then do
-                                      use (globals.vec3Origin) >>= \v3o ->
+                                      use (globals.gVec3Origin) >>= \v3o ->
                                         modifyEdictT edictRef (\v -> v & eVelocity .~ v3o)
                                       return blockedMask'
 
@@ -941,7 +941,7 @@ flyMove edictRef time mask = do
                                 else do -- go along the crease
                                   if numPlanes'' /= 2
                                     then do
-                                      use (globals.vec3Origin) >>= \v3o ->
+                                      use (globals.gVec3Origin) >>= \v3o ->
                                         modifyEdictT edictRef (\v -> v & eVelocity .~ v3o)
                                       return 7
 
@@ -956,7 +956,7 @@ flyMove edictRef time mask = do
                                       -- to avoid tiny occilations in sloping corners
                                       if newVelocity `dot` primalVelocity <= 0
                                         then do
-                                          use (globals.vec3Origin) >>= \v3o ->
+                                          use (globals.gVec3Origin) >>= \v3o ->
                                             modifyEdictT edictRef (\v -> v & eVelocity .~ v3o)
                                           return blockedMask'
                                         else

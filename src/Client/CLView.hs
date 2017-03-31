@@ -32,14 +32,14 @@ import qualified Util.Lib as Lib
 -}
 prepRefresh :: Quake ()
 prepRefresh = do
-    Just str <- preuse $ globals.cl.csConfigStrings.ix (Constants.csModels + 1)
+    Just str <- preuse $ globals.gCl.csConfigStrings.ix (Constants.csModels + 1)
     let len = B.length str
 
             -- no map loaded
     unless (len == 0) $ do
-      vidDef' <- use $ globals.vidDef
-      configStrings <- use $ globals.cl.csConfigStrings
-      Just renderer <- use $ globals.re
+      vidDef' <- use $ globals.gVidDef
+      configStrings <- use $ globals.gCl.csConfigStrings
+      Just renderer <- use $ globals.gRenderer
 
       SCR.addDirtyPoint 0 0
       SCR.addDirtyPoint ((vidDef'^.vdWidth) - 1) ((vidDef'^.vdHeight) - 1)
@@ -74,7 +74,7 @@ prepRefresh = do
       Com.printf "                                     \r"
       processClients configStrings 0 Constants.maxClients
 
-      CLParse.loadClientInfo (globals.cl.csBaseClientInfo) "unnamed\\male/grunt"
+      CLParse.loadClientInfo (globals.gCl.csBaseClientInfo) "unnamed\\male/grunt"
 
       -- set sky textures and speed
       Com.printf "sky\r"
@@ -91,8 +91,8 @@ prepRefresh = do
       Console.clearNotify
 
       SCR.updateScreen
-      globals.cl.csRefreshPrepped .= True
-      globals.cl.csForceRefDef .= True -- make sure we have a valid refdef
+      globals.gCl.csRefreshPrepped .= True
+      globals.gCl.csForceRefDef .= True -- make sure we have a valid refdef
 
   where registerModels :: V.Vector B.ByteString -> Int -> Int -> Quake ()
         registerModels configStrings idx maxIdx
@@ -116,16 +116,16 @@ prepRefresh = do
                     clientGlobals.cgWeaponModels.ix numWeaponModels .= B.drop 1 fullName
                     clientGlobals.cgNumCLWeaponModels += 1
                 else do
-                  Just renderer <- use $ globals.re
+                  Just renderer <- use $ globals.gRenderer
                   modelRef <- (renderer^.rRefExport.reRegisterModel) fullName
-                  globals.cl.csModelDraw.ix idx .= modelRef
+                  globals.gCl.csModelDraw.ix idx .= modelRef
 
                   if name `BC.index` 0 == '*'
                     then do
                       inlineModelRef <- CM.inlineModel fullName
-                      globals.cl.csModelClip.ix idx .= Just inlineModelRef
+                      globals.gCl.csModelClip.ix idx .= Just inlineModelRef
                     else
-                      globals.cl.csModelClip.ix idx .= Nothing
+                      globals.gCl.csModelClip.ix idx .= Nothing
 
               when (name `BC.index` 0 /= '*') $
                 Com.printf "                                     \r"
@@ -136,9 +136,9 @@ prepRefresh = do
         registerImages configStrings idx maxIdx
           | idx >= maxIdx || B.length (configStrings V.! (Constants.csImages + idx)) == 0 = return ()
           | otherwise = do
-              Just renderer <- use $ globals.re
+              Just renderer <- use $ globals.gRenderer
               picRef <- (renderer^.rRefExport.reRegisterPic) (configStrings V.! (Constants.csImages + idx))
-              globals.cl.csImagePrecache.ix idx .= picRef
+              globals.gCl.csImagePrecache.ix idx .= picRef
               Sys.sendKeyEvents -- pump message loop
               registerImages configStrings (idx + 1) maxIdx
 
@@ -161,7 +161,7 @@ prepRefresh = do
           let rotate = Lib.atof (configStrings V.! Constants.csSkyRotate)
               (a:b:c:_) = BC.split ' ' (configStrings V.! Constants.csSkyAxis)
               axis = V3 (Lib.atof a) (Lib.atof b) (Lib.atof c)
-          Just renderer <- use $ globals.re
+          Just renderer <- use $ globals.gRenderer
           (renderer^.rRefExport.reSetSky) (configStrings V.! Constants.csSky) rotate axis
 
 addNetGraph :: Quake ()
@@ -172,18 +172,18 @@ addNetGraph = do
     timeGraphValue <- liftM (^.cvValue) scrTimeGraphCVar
 
     unless (debugGraphValue == 0 || timeGraphValue == 0) $ do
-      dropped <- use $ globals.cls.csNetChan.ncDropped
+      dropped <- use $ globals.gCls.csNetChan.ncDropped
       mapM_ (\_ -> SCR.debugGraph 30 0x40) [0..dropped-1]
 
-      surpressCount <- use $ globals.cl.csSurpressCount
+      surpressCount <- use $ globals.gCl.csSurpressCount
       mapM_ (\_ -> SCR.debugGraph 30 0xDF) [0..surpressCount-1]
 
       -- see what the latency was on this packet
-      inAck <- use $ globals.cls.csNetChan.ncIncomingAcknowledged
+      inAck <- use $ globals.gCls.csNetChan.ncIncomingAcknowledged
       let idx = inAck .&. (Constants.cmdBackup - 1)
 
-      realTime <- use $ globals.cls.csRealTime
-      Just time <- preuse $ globals.cl.csCmdTime.ix idx
+      realTime <- use $ globals.gCls.csRealTime
+      Just time <- preuse $ globals.gCl.csCmdTime.ix idx
       let ping = (realTime - time) `div` 30
           ping' = if ping > 30 then 30 else ping
 

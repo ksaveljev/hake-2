@@ -31,7 +31,7 @@ monsterPlasmaShell origin = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               o1 <- Lib.crandom
               o2 <- Lib.crandom
               o3 <- Lib.crandom
@@ -56,15 +56,15 @@ heatBeam start forward = do
 
     -- FIXME - pmm - these might end up using old values?
     --               MakeNormalVectors (vec, right, up)
-    right <- use $ globals.cl.csVRight
-    up <- use $ globals.cl.csVUp
+    right <- use $ globals.gCl.csVRight
+    up <- use $ globals.gCl.csVUp
 
     -- TODO: if (Globals.vidref_val == Defines.VIDREF_GL) { // GL mode
     let move = start + fmap (* (-0.5)) right + fmap (* (-0.5)) up
     -- otherwise assume SOFT
 
 
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
     let ltime = fromIntegral time / 1000.0
         startPt = truncate (ltime * 96) `mod` 32 :: Int
         move' = move + fmap (* (fromIntegral startPt)) vec'
@@ -93,9 +93,9 @@ heatBeam start forward = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
-              right <- use $ globals.cl.csVRight
-              up <- use $ globals.cl.csVUp
+              time <- use $ globals.gCl.csTime
+              right <- use $ globals.gCl.csVRight
+              up <- use $ globals.gCl.csVUp
               r <- Lib.rand
 
               let c = (cos rot) * 0.5
@@ -136,7 +136,7 @@ tagTrail start end color = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               o1 <- Lib.crandom
               o2 <- Lib.crandom
@@ -177,7 +177,7 @@ blasterTrail2 start end = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               o1 <- Lib.crandom
               o2 <- Lib.crandom
@@ -213,7 +213,7 @@ blasterParticles2 org dir color = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               r <- Lib.rand
               d <- Lib.rand >>= \d -> return (fromIntegral (d .&. 15))
@@ -258,7 +258,7 @@ debugTrail start end = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
 
               io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
@@ -276,7 +276,7 @@ debugTrail start end = do
 flashlight :: Int -> V3 Float -> Quake ()
 flashlight ent pos = do
     dlRef <- CLFX.allocDLight ent
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
 
     io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = pos
                                      , _cdlRadius = 400
@@ -309,7 +309,7 @@ forceWall start end color = do
                   activeParticles <- use $ clientGlobals.cgActiveParticles
                   clientGlobals.cgActiveParticles .= Just pRef
 
-                  time <- use $ globals.cl.csTime
+                  time <- use $ globals.gCl.csTime
                   f' <- Lib.randomF
                   o1 <- Lib.crandom
                   o2 <- Lib.crandom
@@ -347,7 +347,7 @@ particleSteamEffect org dir color count magnitude = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r' <- Lib.rand
               f <- Lib.randomF
               o1 <- Lib.crandom
@@ -388,7 +388,7 @@ bubbleTrail2 start end dist = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               f <- Lib.randomF
               r <- Lib.rand
               o1 <- Lib.crandom
@@ -428,7 +428,7 @@ particleSmokeEffect org dir color count magnitude = do
 
               let magnitude' = fromIntegral magnitude
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r' <- Lib.rand
               o1 <- Lib.crandom
               o2 <- Lib.crandom
@@ -456,7 +456,7 @@ colorFlash pos ent intensity r g b = do
                                      then (-r, -g, -b, -intensity)
                                      else (r, g, b, intensity)
 
-    time <- use $ globals.cl.csTime
+    time <- use $ globals.gCl.csTime
 
     dlRef <- CLFX.allocDLight ent
     io $ modifyIORef' dlRef (\v -> v { _cdlOrigin = pos
@@ -481,7 +481,7 @@ colorExplosionParticles org color run = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
               f <- Lib.randomF
               o1 <- Lib.rand
@@ -518,8 +518,8 @@ widowSplash org = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              v3o <- use $ globals.vec3Origin
-              time <- use $ globals.cl.csTime
+              v3o <- use $ globals.gVec3Origin
+              time <- use $ globals.gCl.csTime
               r <- Lib.rand
               d1 <- Lib.crandom
               d2 <- Lib.crandom
@@ -562,7 +562,7 @@ trackerTrail start end particleColor = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
 
               io $ modifyIORef' pRef (\v -> v { _cpNext = activeParticles
                                               , _cpAccel = V3 0 0 0
@@ -591,7 +591,7 @@ trackerShell origin = do
               activeParticles <- use $ clientGlobals.cgActiveParticles
               clientGlobals.cgActiveParticles .= Just pRef
 
-              time <- use $ globals.cl.csTime
+              time <- use $ globals.gCl.csTime
               d1 <- Lib.crandom
               d2 <- Lib.crandom
               d3 <- Lib.crandom

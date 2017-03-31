@@ -82,7 +82,7 @@ forceCenterViewF =
                    2 -> _z
                    _ -> undefined -- shouldn't happen
 
-    globals.cl.csViewAngles.(access) .= 0
+    globals.gCl.csViewAngles.(access) .= 0
   )
 
 activateMouse :: Quake ()
@@ -109,13 +109,13 @@ deactivateMouse = do
 
 installGrabs :: Quake ()
 installGrabs = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     renderer^.rRefExport.reGetKeyboardHandler.kbdInstallGrabs
     inGlobals.inIgnoreFirst .= True
 
 uninstallGrabs :: Quake ()
 uninstallGrabs = do
-    Just renderer <- use $ globals.re
+    Just renderer <- use $ globals.gRenderer
     renderer^.rRefExport.reGetKeyboardHandler.kbdUninstallGrabs
 
 centerView :: XCommandT
@@ -127,14 +127,14 @@ centerView =
                    2 -> _z
                    _ -> undefined -- shouldn't happen
 
-    Just angle <- preuse $ globals.cl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.(Math3D.v3Access Constants.pitch)
-    globals.cl.csViewAngles.(access) .= (- (Math3D.shortToAngle (fromIntegral angle)))
+    Just angle <- preuse $ globals.gCl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles.(Math3D.v3Access Constants.pitch)
+    globals.gCl.csViewAngles.(access) .= (- (Math3D.shortToAngle (fromIntegral angle)))
   )
 
 frame :: Quake ()
 frame = do
-    cl' <- use $ globals.cl
-    keyDest <- use $ globals.cls.csKeyDest
+    cl' <- use $ globals.gCl
+    keyDest <- use $ globals.gCls.csKeyDest
 
     if not (cl'^.csCinematicPaletteActive) && (not (cl'^.csRefreshPrepped) || keyDest == Constants.keyConsole || keyDest == Constants.keyMenu)
       then deactivateMouse
@@ -145,7 +145,7 @@ commands = do
     mouseAvail <- use $ inGlobals.inMouseAvail
 
     when mouseAvail $ do
-      Just renderer <- use $ globals.re
+      Just renderer <- use $ globals.gRenderer
       let kbd = renderer^.rRefExport.reGetKeyboardHandler
       checkMouseButtonState kbd 0 3
       mouseButtonState <- use $ inGlobals.inMouseButtonState
@@ -196,7 +196,7 @@ move (UserCmdReference cmdIdx) = do
     if (inStrafe^.kbState) .&. 1 /= 0 || (lookStrafeValue /= 0 && looking)
       then do
         sideValue <- liftM (^.cvValue) mSideCVar
-        globals.cl.csCmds.ix cmdIdx.ucSideMove += truncate (sideValue * fromIntegral mx)
+        globals.gCl.csCmds.ix cmdIdx.ucSideMove += truncate (sideValue * fromIntegral mx)
       else do
         yawValue <- liftM (^.cvValue) mYawCVar
         let access = case Constants.yaw of
@@ -204,7 +204,7 @@ move (UserCmdReference cmdIdx) = do
                        1 -> _y
                        2 -> _z
                        _ -> undefined -- shouldn't happen
-        globals.cl.csViewAngles.access -= yawValue * fromIntegral mx
+        globals.gCl.csViewAngles.access -= yawValue * fromIntegral mx
 
     freeLookValue <- liftM (^.cvValue) freeLookCVar
 
@@ -216,10 +216,10 @@ move (UserCmdReference cmdIdx) = do
                        1 -> _y
                        2 -> _z
                        _ -> undefined -- shouldn't happen
-        globals.cl.csViewAngles.access += pitchValue * fromIntegral my
+        globals.gCl.csViewAngles.access += pitchValue * fromIntegral my
       else do
         forwardValue <- liftM (^.cvValue) mForwardCVar
-        globals.cl.csCmds.ix cmdIdx.ucForwardMove -= truncate (forwardValue * fromIntegral my)
+        globals.gCl.csCmds.ix cmdIdx.ucForwardMove -= truncate (forwardValue * fromIntegral my)
 
     kbdGlobals.kbdMx .= 0
     kbdGlobals.kbdMy .= 0
