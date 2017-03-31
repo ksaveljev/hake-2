@@ -107,7 +107,7 @@ predPMTrace start mins maxs end = do
 
     let t' = if (t^.tFraction) < 1
                -- TODO: do not forget about this dummy edict
-               then t { _tEnt = Just (newEdictReference (Constants.maxEdicts)) } -- dummy ent
+               then t { _tEnt = Just (Ref (Constants.maxEdicts)) } -- dummy ent
                else t
 
     -- check all other solid models

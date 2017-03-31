@@ -5,22 +5,22 @@ import Linear (V3)
 import Types
 import QuakeState
 
-physicsPusher :: EdictReference -> Quake ()
+physicsPusher :: Ref EdictT -> Quake ()
 
-physicsNone :: EdictReference -> Quake ()
+physicsNone :: Ref EdictT -> Quake ()
 
-physicsNoClip :: EdictReference -> Quake ()
+physicsNoClip :: Ref EdictT -> Quake ()
 
-physicsStep :: EdictReference -> Quake ()
+physicsStep :: Ref EdictT -> Quake ()
 
-physicsToss :: EdictReference -> Quake ()
+physicsToss :: Ref EdictT -> Quake ()
 
-push :: EdictReference -> V3 Float -> V3 Float -> Quake Bool
+push :: Ref EdictT -> V3 Float -> V3 Float -> Quake Bool
 
-moveStep :: EdictReference -> V3 Float -> Bool -> Quake Bool
+moveStep :: Ref EdictT -> V3 Float -> Bool -> Quake Bool
 
-stepDirection :: EdictReference -> Float -> Float -> Quake Bool
+stepDirection :: Ref EdictT -> Float -> Float -> Quake Bool
 
-closeEnough :: EdictReference -> EdictReference -> Float -> Quake Bool
+closeEnough :: Ref EdictT -> Ref EdictT -> Float -> Quake Bool
 
-newChaseDir :: EdictReference -> Maybe EdictReference -> Float -> Quake ()
+newChaseDir :: Ref EdictT -> Maybe (Ref EdictT) -> Float -> Quake ()

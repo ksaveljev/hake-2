@@ -22,6 +22,7 @@ import Types
 import QuakeState
 import CVarVariables
 import Game.Adapters
+import QuakeRef
 import qualified Constants
 import {-# SOURCE #-} qualified Game.GameItemList as GameItemList
 import {-# SOURCE #-} qualified Game.GameUtil as GameUtil
@@ -41,7 +42,7 @@ initItems = do
 - Items can't be immediately dropped to floor, because they might be on an
 - entity that hasn't spawned yet. ============
 -}
-spawnItem :: EdictReference -> GItemReference -> Quake ()
+spawnItem :: Ref EdictT -> GItemReference -> Quake ()
 spawnItem edictRef gir@(GItemReference itemIdx) = do
     precacheItem (Just gir)
 
@@ -52,10 +53,10 @@ spawnItem edictRef gir@(GItemReference itemIdx) = do
     let dprintf = gameImport^.giDprintf
         modelIndex = gameImport^.giModelIndex
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eSpawnFlags) /= 0 && (edict^.eClassName) == "key_power_cube") $ do
-      modifyEdictT edictRef (\v -> v & eSpawnFlags .~ 0)
+      modifyRef edictRef (\v -> v & eSpawnFlags .~ 0)
       dprintf $ (edict^.eClassName) `B.append` " at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " has invalid spawnflags set\n"
       
     -- some items will be prevented in deathmatch
@@ -104,7 +105,7 @@ spawnItem edictRef gir@(GItemReference itemIdx) = do
 
         when (coopValue /= 0 && (edict^.eClassName) == "key_power_cube") $ do
           powerCubes <- use $ gameBaseGlobals.gbLevel.llPowerCubes
-          modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.|. (1 `shiftL` (8 + powerCubes))))
+          modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. (1 `shiftL` (8 + powerCubes))))
           gameBaseGlobals.gbLevel.llPowerCubes += 1
 
         -- don't let them drop items that stay in a coop game
@@ -113,7 +114,7 @@ spawnItem edictRef gir@(GItemReference itemIdx) = do
 
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT edictRef (\v -> v & eItem .~ Just gir
+        modifyRef edictRef (\v -> v & eItem .~ Just gir
                                        & eNextThink .~ levelTime + 2 * Constants.frameTime
                                        -- items start after other solids
                                        & eThink .~ Just dropToFloor
@@ -277,7 +278,7 @@ bodyArmorInfo =
 
 pickupArmor :: EntInteract
 pickupArmor = PickupArmor "pickup_armor" $ \edictRef otherRef -> do
-  edict <- readEdictT edictRef
+  edict <- readRef edictRef
   let Just (GItemReference gItemIdx) = edict^.eItem
 
   -- get info on new armor
@@ -286,7 +287,7 @@ pickupArmor = PickupArmor "pickup_armor" $ \edictRef otherRef -> do
 
   oldArmorIndex <- armorIndex otherRef
 
-  other <- readEdictT otherRef
+  other <- readRef otherRef
   let Just (GClientReference otherGClientIdx) = other^.eClient
 
   GItemReference jacketArmorIndex <- use $ gameItemsGlobals.giJacketArmorIndex
@@ -315,11 +316,11 @@ pickupArmor = PickupArmor "pickup_armor" $ \edictRef otherRef -> do
 pickupPowerArmor :: EntInteract
 pickupPowerArmor =
   PickupPowerArmor "pickup_powerarmor" $ \edictRef otherRef -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
     let Just (GClientReference gClientIdx) = other^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gItemRef@(GItemReference gItemIdx) = edict^.eItem
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -341,7 +342,7 @@ pickupPowerArmor =
 usePowerArmor :: ItemUse
 usePowerArmor =
   GenericItemUse "use_powerarmor" $ \edictRef _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -350,7 +351,7 @@ usePowerArmor =
 
     if (edict^.eFlags) .&. Constants.flPowerArmor /= 0
       then do
-        modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
+        modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
 
         soundIdx <- soundIndex (Just "misc/power2.wav")
         sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
@@ -367,7 +368,7 @@ usePowerArmor =
             cprintf (Just edictRef) Constants.printHigh "No cells for power armor.\n"
 
           else do
-            modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flPowerArmor))
+            modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flPowerArmor))
 
             soundIdx <- soundIndex (Just "misc/power1.wav")
             sound (Just edictRef) Constants.chanAuto soundIdx 1 Constants.attnNorm 0
@@ -375,7 +376,7 @@ usePowerArmor =
 dropPowerArmor :: ItemDrop
 dropPowerArmor =
   GenericItemDrop "drop_powerarmor" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
@@ -388,11 +389,11 @@ dropPowerArmor =
 pickupAmmo :: EntInteract
 pickupAmmo =
   GenericEntInteract "pickup_ammo" $ \edictRef otherRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gItemRef@(GItemReference gItemIdx) = edict^.eItem
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
-    other <- readEdictT otherRef
+    other <- readRef otherRef
     let Just (GClientReference gClientIdx) = other^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -430,7 +431,7 @@ dropAmmo =
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
     droppedRef <- dropItem edictRef gItemRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -438,13 +439,13 @@ dropAmmo =
                   then gItem^.giQuantity
                   else (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)
 
-    modifyEdictT droppedRef (\v -> v & eCount .~ count)
+    modifyRef droppedRef (\v -> v & eCount .~ count)
 
     weapon <- case gClient^.gcPers.cpWeapon of
                 Nothing -> return Nothing
                 Just (GItemReference weaponIdx) -> preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
 
-    dropped <- readEdictT droppedRef
+    dropped <- readRef droppedRef
 
     if isJust weapon && ((fromJust weapon)^.giTag) == Constants.ammoGrenades && (gItem^.giTag) == Constants.ammoGrenades && ((gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex)) - (dropped^.eCount) <= 0
       then do
@@ -459,7 +460,7 @@ dropAmmo =
 useQuad :: ItemUse
 useQuad =
   GenericItemUse "use_quad" $ \edictRef (GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -495,8 +496,8 @@ useQuad =
 pickupPowerup :: EntInteract
 pickupPowerup =
   GenericEntInteract "pickup_powerup" $ \edictRef otherRef -> do
-    edict <- readEdictT edictRef
-    other <- readEdictT otherRef
+    edict <- readRef edictRef
+    other <- readRef otherRef
     let Just (GItemReference gItemIdx) = edict^.eItem
     let Just (GClientReference gClientIdx) = other^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
@@ -528,7 +529,7 @@ dropGeneral =
   GenericItemDrop "drop_general" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
     dropItem edictRef gItemRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -538,7 +539,7 @@ dropGeneral =
 useInvulnerability :: ItemUse
 useInvulnerability =
   GenericItemUse "use_invulnerability" $ \edictRef (GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -565,7 +566,7 @@ useInvulnerability =
 useSilencer :: ItemUse
 useSilencer =
   GenericItemUse "use_silencer" $ \edictRef (GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -585,7 +586,7 @@ useSilencer =
 useBreather :: ItemUse
 useBreather =
   GenericItemUse "use_breather" $ \edictRef (GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -612,7 +613,7 @@ useBreather =
 useEnviroSuit :: ItemUse
 useEnviroSuit =
   GenericItemUse "use_envirosuit" $ \edictRef (GItemReference gItemIdx) -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -639,9 +640,9 @@ useEnviroSuit =
 pickupAncientHead :: EntInteract
 pickupAncientHead =
   PickupAncientHead "pickup_ancienthead" $ \edictRef otherRef -> do
-    modifyEdictT otherRef (\v -> v & eMaxHealth +~ 2)
+    modifyRef otherRef (\v -> v & eMaxHealth +~ 2)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
@@ -657,14 +658,14 @@ pickupAdrenaline =
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     when (deathmatchValue == 0) $
-      modifyEdictT otherRef (\v -> v & eMaxHealth +~ 1)
+      modifyRef otherRef (\v -> v & eMaxHealth +~ 1)
 
-    other <- readEdictT otherRef
+    other <- readRef otherRef
 
     when ((other^.eHealth) < (other^.eMaxHealth)) $
-      modifyEdictT otherRef (\v -> v & eHealth .~ (other^.eMaxHealth))
+      modifyRef otherRef (\v -> v & eHealth .~ (other^.eMaxHealth))
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
       let Just (GItemReference gItemIdx) = edict^.eItem
@@ -676,7 +677,7 @@ pickupAdrenaline =
 pickupBandolier :: EntInteract
 pickupBandolier =
   GenericEntInteract "pickup_bandolier" $ \edictRef otherRef -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
     let Just gClientRef = other^.eClient
 
     checkMaxAmmo gClientRef
@@ -684,7 +685,7 @@ pickupBandolier =
     checkBullets gClientRef
     checkShells gClientRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
@@ -714,7 +715,7 @@ pickupBandolier =
 pickupPack :: EntInteract
 pickupPack =
   GenericEntInteract "pickup_pack" $ \edictRef otherRef -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
     let Just gClientRef = other^.eClient
 
     checkMaxAmmo gClientRef
@@ -726,7 +727,7 @@ pickupPack =
     checkRockets gClientRef
     checkSlugs gClientRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     when ((edict^.eSpawnFlags) .&. Constants.droppedItem == 0 && deathmatchValue /= 0) $ do
@@ -840,8 +841,8 @@ pickupKey :: EntInteract
 pickupKey =
   GenericEntInteract "pickup_key" $ \edictRef otherRef -> do
     coopValue <- liftM (^.cvValue) coopCVar
-    edict <- readEdictT edictRef
-    other <- readEdictT otherRef
+    edict <- readRef edictRef
+    other <- readRef otherRef
 
     let Just (GClientReference gClientIdx) = other^.eClient
         Just (GItemReference gItemIdx) = edict^.eItem
@@ -880,23 +881,23 @@ pickupKey =
 
 pickupHealth :: EntInteract
 pickupHealth = PickupHealth "pickup_health" $ \edictRef otherRef -> do
-  edict <- readEdictT edictRef
-  other <- readEdictT otherRef
+  edict <- readRef edictRef
+  other <- readRef otherRef
 
   if (edict^.eStyle) .&. Constants.healthIgnoreMax == 0 && (other^.eHealth) >= (other^.eMaxHealth)
     then
       return False
 
     else do
-      modifyEdictT otherRef (\v -> v & eHealth +~ (edict^.eCount))
+      modifyRef otherRef (\v -> v & eHealth +~ (edict^.eCount))
       when ((edict^.eStyle) .&. Constants.healthIgnoreMax == 0) $
-        modifyEdictT otherRef (\v -> v & eHealth %~ (\vv -> if vv > (other^.eMaxHealth) then other^.eMaxHealth else vv))
+        modifyRef otherRef (\v -> v & eHealth %~ (\vv -> if vv > (other^.eMaxHealth) then other^.eMaxHealth else vv))
 
       if (edict^.eStyle) .&. Constants.healthTimed /= 0
         then do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-          modifyEdictT edictRef (\v -> v & eThink .~ Just GameUtil.megaHealthThink
+          modifyRef edictRef (\v -> v & eThink .~ Just GameUtil.megaHealthThink
                                          & eNextThink .~ levelTime + 5
                                          & eOwner .~ Just otherRef
                                          & eFlags %~ (.|. Constants.flRespawn)
@@ -912,7 +913,7 @@ pickupHealth = PickupHealth "pickup_health" $ \edictRef otherRef -> do
       return True
 
 -- QUAKED item_health (.3 .3 1) (-16 -16 -16) (16 16 16)
-spItemHealth :: EdictReference -> Quake ()
+spItemHealth :: Ref EdictT -> Quake ()
 spItemHealth edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     dmflags :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
@@ -922,7 +923,7 @@ spItemHealth edictRef = do
         GameUtil.freeEdict edictRef
 
       else do
-        modifyEdictT edictRef (\v -> v & eiModel .~ Just "models/items/healing/medium/tris.md2"
+        modifyRef edictRef (\v -> v & eiModel .~ Just "models/items/healing/medium/tris.md2"
                                        & eCount .~ 10)
 
         findItem "Health" >>= (spawnItem edictRef) . fromJust
@@ -931,7 +932,7 @@ spItemHealth edictRef = do
         void $ soundIndex (Just "items/n_health.wav")
 
 -- QUAKED item_health_small (.3 .3 1) (-16 -16 -16) (16 16 16)
-spItemHealthSmall :: EdictReference -> Quake ()
+spItemHealthSmall :: Ref EdictT -> Quake ()
 spItemHealthSmall edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     dmflags :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
@@ -941,18 +942,18 @@ spItemHealthSmall edictRef = do
         GameUtil.freeEdict edictRef 
 
       else do
-        modifyEdictT edictRef (\v -> v & eiModel .~ Just "models/items/healing/stimpack/tris.md2"
+        modifyRef edictRef (\v -> v & eiModel .~ Just "models/items/healing/stimpack/tris.md2"
                                        & eCount .~ 2)
 
         findItem "Health" >>= (spawnItem edictRef) . fromJust
 
-        modifyEdictT edictRef (\v -> v & eStyle .~ Constants.healthIgnoreMax)
+        modifyRef edictRef (\v -> v & eStyle .~ Constants.healthIgnoreMax)
 
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
         void $ soundIndex (Just "items/s_health.wav")
 
 -- QUAKED item_health_large (.3 .3 1) (-16 -16 -16) (16 16 16)
-spItemHealthLarge :: EdictReference -> Quake ()
+spItemHealthLarge :: Ref EdictT -> Quake ()
 spItemHealthLarge edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     dmflags :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
@@ -962,7 +963,7 @@ spItemHealthLarge edictRef = do
         GameUtil.freeEdict edictRef
 
       else do
-        modifyEdictT edictRef (\v -> v & eiModel .~ Just "models/items/healing/large/tris.md2"
+        modifyRef edictRef (\v -> v & eiModel .~ Just "models/items/healing/large/tris.md2"
                                        & eCount .~ 25)
 
         findItem "Health" >>= (spawnItem edictRef) . fromJust
@@ -973,7 +974,7 @@ spItemHealthLarge edictRef = do
 {-
 - QUAKED item_health_mega (.3 .3 1) (-16 -16 -16) (16 16 16)
 -}
-spItemHealthMega :: EdictReference -> Quake ()
+spItemHealthMega :: Ref EdictT -> Quake ()
 spItemHealthMega selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
@@ -983,7 +984,7 @@ spItemHealthMega selfRef = do
         GameUtil.freeEdict selfRef
 
       else do
-        modifyEdictT selfRef (\v -> v & eiModel .~ Just "models/items/mega_h/tris.md2"
+        modifyRef selfRef (\v -> v & eiModel .~ Just "models/items/mega_h/tris.md2"
                                       & eCount .~ 100)
 
         Just health <- findItem "Health"
@@ -992,12 +993,12 @@ spItemHealthMega selfRef = do
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
         soundIndex (Just "items/m_health.wav")
 
-        modifyEdictT selfRef (\v -> v & eStyle .~ Constants.healthIgnoreMax .|. Constants.healthTimed)
+        modifyRef selfRef (\v -> v & eStyle .~ Constants.healthIgnoreMax .|. Constants.healthTimed)
 
 dropToFloor :: EntThink
 dropToFloor =
   GenericEntThink "drop_to_floor" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eMins .~ V3 (-15) (-15) (-15)
+    modifyRef edictRef (\v -> v & eMins .~ V3 (-15) (-15) (-15)
                                    & eMaxs .~ V3 15 15 15)
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -1007,7 +1008,7 @@ dropToFloor =
         linkEntity = gameImport^.giLinkEntity
         trace = gameImport^.giTrace
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if isJust (edict^.eiModel)
       then
@@ -1018,7 +1019,7 @@ dropToFloor =
         Just worldModel <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giWorldModel
         setModel edictRef worldModel
 
-    modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidTrigger
+    modifyRef edictRef (\v -> v & eSolid .~ Constants.solidTrigger
                                    & eMoveType .~ Constants.moveTypeToss
                                    & eTouch .~ Just touchItem)
     
@@ -1031,10 +1032,10 @@ dropToFloor =
         dprintf $ "droptofloor: " `B.append` (edict^.eClassName) `B.append` " startsolid at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` "\n"
         GameUtil.freeEdict edictRef
       else do
-        modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ (tr^.tEndPos))
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (tr^.tEndPos))
 
         when (isJust $ edict^.eTeam) $ do
-          modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flTeamSlave))
+          modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flTeamSlave))
                                          & eChain .~ (edict^.eTeamChain)
                                          & eTeamChain .~ Nothing
                                          & eSvFlags %~ (.|. Constants.svfNoClient)
@@ -1043,17 +1044,17 @@ dropToFloor =
           when ((Just edictRef) == (edict^.eTeamMaster)) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-            modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+            modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
                                            & eThink .~ Just doRespawn)
             
         when ((edict^.eSpawnFlags) .&. Constants.itemNoTouch /= 0) $ do
-          modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidBbox
+          modifyRef edictRef (\v -> v & eSolid .~ Constants.solidBbox
                                          & eTouch .~ Nothing
                                          & eEntityState.esEffects %~ (.&. (complement Constants.efRotate))
                                          & eEntityState.esRenderFx %~ (.&. (complement Constants.rfGlow)))
 
         when ((edict^.eSpawnFlags) .&. Constants.itemTriggerSpawn /= 0) $ do
-          modifyEdictT edictRef (\v -> v & eSvFlags %~ (.|. Constants.svfNoClient)
+          modifyRef edictRef (\v -> v & eSvFlags %~ (.|. Constants.svfNoClient)
                                          & eSolid .~ Constants.solidNot
                                          & eUse .~ Just useItem)
 
@@ -1074,8 +1075,8 @@ touchItem =
 
     unless done $ do
       taken <- runItemInteract edictRef otherRef
-      edict <- readEdictT edictRef
-      other <- readEdictT otherRef
+      edict <- readRef edictRef
+      other <- readRef otherRef
 
       when taken $ do
         -- flash the screen
@@ -1119,25 +1120,25 @@ touchItem =
 
       when ((spawnFlags .&. Constants.itemTargetsUsed) == 0) $ do
         GameUtil.useTargets edictRef (Just otherRef)
-        modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.|. Constants.itemTargetsUsed))
+        modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. Constants.itemTargetsUsed))
 
       when (taken) $ do
         coopValue <- liftM (^.cvValue) coopCVar
         let Just (GItemReference itemIdx) = edict^.eItem
         Just itemFlags <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giFlags
-        edict' <- readEdictT edictRef
+        edict' <- readRef edictRef
         let updatedSpawnFlags = edict'^.eSpawnFlags
 
         when (not (coopValue /= 0 && (itemFlags .&. Constants.itStayCoop) /= 0) || (updatedSpawnFlags .&. (Constants.droppedItem .|. Constants.droppedPlayerItem)) /= 0) $ do
           let flags = edict'^.eFlags
           if flags .&. Constants.flRespawn /= 0
-            then modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flRespawn)))
+            then modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flRespawn)))
             else GameUtil.freeEdict edictRef
 
-  where shouldReturn :: EdictReference -> EdictReference -> Quake Bool
+  where shouldReturn :: Ref EdictT -> Ref EdictT -> Quake Bool
         shouldReturn edictRef otherRef = do
-          edict <- readEdictT edictRef
-          other <- readEdictT otherRef
+          edict <- readRef edictRef
+          other <- readRef otherRef
 
           let Just (GItemReference itemIdx) = edict^.eItem
           Just pickup <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giPickup
@@ -1146,9 +1147,9 @@ touchItem =
             then return True
             else return False
 
-        runItemInteract :: EdictReference -> EdictReference -> Quake Bool
+        runItemInteract :: Ref EdictT -> Ref EdictT -> Quake Bool
         runItemInteract edictRef otherRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let Just (GItemReference itemIdx) = edict^.eItem
           Just pickup <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx.giPickup
 
@@ -1157,7 +1158,7 @@ touchItem =
 doRespawn :: EntThink
 doRespawn =
   GenericEntThink "do_respawn" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     entRef <-
       if isJust (edict^.eTeam)
@@ -1173,40 +1174,40 @@ doRespawn =
         else
           return edictRef
 
-    modifyEdictT entRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+    modifyRef entRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
                                  & eSolid .~ Constants.solidTrigger)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity entRef
 
     -- send an effect
-    modifyEdictT entRef (\v -> v & eEntityState.esEvent .~ Constants.evItemRespawn)
+    modifyRef entRef (\v -> v & eEntityState.esEvent .~ Constants.evItemRespawn)
 
     return False
 
-  where countDepth :: Maybe EdictReference -> Int -> Quake Int
+  where countDepth :: Maybe (Ref EdictT) -> Int -> Quake Int
         countDepth Nothing count = return count
         countDepth (Just entRef) count = do
-          ent <- readEdictT entRef
+          ent <- readRef entRef
           countDepth (ent^.eChain) (count + 1)
 
-        makeChoice :: EdictReference -> Int -> Int -> Quake EdictReference
+        makeChoice :: Ref EdictT -> Int -> Int -> Quake (Ref EdictT)
         makeChoice entRef idx maxIdx
           | idx >= maxIdx = return entRef
           | otherwise = do
-              ent <- readEdictT entRef
+              ent <- readRef entRef
               makeChoice (fromJust $ ent^.eChain) (idx + 1) maxIdx
 
 useItem :: EntUse
 useItem =
   GenericEntUse "use_item" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let (solid, touch) = if (edict^.eSpawnFlags) .&. Constants.itemNoTouch /= 0
                            then (Constants.solidBbox, Nothing)
                            else (Constants.solidTrigger, Just touchItem)
 
-    modifyEdictT edictRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+    modifyRef edictRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
                                    & eUse .~ Nothing
                                    & eSolid .~ solid
                                    & eTouch .~ touch)
@@ -1214,11 +1215,11 @@ useItem =
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity edictRef
 
-dropItem :: EdictReference -> GItemReference -> Quake EdictReference
+dropItem :: Ref EdictT -> GItemReference -> Quake (Ref EdictT)
 dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     droppedRef <- GameUtil.spawn
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -1226,7 +1227,7 @@ dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
         trace = gameImport^.giTrace
         linkEntity = gameImport^.giLinkEntity
 
-    modifyEdictT droppedRef (\v -> v & eClassName .~ (item^.giClassName)
+    modifyRef droppedRef (\v -> v & eClassName .~ (item^.giClassName)
                                      & eItem .~ Just gItemRef
                                      & eSpawnFlags .~ Constants.droppedItem
                                      & eEntityState.esEffects .~ (item^.giWorldModelFlags)
@@ -1248,22 +1249,22 @@ dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
                        offset = V3 24 0 (-16)
                        origin = Math3D.projectSource (edict^.eEntityState.esOrigin) offset forward right
                    
-                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ origin)
-                   dropped <- readEdictT droppedRef
+                   modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ origin)
+                   dropped <- readRef droppedRef
 
                    traceT <- trace (edict^.eEntityState.esOrigin) (Just $ dropped^.eMins) (Just $ dropped^.eMaxs) (dropped^.eEntityState.esOrigin) (Just edictRef) Constants.contentsSolid
-                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+                   modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
                    return forward
 
                  Nothing -> do
                    let (Just forward, _, _) = Math3D.angleVectors (edict^.eEntityState.esAngles) True False False
-                   modifyEdictT droppedRef (\v -> v & eEntityState.esOrigin .~ (edict^.eEntityState.esOrigin))
+                   modifyRef droppedRef (\v -> v & eEntityState.esOrigin .~ (edict^.eEntityState.esOrigin))
                    return forward
 
     let V3 a b c = fmap (* 100) forward
         velocity = V3 a b 300
 
-    modifyEdictT droppedRef (\v -> v & eVelocity .~ velocity
+    modifyRef droppedRef (\v -> v & eVelocity .~ velocity
                                      & eThink .~ Just dropMakeTouchable
                                      & eNextThink .~ levelTime + 1)
 
@@ -1274,7 +1275,7 @@ dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
 dropTempTouch :: EntTouch
 dropTempTouch =
   GenericEntTouch "drop_temp_touch" $ \edictRef otherRef plane surf -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unless (Just otherRef == (edict^.eOwner)) $
       touch touchItem edictRef otherRef plane surf
@@ -1282,20 +1283,20 @@ dropTempTouch =
 dropMakeTouchable :: EntThink
 dropMakeTouchable =
   GenericEntThink "drop_make_touchable" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eTouch .~ Just touchItem)
+    modifyRef edictRef (\v -> v & eTouch .~ Just touchItem)
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     when (deathmatchValue /= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-      modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + 29
+      modifyRef edictRef (\v -> v & eNextThink .~ levelTime + 29
                                      & eThink .~ Just GameUtil.freeEdictA)
 
     return False
 
-powerArmorType :: EdictReference -> Quake Int
+powerArmorType :: Ref EdictT -> Quake Int
 powerArmorType edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eClient of
       Nothing ->
@@ -1316,9 +1317,9 @@ powerArmorType edictRef = do
                     | (gClient^.gcPers.cpInventory) UV.! (powerScreen^.giIndex) > 0 -> Constants.powerArmorScreen
                     | otherwise -> Constants.powerArmorNone
 
-armorIndex :: EdictReference -> Quake Int
+armorIndex :: Ref EdictT -> Quake Int
 armorIndex edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eClient of
       Nothing ->
@@ -1349,11 +1350,11 @@ getItemByIndex index = do
       then return Nothing
       else preuse $ gameBaseGlobals.gbItemList.ix index
 
-setRespawn :: EdictReference -> Float -> Quake ()
+setRespawn :: Ref EdictT -> Float -> Quake ()
 setRespawn edictRef delay = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn)
+    modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flRespawn)
                                    & eSvFlags %~ (.|. Constants.svfNoClient)
                                    & eSolid .~ Constants.solidNot
                                    & eNextThink .~ levelTime + delay
@@ -1362,9 +1363,9 @@ setRespawn edictRef delay = do
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity edictRef
 
-addAmmo :: EdictReference -> GItemReference -> Int -> Quake Bool
+addAmmo :: Ref EdictT -> GItemReference -> Int -> Quake Bool
 addAmmo edictRef (GItemReference gItemIdx) count = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eClient of
       Nothing ->
@@ -1395,6 +1396,6 @@ addAmmo edictRef (GItemReference gItemIdx) count = do
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) %= (\v -> if v + count > max' then max' else v + count)
                 return True
 
-selectNextItem :: EdictReference -> Int -> Quake ()
+selectNextItem :: Ref EdictT -> Int -> Quake ()
 selectNextItem _ _ = do
     io (putStrLn "GameItems.selectNextItem") >> undefined -- TODO

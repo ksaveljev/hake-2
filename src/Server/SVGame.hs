@@ -11,6 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -29,9 +30,9 @@ import qualified Server.SVWorld as SVWorld
 - 
 - Sends the contents of the mutlicast buffer to a single client.
 -}
-unicast :: EdictReference -> Bool -> Quake ()
+unicast :: Ref EdictT -> Bool -> Quake ()
 unicast edictRef reliable = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let p = edict^.eIndex
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
@@ -53,7 +54,7 @@ dprintf :: B.ByteString -> Quake ()
 dprintf = Com.printf
 
 -- Centerprintf for critical messages.
-cprintfHigh :: EdictReference -> B.ByteString -> Quake ()
+cprintfHigh :: Ref EdictT -> B.ByteString -> Quake ()
 cprintfHigh edictRef str = cprintf (Just edictRef) Constants.printHigh str
 
 {-
@@ -61,14 +62,14 @@ cprintfHigh edictRef str = cprintf (Just edictRef) Constants.printHigh str
 - 
 - Print to a single client.
 -}
-cprintf :: Maybe EdictReference -> Int -> B.ByteString -> Quake ()
+cprintf :: Maybe (Ref EdictT) -> Int -> B.ByteString -> Quake ()
 cprintf maybeEdict level str = do
     case maybeEdict of
       Nothing ->
         Com.printf str
 
       Just edictRef -> do
-        edict <- readEdictT edictRef
+        edict <- readRef edictRef
 
         maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
@@ -84,9 +85,9 @@ cprintf maybeEdict level str = do
 - 
 - centerprint to a single client.
 -}
-centerPrintf :: EdictReference -> B.ByteString -> Quake ()
+centerPrintf :: Ref EdictT -> B.ByteString -> Quake ()
 centerPrintf edictRef str = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let n = edict^.eIndex
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
 
@@ -111,7 +112,7 @@ pfError2 level str = Com.comError level str
 - 
 - Also sets mins and maxs for inline bmodels.
 -}
-setModel :: EdictReference -> Maybe B.ByteString -> Quake ()
+setModel :: Ref EdictT -> Maybe B.ByteString -> Quake ()
 setModel edictRef name = do
     when (isNothing name) $
       Com.comError Constants.errDrop "PF_setmodel: NULL"
@@ -119,14 +120,14 @@ setModel edictRef name = do
     let modelName = fromJust name
     idx <- SVInit.modelIndex name
 
-    modifyEdictT edictRef (\v -> v & eEntityState.esModelIndex .~ idx)
+    modifyRef edictRef (\v -> v & eEntityState.esModelIndex .~ idx)
 
     -- if it is an inline model, get the size information for it
     when (BC.head modelName == '*') $ do
       (CModelReference modelIdx) <- CM.inlineModel modelName
       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
-      modifyEdictT edictRef (\v -> v & eMins .~ (model^.cmMins)
+      modifyRef edictRef (\v -> v & eMins .~ (model^.cmMins)
                                      & eMaxs .~ (model^.cmMaxs))
 
       SVWorld.linkEdict edictRef
@@ -226,7 +227,7 @@ inPHS p1 p2 = do
              then return False -- a door blocks hearing
              else return True
 
-startSound :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (Ref EdictT) -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound maybeEdictRef channel soundNum volume attenuation timeOfs = do
     case maybeEdictRef of
       Nothing -> return ()

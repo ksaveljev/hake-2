@@ -9,51 +9,51 @@ import Game.Adapters
 
 lightUse :: EntUse
 
-spPathCorner :: EdictReference -> Quake ()
+spPathCorner :: Ref EdictT -> Quake ()
 
 pathCornerTouch :: EntTouch
 
-spPointCombat :: EdictReference -> Quake ()
+spPointCombat :: Ref EdictT -> Quake ()
 
-spViewThing :: EdictReference -> Quake ()
+spViewThing :: Ref EdictT -> Quake ()
 
 thViewThing :: EntThink
 
-spInfoNull :: EdictReference -> Quake ()
+spInfoNull :: Ref EdictT -> Quake ()
 
-spInfoNotNull :: EdictReference -> Quake ()
+spInfoNotNull :: Ref EdictT -> Quake ()
 
-spLight :: EdictReference -> Quake ()
+spLight :: Ref EdictT -> Quake ()
 
-spFuncWall :: EdictReference -> Quake ()
+spFuncWall :: Ref EdictT -> Quake ()
 
-spFuncObject :: EdictReference -> Quake ()
+spFuncObject :: Ref EdictT -> Quake ()
 
-spFuncExplosive :: EdictReference -> Quake ()
+spFuncExplosive :: Ref EdictT -> Quake ()
 
-spMiscExploBox :: EdictReference -> Quake ()
+spMiscExploBox :: Ref EdictT -> Quake ()
 
-spMiscBlackHole :: EdictReference -> Quake ()
+spMiscBlackHole :: Ref EdictT -> Quake ()
 
-spMiscEasterTank :: EdictReference -> Quake ()
+spMiscEasterTank :: Ref EdictT -> Quake ()
 
-spMiscEasterChick :: EdictReference -> Quake ()
+spMiscEasterChick :: Ref EdictT -> Quake ()
 
-spMiscEasterChick2 :: EdictReference -> Quake ()
+spMiscEasterChick2 :: Ref EdictT -> Quake ()
 
-spMonsterCommanderBody :: EdictReference -> Quake ()
+spMonsterCommanderBody :: Ref EdictT -> Quake ()
 
-spMiscBanner :: EdictReference -> Quake ()
+spMiscBanner :: Ref EdictT -> Quake ()
 
-spMiscDeadSoldier :: EdictReference -> Quake ()
+spMiscDeadSoldier :: Ref EdictT -> Quake ()
 
-spMiscViper :: EdictReference -> Quake ()
+spMiscViper :: Ref EdictT -> Quake ()
 
 miscViperUse :: EntUse
 
-spMiscBigViper :: EdictReference -> Quake ()
+spMiscBigViper :: Ref EdictT -> Quake ()
 
-spMiscViperBomb :: EdictReference -> Quake ()
+spMiscViperBomb :: Ref EdictT -> Quake ()
 
 miscViperBombUse :: EntUse
 
@@ -61,41 +61,41 @@ miscViperBombPrethink :: EntThink
 
 miscViperBombTouch :: EntTouch
 
-spMiscStroggShip :: EdictReference -> Quake ()
+spMiscStroggShip :: Ref EdictT -> Quake ()
 
-spMiscSatelliteDish :: EdictReference -> Quake ()
+spMiscSatelliteDish :: Ref EdictT -> Quake ()
 
 miscSatelliteDishUse :: EntUse
 
 miscSatelliteDishThink :: EntThink
 
-spLightMine1 :: EdictReference -> Quake ()
+spLightMine1 :: Ref EdictT -> Quake ()
 
-spLightMine2 :: EdictReference -> Quake ()
+spLightMine2 :: Ref EdictT -> Quake ()
 
-spMiscGibArm :: EdictReference -> Quake ()
+spMiscGibArm :: Ref EdictT -> Quake ()
 
-spMiscGibLeg :: EdictReference -> Quake ()
+spMiscGibLeg :: Ref EdictT -> Quake ()
 
-spMiscGibHead :: EdictReference -> Quake ()
+spMiscGibHead :: Ref EdictT -> Quake ()
 
-spTargetCharacter :: EdictReference -> Quake ()
+spTargetCharacter :: Ref EdictT -> Quake ()
 
-spTargetString :: EdictReference -> Quake ()
+spTargetString :: Ref EdictT -> Quake ()
 
 targetStringUse :: EntUse
 
-spFuncClock :: EdictReference -> Quake ()
+spFuncClock :: Ref EdictT -> Quake ()
 
-funcClockReset :: EdictReference -> Quake ()
+funcClockReset :: Ref EdictT -> Quake ()
 
 funcClockThink :: EntThink
 
-funcClockFormatCountdown :: EdictReference -> Quake ()
+funcClockFormatCountdown :: Ref EdictT -> Quake ()
 
 funcClockUse :: EntUse
 
-spMiscTeleporter :: EdictReference -> Quake ()
+spMiscTeleporter :: Ref EdictT -> Quake ()
 
 teleporterTouch :: EntTouch
 
@@ -105,17 +105,17 @@ spMiscTeleporterDest :: EntThink
 
 miscDeadSoldierDie :: EntDie
 
-throwGib :: EdictReference -> B.ByteString -> Int -> Int -> Quake ()
+throwGib :: Ref EdictT -> B.ByteString -> Int -> Int -> Quake ()
 
 gibTouch :: EntTouch
 
 gibThink :: EntThink
 
-clipGibVelocity :: EdictReference -> Quake ()
+clipGibVelocity :: Ref EdictT -> Quake ()
 
 velocityForDamage :: Int -> Quake (V3 Float)
 
-throwHead :: EdictReference -> B.ByteString -> Int -> Int -> Quake ()
+throwHead :: Ref EdictT -> B.ByteString -> Int -> Int -> Quake ()
 
 barrelDelay :: EntDie
 
@@ -163,10 +163,10 @@ commanderBodyThink :: EntThink
 
 commanderBodyDrop :: EntThink
 
-throwDebris :: EdictReference -> B.ByteString -> Float -> V3 Float -> Quake ()
+throwDebris :: Ref EdictT -> B.ByteString -> Float -> V3 Float -> Quake ()
 
-becomeExplosion1 :: EdictReference -> Quake ()
+becomeExplosion1 :: Ref EdictT -> Quake ()
 
-becomeExplosion2 :: EdictReference -> Quake ()
+becomeExplosion2 :: Ref EdictT -> Quake ()
 
 debrisDie :: EntDie

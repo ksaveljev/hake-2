@@ -14,6 +14,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -116,7 +117,7 @@ floaterIdle =
 floaterFireBlaster :: EntThink
 floaterFireBlaster =
   GenericEntThink "floater_fire_blaster" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let effect = if (self^.eEntityState.esFrame) == frameAttack104 || (self^.eEntityState.esFrame) == frameAttack107
                    then Constants.efHyperblaster
@@ -125,7 +126,7 @@ floaterFireBlaster =
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2FloatBlaster1) forward right
         Just enemyRef = self^.eEnemy
 
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -262,7 +263,7 @@ floaterStand =
                    then floaterMoveStand1
                    else floaterMoveStand2
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterFramesActivate :: V.Vector MFrameT
@@ -305,13 +306,13 @@ floaterMoveActivate = MMoveT "floaterMoveActivate" frameActivate01 frameActivate
 floaterRun :: EntThink
 floaterRun =
   GenericEntThink "floater_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then floaterMoveStand1
                    else floaterMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterFramesAttack1 :: V.Vector MFrameT
@@ -387,9 +388,9 @@ floaterMoveAttack2 = MMoveT "floaterMoveAttack2" frameAttack201 frameAttack225 f
 floaterZap :: EntThink
 floaterZap =
   GenericEntThink "floater_zap" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let dir = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
@@ -488,7 +489,7 @@ floaterFramesDeath =
 floaterDead :: EntThink
 floaterDead =
   GenericEntThink "floater_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -671,13 +672,13 @@ floaterMoveRun = MMoveT "floaterMoveRun" frameStand101 frameStand152 floaterFram
 floaterWalk :: EntThink
 floaterWalk =
   GenericEntThink "floater_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveWalk)
     return True
 
 floaterAttack :: EntThink
 floaterAttack =
   GenericEntThink "floater_attack" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveAttack1)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just floaterMoveAttack1)
     return True
 
 floaterMelee :: EntThink
@@ -689,21 +690,21 @@ floaterMelee =
                    then floaterMoveAttack3
                    else floaterMoveAttack2
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 floaterPain :: EntPain
 floaterPain =
   GenericEntPain "floater_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -720,7 +721,7 @@ floaterPain =
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 floaterDie :: EntDie
 floaterDie =
@@ -734,7 +735,7 @@ floaterDie =
 - QUAKED monster_floater (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterFloater :: EdictReference -> Quake ()
+spMonsterFloater :: Ref EdictT -> Quake ()
 spMonsterFloater selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -762,7 +763,7 @@ spMonsterFloater selfRef = do
         soundIdx <- soundIndex (Just "floater/fltsrch1.wav")
         modelIdx <- modelIndex (Just "models/monsters/float/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ soundIdx
                                       & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
@@ -789,7 +790,7 @@ spMonsterFloater selfRef = do
                             then floaterMoveStand1
                             else floaterMoveStand2
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.flyMonsterStart selfRef

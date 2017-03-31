@@ -9,9 +9,9 @@ import           Types
 
 makeLenses ''EntityStateT
 
-newEntityStateT :: Maybe EdictReference -> EntityStateT
-newEntityStateT er = EntityStateT
-    { _esNumber         = if isJust er then let Just (EdictReference idx) = er in idx else 0
+newEntityStateT :: Maybe (Ref EdictT) -> EntityStateT
+newEntityStateT edictRef = EntityStateT
+    { _esNumber         = number edictRef
     , _esOrigin         = V3 0 0 0
     , _esAngles         = V3 0 0 0
     , _esOldOrigin      = V3 0 0 0
@@ -26,5 +26,8 @@ newEntityStateT er = EntityStateT
     , _esSolid          = 0
     , _esSound          = 0
     , _esEvent          = 0
-    , _esSurroundingEnt = er
+    , _esSurroundingEnt = edictRef
     }
+  where
+    number Nothing = 0
+    number (Just (Ref idx)) = idx

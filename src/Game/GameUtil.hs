@@ -35,6 +35,7 @@ import Game.GClientT
 import Game.MonsterInfoT
 import Game.ClientPersistantT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -54,7 +55,7 @@ import qualified Util.Math3D as Math3D
 - think the entity morphed into something else instead of being removed and
 - recreated, which can cause interpolated angles and bad trails.
 -}
-spawn :: Quake EdictReference
+spawn :: Quake (Ref EdictT)
 spawn = do
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
@@ -67,8 +68,8 @@ spawn = do
 
     case foundIndex of
       Just idx -> do
-        let newRef = newEdictReference idx
-        writeEdictT newRef (newEdictT idx)
+        let newRef = Ref idx
+        writeRef newRef (newEdictT idx)
         initEdict newRef
         return newRef
 
@@ -79,8 +80,8 @@ spawn = do
           err <- use $ gameBaseGlobals.gbGameImport.giError
           err "ED_Alloc: no free edicts"
 
-        let newRef = newEdictReference numEdicts
-        writeEdictT newRef (newEdictT numEdicts)
+        let newRef = Ref numEdicts
+        writeRef newRef (newEdictT numEdicts)
         gameBaseGlobals.gbNumEdicts += 1
         initEdict newRef
         return newRef
@@ -103,11 +104,11 @@ spawn = do
                 then return (Just idx)
                 else findIndex edicts p (idx + 1) maxIdx
 
-initEdict :: EdictReference -> Quake ()
+initEdict :: Ref EdictT -> Quake ()
 initEdict edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eInUse .~ True
+    modifyRef edictRef (\v -> v & eInUse .~ True
                                    & eClassName .~ "noclass"
                                    & eGravity .~ 1.0
                                    & eEntityState .~ (newEntityStateT (Just edictRef)) { _esNumber = (edict^.eIndex) })
@@ -116,15 +117,15 @@ initEdict edictRef = do
 - Call after linking a new trigger in during gameplay to force all entities
 - it covers to immediately touch it.
 -}
-clearEdict :: EdictReference -> Quake ()
+clearEdict :: Ref EdictT -> Quake ()
 clearEdict edictRef = do
-    edict <- readEdictT edictRef
-    writeEdictT edictRef (newEdictT (edict^.eIndex))
+    edict <- readRef edictRef
+    writeRef edictRef (newEdictT (edict^.eIndex))
 
 -- Marks the edict as free
-freeEdict :: EdictReference -> Quake ()
+freeEdict :: Ref EdictT -> Quake ()
 freeEdict edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unlinkEntity <- use $ gameBaseGlobals.gbGameImport.giUnlinkEntity
     unlinkEntity edictRef
@@ -133,7 +134,7 @@ freeEdict edictRef = do
 
     when ((edict^.eIndex) > maxClientsValue + Constants.bodyQueueSize) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-      writeEdictT edictRef (newEdictT (edict^.eIndex)) { _eClassName = "freed", _eFreeTime = levelTime, _eInUse = False }
+      writeRef edictRef (newEdictT (edict^.eIndex)) { _eClassName = "freed", _eFreeTime = levelTime, _eInUse = False }
 
 {-
 - Returns the range catagorization of an entity reletive to self 0 melee
@@ -164,9 +165,9 @@ range self other =
 - Search for (string)targetname in all entities that match
 - (string)self.target and call their .use function
 -}
-useTargets :: EdictReference -> Maybe EdictReference -> Quake ()
+useTargets :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
 useTargets edictRef activatorRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let dprintf = gameImport^.giDprintf
@@ -184,7 +185,7 @@ useTargets edictRef activatorRef = do
         when (isNothing activatorRef) $ do
           dprintf "Think_Delay with no activator\n"
 
-        modifyEdictT tmpRef (\v -> v & eClassName .~ "DelayedUse"
+        modifyRef tmpRef (\v -> v & eClassName .~ "DelayedUse"
                                      & eNextThink .~ levelTime + (edict^.eDelay)
                                      & eThink .~ Just thinkDelay
                                      & eActivator .~ activatorRef
@@ -194,7 +195,7 @@ useTargets edictRef activatorRef = do
 
       else do
         let actRef = fromJust activatorRef
-        activator <- readEdictT actRef
+        activator <- readRef actRef
 
         -- print the message
         when (isJust (edict^.eMessage) && ((activator^.eSvFlags) .&. Constants.svfMonster) == 0) $ do
@@ -218,14 +219,14 @@ useTargets edictRef activatorRef = do
           when (isJust $ edict^.eTarget) $ do
             fireTargets (BC.map toLower (edict^.eClassName)) Nothing GameBase.findByTarget (fromJust $ edict^.eTarget)
 
-  where killKillTargets :: Maybe EdictReference -> B.ByteString -> Quake Bool
+  where killKillTargets :: Maybe (Ref EdictT) -> B.ByteString -> Quake Bool
         killKillTargets entRef killTarget = do
           nextRef <- GameBase.gFind entRef GameBase.findByTarget killTarget
 
           case nextRef of
             Just newRef -> do
               freeEdict newRef
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
 
               if (edict^.eInUse)
                 then
@@ -239,13 +240,13 @@ useTargets edictRef activatorRef = do
             Nothing ->
               return False
 
-        fireTargets :: B.ByteString -> Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake ()
+        fireTargets :: B.ByteString -> Maybe (Ref EdictT) -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake ()
         fireTargets edictClassName ref findBy targetName = do
           foundRef <- GameBase.gFind ref findBy targetName
 
           when (isJust foundRef) $ do
             let Just foundEdictRef = foundRef
-            foundEdict <- readEdictT foundEdictRef
+            foundEdict <- readRef foundEdictRef
 
             -- doors fire area portals in a specific way
             let foundEdictClassName = BC.map toLower (foundEdict^.eClassName)
@@ -265,7 +266,7 @@ useTargets edictRef activatorRef = do
                     when (isJust $ foundEdict^.eUse) $
                       entUse (fromJust $ foundEdict^.eUse) foundEdictRef (Just edictRef) activatorRef
 
-                edict <- readEdictT edictRef
+                edict <- readRef edictRef
 
                 if not (edict^.eInUse)
                   then dprintf "entity was removed while using targets\n"
@@ -274,7 +275,7 @@ useTargets edictRef activatorRef = do
 thinkDelay :: EntThink
 thinkDelay =
   GenericEntThink "Think_Delay" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     useTargets edictRef (edict^.eActivator)
     freeEdict edictRef
     return True
@@ -288,27 +289,27 @@ freeEdictA =
 monsterUse :: EntUse
 monsterUse =
   GenericEntUse "monster_use" $ \selfRef _ (Just activatorRef) -> do
-    self <- readEdictT selfRef
-    activator <- readEdictT activatorRef
+    self <- readRef selfRef
+    activator <- readRef activatorRef
 
     let done = isJust (self^.eEnemy) || (self^.eHealth) <= 0 || ((activator^.eFlags) .&. Constants.flNoTarget) /= 0 || (isNothing (activator^.eClient) && ((activator^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy) == 0)
     
     unless done $ do
-      modifyEdictT selfRef (\v -> v & eEnemy .~ Just activatorRef)
+      modifyRef selfRef (\v -> v & eEnemy .~ Just activatorRef)
       foundTarget selfRef
 
 mCheckAttack :: EntThink
 mCheckAttack =
   GenericEntThink "M_CheckAttack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
 
     checkEnemyHealth selfRef enemyRef
 
-  where checkEnemyHealth :: EdictReference -> EdictReference -> Quake Bool
+  where checkEnemyHealth :: Ref EdictT -> Ref EdictT -> Quake Bool
         checkEnemyHealth selfRef enemyRef = do
-          self <- readEdictT selfRef
-          enemy <- readEdictT enemyRef
+          self <- readRef selfRef
+          enemy <- readRef enemyRef
 
           if (enemy^.eHealth) > 0
             then do
@@ -326,10 +327,10 @@ mCheckAttack =
             else
               meleeAttack selfRef
 
-        meleeAttack :: EdictReference -> Quake Bool
+        meleeAttack :: Ref EdictT -> Quake Bool
         meleeAttack selfRef = do
           enemyRange <- use $ gameBaseGlobals.gbEnemyRange
-          self <- readEdictT selfRef
+          self <- readRef selfRef
 
           if enemyRange == Constants.rangeMelee
             then do
@@ -345,15 +346,15 @@ mCheckAttack =
                                       Just _ -> Constants.asMelee
                                       Nothing -> Constants.asMissile
 
-                  modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+                  modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
                   return True
 
             else
               missileAttack selfRef
 
-        missileAttack :: EdictReference -> Quake Bool
+        missileAttack :: Ref EdictT -> Quake Bool
         missileAttack selfRef = do
-          self <- readEdictT selfRef
+          self <- readRef selfRef
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
           enemyRange <- use $ gameBaseGlobals.gbEnemyRange
 
@@ -383,7 +384,7 @@ mCheckAttack =
                        then do
                          r' <- Lib.randomF
 
-                         modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile
+                         modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile
                                                        & eMonsterInfo.miAttackFinished .~ levelTime + 2 * r')
 
                          return True
@@ -396,7 +397,7 @@ mCheckAttack =
                                                then Constants.asSliding
                                                else Constants.asStraight
 
-                           modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+                           modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
 
                          return False
 
@@ -404,9 +405,9 @@ mCheckAttack =
 - Kills all entities that would touch the proposed new positioning of ent.
 - Ent should be unlinked before calling this!
 -}
-killBox :: EdictReference -> Quake Bool
+killBox :: Ref EdictT -> Quake Bool
 killBox edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
     traceT <- trace (edict^.eEntityState.esOrigin)
@@ -437,17 +438,17 @@ killBox edictRef = do
                           Constants.modTelefrag
 
         -- if we didnt' kill it, fail
-        traceEnt <- readEdictT traceEntRef
+        traceEnt <- readRef traceEntRef
 
         if (traceEnt^.eSolid) /= 0
           then return False
           else killBox edictRef
 
 -- Returns 1 if the entity is visible to self, even if not infront()
-visible :: EdictReference -> EdictReference -> Quake Bool
+visible :: Ref EdictT -> Ref EdictT -> Quake Bool
 visible selfRef otherRef = do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
 
     let spot1 = (self^.eEntityState.esOrigin) & _z +~ fromIntegral (self^.eViewHeight)
         spot2 = (other^.eEntityState.esOrigin) & _z +~ fromIntegral (other^.eViewHeight)
@@ -473,9 +474,9 @@ visible selfRef otherRef = do
 - checked each frame. This means multi player games will have slightly
 - slower noticing monsters.
 -}
-findTarget :: EdictReference -> Quake Bool
+findTarget :: Ref EdictT -> Quake Bool
 findTarget selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0
       then
@@ -511,7 +512,7 @@ findTarget selfRef = do
 
           if | (level^.llSightEntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 == 0 -> do
                  let Just clientRef = level^.llSightEntity
-                 client <- readEdictT clientRef
+                 client <- readRef clientRef
                  if (client^.eEnemy) == (self^.eEnemy)
                    then return False
                    else checkClientInUse clientRef False
@@ -527,15 +528,15 @@ findTarget selfRef = do
                    Nothing -> return False -- no clients to get mad at
                    Just clientRef -> checkClientInUse clientRef False
 
-        checkClientInUse :: EdictReference -> Bool -> Quake Bool
+        checkClientInUse :: Ref EdictT -> Bool -> Quake Bool
         checkClientInUse clientRef heardIt = do
           -- if the entity went away, forget it
-          client <- readEdictT clientRef
+          client <- readRef clientRef
           if not (client^.eInUse)
             then return False
             else checkClientFlags clientRef client heardIt
 
-        checkClientFlags :: EdictReference -> EdictT -> Bool -> Quake Bool
+        checkClientFlags :: Ref EdictT -> EdictT -> Bool -> Quake Bool
         checkClientFlags clientRef client heardIt = do
           if | isJust (client^.eClient) ->
                  if (client^.eFlags) .&. Constants.flNoTarget /= 0
@@ -546,14 +547,14 @@ findTarget selfRef = do
                  case client^.eEnemy of
                    Nothing -> return False
                    Just enemyRef -> do
-                     enemy <- readEdictT enemyRef
+                     enemy <- readRef enemyRef
                      if (enemy^.eFlags) .&. Constants.flNoTarget /= 0
                        then return False
                        else actBasedOnHeardIt clientRef heardIt
 
              | heardIt -> do
                  let Just ownerRef = client^.eOwner
-                 owner <- readEdictT ownerRef
+                 owner <- readRef ownerRef
 
                  if (owner^.eFlags) .&. Constants.flNoTarget /= 0
                    then return False
@@ -561,10 +562,10 @@ findTarget selfRef = do
 
              | otherwise -> return False
 
-        actBasedOnHeardIt :: EdictReference -> Bool -> Quake Bool
+        actBasedOnHeardIt :: Ref EdictT -> Bool -> Quake Bool
         actBasedOnHeardIt clientRef heardIt = do
-          self <- readEdictT selfRef
-          client <- readEdictT clientRef
+          self <- readRef selfRef
+          client <- readRef clientRef
 
           if not heardIt
             then do
@@ -593,22 +594,22 @@ findTarget selfRef = do
                             return True -- JDC false
 
                         | otherwise -> do
-                            modifyEdictT selfRef (\v -> v & eEnemy .~ Just clientRef)
+                            modifyRef selfRef (\v -> v & eEnemy .~ Just clientRef)
 
                             if (client^.eClassName) /= "player_noise"
                               then do
-                                modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
+                                modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
 
                                 case client^.eClient of
                                   Nothing -> do
-                                    modifyEdictT selfRef (\v -> v & eEnemy .~ (client^.eEnemy))
+                                    modifyRef selfRef (\v -> v & eEnemy .~ (client^.eEnemy))
 
                                     let Just enemyRef = client^.eEnemy
-                                    enemy <- readEdictT enemyRef
+                                    enemy <- readRef enemyRef
 
                                     case enemy^.eClient of
                                       Nothing -> do
-                                        modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
+                                        modifyRef selfRef (\v -> v & eEnemy .~ Nothing)
                                         return False
 
                                       _ -> finishFindTarget
@@ -657,19 +658,19 @@ findTarget selfRef = do
                               return False
 
                             else do
-                              modifyEdictT selfRef (\v' -> v' & eIdealYaw .~ Math3D.vectorYaw temp)
+                              modifyRef selfRef (\v' -> v' & eIdealYaw .~ Math3D.vectorYaw temp)
                               M.changeYaw selfRef
 
                               -- hunt the sound for a bit; hopefully find
                               -- the real player
-                              modifyEdictT selfRef (\v' -> v' & eMonsterInfo.miAIFlags %~ (.|. Constants.aiSoundTarget))
+                              modifyRef selfRef (\v' -> v' & eMonsterInfo.miAIFlags %~ (.|. Constants.aiSoundTarget))
 
                               if Just clientRef == (self^.eEnemy)
                                 then
                                   return True
 
                                 else do
-                                  modifyEdictT selfRef (\v' -> v' & eEnemy .~ Just clientRef)
+                                  modifyRef selfRef (\v' -> v' & eEnemy .~ Just clientRef)
                                   finishFindTarget
 
         finishFindTarget :: Quake Bool
@@ -677,7 +678,7 @@ findTarget selfRef = do
           -- got one
           foundTarget selfRef
 
-          self <- readEdictT selfRef
+          self <- readRef selfRef
 
           when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget == 0 && isJust (self^.eMonsterInfo.miSight)) $
             void $ entInteract (fromJust $ self^.eMonsterInfo.miSight) selfRef (fromJust $ self^.eEnemy) -- RESEARCH: are we sure eEnemy is Just ?
@@ -692,11 +693,11 @@ inFront self other =
         dot' = vec `dot` forward
     in dot' > 0.3
 
-foundTarget :: EdictReference -> Quake ()
+foundTarget :: Ref EdictT -> Quake ()
 foundTarget selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     -- let other monsters see this monster for a while
     when (isJust (enemy^.eClient)) $ do
@@ -706,12 +707,12 @@ foundTarget selfRef = do
         llSightEntity .= Just selfRef
         llSightEntityFrameNum .= frameNum
 
-      modifyEdictT selfRef (\v -> v & eLightLevel .~ 128)
+      modifyRef selfRef (\v -> v & eLightLevel .~ 128)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
 
-    modifyEdictT selfRef (\v -> v & eShowHostile .~ truncate levelTime + 1 -- wake up other monsters
+    modifyRef selfRef (\v -> v & eShowHostile .~ truncate levelTime + 1 -- wake up other monsters
                                   & eMonsterInfo.miLastSighting .~ (enemy^.eEntityState.esOrigin)
                                   & eMonsterInfo.miTrailTime .~ levelTime)
 
@@ -724,7 +725,7 @@ foundTarget selfRef = do
 
         case target of
           Nothing -> do
-            modifyEdictT selfRef (\v -> v & eGoalEntity .~ (self^.eEnemy)
+            modifyRef selfRef (\v -> v & eGoalEntity .~ (self^.eEnemy)
                                           & eMoveTarget .~ (self^.eEnemy))
 
             GameAI.huntTarget selfRef
@@ -738,7 +739,7 @@ foundTarget selfRef = do
                      " not found\n")
 
           Just _ -> do
-            modifyEdictT selfRef (\v -> v & eGoalEntity .~ target
+            modifyRef selfRef (\v -> v & eGoalEntity .~ target
                                           & eMoveTarget .~ target
                                           -- clear out our combattarget, these are a one shot deal
                                           & eCombatTarget .~ Nothing
@@ -747,18 +748,18 @@ foundTarget selfRef = do
 
             -- clear the targetname, that point is ours!
             let Just moveTargetRef = target
-            modifyEdictT moveTargetRef (\v -> v & eTargetName .~ Nothing)
+            modifyRef moveTargetRef (\v -> v & eTargetName .~ Nothing)
 
             -- run for it
             void $ think (fromJust $ self^.eMonsterInfo.miRun) selfRef
 
-attackFinished :: EdictReference -> Float -> Quake ()
+attackFinished :: Ref EdictT -> Float -> Quake ()
 attackFinished selfRef time = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + time)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + time)
 
 -- Returns true, if two edicts are on the same team.
-onSameTeam :: EdictReference -> EdictReference -> Quake Bool
+onSameTeam :: Ref EdictT -> Ref EdictT -> Quake Bool
 onSameTeam edictRef otherRef = do
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
     
@@ -772,9 +773,9 @@ onSameTeam edictRef otherRef = do
 
 -- Returns the team string of an entity 
 -- with respect to rteam_by_model and team_by_skin. 
-clientTeam :: EdictReference -> Quake B.ByteString
+clientTeam :: Ref EdictT -> Quake B.ByteString
 clientTeam edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     
     case edict^.eClient of
       Nothing ->
@@ -798,15 +799,15 @@ clientTeam edictRef = do
 megaHealthThink :: EntThink
 megaHealthThink =
   GenericEntThink "MegaHealth_think" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just ownerRef = self^.eOwner
-    owner <- readEdictT ownerRef
+    owner <- readRef ownerRef
     
     if (owner^.eHealth) > (owner^.eMaxHealth)
       then do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1)
-        modifyEdictT ownerRef (\v -> v & eHealth -~ 1)
+        modifyRef selfRef (\v -> v & eNextThink .~ levelTime + 1)
+        modifyRef ownerRef (\v -> v & eHealth -~ 1)
         return False
         
       else do
@@ -820,9 +821,9 @@ megaHealthThink =
         
         return False
 
-validateSelectedItem :: EdictReference -> Quake ()
+validateSelectedItem :: Ref EdictT -> Quake ()
 validateSelectedItem edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx

@@ -16,6 +16,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -157,7 +158,7 @@ brainMoveStand = MMoveT "brainMoveStand" frameStand01 frameStand30 brainFramesSt
 brainStand :: EntThink
 brainStand =
   GenericEntThink "brain_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveStand)
     return True
 
 brainFramesIdle :: V.Vector MFrameT
@@ -204,7 +205,7 @@ brainIdle =
     soundIdle3 <- use $ mBrainGlobals.mBrainSoundIdle3
     sound (Just selfRef) Constants.chanAuto soundIdle3 1 Constants.attnIdle 0
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveIdle)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveIdle)
     return True
 
 brainFramesWalk1 :: V.Vector MFrameT
@@ -261,20 +262,20 @@ brainMoveWalk1 = MMoveT "brainMoveWalk1" frameWalk101 frameWalk111 brainFramesWa
 brainWalk :: EntThink
 brainWalk =
   GenericEntThink "brain_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveWalk1)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveWalk1)
     return True
 
 brainDuckDown :: EntThink
 brainDuckDown =
   GenericEntThink "brain_duck_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
       then
         return True
 
       else do
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
                                       & eMaxs._z -~ 32
                                       & eTakeDamage .~ Constants.damageYes)
 
@@ -286,19 +287,19 @@ brainDuckDown =
 brainDuckHold :: EntThink
 brainDuckHold =
   GenericEntThink "brain_duck_hold" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+      then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 brainDuckUp :: EntThink
 brainDuckUp =
   GenericEntThink "brain_duck_up" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
                                   & eMaxs._z +~ 32
                                   & eTakeDamage .~ Constants.damageAim)
 
@@ -313,11 +314,11 @@ brainDodge =
     r <- Lib.randomF
 
     unless (r > 0.25) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
       when (isNothing (self^.eEnemy)) $
-        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef
+        modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef
                                       & eMonsterInfo.miPauseTime .~ levelTime + eta + 0.5
                                       & eMonsterInfo.miCurrentMove .~ Just brainMoveDuck)
 
@@ -333,7 +334,7 @@ brainFramesDeath2 =
 brainDead :: EntThink
 brainDead =
   GenericEntThink "brain_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -383,7 +384,7 @@ brainSwingRight =
 brainHitRight :: EntThink
 brainHitRight =
   GenericEntThink "brain_hit_right" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 8
     r <- Lib.rand
@@ -408,7 +409,7 @@ brainSwingLeft =
 brainHitLeft :: EntThink
 brainHitLeft =
   GenericEntThink "brain_hit_left" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 8
     r <- Lib.rand
@@ -425,7 +426,7 @@ brainHitLeft =
 brainChestOpen :: EntThink
 brainChestOpen =
   GenericEntThink "brain_chest_open" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 65536))
+    modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 65536))
                                   & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorNone)
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
@@ -442,7 +443,7 @@ brainTentacleAttack =
     hit <- GameWeapon.fireHit selfRef aim (10 + (fromIntegral r `mod` 5)) (-600)
 
     when hit $
-      modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.|. 65536))
+      modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. 65536))
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundTentaclesRetract <- use $ mBrainGlobals.mBrainSoundTentaclesRetract
@@ -475,12 +476,12 @@ brainFramesAttack1 =
 brainChestClosed :: EntThink
 brainChestClosed =
   GenericEntThink "brain_chest_closed" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorScreen)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorScreen)
 
     when ((self^.eSpawnFlags) .&. 65536 /= 0) $
-      modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 65536))
+      modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 65536))
                                     & eMonsterInfo.miCurrentMove .~ Just brainMoveAttack1)
 
     return True
@@ -515,7 +516,7 @@ brainMelee =
                    then brainMoveAttack1
                    else brainMoveAttack2
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 brainFramesRun :: V.Vector MFrameT
@@ -539,15 +540,15 @@ brainMoveRun = MMoveT "brainMoveRun" frameWalk101 frameWalk111 brainFramesRun No
 brainRun :: EntThink
 brainRun =
   GenericEntThink "brain_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorScreen)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorScreen)
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then brainMoveStand
                    else brainMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 brainFramesDefense :: V.Vector MFrameT
@@ -640,15 +641,15 @@ brainMoveDuck = MMoveT "brainMoveDuck" frameDuck01 frameDuck08 brainFramesDuck (
 brainPain :: EntPain
 brainPain =
   GenericEntPain "brain_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -669,15 +670,15 @@ brainPain =
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 brainDie :: EntDie
 brainDie =
   GenericEntDie "brain_die" $ \selfRef _ _ damage _ -> do
-    modifyEdictT selfRef (\v -> v & eEntityState.esEffects .~ 0
+    modifyRef selfRef (\v -> v & eEntityState.esEffects .~ 0
                                   & eMonsterInfo.miPowerArmorType .~ Constants.powerArmorNone)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -697,7 +698,7 @@ brainDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -712,7 +713,7 @@ brainDie =
                                then brainMoveDeath1
                                else brainMoveDeath2
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
@@ -726,7 +727,7 @@ brainMoveAttack2 = MMoveT "brainMoveAttack2" frameAttack201 frameAttack217 brain
 - QUAKED monster_brain (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterBrain :: EdictReference -> Quake ()
+spMonsterBrain :: Ref EdictT -> Quake ()
 spMonsterBrain selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -758,7 +759,7 @@ spMonsterBrain selfRef = do
 
         modelIdx <- modelIndex (Just "models/monsters/brain/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-16) (-16) (-24)
@@ -781,7 +782,7 @@ spMonsterBrain selfRef = do
 
         linkEntity selfRef
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveStand
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just brainMoveStand
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef

@@ -69,8 +69,7 @@ data KeyFuncT =
 instance Eq KeyFuncT where
     x == y = _kfName x == _kfName y
 
--- reference to gameBaseGlobals.gbGEdicts
-newtype EdictReference = EdictReference Int deriving (Eq, Show, Ord)
+data Ref a = Ref Int deriving (Eq, Show, Ord)
 
 -- reference to svGlobals.svServerStatic.ssClients
 newtype ClientReference = ClientReference Int deriving Eq
@@ -269,21 +268,21 @@ data SVGlobals =
             , _svClient               :: Maybe ClientReference
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
-            , _svPlayer               :: Maybe EdictReference
+            , _svPlayer               :: Maybe (Ref EdictT)
             , _svFirstMap             :: B.ByteString
             , _svMsgBuf               :: B.ByteString
             , _svNumAreaNodes         :: Int
             , _svAreaNodes            :: V.Vector AreaNodeT
             , _svAreaMins             :: V3 Float
             , _svAreaMaxs             :: V3 Float
-            , _svAreaList             :: V.Vector EdictReference
+            , _svAreaList             :: V.Vector (Ref EdictT)
             , _svAreaCount            :: Int
             , _svAreaMaxCount         :: Int
             , _svAreaType             :: Int
             , _svLeafs                :: UV.Vector Int
             , _svClusters             :: UV.Vector Int
-            , _svTouch                :: V.Vector EdictReference
-            , _svTouchList            :: V.Vector EdictReference
+            , _svTouch                :: V.Vector (Ref EdictT)
+            , _svTouchList            :: V.Vector (Ref EdictT)
             , _svLinks                :: V.Vector LinkT
             , _svMsg                  :: SizeBufT
             , _svLeafsTmp             :: UV.Vector Int
@@ -555,106 +554,6 @@ data CmdFunctionT =
                , _cfFunction :: Maybe XCommandT
                }
 
-{-
-data EdictActionT =
-  EdictActionT { _eaNextThink :: Float
-               , _eaPrethink  :: Maybe EntThink
-               , _eaThink     :: Maybe EntThink
-               , _eaBlocked   :: Maybe EntBlocked
-               , _eaTouch     :: Maybe EntTouch
-               , _eaUse       :: Maybe EntUse
-               , _eaPain      :: Maybe EntPain
-               , _eaDie       :: Maybe EntDie
-               }
-               -}
-
-{-
-data EdictOtherT =
-  EdictOtherT { _eoChain        :: Maybe EdictReference
-              , _eoEnemy        :: Maybe EdictReference
-              , _eoOldEnemy     :: Maybe EdictReference
-              , _eoActivator    :: Maybe EdictReference
-              , _eoGroundEntity :: Maybe EdictReference
-              , _eoTeamChain    :: Maybe EdictReference
-              , _eoTeamMaster   :: Maybe EdictReference
-              , _eoMyNoise      :: Maybe EdictReference
-              , _eoMyNoise2     :: Maybe EdictReference
-              }
-              -}
-
-{-
-data EdictTimingT =
-  EdictTimingT { _etTouchDebounceTime    :: Float
-               , _etPainDebounceTime     :: Float
-               , _etDamageDebounceTime   :: Float
-               , _etFlySoundDebounceTime :: Float
-               , _etLastMoveTime         :: Float
-               }
-               -}
-
-{-
-data EdictMinMaxT =
-  EdictMinMaxT { _eMins   :: V3 Float
-               , _eMaxs   :: V3 Float
-               , _eAbsMin :: V3 Float
-               , _eAbsMax :: V3 Float
-               , _eSize   :: V3 Float
-               }
-               -}
-
-{-
-data EdictInfoT =
-  EdictInfoT { _eiModel        :: Maybe B.ByteString
-             , _eiMessage      :: Maybe B.ByteString
-             , _eiTarget       :: Maybe B.ByteString
-             , _eiTargetName   :: Maybe B.ByteString
-             , _eiKillTarget   :: Maybe B.ByteString
-             , _eiTeam         :: Maybe B.ByteString
-             , _eiPathTarget   :: Maybe B.ByteString
-             , _eiDeathTarget  :: Maybe B.ByteString
-             , _eiCombatTarget :: Maybe B.ByteString
-             , _eiMap          :: Maybe B.ByteString
-             }
-             -}
-
-{-
-data EdictPhysicsT =
-  EdictPhysicsT { _eAngle       :: Float
-                , _eSpeed       :: Float
-                , _eAccel       :: Float
-                , _eDecel       :: Float
-                , _eMoveDir     :: V3 Float
-                , _ePos1        :: V3 Float
-                , _ePos2        :: V3 Float
-                , _eVelocity    :: V3 Float
-                , _eAVelocity   :: V3 Float
-                , _eMass        :: Int
-                , _eAirFinished :: Float
-                , _eGravity     :: Float
-                , _eYawSpeed    :: Float
-                , _eIdealYaw    :: Float
-                }
-                -}
-
-{-
-data EdictStatusT =
-  EdictStatusT { _eHealth         :: Int
-               , _eMaxHealth      :: Int
-               , _eGibHealth      :: Int
-               , _eDeadFlag       :: Int
-               , _eShowHostile    :: Int
-               , _ePowerArmorTime :: Float
-               , _eViewHeight     :: Int
-               , _eTakeDamage     :: Int
-               , _eDmg            :: Int
-               , _eRadiusDmg      :: Int
-               , _eDmgRadius      :: Float
-               }
-               -}
-
--- had to split EdictT into smaller EdictXXX types in order
--- for makeLenses not to generate A LOT of code which eats up
--- A LOT of memory
 data EdictT =
   EdictT { _eEntityState           :: EntityStateT
          , _eInUse                 :: Bool
@@ -674,7 +573,6 @@ data EdictT =
          , _eFreeTime              :: Float
          , _eSpawnFlags            :: Int
          , _eTimeStamp             :: Float
-         -- , _eEdictPhysics          :: EdictPhysicsT
          , _eAngle                 :: Float
          , _eSpeed                 :: Float
          , _eAccel                 :: Float
@@ -689,10 +587,9 @@ data EdictT =
          , _eGravity               :: Float
          , _eYawSpeed              :: Float
          , _eIdealYaw              :: Float
-         , _eTargetEnt             :: Maybe EdictReference
-         , _eGoalEntity            :: Maybe EdictReference
-         , _eMoveTarget            :: Maybe EdictReference
-         -- , _eEdictAction           :: EdictActionT
+         , _eTargetEnt             :: Maybe (Ref EdictT)
+         , _eGoalEntity            :: Maybe (Ref EdictT)
+         , _eMoveTarget            :: Maybe (Ref EdictT)
          , _eNextThink             :: Float
          , _ePrethink              :: Maybe EntThink
          , _eThink                 :: Maybe EntThink
@@ -701,13 +598,11 @@ data EdictT =
          , _eUse                   :: Maybe EntUse
          , _ePain                  :: Maybe EntPain
          , _eDie                   :: Maybe EntDie
-         -- , _eEdictTiming           :: EdictTimingT
          , _eTouchDebounceTime     :: Float
          , _ePainDebounceTime      :: Float
          , _eDamageDebounceTime    :: Float
          , _eFlySoundDebounceTime  :: Float
          , _eLastMoveTime          :: Float
-         -- , _eEdictStatus           :: EdictStatusT
          , _eHealth                :: Int
          , _eMaxHealth             :: Int
          , _eGibHealth             :: Int
@@ -722,16 +617,15 @@ data EdictT =
          , _eSounds                :: Int
          , _eCount                 :: Int
          , _eGroundEntityLinkCount :: Int
-         -- , _eEdictOther            :: EdictOtherT
-         , _eChain                 :: Maybe EdictReference
-         , _eEnemy                 :: Maybe EdictReference
-         , _eOldEnemy              :: Maybe EdictReference
-         , _eActivator             :: Maybe EdictReference
-         , _eGroundEntity          :: Maybe EdictReference
-         , _eTeamChain             :: Maybe EdictReference
-         , _eTeamMaster            :: Maybe EdictReference
-         , _eMyNoise               :: Maybe EdictReference
-         , _eMyNoise2              :: Maybe EdictReference
+         , _eChain                 :: Maybe (Ref EdictT)
+         , _eEnemy                 :: Maybe (Ref EdictT)
+         , _eOldEnemy              :: Maybe (Ref EdictT)
+         , _eActivator             :: Maybe (Ref EdictT)
+         , _eGroundEntity          :: Maybe (Ref EdictT)
+         , _eTeamChain             :: Maybe (Ref EdictT)
+         , _eTeamMaster            :: Maybe (Ref EdictT)
+         , _eMyNoise               :: Maybe (Ref EdictT)
+         , _eMyNoise2              :: Maybe (Ref EdictT)
          , _eNoiseIndex            :: Int
          , _eNoiseIndex2           :: Int
          , _eVolume                :: Float
@@ -750,9 +644,8 @@ data EdictT =
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
          , _eClient                :: Maybe GClientReference
-         , _eOwner                 :: Maybe EdictReference
+         , _eOwner                 :: Maybe (Ref EdictT)
          , _eIndex                 :: Int
-         -- , _eEdictInfo             :: EdictInfoT
          , _eiModel                :: Maybe B.ByteString
          , _eMessage               :: Maybe B.ByteString
          , _eTarget                :: Maybe B.ByteString
@@ -763,7 +656,6 @@ data EdictT =
          , _eDeathTarget           :: Maybe B.ByteString
          , _eCombatTarget          :: Maybe B.ByteString
          , _eMap                   :: Maybe B.ByteString
-         -- , _eEdictMinMax           :: EdictMinMaxT
          , _eMins                  :: V3 Float
          , _eMaxs                  :: V3 Float
          , _eAbsMin                :: V3 Float
@@ -787,7 +679,7 @@ data EntityStateT =
                , _esSolid          :: Int
                , _esSound          :: Int
                , _esEvent          :: Int
-               , _esSurroundingEnt :: Maybe EdictReference
+               , _esSurroundingEnt :: Maybe (Ref EdictT)
                }
 
 data GClientT =
@@ -848,7 +740,7 @@ data GClientT =
            , _gcFloodWhen          :: UV.Vector Float
            , _gcFloodWhenHead      :: Int
            , _gcRespawnTime        :: Float
-           , _gcChaseTarget        :: Maybe EdictReference
+           , _gcChaseTarget        :: Maybe (Ref EdictT)
            , _gcUpdateChase        :: Bool
            , _gcIndex              :: Int
            }
@@ -864,7 +756,7 @@ data ClientT =
           , _cMessageSize   :: UV.Vector Int
           , _cRate          :: Int
           , _cSurpressCount :: Int
-          , _cEdict         :: Maybe EdictReference
+          , _cEdict         :: Maybe (Ref EdictT)
           , _cName          :: B.ByteString
           , _cMessageLevel  :: Int
           , _cDatagram      :: SizeBufT
@@ -936,12 +828,12 @@ data LevelLocalsT =
                , _llExitIntermission     :: Bool
                , _llIntermissionOrigin   :: V3 Float
                , _llIntermissionAngle    :: V3 Float
-               , _llSightClient          :: Maybe EdictReference
-               , _llSightEntity          :: Maybe EdictReference
+               , _llSightClient          :: Maybe (Ref EdictT)
+               , _llSightEntity          :: Maybe (Ref EdictT)
                , _llSightEntityFrameNum  :: Int
-               , _llSoundEntity          :: Maybe EdictReference
+               , _llSoundEntity          :: Maybe (Ref EdictT)
                , _llSoundEntityFrameNum  :: Int
-               , _llSound2Entity         :: Maybe EdictReference
+               , _llSound2Entity         :: Maybe (Ref EdictT)
                , _llSound2EntityFrameNum :: Int
                , _llPicHealth            :: Int
                , _llTotalSecrets         :: Int
@@ -950,7 +842,7 @@ data LevelLocalsT =
                , _llFoundGoals           :: Int
                , _llTotalMonsters        :: Int
                , _llKilledMonsters       :: Int
-               , _llCurrentEntity        :: Maybe EdictReference
+               , _llCurrentEntity        :: Maybe (Ref EdictT)
                , _llBodyQue              :: Int
                , _llPowerCubes           :: Int
                }
@@ -958,28 +850,28 @@ data LevelLocalsT =
 data GameImportT =
   GameImportT { _giBprintf            :: Int -> B.ByteString -> Quake ()
               , _giDprintf            :: B.ByteString -> Quake ()
-              , _giCprintf            :: Maybe EdictReference -> Int -> B.ByteString -> Quake ()
-              , _giCenterPrintf       :: EdictReference -> B.ByteString -> Quake ()
-              , _giSound              :: Maybe EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
-              , _giPositionedSound    :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+              , _giCprintf            :: Maybe (Ref EdictT) -> Int -> B.ByteString -> Quake ()
+              , _giCenterPrintf       :: Ref EdictT -> B.ByteString -> Quake ()
+              , _giSound              :: Maybe (Ref EdictT) -> Int -> Int -> Float -> Float -> Float -> Quake ()
+              , _giPositionedSound    :: Maybe (V3 Float) -> (Ref EdictT) -> Int -> Int -> Float -> Float -> Float -> Quake ()
               , _giConfigString       :: Int -> B.ByteString -> Quake ()
               , _giError              :: B.ByteString -> Quake ()
               , _giError2             :: Int -> B.ByteString -> Quake ()
               , _giModelIndex         :: Maybe B.ByteString -> Quake Int
               , _giSoundIndex         :: Maybe B.ByteString -> Quake Int
               , _giImageIndex         :: Maybe B.ByteString -> Quake Int
-              , _giSetModel           :: EdictReference -> Maybe B.ByteString -> Quake ()
-              , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictReference -> Int -> Quake TraceT
+              , _giSetModel           :: (Ref EdictT) -> Maybe B.ByteString -> Quake ()
+              , _giTrace              :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
               , _giPointContents      :: V3 Float -> Quake Int
               , _giInPHS              :: V3 Float -> V3 Float -> Quake Bool
               , _giSetAreaPortalState :: Int -> Bool -> Quake ()
               , _giAreasConnected     :: Int -> Int -> Quake Bool
-              , _giLinkEntity         :: EdictReference -> Quake ()
-              , _giUnlinkEntity       :: EdictReference -> Quake ()
-              , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
+              , _giLinkEntity         :: (Ref EdictT) -> Quake ()
+              , _giUnlinkEntity       :: (Ref EdictT) -> Quake ()
+              , _giBoxEdicts          :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
               , _giPMove              :: PMoveT -> Quake PMoveT
               , _giMulticast          :: V3 Float -> Int -> Quake ()
-              , _giUnicast            :: EdictReference -> Bool -> Quake ()
+              , _giUnicast            :: (Ref EdictT) -> Bool -> Quake ()
               , _giWriteByte          :: Int -> Quake ()
               , _giWriteShort         :: Int -> Quake ()
               , _giWriteString        :: B.ByteString -> Quake ()
@@ -1002,7 +894,7 @@ data TraceT =
          , _tPlane      :: CPlaneT
          , _tSurface    :: Maybe CSurfaceT
          , _tContents   :: Int
-         , _tEnt        :: Maybe EdictReference
+         , _tEnt        :: Maybe (Ref EdictT)
          }
 
 data PMoveT =
@@ -1010,12 +902,12 @@ data PMoveT =
          , _pmCmd           :: UserCmdT
          , _pmSnapInitial   :: Bool
          , _pmNumTouch      :: Int
-         , _pmTouchEnts     :: V.Vector EdictReference
+         , _pmTouchEnts     :: V.Vector (Ref EdictT)
          , _pmViewAngles    :: V3 Float
          , _pmViewHeight    :: Float
          , _pmMins          :: V3 Float
          , _pmMaxs          :: V3 Float
-         , _pmGroundEntity  :: Maybe EdictReference
+         , _pmGroundEntity  :: Maybe (Ref EdictT)
          , _pmWaterType     :: Int
          , _pmWaterLevel    :: Int
          , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
@@ -1036,13 +928,13 @@ data GameBaseGlobals =
                   , _gbItemList          :: V.Vector GItemT
                   , _gbPushed            :: V.Vector PushedT
                   , _gbPushedP           :: Int
-                  , _gbObstacle          :: Maybe EdictReference
+                  , _gbObstacle          :: Maybe (Ref EdictT)
                   , _gbCYes              :: Int
                   , _gbCNo               :: Int
-                  , _gbTouch             :: V.Vector EdictReference
+                  , _gbTouch             :: V.Vector (Ref EdictT)
                   , _gbIsQuad            :: Bool
                   , _gbIsSilenced        :: Int
-                  , _gbCurrentPlayer     :: Maybe EdictReference
+                  , _gbCurrentPlayer     :: Maybe (Ref EdictT)
                   , _gbCurrentClient     :: Maybe GClientReference
                   , _gbForward           :: V3 Float
                   , _gbRight             :: V3 Float
@@ -1395,97 +1287,97 @@ class SuperAdapter a where
     getID :: a -> B.ByteString
 
 class EntInteractAdapter a where
-    entInteract :: a -> EdictReference -> EdictReference -> Quake Bool
+    entInteract :: a -> (Ref EdictT) -> (Ref EdictT) -> Quake Bool
 
 class EntThinkAdapter a where
-    think :: a -> EdictReference -> Quake Bool
+    think :: a -> (Ref EdictT) -> Quake Bool
 
 class EntBlockedAdapter a where
-    blocked :: a -> EdictReference -> EdictReference -> Quake ()
+    blocked :: a -> (Ref EdictT) -> (Ref EdictT) -> Quake ()
 
 class EntDodgeAdapter a where
-    dodge :: a -> EdictReference -> EdictReference -> Float -> Quake ()
+    dodge :: a -> (Ref EdictT) -> (Ref EdictT) -> Float -> Quake ()
 
 class EntTouchAdapter a where
-    touch :: a -> EdictReference -> EdictReference -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+    touch :: a -> (Ref EdictT) -> (Ref EdictT) -> CPlaneT -> Maybe CSurfaceT -> Quake ()
 
 class EntUseAdapter a where
-    entUse :: a -> EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ()
+    entUse :: a -> (Ref EdictT) -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
 
 class EntPainAdapter a where
-    pain :: a -> EdictReference -> EdictReference -> Float -> Int -> Quake ()
+    pain :: a -> (Ref EdictT) -> (Ref EdictT) -> Float -> Int -> Quake ()
 
 class EntDieAdapter a where
-    die :: a -> EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
+    die :: a -> (Ref EdictT) -> (Ref EdictT) -> (Ref EdictT) -> Int -> V3 Float -> Quake ()
 
 class ItemUseAdapter a where
-    itemUse :: a -> EdictReference -> GItemReference -> Quake ()
+    itemUse :: a -> (Ref EdictT) -> GItemReference -> Quake ()
 
 class ItemDropAdapter a where
-    itemDrop :: a -> EdictReference -> GItemReference -> Quake ()
+    itemDrop :: a -> (Ref EdictT) -> GItemReference -> Quake ()
 
 class AIAdapter a where
-    ai :: a -> EdictReference -> Float -> Quake ()
+    ai :: a -> (Ref EdictT) -> Float -> Quake ()
 
 data EntInteract =
-    PickupArmor B.ByteString (EdictReference -> EdictReference -> Quake Bool)
-  | PickupPowerArmor B.ByteString (EdictReference -> EdictReference -> Quake Bool)
-  | PickupHealth B.ByteString (EdictReference -> EdictReference -> Quake Bool)
-  | PickupAdrenaline B.ByteString (EdictReference -> EdictReference -> Quake Bool)
-  | PickupAncientHead B.ByteString (EdictReference -> EdictReference -> Quake Bool)
+    PickupArmor B.ByteString ((Ref EdictT) -> (Ref EdictT) -> Quake Bool)
+  | PickupPowerArmor B.ByteString ((Ref EdictT) -> (Ref EdictT) -> Quake Bool)
+  | PickupHealth B.ByteString ((Ref EdictT) -> (Ref EdictT) -> Quake Bool)
+  | PickupAdrenaline B.ByteString ((Ref EdictT) -> (Ref EdictT) -> Quake Bool)
+  | PickupAncientHead B.ByteString ((Ref EdictT) -> (Ref EdictT) -> Quake Bool)
   | GenericEntInteract { _geiId :: B.ByteString
-                       , _geiInteract :: EdictReference -> EdictReference -> Quake Bool
+                       , _geiInteract :: (Ref EdictT) -> (Ref EdictT) -> Quake Bool
                        }
 
 data EntThink =
   GenericEntThink { _gethId :: B.ByteString
-                  , _gethThink :: EdictReference -> Quake Bool
+                  , _gethThink :: (Ref EdictT) -> Quake Bool
                   }
 
 data EntBlocked =
   GenericEntBlocked { _gebId :: B.ByteString
-                    , _gebBlocked :: EdictReference -> EdictReference -> Quake ()
+                    , _gebBlocked :: (Ref EdictT) -> (Ref EdictT) -> Quake ()
                     }
 
 data EntDodge =
   GenericEntDodge { _gedoId :: B.ByteString
-                  , _gedoDodge :: EdictReference -> EdictReference -> Float -> Quake ()
+                  , _gedoDodge :: (Ref EdictT) -> (Ref EdictT) -> Float -> Quake ()
                   }
 
 data EntTouch =
   GenericEntTouch { _getId :: B.ByteString
-                  , _getTouch :: EdictReference -> EdictReference -> CPlaneT -> Maybe CSurfaceT -> Quake ()
+                  , _getTouch :: (Ref EdictT) -> (Ref EdictT) -> CPlaneT -> Maybe CSurfaceT -> Quake ()
                   }
 
 data EntUse =
-    FuncExplosiveUse B.ByteString (EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ())
+    FuncExplosiveUse B.ByteString ((Ref EdictT) -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ())
   | GenericEntUse { _geuId :: B.ByteString
-                , _geuUse :: EdictReference -> Maybe EdictReference -> Maybe EdictReference -> Quake ()
+                , _geuUse :: (Ref EdictT) -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
                 }
 
 data EntPain =
   GenericEntPain { _gepId :: B.ByteString
-                 , _gepPain :: EdictReference -> EdictReference -> Float -> Int -> Quake ()
+                 , _gepPain :: (Ref EdictT) -> (Ref EdictT) -> Float -> Int -> Quake ()
                  }
 
 data EntDie =
   GenericEntDie { _gedId :: B.ByteString
-                , _gedDie :: EdictReference -> EdictReference -> EdictReference -> Int -> V3 Float -> Quake ()
+                , _gedDie :: (Ref EdictT) -> (Ref EdictT) -> (Ref EdictT) -> Int -> V3 Float -> Quake ()
                 }
 
 data ItemUse =
   GenericItemUse { _giuId :: B.ByteString
-                 , _giuUse :: EdictReference -> GItemReference -> Quake ()
+                 , _giuUse :: (Ref EdictT) -> GItemReference -> Quake ()
                  }
 
 data ItemDrop =
   GenericItemDrop { _gidId :: B.ByteString
-                  , _gidDrop :: EdictReference -> GItemReference -> Quake ()
+                  , _gidDrop :: (Ref EdictT) -> GItemReference -> Quake ()
                   }
 
 data AI =
   GenericAI { _gaiId :: B.ByteString
-            , _gaiAi :: EdictReference -> Float -> Quake ()
+            , _gaiAi :: (Ref EdictT) -> Float -> Quake ()
             }
 
 instance SuperAdapter EntInteract where
@@ -1698,7 +1590,7 @@ data LinkT =
   LinkT { _lIndex :: Int
         , _lPrev  :: Maybe LinkReference
         , _lNext  :: Maybe LinkReference
-        , _lEdict :: Maybe EdictReference
+        , _lEdict :: Maybe (Ref EdictT)
         }
 
 data SpawnT =
@@ -1760,13 +1652,13 @@ data MMoveT =
          }
 
 data PlayerTrailGlobals =
-  PlayerTrailGlobals { _ptTrail       :: V.Vector EdictReference
+  PlayerTrailGlobals { _ptTrail       :: V.Vector (Ref EdictT)
                      , _ptTrailHead   :: Int
                      , _ptTrailActive :: Bool
                      }
 
 data PushedT =
-  PushedT { _pEnt      :: Maybe EdictReference
+  PushedT { _pEnt      :: Maybe (Ref EdictT)
           , _pOrigin   :: V3 Float
           , _pAngles   :: V3 Float
           , _pDeltaYaw :: Float
@@ -2099,7 +1991,7 @@ data ClientGlobals =
                 , _cgPrecacheModel      :: Maybe B.ByteString
                 , _cgNumCLWeaponModels  :: Int
                 , _cgWeaponModels       :: V.Vector B.ByteString
-                , _cgPMPassEnt          :: Maybe EdictReference
+                , _cgPMPassEnt          :: Maybe (Ref EdictT)
                 , _cgIsDown             :: Bool
                 , _cgAVelocities        :: V.Vector (V3 Float)
                 }

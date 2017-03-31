@@ -32,6 +32,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -125,35 +126,35 @@ spFuncButton =
 
     GameBase.setMoveDir edictRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypeStop
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypeStop
                                    & eSolid .~ Constants.solidBsp)
 
     setModel edictRef (edict^.eiModel)
 
     when ((edict^.eSounds) /= 1) $ do
       soundIdx <- soundIndex (Just "switches/butn2.wav")
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundIdx)
+      modifyRef edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundIdx)
 
     let speed = if (edict^.eSpeed) == 0 then 40 else edict^.eSpeed
-    modifyEdictT edictRef (\v -> v & eSpeed .~ speed)
+    modifyRef edictRef (\v -> v & eSpeed .~ speed)
 
     when ((edict^.eAccel) == 0) $
-      modifyEdictT edictRef (\v -> v & eAccel .~ speed)
+      modifyRef edictRef (\v -> v & eAccel .~ speed)
 
     when ((edict^.eDecel) == 0) $
-      modifyEdictT edictRef (\v -> v & eDecel .~ speed)
+      modifyRef edictRef (\v -> v & eDecel .~ speed)
 
     when ((edict^.eWait) == 0) $
-      modifyEdictT edictRef (\v -> v & eWait .~ 3)
+      modifyRef edictRef (\v -> v & eWait .~ 3)
     
     lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     when (lip == 0) $
       gameBaseGlobals.gbSpawnTemp.stLip .= 4
 
     let origin = edict^.eEntityState.esOrigin
-    modifyEdictT edictRef (\v -> v & ePos1 .~ origin)
+    modifyRef edictRef (\v -> v & ePos1 .~ origin)
 
     lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     let moveDir = edict^.eMoveDir
@@ -165,23 +166,23 @@ spFuncButton =
              - (fromIntegral lip')
 
     let pos2 = origin + fmap (* dist) moveDir
-    modifyEdictT edictRef (\v -> v & ePos2 .~ pos2
+    modifyRef edictRef (\v -> v & ePos2 .~ pos2
                                    & eUse .~ Just buttonUse
                                    & eEntityState.esEffects %~ (.|. Constants.efAnim01))
 
     if (edict^.eHealth) /= 0
       then
-        modifyEdictT edictRef (\v -> v & eMaxHealth .~ (edict^.eHealth)
+        modifyRef edictRef (\v -> v & eMaxHealth .~ (edict^.eHealth)
                                        & eDie .~ Just buttonKilled
                                        & eTakeDamage .~ Constants.damageYes)
 
       else
         when (isNothing (edict^.eTargetName)) $
-          modifyEdictT edictRef (\v -> v & eTouch .~ Just buttonTouch)
+          modifyRef edictRef (\v -> v & eTouch .~ Just buttonTouch)
 
-    updatedEdict <- readEdictT edictRef
+    updatedEdict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom
                                    & eMoveInfo.miSpeed .~ (updatedEdict^.eSpeed)
                                    & eMoveInfo.miAccel .~ (updatedEdict^.eAccel)
                                    & eMoveInfo.miDecel .~ (updatedEdict^.eDecel)
@@ -205,42 +206,42 @@ spFuncDoor =
 
     GameBase.setMoveDir edictRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eSounds) /= 1) $ do
       soundStart <- soundIndex (Just "doors/dr1_strt.wav")
       soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
       soundEnd <- soundIndex (Just "doors/dr1_end.wav")
 
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+      modifyRef edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
                                      & eMoveInfo.miSoundMiddle .~ soundMiddle
                                      & eMoveInfo.miSoundEnd .~ soundEnd)
 
-    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
                                    & eSolid .~ Constants.solidBsp)
 
     setModel edictRef (edict^.eiModel)
 
-    modifyEdictT edictRef (\v -> v & eBlocked .~ Just doorBlocked
+    modifyRef edictRef (\v -> v & eBlocked .~ Just doorBlocked
                                    & eUse .~ Just doorUse)
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
         speed' = if deathmatchValue /= 0 then speed * 2 else speed
 
-    modifyEdictT edictRef (\v -> v & eSpeed .~ speed')
+    modifyRef edictRef (\v -> v & eSpeed .~ speed')
 
     when ((edict^.eAccel) == 0) $
-      modifyEdictT edictRef (\v -> v & eAccel .~ speed')
+      modifyRef edictRef (\v -> v & eAccel .~ speed')
 
     when ((edict^.eDecel) == 0) $
-      modifyEdictT edictRef (\v -> v & eDecel .~ speed')
+      modifyRef edictRef (\v -> v & eDecel .~ speed')
 
     when ((edict^.eWait) == 0) $
-      modifyEdictT edictRef (\v -> v & eWait .~ 3)
+      modifyRef edictRef (\v -> v & eWait .~ 3)
 
     when ((edict^.eDmg) == 0) $
-      modifyEdictT edictRef (\v -> v & eDmg .~ 2)
+      modifyRef edictRef (\v -> v & eDmg .~ 2)
     
     lip <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     when (lip == 0) $
@@ -248,7 +249,7 @@ spFuncDoor =
 
     -- calculate second position
     let origin = edict^.eEntityState.esOrigin
-    modifyEdictT edictRef (\v -> v & ePos1 .~ origin)
+    modifyRef edictRef (\v -> v & ePos1 .~ origin)
 
     lip' <- use $ gameBaseGlobals.gbSpawnTemp.stLip
     let moveDir = edict^.eMoveDir
@@ -259,33 +260,33 @@ spFuncDoor =
              + (absMoveDir^._z) * (size^._z)
              - (fromIntegral lip')
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miDistance .~ dist)
+    modifyRef edictRef (\v -> v & eMoveInfo.miDistance .~ dist)
 
     let pos2 = origin + fmap (* dist) moveDir
-    modifyEdictT edictRef (\v -> v & ePos2 .~ pos2)
+    modifyRef edictRef (\v -> v & ePos2 .~ pos2)
 
     -- if it starts open, switch the positions
     when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $ do
-      modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ pos2
+      modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ pos2
                                      & ePos2 .~ origin
                                      & ePos1 .~ pos2)
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
 
     if (edict^.eHealth) /= 0
       then
-        modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+        modifyRef edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
                                        & eMaxHealth .~ (edict^.eHealth)
                                        & eDie .~ Just doorKilled)
 
       else
         when (isJust (edict^.eTargetName) && isJust (edict^.eMessage)) $ do
           void $ soundIndex (Just "misc/talk.wav")
-          modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
+          modifyRef edictRef (\v -> v & eTouch .~ Just doorTouch)
 
-    updatedEdict <- readEdictT edictRef
+    updatedEdict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miSpeed .~ (updatedEdict^.eSpeed)
+    modifyRef edictRef (\v -> v & eMoveInfo.miSpeed .~ (updatedEdict^.eSpeed)
                                    & eMoveInfo.miAccel .~ (updatedEdict^.eAccel)
                                    & eMoveInfo.miDecel .~ (updatedEdict^.eDecel)
                                    & eMoveInfo.miWait .~ (updatedEdict^.eWait)
@@ -295,25 +296,25 @@ spFuncDoor =
                                    & eMoveInfo.miEndAngles .~ (updatedEdict^.eEntityState.esAngles))
 
     when ((updatedEdict^.eSpawnFlags) .&. 16 /= 0) $
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
 
     when ((updatedEdict^.eSpawnFlags) .&. 64 /= 0) $
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
 
     -- to simplify logic elsewhere, make non-teamed doors into a team of one
     when (isNothing (updatedEdict^.eTeam)) $
-      modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
+      modifyRef edictRef (\v -> v & eTeamMaster .~ Just edictRef)
 
     linkEntity edictRef
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     let nextThink = if (updatedEdict^.eHealth) /= 0 || isJust (updatedEdict^.eTargetName)
                       then thinkCalcMoveSpeed
                       else thinkSpawnDoorTrigger
 
-    modifyEdictT edictRef (\v -> v & eThink .~ Just nextThink)
+    modifyRef edictRef (\v -> v & eThink .~ Just nextThink)
 
     return True
 
@@ -330,7 +331,7 @@ spFuncDoorSecret =
     soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
     soundEnd <- soundIndex (Just "doors/dr1_end.wav")
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+    modifyRef edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
                                    & eMoveInfo.miSoundMiddle .~ soundMiddle
                                    & eMoveInfo.miSoundEnd .~ soundEnd
                                    & eMoveType .~ Constants.moveTypePush
@@ -338,30 +339,30 @@ spFuncDoorSecret =
                                    & eBlocked .~ Just doorSecretBlocked
                                    & eUse .~ Just doorSecretUse)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     setModel edictRef (edict^.eiModel)
 
     when (isNothing (edict^.eTargetName) || (edict^.eSpawnFlags) .&. secretAlwaysShoot /= 0) $
-      modifyEdictT edictRef (\v -> v & eHealth .~ 0
+      modifyRef edictRef (\v -> v & eHealth .~ 0
                                      & eTakeDamage .~ Constants.damageYes
                                      & eDie .~ Just doorSecretDie)
 
     when ((edict^.eDmg) == 0) $
-      modifyEdictT edictRef (\v -> v & eDmg .~ 2)
+      modifyRef edictRef (\v -> v & eDmg .~ 2)
 
     when ((edict^.eWait) == 0) $
-      modifyEdictT edictRef (\v -> v & eWait .~ 5)
+      modifyRef edictRef (\v -> v & eWait .~ 5)
 
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miAccel .~ 50
+    modifyRef edictRef (\v -> v & eMoveInfo.miAccel .~ 50
                                    & eMoveInfo.miDecel .~ 50
                                    & eMoveInfo.miSpeed .~ 50)
 
     -- calculate positions
     let (Just forward, Just right, Just up) = Math3D.angleVectors (edict^.eEntityState.esAngles) True True True
 
-    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0)
+    modifyRef edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0)
 
     let side = 1.0 - fromIntegral ((edict^.eSpawnFlags) .&. secretFirstLeft)
         width = if (edict^.eSpawnFlags) .&. secretFirstDown /= 0
@@ -373,19 +374,19 @@ spFuncDoorSecret =
                  else (edict^.eEntityState.esOrigin) + fmap (* (side * width)) right
         pos2 = pos1 + fmap (* length) forward
 
-    modifyEdictT edictRef (\v -> v & ePos1 .~ pos1
+    modifyRef edictRef (\v -> v & ePos1 .~ pos1
                                    & ePos2 .~ pos2)
 
     if (edict^.eHealth) /= 0
       then
-        modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+        modifyRef edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
                                        & eDie .~ Just doorKilled
                                        & eMaxHealth .~ (edict^.eHealth))
       else do
         void $ soundIndex (Just "misc/talk.wav")
-        modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
+        modifyRef edictRef (\v -> v & eTouch .~ Just doorTouch)
 
-    modifyEdictT edictRef (\v -> v & eClassName .~ "func_door")
+    modifyRef edictRef (\v -> v & eClassName .~ "func_door")
 
     linkEntity edictRef
     return True
@@ -393,8 +394,8 @@ spFuncDoorSecret =
 doorSecretBlocked :: EntBlocked
 doorSecretBlocked =
   GenericEntBlocked "door_secret_blocked" $ \selfRef otherRef -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     v3o <- use $ globals.gVec3Origin
 
@@ -403,7 +404,7 @@ doorSecretBlocked =
            GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o 100000 1 0 Constants.modCrush
            -- if it's still there, nuke it
            -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
-           other' <- readEdictT otherRef
+           other' <- readRef otherRef
            when (other'^.eInUse) $
              GameMisc.becomeExplosion1 otherRef
 
@@ -411,13 +412,13 @@ doorSecretBlocked =
            return ()
 
        | otherwise -> do
-           modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
+           modifyRef selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
            GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 doorSecretUse :: EntUse
 doorSecretUse =
   GenericEntUse "door_secret_use" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     v3o <- use $ globals.gVec3Origin
 
     -- make sure we're not already moving
@@ -432,35 +433,35 @@ doorSecretMove1 :: EntThink
 doorSecretMove1 =
   GenericEntThink "door_secret_move1" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1.0
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + 1.0
                                   & eThink .~ Just doorSecretMove2)
     return True
 
 doorSecretMove2 :: EntThink
 doorSecretMove2 =
   GenericEntThink "door_secret_move2" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     moveCalc selfRef (self^.ePos2) doorSecretMove3
     return True
 
 doorSecretMove3 :: EntThink
 doorSecretMove3 =
   GenericEntThink "door_secret_move3" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eWait) == -1
       then
         return True
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eWait)
+        modifyRef selfRef (\v -> v & eNextThink .~ levelTime + (self^.eWait)
                                       & eThink .~ Just doorSecretMove4)
         return True
 
 doorSecretMove4 :: EntThink
 doorSecretMove4 =
   GenericEntThink "door_secret_move4" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     moveCalc selfRef (self^.ePos1) doorSecretMove5
     return True
 
@@ -468,7 +469,7 @@ doorSecretMove5 :: EntThink
 doorSecretMove5 =
   GenericEntThink "door_secret_move5" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 1.0
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + 1.0
                                   & eThink .~ Just doorSecretMove6)
     return True
 
@@ -482,10 +483,10 @@ doorSecretMove6 =
 doorSecretDone :: EntThink
 doorSecretDone =
   GenericEntThink "door_secret_move7" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when (isNothing (self^.eTargetName) || (self^.eSpawnFlags) .&. secretAlwaysShoot /= 0) $
-      modifyEdictT selfRef (\v -> v & eHealth .~ 0
+      modifyRef selfRef (\v -> v & eHealth .~ 0
                                     & eTakeDamage .~ Constants.damageYes)
 
     doorUseAreaPortals selfRef False
@@ -494,13 +495,13 @@ doorSecretDone =
 doorSecretDie :: EntDie
 doorSecretDie =
   GenericEntDie "door_secret_die" $ \selfRef _ attackerRef _ _ -> do
-    modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
+    modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
     entUse doorSecretUse selfRef (Just attackerRef) (Just attackerRef)
 
 spFuncDoorRotating :: EntThink
 spFuncDoorRotating =
   GenericEntThink "sp_func_door_rotating" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let dprintf = gameImport^.giDprintf
@@ -517,7 +518,7 @@ spFuncDoorRotating =
                      then fmap negate moveDir
                      else moveDir
 
-    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+    modifyRef edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
                                    & eMoveDir .~ moveDir')
       
     use (gameBaseGlobals.gbSpawnTemp) >>= \spawnTemp ->
@@ -529,7 +530,7 @@ spFuncDoorRotating =
 
     let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
 
-    modifyEdictT edictRef (\v -> v & ePos1 .~ V3 0 0 0
+    modifyRef edictRef (\v -> v & ePos1 .~ V3 0 0 0
                                    & ePos2 .~ fmap (* fromIntegral (spawnTemp^.stDistance)) moveDir'
                                    & eMoveInfo.miDistance .~ fromIntegral (spawnTemp^.stDistance)
                                    & eMoveType .~ Constants.moveTypePush
@@ -548,30 +549,30 @@ spFuncDoorRotating =
       soundStart <- soundIndex (Just "doors/dr1_strt.wav")
       soundMiddle <- soundIndex (Just "doors/dr1_mid.wav")
       soundEnd <- soundIndex (Just "doors/dr1_end.wav")
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+      modifyRef edictRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
                                      & eMoveInfo.miSoundMiddle .~ soundMiddle
                                      & eMoveInfo.miSoundEnd .~ soundEnd)
 
     -- if it starts open, switch the positions
     when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $ do
-      edict' <- readEdictT edictRef
-      modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ (edict'^.ePos2)
+      edict' <- readRef edictRef
+      modifyRef edictRef (\v -> v & eEntityState.esAngles .~ (edict'^.ePos2)
                                      & ePos2 .~ (edict'^.ePos1)
                                      & ePos1 .~ (edict'^.ePos2)
                                      & eMoveDir %~ (fmap negate))
 
     when ((edict^.eHealth) /= 0) $
-      modifyEdictT edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
+      modifyRef edictRef (\v -> v & eTakeDamage .~ Constants.damageYes
                                      & eDie .~ Just doorKilled
                                      & eMaxHealth .~ (edict^.eHealth))
 
     when (isJust (edict^.eTargetName) && isJust (edict^.eMessage)) $ do
       void $ soundIndex (Just "misc/talk.wav")
-      modifyEdictT edictRef (\v -> v & eTouch .~ Just doorTouch)
+      modifyRef edictRef (\v -> v & eTouch .~ Just doorTouch)
 
-    edict' <- readEdictT edictRef
+    edict' <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateBottom
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateBottom
                                    & eMoveInfo.miSpeed .~ (edict'^.eSpeed)
                                    & eMoveInfo.miAccel .~ (edict'^.eAccel)
                                    & eMoveInfo.miDecel .~ (edict'^.eDecel)
@@ -582,37 +583,37 @@ spFuncDoorRotating =
                                    & eMoveInfo.miEndAngles .~ (edict'^.ePos2))
 
     when ((edict'^.eSpawnFlags) .&. 16 /= 0) $
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
       
     -- to simplify logic elsewhere, make non-teamed doors into a team of one
     when (isNothing (edict'^.eTeam)) $
-      modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
+      modifyRef edictRef (\v -> v & eTeamMaster .~ Just edictRef)
 
     linkEntity edictRef
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     let nextThink = if (edict'^.eHealth) /= 0 || isJust (edict'^.eTargetName)
                       then Just thinkCalcMoveSpeed
                       else Just thinkSpawnDoorTrigger
 
-    modifyEdictT edictRef (\v -> v & eThink .~ nextThink)
+    modifyRef edictRef (\v -> v & eThink .~ nextThink)
     return True
 
 spFuncConveyor :: EntThink
 spFuncConveyor =
   GenericEntThink "sp_func_conveyor" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let speed = if (self^.eSpeed) == 0 then 100 else self^.eSpeed
-    modifyEdictT selfRef (\v -> v & eSpeed .~ speed)
+    modifyRef selfRef (\v -> v & eSpeed .~ speed)
 
     when ((self^.eSpawnFlags) .&. 1 == 0) $ do
-      modifyEdictT selfRef (\v -> v & eCount .~ truncate speed
+      modifyRef selfRef (\v -> v & eCount .~ truncate speed
                                      & eSpeed .~ 0)
 
-    modifyEdictT selfRef (\v -> v & eUse .~ Just funcConveyorUse)
+    modifyRef selfRef (\v -> v & eUse .~ Just funcConveyorUse)
     
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -620,7 +621,7 @@ spFuncConveyor =
         linkEntity = gameImport^.giLinkEntity
 
     setModel selfRef (self^.eiModel)
-    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidBsp)
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp)
     linkEntity selfRef
 
     return True
@@ -637,12 +638,12 @@ useKillBox =
 spFuncKillBox :: EntThink
 spFuncKillBox =
   GenericEntThink "sp_func_killbox" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     setModel <- use $ gameBaseGlobals.gbGameImport.giSetModel
 
     setModel edictRef (edict^.eiModel)
 
-    modifyEdictT edictRef (\v -> v & eUse .~ Just useKillBox
+    modifyRef edictRef (\v -> v & eUse .~ Just useKillBox
                                    & eSvFlags .~ Constants.svfNoClient)
 
     return True
@@ -655,7 +656,7 @@ spFuncRotating =
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
 
-    modifyEdictT edictRef (\v -> v & eSolid .~ Constants.solidBsp)
+    modifyRef edictRef (\v -> v & eSolid .~ Constants.solidBsp)
 
     updateMoveType edictRef
 
@@ -667,71 +668,71 @@ spFuncRotating =
 
     checkSpeedAndDmg edictRef
 
-    modifyEdictT edictRef (\v -> v & eUse .~ Just rotatingUse)
+    modifyRef edictRef (\v -> v & eUse .~ Just rotatingUse)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eDmg) /= 0) $
-      modifyEdictT edictRef (\v -> v & eBlocked .~ Just rotatingBlocked)
+      modifyRef edictRef (\v -> v & eBlocked .~ Just rotatingBlocked)
 
     when ((edict^.eSpawnFlags) .&. 1 /= 0) $
       entUse (fromJust $ edict^.eUse) edictRef Nothing Nothing
 
     when ((edict^.eSpawnFlags) .&. 64 /= 0) $
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
 
     when ((edict^.eSpawnFlags) .&. 128 /= 0) $
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
 
     setModel edictRef (edict^.eiModel)
     linkEntity edictRef
 
     return True
 
-  where updateMoveType :: EdictReference -> Quake ()
+  where updateMoveType :: Ref EdictT -> Quake ()
         updateMoveType edictRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let spawnFlags = edict^.eSpawnFlags
 
           let moveType = if spawnFlags .&. 32 /= 0
                            then Constants.moveTypeStop
                            else Constants.moveTypePush
 
-          modifyEdictT edictRef (\v -> v & eMoveType .~ moveType)
+          modifyRef edictRef (\v -> v & eMoveType .~ moveType)
 
-        updateRotationAxis :: EdictReference -> Quake ()
+        updateRotationAxis :: Ref EdictT -> Quake ()
         updateRotationAxis edictRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let spawnFlags = edict^.eSpawnFlags
 
           let moveDir = if | spawnFlags .&. 4 /= 0 -> V3 0 0 1
                            | spawnFlags .&. 8 /= 0 -> V3 1 0 0
                            | otherwise -> V3 0 1 0
 
-          modifyEdictT edictRef (\v -> v & eMoveDir .~ moveDir)
+          modifyRef edictRef (\v -> v & eMoveDir .~ moveDir)
 
-        checkRevereseRotation :: EdictReference -> Quake ()
+        checkRevereseRotation :: Ref EdictT -> Quake ()
         checkRevereseRotation edictRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let spawnFlags = edict^.eSpawnFlags
 
           when (spawnFlags .&. 2 /= 0) $
-            modifyEdictT edictRef (\v -> v & eMoveDir %~ (fmap (0 -)))
+            modifyRef edictRef (\v -> v & eMoveDir %~ (fmap (0 -)))
 
-        checkSpeedAndDmg :: EdictReference -> Quake ()
+        checkSpeedAndDmg :: Ref EdictT -> Quake ()
         checkSpeedAndDmg edictRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when ((edict^.eSpeed) == 0) $
-            modifyEdictT edictRef (\v -> v & eSpeed .~ 100)
+            modifyRef edictRef (\v -> v & eSpeed .~ 100)
 
           when ((edict^.eDmg) == 0) $
-            modifyEdictT edictRef (\v -> v & eDmg .~ 2)
+            modifyRef edictRef (\v -> v & eDmg .~ 2)
 
 triggerElevatorInit :: EntThink
 triggerElevatorInit =
   GenericEntThink "trigger_elevator_init" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
 
     case self^.eTarget of
@@ -741,7 +742,7 @@ triggerElevatorInit =
 
       Just target -> do
         maybeMoveTargetRef <- GameBase.pickTarget (self^.eTarget)
-        modifyEdictT selfRef (\v -> v & eMoveTarget .~ maybeMoveTargetRef)
+        modifyRef selfRef (\v -> v & eMoveTarget .~ maybeMoveTargetRef)
 
         case maybeMoveTargetRef of
           Nothing -> do
@@ -749,14 +750,14 @@ triggerElevatorInit =
             return True
             
           Just moveTargetRef -> do
-            moveTarget <- readEdictT moveTargetRef
+            moveTarget <- readRef moveTargetRef
 
             if (moveTarget^.eClassName) /= "func_train"
               then do
                 dprintf ("trigger_elevator target " `B.append` target `B.append` " is not a train\n")
                 return True
               else do
-                modifyEdictT selfRef (\v -> v & eUse .~ Just triggerElevatorUse
+                modifyRef selfRef (\v -> v & eUse .~ Just triggerElevatorUse
                                               & eSvFlags .~ Constants.svfNoClient)
 
                 return True
@@ -766,7 +767,7 @@ spTriggerElevator =
   GenericEntThink "sp_trigger_elevator" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT selfRef (\v -> v & eThink .~ Just triggerElevatorInit
+    modifyRef selfRef (\v -> v & eThink .~ Just triggerElevatorInit
                                   & eNextThink .~ levelTime + Constants.frameTime)
 
     return True
@@ -790,16 +791,16 @@ spTriggerElevator =
 - 
 - Set "sounds" to one of the following: 1) base fast 2) chain slow
 -}
-spFuncPlat :: EdictReference -> Quake ()
+spFuncPlat :: Ref EdictT -> Quake ()
 spFuncPlat edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let setModel = gameImport^.giSetModel
         soundIndex = gameImport^.giSoundIndex
         linkEntity = gameImport^.giLinkEntity
 
-    modifyEdictT edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+    modifyRef edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
                                    & eSolid .~ Constants.solidBsp
                                    & eMoveType .~ Constants.moveTypePush
                                    & eBlocked .~ Just platBlocked
@@ -822,7 +823,7 @@ spFuncPlat edictRef = do
                  then (edict^.eEntityState.esOrigin) & _z -~ fromIntegral (spawnTemp^.stHeight)
                  else (edict^.eEntityState.esOrigin) & _z -~ (edict^.eMaxs._z) - (edict^.eMins._z) - fromIntegral (spawnTemp^.stLip)
 
-    modifyEdictT edictRef (\v -> v & ePos1 .~ pos1
+    modifyRef edictRef (\v -> v & ePos1 .~ pos1
                                    & ePos2 .~ pos2
                                    & eUse .~ Just usePlat)
 
@@ -830,20 +831,20 @@ spFuncPlat edictRef = do
 
     case edict^.eTargetName of
       Just _ ->
-        modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateUp)
+        modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateUp)
 
       Nothing -> do
-        modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ pos2)
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ pos2)
         linkEntity edictRef
-        modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateBottom)
+        modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateBottom)
 
-    edict' <- readEdictT edictRef
+    edict' <- readRef edictRef
 
     soundStart <- soundIndex (Just "plats/pt1_strt.wav")
     soundMiddle <- soundIndex (Just "plats/pt1_mid.wav")
     soundEnd <- soundIndex (Just "plats/pt1_end.wav")
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miSpeed .~ (edict'^.eSpeed)
+    modifyRef edictRef (\v -> v & eMoveInfo.miSpeed .~ (edict'^.eSpeed)
                                    & eMoveInfo.miAccel .~ (edict'^.eAccel)
                                    & eMoveInfo.miDecel .~ (edict'^.eDecel)
                                    & eMoveInfo.miWait .~ (edict'^.eWait)
@@ -858,8 +859,8 @@ spFuncPlat edictRef = do
 platBlocked :: EntBlocked
 platBlocked =
   GenericEntBlocked "plat_blocked" $ \selfRef otherRef -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
     v3o <- use $ globals.gVec3Origin
 
     if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
@@ -869,14 +870,14 @@ platBlocked =
 
         -- if it's still there, nuke it
         -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
-        other' <- readEdictT otherRef
+        other' <- readRef otherRef
         when (other'^.eInUse) $
           GameMisc.becomeExplosion1 otherRef
 
       else do
         GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
-        self' <- readEdictT selfRef
+        self' <- readRef selfRef
         if (self'^.eMoveInfo.miState) == stateUp
           then void $ think platGoDown selfRef
           else platGoUp selfRef
@@ -884,52 +885,52 @@ platBlocked =
 platGoDown :: EntThink
 platGoDown =
   GenericEntThink "plat_go_down" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
+      modifyRef edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateDown)
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateDown)
     moveCalc edictRef (edict^.eMoveInfo.miEndOrigin) platHitBottom
     return True
 
 platHitBottom :: EntThink
 platHitBottom =
   GenericEntThink "plat_hit_bottom" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((edict^.eMoveInfo.miSoundEnd) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0)
+      modifyRef edictRef (\v -> v & eEntityState.esSound .~ 0)
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateBottom)
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateBottom)
     return True
 
-platGoUp :: EdictReference -> Quake ()
+platGoUp :: Ref EdictT -> Quake ()
 platGoUp edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
+      modifyRef edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateUp)
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateUp)
     moveCalc edictRef (edict^.eMoveInfo.miStartOrigin) platHitTop
 
 platHitTop :: EntThink
 platHitTop =
   GenericEntThink "plat_hit_top" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
@@ -937,9 +938,9 @@ platHitTop =
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0)
+      modifyRef edictRef (\v -> v & eEntityState.esSound .~ 0)
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ stateTop
+    modifyRef edictRef (\v -> v & eMoveInfo.miState .~ stateTop
                                    & eThink .~ Just platGoDown
                                    & eNextThink .~ levelTime + 3)
 
@@ -948,15 +949,15 @@ platHitTop =
 usePlat :: EntUse
 usePlat =
   GenericEntUse "use_plat" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eThink of
       Just _ -> return () -- already down
       Nothing -> void $ think platGoDown edictRef
 
-platSpawnInsideTrigger :: EdictReference -> Quake ()
+platSpawnInsideTrigger :: Ref EdictT -> Quake ()
 platSpawnInsideTrigger edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
     triggerRef <- GameUtil.spawn
 
@@ -978,7 +979,7 @@ platSpawnInsideTrigger edictRef = do
                                     in (tmin''', tmax''')
                                else (tmin'', tmax'')
 
-    modifyEdictT triggerRef (\v -> v & eTouch .~ Just touchPlatCenter
+    modifyRef triggerRef (\v -> v & eTouch .~ Just touchPlatCenter
                                      & eMoveType .~ Constants.moveTypeNone
                                      & eSolid .~ Constants.solidTrigger
                                      & eEnemy .~ Just edictRef
@@ -991,21 +992,21 @@ platSpawnInsideTrigger edictRef = do
 touchPlatCenter :: EntTouch
 touchPlatCenter =
   GenericEntTouch "touch_plat_center" $ \edictRef otherRef _ _ -> do
-    edict <- readEdictT edictRef
-    other <- readEdictT otherRef
+    edict <- readRef edictRef
+    other <- readRef otherRef
 
     unless (isNothing (other^.eClient) || (other^.eHealth) <= 0) $ do
       -- now point at the plat, not the trigger
       -- RESEARCH: make sure this is what the jake2 code does
       let Just enemyRef = edict^.eEnemy
-      enemy <- readEdictT enemyRef
+      enemy <- readRef enemyRef
 
       if | (enemy^.eMoveInfo.miState) == stateBottom ->
              platGoUp enemyRef
 
          | (enemy^.eMoveInfo.miState) == stateTop -> do
              levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-             modifyEdictT enemyRef (\v -> v & eNextThink .~ levelTime + 1) -- the player is still on the plat, so delay going down
+             modifyRef enemyRef (\v -> v & eNextThink .~ levelTime + 1) -- the player is still on the plat, so delay going down
 
          | otherwise ->
              return ()
@@ -1023,7 +1024,7 @@ touchPlatCenter =
 - TOGGLE) "lip" lip remaining at end of move (0 default) "sounds" (yes,
 - these need to be changed) 0) no sound 1) water 2) lava
 -}
-spFuncWater :: EdictReference -> Quake ()
+spFuncWater :: Ref EdictT -> Quake ()
 spFuncWater selfRef = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -1033,7 +1034,7 @@ spFuncWater selfRef = do
 
     GameBase.setMoveDir selfRef
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
     sounds <- case self^.eSounds of
                 1 -> do -- water
@@ -1051,13 +1052,13 @@ spFuncWater selfRef = do
     case sounds of
       Nothing -> return ()
       Just (soundStart, soundEnd) ->
-        modifyEdictT selfRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
+        modifyRef selfRef (\v -> v & eMoveInfo.miSoundStart .~ soundStart
                                       & eMoveInfo.miSoundEnd .~ soundEnd)
 
     let absMoveDir = fmap abs (self^.eMoveDir)
         distance = (absMoveDir^._x) * (self^.eSize._x) + (absMoveDir^._y) * (self^.eSize._y) + (absMoveDir^._z) * (self^.eSize._z) - fromIntegral (spawnTemp^.stLip)
 
-    modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypePush
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypePush
                                   & eSolid .~ Constants.solidBsp
                                   & ePos1 .~ (self^.eEntityState.esOrigin)
                                   & eMoveInfo.miDistance .~ distance
@@ -1067,17 +1068,17 @@ spFuncWater selfRef = do
 
     -- if it starts open, switch the positions
     when ((self^.eSpawnFlags) .&. doorStartOpen /= 0) $ do
-      self' <- readEdictT selfRef
-      modifyEdictT selfRef (\v -> v & eEntityState.esOrigin .~ (self'^.ePos2)
+      self' <- readRef selfRef
+      modifyRef selfRef (\v -> v & eEntityState.esOrigin .~ (self'^.ePos2)
                                     & ePos2 .~ (self'^.ePos1)
                                     & ePos1 .~ (self'^.ePos2))
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
 
     let speed = if (self'^.eSpeed) == 0 then 25 else self'^.eSpeed
         wait = if (self'^.eWait) == 0 then -1 else self'^.eWait
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miStartOrigin .~ (self'^.ePos1)
+    modifyRef selfRef (\v -> v & eMoveInfo.miStartOrigin .~ (self'^.ePos1)
                                   & eMoveInfo.miStartAngles .~ (self'^.eEntityState.esAngles)
                                   & eMoveInfo.miEndOrigin .~ (self'^.ePos2)
                                   & eMoveInfo.miEndAngles .~ (self'^.eEntityState.esAngles)
@@ -1093,7 +1094,7 @@ spFuncWater selfRef = do
 
     linkEntity selfRef
 
-spFuncTrain :: EdictReference -> Quake ()
+spFuncTrain :: Ref EdictT -> Quake ()
 spFuncTrain edictRef = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -1102,20 +1103,20 @@ spFuncTrain edictRef = do
         linkEntity = gameImport^.giLinkEntity
         dprintf = gameImport^.giDprintf
 
-    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
                                    & eEntityState.esAngles .~ V3 0 0 0
                                    & eBlocked .~ Just trainBlocked
                                    & eSolid .~ Constants.solidBsp)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eSpawnFlags) .&. trainBlockStops /= 0
       then
-        modifyEdictT edictRef (\v -> v & eDmg .~ 0)
+        modifyRef edictRef (\v -> v & eDmg .~ 0)
 
       else
         when ((edict^.eDmg) == 0) $
-          modifyEdictT edictRef (\v -> v & eDmg .~ 100)
+          modifyRef edictRef (\v -> v & eDmg .~ 100)
 
     setModel edictRef (edict^.eiModel)
 
@@ -1123,10 +1124,10 @@ spFuncTrain edictRef = do
 
     when (isJust noise) $ do
       noiseIdx <- soundIndex noise
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miSoundMiddle .~ noiseIdx)
+      modifyRef edictRef (\v -> v & eMoveInfo.miSoundMiddle .~ noiseIdx)
 
     let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
-    modifyEdictT edictRef (\v -> v & eSpeed .~ speed
+    modifyRef edictRef (\v -> v & eSpeed .~ speed
                                    & eMoveInfo.miSpeed .~ speed
                                    & eMoveInfo.miAccel .~ speed
                                    & eMoveInfo.miDecel .~ speed
@@ -1139,24 +1140,24 @@ spFuncTrain edictRef = do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         -- start trains on the second frame, to make sure their targets
         -- have had a chance to spawn
-        modifyEdictT edictRef (\v -> v & eThink .~ Just funcTrainFind
+        modifyRef edictRef (\v -> v & eThink .~ Just funcTrainFind
                                        & eNextThink .~ levelTime + Constants.frameTime)
 
       else
         dprintf $ "func_train without a target at " `B.append` Lib.vtos (edict^.eAbsMin) `B.append` "\n"
 
-spFuncTimer :: EdictReference -> Quake ()
+spFuncTimer :: Ref EdictT -> Quake ()
 spFuncTimer edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eWait) == 0) $
-      modifyEdictT edictRef (\v -> v & eWait .~ 1)
+      modifyRef edictRef (\v -> v & eWait .~ 1)
 
-    modifyEdictT edictRef (\v -> v & eUse .~ Just funcTimerUse
+    modifyRef edictRef (\v -> v & eUse .~ Just funcTimerUse
                                    & eThink .~ Just funcTimerThink)
 
     when ((edict^.eRandom) >= (edict^.eWait)) $ do
-      modifyEdictT edictRef (\v -> v & eRandom .~ (edict^.eWait) - Constants.frameTime)
+      modifyRef edictRef (\v -> v & eRandom .~ (edict^.eWait) - Constants.frameTime)
       dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
       dprintf $ "func_timer at " `B.append` Lib.vtos (edict^.eEntityState.esOrigin) `B.append` " has random >= wait\n"
     
@@ -1165,28 +1166,28 @@ spFuncTimer edictRef = do
       pauseTime <- use $ gameBaseGlobals.gbSpawnTemp.stPauseTime
       cr <- Lib.crandom
 
-      modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
+      modifyRef edictRef (\v -> v & eNextThink .~ levelTime + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
                                      & eActivator .~ Just edictRef)
 
-    modifyEdictT edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
+    modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
 
 funcTimerUse :: EntUse
 funcTimerUse =
   GenericEntUse "func_timer_use" $ \selfRef _ activator -> do
-    modifyEdictT selfRef (\v -> v & eActivator .~ activator)
+    modifyRef selfRef (\v -> v & eActivator .~ activator)
 
     -- if on, turn it off
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eNextThink) /= 0
       then
-        modifyEdictT selfRef (\v -> v & eNextThink .~ 0)
+        modifyRef selfRef (\v -> v & eNextThink .~ 0)
       else
         -- turn it on
         if (self^.eDelay) /= 0
           then do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-            modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eDelay))
+            modifyRef selfRef (\v -> v & eNextThink .~ levelTime + (self^.eDelay))
           else
             void $ think funcTimerThink selfRef
 
@@ -1208,21 +1209,21 @@ funcTimerUse =
 funcTimerThink :: EntThink
 funcTimerThink =
   GenericEntThink "func_timer_think" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     GameUtil.useTargets edictRef (edict^.eActivator)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     r <- Lib.crandom
-    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eWait) + r * (edict^.eRandom))
+    modifyRef edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eWait) + r * (edict^.eRandom))
 
     return True
 
 trainBlocked :: EntBlocked
 trainBlocked =
   GenericEntBlocked "train_blocked" $ \selfRef otherRef -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     v3o <- use $ globals.gVec3Origin
 
@@ -1232,7 +1233,7 @@ trainBlocked =
 
            -- if it's still there, nuke it
            -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
-           other' <- readEdictT otherRef
+           other' <- readRef otherRef
            when (other'^.eInUse) $
              GameMisc.becomeExplosion1 otherRef
 
@@ -1240,20 +1241,20 @@ trainBlocked =
            return ()
 
        | otherwise -> do
-           modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
+           modifyRef selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 0.5)
            GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 trainUse :: EntUse
 trainUse =
   GenericEntUse "train_use" $ \selfRef _ activatorRef -> do
-    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. trainStartOn /= 0
       then
         unless ((self^.eSpawnFlags) .&. trainToggle == 0) $ do
-          modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+          modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
                                         & eVelocity .~ V3 0 0 0
                                         & eNextThink .~ 0)
 
@@ -1265,7 +1266,7 @@ trainUse =
 funcTrainFind :: EntThink
 funcTrainFind =
   GenericEntThink "func_train_find" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let dprintf = gameImport^.giDprintf
@@ -1281,26 +1282,26 @@ funcTrainFind =
           then
             dprintf $ "train_find: target " `B.append` (fromJust $ self^.eTarget) `B.append` " not found\n"
           else do
-            ent <- readEdictT (fromJust entRef)
+            ent <- readRef (fromJust entRef)
 
             let origin = ent^.eEntityState.esOrigin
                 mins = self^.eMins
 
-            modifyEdictT selfRef (\v -> v & eTarget .~ (ent^.eTarget)
+            modifyRef selfRef (\v -> v & eTarget .~ (ent^.eTarget)
                                           & eEntityState.esOrigin .~ (origin - mins))
 
             linkEntity selfRef
 
             -- if not triggered, start immediately
             when (isNothing (self^.eTargetName)) $
-              modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+              modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
-            updatedSelf <- readEdictT selfRef
+            updatedSelf <- readRef selfRef
 
             when ((updatedSelf^.eSpawnFlags) .&. trainStartOn /= 0) $ do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-              modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+              modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
                                             & eThink .~ Just trainNext
                                             & eActivator .~ Just selfRef)
 
@@ -1309,7 +1310,7 @@ funcTrainFind =
 doorUse :: EntUse
 doorUse =
   GenericEntUse "door_use" $ \selfRef _ activatorRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     unless ((self^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
       done <- if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
@@ -1325,13 +1326,13 @@ doorUse =
         -- trigger all paired doors
         triggerPairedDoors activatorRef (Just selfRef)
 
-  where triggerPairedDoors :: Maybe EdictReference -> Maybe EdictReference -> Quake ()
+  where triggerPairedDoors :: Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
         triggerPairedDoors _ Nothing = return ()
         triggerPairedDoors activatorRef (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let teamChain = edict^.eTeamChain
 
-          modifyEdictT edictRef (\v -> v & eMessage .~ Nothing
+          modifyRef edictRef (\v -> v & eMessage .~ Nothing
                                          & eTouch .~ Nothing)
           doorGoUp edictRef activatorRef
           triggerPairedDoors activatorRef teamChain
@@ -1339,8 +1340,8 @@ doorUse =
 doorBlocked :: EntBlocked
 doorBlocked =
   GenericEntBlocked "door_blocked" $ \selfRef otherRef -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
     v3o <- use $ globals.gVec3Origin
 
     if (other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient)
@@ -1350,14 +1351,14 @@ doorBlocked =
 
         -- if it's still there, nuke it
         -- RESEARCH: are we sure it is the correct way? (jake2 has different stuff here)
-        other' <- readEdictT otherRef
+        other' <- readRef otherRef
         when (other'^.eInUse) $
           GameMisc.becomeExplosion1 otherRef
 
       else do
         GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
-        self' <- readEdictT selfRef
+        self' <- readRef selfRef
 
         unless ((self'^.eSpawnFlags) .&. doorCrusher /= 0) $ do
           -- if a door has a negative wait, it would never come back if
@@ -1367,33 +1368,33 @@ doorBlocked =
               then teamDoorGoUp (self'^.eTeamMaster)
               else teamDoorGoDown (self'^.eTeamMaster)
 
-  where teamDoorGoUp :: Maybe EdictReference -> Quake ()
+  where teamDoorGoUp :: Maybe (Ref EdictT) -> Quake ()
         teamDoorGoUp Nothing = return ()
         teamDoorGoUp (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           doorGoUp edictRef (edict^.eActivator)
           teamDoorGoUp (edict^.eTeamChain)
 
-        teamDoorGoDown :: Maybe EdictReference -> Quake ()
+        teamDoorGoDown :: Maybe (Ref EdictT) -> Quake ()
         teamDoorGoDown Nothing = return ()
         teamDoorGoDown (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           void $ think doorGoDown edictRef
           teamDoorGoDown (edict^.eTeamChain)
 
 doorKilled :: EntDie
 doorKilled =
   GenericEntDie "door_killed" $ \selfRef _ attackerRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     updateDoorTeam (self^.eTeamMaster)
     entUse doorUse (fromJust $ self^.eTeamMaster) (Just attackerRef) (Just attackerRef)
 
-  where updateDoorTeam :: Maybe EdictReference -> Quake ()
+  where updateDoorTeam :: Maybe (Ref EdictT) -> Quake ()
         updateDoorTeam Nothing = return ()
         updateDoorTeam (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
-          modifyEdictT edictRef (\v -> v & eHealth .~ (edict^.eMaxHealth)
+          modifyRef edictRef (\v -> v & eHealth .~ (edict^.eMaxHealth)
                                          & eTakeDamage .~ Constants.damageNo)
 
           updateDoorTeam (edict^.eTeamChain)
@@ -1401,18 +1402,18 @@ doorKilled =
 doorTouch :: EntTouch
 doorTouch =
   GenericEntTouch "door_touch" $ \selfRef otherRef _ _ -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
 
     case other^.eClient of
       Nothing ->
         return ()
 
       Just _ -> do
-        self <- readEdictT selfRef
+        self <- readRef selfRef
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
         unless (levelTime < (self^.eTouchDebounceTime)) $ do
-          modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 5.0)
+          modifyRef selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 5.0)
 
           gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -1427,7 +1428,7 @@ doorTouch =
 thinkCalcMoveSpeed :: EntThink
 thinkCalcMoveSpeed =
   GenericEntThink "think_calc_movespeed" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     -- only the team master does this
     unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
@@ -1441,20 +1442,20 @@ thinkCalcMoveSpeed =
 
     return True
 
-  where findSmallestDistance :: Maybe EdictReference -> Float -> Quake Float
+  where findSmallestDistance :: Maybe (Ref EdictT) -> Float -> Quake Float
         findSmallestDistance Nothing minDist = return minDist
         findSmallestDistance (Just entRef) minDist = do
-          ent <- readEdictT entRef
+          ent <- readRef entRef
 
           let dist = abs (ent^.eMoveInfo.miDistance)
               minDist' = if dist < minDist then dist else minDist
 
           findSmallestDistance (ent^.eTeamChain) minDist'
 
-        adjustSpeeds :: Maybe EdictReference -> Float -> Quake ()
+        adjustSpeeds :: Maybe (Ref EdictT) -> Float -> Quake ()
         adjustSpeeds Nothing _ = return ()
         adjustSpeeds (Just entRef) time = do
-          ent <- readEdictT entRef
+          ent <- readRef entRef
 
           let newspeed = (abs $ ent^.eMoveInfo.miSpeed) / time
               ratio = newspeed / (ent^.eMoveInfo.miSpeed)
@@ -1465,7 +1466,7 @@ thinkCalcMoveSpeed =
                         then newspeed
                         else (ent^.eMoveInfo.miDecel) * ratio
 
-          modifyEdictT entRef (\v -> v & eMoveInfo.miAccel .~ accel
+          modifyRef entRef (\v -> v & eMoveInfo.miAccel .~ accel
                                        & eMoveInfo.miDecel .~ decel
                                        & eMoveInfo.miSpeed .~ newspeed)
 
@@ -1474,7 +1475,7 @@ thinkCalcMoveSpeed =
 thinkSpawnDoorTrigger :: EntThink
 thinkSpawnDoorTrigger =
   GenericEntThink "think_spawn_door_trigger" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     -- only the team leader spawns a trigger
     unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
@@ -1488,7 +1489,7 @@ thinkSpawnDoorTrigger =
 
       otherRef <- GameUtil.spawn
 
-      modifyEdictT otherRef (\v -> v & eMins .~ expandedMins
+      modifyRef otherRef (\v -> v & eMins .~ expandedMins
                                      & eMaxs .~ expandedMaxs
                                      & eOwner .~ Just edictRef
                                      & eSolid .~ Constants.solidTrigger
@@ -1505,10 +1506,10 @@ thinkSpawnDoorTrigger =
 
     return True
 
-  where teamChainAddPointToBound :: Maybe EdictReference -> V3 Float -> V3 Float -> Quake (V3 Float, V3 Float)
+  where teamChainAddPointToBound :: Maybe (Ref EdictT) -> V3 Float -> V3 Float -> Quake (V3 Float, V3 Float)
         teamChainAddPointToBound Nothing mins maxs = return (mins, maxs)
         teamChainAddPointToBound (Just otherRef) mins maxs = do
-          other <- readEdictT otherRef
+          other <- readRef otherRef
 
           let (mins', maxs') = GameBase.addPointToBound (other^.eAbsMin) mins maxs
               (mins'', maxs'') = GameBase.addPointToBound (other^.eAbsMax) mins' maxs'
@@ -1518,24 +1519,24 @@ thinkSpawnDoorTrigger =
 buttonUse :: EntUse
 buttonUse =
   GenericEntUse "button_use" $ \selfRef _ activatorRef -> do
-    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
     void $ think buttonFire selfRef
 
 buttonTouch :: EntTouch
 buttonTouch =
   GenericEntTouch "button_touch" $ \selfRef otherRef _ _ -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
 
     unless (isNothing (other^.eClient) || (other^.eHealth) <= 0) $ do
-      modifyEdictT selfRef (\v -> v & eActivator .~ Just otherRef)
+      modifyRef selfRef (\v -> v & eActivator .~ Just otherRef)
       void $ think buttonFire selfRef
 
 buttonKilled :: EntDie
 buttonKilled =
   GenericEntDie "button_killed" $ \selfRef _ attackerRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
-    modifyEdictT selfRef (\v -> v & eActivator .~ Just attackerRef
+    modifyRef selfRef (\v -> v & eActivator .~ Just attackerRef
                                   & eHealth .~ (self^.eMaxHealth)
                                   & eTakeDamage .~ Constants.damageNo)
 
@@ -1544,14 +1545,14 @@ buttonKilled =
 buttonFire :: EntThink
 buttonFire =
   GenericEntThink "button_fire" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMoveInfo.miState) == stateUp || (self^.eMoveInfo.miState) == stateTop
       then
         return True
 
       else do
-        modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateUp)
+        modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateUp)
 
         when ((self^.eMoveInfo.miSoundStart) /= 0 && (self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
           sound <- use $ gameBaseGlobals.gbGameImport.giSound
@@ -1563,21 +1564,21 @@ buttonFire =
 buttonWait :: EntThink
 buttonWait =
   GenericEntThink "button_wait" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateTop
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateTop
                                   & eEntityState.esEffects %~ (.&. (complement Constants.efAnim01))
                                   & eEntityState.esEffects %~ (.|. Constants.efAnim23))
 
     GameUtil.useTargets selfRef (self^.eActivator)
 
-    modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 1)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame .~ 1)
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
 
     when ((self'^.eMoveInfo.miWait) >= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-      modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self'^.eMoveInfo.miWait)
+      modifyRef selfRef (\v -> v & eNextThink .~ levelTime + (self'^.eMoveInfo.miWait)
                                     & eThink .~ Just buttonReturn)
 
     return True
@@ -1585,25 +1586,25 @@ buttonWait =
 buttonReturn :: EntThink
 buttonReturn =
   GenericEntThink "button_return" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateDown)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateDown)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     moveCalc selfRef (self^.eMoveInfo.miStartOrigin) buttonDone
 
-    modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 0)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame .~ 0)
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
 
     when ((self'^.eHealth) /= 0) $
-      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageYes)
+      modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageYes)
 
     return True
 
 buttonDone :: EntThink
 buttonDone =
   GenericEntThink "button_done" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateBottom
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateBottom
                                   & eEntityState.esEffects %~ (.&. (complement Constants.efAnim23))
                                   & eEntityState.esEffects %~ (.|. Constants.efAnim01))
 
@@ -1615,10 +1616,10 @@ trainNext =
     (done, entRef) <- pickNextTarget edictRef True
 
     unless done $ do
-      edict <- readEdictT edictRef
-      ent <- readEdictT (fromJust entRef)
+      edict <- readRef edictRef
+      ent <- readRef (fromJust entRef)
 
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miWait .~ (ent^.eMoveInfo.miWait)
+      modifyRef edictRef (\v -> v & eMoveInfo.miWait .~ (ent^.eMoveInfo.miWait)
                                      & eTargetEnt .~ entRef)
 
       when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
@@ -1626,23 +1627,23 @@ trainNext =
           sound <- use $ gameBaseGlobals.gbGameImport.giSound
           sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
 
-        modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
+        modifyRef edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
 
       let dest = (ent^.eEntityState.esOrigin) - (edict^.eMins)
 
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop
+      modifyRef edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop
                                      & eMoveInfo.miStartOrigin .~ (edict^.eEntityState.esOrigin)
                                      & eMoveInfo.miEndOrigin .~ dest)
 
       moveCalc edictRef dest trainWait
 
-      modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+      modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
     return True
 
-  where pickNextTarget :: EdictReference -> Bool -> Quake (Bool, Maybe EdictReference)
+  where pickNextTarget :: Ref EdictT -> Bool -> Quake (Bool, Maybe (Ref EdictT))
         pickNextTarget selfRef first = do
-          self <- readEdictT selfRef
+          self <- readRef selfRef
           gameImport <- use $ gameBaseGlobals.gbGameImport
 
           let dprintf = gameImport^.giDprintf
@@ -1660,8 +1661,8 @@ trainNext =
                   dprintf $ "train_next: bad target " `B.append` (fromJust $ self^.eTarget) `B.append` "\n"
                   return (True, Nothing)
                 else do
-                  ent <- readEdictT (fromJust entRef)
-                  modifyEdictT selfRef (\v -> v & eTarget .~ (ent^.eTarget))
+                  ent <- readRef (fromJust entRef)
+                  modifyRef selfRef (\v -> v & eTarget .~ (ent^.eTarget))
 
                   -- check for a teleport path_corner
                   if (ent^.eSpawnFlags) .&. 1 /= 0
@@ -1673,7 +1674,7 @@ trainNext =
                         else do
                           let origin = ((ent^.eEntityState.esOrigin) - (self^.eMins))
 
-                          modifyEdictT selfRef (\v -> v & eEntityState.esOrigin .~ origin
+                          modifyRef selfRef (\v -> v & eEntityState.esOrigin .~ origin
                                                         & eEntityState.esOldOrigin .~ origin
                                                         & eEntityState.esEvent .~ Constants.evOtherTeleport)
 
@@ -1686,11 +1687,11 @@ trainNext =
 touchDoorTrigger :: EntTouch
 touchDoorTrigger =
   GenericEntTouch "touch_door_trigger" $ \selfRef otherRef _ _ -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
 
     let Just ownerRef = self^.eOwner
-    owner <- readEdictT ownerRef
+    owner <- readRef ownerRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     let skip = (other^.eHealth) <= 0 
@@ -1699,7 +1700,7 @@ touchDoorTrigger =
             || levelTime < (self^.eTouchDebounceTime)
 
     unless skip $ do
-      modifyEdictT selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 1)
+      modifyRef selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 1)
       entUse doorUse ownerRef (Just otherRef) (Just otherRef)
 
 {-
@@ -1728,44 +1729,44 @@ touchDoorTrigger =
 - silent 2) light 3) medium 4) heavy
 -}
 
-doorUseAreaPortals :: EdictReference -> Bool -> Quake ()
+doorUseAreaPortals :: Ref EdictT -> Bool -> Quake ()
 doorUseAreaPortals selfRef open = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     case self^.eTarget of
       Nothing -> return ()
       Just target -> setAreaPortals target Nothing
 
-  where setAreaPortals :: B.ByteString -> Maybe EdictReference -> Quake ()
+  where setAreaPortals :: B.ByteString -> Maybe (Ref EdictT) -> Quake ()
         setAreaPortals target ref = do
           maybeFoundRef <- GameBase.gFind ref GameBase.findByTarget target
 
           case maybeFoundRef of
             Nothing -> return ()
             Just foundRef -> do
-              foundEdict <- readEdictT foundRef
+              foundEdict <- readRef foundRef
               when (BC.map toLower (foundEdict^.eClassName) == "func_areaportal") $ do
                 setAreaPortalState <- use $ gameBaseGlobals.gbGameImport.giSetAreaPortalState
                 setAreaPortalState (foundEdict^.eStyle) open
               setAreaPortals target maybeFoundRef
 
-trainResume :: EdictReference -> Quake ()
+trainResume :: Ref EdictT -> Quake ()
 trainResume selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let Just edictRef = self^.eTargetEnt
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let dest = (edict^.eEntityState.esOrigin) - (self^.eMins)
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ stateTop
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateTop
                                   & eMoveInfo.miStartOrigin .~ (self^.eEntityState.esOrigin)
                                   & eMoveInfo.miEndOrigin .~ dest)
 
     moveCalc selfRef dest trainWait
 
-    modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+    modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
 trainWait :: EntThink
 trainWait =
@@ -1773,20 +1774,20 @@ trainWait =
     done <- checkPathTarget edictRef
 
     unless done $ do
-      edict <- readEdictT edictRef
+      edict <- readRef edictRef
 
       if edict^.eMoveInfo.miWait /= 0
         then do
           if | edict^.eMoveInfo.miWait > 0 -> do
                  levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-                 modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eMoveInfo.miWait)
+                 modifyRef edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eMoveInfo.miWait)
                                                 & eThink .~ Just trainNext)
 
              | (edict^.eSpawnFlags) .&. trainToggle /= 0 -> do
                  void $ think trainNext edictRef
 
-                 modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+                 modifyRef edictRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
                                                 & eVelocity .~ V3 0 0 0
                                                 & eNextThink .~ 0)
 
@@ -1797,43 +1798,43 @@ trainWait =
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
               sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-            modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0)
+            modifyRef edictRef (\v -> v & eEntityState.esSound .~ 0)
 
         else void $ think trainNext edictRef
 
     return True
 
-  where checkPathTarget :: EdictReference -> Quake Bool
+  where checkPathTarget :: Ref EdictT -> Quake Bool
         checkPathTarget edictRef = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let Just targetRef = edict^.eTargetEnt
-          target <- readEdictT targetRef
+          target <- readRef targetRef
 
           if isJust $ target^.ePathTarget
             then do
               let saveTarget = target^.eTarget
-              modifyEdictT targetRef (\v -> v & eTarget .~ (target^.ePathTarget))
+              modifyRef targetRef (\v -> v & eTarget .~ (target^.ePathTarget))
 
               GameUtil.useTargets targetRef (edict^.eActivator)
 
-              modifyEdictT targetRef (\v -> v & eTarget .~ saveTarget)
+              modifyRef targetRef (\v -> v & eTarget .~ saveTarget)
 
               -- make sure we didn't get killed by a killtarget
-              edict' <- readEdictT edictRef
+              edict' <- readRef edictRef
               let inUse = edict'^.eInUse
               return $ if inUse then False else True
 
             else return False
 
-moveCalc :: EdictReference -> V3 Float -> EntThink -> Quake ()
+moveCalc :: Ref EdictT -> V3 Float -> EntThink -> Quake ()
 moveCalc edictRef dest func = do
-    modifyEdictT edictRef (\v -> v & eVelocity .~ V3 0 0 0)
+    modifyRef edictRef (\v -> v & eVelocity .~ V3 0 0 0)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let dir = dest - (edict^.eEntityState.esOrigin)
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miDir .~ normalize dir
+    modifyRef edictRef (\v -> v & eMoveInfo.miDir .~ normalize dir
                                    & eMoveInfo.miRemainingDistance .~ norm dir
                                    & eMoveInfo.miEndFunc .~ Just func)
 
@@ -1852,23 +1853,23 @@ moveCalc edictRef dest func = do
             void $ think moveBegin edictRef
 
           else
-            modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+            modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
                                            & eThink .~ Just moveBegin)
 
       else do
         -- aceelerative
-        modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ 0
+        modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ 0
                                        & eThink .~ Just thinkAccelMove
                                        & eNextThink .~ levelTime + Constants.frameTime)
 
-angleMoveCalc :: EdictReference -> EntThink -> Quake ()
+angleMoveCalc :: Ref EdictT -> EntThink -> Quake ()
 angleMoveCalc edictRef func = do
-    modifyEdictT edictRef (\v -> v & eAVelocity .~ V3 0 0 0
+    modifyRef edictRef (\v -> v & eAVelocity .~ V3 0 0 0
                                    & eMoveInfo.miEndFunc .~ Just func)
 
     currentEntity <- use $ gameBaseGlobals.gbLevel.llCurrentEntity
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let ent = if (edict^.eFlags) .&. Constants.flTeamSlave /= 0
                 then edict^.eTeamMaster
                 else Just edictRef
@@ -1879,13 +1880,13 @@ angleMoveCalc edictRef func = do
 
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+        modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
                                        & eThink .~ Just angleMoveBegin)
 
 angleMoveBegin :: EntThink
 angleMoveBegin =
   GenericEntThink "angle_move_begin" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
         -- set destdelta to the vector needed to move
     let destDelta = if (edict^.eMoveInfo.miState) == stateUp
@@ -1907,7 +1908,7 @@ angleMoveBegin =
 
         -- scale the destdelta vector by the time spent traveling to get
         -- velocity
-        modifyEdictT edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / travelTime)) destDelta
+        modifyRef edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / travelTime)) destDelta
                                        -- set nextthink to trigger a think when dest
                                        -- is reached
                                        & eNextThink .~ levelTime + fromIntegral frames * Constants.frameTime
@@ -1918,7 +1919,7 @@ angleMoveBegin =
 angleMoveFinal :: EntThink
 angleMoveFinal =
   GenericEntThink "angle_move_final" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     v3o <- use $ globals.gVec3Origin
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -1932,7 +1933,7 @@ angleMoveFinal =
         return True
 
       else do
-        modifyEdictT edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / Constants.frameTime)) move
+        modifyRef edictRef (\v -> v & eAVelocity .~ fmap (* (1.0 / Constants.frameTime)) move
                                        & eThink .~ Just angleMoveDone
                                        & eNextThink .~ levelTime + Constants.frameTime)
         return True
@@ -1940,9 +1941,9 @@ angleMoveFinal =
 angleMoveDone :: EntThink
 angleMoveDone =
   GenericEntThink "angle_move_done" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eAVelocity .~ V3 0 0 0)
+    modifyRef edictRef (\v -> v & eAVelocity .~ V3 0 0 0)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     void $ think (fromJust $ edict^.eMoveInfo.miEndFunc) edictRef
 
     return True
@@ -1950,7 +1951,7 @@ angleMoveDone =
 moveBegin :: EntThink
 moveBegin =
   GenericEntThink "move_begin" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let moveInfo = edict^.eMoveInfo
 
     if (moveInfo^.miSpeed) * Constants.frameTime >= (moveInfo^.miRemainingDistance)
@@ -1965,7 +1966,7 @@ moveBegin =
 
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT edictRef (\v -> v & eVelocity .~ velocity
+        modifyRef edictRef (\v -> v & eVelocity .~ velocity
                                        & eMoveInfo.miRemainingDistance -~ framesF * (moveInfo^.miSpeed) * Constants.frameTime
                                        & eNextThink .~ levelTime + (framesF * Constants.frameTime)
                                        & eThink .~ Just moveFinal)
@@ -1975,9 +1976,9 @@ moveBegin =
 thinkAccelMove :: EntThink
 thinkAccelMove =
   GenericEntThink "think_accelmove" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveInfo.miRemainingDistance -~ (edict^.eMoveInfo.miCurrentSpeed))
+    modifyRef edictRef (\v -> v & eMoveInfo.miRemainingDistance -~ (edict^.eMoveInfo.miCurrentSpeed))
 
     when ((edict^.eMoveInfo.miCurrentSpeed) == 0) $ -- starting or blocked
       platCalcAcceleratedMove edictRef
@@ -1985,7 +1986,7 @@ thinkAccelMove =
     platAccelerate edictRef
 
     -- will the entire move complete on next frame?
-    edict' <- readEdictT edictRef
+    edict' <- readRef edictRef
 
     if (edict'^.eMoveInfo.miRemainingDistance) <= (edict'^.eMoveInfo.miCurrentSpeed)
       then do
@@ -1995,14 +1996,14 @@ thinkAccelMove =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT edictRef (\v -> v & eVelocity .~ fmap (* ((edict'^.eMoveInfo.miCurrentSpeed) * 10)) (edict'^.eMoveInfo.miDir)
+        modifyRef edictRef (\v -> v & eVelocity .~ fmap (* ((edict'^.eMoveInfo.miCurrentSpeed) * 10)) (edict'^.eMoveInfo.miDir)
                                        & eNextThink .~ levelTime + Constants.frameTime
                                        & eThink .~ Just thinkAccelMove)
         return True
 
-platAccelerate :: EdictReference -> Quake ()
+platAccelerate :: Ref EdictT -> Quake ()
 platAccelerate edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let moveInfo = edict^.eMoveInfo
 
          -- are we decelerating?
@@ -2010,12 +2011,12 @@ platAccelerate edictRef = do
            when ((moveInfo^.miRemainingDistance) < (moveInfo^.miDecelDistance)) $
              if (moveInfo^.miNextSpeed) /= 0
                then
-                 modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miNextSpeed)
+                 modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miNextSpeed)
                                                 & eMoveInfo.miNextSpeed .~ 0)
 
                else
                  when ((moveInfo^.miCurrentSpeed) > (moveInfo^.miDecel)) $
-                   modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed -~ (moveInfo^.miDecel))
+                   modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed -~ (moveInfo^.miDecel))
 
          -- are we at full speed and need to start decelerating during this move?
        | (moveInfo^.miCurrentSpeed) == (moveInfo^.miMoveSpeed) && (moveInfo^.miRemainingDistance) - (moveInfo^.miCurrentSpeed) < (moveInfo^.miDecelDistance) -> do
@@ -2023,7 +2024,7 @@ platAccelerate edictRef = do
                p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / (moveInfo^.miMoveSpeed)))
                distance = p1Distance + p2Distance
 
-           modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miMoveSpeed)
+           modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miMoveSpeed)
                                           & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
 
          -- are we accelerating?
@@ -2035,7 +2036,7 @@ platAccelerate edictRef = do
                                 then moveInfo^.miSpeed
                                 else speed
 
-           modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ currentSpeed)
+           modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ currentSpeed)
 
            -- are we accelerating throughout this entire move?
            unless ((moveInfo^.miRemainingDistance) - currentSpeed >= (moveInfo^.miDecelDistance)) $ do
@@ -2047,24 +2048,24 @@ platAccelerate edictRef = do
                  p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / p1Speed))
                  distance = p1Distance + p2Distance
 
-             modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (p1Speed * (p1Distance / distance)) + ((moveInfo^.miMoveSpeed) * (p2Distance / distance))
+             modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (p1Speed * (p1Distance / distance)) + ((moveInfo^.miMoveSpeed) * (p2Distance / distance))
                                             & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
 
          -- we are at constant velocity (move_speed)
        | otherwise ->
            return ()
 
-platCalcAcceleratedMove :: EdictReference -> Quake ()
+platCalcAcceleratedMove :: Ref EdictT -> Quake ()
 platCalcAcceleratedMove edictRef = do
-    readEdictT edictRef >>= \edict ->
-      modifyEdictT edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ (edict^.eMoveInfo.miSpeed))
+    readRef edictRef >>= \edict ->
+      modifyRef edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ (edict^.eMoveInfo.miSpeed))
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let moveInfo = edict^.eMoveInfo
 
     if (moveInfo^.miRemainingDistance) < (moveInfo^.miAccel)
       then
-        modifyEdictT edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miRemainingDistance))
+        modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miRemainingDistance))
 
       else do
         let accelDist = accelerationDistance (moveInfo^.miSpeed) (moveInfo^.miAccel)
@@ -2076,11 +2077,11 @@ platCalcAcceleratedMove edictRef = do
                 moveSpeed = (-2 + sqrt (4 - 4 * f * (-2 * (moveInfo^.miRemainingDistance)))) / (2 * f)
                 decelDist' = accelerationDistance moveSpeed (moveInfo^.miDecel)
 
-            modifyEdictT edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ moveSpeed
+            modifyRef edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ moveSpeed
                                            & eMoveInfo.miDecelDistance .~ decelDist')
 
           else do
-            modifyEdictT edictRef (\v -> v & eMoveInfo.miDecelDistance .~ decelDist)
+            modifyRef edictRef (\v -> v & eMoveInfo.miDecelDistance .~ decelDist)
 
   where accelerationDistance :: Float -> Float -> Float
         accelerationDistance target rate = target * ((target / rate) + 1) / 2
@@ -2088,7 +2089,7 @@ platCalcAcceleratedMove edictRef = do
 moveFinal :: EntThink
 moveFinal =
   GenericEntThink "move_final" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eMoveInfo.miRemainingDistance) == 0
       then do
@@ -2098,7 +2099,7 @@ moveFinal =
         let velocity = fmap (* ((edict^.eMoveInfo.miRemainingDistance) / Constants.frameTime)) (edict^.eMoveInfo.miDir)
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         
-        modifyEdictT edictRef (\v -> v & eVelocity .~ velocity
+        modifyRef edictRef (\v -> v & eVelocity .~ velocity
                                        & eThink .~ Just moveDone
                                        & eNextThink .~ levelTime + Constants.frameTime)
 
@@ -2107,8 +2108,8 @@ moveFinal =
 moveDone :: EntThink
 moveDone =
   GenericEntThink "move_done" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eVelocity .~ V3 0 0 0)
-    edict <- readEdictT edictRef
+    modifyRef edictRef (\v -> v & eVelocity .~ V3 0 0 0)
+    edict <- readRef edictRef
     let endFunc = edict^.eMoveInfo.miEndFunc
 
     void $ think (fromJust endFunc) edictRef
@@ -2118,27 +2119,27 @@ moveDone =
 rotatingUse :: EntUse
 rotatingUse =
   GenericEntUse "rotating_use" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     vec3origin <- use $ globals.gVec3Origin
 
     if (self^.eAVelocity) /= vec3origin
       then
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0
                                       & eAVelocity .~ V3 0 0 0
                                       & eTouch .~ Nothing)
 
       else do
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ (self^.eMoveInfo.miSoundMiddle)
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ (self^.eMoveInfo.miSoundMiddle)
                                       & eAVelocity .~ fmap (* (self^.eSpeed)) (self^.eMoveDir))
 
         when ((self^.eSpawnFlags) .&. 16 /= 0) $
-          modifyEdictT selfRef (\v -> v & eTouch .~ Just rotatingTouch)
+          modifyRef selfRef (\v -> v & eTouch .~ Just rotatingTouch)
 
 rotatingBlocked :: EntBlocked
 rotatingBlocked =
   GenericEntBlocked "rotating_blocked" $ \selfRef otherRef -> do
-    self <- readEdictT selfRef
-    other <- readEdictT otherRef
+    self <- readRef selfRef
+    other <- readRef otherRef
     v3o <- use $ globals.gVec3Origin
 
     GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
@@ -2146,17 +2147,17 @@ rotatingBlocked =
 rotatingTouch :: EntTouch
 rotatingTouch =
   GenericEntTouch "rotating_touch" $ \selfRef otherRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eAVelocity._x) /= 0 || (self^.eAVelocity._y) /= 0 || (self^.eAVelocity._z) /= 0) $ do
-      other <- readEdictT otherRef
+      other <- readRef otherRef
       v3o <- use $ globals.gVec3Origin
 
       GameCombat.damage otherRef selfRef selfRef v3o (other^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
-doorGoUp :: EdictReference -> Maybe EdictReference -> Quake ()
+doorGoUp :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
 doorGoUp selfRef activatorRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     unless ((self^.eMoveInfo.miState) == Constants.stateUp) $ do
       if (self^.eMoveInfo.miState) == Constants.stateTop
@@ -2164,7 +2165,7 @@ doorGoUp selfRef activatorRef = do
           -- reset top wait time
           when ((self^.eMoveInfo.miWait) >= 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-            modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
+            modifyRef selfRef (\v -> v & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
 
         else do
           when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
@@ -2172,9 +2173,9 @@ doorGoUp selfRef activatorRef = do
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
               sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
 
-            modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
+            modifyRef selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
 
-          modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateUp)
+          modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateUp)
 
           if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miEndOrigin) doorHitTop
              | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitTop
@@ -2186,16 +2187,16 @@ doorGoUp selfRef activatorRef = do
 doorHitTop :: EntThink
 doorHitTop =
   GenericEntThink "door_hit_top" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
 
-      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+      modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop)
 
     if (self^.eSpawnFlags) .&. Constants.doorToggle /= 0
       then
@@ -2205,7 +2206,7 @@ doorHitTop =
         when ((self^.eMoveInfo.miWait) >= 0) $ do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-          modifyEdictT selfRef (\v -> v & eThink .~ Just doorGoDown
+          modifyRef selfRef (\v -> v & eThink .~ Just doorGoDown
                                         & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
 
         return True
@@ -2213,20 +2214,20 @@ doorHitTop =
 doorGoDown :: EntThink
 doorGoDown =
   GenericEntThink "door_go_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
 
-      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
+      modifyRef selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
 
     when ((self^.eMaxHealth) /= 0) $ do
-      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageYes
+      modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageYes
                                     & eHealth .~ self^.eMaxHealth)
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateDown)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateDown)
 
     if | (self^.eClassName) == "func_door" -> moveCalc selfRef (self^.eMoveInfo.miStartOrigin) doorHitBottom
        | (self^.eClassName) == "func_door_rotating" -> angleMoveCalc selfRef doorHitBottom
@@ -2237,16 +2238,16 @@ doorGoDown =
 doorHitBottom :: EntThink
 doorHitBottom =
   GenericEntThink "door_hit_bottom" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
       when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
       
-      modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+      modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
 
-    modifyEdictT selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
     doorUseAreaPortals selfRef False
     return True
 
@@ -2258,30 +2259,30 @@ doorHitBottom =
 funcConveyorUse :: EntUse
 funcConveyorUse =
   GenericEntUse "func_conveyor_use" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 1 /= 0
       then do
-        modifyEdictT selfRef (\v -> v & eSpeed .~ 0
+        modifyRef selfRef (\v -> v & eSpeed .~ 0
                                       & eSpawnFlags %~ (.&. (complement 1)))
       else do
-        modifyEdictT selfRef (\v -> v & eSpeed .~ fromIntegral (self^.eCount)
+        modifyRef selfRef (\v -> v & eSpeed .~ fromIntegral (self^.eCount)
                                       & eSpawnFlags %~ (.|. 1))
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
     let spawnFlags = self'^.eSpawnFlags
     when (spawnFlags .&. 2 == 0) $
-      modifyEdictT selfRef (\v -> v & eCount .~ 0)
+      modifyRef selfRef (\v -> v & eCount .~ 0)
 
 triggerElevatorUse :: EntUse
 triggerElevatorUse =
   GenericEntUse "trigger_elevator_use" $ \selfRef (Just otherRef) _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just moveTargetRef = self^.eMoveTarget
-    moveTarget <- readEdictT moveTargetRef
+    moveTarget <- readRef moveTargetRef
 
     unless ((moveTarget^.eNextThink) /= 0) $ do
-      other <- readEdictT otherRef
+      other <- readRef otherRef
       dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
 
       case other^.ePathTarget of
@@ -2296,5 +2297,5 @@ triggerElevatorUse =
               dprintf ("elevator used with bad pathtarget: " `B.append` pathTarget `B.append` "\n")
 
             Just targetRef -> do
-              modifyEdictT moveTargetRef (\v -> v & eTargetEnt .~ foundTarget)
+              modifyRef moveTargetRef (\v -> v & eTargetEnt .~ foundTarget)
               trainResume moveTargetRef

@@ -48,13 +48,7 @@ module QuakeState ( QuakeState(..)
                   , vGlobals
                   , netChannelGlobals
                   , clTEntGlobals
-                  , EdictReference
                   , worldRef
-                  , newEdictReference
-                  , nextEdictReference
-                  , readEdictT
-                  , modifyEdictT
-                  , writeEdictT
                   , ClientReference(..)
                   , GClientReference(..)
                   , CModelReference(..)
@@ -262,29 +256,8 @@ initialQuakeState =
              , _clTEntGlobals         = initialCLTEntGlobals
              }
 
-readEdictT :: EdictReference -> Quake EdictT
-readEdictT (EdictReference edictIdx) = do
-    edicts <- use $ gameBaseGlobals.gbGEdicts
-    liftIO $ MV.read edicts edictIdx
-
-modifyEdictT :: EdictReference -> (EdictT -> EdictT) -> Quake ()
-modifyEdictT (EdictReference edictIdx) f = do
-    edicts <- use $ gameBaseGlobals.gbGEdicts
-    liftIO $ MV.modify edicts f edictIdx
-
-writeEdictT :: EdictReference -> EdictT -> Quake ()
-writeEdictT (EdictReference edictIdx) edict = do
-    edicts <- use $ gameBaseGlobals.gbGEdicts
-    liftIO $ MV.write edicts edictIdx edict
-
-worldRef :: EdictReference
-worldRef = EdictReference 0
-
-newEdictReference :: Int -> EdictReference
-newEdictReference = EdictReference
-
-nextEdictReference :: EdictReference -> EdictReference
-nextEdictReference (EdictReference edictIdx) = EdictReference (edictIdx + 1)
+worldRef :: Ref EdictT
+worldRef = Ref 0
 
 readCPlaneT :: CPlaneReference -> Quake CPlaneT
 readCPlaneT (CPlaneReference planeIdx) = do

@@ -27,6 +27,7 @@ import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
 import Game.CVarT
+import QuakeRef
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
@@ -489,8 +490,8 @@ gameMapF =
               clients <- use $ svGlobals.svServerStatic.ssClients
               savedInUse <- mapM (\i -> do
                                         let Just edictRef = (clients V.! i)^.cEdict
-                                        inUse <- readEdictT edictRef >>= \e -> return (e^.eInUse)
-                                        modifyEdictT edictRef (\v -> v & eInUse .~ False)
+                                        inUse <- readRef edictRef >>= \e -> return (e^.eInUse)
+                                        modifyRef edictRef (\v -> v & eInUse .~ False)
                                         return inUse
                                 ) [0..maxClientsValue-1]
 
@@ -499,7 +500,7 @@ gameMapF =
               -- we must restore these for clients to transfer over correctly
               mapM_ (\(i, inUse) -> do
                                     let Just edictRef = (clients V.! i)^.cEdict
-                                    modifyEdictT edictRef (\v -> v & eInUse .~ inUse)
+                                    modifyRef edictRef (\v -> v & eInUse .~ inUse)
                     ) ([0..] `zip` savedInUse)
 
         -- start up the next map
@@ -609,7 +610,7 @@ saveGameF =
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
     Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
-    Just (GClientReference clientIdx) <- readEdictT edictRef >>= \e -> return (e^.eClient)
+    Just (GClientReference clientIdx) <- readRef edictRef >>= \e -> return (e^.eClient)
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
     let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth
 

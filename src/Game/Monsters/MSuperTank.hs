@@ -15,6 +15,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -214,7 +215,7 @@ superTankMoveStand = MMoveT "superTankMoveStand" frameStand1 frameStand60 superT
 superTankStand :: EntThink
 superTankStand =
   GenericEntThink "supertank_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveStand)
     return True
 
 superTankFramesRun :: V.Vector MFrameT
@@ -270,31 +271,31 @@ superTankMoveForward = MMoveT "superTankMoveForward" frameForward1 frameForward1
 superTankForward :: EntThink
 superTankForward =
   GenericEntThink "supertank_forward" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveForward)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveForward)
     return True
 
 superTankWalk :: EntThink
 superTankWalk =
   GenericEntThink "supertank_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveForward)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveForward)
     return True
 
 superTankRun :: EntThink
 superTankRun =
   GenericEntThink "supertank_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then superTankMoveStand
                    else superTankMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 superTankDead :: EntThink
 superTankDead =
   GenericEntThink "supertank_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-60) (-60) 0
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-60) (-60) 0
                                   & eMaxs .~ V3 60 60 72
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -308,7 +309,7 @@ superTankDead =
 superTankRocket :: EntThink
 superTankRocket =
   GenericEntThink "supertankRocket" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let flashNumber = if | (self^.eEntityState.esFrame) == frameAttack208 -> Constants.mz2SupertankRocket1
                          | (self^.eEntityState.esFrame) == frameAttack211 -> Constants.mz2SupertankRocket2
@@ -318,7 +319,7 @@ superTankRocket =
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
         Just enemyRef = self^.eEnemy
 
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -330,7 +331,7 @@ superTankRocket =
 superTankMachineGun :: EntThink
 superTankMachineGun =
   GenericEntThink "supertankMachineGun" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let flashNumber = Constants.mz2SupertankMachinegun1 + (self^.eEntityState.esFrame) - frameAttack101
         -- FIXME!!!
@@ -340,7 +341,7 @@ superTankMachineGun =
 
     case self^.eEnemy of
       Just enemyRef -> do
-        enemy <- readEdictT enemyRef
+        enemy <- readRef enemyRef
 
         let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* 0) (enemy^.eVelocity)
             vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -356,9 +357,9 @@ superTankMachineGun =
 superTankAttack :: EntThink
 superTankAttack =
   GenericEntThink "supertank_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm vec
@@ -372,7 +373,7 @@ superTankAttack =
                                   then superTankMoveAttack1
                                   else superTankMoveAttack2
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 superTankFramesTurnRight :: V.Vector MFrameT
@@ -598,7 +599,7 @@ superTankMoveAttack2 = MMoveT "superTankMoveAttack2" frameAttack201 frameAttack2
 superTankReAttack1 :: EntThink
 superTankReAttack1 =
   GenericEntThink "supertank_reattack1" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
 
     vis <- GameUtil.visible selfRef enemyRef
@@ -612,7 +613,7 @@ superTankReAttack1 =
                         else
                           superTankMoveEndAttack1
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 superTankFramesAttack1 :: V.Vector MFrameT
@@ -652,10 +653,10 @@ superTankMoveEndAttack1 = MMoveT "superTankMoveEndAttack1" frameAttack107 frameA
 superTankPain :: EntPain
 superTankPain =
   GenericEntPain "supertank_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -668,7 +669,7 @@ superTankPain =
         skillValue <- liftM (^.cvValue) skillCVar
 
         unless (skillValue >= 2 && (self^.eEntityState.esFrame) >= frameAttack201 && (self^.eEntityState.esFrame) <= frameAttack214) $ do
-          modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+          modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
           unless (skillValue == 3) $ do -- no pain anims in nightmare
             (soundPain, currentMove) <- if | damage <= 10 -> do
@@ -684,7 +685,7 @@ superTankPain =
             sound <- use $ gameBaseGlobals.gbGameImport.giSound
             sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
 
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 superTankDie :: EntDie
 superTankDie =
@@ -693,7 +694,7 @@ superTankDie =
     soundDeath <- use $ mSuperTankGlobals.mSuperTankSoundDeath
     sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
 
-    modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+    modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                   & eTakeDamage .~ Constants.damageNo
                                   & eCount .~ 0
                                   & eMonsterInfo.miCurrentMove .~ Just superTankMoveDeath)
@@ -729,7 +730,7 @@ spMonsterSuperTank =
 
         modelIdx <- modelIndex (Just "models/monsters/boss1/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-64) (-64) 0
@@ -750,7 +751,7 @@ spMonsterSuperTank =
 
         linkEntity selfRef
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveStand
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just superTankMoveStand
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef
@@ -760,18 +761,18 @@ spMonsterSuperTank =
 bossExplode :: EntThink
 bossExplode =
   GenericEntThink "BossExplode" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     r <- Lib.rand
 
     let V3 a b c = self^.eEntityState.esOrigin
         c' = c + 24 + fromIntegral (r .&. 15)
 
-    modifyEdictT selfRef (\v -> v & eThink .~ Just bossExplode
+    modifyRef selfRef (\v -> v & eThink .~ Just bossExplode
                                   & eCount +~ 1)
 
     if (self^.eCount) == 8
       then do
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
 
         GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
         GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" 500 Constants.gibOrganic
@@ -791,7 +792,7 @@ bossExplode =
 
         GameMisc.throwHead selfRef "models/objects/gibs/gear/tris.md2" 500 Constants.gibMetallic
 
-        modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+        modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
         return True
 
@@ -819,6 +820,6 @@ bossExplode =
         multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
 
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + 0.1)
+        modifyRef selfRef (\v -> v & eNextThink .~ levelTime + 0.1)
 
         return True

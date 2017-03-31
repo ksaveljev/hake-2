@@ -12,10 +12,11 @@ import Game.ClientRespawnT
 import Types
 import Game.PMoveStateT
 import QuakeState
+import QuakeRef
 import CVarVariables
 import qualified Util.Math3D as Math3D
 
-getChaseTarget :: EdictReference -> Quake ()
+getChaseTarget :: Ref EdictT -> Quake ()
 getChaseTarget edictRef = do
     maxClientsValue <- liftM (^.cvValue) maxClientsCVar
     done <- findChaseTarget 1 (truncate maxClientsValue)
@@ -28,8 +29,8 @@ getChaseTarget edictRef = do
         findChaseTarget idx maxIdx
           | idx > maxIdx = return False
           | otherwise = do
-              let otherRef = newEdictReference idx
-              other <- readEdictT otherRef
+              let otherRef = Ref idx
+              other <- readRef otherRef
               let Just (GClientReference gClientIdx) = other^.eClient
               Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -45,9 +46,9 @@ getChaseTarget edictRef = do
                 else
                   findChaseTarget (idx + 1) maxIdx
 
-updateChaseCam :: EdictReference -> Quake ()
+updateChaseCam :: Ref EdictT -> Quake ()
 updateChaseCam edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
 
     -- is our chase target gone?
@@ -56,7 +57,7 @@ updateChaseCam edictRef = do
     unless gone $ do
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       let Just targRef = gClient^.gcChaseTarget
-      targ <- readEdictT targRef
+      targ <- readRef targRef
       let Just (GClientReference targClientIdx) = targ^.eClient
       Just targClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix targClientIdx
 
@@ -72,7 +73,7 @@ updateChaseCam edictRef = do
         isChaseTargetGone (GClientReference gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let Just chaseTargetRef = gClient^.gcChaseTarget
-          chaseTarget <- readEdictT chaseTargetRef
+          chaseTarget <- readRef chaseTargetRef
           let Just (GClientReference chaseTargetClientIdx) = chaseTarget^.eClient
           Just chaseTargetClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -96,6 +97,6 @@ updateChaseCam edictRef = do
             else
               return False
 
-chaseNext :: EdictReference -> Quake ()
+chaseNext :: Ref EdictT -> Quake ()
 chaseNext _ = do
     io (putStrLn "GameChase.chaseNext") >> undefined -- TODO

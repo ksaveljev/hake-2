@@ -16,6 +16,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Types
+import QuakeRef
 import QuakeState
 import Server.MoveClipT
 import qualified Constants
@@ -76,9 +77,9 @@ removeLink (LinkReference idx) = do
     svGlobals.svLinks.ix nextLinkIdx.lPrev .= link^.lPrev
     svGlobals.svLinks.ix prevLinkIdx.lNext .= link^.lNext
 
-unlinkEdict :: EdictReference -> Quake ()
+unlinkEdict :: Ref EdictT -> Quake ()
 unlinkEdict edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let linkRef@(LinkReference linkIdx) = edict^.eArea
 
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
@@ -86,9 +87,9 @@ unlinkEdict edictRef = do
       removeLink linkRef
       svGlobals.svLinks.ix linkIdx .= link { _lNext = Nothing, _lPrev = Nothing }
 
-linkEdict :: EdictReference -> Quake ()
+linkEdict :: Ref EdictT -> Quake ()
 linkEdict edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let LinkReference linkIdx = edict^.eArea
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
 
@@ -98,7 +99,7 @@ linkEdict edictRef = do
     -- don't add the world and the one not in use
     unless ((edict^.eIndex) == 0 || not (edict^.eInUse)) $ do
       -- set the size
-      modifyEdictT edictRef (\v -> v & eSize .~ (edict^.eMaxs) - (edict^.eMins))
+      modifyRef edictRef (\v -> v & eSize .~ (edict^.eMaxs) - (edict^.eMins))
 
       -- encode the size into the entity_state for client prediction
       solid <- if | (edict^.eSolid) == Constants.solidBbox && 0 == ((edict^.eSvFlags) .&. Constants.svfDeadMonster) -> do
@@ -128,7 +129,7 @@ linkEdict edictRef = do
                   | otherwise ->
                       return  0
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esSolid .~ solid)
+      modifyRef edictRef (\v -> v & eEntityState.esSolid .~ solid)
 
       -- set the abs box
       if solid == Constants.solidBsp && F.any (/= 0) (edict^.eEntityState.esAngles)
@@ -140,24 +141,24 @@ linkEdict edictRef = do
               maxMax = F.maximum aMaxs
               m = F.maximum [minMax, maxMax]
 
-          modifyEdictT edictRef (\v -> v & eAbsMin .~ fmap (m `subtract`) (edict^.eEntityState.esOrigin)
+          modifyRef edictRef (\v -> v & eAbsMin .~ fmap (m `subtract`) (edict^.eEntityState.esOrigin)
                                          & eAbsMax .~ fmap (+ m) (edict^.eEntityState.esOrigin))
 
         else
           -- normal
-          modifyEdictT edictRef (\v -> v & eAbsMin .~ (edict^.eEntityState.esOrigin) + (edict^.eMins)
+          modifyRef edictRef (\v -> v & eAbsMin .~ (edict^.eEntityState.esOrigin) + (edict^.eMins)
                                          & eAbsMax .~ (edict^.eEntityState.esOrigin) + (edict^.eMaxs))
 
       -- because movement is clipped an epsilon away from an actual edge,
       -- we must fully check even when bouding boxes don't quite touch
-      modifyEdictT edictRef (\v -> v & eAbsMin -~ 1
+      modifyRef edictRef (\v -> v & eAbsMin -~ 1
                                      & eAbsMax +~ 1
                                        -- link to PVS leafs
                                      & eNumClusters .~ 0
                                      & eAreaNum .~ 0
                                      & eAreaNum2 .~ 0)
 
-      updatedEdict <- readEdictT edictRef
+      updatedEdict <- readRef edictRef
       (numLeafs, Just iw) <- CM.boxLeafNums (updatedEdict^.eAbsMin)
                                            (updatedEdict^.eAbsMax)
                                            (svGlobals.svLeafs)
@@ -171,17 +172,17 @@ linkEdict edictRef = do
 
       if numLeafs >= 128
         then -- assume we missed some leafs, and mark by headnode
-          modifyEdictT edictRef (\v -> v & eNumClusters .~ (-1)
+          modifyRef edictRef (\v -> v & eNumClusters .~ (-1)
                                          & eHeadNode .~ topnode)
         else do
-          modifyEdictT edictRef (\v -> v & eNumClusters .~ 0)
+          modifyRef edictRef (\v -> v & eNumClusters .~ 0)
           setHeadNode topnode 0 numLeafs
 
       -- if first time, make sure old_origin is valid
       when ((updatedEdict^.eLinkCount) == 0) $
-        modifyEdictT edictRef (\v -> v & eEntityState.esOldOrigin .~ (updatedEdict^.eEntityState.esOrigin))
+        modifyRef edictRef (\v -> v & eEntityState.esOldOrigin .~ (updatedEdict^.eEntityState.esOrigin))
 
-      modifyEdictT edictRef (\v -> v & eLinkCount +~ 1)
+      modifyRef edictRef (\v -> v & eLinkCount +~ 1)
 
       unless ((updatedEdict^.eSolid) == Constants.solidNot) $ do
         -- find the first node that the ent's box crosses
@@ -199,7 +200,7 @@ linkEdict edictRef = do
           svGlobals.svClusters.ix idx .= leafCluster
 
           area <- CM.leafArea (leafs UV.! idx)
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when (area /= 0) $
             -- doors may legally straggle two areas,
@@ -211,9 +212,9 @@ linkEdict edictRef = do
                 when ((edict^.eAreaNum2) /= 0 && (edict^.eAreaNum2) /= area && state == Constants.ssLoading) $
                   Com.dprintf $ "Object touching 3 areas at " `B.append` BC.pack (show (edict^.eAbsMin)) `B.append` "\n"
 
-                modifyEdictT edictRef (\v -> v & eAreaNum2 .~ area)
+                modifyRef edictRef (\v -> v & eAreaNum2 .~ area)
               else do
-                modifyEdictT edictRef (\v -> v & eAreaNum .~ area)
+                modifyRef edictRef (\v -> v & eAreaNum .~ area)
 
         setHeadNode :: Int -> Int -> Int -> Quake ()
         setHeadNode topnode idx maxIdx
@@ -231,16 +232,16 @@ linkEdict edictRef = do
 
                   if isNothing foundIndex
                     then do
-                      edict <- readEdictT edictRef
+                      edict <- readRef edictRef
                       let numClusters = edict^.eNumClusters
 
                       if numClusters == Constants.maxEntClusters
                         then do
                           -- assume we missed some leafs, and mark by headnode
-                          modifyEdictT edictRef (\v -> v & eNumClusters .~ (-1)
+                          modifyRef edictRef (\v -> v & eNumClusters .~ (-1)
                                                          & eHeadNode .~ topnode)
                         else do
-                          modifyEdictT edictRef (\v -> v & eClusterNums.ix numClusters .~ c
+                          modifyRef edictRef (\v -> v & eClusterNums.ix numClusters .~ c
                                                          & eNumClusters +~ 1)
 
                           setHeadNode topnode (idx + 1) maxIdx
@@ -297,7 +298,7 @@ areaEdictsR nodeIdx = do
           | otherwise = do
               Just link <- preuse $ svGlobals.svLinks.ix linkIdx
               let Just edictRef = link^.lEdict
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
               areaMaxs <- use $ svGlobals.svAreaMaxs
               areaMins <- use $ svGlobals.svAreaMins
               areaCount <- use $ svGlobals.svAreaCount
@@ -310,7 +311,7 @@ areaEdictsR nodeIdx = do
                      return ()
                  | otherwise -> do
                      zoom (svGlobals) $ do
-                       svAreaList.ix areaCount .= newEdictReference (edict^.eIndex)
+                       svAreaList.ix areaCount .= Ref (edict^.eIndex)
                        svAreaCount += 1
 
                      findTouching startIdx (fromJust $ link^.lNext)
@@ -328,7 +329,7 @@ areaEdictsR nodeIdx = do
                 then True
                 else False
 
-areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector EdictReference) -> Int -> Int -> Quake Int
+areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
 areaEdicts mins maxs listLens maxCount areaType = do
     list <- use listLens
 
@@ -357,7 +358,7 @@ areaEdicts mins maxs listLens maxCount areaType = do
 - 
 - ==================
 -}
-trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe EdictReference -> Int -> Quake TraceT
+trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
 trace start maybeMins maybeMaxs end passEdict contentMask = do
     v3o <- use $ globals.gVec3Origin
 
@@ -439,7 +440,7 @@ clipMoveToEntities initialClip = do
           | idx >= maxIdx = return clip
           | otherwise = do
               Just touchRef <- preuse $ svGlobals.svTouchList.ix idx
-              touchEdict <- readEdictT touchRef
+              touchEdict <- readRef touchRef
 
               (done, skip) <- shouldSkip touchRef touchEdict clip
 
@@ -486,7 +487,7 @@ clipMoveToEntities initialClip = do
 
                       tryClipping (idx + 1) maxIdx clip'
 
-        shouldSkip :: EdictReference -> EdictT -> MoveClipT -> Quake (Bool, Bool)
+        shouldSkip :: Ref EdictT -> EdictT -> MoveClipT -> Quake (Bool, Bool)
         shouldSkip touchRef touchEdict clip =
           if | (touchEdict^.eSolid) == Constants.solidNot -> return (False, True)
              | (Just touchRef) == (clip^.mcPassEdict) -> return (False, True)
@@ -497,7 +498,7 @@ clipMoveToEntities initialClip = do
                    then return (False, True) -- don't clip against own missiles
                    else do
                      let Just passEdictRef = clip^.mcPassEdict
-                     passEdict <- readEdictT passEdictRef
+                     passEdict <- readRef passEdictRef
                      if passEdict^.eOwner == (Just touchRef)
                        then return (False, True) -- don't clip against owner
                        else return (False, False)
@@ -541,7 +542,7 @@ pointContents p = do
           | idx >= maxIdx = return contents
           | otherwise = do
               Just edictRef <- preuse $ svGlobals.svTouch.ix idx
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
               -- might intersect, so do an exact clip
               headNode <- hullForEntity edict
               when ((edict^.eSolid) /= Constants.solidBsp) $

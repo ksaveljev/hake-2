@@ -16,6 +16,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -212,7 +213,7 @@ mutantMoveStand = MMoveT "mutantMoveStand" frameStand101 frameStand151 mutantFra
 mutantStand :: EntThink
 mutantStand =
   GenericEntThink "mutant_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStand)
     return True
 
 mutantIdleLoop :: EntThink
@@ -221,7 +222,7 @@ mutantIdleLoop =
     r <- Lib.randomF
 
     when (r < 0.75) $
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameStand155)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameStand155)
 
     return True
 
@@ -250,7 +251,7 @@ mutantMoveIdle = MMoveT "mutantMoveIdle" frameStand152 frameStand164 mutantFrame
 mutantIdle :: EntThink
 mutantIdle =
   GenericEntThink "mutant_idle" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveIdle)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveIdle)
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundIdle <- use $ mMutantGlobals.mMutantSoundIdle
@@ -279,7 +280,7 @@ mutantMoveWalk = MMoveT "mutantMoveWalk" frameWalk05 frameWalk16 mutantFramesWal
 mutantWalkLoop :: EntThink
 mutantWalkLoop =
   GenericEntThink "mutant_walk_loop" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveWalk)
     return True
 
 mutantFramesStartWalk :: V.Vector MFrameT
@@ -296,7 +297,7 @@ mutantMoveStartWalk = MMoveT "mutantMoveStartWalk" frameWalk01 frameWalk04 mutan
 mutantWalk :: EntThink
 mutantWalk =
   GenericEntThink "mutant_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStartWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStartWalk)
     return True
 
 mutantFramesRun :: V.Vector MFrameT
@@ -315,19 +316,19 @@ mutantMoveRun = MMoveT "mutantMoveRun" frameRun03 frameRun08 mutantFramesRun Not
 mutantRun :: EntThink
 mutantRun =
   GenericEntThink "mutantRun" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then mutantMoveStand
                    else mutantMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 mutantHitLeft :: EntThink
 mutantHitLeft =
   GenericEntThink "mutant_hit_left" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 8
 
@@ -346,7 +347,7 @@ mutantHitLeft =
 mutantHitRight :: EntThink
 mutantHitRight =
   GenericEntThink "mutant_hit_right" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMaxs._x) 8
 
@@ -365,14 +366,14 @@ mutantHitRight =
 mutantCheckReFire :: EntThink
 mutantCheckReFire =
   GenericEntThink "mutant_check_refire" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     done <- case self^.eEnemy of
               Nothing ->
                 return True
 
               Just enemyRef -> do
-                enemy <- readEdictT enemyRef
+                enemy <- readRef enemyRef
 
                 return $ if not (enemy^.eInUse) || (enemy^.eHealth) <= 0
                            then True
@@ -383,10 +384,10 @@ mutantCheckReFire =
       r <- Lib.randomF
 
       let Just enemyRef = self^.eEnemy
-      enemy <- readEdictT enemyRef
+      enemy <- readRef enemyRef
 
       when (skillValue == 3 && r < 0.5 || GameUtil.range self enemy == Constants.rangeMelee) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttack09)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttack09)
 
     return True
 
@@ -407,20 +408,20 @@ mutantMoveAttack = MMoveT "mutantMoveAttack" frameAttack09 frameAttack15 mutantF
 mutantMelee :: EntThink
 mutantMelee =
   GenericEntThink "mutant_melee" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveAttack)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveAttack)
     return True
 
 mutantJumpTouch :: EntTouch
 mutantJumpTouch =
   GenericEntTouch "mutant_jump_touch" $ \selfRef otherRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eHealth) <= 0
       then
-        modifyEdictT selfRef (\v -> v & eTouch .~ Nothing)
+        modifyRef selfRef (\v -> v & eTouch .~ Nothing)
 
       else do
-        other <- readEdictT otherRef
+        other <- readRef otherRef
 
         when ((other^.eTakeDamage) /= 0 && norm (self^.eVelocity) > 400) $ do
           r <- Lib.randomF
@@ -435,19 +436,19 @@ mutantJumpTouch =
 
         if not bottom
           then do
-            self' <- readEdictT selfRef
+            self' <- readRef selfRef
 
             when (isJust (self'^.eGroundEntity)) $ do
-              modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttack02
+              modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttack02
                                             & eTouch .~ Nothing)
 
           else
-            modifyEdictT selfRef (\v -> v & eTouch .~ Nothing)
+            modifyRef selfRef (\v -> v & eTouch .~ Nothing)
 
 mutantJumpTakeOff :: EntThink
 mutantJumpTakeOff =
   GenericEntThink "mutant_jump_takeoff" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     soundSight <- use $ mMutantGlobals.mMutantSoundSight
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
@@ -458,7 +459,7 @@ mutantJumpTakeOff =
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT selfRef (\v -> v & eEntityState.esOrigin._z +~ 1
+    modifyRef selfRef (\v -> v & eEntityState.esOrigin._z +~ 1
                                   & eVelocity .~ V3 a b 250
                                   & eGroundEntity .~ Nothing
                                   & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
@@ -470,7 +471,7 @@ mutantJumpTakeOff =
 mutantCheckLanding :: EntThink
 mutantCheckLanding =
   GenericEntThink "mutant_check_landing" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     case self^.eGroundEntity of
       Just _ -> do
@@ -478,7 +479,7 @@ mutantCheckLanding =
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanWeapon soundThud 1 Constants.attnNorm 0
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ 0
+        modifyRef selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ 0
                                       & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked)))
 
       Nothing -> do
@@ -488,7 +489,7 @@ mutantCheckLanding =
                           then frameAttack02
                           else frameAttack05
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
 
     return True
 
@@ -510,15 +511,15 @@ mutantMoveJump = MMoveT "mutantMoveJump" frameAttack01 frameAttack08 mutantFrame
 mutantJump :: EntThink
 mutantJump =
   GenericEntThink "mutant_jump" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveJump)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveJump)
     return True
 
 mutantCheckMelee :: EntThink
 mutantCheckMelee =
   GenericEntThink "mutant_check_melee" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     return $ if GameUtil.range self enemy == Constants.rangeMelee
                then True
@@ -527,9 +528,9 @@ mutantCheckMelee =
 mutantCheckJump :: EntThink
 mutantCheckJump =
   GenericEntThink "mutant_check_jump" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     if | (self^.eAbsMin._z) > ((enemy^.eAbsMin._z) + 0.75 * (enemy^.eSize._z)) ->
            return False
@@ -552,14 +553,14 @@ mutantCheckJump =
 mutantCheckAttack :: EntThink
 mutantCheckAttack =
   GenericEntThink "mutant_checkattack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     case self^.eEnemy of
       Nothing ->
         return False
 
       Just enemyRef -> do
-        enemy <- readEdictT enemyRef
+        enemy <- readRef enemyRef
 
         if (enemy^.eHealth) <= 0
           then
@@ -570,7 +571,7 @@ mutantCheckAttack =
 
             if melee
               then do
-                modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMelee)
+                modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMelee)
                 return True
 
               else do
@@ -578,7 +579,7 @@ mutantCheckAttack =
 
                 if jump
                   then do
-                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile)
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile)
                     -- FIXME: play a jump sound here
                     return True
 
@@ -631,15 +632,15 @@ mutantMovePain3 = MMoveT "mutantMovePain3" framePain301 framePain311 mutantFrame
 mutantPain :: EntPain
 mutantPain =
   GenericEntPain "mutant_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -658,7 +659,7 @@ mutantPain =
                                            soundPain <- use $ mMutantGlobals.mMutantSoundPain1
                                            return (soundPain, mutantMovePain3)
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
@@ -666,7 +667,7 @@ mutantPain =
 mutantDead :: EntThink
 mutantDead =
   GenericEntThink "mutant_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster))
@@ -714,7 +715,7 @@ mutantMoveDeath2 = MMoveT "mutantMoveDeath2" frameDeath201 frameDeath210 mutantF
 mutantDie :: EntDie
 mutantDie =
   GenericEntDie "mutant_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -734,7 +735,7 @@ mutantDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -745,7 +746,7 @@ mutantDie =
 
            r <- Lib.randomF
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eEntityState.esSkinNum .~ 1
                                          & eMonsterInfo.miCurrentMove .~ Just (if r < 0.5 then mutantMoveDeath1 else mutantMoveDeath2))
@@ -787,7 +788,7 @@ spMonsterMutant =
 
         modelIdx <- modelIndex (Just "models/monsters/mutant/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-32) (-32) (-24)
@@ -810,7 +811,7 @@ spMonsterMutant =
 
         linkEntity selfRef
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStand
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just mutantMoveStand
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef

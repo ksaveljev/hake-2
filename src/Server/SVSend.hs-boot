@@ -14,7 +14,7 @@ broadcastCommand :: B.ByteString -> Quake ()
 
 multicast :: V3 Float -> Int -> Quake ()
 
-startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
 
 demoCompleted :: Quake ()
 

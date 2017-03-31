@@ -145,21 +145,21 @@ readBool (QuakeFile h) = do
     print ("readBool = " ++ show (runGet getBool p))
     return (runGet getBool p)
 
-writeEdictRef :: QuakeFile -> Maybe EdictReference -> IO ()
+writeEdictRef :: QuakeFile -> Maybe (Ref EdictT) -> IO ()
 writeEdictRef saveFile Nothing = writeInt saveFile (-1)
-writeEdictRef saveFile (Just (EdictReference idx)) = writeInt saveFile idx
+writeEdictRef saveFile (Just (Ref idx)) = writeInt saveFile idx
 
-readEdictRef :: QuakeFile -> IO (Maybe EdictReference)
+readEdictRef :: QuakeFile -> IO (Maybe (Ref EdictT))
 readEdictRef (QuakeFile h) = do
     num <- BL.hGet h 4
     let idx = runGet getInt num
     
     return $ if idx == -1
                then Nothing
-               else Just (EdictReference idx) -- IMPROVE: if (i > GameBase.g_edicts.length) {
-                                              --              Com.DPrintf("jake2: illegal edict num:" + i + "\n");
-                                              --              return null;
-                                              --          }
+               else Just (Ref idx) -- IMPROVE: if (i > GameBase.g_edicts.length) {
+                                   --              Com.DPrintf("jake2: illegal edict num:" + i + "\n");
+                                   --              return null;
+                                   --          }
 
 writeVector :: QuakeFile -> V3 Float -> IO ()
 writeVector saveFile (V3 a b c) = do

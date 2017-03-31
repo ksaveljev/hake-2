@@ -21,6 +21,7 @@ import Game.GClientT
 import Types
 import Game.PMoveStateT
 import QuakeState
+import QuakeRef
 import CVarVariables
 import qualified Constants
 import qualified QCommon.CM as CM
@@ -315,7 +316,7 @@ buildClientFrame (ClientReference clientIdx) = do
     -- io (print "buildClientFrame")
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     let Just clEntRef = client^.cEdict
-    clEnt <- readEdictT clEntRef
+    clEnt <- readRef clEntRef
 
     case clEnt^.eClient of
       Nothing -> return () -- not in game yet
@@ -357,11 +358,11 @@ buildClientFrame (ClientReference clientIdx) = do
         -- io (print "collecting edicts")
         collectEdicts org clientPHS clientArea clEntRef frame 1 numEdicts
 
-  where --collectEdicts :: V3Float -> B.ByteString -> Int -> EdictReference -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
+  where --collectEdicts :: V3Float -> B.ByteString -> Int -> Ref EdictT -> Traversal' QuakeState ClientFrameT -> Int -> Int -> Quake ()
         collectEdicts org clientPHS clientArea clEntRef frame idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              edict <- readEdictT (newEdictReference idx)
+              edict <- readRef (Ref idx)
 
               -- io (print $ "working through edict " ++ show idx)
 
@@ -376,7 +377,7 @@ buildClientFrame (ClientReference clientIdx) = do
                  | otherwise -> do
                      -- ignore if not touching a PV leaf
                      -- check area
-                     skip <- if newEdictReference idx /= clEntRef
+                     skip <- if Ref idx /= clEntRef
                                then do
                                  blocked <- isBlockedByDoor clientArea edict
 
@@ -444,9 +445,9 @@ buildClientFrame (ClientReference clientIdx) = do
                         
                          when ((edict^.eEntityState.esNumber) /= idx) $ do
                            Com.dprintf "FIXING ENT.S.NUMBER!!!\n"
-                           modifyEdictT (newEdictReference idx) (\v -> v & eEntityState.esNumber .~ idx)
+                           modifyRef (Ref idx) (\v -> v & eEntityState.esNumber .~ idx)
 
-                         readEdictT (newEdictReference idx) >>= \edict' ->
+                         readRef (Ref idx) >>= \edict' ->
                            svGlobals.svServerStatic.ssClientEntities.ix index .= (edict'^.eEntityState)
 
                          -- don't mark players missiles as solid

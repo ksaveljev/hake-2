@@ -16,6 +16,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -204,7 +205,7 @@ gunnerFramesFidget =
 gunnerStand :: EntThink
 gunnerStand =
   GenericEntThink "gunner_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveStand)
     return True
 
 gunnerMoveFidget :: MMoveT
@@ -213,7 +214,7 @@ gunnerMoveFidget = MMoveT "gunnerMoveFidget" frameStand31 frameStand70 gunnerFra
 gunnerFidget :: EntThink
 gunnerFidget =
   GenericEntThink "gunner_fidget" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
       then
@@ -223,7 +224,7 @@ gunnerFidget =
         r <- Lib.randomF
 
         when (r <= 0.05) $
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveFidget)
+          modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveFidget)
 
         return True
 
@@ -287,7 +288,7 @@ gunnerMoveWalk = MMoveT "gunnerMoveWalk" frameWalk07 frameWalk19 gunnerFramesWal
 gunnerWalk :: EntThink
 gunnerWalk =
   GenericEntThink "gunner_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveWalk)
     return True
 
 gunnerFramesRun :: V.Vector MFrameT
@@ -308,13 +309,13 @@ gunnerMoveRun = MMoveT "gunnerMoveRun" frameRun01 frameRun08 gunnerFramesRun Not
 gunnerRun :: EntThink
 gunnerRun =
   GenericEntThink "gunner_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then gunnerMoveStand
                    else gunnerMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 gunnerFramesRunAndShoot :: V.Vector MFrameT
@@ -333,7 +334,7 @@ gunnerMoveRunAndShoot = MMoveT "gunnerMoveRunAndShoot" frameRunShoot01 frameRunS
 gunnerRunAndShoot :: EntThink
 gunnerRunAndShoot =
   GenericEntThink "gunner_runandshoot" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveRunAndShoot)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveRunAndShoot)
     return True
 
 gunnerFramesPain3 :: V.Vector MFrameT
@@ -391,15 +392,15 @@ gunnerMovePain1 = MMoveT "gunnerMovePain1" framePain101 framePain118 gunnerFrame
 gunnerPain :: EntPain
 gunnerPain =
   GenericEntPain "gunner_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       sound <- use $ gameBaseGlobals.gbGameImport.giSound
       r <- Lib.rand
@@ -416,12 +417,12 @@ gunnerPain =
                              | damage <= 25 -> gunnerMovePain2
                              | otherwise -> gunnerMovePain1
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 gunnerDead :: EntThink
 gunnerDead =
   GenericEntThink "gunner_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -453,7 +454,7 @@ gunnerMoveDeath = MMoveT "gunnerMoveDeath" frameDeath01 frameDeath11 gunnerFrame
 gunnerDie :: EntDie
 gunnerDie =
   GenericEntDie "gunner_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -473,7 +474,7 @@ gunnerDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -482,21 +483,21 @@ gunnerDie =
            soundDeath <- use $ mGunnerGlobals.mGunnerSoundDeath
            sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just gunnerMoveDeath)
 
 gunnerDuckDown :: EntThink
 gunnerDuckDown =
   GenericEntThink "gunner_duck_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
       then
         return True
 
       else do
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked))
+        modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked))
 
         skillValue <- liftM (^.cvValue) skillCVar
 
@@ -507,7 +508,7 @@ gunnerDuckDown =
 
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT selfRef (\v -> v & eMaxs._z -~ 32
+        modifyRef selfRef (\v -> v & eMaxs._z -~ 32
                                       & eTakeDamage .~ Constants.damageYes
                                       & eMonsterInfo.miPauseTime .~ levelTime + 1)
 
@@ -519,19 +520,19 @@ gunnerDuckDown =
 gunnerDuckHold :: EntThink
 gunnerDuckHold =
   GenericEntThink "gunner_duck_hold" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+      then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 gunnerDuckUp :: EntThink
 gunnerDuckUp =
   GenericEntThink "gunner_duck_up" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
                                   & eMaxs._z +~ 32
                                   & eTakeDamage .~ Constants.damageAim)
 
@@ -561,12 +562,12 @@ gunnerDodge =
     r <- Lib.randomF
 
     unless (r > 0.25) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
 
       when (isNothing (self^.eEnemy)) $
-        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+        modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveDuck)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveDuck)
 
 gunnerOpenGun :: EntThink
 gunnerOpenGun =
@@ -579,14 +580,14 @@ gunnerOpenGun =
 gunnerFire :: EntThink
 gunnerFire =
   GenericEntThink "GunnerFire" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let flashNumber = Constants.mz2GunnerMachinegun1 + (self^.eEntityState.esFrame) - frameAttack216
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! flashNumber) forward right
         Just enemyRef = self^.eEnemy
 
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = (enemy^.eEntityState.esOrigin) + fmap (* (-0.2)) (enemy^.eVelocity)
         target = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -599,7 +600,7 @@ gunnerFire =
 gunnerGrenade :: EntThink
 gunnerGrenade =
   GenericEntThink "GunnerGrenade" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let flashNumber = if | (self^.eEntityState.esFrame) == frameAttack105 -> Constants.mz2GunnerGrenade1
                          | (self^.eEntityState.esFrame) == frameAttack108 -> Constants.mz2GunnerGrenade2
@@ -618,9 +619,9 @@ gunnerGrenade =
 gunnerAttack :: EntThink
 gunnerAttack =
   GenericEntThink "gunner_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     r <- Lib.randomF
 
     let currentMove = if GameUtil.range self enemy == Constants.rangeMelee
@@ -629,13 +630,13 @@ gunnerAttack =
                                then gunnerMoveAttackGrenade
                                else gunnerMoveAttackChain
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 gunnerFireChain :: EntThink
 gunnerFireChain =
   GenericEntThink "gunner_fire_chain" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveFireChain)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveFireChain)
     return True
 
 gunnerFramesAttackChain :: V.Vector MFrameT
@@ -667,9 +668,9 @@ gunnerFramesFireChain =
 gunnerReFireChain :: EntThink
 gunnerReFireChain =
   GenericEntThink "gunner_refire_chain" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     currentMove <- if (enemy^.eHealth) > 0
                      then do
@@ -682,7 +683,7 @@ gunnerReFireChain =
                      else
                        return gunnerMoveEndFireChain
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
     return True
 
 gunnerMoveFireChain :: MMoveT
@@ -734,7 +735,7 @@ gunnerMoveAttackGrenade = MMoveT "gunnerMoveAttackGrenade" frameAttack101 frameA
 - QUAKED monster_gunner (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterGunner :: EdictReference -> Quake ()
+spMonsterGunner :: Ref EdictT -> Quake ()
 spMonsterGunner selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -762,7 +763,7 @@ spMonsterGunner selfRef = do
 
         modelIdx <- modelIndex (Just "models/monsters/gunner/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-16) (-16) (-24)
@@ -783,7 +784,7 @@ spMonsterGunner selfRef = do
 
         linkEntity selfRef
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveStand
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just gunnerMoveStand
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef

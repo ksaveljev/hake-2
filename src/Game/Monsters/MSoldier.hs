@@ -20,6 +20,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -230,7 +231,7 @@ soldierDead =
   GenericEntThink "soldier_dead" $ \selfRef -> do
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
 
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -243,7 +244,7 @@ soldierDead =
 soldierDie :: EntDie
 soldierDie =
   GenericEntDie "soldier_die" $ \selfRef inflictorRef attackerRef damage point -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     -- check for gib
@@ -261,18 +262,18 @@ soldierDie =
            GameMisc.throwGib selfRef "models/objects/gibs/chest/tris.md2" damage Constants.gibOrganic
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead -> do
            return ()
 
        | otherwise -> do
            -- regular death
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eEntityState.esSkinNum %~ (.|. 1))
 
-           self' <- readEdictT selfRef
+           self' <- readRef selfRef
            let sound = gameImport^.giSound
 
            soundIdx <- if | (self'^.eEntityState.esSkinNum) == 1 -> use $ mSoldierGlobals.msSoundDeathLight
@@ -284,7 +285,7 @@ soldierDie =
            if abs (((self'^.eEntityState.esOrigin._z) + fromIntegral (self'^.eViewHeight)) - (point^._z)) <= 4
              then
                -- head shot
-               modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMoveDeath3)
+               modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMoveDeath3)
 
              else do
                n <- liftM (`mod` 5) Lib.rand
@@ -295,7 +296,7 @@ soldierDie =
                                     | n == 3 -> soldierMoveDeath5
                                     | otherwise -> soldierMoveDeath6
 
-               modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+               modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 soldierFramesPain1 :: V.Vector MFrameT
 soldierFramesPain1 =
@@ -375,10 +376,10 @@ soldierMovePain4 = MMoveT "soldierMovePain4" framePain401 framePain417 soldierFr
 soldierPain :: EntPain
 soldierPain =
   GenericEntPain "soldier_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < ((self^.eMaxHealth) `div` 2)) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum %~ (.|. 1))
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum %~ (.|. 1))
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
@@ -389,10 +390,10 @@ soldierPain =
               moveId = move^.mmId
 
           when (any (== moveId) ["soldierMovePain1", "soldierMovePain2", "soldierMovePain3"]) $
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMovePain4)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMovePain4)
 
       else do
-        modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+        modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
         let n = (self^.eEntityState.esSkinNum) .|. 1
 
@@ -409,7 +410,7 @@ soldierPain =
 
         if (self^.eVelocity._z) > 100
           then
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMovePain4)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMovePain4)
 
           else do
             skillValue <- liftM (^.cvValue) skillCVar
@@ -422,7 +423,7 @@ soldierPain =
                                 | r < 0.66 -> soldierMovePain2
                                 | otherwise -> soldierMovePain3
 
-              modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+              modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
 soldierFramesStand1 :: V.Vector MFrameT
 soldierFramesStand1 =
@@ -510,7 +511,7 @@ soldierMoveStand3 = MMoveT "soldierMoveStand3" frameStand301 frameStand339 soldi
 soldierStand :: EntThink
 soldierStand =
   GenericEntThink "soldier_stand" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     r <- Lib.randomF
     let currentMove = self^.eMonsterInfo.miCurrentMove
@@ -520,7 +521,7 @@ soldierStand =
                      then soldierMoveStand1
                      else soldierMoveStand3
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
     return True
 
@@ -587,7 +588,7 @@ soldierWalk1Random =
     r <- Lib.randomF
 
     when (r > 0.1) $
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameWalk101)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameWalk101)
 
     return True
 
@@ -600,7 +601,7 @@ soldierWalk =
                      then soldierMoveWalk1
                      else soldierMoveWalk2
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
     return True
 
@@ -629,7 +630,7 @@ soldierMoveStartRun = MMoveT "soldierMoveStartRun" frameRun01 frameRun02 soldier
 soldierRun :: EntThink
 soldierRun =
   GenericEntThink "soldier_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let currentMove = self^.eMonsterInfo.miCurrentMove
 
     let nextMove = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
@@ -646,7 +647,7 @@ soldierRun =
 
                             else soldierMoveStartRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
     return True
 
@@ -656,11 +657,11 @@ soldierDodge =
     r <- Lib.randomF
 
     when (r > 0.25) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
       let enemy = self^.eEnemy
 
       when (isNothing enemy) $
-        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+        modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -670,7 +671,7 @@ soldierDodge =
 
                     else do
                       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                      modifyEdictT selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + eta + 0.3)
+                      modifyRef selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + eta + 0.3)
                       r' <- Lib.randomF
 
                       return $ if | skillValue == 1 ->
@@ -684,12 +685,12 @@ soldierDodge =
                                   | otherwise ->
                                       soldierMoveAttack3
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
 soldierCock :: EntThink
 soldierCock =
   GenericEntThink "soldier_cock" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let frame = self^.eEntityState.esFrame
 
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
@@ -744,9 +745,9 @@ soldierFire8 =
     soldierFire selfRef 7
     return True
 
-soldierFire :: EdictReference -> Int -> Quake ()
+soldierFire :: Ref EdictT -> Int -> Quake ()
 soldierFire selfRef flashNumber = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let flashIndex = if | (self^.eEntityState.esSkinNum) < 2 -> blasterFlash UV.! flashNumber
                         | (self^.eEntityState.esSkinNum) < 4 -> shotgunFlash UV.! flashNumber
@@ -761,7 +762,7 @@ soldierFire selfRef flashNumber = do
 
              else do
                let Just enemyRef = self^.eEnemy
-               enemy <- readEdictT enemyRef
+               enemy <- readRef enemyRef
 
                let V3 a b c = enemy^.eEntityState.esOrigin
                    end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -790,22 +791,22 @@ soldierFire selfRef flashNumber = do
 
            when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0) $ do
              r <- Lib.rand
-             modifyEdictT selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + (3 + fromIntegral (r `mod` 8)) * Constants.frameTime)
+             modifyRef selfRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + (3 + fromIntegral (r `mod` 8)) * Constants.frameTime)
 
            Monster.monsterFireBullet selfRef start aim 2 4 Constants.defaultBulletHspread Constants.defaultBulletVspread flashIndex
 
-           pauseTime <- readEdictT selfRef >>= \e -> return (e^.eMonsterInfo.miPauseTime)
+           pauseTime <- readRef selfRef >>= \e -> return (e^.eMonsterInfo.miPauseTime)
 
            if levelTime >= pauseTime
-             then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-             else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+             then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+             else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
 soldierAttack1Refire1 :: EntThink
 soldierAttack1Refire1 =
   GenericEntThink "soldier_attack1_refire1" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     unless (self^.eEntityState.esSkinNum > 1 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
@@ -815,32 +816,32 @@ soldierAttack1Refire1 =
                         then frameAttak102
                         else frameAttak110
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
 
     return True
 
 soldierAttack1Refire2 :: EntThink
 soldierAttack1Refire2 =
   GenericEntThink "soldier_attack1_refire2" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     unless (self^.eEntityState.esSkinNum < 2 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
       when ((skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak102)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak102)
 
     return True
 
 soldierAttack2Refire1 :: EntThink
 soldierAttack2Refire1 =
   GenericEntThink "soldier_attack2_refire1" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     unless (self^.eEntityState.esSkinNum > 1 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
@@ -850,49 +851,49 @@ soldierAttack2Refire1 =
                         then frameAttak204
                         else frameAttak216
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ nextFrame)
 
     return True
 
 soldierAttack2Refire2 :: EntThink
 soldierAttack2Refire2 =
   GenericEntThink "soldier_attack2_refire2" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     unless (self^.eEntityState.esSkinNum < 2 || enemy^.eHealth <= 0) $ do
       skillValue <- liftM (^.cvValue) skillCVar
       r <- Lib.randomF
 
       when ((skillValue == 3 && r < 0.5) || GameUtil.range self enemy == Constants.rangeMelee) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak204)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak204)
 
     return True
 
 soldierAttack3Refire :: EntThink
 soldierAttack3Refire =
   GenericEntThink "soldier_attack3_refire" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     when ((levelTime + 0.4) < (self^.eMonsterInfo.miPauseTime)) $
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak303)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameAttak303)
 
     return True
 
 soldierAttack6Refire :: EntThink
 soldierAttack6Refire =
   GenericEntThink "soldier_attack6_refire" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     unless (enemy^.eHealth <= 0 || GameUtil.range self enemy < Constants.rangeMid) $ do
       skillValue <- liftM (^.cvValue) skillCVar
 
       when (skillValue == 3) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameRuns03)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miNextFrame .~ frameRuns03)
 
     return True
 
@@ -901,7 +902,7 @@ soldierDuckUp =
   GenericEntThink "soldier_duck_up" $ \selfRef -> do
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
                                   & eMaxs._z +~ 32
                                   & eTakeDamage .~ Constants.damageAim)
 
@@ -912,13 +913,13 @@ soldierDuckUp =
 soldierDuckDown :: EntThink
 soldierDuckDown =
   GenericEntThink "soldier_duck_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked == 0) $ do
       linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
                                     & eMaxs._z -~ 32
                                     & eTakeDamage .~ Constants.damageYes
                                     & eMonsterInfo.miPauseTime .~ levelTime + 1)
@@ -930,14 +931,14 @@ soldierDuckDown =
 soldierDuckHold :: EntThink
 soldierDuckHold =
   GenericEntThink "soldier_duck_hold" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     let updateMI = if levelTime >= self^.eMonsterInfo.miPauseTime
                      then (.&. (complement Constants.aiHoldFrame))
                      else (.|. Constants.aiHoldFrame)
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ updateMI)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ updateMI)
 
     return True
 
@@ -1295,7 +1296,7 @@ soldierMoveDeath6 = MMoveT "soldierMoveDeath6" frameDeath601 frameDeath610 soldi
 soldierAttack :: EntThink
 soldierAttack =
   GenericEntThink "soldier_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let skinNum = self^.eEntityState.esSkinNum
 
     nextMove <- if skinNum < 4
@@ -1306,7 +1307,7 @@ soldierAttack =
                   else
                     return soldierMoveAttack4
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just nextMove)
 
     return True
 
@@ -1325,9 +1326,9 @@ soldierIdle =
 soldierSight :: EntInteract
 soldierSight =
   GenericEntInteract "soldier_sight" $ \selfRef _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     r <- Lib.randomF
     skillValue <- liftM (^.cvValue) skillCVar
@@ -1341,7 +1342,7 @@ soldierSight =
 
     when (skillValue > 0 && GameUtil.range self enemy >= Constants.rangeMid) $
       when (r > 0.5) $
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMoveAttack6)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just soldierMoveAttack6)
 
     return True
 
@@ -1361,7 +1362,7 @@ spMonsterSoldierX =
 
     modelIdx <- modelIndex (Just "models/monsters/soldier/tris.md2")
 
-    modifyEdictT selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
+    modifyRef selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
                                   & eMonsterInfo.miScale .~ modelScale
                                   & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 32
@@ -1392,7 +1393,7 @@ spMonsterSoldierX =
 spMonsterSoldier :: EntThink
 spMonsterSoldier =
   GenericEntThink "SP_monster_soldier" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     Com.dprintf $ "Spawning a soldier at " `B.append` BC.pack (show (self^.eEntityState.esOrigin)) -- IMPROVE
 
@@ -1412,7 +1413,7 @@ spMonsterSoldier =
 
         void $ soundIndex (Just "soldier/solatck1.wav")
 
-        modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 2
+        modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 2
                                       & eHealth .~ 30
                                       & eGibHealth .~ (-30))
 
@@ -1441,7 +1442,7 @@ spMonsterSoldierSS =
 
         void $ soundIndex (Just "soldier/solatck3.wav")
 
-        modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 4
+        modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 4
                                       & eHealth .~ 40
                                       & eGibHealth .~ (-30))
 
@@ -1475,7 +1476,7 @@ spMonsterSoldierLight =
         void $ soundIndex (Just "misc/lasfly.wav")
         void $ soundIndex (Just "soldier/solatck2.wav")
 
-        modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 0
+        modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 0
                                       & eHealth .~ 20
                                       & eGibHealth .~ (-30))
 

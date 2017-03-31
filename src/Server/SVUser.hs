@@ -16,6 +16,7 @@ import Types
 import Game.UserCmdT
 import QuakeState
 import CVarVariables
+import QuakeRef
 import QCommon.XCommandT
 import Server.UCmdT
 import qualified Constants
@@ -273,8 +274,8 @@ newF =
            when (state == Constants.ssGame) $ do
              io $ print "STATE = CONSTANTS.SSGAME"
              -- set up the entity for the client
-             let edictRef = newEdictReference (playerNum + 1)
-             modifyEdictT edictRef (\v -> v & eEntityState.esNumber .~ playerNum + 1)
+             let edictRef = Ref (playerNum + 1)
+             modifyRef edictRef (\v -> v & eEntityState.esNumber .~ playerNum + 1)
              zoom (svGlobals.svServerStatic.ssClients.ix clientIdx) $ do
                cEdict .= Just edictRef
                cLastCmd .= newUserCmdT

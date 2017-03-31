@@ -18,6 +18,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -160,17 +161,17 @@ insaneCross =
                    then insaneMoveCross
                    else insaneMoveStruggleCross
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 insaneWalk :: EntThink
 insaneWalk =
   GenericEntThink "insane_walk" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 16 /= 0 && (self^.eEntityState.esFrame) == frameCrawlPain10
       then do
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
         return True
 
       else do
@@ -180,17 +181,17 @@ insaneWalk =
                              | r <= 0.5 -> insaneMoveWalkNormal
                              | otherwise -> insaneMoveWalkInsane
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
         return True
 
 insaneRun :: EntThink
 insaneRun =
   GenericEntThink "insane_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 16 /= 0 && (self^.eEntityState.esFrame) == frameCrawlPain10
       then do
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
         return True
 
       else do
@@ -200,17 +201,17 @@ insaneRun =
                              | r <= 0.5 -> insaneMoveRunNormal
                              | otherwise -> insaneMoveRunInsane
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
         return True
 
 insanePain :: EntPain
 insanePain =
   GenericEntPain "insane_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       r <- Lib.rand
       let r' = 1 + (r .&. 1)
@@ -233,7 +234,7 @@ insanePain =
         -- don't go into pain frames if crucified
         if (self^.eSpawnFlags) .&. 8 /= 0
           then
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStruggleCross)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStruggleCross)
 
           else do
             let frame = self^.eEntityState.esFrame
@@ -241,18 +242,18 @@ insanePain =
                                 then insaneMoveCrawlPain
                                 else insaneMoveStandPain
 
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 insaneOnGround :: EntThink
 insaneOnGround =
   GenericEntThink "insane_onground" $ \selfRef-> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDown)
     return True
 
 insaneCheckDown :: EntThink
 insaneCheckDown =
   GenericEntThink "insane_checkdown" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 32 /= 0 -- always stand
       then
@@ -268,14 +269,14 @@ insaneCheckDown =
                               then insaneMoveUpToDown
                               else insaneMoveJumpDown
 
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+          modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
         return True
 
 insaneCheckUp :: EntThink
 insaneCheckUp =
   GenericEntThink "insane_checkup" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     -- If Hold_Ground and Crawl are set
     if (self^.eSpawnFlags) .&. 4 /= 0 && (self^.eSpawnFlags) .&. 16 /= 0
@@ -286,17 +287,17 @@ insaneCheckUp =
         r <- Lib.randomF
 
         when (r < 0.5) $
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDownToUp)
+          modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveDownToUp)
 
         return True
 
 insaneStand :: EntThink
 insaneStand =
   GenericEntThink "insane_stand" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     action <- if | (self^.eSpawnFlags) .&. 8 /= 0 -> do -- If crucified
-                     modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
+                     modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
                      return insaneMoveCross
 
                  | (self^.eSpawnFlags) .&. 4 /= 0 && (self^.eSpawnFlags) .&. 16 /= 0 ->
@@ -306,23 +307,23 @@ insaneStand =
                      r <- Lib.randomF
                      return $ if r < 0.5 then insaneMoveStandNormal else insaneMoveStandInsane
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 insaneDead :: EntThink
 insaneDead =
   GenericEntThink "insane_dead" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 8 /= 0
       then
-        modifyEdictT selfRef (\v -> v & eFlags %~ (.|. Constants.flFly))
+        modifyRef selfRef (\v -> v & eFlags %~ (.|. Constants.flFly))
       else
-        modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+        modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                       & eMaxs .~ V3 16 16 (-8)
                                       & eMoveType .~ Constants.moveTypeToss)
 
-    modifyEdictT selfRef (\v -> v & eSvFlags %~ (.|. Constants.svfDeadMonster)
+    modifyRef selfRef (\v -> v & eSvFlags %~ (.|. Constants.svfDeadMonster)
                                   & eNextThink .~ 0)
 
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
@@ -333,7 +334,7 @@ insaneDead =
 insaneDie :: EntDie
 insaneDie =
   GenericEntDie "insane_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -353,7 +354,7 @@ insaneDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -363,7 +364,7 @@ insaneDie =
            soundIdx <- soundIndex (Just ("player/male/death" `B.append` BC.pack (show ((r `mod` 4) + 1)) `B.append` ".wav"))
            sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnIdle 0
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes)
 
            if (self^.eSpawnFlags) .&. 8 /= 0
@@ -376,7 +377,7 @@ insaneDie =
                                    then insaneMoveCrawlDeath
                                    else insaneMoveStandDeath
 
-               modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+               modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 insaneFramesStandNormal :: V.Vector MFrameT
 insaneFramesStandNormal =
@@ -779,7 +780,7 @@ insaneMoveStruggleCross = MMoveT "insaneMoveStruggleCross" frameCross16 frameCro
 - QUAKED misc_insane (1 .5 0) (-16 -16 -24) (16 16 32) Ambush Trigger_Spawn
 - CRAWL CRUCIFIED STAND_GROUND ALWAYS_STAND
 -}
-spMiscInsane :: EdictReference -> Quake ()
+spMiscInsane :: Ref EdictT -> Quake ()
 spMiscInsane selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -810,7 +811,7 @@ spMiscInsane selfRef = do
 
         modelIdx <- modelIndex (Just "models/monsters/insane/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-16) (-16) (-24)
@@ -831,17 +832,17 @@ spMiscInsane selfRef = do
 
         linkEntity selfRef
 
-        self <- readEdictT selfRef
+        self <- readRef selfRef
 
         when ((self^.eSpawnFlags) .&. 16 /= 0) $ -- stand ground
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
+          modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiStandGround))
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStandNormal
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just insaneMoveStandNormal
                                       & eMonsterInfo.miScale .~ modelScale)
 
         if (self^.eSpawnFlags) .&. 8 /= 0 -- crucified ?
           then do
-            modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) 0 0
+            modifyRef selfRef (\v -> v & eMins .~ V3 (-16) 0 0
                                           & eMaxs .~ V3 16 8 32
                                           & eFlags %~ (.|. Constants.flNoKnockback))
 
@@ -851,4 +852,4 @@ spMiscInsane selfRef = do
             void $ think GameAI.walkMonsterStart selfRef
 
             r <- Lib.rand
-            modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ fromIntegral r `mod` 3)
+            modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ fromIntegral r `mod` 3)

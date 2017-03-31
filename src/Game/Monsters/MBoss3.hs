@@ -12,6 +12,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -22,7 +23,7 @@ import qualified Game.Monsters.MBoss32 as MBoss32
 useBoss3 :: EntUse
 useBoss3 =
   GenericEntUse "Use_Boss3" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let writeByte = gameImport^.giWriteByte
@@ -38,14 +39,14 @@ useBoss3 =
 thinkBoss3Stand :: EntThink
 thinkBoss3Stand =
   GenericEntThink "Think_Boss3Stand" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eEntityState.esFrame) == MBoss32.frameStand260
-      then modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MBoss32.frameStand201)
-      else modifyEdictT edictRef (\v -> v & eEntityState.esFrame +~ 1)
+      then modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MBoss32.frameStand201)
+      else modifyRef edictRef (\v -> v & eEntityState.esFrame +~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
 {-
@@ -53,7 +54,7 @@ thinkBoss3Stand =
 - 
 - Just stands and cycles in one place until targeted, then teleports away.
 -}
-spMonsterBoss3Stand :: EdictReference -> Quake ()
+spMonsterBoss3Stand :: Ref EdictT -> Quake ()
 spMonsterBoss3Stand selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -68,11 +69,11 @@ spMonsterBoss3Stand selfRef = do
             soundIndex = gameImport^.giSoundIndex
             linkEntity = gameImport^.giLinkEntity
 
-        self <- readEdictT selfRef
+        self <- readRef selfRef
         modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT selfRef (\v -> v & eMoveType                 .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType                 .~ Constants.moveTypeStep
                                       & eSolid                    .~ Constants.solidBbox
                                       & eiModel                   .~ Just "models/monsters/boss3/rider/tris.md2"
                                       & eEntityState.esModelIndex .~ modelIdx

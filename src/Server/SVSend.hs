@@ -17,6 +17,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Util.Binary
@@ -148,7 +149,7 @@ multicast origin to = do
                           if isJust mask
                             then do
                               let Just edictRef = client^.cEdict
-                              orig <- readEdictT edictRef >>= \e -> return (e^.eEntityState.esOrigin)
+                              orig <- readRef edictRef >>= \e -> return (e^.eEntityState.esOrigin)
                               leafNum <- CM.pointLeafNum orig
                               cluster <- CM.leafCluster leafNum
                               area2 <- CM.leafArea leafNum
@@ -200,7 +201,7 @@ If origin is null, the origin is determined from the entity origin
 or the midpoint of the entity box for bmodels.
 ==================
 -}
-startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Int -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
 startSound maybeOrigin edictRef channel soundIndex volume attenuation timeOfs = do
     when (volume < 0 || volume > 1) $
       Com.comError Constants.errFatal ("SV_StartSound: volume = " `B.append` BC.pack (show volume)) -- IMPROVE?
@@ -211,7 +212,7 @@ startSound maybeOrigin edictRef channel soundIndex volume attenuation timeOfs = 
     when (timeOfs < 0 || timeOfs > 0.255) $
       Com.comError Constants.errFatal ("SV_StartSound: timeofs = " `B.append` BC.pack (show timeOfs)) -- IMPROVE?
 
-    ent <- readEdictT edictRef >>= \e -> return (e^.eIndex)
+    ent <- readRef edictRef >>= \e -> return (e^.eIndex)
 
     -- no PHS flag
     let (usePHS, updatedChannel) = if channel .&. 8 /= 0
@@ -226,7 +227,7 @@ startSound maybeOrigin edictRef channel soundIndex volume attenuation timeOfs = 
     origin <- case maybeOrigin of
                 Just orgn -> return orgn
                 Nothing -> do
-                  edict <- readEdictT edictRef
+                  edict <- readRef edictRef
                   if (edict^.eSolid) == Constants.solidBsp
                     then
                       return $ (edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs))
@@ -267,7 +268,7 @@ startSound maybeOrigin edictRef channel soundIndex volume attenuation timeOfs = 
 
   where composeFlags :: Quake Int
         composeFlags = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           let a = if volume /= Constants.defaultSoundPacketVolume
                     then Constants.sndVolume

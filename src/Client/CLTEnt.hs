@@ -950,7 +950,7 @@ parseTEnt = do
            Just modLightning <- use $ clTEntGlobals.clteModLightning
            ent <- parseLightning modLightning
            sfxLightning <- use $ clTEntGlobals.clteSfxLightning
-           S.startSound Nothing (newEdictReference ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
+           S.startSound Nothing (Ref ent) Constants.chanWeapon sfxLightning 1 Constants.attnNorm 0
 
        | entType == Constants.teDebugTrail -> do
            pos <- MSG.readPos (globals.gNetMessage)

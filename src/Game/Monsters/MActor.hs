@@ -18,6 +18,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -109,7 +110,7 @@ actorNames = V.fromList [ "Hellrot", "Tokay", "Killme", "Disruptor"
 actorStand :: EntThink
 actorStand =
   GenericEntThink "actor_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveStand)
 
     -- randomize on startup
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -117,7 +118,7 @@ actorStand =
     when (levelTime < 1.0) $ do
       r <- Lib.rand
       let currentMove = actorMoveStand
-      modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ (currentMove^.mmFirstFrame) + (fromIntegral r `mod` ((currentMove^.mmLastFrame) - (currentMove^.mmFirstFrame) + 1)))
+      modifyRef selfRef (\v -> v & eEntityState.esFrame .~ (currentMove^.mmFirstFrame) + (fromIntegral r `mod` ((currentMove^.mmLastFrame) - (currentMove^.mmFirstFrame) + 1)))
 
     return True
 
@@ -189,7 +190,7 @@ actorMoveWalk = MMoveT "actorMoveWalk" frameWalk01 frameWalk08 actorFramesWalk N
 actorWalk :: EntThink
 actorWalk =
   GenericEntThink "actor_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveWalk)
     return True
 
 actorFramesRun :: V.Vector MFrameT
@@ -214,7 +215,7 @@ actorMoveRun = MMoveT "actorMoveRun" frameRun02 frameRun07 actorFramesRun Nothin
 actorRun :: EntThink
 actorRun =
   GenericEntThink "actor_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime < (self^.ePainDebounceTime) && isNothing (self^.eEnemy)
@@ -226,7 +227,7 @@ actorRun =
       else do
         if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
           then void $ think actorStand selfRef
-          else modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveRun)
+          else modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveRun)
 
     return True
 
@@ -311,17 +312,17 @@ messages = V.fromList [ "Watch it", "#$@*&", "Idiot", "Check your targets" ]
 actorPain :: EntPain
 actorPain =
   GenericEntPain "actor_pain" $ \selfRef otherRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
-      other <- readEdictT otherRef
+      other <- readRef otherRef
       r <- Lib.randomF
 
       if isJust (other^.eClient) && r < 0.4
@@ -335,7 +336,7 @@ actorPain =
                               then actorMoveFlipOff
                               else actorMoveTaunt
 
-          modifyEdictT selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw a
+          modifyRef selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw a
                                         & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
           -- FIXME: does the ent-id work out ?
@@ -351,12 +352,12 @@ actorPain =
                                | n == 1 -> actorMovePain2
                                | otherwise -> actorMovePain3
 
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+          modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 actorDead :: EntThink
 actorDead =
   GenericEntThink "actor_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -404,7 +405,7 @@ actorMoveDeath2 = MMoveT "actorMoveDeath2" frameDeath201 frameDeath213 actorFram
 actorDie :: EntDie
 actorDie =
   GenericEntDie "actor_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if | (self^.eHealth) <= (-80) -> do -- check for gib
            GameMisc.throwGib selfRef "models/objects/gibs/bone/tris.md2" damage Constants.gibOrganic
@@ -417,7 +418,7 @@ actorDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -429,7 +430,7 @@ actorDie =
                                then actorMoveDeath1
                                else actorMoveDeath2
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
@@ -439,11 +440,11 @@ actorFire =
     actorMachineGun selfRef
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+      then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
@@ -465,7 +466,7 @@ actorAttack =
     r <- Lib.rand
     let n = (r .&. 15) + 3 + 7
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveAttack
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveAttack
                                   & eMonsterInfo.miPauseTime .~ levelTime + (fromIntegral n) * Constants.frameTime)
 
     return True
@@ -473,11 +474,11 @@ actorAttack =
 actorUse :: EntUse
 actorUse =
   GenericEntUse "actor_use" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     target <- GameBase.pickTarget (self^.eTarget)
 
-    modifyEdictT selfRef (\v -> v & eGoalEntity .~ target
+    modifyRef selfRef (\v -> v & eGoalEntity .~ target
                                   & eMoveTarget .~ target)
 
     case target of
@@ -485,7 +486,7 @@ actorUse =
         badTarget selfRef
 
       Just targetRef -> do
-        target <- readEdictT targetRef
+        target <- readRef targetRef
 
         if (target^.eClassName) /= "target_actor"
           then
@@ -495,21 +496,21 @@ actorUse =
             let v = (target^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
                 yaw = Math3D.vectorYaw v
 
-            modifyEdictT selfRef (\v -> v & eIdealYaw .~ yaw
+            modifyRef selfRef (\v -> v & eIdealYaw .~ yaw
                                           & eEntityState.esAngles._y .~ yaw) -- IMPROVE: use Constants.yaw instead of using _y directly
 
             void $ think (fromJust $ self^.eMonsterInfo.miWalk) selfRef
 
-            modifyEdictT selfRef (\v -> v & eTarget .~ Nothing)
+            modifyRef selfRef (\v -> v & eTarget .~ Nothing)
 
-  where badTarget :: EdictReference -> Quake ()
+  where badTarget :: Ref EdictT -> Quake ()
         badTarget selfRef = do
-          self <- readEdictT selfRef
+          self <- readRef selfRef
           dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
 
           dprintf ((self^.eClassName) `B.append` " has bad target " `B.append` (fromJust $ self^.eTarget) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
 
-          modifyEdictT selfRef (\v -> v & eTarget .~ Nothing
+          modifyRef selfRef (\v -> v & eTarget .~ Nothing
                                         & eMonsterInfo.miPauseTime .~ 100000000)
 
           void $ think (fromJust $ self^.eMonsterInfo.miStand) selfRef
@@ -532,16 +533,16 @@ targetActorTouch =
   GenericEntTouch "target_actor_touch" $ \_ _ _ _ -> do
     io (putStrLn "MActor.targetActorTouch") >> undefined -- TODO
 
-actorMachineGun :: EdictReference -> Quake ()
+actorMachineGun :: Ref EdictT -> Quake ()
 actorMachineGun _ = do
     io (putStrLn "MActor.actorMachineGun") >> undefined -- TODO
 
 {-
 - QUAKED misc_actor (1 .5 0) (-16 -16 -24) (16 16 32)
 -}
-spMiscActor :: EdictReference -> Quake ()
+spMiscActor :: Ref EdictT -> Quake ()
 spMiscActor selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -563,7 +564,7 @@ spMiscActor selfRef = do
        | otherwise -> do
            modelIdx <- modelIndex (Just "players/male/tris.md2")
 
-           modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+           modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                          & eSolid .~ Constants.solidBbox
                                          & eEntityState.esModelIndex .~ modelIdx
                                          & eMins .~ V3 (-16) (-16) (-24)
@@ -582,18 +583,18 @@ spMiscActor selfRef = do
 
            linkEntity selfRef
 
-           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveStand
+           modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just actorMoveStand
                                          & eMonsterInfo.miScale .~ modelScale)
 
            void $ think GameAI.walkMonsterStart selfRef
 
            -- actors always start in a dormant state, they *must* be used
            -- to get going
-           modifyEdictT selfRef (\v -> v & eUse .~ Just actorUse)
+           modifyRef selfRef (\v -> v & eUse .~ Just actorUse)
 
-spTargetActor :: EdictReference -> Quake ()
+spTargetActor :: Ref EdictT -> Quake ()
 spTargetActor selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let dprintf = gameImport^.giDprintf
@@ -602,7 +603,7 @@ spTargetActor selfRef = do
     when (isNothing (self^.eTargetName)) $ do
       dprintf ((self^.eClassName) `B.append` " with no targetname at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` "\n")
 
-    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidTrigger
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidTrigger
                                   & eTouch .~ Just targetActorTouch
                                   & eMins .~ V3 (-8) (-8) (-8)
                                   & eMaxs .~ V3 8 8 8
@@ -614,12 +615,12 @@ spTargetActor selfRef = do
       let speed = if (self^.eSpeed) == 0 then 200 else self^.eSpeed
           angle = if (self^.eEntityState.esAngles._y) == 0 then 360 else self^.eEntityState.esAngles._y -- IMPROVE: use Constants.yaw instead of using _y directly
 
-      modifyEdictT selfRef (\v -> v & eSpeed .~ speed
+      modifyRef selfRef (\v -> v & eSpeed .~ speed
                                     & eEntityState.esAngles._y .~ angle) -- IMPROVE: use Constants.yaw
 
       GameBase.setMoveDir selfRef
 
       height <- use $ gameBaseGlobals.gbSpawnTemp.stHeight
-      modifyEdictT selfRef (\v -> v & eMoveDir._z .~ fromIntegral height)
+      modifyRef selfRef (\v -> v & eMoveDir._z .~ fromIntegral height)
 
     linkEntity selfRef

@@ -16,6 +16,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -123,7 +124,7 @@ makronTaunt =
 makronStand :: EntThink
 makronStand =
   GenericEntThink "makron_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveStand)
     return True
 
 makronHit :: EntThink
@@ -289,7 +290,7 @@ makronMoveWalk = MMoveT "makronMoveWalk" frameWalk204 frameWalk213 makronFramesR
 makronDead :: EntThink
 makronDead =
   GenericEntThink "makron_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-60) (-60) 0
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-60) (-60) 0
                                   & eMaxs .~ V3 60 60 72
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -303,19 +304,19 @@ makronDead =
 makronWalk :: EntThink
 makronWalk =
   GenericEntThink "makron_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveWalk)
     return True
 
 makronRun :: EntThink
 makronRun =
   GenericEntThink "makron_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then makronMoveStand
                    else makronMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 makronFramesPain6 :: V.Vector MFrameT
@@ -537,13 +538,13 @@ makronMoveSight = MMoveT "makronMoveSight" frameActive01 frameActive13 makronFra
 makronBFG :: EntThink
 makronBFG =
   GenericEntThink "makronBFG" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MakronBfg) forward right
         Just enemyRef = self^.eEnemy
         
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let V3 a b c = enemy^.eEntityState.esOrigin
         vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -562,21 +563,21 @@ makronBFG =
 makronSaveLoc :: EntThink
 makronSaveLoc =
   GenericEntThink "MakronSaveloc" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = (enemy^.eEntityState.esOrigin)
 
     -- save for aiming the shot
-    modifyEdictT selfRef (\v -> v & ePos1 .~ V3 a b (c + fromIntegral (enemy^.eViewHeight)))
+    modifyRef selfRef (\v -> v & ePos1 .~ V3 a b (c + fromIntegral (enemy^.eViewHeight)))
     return True
 
 -- FIXME: He's not firing from the proper Z
 makronRailGun :: EntThink
 makronRailGun =
   GenericEntThink "MakronRailgun" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MakronRailgun1) forward right
@@ -590,7 +591,7 @@ makronRailGun =
 makronHyperBlaster :: EntThink
 makronHyperBlaster =
   GenericEntThink "MakronHyperblaster" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     let flashNumber = Constants.mz2MakronBlaster1 + (self^.eEntityState.esFrame) - frameAttack405
         (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
@@ -601,7 +602,7 @@ makronHyperBlaster =
              return 0
            
            Just enemyRef -> do
-             enemy <- readEdictT enemyRef
+             enemy <- readRef enemyRef
              let V3 a b c = enemy^.eEntityState.esOrigin
                  vec = (V3 a b (c + fromIntegral (enemy^.eViewHeight))) - start
                  vec' = Math3D.vectorAngles vec
@@ -621,10 +622,10 @@ makronHyperBlaster =
 makronPain :: EntPain
 makronPain =
   GenericEntPain "makron_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
     
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     --Lessen the chance of him going into his pain frames
@@ -636,7 +637,7 @@ makronPain =
                           return False
     
     unless (levelTime < (self^.ePainDebounceTime) || skipPainFrames) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
       skillValue <- liftM (^.cvValue) skillCVar
       
       -- no pain anims in nightmare
@@ -677,12 +678,12 @@ makronPain =
           Just (soundPain, currentMove) -> do
             sound <- use $ gameBaseGlobals.gbGameImport.giSound
             sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNone 0
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 makronSight :: EntInteract
 makronSight =
   GenericEntInteract "makron_sight" $ \selfRef _ -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight)
     return True
 
 makronAttack :: EntThink
@@ -690,9 +691,9 @@ makronAttack =
   GenericEntThink "makron_attack" $ \selfRef -> do
     r <- Lib.randomF
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm vec
@@ -701,21 +702,21 @@ makronAttack =
                     | r <= 0.6 -> makronMoveAttack4
                     | otherwise -> makronMoveAttack5
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 -- Makron Torso. This needs to be spawned in
 makronTorsoThink :: EntThink
 makronTorsoThink =
   GenericEntThink "makron_torso_think" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eEntityState.esFrame) < 365
-      then modifyEdictT selfRef (\v -> v & eEntityState.esFrame +~ 1)
-      else modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ 346)
+      then modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1)
+      else modifyRef selfRef (\v -> v & eEntityState.esFrame .~ 346)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     return True
 
@@ -732,7 +733,7 @@ makronTorso =
     modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
     soundIdx <- soundIndex (Just "makron/spine.wav")
 
-    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypeNone
                                    & eSolid .~ Constants.solidNot
                                    & eMins .~ V3 (-8) (-8) 0
                                    & eMaxs .~ V3 8 8 8
@@ -749,9 +750,9 @@ makronTorso =
 makronDie :: EntDie
 makronDie =
   GenericEntDie "makron_die" $ \selfRef _ _ damage _ -> do
-    modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+    modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
     
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
     
     let sound = gameImport^.giSound
@@ -770,7 +771,7 @@ makronDie =
            
            GameMisc.throwHead selfRef "models/objects/gibs/gear/tris.md2" damage Constants.gibMetallic
            
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
         
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -780,27 +781,27 @@ makronDie =
            soundDeath <- use $ mBoss32Globals.mb32SoundDeath
            sound (Just selfRef) Constants.chanVoice soundDeath 1 Constants.attnNorm 0
            
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          )
             
            tempEntRef <- GameUtil.spawn
            
-           modifyEdictT tempEntRef (\v -> v & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
+           modifyRef tempEntRef (\v -> v & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
                                             & eEntityState.esAngles .~ (self^.eEntityState.esAngles)
                                             & eEntityState.esOrigin._y -~ 84
                                             )
                                             
            void $ think makronTorso tempEntRef
            
-           modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveDeath2)
+           modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveDeath2)
 
 makronCheckAttack :: EntThink
 makronCheckAttack =
   GenericEntThink "Makron_CheckAttack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     done <- if (enemy^.eHealth) > 0
               then do
@@ -827,7 +828,7 @@ makronCheckAttack =
             temp = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
             enemyYaw = Math3D.vectorYaw temp
         
-        modifyEdictT selfRef (\v -> v & eIdealYaw .~ enemyYaw)
+        modifyRef selfRef (\v -> v & eIdealYaw .~ enemyYaw)
         
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         
@@ -836,7 +837,7 @@ makronCheckAttack =
                let attackState = case self^.eMonsterInfo.miMelee of
                                    Nothing -> Constants.asMissile
                                    Just _ -> Constants.asMelee
-               modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+               modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
                return True
                 
              -- missile attack
@@ -866,7 +867,7 @@ makronCheckAttack =
                    if r < chance
                      then do
                        r' <- Lib.randomF
-                       modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile
+                       modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ Constants.asMissile
                                                      & eMonsterInfo.miAttackFinished .~ levelTime + 2 * r'
                                                      )
                        return True
@@ -877,7 +878,7 @@ makronCheckAttack =
                          let attackState = if r' < 0.3
                                              then Constants.asSliding
                                              else Constants.asStraight
-                         modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
+                         modifyRef selfRef (\v -> v & eMonsterInfo.miAttackState .~ attackState)
                       
                        return False
 
@@ -966,14 +967,14 @@ makronSpawn =
         return True
         
       Just playerRef -> do
-        self <- readEdictT selfRef
-        player <- readEdictT playerRef
+        self <- readRef selfRef
+        player <- readRef playerRef
         v3o <- use $ globals.gVec3Origin
         
         let vec = (player^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
             vec' = normalize vec
         
-        modifyEdictT selfRef (\v -> v & eEntityState.esAngles._y .~ Math3D.vectorYaw vec -- IMPROVE: use Constants.yaw instead of using _y directly
+        modifyRef selfRef (\v -> v & eEntityState.esAngles._y .~ Math3D.vectorYaw vec -- IMPROVE: use Constants.yaw instead of using _y directly
                                       & eVelocity .~ ((v3o + fmap (* 400) vec') & _z .~ 200)
                                       & eGroundEntity .~ Nothing
                                       )
@@ -983,12 +984,12 @@ makronSpawn =
 makronToss :: EntThink
 makronToss =
   GenericEntThink "MakronToss" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
     entRef <- GameUtil.spawn
     
-    modifyEdictT entRef (\v -> v & eNextThink .~ levelTime + 0.8
+    modifyRef entRef (\v -> v & eNextThink .~ levelTime + 0.8
                                  & eThink .~ Just makronSpawn
                                  & eTarget .~ (self^.eTarget)
                                  & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
@@ -1024,7 +1025,7 @@ makronPrecache = do
 - QUAKED monster_makron (1 .5 0) (-30 -30 0) (30 30 90) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterMakron :: EdictReference -> Quake ()
+spMonsterMakron :: Ref EdictT -> Quake ()
 spMonsterMakron selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     
@@ -1042,7 +1043,7 @@ spMonsterMakron selfRef = do
         
         modelIdx <- modelIndex (Just "models/monsters/boss3/rider/tris.md2")
         
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-30) (-30) 0
@@ -1064,7 +1065,7 @@ spMonsterMakron selfRef = do
         
         linkEntity selfRef
         
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just makronMoveSight
                                       & eMonsterInfo.miScale .~ modelScale
                                       )
         

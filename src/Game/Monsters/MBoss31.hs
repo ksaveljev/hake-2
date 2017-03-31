@@ -15,6 +15,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -156,13 +157,13 @@ jorgStepRight =
 jorgStand :: EntThink
 jorgStand =
   GenericEntThink "jorg_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveStand)
     return True
 
 jorgReAttack1 :: EntThink
 jorgReAttack1 =
   GenericEntThink "jorg_reattack1" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
     -- Just enemy <- preuse $ gameBaseGlobals.gbGEdicts.ix enemyIdx
     vis <- GameUtil.visible selfRef enemyRef
@@ -173,13 +174,13 @@ jorgReAttack1 =
 
         if r < 0.9
           then
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack1)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack1)
 
           else do
-            modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+            modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0
                                           & eMonsterInfo.miCurrentMove .~ Just jorgMoveEndAttack1)
       else do
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0
                                       & eMonsterInfo.miCurrentMove .~ Just jorgMoveEndAttack1)
 
     return True
@@ -187,18 +188,18 @@ jorgReAttack1 =
 jorgAttack1 :: EntThink
 jorgAttack1 =
   GenericEntThink "jorg_attack1" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ (Just jorgMoveAttack1))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ (Just jorgMoveAttack1))
     return True
 
 jorgPain :: EntPain
 jorgPain =
   GenericEntPain "jorg_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
       
-    modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ 0)
+    modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
     
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     -- Lessen the chance of him going into his pain frames if he takes
@@ -216,7 +217,7 @@ jorgPain =
       done <- checkAttackFrames self
       
       unless done $ do
-        modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+        modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
         
         skillValue <- liftM (^.cvValue) skillCVar
         
@@ -244,7 +245,7 @@ jorgPain =
             Just (soundPain, currentMove) -> do
               sound <- use $ gameBaseGlobals.gbGameImport.giSound
               sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
-              modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+              modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
   
   where checkAttackFrames :: EdictT -> Quake Bool
         checkAttackFrames self = do
@@ -266,9 +267,9 @@ jorgPain =
 jorgBFG :: EntThink
 jorgBFG =
   GenericEntThink "jorgBFG" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgBfg1) forward right
@@ -285,9 +286,9 @@ jorgBFG =
 jorgFireBulletRight :: EntThink
 jorgFireBulletRight =
   GenericEntThink "jorg_firebullet_right" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgMachinegunR1) forward right
@@ -300,9 +301,9 @@ jorgFireBulletRight =
 jorgFireBulletLeft :: EntThink
 jorgFireBulletLeft =
   GenericEntThink "jorg_firebullet_left" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2JorgMachinegunL1) forward right
@@ -322,9 +323,9 @@ jorgFireBullet =
 jorgAttack :: EntThink
 jorgAttack =
   GenericEntThink "jorg_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let vec = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm vec
@@ -340,13 +341,13 @@ jorgAttack =
         soundAttack <- use $ mBoss31Globals.mb31SoundAttack1
         sound (Just selfRef) Constants.chanVoice soundAttack 1 Constants.attnNorm 0
         soundIdx <- soundIndex (Just "boss3/w_loop.wav")
-        modifyEdictT selfRef (\v -> v & eEntityState.esSound .~ soundIdx
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ soundIdx
                                       & eMonsterInfo.miCurrentMove .~ Just jorgMoveStartAttack1
                                       )
       else do
         soundAttack <- use $ mBoss31Globals.mb31SoundAttack2
         sound (Just selfRef) Constants.chanVoice soundAttack 1 Constants.attnNorm 0
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack2)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveAttack2)
     
     return True
 
@@ -498,19 +499,19 @@ jorgMoveEndWalk = MMoveT "jorgMoveEndWalk" frameWalk20 frameWalk25 jorgFramesEnd
 jorgWalk :: EntThink
 jorgWalk =
   GenericEntThink "jorg_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just jorgMoveWalk)
     return True
 
 jorgRun :: EntThink
 jorgRun =
   GenericEntThink "jorg_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then jorgMoveStand
                    else jorgMoveRun
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 jorgFramesPain3 :: V.Vector MFrameT
@@ -689,5 +690,5 @@ jorgMoveEndAttack1 = MMoveT "jorgMoveEndAttack1" frameAttack115 frameAttack118 j
 - QUAKED monster_jorg (1 .5 0) (-80 -80 0) (90 90 140) Ambush Trigger_Spawn
 - Sight
 -}
-spMonsterJorg :: EdictReference -> Quake ()
+spMonsterJorg :: Ref EdictT -> Quake ()
 spMonsterJorg _ = io (putStrLn "MBoss31.spMonsterJorg") >> undefined -- TODO

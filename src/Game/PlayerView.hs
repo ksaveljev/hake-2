@@ -18,6 +18,7 @@ import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
 import Game.PMoveStateT
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -33,7 +34,7 @@ import qualified Util.Math3D as Math3D
 - Called for each player at the end of the server frame and right after
 - spawning.
 -}
-clientEndServerFrame :: EdictReference -> Quake ()
+clientEndServerFrame :: Ref EdictT -> Quake ()
 clientEndServerFrame edictRef = do
     setCurrentPlayerAndClient
 
@@ -95,7 +96,7 @@ clientEndServerFrame edictRef = do
 
       setClientFrame edictRef
 
-      edict <- readEdictT edictRef
+      edict <- readRef edictRef
       let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -118,13 +119,13 @@ clientEndServerFrame edictRef = do
 
   where setCurrentPlayerAndClient :: Quake ()
         setCurrentPlayerAndClient = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           gameBaseGlobals.gbCurrentPlayer .= Just edictRef
           gameBaseGlobals.gbCurrentClient .= edict^.eClient
 
         updatePMoveValues :: Quake ()
         updatePMoveValues = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState) $ do
             pmsOrigin .= fmap (truncate . (* 8.0)) (edict^.eEntityState.esOrigin)
@@ -164,15 +165,15 @@ clientEndServerFrame edictRef = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) > 180
-            then modifyEdictT edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.pitch) .~ ((-360) + (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch))) / 3)
-            else modifyEdictT edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.pitch) .~ (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) / 3)
+            then modifyRef edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.pitch) .~ ((-360) + (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch))) / 3)
+            else modifyRef edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.pitch) .~ (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) / 3)
 
-          modifyEdictT edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.yaw) .~ (gClient^.gcVAngle.(Math3D.v3Access Constants.yaw))
+          modifyRef edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.yaw) .~ (gClient^.gcVAngle.(Math3D.v3Access Constants.yaw))
                                          & eEntityState.esAngles.(v3setter Constants.roll) .~ 0)
 
-          readEdictT edictRef >>= \edict -> do
+          readRef edictRef >>= \edict -> do
             roll <- calcRoll (edict^.eEntityState.esAngles) (edict^.eVelocity)
-            modifyEdictT edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.roll) .~ roll * 4)
+            modifyRef edictRef (\v -> v & eEntityState.esAngles.(v3setter Constants.roll) .~ roll * 4)
 
         v3setter x = case x of
                        0 -> _x
@@ -182,7 +183,7 @@ clientEndServerFrame edictRef = do
 
         calculateSpeedAndCycle :: Quake ()
         calculateSpeedAndCycle = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
 
           let velocity = edict^.eVelocity
@@ -213,7 +214,7 @@ clientEndServerFrame edictRef = do
 
         setCameraStuff :: Quake ()
         setCameraStuff = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           let Just (GClientReference gClientIdx) = edict^.eClient
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -225,13 +226,13 @@ clientEndServerFrame edictRef = do
 worldEffects :: Quake ()
 worldEffects = do
     Just edictRef <- use $ gameBaseGlobals.gbCurrentPlayer
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eMoveType) == Constants.moveTypeNoClip
       then do
         -- don't need air
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-        modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 12)
+        modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 12)
       else do
         Just gClientRef@(GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
@@ -263,10 +264,10 @@ worldEffects = do
         -- check for sizzle damage
         checkForSizzleDamage edictRef gClientRef waterLevel enviroSuit
 
-  where waterEnterPlaySound :: EdictReference -> Int -> Int -> Quake ()
+  where waterEnterPlaySound :: Ref EdictT -> Int -> Int -> Quake ()
         waterEnterPlaySound edictRef waterLevel oldWaterLevel =
           when (oldWaterLevel == 0 && waterLevel /= 0) $ do
-            edict <- readEdictT edictRef
+            edict <- readRef edictRef
             gameImport <- use $ gameBaseGlobals.gbGameImport
 
             let sound = gameImport^.giSound
@@ -290,14 +291,14 @@ worldEffects = do
 
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-            modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
+            modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
                                            -- clear damage_debounce, so the pain sound will play immediately
                                            & eDamageDebounceTime .~ levelTime - 1)
 
-        waterExitPlaySound :: EdictReference -> Int -> Int -> Quake ()
+        waterExitPlaySound :: Ref EdictT -> Int -> Int -> Quake ()
         waterExitPlaySound edictRef waterLevel oldWaterLevel =
           when (oldWaterLevel /= 0 && waterLevel == 0) $ do
-            edict <- readEdictT edictRef
+            edict <- readRef edictRef
             gameImport <- use $ gameBaseGlobals.gbGameImport
 
             let sound = gameImport^.giSound
@@ -308,9 +309,9 @@ worldEffects = do
             idx <- soundIndex (Just "player/watr_out.wav")
             sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
 
-            modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
+            modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
 
-        checkHeadUnderWater :: EdictReference -> Int -> Int -> Quake ()
+        checkHeadUnderWater :: Ref EdictT -> Int -> Int -> Quake ()
         checkHeadUnderWater edictRef waterLevel oldWaterLevel =
           when (oldWaterLevel /= 3 && waterLevel == 3) $ do
             gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -321,10 +322,10 @@ worldEffects = do
             idx <- soundIndex (Just "player/watr_un.wav")
             sound (Just edictRef) Constants.chanBody idx 1 Constants.attnNorm 0
 
-        checkHeadOutOfWater :: EdictReference -> Int -> Int -> Quake ()
+        checkHeadOutOfWater :: Ref EdictT -> Int -> Int -> Quake ()
         checkHeadOutOfWater edictRef waterLevel oldWaterLevel =
           when (oldWaterLevel == 3 && waterLevel /= 3) $ do
-            edict <- readEdictT edictRef
+            edict <- readRef edictRef
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
             gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -342,7 +343,7 @@ worldEffects = do
 
                | otherwise -> return ()
 
-        checkForDrowning :: EdictReference -> GClientReference -> Int -> Bool -> Bool -> Quake ()
+        checkForDrowning :: Ref EdictT -> GClientReference -> Int -> Bool -> Bool -> Quake ()
         checkForDrowning edictRef gClientRef@(GClientReference gClientIdx) waterLevel breather enviroSuit =
           if waterLevel == 3
             then do
@@ -354,9 +355,9 @@ worldEffects = do
 
               -- breather or envirosuit give air
               when (breather || enviroSuit) $ do
-                modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 10)
+                modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 10)
                 Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-                edict <- readEdictT edictRef
+                edict <- readRef edictRef
                 frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
                 when ((truncate (gClient^.gcBreatherFrameNum) - frameNum) `mod` 25 == 0) $ do
@@ -369,7 +370,7 @@ worldEffects = do
                   -- FIXME: release a bubble?
 
               -- if out of air, start drowning
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
               
               when ((edict^.eAirFinished) < levelTime) $ do -- drown!
                 let Just (GClientReference clientIdx) = edict^.eClient
@@ -379,15 +380,15 @@ worldEffects = do
                   gameBaseGlobals.gbGame.glClients.ix clientIdx.gcNextDrownTime .= levelTime + 1
 
                   -- take more damage the longer underwater
-                  modifyEdictT edictRef (\v -> v & eDmg %~ (\v -> if v + 2 > 15 then 15 else v + 2))
+                  modifyRef edictRef (\v -> v & eDmg %~ (\v -> if v + 2 > 15 then 15 else v + 2))
 
                   -- play a gurp sound instead of a normal pain sound
                   playDrowningSound edictRef
 
-                  modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime)
+                  modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime)
 
                   v3o <- use $ globals.gVec3Origin
-                  readEdictT edictRef >>= \ent ->
+                  readRef edictRef >>= \ent ->
                     GameCombat.damage edictRef
                                       worldRef
                                       worldRef
@@ -401,17 +402,17 @@ worldEffects = do
             else do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-              modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 12
+              modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 12
                                              & eDmg .~ 2)
 
-        playDrowningSound :: EdictReference -> Quake ()
+        playDrowningSound :: Ref EdictT -> Quake ()
         playDrowningSound edictRef = do
           gameImport <- use $ gameBaseGlobals.gbGameImport
 
           let sound = gameImport^.giSound
               soundIndex = gameImport^.giSoundIndex
 
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           r <- Lib.rand
 
           idx <- if | (edict^.eHealth) <= (edict^.eDmg) ->
@@ -423,9 +424,9 @@ worldEffects = do
 
           sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
 
-        checkForSizzleDamage :: EdictReference -> GClientReference -> Int -> Bool -> Quake ()
+        checkForSizzleDamage :: Ref EdictT -> GClientReference -> Int -> Bool -> Quake ()
         checkForSizzleDamage edictRef gClientRef@(GClientReference gClientIdx) waterLevel enviroSuit = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when (waterLevel /= 0 && (edict^.eWaterType) .&. (Constants.contentsLava .|. Constants.contentsSlime) /= 0) $ do
             when ((edict^.eWaterType) .&. Constants.contentsLava /= 0) $ do
@@ -446,7 +447,7 @@ worldEffects = do
 
                 sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
 
-                modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+                modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
               v3o <- use $ globals.gVec3Origin
 
@@ -504,9 +505,9 @@ calcRoll angles velocity = do
     return (side'' * sign)
 
 -- Calculated damage and effect when a player falls down.
-fallingDamage :: EdictReference -> Quake ()
+fallingDamage :: Ref EdictT -> Quake ()
 fallingDamage edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unless ((edict^.eEntityState.esModelIndex) /= 255 || (edict^.eMoveType) == Constants.moveTypeNoClip) $ do
       let Just (GClientReference gClientIdx) = edict^.eClient
@@ -535,10 +536,10 @@ fallingDamage edictRef = do
                 then do
                   when ((edict^.eHealth) > 0) $
                     if (edict^.eHealth) >= 55
-                      then modifyEdictT edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFallFar)
-                      else modifyEdictT edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFall)
+                      then modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFallFar)
+                      else modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFall)
 
-                  modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime) -- no normal pain sound
+                  modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime) -- no normal pain sound
 
                   let damage :: Int = truncate ((delta' - 30) / 2)
                       damage' = if damage < 1 then 1 else damage
@@ -560,7 +561,7 @@ fallingDamage edictRef = do
                                       0
                                       Constants.modFalling
                 else
-                  modifyEdictT edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFallShort)
+                  modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFallShort)
 
   where updateDelta :: EdictT -> Float -> Quake (Maybe Float)
         updateDelta edict delta =
@@ -572,7 +573,7 @@ fallingDamage edictRef = do
                                  | otherwise -> delta
                  in if | delta' < 1 -> return Nothing
                        | delta' < 15 -> do
-                           modifyEdictT edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
+                           modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
                            return Nothing
                        | otherwise -> return (Just delta')
 
@@ -583,9 +584,9 @@ fallingDamage edictRef = do
 - Handles color blends and view kicks 
 - ===============
 -}
-damageFeedback :: EdictReference -> Quake ()
+damageFeedback :: Ref EdictT -> Quake ()
 damageFeedback playerRef = do
-    player <- readEdictT playerRef
+    player <- readRef playerRef
 
     let Just (GClientReference gClientIdx) = player^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
@@ -609,7 +610,7 @@ damageFeedback playerRef = do
       when ((gClient^.gcAnimPriority) < Constants.animPain && (player^.eEntityState.esModelIndex) == 255) $ do
         if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
           then do
-            modifyEdictT playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain1 - 1)
+            modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain1 - 1)
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRPain4
           else do
             gameBaseGlobals.gbXxxi %= (\x -> (x + 1) `mod` 3)
@@ -617,15 +618,15 @@ damageFeedback playerRef = do
 
             case xxxi of
               0 -> do
-                modifyEdictT playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain101 - 1)
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain101 - 1)
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain104
 
               1 -> do
-                modifyEdictT playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain201 - 1)
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain201 - 1)
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain204
 
               2 -> do
-                modifyEdictT playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain301 - 1)
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain301 - 1)
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain304
 
               _ -> undefined -- shouldn't ever happen
@@ -638,7 +639,7 @@ damageFeedback playerRef = do
         r <- Lib.rand
         let r' = 1 + (r .&. 1)
 
-        modifyEdictT playerRef (\v -> v & ePainDebounceTime .~ levelTime + 0.7)
+        modifyRef playerRef (\v -> v & ePainDebounceTime .~ levelTime + 0.7)
 
         let l = if | (player^.eHealth) < 25 -> 25
                    | (player^.eHealth) < 50 -> 50
@@ -727,9 +728,9 @@ damageFeedback playerRef = do
 - fall from 640: 960 =  
 - damage = deltavelocity*deltavelocity * 0.0001
 -}
-calcViewOffset :: EdictReference -> Quake ()
+calcViewOffset :: Ref EdictT -> Quake ()
 calcViewOffset edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -808,7 +809,7 @@ calcViewOffset edictRef = do
 
         addVelocityAngles :: V3 Float -> Quake (V3 Float)
         addVelocityAngles angles = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           runPitchValue <- liftM (^.cvValue) runPitchCVar
           runRollValue <- liftM (^.cvValue) runRollCVar
           forward <- use $ gameBaseGlobals.gbForward
@@ -852,9 +853,9 @@ calcViewOffset edictRef = do
                          _ -> undefined -- shouldn't happen
 
 -- Calculates where to draw the gun.
-calcGunOffset :: EdictReference -> Quake ()
+calcGunOffset :: Ref EdictT -> Quake ()
 calcGunOffset edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
 
     xyspeed <- use $ gameBaseGlobals.gbXYSpeed
@@ -920,14 +921,14 @@ calcGunOffset edictRef = do
               in getGunOffset forward right up (V3 (a + a') (b + b') (c + c')) gunX gunY gunZ (idx + 1) maxIdx
 
 
-calcBlend :: EdictReference -> Quake ()
+calcBlend :: Ref EdictT -> Quake ()
 calcBlend _ = do
     return ()
     -- io (putStrLn "PlayerView.calcBlend") >> undefined -- TODO
 
-setClientEvent :: EdictReference -> Quake ()
+setClientEvent :: Ref EdictT -> Quake ()
 setClientEvent edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unless ((edict^.eEntityState.esEvent) /= 0) $ do
       xyspeed <- use $ gameBaseGlobals.gbXYSpeed
@@ -938,14 +939,14 @@ setClientEvent edictRef = do
         bobMove <- use $ gameBaseGlobals.gbBobMove
         bobCycle <- use $ gameBaseGlobals.gbBobCycle
         when (truncate (bobTime + bobMove) /= bobCycle) $
-          modifyEdictT edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
+          modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
 
-setClientEffects :: EdictReference -> Quake ()
+setClientEffects :: Ref EdictT -> Quake ()
 setClientEffects edictRef = do
-    modifyEdictT edictRef (\v -> v & eEntityState.esEffects .~ 0
+    modifyRef edictRef (\v -> v & eEntityState.esEffects .~ 0
                                    & eEntityState.esRenderFx .~ 0)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
 
     unless ((edict^.eHealth) <= 0 || intermissionTime /= 0) $ do
@@ -955,10 +956,10 @@ setClientEffects edictRef = do
         paType <- GameItems.powerArmorType edictRef
 
         if | paType == Constants.powerArmorScreen ->
-               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
+               modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
 
            | paType == Constants.powerArmorShield -> do
-               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+               modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
                                               & eEntityState.esRenderFx %~ (.|. Constants.rfShellGreen))
 
            | otherwise -> return ()
@@ -970,21 +971,21 @@ setClientEffects edictRef = do
       when (truncate (gClient^.gcQuadFrameNum) > frameNum) $ do
         let remaining = truncate (gClient^.gcQuadFrameNum) - frameNum
         when (remaining > 30 || (remaining .&. 4) /= 0) $
-          modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efQuad))
+          modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efQuad))
 
       when (truncate (gClient^.gcInvincibleFrameNum) > frameNum) $ do
         let remaining = truncate (gClient^.gcInvincibleFrameNum) - frameNum
         when (remaining > 30 || (remaining .&. 4) /= 0) $
-          modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPent))
+          modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPent))
 
       -- show cheaters!!!
       when ((edict^.eFlags) .&. Constants.flGodMode /= 0) $ do
-        modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+        modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
                                        & eEntityState.esRenderFx %~ (.|. (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue)))
 
-setClientSound :: EdictReference -> Quake ()
+setClientSound :: Ref EdictT -> Quake ()
 setClientSound edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gClientRef = edict^.eClient
 
     checkHelpChanged gClientRef
@@ -1029,7 +1030,7 @@ setClientSound edictRef = do
                       Just weapon <- preuse $ gameBaseGlobals.gbItemList.ix weaponIdx
                       return $ weapon^.giClassName
 
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
 
           snd <- if | (edict^.eWaterLevel) /= 0 && (edict^.eWaterType) .&. (Constants.contentsLava .|. Constants.contentsSlime) /= 0 ->
@@ -1043,11 +1044,11 @@ setClientSound edictRef = do
 
                     | otherwise -> return 0
 
-          modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ snd)
+          modifyRef edictRef (\v -> v & eEntityState.esSound .~ snd)
 
-setClientFrame :: EdictReference -> Quake ()
+setClientFrame :: Ref EdictT -> Quake ()
 setClientFrame edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     -- only when we are in the player model
     when ((edict^.eEntityState.esModelIndex) == 255) $ do
@@ -1075,25 +1076,25 @@ setClientFrame edictRef = do
         if | isNothing (edict^.eGroundEntity) -> do
                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animJump
                when ((edict^.eEntityState.esFrame) /= MPlayer.frameJump2) $
-                 modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump1)
+                 modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump1)
                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameJump2
 
            | run -> do -- running
                if duck
                  then do
-                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRWalk1)
+                   modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRWalk1)
                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRWalk6
                  else do
-                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameRun1)
+                   modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameRun1)
                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameRun6
 
            | otherwise -> do -- standing
                if duck
                  then do
-                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRStnd01)
+                   modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRStnd01)
                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameCRStnd19
                  else do
-                   modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameStand01)
+                   modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameStand01)
                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameStand40
 
   where checkSkip :: EdictT -> GClientT -> Bool -> Bool -> Bool
@@ -1114,14 +1115,14 @@ setClientFrame edictRef = do
           if (gClient^.gcAnimPriority) == Constants.animReverse
             then if (edict^.eEntityState.esFrame) > (gClient^.gcAnimEnd)
                    then do
-                     modifyEdictT edictRef (\v -> v & eEntityState.esFrame -~ 1)
+                     modifyRef edictRef (\v -> v & eEntityState.esFrame -~ 1)
                      return True
                    else
                      checkDeath edict gClient
 
             else if (edict^.eEntityState.esFrame) < (gClient^.gcAnimEnd) -- continue an animation
                    then do
-                     modifyEdictT edictRef (\v -> v & eEntityState.esFrame +~ 1)
+                     modifyRef edictRef (\v -> v & eEntityState.esFrame +~ 1)
                      return True
                    else
                      checkDeath edict gClient
@@ -1141,7 +1142,7 @@ setClientFrame edictRef = do
                 else do
                   let Just (GClientReference gClientIdx) = edict^.eClient
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animWave
-                  modifyEdictT edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump3)
+                  modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump3)
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameJump6
                   return True
             else

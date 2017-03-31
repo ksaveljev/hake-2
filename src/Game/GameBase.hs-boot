@@ -17,9 +17,9 @@ findByTarget :: EdictT -> B.ByteString -> Bool
 
 findByClass :: EdictT -> B.ByteString -> Bool
 
-gFind :: Maybe EdictReference -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe EdictReference)
+gFind :: Maybe (Ref EdictT) -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe (Ref EdictT))
 
-setMoveDir :: EdictReference -> Quake ()
+setMoveDir :: Ref EdictT -> Quake ()
 
 exitLevel :: Quake ()
 
@@ -29,14 +29,14 @@ checkNeedPass :: Quake ()
 
 clientEndServerFrames :: Quake ()
 
-runEntity :: EdictReference -> Quake ()
+runEntity :: Ref EdictT -> Quake ()
 
-pickTarget :: Maybe B.ByteString -> Quake (Maybe EdictReference)
+pickTarget :: Maybe B.ByteString -> Quake (Maybe (Ref EdictT))
 
 addPointToBound :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
 
 clipVelocity :: V3 Float -> V3 Float -> Float -> (Int, V3 Float)
 
-touchTriggers :: EdictReference -> Quake ()
+touchTriggers :: Ref EdictT -> Quake ()
 
-findRadius :: Maybe EdictReference -> V3 Float -> Float -> Quake (Maybe EdictReference)
+findRadius :: Maybe (Ref EdictT) -> V3 Float -> Float -> Quake (Maybe (Ref EdictT))

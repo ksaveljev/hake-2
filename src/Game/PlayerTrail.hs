@@ -7,6 +7,7 @@ import Linear (V3)
 import qualified Data.Vector as V
 
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Game.GameUtil as GameUtil
@@ -38,13 +39,13 @@ init = do
       playerTrailGlobals.ptTrailHead .= 0
       playerTrailGlobals.ptTrailActive .= True
 
-  where initTrail :: Int -> Quake EdictReference
+  where initTrail :: Int -> Quake (Ref EdictT)
         initTrail _ = do
           edictRef <- GameUtil.spawn
-          modifyEdictT edictRef (\v -> v & eClassName .~ "player_trail")
+          modifyRef edictRef (\v -> v & eClassName .~ "player_trail")
           return edictRef
 
-lastSpot :: Quake EdictReference
+lastSpot :: Quake (Ref EdictT)
 lastSpot = do
     io (putStrLn "PlayerTrail.lastSpot") >> undefined -- TODO
 
@@ -52,10 +53,10 @@ add :: V3 Float -> Quake ()
 add _ = do
     io (putStrLn "PlayerTrail.add") >> undefined -- TODO
 
-pickFirst :: EdictReference -> Quake (Maybe EdictReference)
+pickFirst :: Ref EdictT -> Quake (Maybe (Ref EdictT))
 pickFirst _ = do
     io (putStrLn "PlayerTrail.pickFirst") >> undefined -- TODO
 
-pickNext :: EdictReference -> Quake (Maybe EdictReference)
+pickNext :: Ref EdictT -> Quake (Maybe (Ref EdictT))
 pickNext _ = do
     io (putStrLn "PlayerTrail.pickNext") >> undefined -- TODO

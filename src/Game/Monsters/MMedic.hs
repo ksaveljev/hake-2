@@ -16,6 +16,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -123,13 +124,13 @@ frameAttack50 = 226
 frameAttack60 :: Int
 frameAttack60 = 236
 
-medicFindDeadMonster :: EdictReference -> Quake (Maybe EdictReference)
+medicFindDeadMonster :: Ref EdictT -> Quake (Maybe (Ref EdictT))
 medicFindDeadMonster selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     findDeadMonster (self^.eEntityState.esOrigin) Nothing Nothing
 
-  where findDeadMonster :: V3 Float -> Maybe EdictReference -> Maybe EdictReference -> Quake (Maybe EdictReference)
+  where findDeadMonster :: V3 Float -> Maybe (Ref EdictT) -> Maybe (Ref EdictT) -> Quake (Maybe (Ref EdictT))
         findDeadMonster origin currentRef bestRef = do
           foundRef <- GameBase.findRadius currentRef origin 1024
 
@@ -138,7 +139,7 @@ medicFindDeadMonster selfRef = do
               return bestRef
 
             Just edictRef -> do
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
 
               if edictRef == selfRef || (edict^.eSvFlags) .&. Constants.svfMonster == 0 || (edict^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0 || isNothing (edict^.eOwner) || (edict^.eHealth) > 0 || (edict^.eNextThink) == 0
                 then
@@ -149,7 +150,7 @@ medicFindDeadMonster selfRef = do
                   if | not vis -> findDeadMonster origin (Just edictRef) bestRef
                      | isNothing bestRef -> findDeadMonster origin (Just edictRef) (Just edictRef)
                      | otherwise -> do
-                         best <- readEdictT (fromJust bestRef)
+                         best <- readRef (fromJust bestRef)
 
                          if (edict^.eMaxHealth) <= (best^.eMaxHealth)
                            then findDeadMonster origin (Just edictRef) bestRef
@@ -169,10 +170,10 @@ medicIdle =
         return True
 
       Just deadMonsterRef -> do
-        modifyEdictT selfRef (\v -> v & eEnemy .~ deadMonster
+        modifyRef selfRef (\v -> v & eEnemy .~ deadMonster
                                       & eMonsterInfo.miAIFlags %~ (.|. Constants.aiMedic))
 
-        modifyEdictT deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
+        modifyRef deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
 
         GameUtil.foundTarget selfRef
         return True
@@ -184,7 +185,7 @@ medicSearch =
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     sound (Just selfRef) Constants.chanVoice soundSearch 1 Constants.attnIdle 0
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     case self^.eOldEnemy of
       Nothing -> do
@@ -195,11 +196,11 @@ medicSearch =
             return True
 
           Just deadMonsterRef -> do
-            modifyEdictT selfRef (\v -> v & eOldEnemy .~ (self^.eEnemy)
+            modifyRef selfRef (\v -> v & eOldEnemy .~ (self^.eEnemy)
                                           & eEnemy .~ deadMonster
                                           & eMonsterInfo.miAIFlags %~ (.|. Constants.aiMedic))
 
-            modifyEdictT deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
+            modifyRef deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
 
             GameUtil.foundTarget selfRef
             return True
@@ -315,7 +316,7 @@ medicMoveStand = MMoveT "medicMoveStand" frameWait1 frameWait90 medicFramesStand
 medicStand :: EntThink
 medicStand =
   GenericEntThink "medic_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveStand)
     return True
 
 medicFramesWalk :: V.Vector MFrameT
@@ -340,7 +341,7 @@ medicMoveWalk = MMoveT "medicMoveWalk" frameWalk1 frameWalk12 medicFramesWalk No
 medicWalk :: EntThink
 medicWalk =
   GenericEntThink "medic_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveWalk)
     return True
 
 medicFramesRun :: V.Vector MFrameT
@@ -359,7 +360,7 @@ medicMoveRun = MMoveT "medicMoveRun" frameRun1 frameRun6 medicFramesRun Nothing
 medicRun :: EntThink
 medicRun =
   GenericEntThink "medic_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     done <- if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic == 0
               then do
@@ -370,11 +371,11 @@ medicRun =
                     return False
 
                   Just deadMonsterRef -> do
-                    modifyEdictT selfRef (\v -> v & eOldEnemy .~ (self^.eEnemy)
+                    modifyRef selfRef (\v -> v & eOldEnemy .~ (self^.eEnemy)
                                                   & eEnemy .~ deadMonster
                                                   & eMonsterInfo.miAIFlags %~ (.|. Constants.aiMedic))
 
-                    modifyEdictT deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
+                    modifyRef deadMonsterRef (\v -> v & eOwner .~ Just selfRef)
                     GameUtil.foundTarget selfRef
                     return True
 
@@ -386,7 +387,7 @@ medicRun =
                           then medicMoveStand
                           else medicMoveRun
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
     return True
 
@@ -430,15 +431,15 @@ medicMovePain2 = MMoveT "medicMovePain2" framePainB1 framePainB15 medicFramesPai
 medicPain :: EntPain
 medicPain =
   GenericEntPain "medic_pain" $ \selfRef _ _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       skillValue <- liftM (^.cvValue) skillCVar
 
@@ -453,7 +454,7 @@ medicPain =
                                         soundPain <- use $ mMedicGlobals.mMedicSoundPain2
                                         return (soundPain, medicMovePain2)
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
         sound <- use $ gameBaseGlobals.gbGameImport.giSound
         sound (Just selfRef) Constants.chanVoice soundPain 1 Constants.attnNorm 0
@@ -461,7 +462,7 @@ medicPain =
 medicFireBlaster :: EntThink
 medicFireBlaster =
   GenericEntThink "medic_fire_blaster" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let frame = self^.eEntityState.esFrame
         effect = if | frame `elem` [ frameAttack9, frameAttack12 ] -> Constants.efBlaster
@@ -471,7 +472,7 @@ medicFireBlaster =
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2MedicBlaster1) forward right
         Just enemyRef = self^.eEnemy
 
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         end = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -483,7 +484,7 @@ medicFireBlaster =
 medicDead :: EntThink
 medicDead =
   GenericEntThink "medic_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -534,14 +535,14 @@ medicMoveDeath = MMoveT "medicMoveDeath" frameDeath1 frameDeath30 medicFramesDea
 medicDie :: EntDie
 medicDie =
   GenericEntDie "medic_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     -- if we had a pending patient, free him up for another medic
     when (isJust (self^.eEnemy)) $ do
       let Just enemyRef = self^.eEnemy
-      enemy <- readEdictT enemyRef
+      enemy <- readRef enemyRef
       when ((enemy^.eOwner) == Just selfRef) $
-        modifyEdictT enemyRef (\v -> v & eOwner .~ Nothing)
+        modifyRef enemyRef (\v -> v & eOwner .~ Nothing)
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -562,7 +563,7 @@ medicDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -571,14 +572,14 @@ medicDie =
            soundDie <- use $ mMedicGlobals.mMedicSoundDie
            sound (Just selfRef) Constants.chanVoice soundDie 1 Constants.attnNorm 0
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just medicMoveDeath)
 
 medicDuckDown :: EntThink
 medicDuckDown =
   GenericEntThink "medic_duck_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
       then
@@ -587,7 +588,7 @@ medicDuckDown =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
                                       & eMaxs._z -~ 32
                                       & eTakeDamage .~ Constants.damageYes
                                       & eMonsterInfo.miPauseTime .~ levelTime + 1)
@@ -600,19 +601,19 @@ medicDuckDown =
 medicDuckHold :: EntThink
 medicDuckHold =
   GenericEntThink "medic_duck_hold" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+      then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 medicDuckUp :: EntThink
 medicDuckUp =
   GenericEntThink "medic_duck_up" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
                                   & eMaxs._z +~ 32
                                   & eTakeDamage .~ Constants.damageAim)
 
@@ -650,12 +651,12 @@ medicDodge =
     r <- Lib.randomF
 
     unless (r > 0.25) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
 
       when (isNothing (self^.eEnemy)) $
-        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+        modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveDuck)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveDuck)
 
 medicFramesAttackHyperBlaster :: V.Vector MFrameT
 medicFramesAttackHyperBlaster =
@@ -683,13 +684,13 @@ medicMoveAttackHyperBlaster = MMoveT "medicMoveAttackHyperBlaster" frameAttack15
 medicContinue :: EntThink
 medicContinue =
   GenericEntThink "medic_continue" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     vis <- GameUtil.visible selfRef (fromJust $ self^.eEnemy)
     r <- Lib.randomF
 
     when (vis && r <= 0.95) $
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveAttackHyperBlaster)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveAttackHyperBlaster)
 
     return True
 
@@ -739,9 +740,9 @@ medicCableOffsets =
 medicCableAttack :: EntThink
 medicCableAttack =
   GenericEntThink "medic_cable_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     if not (enemy^.eInUse)
       then
@@ -789,10 +790,10 @@ medicCableAttack =
                            soundHookHit <- use $ mMedicGlobals.mMedicSoundHookHit
                            sound (self^.eEnemy) Constants.chanAuto soundHookHit 1 Constants.attnNorm 0
 
-                           modifyEdictT enemyRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiResurrecting))
+                           modifyRef enemyRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiResurrecting))
 
                        | (self^.eEntityState.esFrame) == frameAttack50 -> do
-                           modifyEdictT enemyRef (\v -> v & eSpawnFlags .~ 0
+                           modifyRef enemyRef (\v -> v & eSpawnFlags .~ 0
                                                           & eMonsterInfo.miAIFlags .~ 0
                                                           & eTarget .~ Nothing
                                                           & eTargetName .~ Nothing
@@ -802,25 +803,25 @@ medicCableAttack =
 
                            GameSpawn.callSpawn enemyRef
 
-                           modifyEdictT enemyRef (\v -> v & eOwner .~ Nothing)
+                           modifyRef enemyRef (\v -> v & eOwner .~ Nothing)
 
-                           enemy' <- readEdictT enemyRef
+                           enemy' <- readRef enemyRef
 
                            when (isJust (enemy'^.eThink)) $ do
                              levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-                             modifyEdictT enemyRef (\v -> v & eNextThink .~ levelTime)
+                             modifyRef enemyRef (\v -> v & eNextThink .~ levelTime)
                              void $ think (fromJust (enemy'^.eThink)) enemyRef
 
-                           modifyEdictT enemyRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiResurrecting))
+                           modifyRef enemyRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiResurrecting))
 
-                           self' <- readEdictT selfRef
+                           self' <- readRef selfRef
 
                            when (isJust (self'^.eOldEnemy)) $ do
                              let Just oldEnemyRef = self'^.eOldEnemy
-                             oldEnemy <- readEdictT oldEnemyRef
+                             oldEnemy <- readRef oldEnemyRef
 
                              when (isJust (oldEnemy^.eClient)) $ do
-                               modifyEdictT enemyRef (\v -> v & eEnemy .~ (self'^.eOldEnemy))
+                               modifyRef enemyRef (\v -> v & eEnemy .~ (self'^.eOldEnemy))
                                GameUtil.foundTarget enemyRef
 
                        | (self^.eEntityState.esFrame) == frameAttack44 -> do
@@ -834,7 +835,7 @@ medicCableAttack =
                     let start' = start + fmap (* 8) f
 
                     -- adjust end z for end spot since the monster is currently dead
-                    enemy' <- readEdictT enemyRef
+                    enemy' <- readRef enemyRef
                     let V3 ea eb ec = enemy'^.eEntityState.esOrigin
                         end = V3 ea eb ((enemy'^.eAbsMin._z) + (enemy'^.eSize._z) / 2)
 
@@ -853,7 +854,7 @@ medicHookRetract =
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
     soundHookRetract <- use $ mMedicGlobals.mMedicSoundHookRetract
     sound (Just selfRef) Constants.chanWeapon soundHookRetract 1 Constants.attnNorm 0
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiResurrecting)))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiResurrecting)))
     return True
 
 medicFramesAttackCable :: V.Vector MFrameT
@@ -894,19 +895,19 @@ medicMoveAttackCable = MMoveT "medicMoveAttackCable" frameAttack33 frameAttack60
 medicAttack :: EntThink
 medicAttack =
   GenericEntThink "medic_attack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic /= 0
                    then medicMoveAttackCable
                    else medicMoveAttackBlaster
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 medicCheckAttack :: EntThink
 medicCheckAttack =
   GenericEntThink "medic_checkattack" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiMedic /= 0
       then do
@@ -919,7 +920,7 @@ medicCheckAttack =
 - QUAKED monster_medic (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterMedic :: EdictReference -> Quake ()
+spMonsterMedic :: Ref EdictT -> Quake ()
 spMonsterMedic selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -949,7 +950,7 @@ spMonsterMedic selfRef = do
 
         modelIdx <- modelIndex (Just "models/monsters/medic/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-24) (-24) (-24)
@@ -972,7 +973,7 @@ spMonsterMedic selfRef = do
 
         linkEntity selfRef
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveStand
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just medicMoveStand
                                       & eMonsterInfo.miScale .~ modelScale)
 
         void $ think GameAI.walkMonsterStart selfRef

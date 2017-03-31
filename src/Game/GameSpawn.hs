@@ -18,6 +18,7 @@ import Types
 import Game.CVarT
 import QuakeState
 import CVarVariables
+import QuakeRef
 import Game.Adapters
 import Game.SpawnT
 import qualified Constants
@@ -79,14 +80,14 @@ spawnEntities mapName entities spawnPoint = do
     gameBaseGlobals.gbLevel .= newLevelLocalsT
 
     maxEntities <- use $ gameBaseGlobals.gbGame.glMaxEntities
-    mapM_ (\i -> writeEdictT (newEdictReference i) (newEdictT i)) [0..maxEntities-1]
+    mapM_ (\i -> writeRef (Ref i) (newEdictT i)) [0..maxEntities-1]
 
     gameBaseGlobals.gbLevel.llMapName .= mapName
     gameBaseGlobals.gbGame.glSpawnPoint .= spawnPoint
 
     -- set client fields on player ents
     maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
-    mapM_ (\i -> modifyEdictT (newEdictReference i) (\v -> v & eClient .~ Just (GClientReference (i - 1)))) [1..maxClients]
+    mapM_ (\i -> modifyRef (Ref i) (\v -> v & eClient .~ Just (GClientReference (i - 1)))) [1..maxClients]
 
     inhibited <- parseEntities True 0 0
 
@@ -115,7 +116,7 @@ spawnEntities mapName entities spawnPoint = do
                                 else GameUtil.spawn
 
                   updatedIdx <- parseEdict edictRef entities newIdx
-                  edict <- readEdictT edictRef
+                  edict <- readRef edictRef
 
                   Com.dprintf $ "spawning ent[" `B.append` BC.pack (show $ edict^.eIndex) `B.append` -- IMPROVE
                                 "], classname=" `B.append` (edict^.eClassName) `B.append`
@@ -126,7 +127,7 @@ spawnEntities mapName entities spawnPoint = do
                         BC.map toLower (edict^.eClassName) == "trigger_once" &&
                         isJust (edict^.eiModel) &&
                         BC.map toLower (fromJust (edict^.eiModel)) == "*27") $
-                    modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement Constants.spawnFlagNotHard)))
+                    modifyRef edictRef (\v -> v & eSpawnFlags %~ (.&. (complement Constants.spawnFlagNotHard)))
 
                   -- remove things (except the world) from different skill levels or deathmatch
                   removed <- if edictRef == worldRef
@@ -162,7 +163,7 @@ spawnEntities mapName entities spawnPoint = do
                                  if freed
                                    then do
                                      let flags = Constants.spawnFlagNotEasy .|. Constants.spawnFlagNotMedium .|. Constants.spawnFlagNotHard .|. Constants.spawnFlagNotCoop .|. Constants.spawnFlagNotDeathmatch
-                                     modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.&. (complement flags)))
+                                     modifyRef edictRef (\v -> v & eSpawnFlags %~ (.&. (complement flags)))
                                      return True
                                    else do
                                      return False
@@ -184,7 +185,7 @@ spawnEntities mapName entities spawnPoint = do
 - Parses an edict out of the given string, returning the new position ed
 - should be a properly initialized empty edict.
 -}
-parseEdict :: EdictReference -> B.ByteString -> Int -> Quake Int
+parseEdict :: Ref EdictT -> B.ByteString -> Int -> Quake Int
 parseEdict edictRef entities idx = do
     gameBaseGlobals.gbSpawnTemp .= newSpawnTempT
 
@@ -234,7 +235,7 @@ parseEdict edictRef entities idx = do
                           parseField (BC.map toLower keyName) anotherToken edictRef
                           parse True finalIdx
 
-parseField :: B.ByteString -> B.ByteString -> EdictReference -> Quake ()
+parseField :: B.ByteString -> B.ByteString -> Ref EdictT -> Quake ()
 parseField key value edictRef = do
     when (key == "nextmap") $
       Com.println $ "nextmap: " `B.append` value
@@ -247,11 +248,11 @@ parseField key value edictRef = do
         gameBaseGlobals.gbSpawnTemp .= updatedSt
 
       else do
-        edict <- readEdictT edictRef
+        edict <- readRef edictRef
         let (updatedEdict, didUpdateEdict) = setEdictField edict key value
         if didUpdateEdict
           then
-            writeEdictT edictRef updatedEdict
+            writeRef edictRef updatedEdict
           else do
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf $ "??? The key [" `B.append` key `B.append` "] is not a field\n"
@@ -335,10 +336,10 @@ newString str = let len = B.length str
 -
 - Finds the spawn function for the entity and calls it.
 -}
-callSpawn :: EdictReference -> Quake ()
+callSpawn :: Ref EdictT -> Quake ()
 callSpawn edictRef = do
     numItems <- use $ gameBaseGlobals.gbGame.glNumItems
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     -- IMPROVE: does it apply to our code?
     -- if (null == ent.classname) {
@@ -395,31 +396,31 @@ findTeams = do
         findNextTeam maxIdx idx c c2
           | idx >= maxIdx = return (c, c2)
           | otherwise = do
-              let edictRef = newEdictReference idx
-              edict <- readEdictT edictRef
+              let edictRef = Ref idx
+              edict <- readRef edictRef
 
               if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0
                 then
                   findNextTeam maxIdx (idx + 1) c c2
 
                 else do
-                  modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just edictRef)
+                  modifyRef edictRef (\v -> v & eTeamMaster .~ Just edictRef)
                   c2' <- findTeamMembers (fromJust $ edict^.eTeam) edictRef edictRef maxIdx (idx + 1) c2
                   findNextTeam maxIdx (idx + 1) (c + 1) c2'
 
-        findTeamMembers :: B.ByteString -> EdictReference -> EdictReference -> Int -> Int -> Int -> Quake Int
+        findTeamMembers :: B.ByteString -> Ref EdictT -> Ref EdictT -> Int -> Int -> Int -> Quake Int
         findTeamMembers teamName master chainRef maxIdx idx c2
           | idx >= maxIdx = return c2
           | otherwise = do
-              let edictRef = newEdictReference idx
-              edict <- readEdictT edictRef
+              let edictRef = Ref idx
+              edict <- readRef edictRef
 
               if not (edict^.eInUse) || isNothing (edict^.eTeam) || (edict^.eFlags) .&. Constants.flTeamSlave /= 0 || teamName /= fromJust (edict^.eTeam)
                 then
                   findTeamMembers teamName master chainRef maxIdx (idx + 1) c2
                 else do
-                  modifyEdictT chainRef (\v -> v & eTeamChain .~ Just edictRef)
-                  modifyEdictT edictRef (\v -> v & eTeamMaster .~ Just master
+                  modifyRef chainRef (\v -> v & eTeamChain .~ Just edictRef)
+                  modifyRef edictRef (\v -> v & eTeamMaster .~ Just master
                                                  & eFlags %~ (.|. Constants.flTeamSlave))
                   findTeamMembers teamName master edictRef maxIdx (idx + 1) (c2 + 1)
 
@@ -617,9 +618,9 @@ spFuncClock =
 spWorldSpawn :: EntThink
 spWorldSpawn =
   GenericEntThink "SP_worldspawn" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
-    modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
                                    & eSolid .~ Constants.solidBsp
                                    -- since the world doesn't use G_Spawn()
                                    & eInUse .~ True

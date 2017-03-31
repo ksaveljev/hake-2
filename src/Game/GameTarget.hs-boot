@@ -4,35 +4,35 @@ import Types
 import QuakeState
 import Game.Adapters
 
-spTargetTempEntity :: EdictReference -> Quake ()
+spTargetTempEntity :: Ref EdictT -> Quake ()
 
-spTargetSpeaker :: EdictReference -> Quake ()
+spTargetSpeaker :: Ref EdictT -> Quake ()
 
-spTargetHelp :: EdictReference -> Quake ()
+spTargetHelp :: Ref EdictT -> Quake ()
 
-spTargetSecret :: EdictReference -> Quake ()
+spTargetSecret :: Ref EdictT -> Quake ()
 
-spTargetGoal :: EdictReference -> Quake ()
+spTargetGoal :: Ref EdictT -> Quake ()
 
-spTargetExplosion :: EdictReference -> Quake ()
+spTargetExplosion :: Ref EdictT -> Quake ()
 
-spTargetChangeLevel :: EdictReference -> Quake ()
+spTargetChangeLevel :: Ref EdictT -> Quake ()
 
-spTargetSplash :: EdictReference -> Quake ()
+spTargetSplash :: Ref EdictT -> Quake ()
 
-spTargetSpawner :: EdictReference -> Quake ()
+spTargetSpawner :: Ref EdictT -> Quake ()
 
-spTargetBlaster :: EdictReference -> Quake ()
+spTargetBlaster :: Ref EdictT -> Quake ()
 
-spTargetCrossLevelTrigger :: EdictReference -> Quake ()
+spTargetCrossLevelTrigger :: Ref EdictT -> Quake ()
 
-spTargetCrossLevelTarget :: EdictReference -> Quake ()
+spTargetCrossLevelTarget :: Ref EdictT -> Quake ()
 
-spTargetLaser :: EdictReference -> Quake ()
+spTargetLaser :: Ref EdictT -> Quake ()
 
-spTargetLightRamp :: EdictReference -> Quake ()
+spTargetLightRamp :: Ref EdictT -> Quake ()
 
-spTargetEarthquake :: EdictReference -> Quake ()
+spTargetEarthquake :: Ref EdictT -> Quake ()
 
 useTargetExplosion :: EntUse
 

@@ -21,6 +21,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -179,7 +180,7 @@ statusString = do
               if (client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned
                 then do
                   let Just edictRef = client^.cEdict
-                  gClientRef <- readEdictT edictRef >>= \e -> return (e^.eClient)
+                  gClientRef <- readRef edictRef >>= \e -> return (e^.eClient)
                   let Just (GClientReference gClientIdx) = gClientRef
                   Just clientStats <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats
 
@@ -375,7 +376,7 @@ calcPings = do
                 
                 -- let the game dll know about the ping
                 let Just edictRef = client^.cEdict
-                gClientRef <- readEdictT edictRef >>= \e -> return (e^.eClient)
+                gClientRef <- readRef edictRef >>= \e -> return (e^.eClient)
                 let Just (GClientReference gClientIdx) = gClientRef
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPing .= ping
 
@@ -498,7 +499,7 @@ prepWorldFrame = do
           | idx >= maxIdx = return ()
           | otherwise = do
               -- events only last for a single message
-              modifyEdictT (newEdictReference idx) (\v -> v & eEntityState.esEvent .~ 0)
+              modifyRef (Ref idx) (\v -> v & eEntityState.esEvent .~ 0)
               resetEdictEvent (idx + 1) maxIdx
 
 {-
@@ -689,13 +690,13 @@ gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport 
 
     let edictIdx = clientIdx + 1
 
-    svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict .= Just (newEdictReference edictIdx)
+    svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict .= Just (Ref edictIdx)
 
     -- save challenge for checksumming
     svGlobals.svServerStatic.ssClients.ix clientIdx.cChallenge .= challenge
 
     -- get the game a chance to reject this connection or modify the userinfo
-    (allowed, userInfo') <- PlayerClient.clientConnect (newEdictReference edictIdx) userInfo
+    (allowed, userInfo') <- PlayerClient.clientConnect (Ref edictIdx) userInfo
 
     if not allowed
       then do

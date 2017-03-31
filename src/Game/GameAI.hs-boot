@@ -3,4 +3,4 @@ module Game.GameAI where
 import Types
 import QuakeState
 
-huntTarget :: EdictReference -> Quake ()
+huntTarget :: Ref EdictT -> Quake ()

@@ -16,7 +16,7 @@ makeLenses ''EdictT
 
 newEdictT :: Int -> EdictT
 newEdictT idx = EdictT
-    { _eEntityState           = newEntityStateT (Just (EdictReference idx))
+    { _eEntityState           = newEntityStateT (Just (Ref idx))
     , _eInUse                 = False
     , _eClassName             = ""
     , _eLinkCount             = 0

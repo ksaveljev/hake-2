@@ -572,7 +572,7 @@ parseStartSoundPacket = do
     -- TODO: research if we need this:
     -- if (null == Globals.cl.sound_precache[sound_num])
     --      return;
-    S.startSound pos (newEdictReference ent) channel sound volume attenuation ofs
+    S.startSound pos (Ref ent) channel sound volume attenuation ofs
 
 parseDownload :: Quake ()
 parseDownload = do

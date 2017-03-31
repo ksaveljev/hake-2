@@ -18,6 +18,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -30,9 +31,9 @@ import qualified Game.Monsters.MInfantry as MInfantry
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
-spTurretBreach :: EdictReference -> Quake ()
+spTurretBreach :: Ref EdictT -> Quake ()
 spTurretBreach selfRef = do
-    modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidBsp
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp
                                   & eMoveType .~ Constants.moveTypePush
                                   )
     
@@ -41,7 +42,7 @@ spTurretBreach selfRef = do
     let setModel = gameImport^.giSetModel
         linkEntity = gameImport^.giLinkEntity
     
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     setModel selfRef (self^.eiModel)
     
@@ -53,7 +54,7 @@ spTurretBreach selfRef = do
     spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
-    modifyEdictT selfRef (\v -> v & eSpeed %~ (\a -> if a == 0 then 50 else a)
+    modifyRef selfRef (\v -> v & eSpeed %~ (\a -> if a == 0 then 50 else a)
                                   & eDmg %~ (\a -> if a == 0 then 10 else a)
                                   & ePos1._x .~ (-1) * (spawnTemp^.stMinPitch) -- IMPROVE: use Constants.pitch instead of using _x directly
                                   & ePos1._y .~ (spawnTemp^.stMinYaw) -- IMPROVE: use Constants.yaw instead of using _y directly
@@ -72,9 +73,9 @@ spTurretBreach selfRef = do
 - QUAKED turret_base (0 0 0) ? This portion of the turret changes yaw only.
 - MUST be teamed with a turret_breach.
 -}
-spTurretBase :: EdictReference -> Quake ()
+spTurretBase :: Ref EdictT -> Quake ()
 spTurretBase selfRef = do
-  modifyEdictT selfRef (\v -> v & eSolid .~ Constants.solidBsp
+  modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp
                                 & eMoveType .~ Constants.moveTypePush
                                 )
   
@@ -82,14 +83,14 @@ spTurretBase selfRef = do
   let setModel = gameImport^.giSetModel
       linkEntity = gameImport^.giLinkEntity
   
-  self <- readEdictT selfRef
+  self <- readRef selfRef
       
   setModel selfRef (self^.eiModel)
   
-  modifyEdictT selfRef (\v -> v & eBlocked .~ Just turretBlocked)
+  modifyRef selfRef (\v -> v & eBlocked .~ Just turretBlocked)
   linkEntity selfRef
 
-spTurretDriver :: EdictReference -> Quake ()
+spTurretDriver :: Ref EdictT -> Quake ()
 spTurretDriver selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     
@@ -98,7 +99,7 @@ spTurretDriver selfRef = do
         GameUtil.freeEdict selfRef
       
       else do
-        self <- readEdictT selfRef
+        self <- readRef selfRef
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         gameImport <- use $ gameBaseGlobals.gbGameImport
         spawnTemp <- use $ gameBaseGlobals.gbSpawnTemp
@@ -109,7 +110,7 @@ spTurretDriver selfRef = do
         
         modelIdx <- modelIndex (Just "models/monsters/infantry/tris.md2")
       
-        modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypePush
+        modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypePush
                                       & eSolid .~ Constants.solidBbox
                                       & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-16) (-16) (-24)
@@ -141,7 +142,7 @@ spTurretDriver selfRef = do
           
           Just itemClassname -> do
             item <- GameItems.findItemByClassname itemClassname
-            modifyEdictT selfRef (\v -> v & eItem .~ item)
+            modifyRef selfRef (\v -> v & eItem .~ item)
             
             case item of
               Just _ -> return ()
@@ -152,12 +153,12 @@ spTurretDriver selfRef = do
 turretBlocked :: EntBlocked
 turretBlocked =
   GenericEntBlocked "turret_blocked" $ \selfRef otherRef -> do
-    other <- readEdictT otherRef
+    other <- readRef otherRef
     
     when ((other^.eTakeDamage) /= 0) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
       let Just teamMasterRef = self^.eTeamMaster
-      teamMaster <- readEdictT teamMasterRef
+      teamMaster <- readRef teamMasterRef
       
       let attackerRef = case teamMaster^.eOwner of
                           Nothing -> teamMasterRef
@@ -170,7 +171,7 @@ turretBlocked =
 turretBreachFinishInit :: EntThink
 turretBreachFinishInit =
   GenericEntThink "turret_breach_finish_init" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     -- get and save info for muzzle location
     case self^.eTarget of
@@ -180,18 +181,18 @@ turretBreachFinishInit =
       
       Just _ -> do
         Just targetRef <- GameBase.pickTarget (self^.eTarget)
-        modifyEdictT selfRef (\v -> v & eTargetEnt .~ Just targetRef)
+        modifyRef selfRef (\v -> v & eTargetEnt .~ Just targetRef)
         
-        target <- readEdictT targetRef
+        target <- readRef targetRef
         let moveOrigin = (target^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
-        modifyEdictT selfRef (\v -> v & eMoveOrigin .~ moveOrigin)
+        modifyRef selfRef (\v -> v & eMoveOrigin .~ moveOrigin)
         
         GameUtil.freeEdict targetRef
     
     let Just teamMasterRef = self^.eTeamMaster
-    modifyEdictT teamMasterRef (\v -> v & eDmg .~ (self^.eDmg))
+    modifyRef teamMasterRef (\v -> v & eDmg .~ (self^.eDmg))
     
-    modifyEdictT selfRef (\v -> v & eThink .~ Just turretBreachThink)
+    modifyRef selfRef (\v -> v & eThink .~ Just turretBreachThink)
     void $ think turretBreachThink selfRef
     return True
 
@@ -203,54 +204,54 @@ turretBreachFinishInit =
 turretDriverDie :: EntDie
 turretDriverDie =
   GenericEntDie "turret_driver_die" $ \selfRef inflictorRef attackerRef damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     let Just targetEntRef = self^.eTargetEnt
     
     -- level the gun
-    modifyEdictT targetEntRef (\v -> v & eMoveAngles._x .~ 0)
+    modifyRef targetEntRef (\v -> v & eMoveAngles._x .~ 0)
     
     -- remove the driver from the end of them team chain
-    targetEnt <- readEdictT targetEntRef
+    targetEnt <- readRef targetEntRef
     removeDriverFromTeamChain selfRef (targetEnt^.eTeamMaster)
     
-    modifyEdictT selfRef (\v -> v & eTeamMaster .~ Nothing
+    modifyRef selfRef (\v -> v & eTeamMaster .~ Nothing
                                   & eFlags %~ (\a -> a .&. complement (Constants.flTeamSlave))
                                   )
     
-    modifyEdictT targetEntRef (\v -> v & eOwner .~ Nothing)
-    modifyEdictT (fromJust $ targetEnt^.eTeamMaster) (\v -> v & eOwner .~ Nothing)
+    modifyRef targetEntRef (\v -> v & eOwner .~ Nothing)
+    modifyRef (fromJust $ targetEnt^.eTeamMaster) (\v -> v & eOwner .~ Nothing)
     
     die MInfantry.infantryDie selfRef inflictorRef attackerRef damage (V3 0 0 0) -- infantryDie doesn't use last argument
             
-  where removeDriverFromTeamChain :: EdictReference -> Maybe EdictReference -> Quake ()
+  where removeDriverFromTeamChain :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
         removeDriverFromTeamChain _ Nothing = return () -- RESEARCH: shouldn't ever reach here, maybe throw an error?
         removeDriverFromTeamChain selfRef (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           
           if (edict^.eTeamChain) == Just selfRef
-            then modifyEdictT edictRef (\v -> v & eTeamChain .~ Nothing)
+            then modifyRef edictRef (\v -> v & eTeamChain .~ Nothing)
             else removeDriverFromTeamChain selfRef (edict^.eTeamChain)
 
 turretDriverLink :: EntThink
 turretDriverLink =
   GenericEntThink "turret_driver_link" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     Just targetEntRef <- GameBase.pickTarget (self^.eTarget)
-    targetEnt <- readEdictT targetEntRef
+    targetEnt <- readRef targetEntRef
     
     let Just teamMasterRef = targetEnt^.eTeamMaster
     
-    modifyEdictT targetEntRef (\v -> v & eOwner .~ Just selfRef)
-    modifyEdictT teamMasterRef (\v -> v & eOwner .~ Just selfRef)
+    modifyRef targetEntRef (\v -> v & eOwner .~ Just selfRef)
+    modifyRef teamMasterRef (\v -> v & eOwner .~ Just selfRef)
     
     let vec = ((targetEnt^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)) & _z .~ 0
         vec' = (self^.eEntityState.esOrigin) - (targetEnt^.eEntityState.esOrigin)
         vec'' = Math3D.vectorAngles vec'
         vec''' = anglesNormalize vec''
   
-    modifyEdictT selfRef (\v -> v & eThink .~ Just turretDriverThink
+    modifyRef selfRef (\v -> v & eThink .~ Just turretDriverThink
                                   & eNextThink .~ levelTime + Constants.frameTime
                                   & eTargetEnt .~ Just targetEntRef
                                   & eEntityState.esAngles .~ (targetEnt^.eEntityState.esAngles)
@@ -261,19 +262,19 @@ turretDriverLink =
     
     addDriverToTeamChain selfRef (targetEnt^.eTeamMaster)
     
-    modifyEdictT selfRef (\v -> v & eTeamMaster .~ (targetEnt^.eTeamMaster)
+    modifyRef selfRef (\v -> v & eTeamMaster .~ (targetEnt^.eTeamMaster)
                                   & eFlags %~ (\a -> a .|. Constants.flTeamSlave)
                                   )
     
     return True
   
-  where addDriverToTeamChain :: EdictReference -> Maybe EdictReference -> Quake ()
+  where addDriverToTeamChain :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
         addDriverToTeamChain _ Nothing = return () -- RESEARCH: shouldn't ever reach here, maybe throw an error?
         addDriverToTeamChain selfRef (Just edictRef) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           
           case edict^.eTeamChain of
-            Nothing -> modifyEdictT edictRef (\v -> v & eTeamChain .~ Just selfRef)
+            Nothing -> modifyRef edictRef (\v -> v & eTeamChain .~ Just selfRef)
             Just _ -> addDriverToTeamChain selfRef (edict^.eTeamChain)
 
 turretBreachThink :: EntThink
@@ -299,11 +300,11 @@ turretDriverThink :: EntThink
 turretDriverThink =
   GenericEntThink "turret_driver_think" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
     
     updateSelfEnemy selfRef
     
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     
     done <- case self^.eEnemy of
               Nothing -> do
@@ -312,7 +313,7 @@ turretDriverThink =
                   then 
                     return True
                   else do
-                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
                                                   & eMonsterInfo.miAIFlags %~ (\a -> a .&. (complement Constants.aiLostSight))
                                                   )
                     return False
@@ -323,13 +324,13 @@ turretDriverThink =
                 if visible
                   then do
                     when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiLostSight /= 0) $
-                      modifyEdictT selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
+                      modifyRef selfRef (\v -> v & eMonsterInfo.miTrailTime .~ levelTime
                                                     & eMonsterInfo.miAIFlags %~ (\a -> a .&. (complement Constants.aiLostSight))
                                                     )
                     return False
                   
                   else do
-                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (\a -> a .|. Constants.aiLostSight))
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (\a -> a .|. Constants.aiLostSight))
                     return True
         
     if done
@@ -337,18 +338,18 @@ turretDriverThink =
         return True
       
       else do
-        self' <- readEdictT selfRef
+        self' <- readRef selfRef
         -- let the turret know where we want it to aim
         let Just enemyRef = self'^.eEnemy
-        enemy <- readEdictT enemyRef
+        enemy <- readRef enemyRef
         let Just targetEntRef = self'^.eTargetEnt
-        targetEnt <- readEdictT targetEntRef
+        targetEnt <- readRef targetEntRef
         
         let target = (enemy^.eEntityState.esOrigin) & _z +~ fromIntegral (enemy^.eViewHeight)
             dir = target - (targetEnt^.eEntityState.esOrigin)
             moveAngles = Math3D.vectorAngles dir
         
-        modifyEdictT targetEntRef (\v -> v & eMoveAngles .~ moveAngles)
+        modifyRef targetEntRef (\v -> v & eMoveAngles .~ moveAngles)
         
         -- decide if we should shoot
         if levelTime < (self'^.eMonsterInfo.miAttackFinished)
@@ -364,17 +365,17 @@ turretDriverThink =
                 return True
               
               else do
-                modifyEdictT selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + reactionTime + 1.0)
+                modifyRef selfRef (\v -> v & eMonsterInfo.miAttackFinished .~ levelTime + reactionTime + 1.0)
                 -- FIXME how do we really want to pass this along?
-                modifyEdictT targetEntRef (\v -> v & eSpawnFlags %~ (\a -> a .|. 65536))
+                modifyRef targetEntRef (\v -> v & eSpawnFlags %~ (\a -> a .|. 65536))
                 return True
                 
-  where updateSelfEnemy :: EdictReference -> Quake ()
+  where updateSelfEnemy :: Ref EdictT -> Quake ()
         updateSelfEnemy selfRef = do
-          self <- readEdictT selfRef
+          self <- readRef selfRef
           case self^.eEnemy of
             Nothing -> return ()
             Just enemyRef -> do
-              enemy <- readEdictT enemyRef
+              enemy <- readRef enemyRef
               when (not (enemy^.eInUse) || (enemy^.eHealth) <= 0) $
-                modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
+                modifyRef selfRef (\v -> v & eEnemy .~ Nothing)

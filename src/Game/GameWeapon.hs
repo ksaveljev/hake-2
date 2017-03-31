@@ -11,6 +11,7 @@ import Linear (V3(..), normalize, norm, _x, _y, _z)
 import Game.MonsterInfoT
 import Types
 import Game.CSurfaceT
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -24,7 +25,7 @@ import qualified Util.Math3D as Math3D
 blasterTouch :: EntTouch
 blasterTouch =
   GenericEntTouch "blaster_touch" $ \selfRef otherRef plane maybeSurf -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     unless (Just otherRef == (self^.eOwner)) $ do
       if isJust maybeSurf && ((fromJust maybeSurf)^.csFlags) .&. Constants.surfSky /= 0
@@ -32,12 +33,12 @@ blasterTouch =
           GameUtil.freeEdict selfRef
         else do
           let Just ownerRef = self^.eOwner
-          owner <- readEdictT ownerRef
+          owner <- readRef ownerRef
 
           when (isJust (owner^.eClient)) $
             PlayerWeapon.playerNoise ownerRef (self^.eEntityState.esOrigin) Constants.pNoiseImpact
 
-          other <- readEdictT otherRef
+          other <- readRef otherRef
 
           if (other^.eTakeDamage) /= 0
             then do
@@ -72,12 +73,12 @@ blasterTouch =
 - Used for all impact (hit/punch/slash) attacks 
 - =================
 -}
-fireHit :: EdictReference -> V3 Float -> Int -> Int -> Quake Bool
+fireHit :: Ref EdictT -> V3 Float -> Int -> Int -> Quake Bool
 fireHit selfRef aim damage kick = do
     -- see if enemy is in range
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
     
     let dir = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
         range = norm dir
@@ -102,7 +103,7 @@ fireHit selfRef aim damage kick = do
         mTraceT <- if (traceT^.tFraction) < 1
                      then do
                        let Just traceEntRef = traceT^.tEnt
-                       traceEnt <- readEdictT traceEntRef
+                       traceEnt <- readRef traceEntRef
                        
                        if (traceEnt^.eTakeDamage) == 0
                          then
@@ -131,7 +132,7 @@ fireHit selfRef aim damage kick = do
             let Just traceEntRef = traceT'^.tEnt
             GameCombat.damage traceEntRef selfRef selfRef dir' point' v3o damage (kick `div` 2) Constants.damageNoKnockback Constants.modHit
             
-            traceEnt <- readEdictT traceEntRef
+            traceEnt <- readRef traceEntRef
             if (traceEnt^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (traceEnt^.eClient)
               then
                 return False
@@ -142,10 +143,10 @@ fireHit selfRef aim damage kick = do
                     a' = normalize (a - point')
                     velocity = (enemy^.eVelocity) + fmap (* (fromIntegral kick)) a'
                   
-                modifyEdictT enemyRef (\v -> v & eVelocity .~ velocity)
+                modifyRef enemyRef (\v -> v & eVelocity .~ velocity)
                 
                 when ((velocity^._z) > 0) $
-                  modifyEdictT enemyRef (\v -> v & eGroundEntity .~ Nothing)
+                  modifyRef enemyRef (\v -> v & eGroundEntity .~ Nothing)
                 
                 return True
 
@@ -156,9 +157,9 @@ fireHit selfRef aim damage kick = do
 - Fires a single blaster bolt. Used by the blaster and hyper blaster.
 - =================
 -}
-fireBlaster :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Bool -> Quake ()
+fireBlaster :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Bool -> Quake ()
 fireBlaster selfRef start direction damage speed effect hyper = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let dir = normalize direction
 
     boltRef <- GameUtil.spawn
@@ -178,7 +179,7 @@ fireBlaster selfRef start direction damage speed effect hyper = do
     soundIdx <- soundIndex (Just "misc/lasfly.wav")
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT boltRef (\v -> v & eSvFlags .~ Constants.svfDeadMonster
+    modifyRef boltRef (\v -> v & eSvFlags .~ Constants.svfDeadMonster
                                   & eEntityState.esOrigin .~ start
                                   & eEntityState.esOldOrigin .~ start
                                   & eEntityState.esAngles .~ dir
@@ -199,7 +200,7 @@ fireBlaster selfRef start direction damage speed effect hyper = do
                                   & eClassName .~ "bolt")
 
     when hyper $
-      modifyEdictT boltRef (\v -> v & eSpawnFlags .~ 1)
+      modifyRef boltRef (\v -> v & eSpawnFlags .~ 1)
 
     linkEntity boltRef
 
@@ -209,7 +210,7 @@ fireBlaster selfRef start direction damage speed effect hyper = do
     traceT <- trace (self^.eEntityState.esOrigin) Nothing Nothing start (Just boltRef) Constants.maskShot
 
     when ((traceT^.tFraction) < 1.0) $ do
-      modifyEdictT boltRef (\v -> v & eEntityState.esOrigin .~ start + fmap (* (-10)) dir)
+      modifyRef boltRef (\v -> v & eEntityState.esOrigin .~ start + fmap (* (-10)) dir)
       dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
       touch blasterTouch boltRef (fromJust $ traceT^.tEnt) dummyPlane Nothing
 
@@ -220,14 +221,14 @@ fireBlaster selfRef start direction damage speed effect hyper = do
 - Shoots shotgun pellets. Used by shotgun and super shotgun.
 - =================
 -}
-fireShotgun :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireShotgun :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireShotgun selfRef start aimDir damage kick hspread vspread count mod'
   | count == 0 = return ()
   | otherwise = do
       fireLead selfRef start aimDir damage kick Constants.teShotgun hspread vspread mod'
       fireShotgun selfRef start aimDir damage kick hspread vspread (count - 1) mod'
 
-fireRail :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
+fireRail :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Quake ()
 fireRail _ _ _ _ _ = do
     io (putStrLn "GameWeapon.fireRail") >> undefined -- TODO
 
@@ -240,7 +241,7 @@ fireRail _ _ _ _ _ = do
 - called. 
 - =================
 -}
-checkDodge :: EdictReference -> V3 Float -> V3 Float -> Int -> Quake ()
+checkDodge :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Quake ()
 checkDodge selfRef start dir speed = do
     skillValue <- liftM (^.cvValue) skillCVar
 
@@ -255,8 +256,8 @@ checkDodge selfRef start dir speed = do
 
       when (isJust (traceT^.tEnt)) $ do
         let Just traceEntRef = traceT^.tEnt
-        traceEnt <- readEdictT traceEntRef
-        self <- readEdictT selfRef
+        traceEnt <- readRef traceEntRef
+        self <- readRef selfRef
 
         when ((traceEnt^.eSvFlags) .&. Constants.svfMonster /= 0 && (traceEnt^.eHealth) > 0 && isJust (traceEnt^.eMonsterInfo.miDodge) && GameUtil.inFront traceEnt self) $ do
           let v = (traceT^.tEndPos) - start
@@ -264,9 +265,9 @@ checkDodge selfRef start dir speed = do
 
           dodge (fromJust $ traceEnt^.eMonsterInfo.miDodge) (fromJust $ traceT^.tEnt) selfRef eta
 
-fireLead :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireLead :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let contentMask = Constants.maskShot .|. Constants.maskWater
@@ -311,7 +312,7 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
           when (not (isJust (traceT^.tSurface) && ((fromJust (traceT^.tSurface))^.csFlags) .&. Constants.surfSky /= 0)) $ do
             when ((traceT^.tFraction) < 1.0) $ do
               let Just traceEntRef = traceT^.tEnt
-              traceEnt <- readEdictT traceEntRef
+              traceEnt <- readRef traceEntRef
 
               if (traceEnt^.eTakeDamage) /= 0
                 then
@@ -331,7 +332,7 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
                     writeDir (traceT^.tPlane.cpNormal)
                     multicast (traceT^.tEndPos) Constants.multicastPvs
 
-                    self <- readEdictT selfRef
+                    self <- readRef selfRef
                     when (isJust (self^.eClient)) $
                       PlayerWeapon.playerNoise selfRef (traceT^.tEndPos) Constants.pNoiseImpact
 
@@ -423,11 +424,11 @@ fireLead selfRef start aimDir damage kick impact hspread vspread mod' = do
 - Fires a single round. Used for machinegun and chaingun. Would be fine for
 - pistols, rifles, etc....
 -}
-fireBullet :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
+fireBullet :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
 fireBullet selfRef start aimDir damage kick hspread vspread mod =
     fireLead selfRef start aimDir damage kick Constants.teGunshot hspread vspread mod
 
-fireGrenade :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Quake ()
+fireGrenade :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Quake ()
 fireGrenade selfRef start aimDir damage speed timer damageRadius = do
     let dir = Math3D.vectorAngles aimDir
         (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
@@ -444,7 +445,7 @@ fireGrenade selfRef start aimDir damage speed timer damageRadius = do
     modelIdx <- modelIndex (Just "models/objects/grenade/tris.md2")
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
-    modifyEdictT grenadeRef (\v -> v & eEntityState.esOrigin .~ start
+    modifyRef grenadeRef (\v -> v & eEntityState.esOrigin .~ start
                                      & eVelocity .~ velocity
                                      & eAVelocity .~ V3 300 300 300
                                      & eMoveType .~ Constants.moveTypeBounce
@@ -465,7 +466,7 @@ fireGrenade selfRef start aimDir damage speed timer damageRadius = do
     
     linkEntity grenadeRef
 
-fireRocket :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
+fireRocket :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Float -> Int -> Quake ()
 fireRocket selfRef start dir damage speed damageRadius radiusDamage = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let modelIndex = gameImport^.giModelIndex
@@ -477,7 +478,7 @@ fireRocket selfRef start dir damage speed damageRadius radiusDamage = do
     soundIdx <- soundIndex (Just "weapons/rockfly.wav")
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
-    modifyEdictT rocketRef (\v -> v & eEntityState.esOrigin .~ start
+    modifyRef rocketRef (\v -> v & eEntityState.esOrigin .~ start
                                     & eMoveDir .~ dir
                                     & eEntityState.esAngles .~ dir
                                     & eVelocity .~ fmap (* (fromIntegral speed)) dir
@@ -499,14 +500,14 @@ fireRocket selfRef start dir damage speed damageRadius radiusDamage = do
                                     & eClassName .~ "rocket"
                                     )
     
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     case self^.eClient of
       Nothing -> return ()
       Just _ -> checkDodge selfRef start dir speed
     
     linkEntity rocketRef
 
-fireBFG :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Quake ()
+fireBFG :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Float -> Quake ()
 fireBFG selfRef start dir damage speed damageRadius = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let modelIndex = gameImport^.giModelIndex
@@ -518,7 +519,7 @@ fireBFG selfRef start dir damage speed damageRadius = do
     soundIdx <- soundIndex (Just "weapons/bfg__l1a.wav")
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
     
-    modifyEdictT bfgRef (\v -> v & eEntityState.esOrigin .~ start
+    modifyRef bfgRef (\v -> v & eEntityState.esOrigin .~ start
                                  & eMoveDir .~ dir
                                  & eEntityState.esAngles .~ Math3D.vectorAngles dir
                                  & eVelocity .~ fmap (* (fromIntegral speed)) dir
@@ -542,14 +543,14 @@ fireBFG selfRef start dir damage speed damageRadius = do
                                  )
                                  
     
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     case self^.eClient of
       Nothing -> return ()
       Just _ -> checkDodge selfRef start dir speed
     
     linkEntity bfgRef
 
-fireGrenade2 :: EdictReference -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Bool -> Quake ()
+fireGrenade2 :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Float -> Float -> Bool -> Quake ()
 fireGrenade2 selfRef start aimDir damage speed timer damageRadius held = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
     let modelIndex = gameImport^.giModelIndex
@@ -568,7 +569,7 @@ fireGrenade2 selfRef start aimDir damage speed timer damageRadius held = do
         (Just forward, Just right, Just up) = Math3D.angleVectors dir True True True
         velocity = fmap (* (fromIntegral speed)) aimDir + fmap (* (200 + c1 * 10)) up + fmap (* (c2 * 10)) right
     
-    modifyEdictT grenadeRef (\v -> v & eEntityState.esOrigin .~ start
+    modifyRef grenadeRef (\v -> v & eEntityState.esOrigin .~ start
                                      & eVelocity .~ velocity
                                      & eAVelocity .~ V3 300 300 300
                                      & eMoveType .~ Constants.moveTypeBounce
@@ -600,7 +601,7 @@ fireGrenade2 selfRef start aimDir damage speed timer damageRadius held = do
 grenadeTouch :: EntTouch
 grenadeTouch =
   GenericEntTouch "grenade_touch" $ \edictRef otherRef _ mSurf -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     
     unless ((edict^.eOwner) == Just otherRef) $ do
       let done = checkSurf mSurf
@@ -610,7 +611,7 @@ grenadeTouch =
           GameUtil.freeEdict edictRef
         
         else do
-          other <- readEdictT otherRef
+          other <- readRef otherRef
           
           if (other^.eTakeDamage) == 0
             then do
@@ -630,7 +631,7 @@ grenadeTouch =
               sound (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
             
             else do
-              modifyEdictT edictRef (\v -> v & eEnemy .~ Just otherRef)
+              modifyRef edictRef (\v -> v & eEnemy .~ Just otherRef)
               void $ think grenadeExplode edictRef
               
   where checkSurf :: Maybe CSurfaceT -> Bool

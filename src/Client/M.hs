@@ -14,6 +14,7 @@ import Game.MFrameT
 import Game.MMoveT
 import Game.MonsterInfoT
 import Types
+import QuakeRef
 import QuakeState
 import Game.Adapters
 import qualified Constants
@@ -22,14 +23,14 @@ import {-# SOURCE #-} qualified Server.SV as SV
 import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
-checkGround :: EdictReference -> Quake ()
+checkGround :: Ref EdictT -> Quake ()
 checkGround edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unless ((edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0) $ do
       if (edict^.eVelocity._z) > 100
         then
-          modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+          modifyRef edictRef (\v -> v { _eGroundEntity = Nothing })
 
         else do
           -- if the hull point one-quarter unit down is solid the entity is
@@ -47,14 +48,14 @@ checkGround edictRef = do
           -- check steepness
           if (traceT^.tPlane.cpNormal._z) < 0.7 && not (traceT^.tStartSolid)
             then
-              modifyEdictT edictRef (\v -> v { _eGroundEntity = Nothing })
+              modifyRef edictRef (\v -> v { _eGroundEntity = Nothing })
 
             else do
               when (not (traceT^.tStartSolid) && not (traceT^.tAllSolid)) $ do
                 let Just traceEntRef = traceT^.tEnt
-                traceEnt <- readEdictT traceEntRef
+                traceEnt <- readRef traceEntRef
 
-                modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos)
+                modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos)
                                                & eGroundEntity .~ (traceT^.tEnt)
                                                & eGroundEntityLinkCount .~ (traceEnt^.eLinkCount)
                                                & eVelocity._z .~ 0)
@@ -63,7 +64,7 @@ checkGround edictRef = do
 fliesOff :: EntThink
 fliesOff =
   GenericEntThink "m_fliesoff" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement Constants.efFlies))
+    modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement Constants.efFlies))
                                    & eEntityState.esSound .~ 0)
 
     return True
@@ -72,14 +73,14 @@ fliesOff =
 fliesOn :: EntThink
 fliesOn =
   GenericEntThink "m_flies_on" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     unless ((edict^.eWaterLevel) /= 0) $ do
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
       soundIdx <- soundIndex (Just "infantry/inflies1.wav")
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efFlies)
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efFlies)
                                      & eEntityState.esSound .~ soundIdx
                                      & eThink .~ Just fliesOff
                                      & eNextThink .~ levelTime + 60)
@@ -90,7 +91,7 @@ fliesOn =
 flyCheck :: EntThink
 flyCheck =
   GenericEntThink "m_fly_check" $ \edictRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     f <- Lib.randomF
 
@@ -98,7 +99,7 @@ flyCheck =
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
       nf <- Lib.randomF
 
-      modifyEdictT edictRef (\v -> v & eThink .~ Just fliesOn
+      modifyRef edictRef (\v -> v & eThink .~ Just fliesOn
                                      & eNextThink .~ levelTime + 5 + 10 * nf)
 
     return True
@@ -106,9 +107,9 @@ flyCheck =
 dropToFloor :: EntThink
 dropToFloor =
   GenericEntThink "m_drop_to_floor" $ \edictRef -> do
-    modifyEdictT edictRef (\v -> v & eEntityState.esOrigin._z +~ 1)
+    modifyRef edictRef (\v -> v & eEntityState.esOrigin._z +~ 1)
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let trace = gameImport^.giTrace
@@ -127,7 +128,7 @@ dropToFloor =
         return True
 
       else do
-        modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
 
         linkEntity edictRef
         checkGround edictRef
@@ -139,9 +140,9 @@ dropToFloor =
 - Returns false if any part of the bottom of the entity is off an edge that
 - is not a staircase.
 -}
-checkBottom :: EdictReference -> Quake Bool
+checkBottom :: Ref EdictT -> Quake Bool
 checkBottom edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let mins = (edict^.eEntityState.esOrigin) + (edict^.eMins)
         maxs = (edict^.eEntityState.esOrigin) + (edict^.eMaxs)
@@ -229,9 +230,9 @@ checkBottom edictRef = do
                 then return (Just False)
                 else checkCorners mins maxs start' stop' mid bottom' x maxX (y + 1) maxY
 
-walkMove :: EdictReference -> Float -> Float -> Quake Bool
+walkMove :: Ref EdictT -> Float -> Float -> Quake Bool
 walkMove edictRef yaw dist = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if isNothing (edict^.eGroundEntity) && (edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0
       then
@@ -243,9 +244,9 @@ walkMove edictRef yaw dist = do
 
         SV.moveStep edictRef move True
 
-catagorizePosition :: EdictReference -> Quake ()
+catagorizePosition :: Ref EdictT -> Quake ()
 catagorizePosition edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     pointContents <- use $ gameBaseGlobals.gbGameImport.giPointContents
 
     let point = (edict^.eEntityState.esOrigin) & _z +~ (edict^.eMins._z) + 1
@@ -253,30 +254,30 @@ catagorizePosition edictRef = do
 
     if cont .&. Constants.maskWater == 0
       then do
-        modifyEdictT edictRef (\v -> v & eWaterLevel .~ 0
+        modifyRef edictRef (\v -> v & eWaterLevel .~ 0
                                        & eWaterType .~ 0)
 
       else do
-        modifyEdictT edictRef (\v -> v & eWaterLevel .~ 1
+        modifyRef edictRef (\v -> v & eWaterLevel .~ 1
                                        & eWaterType .~ cont)
 
         let point' = point & _z +~ 26
         cont' <- pointContents point'
 
         unless (cont' .&. Constants.maskWater == 0) $ do
-          modifyEdictT edictRef (\v -> v & eWaterLevel .~ 2)
+          modifyRef edictRef (\v -> v & eWaterLevel .~ 2)
           let point'' = point' & _z +~ 22
           cont'' <- pointContents point''
 
           when (cont'' .&. Constants.maskWater /= 0) $
-            modifyEdictT edictRef (\v -> v & eWaterLevel .~ 3)
+            modifyRef edictRef (\v -> v & eWaterLevel .~ 3)
 
-moveFrame :: EdictReference -> Quake ()
+moveFrame :: Ref EdictT -> Quake ()
 moveFrame selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     let Just move = self^.eMonsterInfo.miCurrentMove
 
@@ -286,7 +287,7 @@ moveFrame selfRef = do
 
     done <- if (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame)
               then do
-                modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ (self^.eMonsterInfo.miNextFrame)
+                modifyRef selfRef (\v -> v & eEntityState.esFrame .~ (self^.eMonsterInfo.miNextFrame)
                                               & eMonsterInfo.miNextFrame .~ 0)
 
                 return False
@@ -295,7 +296,7 @@ moveFrame selfRef = do
                           then do
                             void $ think (fromJust $ move^.mmEndFunc) selfRef
 
-                            self' <- readEdictT selfRef
+                            self' <- readRef selfRef
 
                             -- check for death
                             if (self'^.eSvFlags) .&. Constants.svfDeadMonster /= 0
@@ -311,12 +312,12 @@ moveFrame selfRef = do
 
                   else do
                     -- regrab move, endfunc is very likely to change it
-                    self' <- readEdictT selfRef
+                    self' <- readRef selfRef
                     let Just move' = self'^.eMonsterInfo.miCurrentMove
 
                     if (self'^.eEntityState.esFrame) < (move'^.mmFirstFrame) || (self'^.eEntityState.esFrame) > (move'^.mmLastFrame)
                       then do
-                        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame))
+                        modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame))
                                                       & eEntityState.esFrame .~ (move'^.mmFirstFrame))
 
                         return False
@@ -325,15 +326,15 @@ moveFrame selfRef = do
                         when ((self'^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0) $ do
                           if (self'^.eEntityState.esFrame) + 1 > move'^.mmLastFrame
                             then
-                              modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ (move'^.mmFirstFrame))
+                              modifyRef selfRef (\v -> v & eEntityState.esFrame .~ (move'^.mmFirstFrame))
                             else
-                              modifyEdictT selfRef (\v -> v & eEntityState.esFrame +~ 1)
+                              modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1)
 
                         return False
 
     unless done $ do
       -- regrab move, endfunc is very likely to change it
-      self' <- readEdictT selfRef
+      self' <- readRef selfRef
       let Just move' = self'^.eMonsterInfo.miCurrentMove
           index = (self'^.eEntityState.esFrame) - (move'^.mmFirstFrame)
           frame = (move'^.mmFrame) V.! index
@@ -354,11 +355,11 @@ moveFrame selfRef = do
       when (isJust (frame^.mfThink)) $
         void $ think (fromJust $ frame^.mfThink) selfRef
 
-worldEffects :: EdictReference -> Quake ()
+worldEffects :: Ref EdictT -> Quake ()
 worldEffects edictRef = do
     checkWaterDamage
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if edict^.eWaterLevel == 0
       then do
@@ -371,7 +372,7 @@ worldEffects edictRef = do
           soundIdx <- soundIndex (Just "player/watr_out.wav")
           sound (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
 
-          modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
+          modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
 
       else do
         checkLava
@@ -380,7 +381,7 @@ worldEffects edictRef = do
 
   where checkWaterDamage :: Quake ()
         checkWaterDamage = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when ((edict^.eHealth) > 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -388,7 +389,7 @@ worldEffects edictRef = do
             -- IMPROVE: refactor, too much same stuff here
             if (edict^.eFlags) .&. Constants.flSwim == 0
               then if | (edict^.eWaterLevel) < 3 ->
-                          modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 12)
+                          modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 12)
 
                       | (edict^.eAirFinished) < levelTime -> do
                           -- drown!
@@ -399,12 +400,12 @@ worldEffects edictRef = do
                             v3o <- use $ globals.gVec3Origin
                             GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
 
-                            modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+                            modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
                       | otherwise -> return ()
 
               else if | (edict^.eWaterLevel) > 0 ->
-                          modifyEdictT edictRef (\v -> v & eAirFinished .~ levelTime + 9)
+                          modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 9)
 
                       | (edict^.eAirFinished) < levelTime -> do
                           -- suffocate!
@@ -415,13 +416,13 @@ worldEffects edictRef = do
                             v3o <- use $ globals.gVec3Origin
                             GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
 
-                            modifyEdictT edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+                            modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
 
                       | otherwise -> return ()
 
         checkLava :: Quake ()
         checkLava = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when ((edict^.eWaterType) .&. Constants.contentsLava /= 0 && (edict^.eFlags) .&. Constants.flImmuneLava == 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -432,7 +433,7 @@ worldEffects edictRef = do
 
         checkSlime :: Quake ()
         checkSlime = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when ((edict^.eWaterType) .&. Constants.contentsSlime /= 0 && (edict^.eFlags) .&. Constants.flImmuneSlime == 0) $ do
             levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -443,7 +444,7 @@ worldEffects edictRef = do
 
         checkInWater :: Quake ()
         checkInWater = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           when ((edict^.eFlags) .&. Constants.flInWater == 0) $ do
             when ((edict^.eSvFlags) .&. Constants.svfDeadMonster == 0) $ do
@@ -469,18 +470,18 @@ worldEffects edictRef = do
 
                  | otherwise -> return ()
 
-            modifyEdictT edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
+            modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
                                            & eDamageDebounceTime .~ 0)
 
-setEffects :: EdictReference -> Quake ()
+setEffects :: Ref EdictT -> Quake ()
 setEffects edictRef = do
-    modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
+    modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
                                    & eEntityState.esRenderFx %~ (.&. (complement (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue))))
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     when ((edict^.eMonsterInfo.miAIFlags) .&. Constants.aiResurrecting /= 0) $ do
-      modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+      modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
                                      & eEntityState.esRenderFx %~ (.|. Constants.rfShellRed))
 
     unless ((edict^.eHealth) <= 0) $ do
@@ -488,17 +489,17 @@ setEffects edictRef = do
 
       when ((edict^.ePowerArmorTime) > levelTime) $
         if | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorScreen ->
-               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
+               modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
 
            | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorShield ->
-               modifyEdictT edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+               modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
                                               & eEntityState.esRenderFx %~ (.|. Constants.rfShellGreen))
 
            | otherwise -> return ()
 
-changeYaw :: EdictReference -> Quake ()
+changeYaw :: Ref EdictT -> Quake ()
 changeYaw edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let current = Math3D.angleMod (edict^.eEntityState.esAngles.(Math3D.v3Access Constants.yaw))
         ideal = edict^.eIdealYaw
@@ -519,11 +520,11 @@ changeYaw edictRef = do
                      2 -> _z
                      _ -> undefined -- shouldn't happen
 
-      modifyEdictT edictRef (\v -> v & eEntityState.esAngles.access .~ Math3D.angleMod (current + move''))
+      modifyRef edictRef (\v -> v & eEntityState.esAngles.access .~ Math3D.angleMod (current + move''))
 
-moveToGoal :: EdictReference -> Float -> Quake ()
+moveToGoal :: Ref EdictT -> Float -> Quake ()
 moveToGoal edictRef dist = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let skip = isNothing (edict^.eGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
     -- if the next step hits the enemy, return immediately
@@ -535,7 +536,7 @@ moveToGoal edictRef dist = do
     -- io (print $ "skip = " ++ show skip ++ " skip' = " ++ show skip')
 
     unless (skip || skip') $ do
-      edict' <- readEdictT edictRef
+      edict' <- readRef edictRef
 
       -- bump around
       r <- Lib.rand
@@ -548,7 +549,7 @@ moveToGoal edictRef dist = do
           v <- SV.stepDirection edictRef (edict'^.eIdealYaw) dist
 
           unless v $ do
-            edict'' <- readEdictT edictRef
+            edict'' <- readRef edictRef
 
             when (edict''^.eInUse) $
               SV.newChaseDir edictRef (edict''^.eGoalEntity) dist

@@ -23,6 +23,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import Game.PMoveStateT
 import QuakeState
 import CVarVariables
@@ -45,9 +46,9 @@ import qualified Util.Lib as Lib
 import qualified Util.Math3D as Math3D
 
 -- Called when a player drops from the server. Will not be called between levels. 
-clientDisconnect :: EdictReference -> Quake ()
+clientDisconnect :: Ref EdictT -> Quake ()
 clientDisconnect edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eClient of
       Nothing ->
@@ -74,7 +75,7 @@ clientDisconnect edictRef = do
 
         unlinkEntity edictRef
 
-        modifyEdictT edictRef (\v -> v & eEntityState.esModelIndex .~ 0
+        modifyRef edictRef (\v -> v & eEntityState.esModelIndex .~ 0
                                        & eSolid .~ Constants.solidNot
                                        & eInUse .~ False
                                        & eClassName .~ "disconnected"
@@ -90,7 +91,7 @@ clientDisconnect edictRef = do
 - Changing levels will NOT cause this to be called again, but loadgames
 - will. 
 -}
-clientConnect :: EdictReference -> B.ByteString -> Quake (Bool, B.ByteString)
+clientConnect :: Ref EdictT -> B.ByteString -> Quake (Bool, B.ByteString)
 clientConnect edictRef userInfo = do
     -- check to see if they are on the banned IP list
     value <- Info.valueForKey userInfo "ip"
@@ -126,13 +127,13 @@ clientConnect edictRef userInfo = do
             return (False, userInfo')
 
           else do
-            edict <- readEdictT edictRef
+            edict <- readRef edictRef
 
             -- they can connect
             let gClientIdx = (edict^.eIndex) - 1
                 gClientRef = GClientReference gClientIdx
 
-            modifyEdictT edictRef (\v -> v & eClient .~ Just gClientRef)
+            modifyRef edictRef (\v -> v & eClient .~ Just gClientRef)
 
             -- if there is already a body waiting for us (a loadgame), just
             -- take it, otherwise spawn one from scratch
@@ -156,7 +157,7 @@ clientConnect edictRef userInfo = do
               Just netName <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpNetName
               dprintf $ netName `B.append` " connected\n"
 
-            modifyEdictT edictRef (\v -> v & eSvFlags .~ 0) -- make sure we start with known default
+            modifyRef edictRef (\v -> v & eSvFlags .~ 0) -- make sure we start with known default
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpConnected .= True
 
             return (True, userInfo'')
@@ -199,9 +200,9 @@ initBodyQue = do
   where spawnBodyQue :: Int -> Quake ()
         spawnBodyQue _ = do
           bodyRef <- GameUtil.spawn
-          modifyEdictT bodyRef (\v -> v & eClassName .~ "bodyque")
+          modifyRef bodyRef (\v -> v & eClassName .~ "bodyque")
 
-spInfoPlayerStart :: EdictReference -> Quake ()
+spInfoPlayerStart :: Ref EdictT -> Quake ()
 spInfoPlayerStart edictRef = do
     coopValue <- liftM (^.cvValue) coopCVar
 
@@ -211,14 +212,14 @@ spInfoPlayerStart edictRef = do
       when (mapName == "security") $ do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         -- invoke one of our gross, ugly, disgusting hacks
-        modifyEdictT edictRef (\v -> v & eThink .~ Just spCreateCoopSpots
+        modifyRef edictRef (\v -> v & eThink .~ Just spCreateCoopSpots
                                        & eNextThink .~ levelTime + Constants.frameTime)
 
 {-
 - QUAKED info_player_deathmatch (1 0 1) (-16 -16 -24) (16 16 32) potential
 - spawning position for deathmatch games.
 -}
-spInfoPlayerDeathmatch :: EdictReference -> Quake ()
+spInfoPlayerDeathmatch :: Ref EdictT -> Quake ()
 spInfoPlayerDeathmatch edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -230,7 +231,7 @@ spInfoPlayerDeathmatch edictRef = do
 - QUAKED info_player_coop (1 0 1) (-16 -16 -24) (16 16 32) potential
 - spawning position for coop games.
 -}
-spInfoPlayerCoop :: EdictReference -> Quake ()
+spInfoPlayerCoop :: Ref EdictT -> Quake ()
 spInfoPlayerCoop edictRef = do
     coopValue <- liftM (^.cvValue) coopCVar
 
@@ -248,7 +249,7 @@ spInfoPlayerCoop edictRef = do
           -- invoke one of our gross, ugly, disgusting hacks
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-          modifyEdictT edictRef (\v -> v & eThink .~ Just spFixCoopSpots
+          modifyRef edictRef (\v -> v & eThink .~ Just spFixCoopSpots
                                          & eNextThink .~ levelTime + Constants.frameTime)
 
 spInfoPlayerIntermission :: Quake ()
@@ -259,7 +260,7 @@ spFixCoopSpots =
   GenericEntThink "SP_FixCoopSpots" $ \selfRef -> do
     fixSpots selfRef Nothing
     
-  where fixSpots :: EdictReference -> Maybe EdictReference -> Quake Bool
+  where fixSpots :: Ref EdictT -> Maybe (Ref EdictT) -> Quake Bool
         fixSpots selfRef es = do
           foundEdict <- GameBase.gFind es GameBase.findByClass "info_player_start"
 
@@ -268,20 +269,20 @@ spFixCoopSpots =
               return True
 
             Just edictRef -> do
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
 
               case edict^.eTargetName of
                 Nothing ->
                   fixSpots selfRef foundEdict
 
                 Just targetName -> do
-                  self <- readEdictT selfRef
+                  self <- readRef selfRef
                   let d = (self^.eEntityState.esOrigin) - (edict^.eEntityState.esOrigin)
 
                   if norm d < 384
                     then do
                       when (isNothing (self^.eTargetName) || BC.map toLower (fromJust $ self^.eTargetName) /= BC.map toLower targetName) $
-                        modifyEdictT selfRef (\v -> v & eTargetName .~ (edict^.eTargetName))
+                        modifyRef selfRef (\v -> v & eTargetName .~ (edict^.eTargetName))
 
                       return True
 
@@ -295,21 +296,21 @@ spCreateCoopSpots =
 
     when (BC.map toLower mapName == "security") $ do
       spotRef <- GameUtil.spawn
-      modifyEdictT spotRef (\v -> v & eClassName .~ "info_player_coop"
+      modifyRef spotRef (\v -> v & eClassName .~ "info_player_coop"
                                     & eEntityState.esOrigin .~ V3 (188 - 64) (-164) 80
                                     & eTargetName .~ Just "jail3"
                                     & eEntityState.esAngles._y .~ 90
                                     )
 
       spotRef' <- GameUtil.spawn
-      modifyEdictT spotRef' (\v -> v & eClassName .~ "info_player_coop"
+      modifyRef spotRef' (\v -> v & eClassName .~ "info_player_coop"
                                      & eEntityState.esOrigin .~ V3 (188 + 64) (-164) 80
                                      & eTargetName .~ Just "jail3"
                                      & eEntityState.esAngles._y .~ 90
                                      )
 
       spotRef'' <- GameUtil.spawn
-      modifyEdictT spotRef'' (\v -> v & eClassName .~ "info_player_coop"
+      modifyRef spotRef'' (\v -> v & eClassName .~ "info_player_coop"
                                       & eEntityState.esOrigin .~ V3 (188 + 128) (-164) 80
                                       & eTargetName .~ Just "jail3"
                                       & eEntityState.esAngles._y .~ 90
@@ -321,12 +322,12 @@ spCreateCoopSpots =
 - This will be called once for each server frame, before running any other
 - entities in the world. 
 -}
-clientBeginServerFrame :: EdictReference -> Quake ()
+clientBeginServerFrame :: Ref EdictT -> Quake ()
 clientBeginServerFrame edictRef = do
     intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
 
     unless (intermissionTime /= 0) $ do
-      edict <- readEdictT edictRef
+      edict <- readRef edictRef
       let Just (GClientReference gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       deathmatchValue <- liftM (^.cvValue) deathmatchCVar
@@ -342,7 +343,7 @@ clientBeginServerFrame edictRef = do
             then PlayerWeapon.thinkWeapon edictRef
             else gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponThunk .= False
 
-          edict' <- readEdictT edictRef
+          edict' <- readRef edictRef
 
           if (edict'^.eDeadFlag) /= 0
             then
@@ -410,7 +411,7 @@ initClientPersistant (GClientReference gClientIdx) = do
 - names, etc) before copying it off. 
 -
 -}
-clientUserInfoChanged :: EdictReference -> B.ByteString -> Quake B.ByteString
+clientUserInfoChanged :: Ref EdictT -> B.ByteString -> Quake B.ByteString
 clientUserInfoChanged edictRef userInfo = do
     -- check for malformed or illegal info strings
     if not (Info.validate userInfo)
@@ -418,7 +419,7 @@ clientUserInfoChanged edictRef userInfo = do
         return "\\name\\badinfo\\skin\\male/grunt"
 
       else do
-        edict <- readEdictT edictRef
+        edict <- readRef edictRef
         let Just (GClientReference gClientIdx) = edict^.eClient
 
         -- set name
@@ -480,11 +481,11 @@ passwordOK p1 p2 =
 - Called when a client has finished connecting, and is ready to be placed
 - into the game. This will happen every level load. 
 -}
-clientBegin :: EdictReference -> Quake ()
+clientBegin :: Ref EdictT -> Quake ()
 clientBegin edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let gClientRef = GClientReference ((edict^.eIndex) - 1)
-    modifyEdictT edictRef (\v -> v & eClient .~ Just gClientRef)
+    modifyRef edictRef (\v -> v & eClient .~ Just gClientRef)
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -510,7 +511,7 @@ clientBegin edictRef = do
             -- except for the persistant data that was initialized at
             -- ClientConnect() time
             GameUtil.initEdict edictRef
-            modifyEdictT edictRef (\v -> v & eClassName .~ "player")
+            modifyRef edictRef (\v -> v & eClassName .~ "player")
             initClientResp gClientRef
             putClientInServer edictRef
 
@@ -531,7 +532,7 @@ clientBegin edictRef = do
                   multicast = gameImport^.giMulticast
                   bprintf = gameImport^.giBprintf
 
-              edict' <- readEdictT edictRef
+              edict' <- readRef edictRef
               Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix ((edict'^.eIndex) - 1)
 
               writeByte Constants.svcMuzzleFlash
@@ -547,10 +548,10 @@ clientBegin edictRef = do
 - A client has just connected to the server in deathmatch mode, so clear
 - everything out before starting them. 
 -}
-clientBeginDeathmatch :: EdictReference -> Quake ()
+clientBeginDeathmatch :: Ref EdictT -> Quake ()
 clientBeginDeathmatch edictRef = do
     GameUtil.initEdict edictRef
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     let gClientIdx = (edict^.eIndex) - 1
     initClientResp (GClientReference gClientIdx) -- TODO: jake uses ent.client to get the client ref
@@ -585,13 +586,13 @@ clientBeginDeathmatch edictRef = do
     PlayerView.clientEndServerFrame edictRef
 
 -- Called when a player connects to a server or respawns in a deathmatch.
-putClientInServer :: EdictReference -> Quake ()
+putClientInServer :: Ref EdictT -> Quake ()
 putClientInServer edictRef = do
     -- find a spawn point
     -- do it before setting health back up, so farthest
     -- ranging doesn't count this client
     (spawnOrigin, spawnAngles) <- selectSpawnPoint edictRef
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let gClientIdx = (edict^.eIndex) - 1
 
     -- deathmatch wipes most client data every spawn
@@ -639,7 +640,7 @@ putClientInServer edictRef = do
     -- clear entity values
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT edictRef (\v -> v & eGroundEntity .~ Nothing
+    modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing
                                    & eClient       .~ Just (GClientReference gClientIdx)
                                    & eTakeDamage   .~ Constants.damageAim
                                    & eMoveType     .~ Constants.moveTypeWalk
@@ -702,7 +703,7 @@ putClientInServer edictRef = do
       gcPlayerState.psViewAngles                .= angles
       gcVAngle                                  .= angles
 
-    modifyEdictT edictRef (\v -> v & eEntityState.esEffects     .~ 0
+    modifyRef edictRef (\v -> v & eEntityState.esEffects     .~ 0
                                    & eEntityState.esModelIndex  .~ 255 -- will use the skin specified model
                                    & eEntityState.esModelIndex2 .~ 255 -- custom gun model
                                    -- sknum is player num and weapon number
@@ -721,7 +722,7 @@ putClientInServer edictRef = do
           gcResp.crSpectator .= True
           gcPlayerState.psGunIndex .= 0
 
-        modifyEdictT edictRef (\v -> v & eMoveType .~ Constants.moveTypeNoClip
+        modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypeNoClip
                                        & eSolid .~ Constants.solidNot
                                        & eSvFlags %~ (.|. Constants.svfNoClient))
 
@@ -739,7 +740,7 @@ putClientInServer edictRef = do
         PlayerWeapon.changeWeapon edictRef
 
 -- Chooses a player start, deathmatch start, coop start, etc.
-selectSpawnPoint :: EdictReference -> Quake (V3 Float, V3 Float)
+selectSpawnPoint :: Ref EdictT -> Quake (V3 Float, V3 Float)
 selectSpawnPoint edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     coopValue <- liftM (^.cvValue) coopCVar
@@ -769,7 +770,7 @@ selectSpawnPoint edictRef = do
         return (V3 0 0 0, V3 0 0 0)
 
       Just entRef -> do
-        ent <- readEdictT entRef
+        ent <- readRef entRef
 
         let entityState = ent^.eEntityState
             origin = let V3 a b c = entityState^.esOrigin in V3 a b (c + 9)
@@ -777,14 +778,14 @@ selectSpawnPoint edictRef = do
 
         return (origin, angles)
 
-  where findPlayerStart :: B.ByteString -> Maybe EdictReference -> Quake (Maybe EdictReference)
+  where findPlayerStart :: B.ByteString -> Maybe (Ref EdictT) -> Quake (Maybe (Ref EdictT))
         findPlayerStart spawnPoint eRef = do
           es <- GameBase.gFind eRef GameBase.findByClass "info_player_start"
 
           case es of
             Nothing -> return Nothing
             Just ref -> do
-              e <- readEdictT ref
+              e <- readRef ref
               let targetName = e^.eTargetName
 
               if | B.length spawnPoint == 0 && isNothing targetName ->
@@ -796,33 +797,33 @@ selectSpawnPoint edictRef = do
                  | otherwise ->
                      findPlayerStart spawnPoint es
 
-selectDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectDeathmatchSpawnPoint :: Quake (Maybe (Ref EdictT))
 selectDeathmatchSpawnPoint = do
     dmFlagsValue <- liftM (^.cvValue) dmFlagsCVar
     if (truncate dmFlagsValue) .&. Constants.dfSpawnFarthest /= 0
       then selectFarthestDeathmatchSpawnPoint
       else selectRandomDeathmatchSpawnPoint
 
-selectRandomDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectRandomDeathmatchSpawnPoint :: Quake (Maybe (Ref EdictT))
 selectRandomDeathmatchSpawnPoint = do
     undefined -- TODO
 
-selectFarthestDeathmatchSpawnPoint :: Quake (Maybe EdictReference)
+selectFarthestDeathmatchSpawnPoint :: Quake (Maybe (Ref EdictT))
 selectFarthestDeathmatchSpawnPoint = do
     undefined -- TODO
 
-selectCoopSpawnPoint :: EdictReference -> Quake (Maybe EdictReference)
+selectCoopSpawnPoint :: Ref EdictT -> Quake (Maybe (Ref EdictT))
 selectCoopSpawnPoint _ = do
     io (putStrLn "PlayerClient.selectCoopSpawnPoint") >> undefined -- TODO
 
-fetchClientEntData :: EdictReference -> Quake ()
+fetchClientEntData :: Ref EdictT -> Quake ()
 fetchClientEntData edictRef = do
     coopValue <- liftM (^.cvValue) coopCVar
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
-    modifyEdictT edictRef (\v -> v & eHealth .~ gClient^.gcPers.cpHealth
+    modifyRef edictRef (\v -> v & eHealth .~ gClient^.gcPers.cpHealth
                                    & eMaxHealth .~ gClient^.gcPers.cpMaxHealth
                                    & eFlags %~ (.|. (gClient^.gcPers.cpSavedFlags)))
 
@@ -842,7 +843,7 @@ playerDie =
         sound = gameImport^.giSound
         linkEntity = gameImport^.giLinkEntity
 
-    modifyEdictT selfRef (\v -> v & eAVelocity .~ V3 0 0 0
+    modifyRef selfRef (\v -> v & eAVelocity .~ V3 0 0 0
                                   & eTakeDamage .~ Constants.damageYes
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eEntityState.esModelIndex2 .~ 0 -- remove linked weapon model
@@ -852,7 +853,7 @@ playerDie =
                                   & eMaxs._z .~ (-8)
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster))
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just gClientRef@(GClientReference gClientIdx) = self^.eClient
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
@@ -889,7 +890,7 @@ playerDie =
       gcBreatherFrameNum .= 0
       gcEnviroFrameNum .= 0
 
-    modifyEdictT selfRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
+    modifyRef selfRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
 
     if (self^.eHealth) < (-40) -- gib
       then do
@@ -903,7 +904,7 @@ playerDie =
 
         GameMisc.throwClientHead selfRef damage
 
-        modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
+        modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
 
       else -- normal death
         when ((self^.eDeadFlag) == 0) $ do
@@ -922,7 +923,7 @@ playerDie =
                                        1 -> (MPlayer.frameDeath201 - 1, MPlayer.frameDeath206)
                                        _ -> (MPlayer.frameDeath301 - 1, MPlayer.frameDeath308)
 
-          modifyEdictT selfRef (\v -> v & eEntityState.esFrame .~ frame)
+          modifyRef selfRef (\v -> v & eEntityState.esFrame .~ frame)
 
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
             gcAnimPriority .= Constants.animDeath
@@ -933,7 +934,7 @@ playerDie =
           soundIdx <- soundIndex (Just soundName)
           sound (Just selfRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
 
-    modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+    modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
     linkEntity selfRef
 
   where clearInventory :: GClientReference -> GClientT -> Float -> V.Vector GItemT -> Int -> Int -> Quake ()
@@ -950,9 +951,9 @@ playerDie =
 - Only called when pers.spectator changes note that resp.spectator should
 - be the opposite of pers.spectator here
 -}
-spectatorRespawn :: EdictReference -> Quake ()
+spectatorRespawn :: Ref EdictT -> Quake ()
 spectatorRespawn edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -1025,7 +1026,7 @@ spectatorRespawn edictRef = do
         gcResp.crScore .= 0
         gcPers.cpScore .= 0
 
-      modifyEdictT edictRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+      modifyRef edictRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
       putClientInServer edictRef
 
       -- add a teleportation effect
@@ -1053,8 +1054,8 @@ spectatorRespawn edictRef = do
         countSpectators idx maxIdx acc
           | idx > maxIdx = return acc
           | otherwise = do
-              let ref = newEdictReference idx
-              edict <- readEdictT ref
+              let ref = Ref idx
+              edict <- readRef ref
 
               if edict^.eInUse
                 then do
@@ -1068,23 +1069,23 @@ spectatorRespawn edictRef = do
                 else
                   countSpectators (idx + 1) maxIdx acc
 
-respawn :: EdictReference -> Quake ()
+respawn :: Ref EdictT -> Quake ()
 respawn selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     coopValue <- liftM (^.cvValue) coopCVar
 
     if deathmatchValue /= 0 || coopValue /= 0
       then do
-        self <- readEdictT selfRef
+        self <- readRef selfRef
 
         when ((self^.eMoveType) /= Constants.moveTypeNoClip) $
           copyToBodyQue selfRef
 
-        modifyEdictT selfRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+        modifyRef selfRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
         putClientInServer selfRef
 
         -- add a teleportation effect
-        modifyEdictT selfRef (\v -> v & eEntityState.esEvent .~ Constants.evPlayerTeleport)
+        modifyRef selfRef (\v -> v & eEntityState.esEvent .~ Constants.evPlayerTeleport)
 
         let Just (GClientReference gClientIdx) = self^.eClient
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -1099,12 +1100,12 @@ respawn selfRef = do
         addCommandString <- use $ gameBaseGlobals.gbGameImport.giAddCommandString
         addCommandString "menu_loadgame\n"
 
-copyToBodyQue :: EdictReference -> Quake ()
+copyToBodyQue :: Ref EdictT -> Quake ()
 copyToBodyQue edictRef = do
     maxClientsValue <- liftM (^.cvValue) maxClientsCVar
     bodyQue <- use $ gameBaseGlobals.gbLevel.llBodyQue
     let idx = truncate maxClientsValue + bodyQue + 1
-        bodyRef = newEdictReference idx
+        bodyRef = Ref idx
 
     gameBaseGlobals.gbLevel.llBodyQue .= (bodyQue + 1) `mod` Constants.bodyQueueSize
 
@@ -1117,9 +1118,9 @@ copyToBodyQue edictRef = do
     unlinkEntity edictRef
     unlinkEntity bodyRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
-    modifyEdictT bodyRef (\v -> v & eEntityState .~ (edict^.eEntityState)
+    modifyRef bodyRef (\v -> v & eEntityState .~ (edict^.eEntityState)
                                   & eEntityState.esNumber .~ idx
                                   & eSvFlags .~ (edict^.eSvFlags)
                                   & eMins .~ (edict^.eMins)
@@ -1140,7 +1141,7 @@ copyToBodyQue edictRef = do
 bodyDie :: EntDie
 bodyDie =
   GenericEntDie "body_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < -40) $ do
       gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -1155,21 +1156,21 @@ bodyDie =
       GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
       GameMisc.throwGib selfRef "models/objects/gibs/sm_meat/tris.md2" damage Constants.gibOrganic
 
-      modifyEdictT selfRef (\v -> v & eEntityState.esOrigin._z -~ 48)
+      modifyRef selfRef (\v -> v & eEntityState.esOrigin._z -~ 48)
 
       GameMisc.throwClientHead selfRef damage
 
-      modifyEdictT selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
+      modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageNo)
 
 {-
 - This will be called once for each client frame, which will usually be a
 - couple times for each server frame.
 -}
-clientThink :: EdictReference -> UserCmdT -> Quake ()
+clientThink :: Ref EdictT -> UserCmdT -> Quake ()
 clientThink edictRef ucmd = do
     gameBaseGlobals.gbLevel.llCurrentEntity .= Just edictRef
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just (GClientReference gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -1190,7 +1191,7 @@ clientThink edictRef ucmd = do
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crCmdAngles .= fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles)
 
           Nothing -> do
-            readEdictT edictRef >>= \edict' -> do
+            readRef edictRef >>= \edict' -> do
               let pmtype = if | (edict'^.eMoveType) == Constants.moveTypeNoClip -> Constants.pmSpectator
                               | (edict'^.eEntityState.esModelIndex) /= 255 -> Constants.pmGib
                               | (edict'^.eDeadFlag) /= 0 -> Constants.pmDead
@@ -1201,7 +1202,7 @@ clientThink edictRef ucmd = do
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState.pmsGravity .= truncate gravityValue
 
             Just pmoveState <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState
-            edict' <- readEdictT edictRef
+            edict' <- readRef edictRef
             gameImport <- use $ gameBaseGlobals.gbGameImport
 
             let pointContents = gameImport^.giPointContents
@@ -1234,28 +1235,28 @@ clientThink edictRef ucmd = do
               gcOldPMove .= (pm'^.pmState)
               gcResp.crCmdAngles .= fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles)
 
-            modifyEdictT edictRef (\v -> v & eEntityState.esOrigin .~ fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
+            modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsOrigin)
                                            & eVelocity .~ fmap ((* 0.125) . fromIntegral) (pm'^.pmState.pmsVelocity)
                                            & eMins .~ (pm'^.pmMins)
                                            & eMaxs .~ (pm'^.pmMaxs))
 
-            readEdictT edictRef >>= \edict'' -> 
+            readRef edictRef >>= \edict'' -> 
               when (isJust (edict''^.eGroundEntity) && isNothing (pm'^.pmGroundEntity) && (pm'^.pmCmd.ucUpMove) >= 10 && (pm'^.pmWaterLevel) == 0) $ do
                 sIdx <- soundIndex (Just "*jump1.wav")
                 sound (Just edictRef) Constants.chanVoice sIdx 1 Constants.attnNorm 0
                 PlayerWeapon.playerNoise edictRef (edict''^.eEntityState.esOrigin) Constants.pNoiseSelf
 
-            modifyEdictT edictRef (\v -> v & eViewHeight .~ truncate (pm'^.pmViewHeight)
+            modifyRef edictRef (\v -> v & eViewHeight .~ truncate (pm'^.pmViewHeight)
                                            & eWaterLevel .~ (pm'^.pmWaterLevel)
                                            & eWaterType .~ (pm'^.pmWaterType)
                                            & eGroundEntity .~ (pm'^.pmGroundEntity))
 
             when (isJust (pm'^.pmGroundEntity)) $ do
               let Just groundEntityRef = pm'^.pmGroundEntity
-              groundEntity <- readEdictT groundEntityRef
-              modifyEdictT edictRef (\v -> v & eGroundEntityLinkCount .~ (groundEntity^.eLinkCount))
+              groundEntity <- readRef groundEntityRef
+              modifyRef edictRef (\v -> v & eGroundEntityLinkCount .~ (groundEntity^.eLinkCount))
 
-            readEdictT edictRef >>= \edict'' ->
+            readRef edictRef >>= \edict'' ->
               if (edict''^.eDeadFlag) /= 0
                 then
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewAngles .= V3 (-15) (gClient^.gcKillerYaw) 40 -- TODO: use ROLL PITCH YAW? -- TODO: we use gcKillerYaw hasn't changed?
@@ -1266,7 +1267,7 @@ clientThink edictRef ucmd = do
 
             linkEntity edictRef
 
-            readEdictT edictRef >>= \edict'' ->
+            readRef edictRef >>= \edict'' ->
               when ((edict''^.eMoveType) /= Constants.moveTypeNoClip) $
                 GameBase.touchTriggers edictRef
 
@@ -1281,7 +1282,7 @@ clientThink edictRef ucmd = do
 
         -- save light level the player is standing on for
         -- monster sighting AI
-        modifyEdictT edictRef (\v -> v & eLightLevel .~ fromIntegral (ucmd^.ucLightLevel))
+        modifyRef edictRef (\v -> v & eLightLevel .~ fromIntegral (ucmd^.ucLightLevel))
 
         -- fire weapon from final position if needed
         preuse (gameBaseGlobals.gbGame.glClients.ix gClientIdx) >>= \(Just gClient') ->
@@ -1316,7 +1317,7 @@ clientThink edictRef ucmd = do
                   duplicated = checkIfDuplicated pm otherRef 0 idx
 
               unless duplicated $ do
-                other <- readEdictT otherRef
+                other <- readRef otherRef
 
                 when (isJust (other^.eTouch)) $ do
                   dummyPlane <- use $ gameBaseGlobals.gbDummyPlane
@@ -1324,7 +1325,7 @@ clientThink edictRef ucmd = do
 
               touchOtherObjects pm (idx + 1) maxIdx
 
-        checkIfDuplicated :: PMoveT -> EdictReference -> Int -> Int -> Bool
+        checkIfDuplicated :: PMoveT -> Ref EdictT -> Int -> Int -> Bool
         checkIfDuplicated pm ref idx maxIdx
           | idx >= maxIdx = False
           | otherwise = let otherRef = (pm^.pmTouchEnts) V.! idx
@@ -1336,20 +1337,20 @@ clientThink edictRef ucmd = do
         updateChaseCamera idx maxIdx
           | idx > maxIdx = return ()
           | otherwise = do
-              other <- readEdictT (newEdictReference idx)
+              other <- readRef (Ref idx)
               when (other^.eInUse) $ do
                 let Just (GClientReference gClientIdx) = other^.eClient
                 Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                 when ((client^.gcChaseTarget) == Just edictRef) $
-                  GameChase.updateChaseCam (newEdictReference idx)
+                  GameChase.updateChaseCam (Ref idx)
 
               updateChaseCamera (idx + 1) maxIdx
 
 defaultTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
 defaultTrace start mins maxs end = do
     Just edictRef <- use $ clientGlobals.cgPMPassEnt
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     trace <- use $ gameBaseGlobals.gbGameImport.giTrace
 
     if (edict^.eHealth) > 0
@@ -1357,12 +1358,12 @@ defaultTrace start mins maxs end = do
       else liftM Just $ trace start (Just mins) (Just maxs) end (Just edictRef) Constants.maskDeadSolid
 
 -- Drop items and weapons in deathmatch games.
-tossClientWeapon :: EdictReference -> Quake ()
+tossClientWeapon :: Ref EdictT -> Quake ()
 tossClientWeapon selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
     unless (deathmatchValue == 0) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
       let Just (GClientReference gClientIdx) = self^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -1395,7 +1396,7 @@ tossClientWeapon selfRef = do
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y -= spread -- IMPROVE: use Constants.yaw instead of _y
           dropRef <- GameItems.dropItem selfRef gItemRef
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y += spread -- IMPROVE: use Constants.yaw instead of _y
-          modifyEdictT dropRef (\v -> v & eSpawnFlags .~ Constants.droppedPlayerItem)
+          modifyRef dropRef (\v -> v & eSpawnFlags .~ Constants.droppedPlayerItem)
 
       when quad $ do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -1403,27 +1404,27 @@ tossClientWeapon selfRef = do
         Just quadRef <- GameItems.findItemByClassname "item_quad"
         dropRef <- GameItems.dropItem selfRef quadRef
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcVAngle._y -= spread -- IMPROVE: use Constants.yaw instead of _y
-        modifyEdictT dropRef (\v -> v & eSpawnFlags %~ (.|. Constants.droppedPlayerItem)
+        modifyRef dropRef (\v -> v & eSpawnFlags %~ (.|. Constants.droppedPlayerItem)
                                       & eTouch .~ Just GameItems.touchItem
                                       & eNextThink .~ levelTime + ((gClient^.gcQuadFrameNum) - fromIntegral frameNum) * Constants.frameTime
                                       & eThink .~ Just GameUtil.freeEdictA
                                       )
 
 -- Changes the camera view to look at the killer.
-lookAtKiller :: EdictReference -> EdictReference -> EdictReference -> Quake ()
+lookAtKiller :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Quake ()
 lookAtKiller selfRef inflictorRef attackerRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
-    let worldRef = newEdictReference 0
+    let worldRef = Ref 0
         Just (GClientReference gClientIdx) = self^.eClient
 
     -- TODO: jake2 checks attacker and inflictor for != null, do we need that?
     mDir <- if | attackerRef /= worldRef && attackerRef /= selfRef -> do
-                   attacker <- readEdictT attackerRef
+                   attacker <- readRef attackerRef
                    return $ Just ((attacker^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
 
                | inflictorRef /= worldRef && inflictorRef /= selfRef -> do
-                   inflictor <- readEdictT inflictorRef
+                   inflictor <- readRef inflictorRef
                    return $ Just ((inflictor^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
 
                | otherwise -> do
@@ -1445,10 +1446,10 @@ lookAtKiller selfRef inflictorRef attackerRef = do
 
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcKillerYaw .= killerYaw'
 
-clientObituary :: EdictReference -> EdictReference -> EdictReference -> Quake ()
+clientObituary :: Ref EdictT -> Ref EdictT -> Ref EdictT -> Quake ()
 clientObituary selfRef inflictorRef attackerRef = do
-    self <- readEdictT selfRef
-    attacker <- readEdictT attackerRef
+    self <- readRef selfRef
+    attacker <- readRef attackerRef
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     coopValue <- liftM (^.cvValue) coopCVar
@@ -1509,11 +1510,11 @@ clientObituary selfRef inflictorRef attackerRef = do
                     when (deathmatchValue /= 0) $
                       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crScore -= 1
 
-                    modifyEdictT selfRef (\v -> v & eEnemy .~ Nothing)
+                    modifyRef selfRef (\v -> v & eEnemy .~ Nothing)
                     return True
 
                   Nothing -> do
-                    modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+                    modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
                     case attacker^.eClient of
                       Just _ -> do
@@ -1573,10 +1574,10 @@ clientObituary selfRef inflictorRef attackerRef = do
       when (deathmatchValue /= 0) $
         gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp.crScore -= 1
 
-isNeutral :: EdictReference -> Quake Bool
+isNeutral :: Ref EdictT -> Quake Bool
 isNeutral _ = do
     io (putStrLn "PlayerClient.isNeutral") >> undefined -- TODO
 
-isFemale :: EdictReference -> Quake Bool
+isFemale :: Ref EdictT -> Quake Bool
 isFemale _ = do
     io (putStrLn "PlayerClient.isFemale") >> undefined -- TODO

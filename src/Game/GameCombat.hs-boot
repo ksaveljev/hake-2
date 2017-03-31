@@ -7,6 +7,6 @@ import Linear (V3)
 import Types
 import QuakeState
 
-radiusDamage :: EdictReference -> EdictReference -> Float -> Maybe EdictReference -> Float -> Int -> Quake ()
+radiusDamage :: Ref EdictT -> Ref EdictT -> Float -> Maybe (Ref EdictT) -> Float -> Int -> Quake ()
 
-damage :: EdictReference -> EdictReference -> EdictReference -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
+damage :: Ref EdictT -> Ref EdictT -> Ref EdictT -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()

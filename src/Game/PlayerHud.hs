@@ -14,18 +14,19 @@ import Game.GClientT
 import Game.ClientRespawnT
 import Game.ClientPersistantT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Constants
 import qualified Game.GameItems as GameItems
 
-moveClientToIntermission :: EdictReference -> Quake ()
+moveClientToIntermission :: Ref EdictT -> Quake ()
 moveClientToIntermission _ = do
     io (putStrLn "PlayerHud.moveClientToIntermission") >> undefined -- TODO
 
-setStats :: EdictReference -> Quake ()
+setStats :: Ref EdictT -> Quake ()
 setStats edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
 
     -- health
@@ -62,7 +63,7 @@ setStats edictRef = do
   where setHealth :: GClientReference -> Quake ()
         setHealth (GClientReference gClientIdx) = do
           picHealth <- use $ gameBaseGlobals.gbLevel.llPicHealth
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
 
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats) $ do
             ix Constants.statHealthIcon .= fromIntegral picHealth
@@ -88,7 +89,7 @@ setStats edictRef = do
 
         setArmor :: GClientReference -> Quake ()
         setArmor (GClientReference gClientIdx) = do
-          edict <- readEdictT edictRef
+          edict <- readRef edictRef
           powerArmorType <- GameItems.powerArmorType edictRef
 
           gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -105,7 +106,7 @@ setStats edictRef = do
 
                 if cells == 0 -- ran out of cells for power armor
                   then do
-                    modifyEdictT edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
+                    modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPowerArmor)))
                     idx <- soundIndex (Just "misc/power2.wav")
                     sound (Just edictRef) Constants.chanItem idx 1 Constants.attnNorm 0
                     return (0, cells)
@@ -241,11 +242,11 @@ setStats edictRef = do
              | otherwise ->
                  gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statHelpIcon .= 0
 
-setSpectatorStats :: EdictReference -> Quake ()
+setSpectatorStats :: Ref EdictT -> Quake ()
 setSpectatorStats _ = do
     io (putStrLn "PlayerHud.setSpectatorStats") >> undefined -- TODO
 
-checkChaseStats :: EdictReference -> Quake ()
+checkChaseStats :: Ref EdictT -> Quake ()
 checkChaseStats edictRef = do
     clients <- use $ gameBaseGlobals.gbGame.glClients
     maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
@@ -256,8 +257,8 @@ checkChaseStats edictRef = do
         setChaseStats clients idx maxIdx
           | idx > maxIdx = return ()
           | otherwise = do
-              let newEdictRef = newEdictReference idx
-              newEdict <- readEdictT newEdictRef
+              let newEdictRef = Ref idx
+              newEdict <- readRef newEdictRef
 
               let Just (GClientReference gClientIdx) = newEdict^.eClient
 
@@ -266,7 +267,7 @@ checkChaseStats edictRef = do
                   setChaseStats clients (idx + 1) maxIdx
 
                 else do
-                  edict <- readEdictT edictRef
+                  edict <- readRef edictRef
                   let Just (GClientReference edictClientIdx) = edict^.eClient
 
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats .= ((clients V.! edictClientIdx)^.gcPlayerState.psStats)
@@ -274,6 +275,6 @@ checkChaseStats edictRef = do
                   setSpectatorStats newEdictRef
                   setChaseStats clients (idx + 1) maxIdx
 
-deathmatchScoreboardMessage :: EdictReference -> Maybe EdictReference -> Quake ()
+deathmatchScoreboardMessage :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
 deathmatchScoreboardMessage _ _ = do
     io (putStrLn "PlayerHud.deathmatchScoreboardMessage") >> undefined -- TODO

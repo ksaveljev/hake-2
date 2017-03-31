@@ -17,6 +17,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -180,7 +181,7 @@ chickFramesFidget =
 chickStand :: EntThink
 chickStand =
   GenericEntThink "chick_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand)
     return True
 
 chickMoveFidget :: MMoveT
@@ -189,7 +190,7 @@ chickMoveFidget = MMoveT "chickMoveFidget" frameStand201 frameStand230 chickFram
 chickFidget :: EntThink
 chickFidget =
   GenericEntThink "chick_fidget" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
       then
@@ -198,7 +199,7 @@ chickFidget =
       else do
         r <- Lib.randomF
         when (r <= 0.3) $ 
-          modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveFidget)
+          modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveFidget)
 
         return True
 
@@ -242,11 +243,11 @@ chickMoveStand = MMoveT "chickMoveStand" frameStand101 frameStand130 chickFrames
 chickRun :: EntThink
 chickRun =
   GenericEntThink "chick_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
       then
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand)
 
       else do
         let action = case self^.eMonsterInfo.miCurrentMove of
@@ -255,7 +256,7 @@ chickRun =
                                       then chickMoveRun
                                       else chickMoveStartRun
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
 
     return True
 
@@ -313,7 +314,7 @@ chickMoveWalk = MMoveT "chickMoveWalk" frameWalk11 frameWalk20 chickFramesWalk N
 chickWalk :: EntThink
 chickWalk =
   GenericEntThink "chick_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveWalk)
     return True
 
 chickFramesPain1 :: V.Vector MFrameT
@@ -371,15 +372,15 @@ chickMovePain3 = MMoveT "chickMovePain3" framePain301 framePain321 chickFramesPa
 chickPain :: EntPain
 chickPain =
   GenericEntPain "chick_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       r <- Lib.randomF
 
@@ -397,12 +398,12 @@ chickPain =
                           | damage <= 25 -> chickMovePain2
                           | otherwise -> chickMovePain3
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just painMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just painMove)
 
 chickDead :: EntThink
 chickDead =
   GenericEntThink "chick_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) 0
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) 0
                                   & eMaxs .~ V3 16 16 16
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -465,7 +466,7 @@ chickMoveDeath1 = MMoveT "chickMoveDeath1" frameDeath101 frameDeath112 chickFram
 chickDie :: EntDie
 chickDie =
   GenericEntDie "chick_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let soundIndex = gameImport^.giSoundIndex
@@ -486,7 +487,7 @@ chickDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -496,7 +497,7 @@ chickDie =
 
            let currentMove = if n == 0 then chickMoveDeath1 else chickMoveDeath2
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
@@ -509,7 +510,7 @@ chickDie =
 chickDuckDown :: EntThink
 chickDuckDown =
   GenericEntThink "chick_duck_down" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiDucked /= 0
       then
@@ -518,7 +519,7 @@ chickDuckDown =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiDucked)
                                       & eMaxs._z -~ 32
                                       & eTakeDamage .~ Constants.damageYes
                                       & eMonsterInfo.miPauseTime .~ levelTime + 1)
@@ -532,18 +533,18 @@ chickDuckHold :: EntThink
 chickDuckHold =
   GenericEntThink "chick_duck_hold" $ \selfRef -> do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if levelTime >= (self^.eMonsterInfo.miPauseTime)
-      then modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
-      else modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
+      then modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame)))
+      else modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.|. Constants.aiHoldFrame))
 
     return True
 
 chickDuckUp :: EntThink
 chickDuckUp =
   GenericEntThink "chick_duck_up" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
+    modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiDucked))
                                   & eMaxs._z +~ 32
                                   & eTakeDamage .~ Constants.damageAim)
 
@@ -572,17 +573,17 @@ chickDodge =
     r <- Lib.randomF
 
     unless (r > 0.25) $ do
-      self <- readEdictT selfRef
+      self <- readRef selfRef
 
       when (isJust (self^.eEnemy)) $ do
-        modifyEdictT selfRef (\v -> v & eEnemy .~ Just attackerRef)
+        modifyRef selfRef (\v -> v & eEnemy .~ Just attackerRef)
 
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveDuck)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveDuck)
 
 chickSlash :: EntThink
 chickSlash =
   GenericEntThink "ChickSlash" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let aim = V3 (fromIntegral Constants.meleeDistance) (self^.eMins._x) 10
 
@@ -599,13 +600,13 @@ chickSlash =
 chickRocket :: EntThink
 chickRocket =
   GenericEntThink "ChickRocket" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let (Just forward, Just right, _) = Math3D.angleVectors (self^.eEntityState.esAngles) True True False
         start = Math3D.projectSource (self^.eEntityState.esOrigin) (MFlash.monsterFlashOffset V.! Constants.mz2ChickRocket1) forward right
         Just enemyRef = self^.eEnemy
 
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     let V3 a b c = enemy^.eEntityState.esOrigin
         vec = V3 a b (c + fromIntegral (enemy^.eViewHeight))
@@ -634,15 +635,15 @@ chickReload =
 chickAttack1 :: EntThink
 chickAttack1 =
   GenericEntThink "chick_attack1" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveAttack1)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveAttack1)
     return True
 
 chickReRocket :: EntThink
 chickReRocket =
   GenericEntThink "chick_rerocket" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     done <- if (enemy^.eHealth) > 0 && GameUtil.range self enemy > Constants.rangeMelee
               then do
@@ -651,7 +652,7 @@ chickReRocket =
 
                 if vis && r <= 0.6
                   then do
-                    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveAttack1)
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveAttack1)
                     return True
                   else
                     return False
@@ -661,7 +662,7 @@ chickReRocket =
 
 
     unless done $ do
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveEndAttack1)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveEndAttack1)
 
     return True
 
@@ -721,9 +722,9 @@ chickMoveEndAttack1 = MMoveT "chickMoveEndAttack1" frameAttack128 frameAttack132
 chickReSlash :: EntThink
 chickReSlash =
   GenericEntThink "chick_reslash" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     let Just enemyRef = self^.eEnemy
-    enemy <- readEdictT enemyRef
+    enemy <- readRef enemyRef
 
     done <- if (enemy^.eHealth) > 0 && GameUtil.range self enemy == Constants.rangeMelee
               then do
@@ -733,14 +734,14 @@ chickReSlash =
                                     then chickMoveSlash
                                     else chickMoveEndSlash
 
-                modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+                modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
                 return True
               else
                 return False
 
 
     unless done $
-      modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveEndSlash)
+      modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveEndSlash)
 
     return True
 
@@ -774,7 +775,7 @@ chickMoveEndSlash = MMoveT "chickMoveEndSlash" frameAttack213 frameAttack216 chi
 chickStartSlash :: EntThink
 chickStartSlash =
   GenericEntThink "chick_slash" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveSlash)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveSlash)
     return True
 
 chickFramesStartSlash :: V.Vector MFrameT
@@ -790,13 +791,13 @@ chickMoveStartSlash = MMoveT "chickMoveStartSlash" frameAttack201 frameAttack203
 chickMelee :: EntThink
 chickMelee =
   GenericEntThink "chick_melee" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStartSlash)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStartSlash)
     return True
 
 chickAttack :: EntThink
 chickAttack =
   GenericEntThink "chick_attack" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStartAttack1)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStartAttack1)
     return True
 
 chickSight :: EntInteract
@@ -811,7 +812,7 @@ chickSight =
 - QUAKED monster_chick (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterChick :: EdictReference -> Quake ()
+spMonsterChick :: Ref EdictT -> Quake ()
 spMonsterChick selfRef = do
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -837,7 +838,7 @@ spMonsterChick selfRef = do
 
     modelIdx <- modelIndex (Just "models/monsters/bitch/tris.md2")
 
-    modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeStep
                                   & eSolid .~ Constants.solidBbox
                                   & eEntityState.esModelIndex .~ modelIdx
                                   & eMins .~ V3 (-16) (-16) 0
@@ -857,7 +858,7 @@ spMonsterChick selfRef = do
 
     linkEntity selfRef
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just chickMoveStand
                                   & eMonsterInfo.miScale .~ modelScale)
 
     void $ think GameAI.walkMonsterStart selfRef

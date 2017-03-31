@@ -14,8 +14,8 @@ argv :: Int -> Quake B.ByteString
 
 executeString :: B.ByteString -> Quake ()
 
-clientCommand :: EdictReference -> Quake ()
+clientCommand :: Ref EdictT -> Quake ()
 
-helpF :: EdictReference -> Quake ()
+helpF :: Ref EdictT -> Quake ()
 
 removeCommand :: B.ByteString -> Quake ()

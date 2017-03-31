@@ -6,21 +6,21 @@ import Types
 import QuakeState
 import Game.Adapters
 
-spawn :: Quake EdictReference
-initEdict :: EdictReference -> Quake ()
-clearEdict :: EdictReference -> Quake ()
-freeEdict :: EdictReference -> Quake ()
+spawn :: Quake (Ref EdictT)
+initEdict :: (Ref EdictT) -> Quake ()
+clearEdict :: (Ref EdictT) -> Quake ()
+freeEdict :: (Ref EdictT) -> Quake ()
 range :: EdictT -> EdictT -> Int
-useTargets :: EdictReference -> Maybe EdictReference -> Quake ()
+useTargets :: (Ref EdictT) -> Maybe (Ref EdictT) -> Quake ()
 freeEdictA :: EntThink
 monsterUse :: EntUse
 mCheckAttack :: EntThink
-killBox :: EdictReference -> Quake Bool
-visible :: EdictReference -> EdictReference -> Quake Bool
-findTarget :: EdictReference -> Quake Bool
+killBox :: (Ref EdictT) -> Quake Bool
+visible :: (Ref EdictT) -> (Ref EdictT) -> Quake Bool
+findTarget :: (Ref EdictT) -> Quake Bool
 inFront :: EdictT -> EdictT -> Bool
-foundTarget :: EdictReference -> Quake ()
-attackFinished :: EdictReference -> Float -> Quake ()
-onSameTeam :: EdictReference -> EdictReference -> Quake Bool
+foundTarget :: (Ref EdictT) -> Quake ()
+attackFinished :: (Ref EdictT) -> Float -> Quake ()
+onSameTeam :: (Ref EdictT) -> (Ref EdictT) -> Quake Bool
 megaHealthThink :: EntThink
-validateSelectedItem :: EdictReference -> Quake ()
+validateSelectedItem :: (Ref EdictT) -> Quake ()

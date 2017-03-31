@@ -15,6 +15,7 @@ import Game.ClientRespawnT
 import Game.MonsterInfoT
 import Game.PlayerStateT
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -113,7 +114,7 @@ berserkSearch =
 berserkFidget :: EntThink
 berserkFidget =
   GenericEntThink "berserk_fidget" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
       then
@@ -127,7 +128,7 @@ berserkFidget =
             return True
 
           else do
-            modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStandFidget)
+            modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStandFidget)
             soundIdle <- use $ mBerserkGlobals.mBerserkSoundIdle
             sound <- use $ gameBaseGlobals.gbGameImport.giSound
             sound (Just selfRef) Constants.chanWeapon soundIdle 1 Constants.attnIdle 0
@@ -148,7 +149,7 @@ berserkMoveStand = MMoveT "berserkMoveStand" frameStand1 frameStand5 berserkFram
 berserkStand :: EntThink
 berserkStand =
   GenericEntThink "berserk_stand" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStand)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveStand)
     return True
 
 berserkFramesStandFidget :: V.Vector MFrameT
@@ -200,7 +201,7 @@ berserkMoveWalk = MMoveT "berserkMoveWalk" frameWalkC1 frameWalkC11 berserkFrame
 berserkWalk :: EntThink
 berserkWalk =
   GenericEntThink "berserk_walk" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveWalk)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just berserkMoveWalk)
     return True
 
 {-
@@ -241,13 +242,13 @@ berserkMoveRun1 = MMoveT "berserkMoveRun1" frameRun1 frameRun6 berserkFramesRun1
 berserkRun :: EntThink
 berserkRun =
   GenericEntThink "berserk_run" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let action = if (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0
                    then berserkMoveStand
                    else berserkMoveRun1
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 berserkAttackSpike :: EntThink
@@ -286,7 +287,7 @@ berserkMoveAttackSpike = MMoveT "berserkMoveAttackSpike" frameAttC1 frameAttC8 b
 berserkAttackClub :: EntThink
 berserkAttackClub =
   GenericEntThink "berserk_attack_club" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     r <- Lib.rand
     let n = r `mod` 6 + 5
@@ -348,7 +349,7 @@ berserkMelee =
                    then berserkMoveAttackSpike
                    else berserkMoveAttackClub
 
-    modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just action)
     return True
 
 {-
@@ -413,15 +414,15 @@ berserkMovePain2 = MMoveT "berserkMovePain2" framePainB1 framePainB20 berserkFra
 berserkPain :: EntPain
 berserkPain =
   GenericEntPain "berserk_pain" $ \selfRef _ _ damage -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eHealth) < (self^.eMaxHealth) `div` 2) $
-      modifyEdictT selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
+      modifyRef selfRef (\v -> v & eEntityState.esSkinNum .~ 1)
 
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     unless (levelTime < (self^.ePainDebounceTime)) $ do
-      modifyEdictT selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
+      modifyRef selfRef (\v -> v & ePainDebounceTime .~ levelTime + 3)
 
       sound <- use $ gameBaseGlobals.gbGameImport.giSound
       soundPain <- use $ mBerserkGlobals.mBerserkSoundPain
@@ -436,12 +437,12 @@ berserkPain =
                             then berserkMovePain1
                             else berserkMovePain2
 
-        modifyEdictT selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
 berserkDead :: EntThink
 berserkDead =
   GenericEntThink "berserk_dead" $ \selfRef -> do
-    modifyEdictT selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
+    modifyRef selfRef (\v -> v & eMins .~ V3 (-16) (-16) (-24)
                                   & eMaxs .~ V3 16 16 (-8)
                                   & eMoveType .~ Constants.moveTypeToss
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster)
@@ -490,7 +491,7 @@ berserkMoveDeath2 = MMoveT "berserkMoveDeath2" frameDeathC1 frameDeathC8 berserk
 berserkDie :: EntDie
 berserkDie =
   GenericEntDie "berserk_die" $ \selfRef _ _ damage _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -510,7 +511,7 @@ berserkDie =
 
            GameMisc.throwHead selfRef "models/objects/gibs/head2/tris.md2" damage Constants.gibOrganic
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
 
        | (self^.eDeadFlag) == Constants.deadDead ->
            return ()
@@ -523,7 +524,7 @@ berserkDie =
                                then berserkMoveDeath1
                                else berserkMoveDeath2
 
-           modifyEdictT selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
+           modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead
                                          & eTakeDamage .~ Constants.damageYes
                                          & eMonsterInfo.miCurrentMove .~ Just currentMove)
 
@@ -531,7 +532,7 @@ berserkDie =
 - QUAKED monster_berserk (1 .5 0) (-16 -16 -24) (16 16 32) Ambush
 - Trigger_Spawn Sight
 -}
-spMonsterBerserk :: EdictReference -> Quake ()
+spMonsterBerserk :: Ref EdictT -> Quake ()
 spMonsterBerserk selfRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -555,7 +556,7 @@ spMonsterBerserk selfRef = do
 
         modelIdx <- modelIndex (Just "models/monsters/berserk/tris.md2")
 
-        modifyEdictT selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
+        modifyRef selfRef (\v -> v & eEntityState.esModelIndex .~ modelIdx
                                       & eMins .~ V3 (-16) (-16) (-24)
                                       & eMaxs .~ V3 16 16 32
                                       & eMoveType .~ Constants.moveTypeStep

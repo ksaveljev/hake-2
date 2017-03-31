@@ -13,6 +13,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import qualified Constants
@@ -94,19 +95,19 @@ createBaseline = do
         edictBaseline idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let edictRef = newEdictReference idx
-              edict <- readEdictT edictRef
+              let edictRef = Ref idx
+              edict <- readRef edictRef
 
               if not (edict^.eInUse) || ((edict^.eEntityState.esModelIndex) == 0 && (edict^.eEntityState.esSound) == 0 && (edict^.eEntityState.esEffects) == 0)
                 then
                   edictBaseline (idx + 1) maxIdx
 
                 else do
-                  modifyEdictT edictRef (\v -> v & eEntityState.esNumber .~ idx
+                  modifyRef edictRef (\v -> v & eEntityState.esNumber .~ idx
                                                  -- take current state as baseline
                                                  & eEntityState.esOldOrigin .~ (edict^.eEntityState.esOrigin))
 
-                  entityState <- readEdictT edictRef >>= \e -> return (e^.eEntityState)
+                  entityState <- readRef edictRef >>= \e -> return (e^.eEntityState)
                   svGlobals.svServer.sBaselines.ix idx .= entityState
 
                   edictBaseline (idx + 1) maxIdx
@@ -303,7 +304,7 @@ initGame = do
     SVGame.initGameProgs
 
     clients <- use $ svGlobals.svServerStatic.ssClients
-    let updatedClients = V.imap (\idx client -> client { _cEdict = Just (newEdictReference (idx + 1)), _cLastCmd = newUserCmdT }) clients
+    let updatedClients = V.imap (\idx client -> client { _cEdict = Just (Ref (idx + 1)), _cLastCmd = newUserCmdT }) clients
     svGlobals.svServerStatic.ssClients .= updatedClients
 
   where initClients :: Quake ()

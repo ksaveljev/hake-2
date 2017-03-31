@@ -12,6 +12,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Types
+import QuakeRef
 import QuakeState
 import CVarVariables
 import Game.Adapters
@@ -23,11 +24,11 @@ import qualified Game.GameUtil as GameUtil
 import {-# SOURCE #-} qualified Game.GameWeapon as GameWeapon
 import qualified Util.Lib as Lib
 
-spTargetTempEntity :: EdictReference -> Quake ()
+spTargetTempEntity :: Ref EdictT -> Quake ()
 spTargetTempEntity edictRef =
-    modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetTEnt)
+    modifyRef edictRef (\v -> v & eUse .~ Just useTargetTEnt)
 
-spTargetSpeaker :: EdictReference -> Quake ()
+spTargetSpeaker :: Ref EdictT -> Quake ()
 spTargetSpeaker edictRef = do
     noise <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -36,7 +37,7 @@ spTargetSpeaker edictRef = do
         soundIndex = gameImport^.giSoundIndex
         linkEntity = gameImport^.giLinkEntity
 
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if isNothing noise
       then
@@ -49,21 +50,21 @@ spTargetSpeaker edictRef = do
                        else noiseStr `B.append` ".wav"
 
         noiseIndex <- soundIndex (Just buffer)
-        modifyEdictT edictRef (\v -> v & eNoiseIndex .~ noiseIndex)
+        modifyRef edictRef (\v -> v & eNoiseIndex .~ noiseIndex)
 
         when ((edict^.eVolume) == 0) $
-          modifyEdictT edictRef (\v -> v & eVolume .~ 1)
+          modifyRef edictRef (\v -> v & eVolume .~ 1)
         
         when ((edict^.eAttenuation) == 0) $
-          modifyEdictT edictRef (\v -> v & eAttenuation .~ 1)
+          modifyRef edictRef (\v -> v & eAttenuation .~ 1)
         when ((edict^.eAttenuation) == (-1)) $
-          modifyEdictT edictRef (\v -> v & eAttenuation .~ 0)
+          modifyRef edictRef (\v -> v & eAttenuation .~ 0)
 
         -- check for prestarted looping sound
         when ((edict^.eSpawnFlags) .&. 1 /= 0) $
-          modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ noiseIndex)
+          modifyRef edictRef (\v -> v & eEntityState.esSound .~ noiseIndex)
 
-        modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetSpeaker)
+        modifyRef edictRef (\v -> v & eUse .~ Just useTargetSpeaker)
 
         -- must link the entity so we get areas and clusters so
         -- the server can determine who to send updates to
@@ -74,7 +75,7 @@ spTargetSpeaker edictRef = do
 - "message" key becomes the current personal computer string, and the
 - message light will be set on all clients status bars.
 -}
-spTargetHelp :: EdictReference -> Quake ()
+spTargetHelp :: Ref EdictT -> Quake ()
 spTargetHelp edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -83,7 +84,7 @@ spTargetHelp edictRef = do
         GameUtil.freeEdict edictRef
 
       else do
-        edict <- readEdictT edictRef
+        edict <- readRef edictRef
 
         case edict^.eMessage of
           Nothing -> do
@@ -92,9 +93,9 @@ spTargetHelp edictRef = do
             GameUtil.freeEdict edictRef
 
           Just _ -> do
-            modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetHelp)
+            modifyRef edictRef (\v -> v & eUse .~ Just useTargetHelp)
 
-spTargetSecret :: EdictReference -> Quake ()
+spTargetSecret :: Ref EdictT -> Quake ()
 spTargetSecret edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -112,20 +113,20 @@ spTargetSecret edictRef = do
         noiseStr <- use $ gameBaseGlobals.gbSpawnTemp.stNoise
         noiseIndex <- soundIndex noiseStr
 
-        modifyEdictT edictRef (\v -> v & eNoiseIndex .~ noiseIndex
+        modifyRef edictRef (\v -> v & eNoiseIndex .~ noiseIndex
                                        & eUse .~ Just useTargetSecret
                                        & eSvFlags .~ Constants.svfNoClient)
 
         gameBaseGlobals.gbLevel.llTotalSecrets += 1
 
         -- map bug hack
-        edict <- readEdictT edictRef
+        edict <- readRef edictRef
         mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
 
         when ("mine3" == mapName && (edict^.eEntityState.esOrigin) == V3 280 (-2048) (-624)) $
-          modifyEdictT edictRef (\v -> v & eMessage .~ Just "You have found a secret area.")
+          modifyRef edictRef (\v -> v & eMessage .~ Just "You have found a secret area.")
 
-spTargetGoal :: EdictReference -> Quake ()
+spTargetGoal :: Ref EdictT -> Quake ()
 spTargetGoal edictRef = do
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -136,24 +137,24 @@ spTargetGoal edictRef = do
       else do
         soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
 
-        modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetGoal)
+        modifyRef edictRef (\v -> v & eUse .~ Just useTargetGoal)
 
         noise <- (use $ gameBaseGlobals.gbSpawnTemp.stNoise) >>= \n -> if isJust n then return n else return (Just "misc/secret.wav")
 
         noiseIdx <- soundIndex noise
-        modifyEdictT edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient
+        modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient
                                        & eNoiseIndex .~ noiseIdx)
 
         gameBaseGlobals.gbLevel.llTotalGoals += 1
 
-spTargetExplosion :: EdictReference -> Quake ()
+spTargetExplosion :: Ref EdictT -> Quake ()
 spTargetExplosion edictRef = do
-    modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetExplosion
+    modifyRef edictRef (\v -> v & eUse .~ Just useTargetExplosion
                                    & eSvFlags .~ Constants.svfNoClient)
 
-spTargetChangeLevel :: EdictReference -> Quake ()
+spTargetChangeLevel :: Ref EdictT -> Quake ()
 spTargetChangeLevel edictRef = do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     case edict^.eMap of
       Nothing -> do
@@ -165,77 +166,77 @@ spTargetChangeLevel edictRef = do
         -- ugly hack because *SOMEBODY* screwed up their map
         mapName <- liftM (BC.map toLower) (use $ gameBaseGlobals.gbLevel.llMapName)
         when (mapName == "fact1" && BC.map toLower (fromJust $ edict^.eMap) == "fact3") $
-          modifyEdictT edictRef (\v -> v & eMap .~ Just "fact3$secret1")
+          modifyRef edictRef (\v -> v & eMap .~ Just "fact3$secret1")
 
-        modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetChangeLevel
+        modifyRef edictRef (\v -> v & eUse .~ Just useTargetChangeLevel
                                        & eSvFlags .~ Constants.svfNoClient)
 
-spTargetSplash :: EdictReference -> Quake ()
+spTargetSplash :: Ref EdictT -> Quake ()
 spTargetSplash edictRef = do
-    modifyEdictT edictRef (\v -> v & eUse .~ Just useTargetSplash)
-    edict <- readEdictT edictRef
+    modifyRef edictRef (\v -> v & eUse .~ Just useTargetSplash)
+    edict <- readRef edictRef
 
     GameBase.setMoveDir edictRef
 
     when ((edict^.eCount) == 0) $
-      modifyEdictT edictRef (\v -> v & eCount .~ 32)
+      modifyRef edictRef (\v -> v & eCount .~ 32)
 
-    modifyEdictT edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
+    modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
 
-spTargetSpawner :: EdictReference -> Quake ()
+spTargetSpawner :: Ref EdictT -> Quake ()
 spTargetSpawner selfRef = do
-    modifyEdictT selfRef (\v -> v & eUse .~ Just useTargetSpawner
+    modifyRef selfRef (\v -> v & eUse .~ Just useTargetSpawner
                                   & eSvFlags .~ Constants.svfNoClient)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     when ((self^.eSpeed) /= 0) $ do
       GameBase.setMoveDir selfRef
-      modifyEdictT selfRef (\v -> v & eMoveDir %~ fmap (* (self^.eSpeed)))
+      modifyRef selfRef (\v -> v & eMoveDir %~ fmap (* (self^.eSpeed)))
 
-spTargetBlaster :: EdictReference -> Quake ()
+spTargetBlaster :: Ref EdictT -> Quake ()
 spTargetBlaster selfRef = do
     GameBase.setMoveDir selfRef
 
     soundIndex <- use $ gameBaseGlobals.gbGameImport.giSoundIndex
     soundIdx <- soundIndex (Just "weapons/laser2.wav")
     
-    modifyEdictT selfRef (\v -> v & eUse .~ Just useTargetBlaster
+    modifyRef selfRef (\v -> v & eUse .~ Just useTargetBlaster
                                   & eNoiseIndex .~ soundIdx
                                   & eDmg %~ (\d -> if d == 0 then 15 else d)
                                   & eSpeed %~ (\s -> if s == 0 then 1000 else s)
                                   & eSvFlags .~ Constants.svfNoClient)
 
-spTargetCrossLevelTrigger :: EdictReference -> Quake ()
+spTargetCrossLevelTrigger :: Ref EdictT -> Quake ()
 spTargetCrossLevelTrigger selfRef =
-    modifyEdictT selfRef (\v -> v & eSvFlags .~ Constants.svfNoClient
+    modifyRef selfRef (\v -> v & eSvFlags .~ Constants.svfNoClient
                                   & eUse .~ Just triggerCrossLevelTriggerUse)
 
-spTargetCrossLevelTarget :: EdictReference -> Quake ()
+spTargetCrossLevelTarget :: Ref EdictT -> Quake ()
 spTargetCrossLevelTarget selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     let delay = if (self^.eDelay) == 0 then 1 else self^.eDelay
 
-    modifyEdictT selfRef (\v -> v & eDelay .~ delay
+    modifyRef selfRef (\v -> v & eDelay .~ delay
                                   & eSvFlags .~ Constants.svfNoClient
                                   & eThink .~ Just targetCrossLevelTargetThink
                                   & eNextThink .~ levelTime + delay)
 
-spTargetLaser :: EdictReference -> Quake ()
+spTargetLaser :: Ref EdictT -> Quake ()
 spTargetLaser selfRef = do
     -- let everything else get spawned before we start firing
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
-    modifyEdictT selfRef (\v -> v & eThink .~ Just targetLaserStart
+    modifyRef selfRef (\v -> v & eThink .~ Just targetLaserStart
                                   & eNextThink .~ levelTime + 1)
 
-spTargetLightRamp :: EdictReference -> Quake ()
+spTargetLightRamp :: Ref EdictT -> Quake ()
 spTargetLightRamp _ = io (putStrLn "GameTarget.spTargetLightRamp") >> undefined -- TODO
 
-spTargetEarthquake :: EdictReference -> Quake ()
+spTargetEarthquake :: Ref EdictT -> Quake ()
 spTargetEarthquake selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let dprintf = gameImport^.giDprintf
@@ -246,7 +247,7 @@ spTargetEarthquake selfRef = do
 
     noiseIndex <- soundIndex (Just "world/quake.wav")
 
-    modifyEdictT selfRef (\v -> v & eCount %~ (\c -> if c == 0 then 5 else c)
+    modifyRef selfRef (\v -> v & eCount %~ (\c -> if c == 0 then 5 else c)
                                   & eSpeed %~ (\s -> if s == 0 then 200 else s)
                                   & eSvFlags %~ (.|. Constants.svfNoClient)
                                   & eThink .~ Just targetEarthquakeThink
@@ -256,9 +257,9 @@ spTargetEarthquake selfRef = do
 useTargetExplosion :: EntUse
 useTargetExplosion =
   GenericEntUse "use_target_explosion" $ \selfRef _ activatorRef -> do
-    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eDelay) == 0
       then
@@ -267,7 +268,7 @@ useTargetExplosion =
       else do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-        modifyEdictT selfRef (\v -> v & eThink .~ Just targetExplosionExplode
+        modifyRef selfRef (\v -> v & eThink .~ Just targetExplosionExplode
                                       & eNextThink .~ levelTime + (self^.eDelay))
 
 {-
@@ -277,7 +278,7 @@ useTargetExplosion =
 useTargetGoal :: EntUse
 useTargetGoal =
   GenericEntUse "use_target_goal" $ \edictRef _ activatorRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let sound = gameImport^.giSound
@@ -310,13 +311,13 @@ useTargetGoal =
 useTargetSpeaker :: EntUse
 useTargetSpeaker =
   GenericEntUse "Use_Target_Speaker" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eSpawnFlags) .&. 3 /= 0 -- looping sound toggles
       then
         if (edict^.eEntityState.esSound) /= 0
-          then modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ 0) -- turn it off
-          else modifyEdictT edictRef (\v -> v & eEntityState.esSound .~ (edict^.eNoiseIndex)) -- start it
+          then modifyRef edictRef (\v -> v & eEntityState.esSound .~ 0) -- turn it off
+          else modifyRef edictRef (\v -> v & eEntityState.esSound .~ (edict^.eNoiseIndex)) -- start it
 
       else do -- normal sound
         let chan = if (edict^.eSpawnFlags) .&. 4 /= 0
@@ -335,7 +336,7 @@ useTargetSpeaker =
 useTargetSecret :: EntUse
 useTargetSecret =
   GenericEntUse "use_target_secret" $ \edictRef _ activatorRef -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     sound <- use $ gameBaseGlobals.gbGameImport.giSound
 
     sound (Just edictRef) Constants.chanVoice (edict^.eNoiseIndex) 1 Constants.attnNorm 0
@@ -348,7 +349,7 @@ useTargetSecret =
 useTargetHelp :: EntUse
 useTargetHelp =
   GenericEntUse "Use_Target_Help" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
 
     if (edict^.eSpawnFlags) .&. 1 /= 0
       then gameBaseGlobals.gbGame.glHelpMessage1 .= fromJust (edict^.eMessage) -- TODO: are we sure about fromJust?
@@ -376,7 +377,7 @@ useTargetSplash =
         writeDir = gameImport^.giWriteDir
         multicast = gameImport^.giMulticast
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     writeByte (fromIntegral Constants.svcTempEntity)
     writeByte (fromIntegral Constants.teSplash)
@@ -403,7 +404,7 @@ targetExplosionExplode =
         writePosition = gameImport^.giWritePosition
         multicast = gameImport^.giMulticast
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     writeByte Constants.svcTempEntity
     writeByte Constants.teExplosion1
@@ -414,9 +415,9 @@ targetExplosionExplode =
 
     let save = self^.eDelay
 
-    modifyEdictT selfRef (\v -> v & eDelay .~ 0)
+    modifyRef selfRef (\v -> v & eDelay .~ 0)
     GameUtil.useTargets selfRef (self^.eActivator)
-    modifyEdictT selfRef (\v -> v & eDelay .~ save)
+    modifyRef selfRef (\v -> v & eDelay .~ save)
 
     return True
 
@@ -427,7 +428,7 @@ targetExplosionExplode =
 useTargetTEnt :: EntUse
 useTargetTEnt =
   GenericEntUse "Use_Target_Tent" $ \edictRef _ _ -> do
-    edict <- readEdictT edictRef
+    edict <- readRef edictRef
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
     let writeByte = gameImport^.giWriteByte
@@ -452,10 +453,10 @@ useTargetTEnt =
 useTargetSpawner :: EntUse
 useTargetSpawner =
   GenericEntUse "use_target_spawner" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     edictRef <- GameUtil.spawn
 
-    modifyEdictT edictRef (\v -> v & eClassName .~ fromJust (self^.eTarget)
+    modifyRef edictRef (\v -> v & eClassName .~ fromJust (self^.eTarget)
                                    & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
                                    & eEntityState.esAngles .~ (self^.eEntityState.esAngles))
 
@@ -470,10 +471,10 @@ useTargetSpawner =
     GameUtil.killBox edictRef
     linkEntity edictRef
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
 
     when ((self'^.eSpeed) /= 0) $
-      modifyEdictT edictRef (\v -> v & eVelocity .~ (self'^.eMoveDir))
+      modifyRef edictRef (\v -> v & eVelocity .~ (self'^.eMoveDir))
 
 {-
 - QUAKED target_blaster (1 0 0) (-8 -8 -8) (8 8 8) NOTRAIL NOEFFECTS Fires
@@ -484,7 +485,7 @@ useTargetSpawner =
 useTargetBlaster :: EntUse
 useTargetBlaster =
   GenericEntUse "use_target_blaster" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let effect = if | (self^.eSpawnFlags) .&. 2 /= 0 -> 0
                     | (self^.eSpawnFlags) .&. 1 /= 0 -> Constants.efHyperblaster
@@ -506,7 +507,7 @@ useTargetBlaster =
 triggerCrossLevelTriggerUse :: EntUse
 triggerCrossLevelTriggerUse =
   GenericEntUse "trigger_crosslevel_trigger_use" $ \selfRef _ _ -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     gameBaseGlobals.gbGame.glServerFlags %= (.|. (self^.eSpawnFlags))
     GameUtil.freeEdict selfRef
 
@@ -522,7 +523,7 @@ triggerCrossLevelTriggerUse =
 targetCrossLevelTargetThink :: EntThink
 targetCrossLevelTargetThink =
   GenericEntThink "target_crosslevel_target_think" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     serverFlags <- use $ gameBaseGlobals.gbGame.glServerFlags
 
     when ((self^.eSpawnFlags) == (serverFlags .&. Constants.sflCrossTriggerMask .&. (self^.eSpawnFlags))) $ do
@@ -534,7 +535,7 @@ targetCrossLevelTargetThink =
 targetLaserStart :: EntThink
 targetLaserStart =
   GenericEntThink "target_laser_start" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
         -- set the beam diameter
     let frame = if (self^.eSpawnFlags) .&. 64 /= 0
@@ -548,7 +549,7 @@ targetLaserStart =
                      | (self^.eSpawnFlags) .&. 32 /= 0 -> 0xE0E1E2E3
                      | otherwise -> self^.eEntityState.esSkinNum
 
-    modifyEdictT selfRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeNone
                                   & eSolid .~ Constants.solidNot
                                   & eEntityState.esRenderFx %~ (.|. (Constants.rfBeam .|. Constants.rfTranslucent))
                                   & eEntityState.esModelIndex .~ 1 -- must be non-zero
@@ -564,12 +565,12 @@ targetLaserStart =
             dprintf <- use $ gameBaseGlobals.gbGameImport.giDprintf
             dprintf ((self^.eClassName) `B.append` " at " `B.append` Lib.vtos (self^.eEntityState.esOrigin) `B.append` ": " `B.append` target `B.append` " is a bad target\n")
 
-          modifyEdictT selfRef (\v -> v & eEnemy .~ foundTarget)
+          modifyRef selfRef (\v -> v & eEnemy .~ foundTarget)
 
         Nothing ->
           GameBase.setMoveDir selfRef
 
-    modifyEdictT selfRef (\v -> v & eUse .~ Just targetLaserUse
+    modifyRef selfRef (\v -> v & eUse .~ Just targetLaserUse
                                   & eThink .~ Just targetLaserThink
                                   & eDmg %~ (\d -> if d == 0 then 1 else d)
                                   & eMins .~ V3 (-8) (-8) (-8)
@@ -578,7 +579,7 @@ targetLaserStart =
     linkEntity <- use $ gameBaseGlobals.gbGameImport.giLinkEntity
     linkEntity selfRef
 
-    self' <- readEdictT selfRef
+    self' <- readRef selfRef
 
     if (self'^.eSpawnFlags) .&. 1 /= 0
       then targetLaserOn selfRef
@@ -586,32 +587,32 @@ targetLaserStart =
 
     return True
 
-targetLaserOn :: EdictReference -> Quake ()
+targetLaserOn :: Ref EdictT -> Quake ()
 targetLaserOn selfRef = do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     let activator = case self^.eActivator of
                       Just _ -> self^.eActivator
                       Nothing -> Just selfRef
 
-    modifyEdictT selfRef (\v -> v & eActivator .~ activator
+    modifyRef selfRef (\v -> v & eActivator .~ activator
                                   & eSpawnFlags %~ (.|. 0x80000001)
                                   & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
 
     void $ think targetLaserThink selfRef
 
-targetLaserOff :: EdictReference -> Quake ()
+targetLaserOff :: Ref EdictT -> Quake ()
 targetLaserOff selfRef =
-    modifyEdictT selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
+    modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
                                   & eSvFlags %~ (.|. Constants.svfNoClient)
                                   & eNextThink .~ 0)
 
 targetLaserUse :: EntUse
 targetLaserUse =
   GenericEntUse "target_laser_use" $ \selfRef _ activatorRef -> do
-    modifyEdictT selfRef (\v -> v & eActivator .~ activatorRef)
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
 
-    self <- readEdictT selfRef
+    self <- readRef selfRef
 
     if (self^.eSpawnFlags) .&. 1 /= 0
       then targetLaserOff selfRef
@@ -636,20 +637,20 @@ targetLaserThink =
 targetEarthquakeThink :: EntThink
 targetEarthquakeThink =
   GenericEntThink "target_earthquake_think" $ \selfRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     when ((self^.eLastMoveTime) < levelTime) $ do
       positionedSound <- use $ gameBaseGlobals.gbGameImport.giPositionedSound
       positionedSound (Just $ self^.eEntityState.esOrigin) selfRef Constants.chanAuto (self^.eNoiseIndex) 1.0 Constants.attnNone 0
-      modifyEdictT selfRef (\v -> v & eLastMoveTime .~ levelTime + 0.5)
+      modifyRef selfRef (\v -> v & eLastMoveTime .~ levelTime + 0.5)
 
     numEdicts <- use $ gameBaseGlobals.gbNumEdicts
 
     shakeEdicts (self^.eSpeed) 1 numEdicts
 
     when (levelTime < (self^.eTimeStamp)) $
-      modifyEdictT selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+      modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
 
     return True
 
@@ -657,9 +658,9 @@ targetEarthquakeThink =
         shakeEdicts speed idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
-              let edictRef = newEdictReference idx
+              let edictRef = Ref idx
 
-              edict <- readEdictT edictRef
+              edict <- readRef edictRef
 
               if not (edict^.eInUse) || isNothing (edict^.eClient) || isNothing (edict^.eGroundEntity)
                 then
@@ -672,7 +673,7 @@ targetEarthquakeThink =
                                                     & _y +~ (c2 * 150)
                                                     & _z .~ speed * (100.0 / fromIntegral (edict^.eMass))
 
-                  modifyEdictT edictRef (\v -> v & eGroundEntity .~ Nothing
+                  modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing
                                                  & eVelocity .~ velocity)
 
                   shakeEdicts speed (idx + 1) maxIdx
@@ -680,10 +681,10 @@ targetEarthquakeThink =
 targetEarthquakeUse :: EntUse
 targetEarthquakeUse =
   GenericEntUse "target_earthquake_use" $ \selfRef _ activatorRef -> do
-    self <- readEdictT selfRef
+    self <- readRef selfRef
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
-    modifyEdictT selfRef (\v -> v & eTimeStamp .~ levelTime + fromIntegral (self^.eCount)
+    modifyRef selfRef (\v -> v & eTimeStamp .~ levelTime + fromIntegral (self^.eCount)
                                   & eNextThink .~ levelTime + Constants.frameTime
                                   & eActivator .~ activatorRef
                                   & eLastMoveTime .~ 0)

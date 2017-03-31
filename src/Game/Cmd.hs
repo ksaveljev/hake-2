@@ -331,11 +331,11 @@ forwardToServer = do
           SZ.print (globals.gCls.csNetChan.ncMessage) " "
           SZ.print (globals.gCls.csNetChan.ncMessage) cmdArgs
 
-clientCommand :: EdictReference -> Quake ()
+clientCommand :: Ref EdictT -> Quake ()
 clientCommand _ = do
     io (putStrLn "Cmd.clientCommand") >> undefined -- TODO
 
-helpF :: EdictReference -> Quake ()
+helpF :: Ref EdictT -> Quake ()
 helpF _ = do
     io (putStrLn "Cmd.helpF") >> undefined -- TODO
 

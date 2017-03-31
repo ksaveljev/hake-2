@@ -34,7 +34,7 @@ registerSound _ = do
     sfx <- io $ newIORef newSfxT
     io (putStrLn "IMPLEMENT ME! S.registerSound") >> return (Just sfx) -- TODO
 
-startSound :: Maybe (V3 Float) -> EdictReference -> Int -> Maybe (IORef SfxT) -> Float -> Float -> Float -> Quake ()
+startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Maybe (IORef SfxT) -> Float -> Float -> Float -> Quake ()
 startSound _ _ _ _ _ _ _ = do
     return () -- IMPLEMENT ME!
     -- io (putStrLn "IMPLEMENT ME! S.startSound") >> return () -- TODO: don't want to get involved with sound system yet
