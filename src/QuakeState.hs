@@ -60,11 +60,6 @@ module QuakeState ( QuakeState(..)
                   , MenuSliderSReference
                   , MenuSeparatorSReference
                   , MenuItemReference(..)
-                  , CBrushReference
-                  , newCBrushReference
-                  , readCBrushT
-                  , modifyCBrushT
-                  , writeCBrushT
                   , readMenuFrameworkSReference
                   , modifyMenuFrameworkSReference
                   , writeMenuFrameworkSReference
@@ -250,24 +245,6 @@ initialQuakeState =
 
 worldRef :: Ref EdictT
 worldRef = Ref 0
-
-readCBrushT :: CBrushReference -> Quake CBrushT
-readCBrushT (CBrushReference brushIdx) = do
-    mapBrushes <- use $ cmGlobals.cmMapBrushes
-    liftIO $ MV.read mapBrushes brushIdx
-
-modifyCBrushT :: CBrushReference -> (CBrushT -> CBrushT) -> Quake ()
-modifyCBrushT (CBrushReference brushIdx) f = do
-    mapBrushes <- use $ cmGlobals.cmMapBrushes
-    liftIO $ MV.modify mapBrushes f brushIdx
-
-writeCBrushT :: CBrushReference -> CBrushT -> Quake ()
-writeCBrushT (CBrushReference brushIdx) brush = do
-    mapBrushes <- use $ cmGlobals.cmMapBrushes
-    liftIO $ MV.write mapBrushes brushIdx brush
-
-newCBrushReference :: Int -> CBrushReference
-newCBrushReference = CBrushReference
 
 readMenuFrameworkSReference :: MenuFrameworkSReference -> Quake MenuFrameworkS
 readMenuFrameworkSReference (MenuFrameworkSReference menuFrameworkIdx) = do

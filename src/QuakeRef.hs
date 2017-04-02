@@ -40,3 +40,14 @@ instance QuakeRef CPlaneT where
     writeRef (Ref idx) item = do
         planes <- use (cmGlobals.cmMapPlanes)
         io (MV.write planes idx item)
+
+instance QuakeRef CBrushT where
+    readRef (Ref idx) = do
+        brushes <- use (cmGlobals.cmMapBrushes)
+        io (MV.read brushes idx)
+    modifyRef (Ref idx) f = do
+        brushes <- use (cmGlobals.cmMapBrushes)
+        io (MV.modify brushes f idx)
+    writeRef (Ref idx) item = do
+        brushes <- use (cmGlobals.cmMapBrushes)
+        io (MV.write brushes idx item)

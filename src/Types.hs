@@ -71,9 +71,6 @@ instance Eq KeyFuncT where
 
 data Ref a = Ref Int deriving (Eq, Show, Ord)
 
--- reference to cmGlobals.cmMapBrushes
-newtype CBrushReference = CBrushReference Int deriving Eq
-
 -- reference to svGlobals.svLinks
 newtype LinkReference = LinkReference Int deriving Eq
 
