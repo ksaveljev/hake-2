@@ -26,6 +26,17 @@ instance QuakeRef EdictT where
     modifyRef (Ref idx) f = do
         edicts <- use (gameBaseGlobals.gbGEdicts)
         io (MV.modify edicts f idx)
-    writeRef (Ref idx) edict = do
+    writeRef (Ref idx) item = do
         edicts <- use (gameBaseGlobals.gbGEdicts)
-        io (MV.write edicts idx edict)
+        io (MV.write edicts idx item)
+
+instance QuakeRef CPlaneT where
+    readRef (Ref idx) = do
+        planes <- use (cmGlobals.cmMapPlanes)
+        io (MV.read planes idx)
+    modifyRef (Ref idx) f = do
+        planes <- use (cmGlobals.cmMapPlanes)
+        io (MV.modify planes f idx)
+    writeRef (Ref idx) item = do
+        planes <- use (cmGlobals.cmMapPlanes)
+        io (MV.write planes idx item)

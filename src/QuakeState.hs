@@ -60,11 +60,6 @@ module QuakeState ( QuakeState(..)
                   , MenuSliderSReference
                   , MenuSeparatorSReference
                   , MenuItemReference(..)
-                  , CPlaneReference
-                  , newCPlaneReference
-                  , readCPlaneT
-                  , modifyCPlaneT
-                  , writeCPlaneT
                   , CBrushReference
                   , newCBrushReference
                   , readCBrushT
@@ -255,24 +250,6 @@ initialQuakeState =
 
 worldRef :: Ref EdictT
 worldRef = Ref 0
-
-readCPlaneT :: CPlaneReference -> Quake CPlaneT
-readCPlaneT (CPlaneReference planeIdx) = do
-    mapPlanes <- use $ cmGlobals.cmMapPlanes
-    liftIO $ MV.read mapPlanes planeIdx
-
-modifyCPlaneT :: CPlaneReference -> (CPlaneT -> CPlaneT) -> Quake ()
-modifyCPlaneT (CPlaneReference planeIdx) f = do
-    mapPlanes <- use $ cmGlobals.cmMapPlanes
-    liftIO $ MV.modify mapPlanes f planeIdx
-
-writeCPlaneT :: CPlaneReference -> CPlaneT -> Quake ()
-writeCPlaneT (CPlaneReference planeIdx) plane = do
-    mapPlanes <- use $ cmGlobals.cmMapPlanes
-    liftIO $ MV.write mapPlanes planeIdx plane
-
-newCPlaneReference :: Int -> CPlaneReference
-newCPlaneReference = CPlaneReference
 
 readCBrushT :: CBrushReference -> Quake CBrushT
 readCBrushT (CBrushReference brushIdx) = do

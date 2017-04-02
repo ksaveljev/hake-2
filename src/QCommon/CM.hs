@@ -25,6 +25,7 @@ import QuakeState
 import CVarVariables
 import Game.CSurfaceT
 import QCommon.LumpT
+import QuakeRef
 import QCommon.QFiles.BSP.DAreaT
 import QCommon.QFiles.BSP.DBrushSideT
 import QCommon.QFiles.BSP.DBrushT
@@ -416,7 +417,7 @@ loadPlanes lump = do
       Com.dprintf "cplanes(normal[0],normal[1],normal[2], dist, type, signbits)\n"
 
     Just buf <- use $ cmGlobals.cmCModBase
-    mapM_ (\i -> readMapPlane buf i >>= \p -> writeCPlaneT (newCPlaneReference i) p) [0..count-1]
+    mapM_ (\i -> readMapPlane buf i >>= \p -> writeRef (Ref i) p) [0..count-1]
 
   where readMapPlane :: BL.ByteString -> Int -> Quake CPlaneT
         readMapPlane buf idx = do
@@ -724,8 +725,8 @@ initBoxHull = do
                            , _cpPad      = (0, 0)
                            }
 
-          writeCPlaneT (newCPlaneReference (numPlanes + idx * 2)) p1
-          writeCPlaneT (newCPlaneReference (numPlanes + idx * 2 + 1)) p2
+          writeRef (Ref (numPlanes + idx * 2)) p1
+          writeRef (Ref (numPlanes + idx * 2 + 1)) p2
 
         calcChildren :: Int -> Int -> Int -> Int -> Int -> (Int, Int)
         calcChildren idx side numLeafs emptyLeaf boxHeadNode =
@@ -897,7 +898,7 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
   | otherwise = do
       Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
       let planeIdx = fromJust (node^.cnPlane)
-      p <- readCPlaneT (newCPlaneReference planeIdx)
+      p <- readRef (Ref planeIdx)
       let s = Math3D.boxOnPlaneSide mins maxs p
 
       if | s == 1 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
@@ -1078,7 +1079,7 @@ recursiveHullCheck num p1f p2f p1 p2 = do
           -- and the offset for the size of the box
           Just node <- preuse $ cmGlobals.cmMapNodes.ix num
           let Just planeIdx = node^.cnPlane
-          plane <- readCPlaneT (newCPlaneReference planeIdx)
+          plane <- readRef (Ref planeIdx)
 
           (t1, t2, offset) <- findDistancesAndOffset plane
 
@@ -1203,7 +1204,7 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
               traceT <- use $ traceLens
 
               when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
-                plane <- readCPlaneT (newCPlaneReference (fromJust $ clipPlane))
+                plane <- readRef (Ref (fromJust $ clipPlane))
                 Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
                 let Just surfaceIdx = brushSide^.cbsSurface
                 surface <- case brushSide^.cbsSurface of
@@ -1224,7 +1225,7 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
           | idx >= maxIdx = return (False, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix ((brush^.cbFirstBrushSide) + idx)
-              plane <- readCPlaneT (newCPlaneReference (fromJust $ side^.cbsPlane))
+              plane <- readRef (Ref (fromJust $ side^.cbsPlane))
 
               -- FIXME: special case for axial
               traceIsPoint <- use $ cmGlobals.cmTraceIsPoint
@@ -1276,18 +1277,18 @@ headnodeForBox mins maxs = do
     -- this version is much better from the point of view of memory
     -- consumption and allocation than three versions below
 
-    modifyCPlaneT (newCPlaneReference (numPlanes +  0)) (\v -> v & cpDist .~ maxs^._x)
-    modifyCPlaneT (newCPlaneReference (numPlanes +  1)) (\v -> v & cpDist .~ - (maxs^._x))
-    modifyCPlaneT (newCPlaneReference (numPlanes +  2)) (\v -> v & cpDist .~ mins^._x)
-    modifyCPlaneT (newCPlaneReference (numPlanes +  3)) (\v -> v & cpDist .~ - (mins^._x))
-    modifyCPlaneT (newCPlaneReference (numPlanes +  4)) (\v -> v & cpDist .~ maxs^._y)
-    modifyCPlaneT (newCPlaneReference (numPlanes +  5)) (\v -> v & cpDist .~ - (maxs^._y))
-    modifyCPlaneT (newCPlaneReference (numPlanes +  6)) (\v -> v & cpDist .~ mins^._y)
-    modifyCPlaneT (newCPlaneReference (numPlanes +  7)) (\v -> v & cpDist .~ - (mins^._y))
-    modifyCPlaneT (newCPlaneReference (numPlanes +  8)) (\v -> v & cpDist .~ maxs^._z)
-    modifyCPlaneT (newCPlaneReference (numPlanes +  9)) (\v -> v & cpDist .~ - (maxs^._z))
-    modifyCPlaneT (newCPlaneReference (numPlanes + 10)) (\v -> v & cpDist .~ mins^._z)
-    modifyCPlaneT (newCPlaneReference (numPlanes + 11)) (\v -> v & cpDist .~ - (mins^._z))
+    modifyRef (Ref (numPlanes +  0)) (\v -> v & cpDist .~ maxs^._x)
+    modifyRef (Ref (numPlanes +  1)) (\v -> v & cpDist .~ - (maxs^._x))
+    modifyRef (Ref (numPlanes +  2)) (\v -> v & cpDist .~ mins^._x)
+    modifyRef (Ref (numPlanes +  3)) (\v -> v & cpDist .~ - (mins^._x))
+    modifyRef (Ref (numPlanes +  4)) (\v -> v & cpDist .~ maxs^._y)
+    modifyRef (Ref (numPlanes +  5)) (\v -> v & cpDist .~ - (maxs^._y))
+    modifyRef (Ref (numPlanes +  6)) (\v -> v & cpDist .~ mins^._y)
+    modifyRef (Ref (numPlanes +  7)) (\v -> v & cpDist .~ - (mins^._y))
+    modifyRef (Ref (numPlanes +  8)) (\v -> v & cpDist .~ maxs^._z)
+    modifyRef (Ref (numPlanes +  9)) (\v -> v & cpDist .~ - (maxs^._z))
+    modifyRef (Ref (numPlanes + 10)) (\v -> v & cpDist .~ mins^._z)
+    modifyRef (Ref (numPlanes + 11)) (\v -> v & cpDist .~ - (mins^._z))
 
     {-
     - this version has huge allocation rate due to needing to copy the
@@ -1391,7 +1392,7 @@ pointLeafNumR p num = do
           | n >= 0 = do
               Just node <- preuse $ cmGlobals.cmMapNodes.ix n
               let Just planeIdx = node^.cnPlane
-              plane <- readCPlaneT (newCPlaneReference planeIdx)
+              plane <- readRef (Ref planeIdx)
 
               let d = if plane^.cpType < 3
                         then p^.(Math3D.v3Access (fromIntegral $ plane^.cpType)) - (plane^.cpDist)
@@ -1483,7 +1484,7 @@ testBoxInBrush mins maxs p1 traceLens brush = do
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix (firstBrushSide + idx)
               let Just planeIdx = side^.cbsPlane
-              plane <- readCPlaneT (newCPlaneReference planeIdx)
+              plane <- readRef (Ref planeIdx)
 
               -- FIXME: special case for axial
               -- general box case
