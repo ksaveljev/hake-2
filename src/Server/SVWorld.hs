@@ -64,23 +64,23 @@ createAreaNode depth mins maxs = do
     return numAreaNodes
 
 -- ClearLink is used for new headnodes
-clearLink :: LinkReference -> Quake ()
-clearLink lr@(LinkReference idx) = do
+clearLink :: Ref LinkT -> Quake ()
+clearLink lr@(Ref idx) = do
     Just link <- preuse $ svGlobals.svLinks.ix idx
     svGlobals.svLinks.ix idx .= link { _lNext = Just lr, _lPrev = Just lr }
 
-removeLink :: LinkReference -> Quake ()
-removeLink (LinkReference idx) = do
+removeLink :: Ref LinkT -> Quake ()
+removeLink (Ref idx) = do
     Just link <- preuse $ svGlobals.svLinks.ix idx
-    let Just (LinkReference nextLinkIdx) = link^.lNext
-        Just (LinkReference prevLinkIdx) = link^.lPrev
+    let Just (Ref nextLinkIdx) = link^.lNext
+        Just (Ref prevLinkIdx) = link^.lPrev
     svGlobals.svLinks.ix nextLinkIdx.lPrev .= link^.lPrev
     svGlobals.svLinks.ix prevLinkIdx.lNext .= link^.lNext
 
 unlinkEdict :: Ref EdictT -> Quake ()
 unlinkEdict edictRef = do
     edict <- readRef edictRef
-    let linkRef@(LinkReference linkIdx) = edict^.eArea
+    let linkRef@(Ref linkIdx) = edict^.eArea
 
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
     unless (isNothing (link^.lPrev)) $ do
@@ -90,7 +90,7 @@ unlinkEdict edictRef = do
 linkEdict :: Ref EdictT -> Quake ()
 linkEdict edictRef = do
     edict <- readRef edictRef
-    let LinkReference linkIdx = edict^.eArea
+    let Ref linkIdx = edict^.eArea
     Just link <- preuse $ svGlobals.svLinks.ix linkIdx
 
     when (isJust (link^.lPrev)) $
@@ -271,7 +271,7 @@ areaEdictsR nodeIdx = do
     Just node <- preuse $ svGlobals.svAreaNodes.ix nodeIdx
 
     -- touch linked edicts
-    let LinkReference linkIdx = if areaType == Constants.areaSolid
+    let Ref linkIdx = if areaType == Constants.areaSolid
                                   then node^.anSolidEdicts
                                   else node^.anTriggerEdicts
 
@@ -292,8 +292,8 @@ areaEdictsR nodeIdx = do
       when ((areaMins^.(Math3D.v3Access (node^.anAxis))) < node^.anDist) $
         areaEdictsR (fromJust $ node^.anChildren._2)
 
-  where findTouching :: Int -> LinkReference -> Quake ()
-        findTouching startIdx (LinkReference linkIdx)
+  where findTouching :: Int -> Ref LinkT -> Quake ()
+        findTouching startIdx (Ref linkIdx)
           | startIdx == linkIdx = return ()
           | otherwise = do
               Just link <- preuse $ svGlobals.svLinks.ix linkIdx
@@ -408,12 +408,12 @@ clearWorld = do
 
     void $ createAreaNode 0 (model^.cmMins) (model^.cmMaxs)
 
-insertLinkBefore :: LinkReference -> LinkReference -> Quake ()
-insertLinkBefore v@(LinkReference vIdx) before@(LinkReference beforeIdx) = do
+insertLinkBefore :: Ref LinkT -> Ref LinkT -> Quake ()
+insertLinkBefore v@(Ref vIdx) before@(Ref beforeIdx) = do
     Just beforePrev <- preuse $ svGlobals.svLinks.ix beforeIdx.lPrev
     svGlobals.svLinks.ix vIdx.lNext .= Just before
     svGlobals.svLinks.ix vIdx.lPrev .= beforePrev
-    let Just (LinkReference beforePrevIdx) = beforePrev
+    let Just (Ref beforePrevIdx) = beforePrev
     svGlobals.svLinks.ix beforePrevIdx.lNext .= Just v
     svGlobals.svLinks.ix beforeIdx.lPrev .= Just v
 

@@ -71,9 +71,6 @@ instance Eq KeyFuncT where
 
 data Ref a = Ref Int deriving (Eq, Show, Ord)
 
--- reference to svGlobals.svLinks
-newtype LinkReference = LinkReference Int deriving Eq
-
 -- reference to gameBaseGlobals.gbItemList
 newtype GItemReference = GItemReference Int deriving Eq
 
@@ -544,7 +541,7 @@ data EdictT =
          , _eInUse                 :: Bool
          , _eClassName             :: B.ByteString
          , _eLinkCount             :: Int
-         , _eArea                  :: LinkReference
+         , _eArea                  :: Ref LinkT
          , _eNumClusters           :: Int
          , _eClusterNums           :: UV.Vector Int
          , _eHeadNode              :: Int
@@ -1567,14 +1564,14 @@ data AreaNodeT =
   AreaNodeT { _anAxis          :: Int
             , _anDist          :: Float
             , _anChildren      :: (Maybe Int, Maybe Int) -- indexes to svGlobals.svAreaNodes
-            , _anTriggerEdicts :: LinkReference
-            , _anSolidEdicts   :: LinkReference
+            , _anTriggerEdicts :: Ref LinkT
+            , _anSolidEdicts   :: Ref LinkT
             }
 
 data LinkT =
   LinkT { _lIndex :: Int
-        , _lPrev  :: Maybe LinkReference
-        , _lNext  :: Maybe LinkReference
+        , _lPrev  :: Maybe (Ref LinkT)
+        , _lNext  :: Maybe (Ref LinkT)
         , _lEdict :: Maybe (Ref EdictT)
         }
 

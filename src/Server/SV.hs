@@ -672,8 +672,8 @@ push pusherRef move amove = do
 
              | otherwise -> return False
         
-        isLinkedAnywhere :: LinkReference -> Quake Bool
-        isLinkedAnywhere (LinkReference linkIdx) = do
+        isLinkedAnywhere :: Ref LinkT -> Quake Bool
+        isLinkedAnywhere (Ref linkIdx) = do
           Just link <- preuse $ svGlobals.svLinks.ix linkIdx
           return $ isJust (link^.lPrev)
 
