@@ -5,4 +5,4 @@ import QuakeState
 
 nextServer :: Quake ()
 
-executeClientMessage :: ClientReference -> Quake ()
+executeClientMessage :: Ref ClientT -> Quake ()

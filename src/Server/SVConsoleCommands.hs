@@ -141,7 +141,7 @@ setPlayer = do
               else do
                 clients <- use $ svGlobals.svServerStatic.ssClients
                 let client = clients V.! idnum
-                svGlobals.svClient .= Just (ClientReference idnum)
+                svGlobals.svClient .= Just (Ref idnum)
                 svGlobals.svPlayer .= (client^.cEdict)
 
                 if (client^.cState) == 0
@@ -158,7 +158,7 @@ setPlayer = do
                 Com.printf $ "Userid " `B.append` v1 `B.append` " is not on the server\n"
                 return False
               Just clientId -> do
-                svGlobals.svClient .= Just (ClientReference clientId)
+                svGlobals.svClient .= Just (Ref clientId)
                 svGlobals.svPlayer .= ((clients V.! clientId)^.cEdict)
                 return True
 
@@ -663,7 +663,7 @@ kickF =
            sp <- setPlayer
 
            when sp $ do
-             Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+             Just clientRef@(Ref clientIdx) <- use $ svGlobals.svClient
              Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
              let playerName = client^.cName
              SVSend.broadcastPrintf Constants.printHigh (playerName `B.append` " was kicked\n")
@@ -755,7 +755,7 @@ dumpUserF =
         when sp $ do
           Com.printf "userinfo\n"
           Com.printf "--------\n"
-          Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+          Just (Ref clientIdx) <- use $ svGlobals.svClient
           userInfo <- use $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
           Info.print userInfo
   )

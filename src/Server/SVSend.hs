@@ -298,8 +298,8 @@ startSound maybeOrigin edictRef channel soundIndex volume attenuation timeOfs = 
 SV_SendClientDatagram
 =======================
 -}
-sendClientDatagram :: ClientReference -> Quake Bool
-sendClientDatagram clientRef@(ClientReference clientIdx) = do
+sendClientDatagram :: Ref ClientT -> Quake Bool
+sendClientDatagram clientRef@(Ref clientIdx) = do
     SVEnts.buildClientFrame clientRef
 
     SZ.init (svGlobals.svMsg) "" Constants.maxMsgLen
@@ -365,8 +365,8 @@ Returns true if the client is over its current
 bandwidth estimation and should not be sent another packet
 =======================
 -}
-rateDrop :: ClientReference -> Quake Bool
-rateDrop (ClientReference clientIdx) = do
+rateDrop :: Ref ClientT -> Quake Bool
+rateDrop (Ref clientIdx) = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
     -- never drop over the loopback
@@ -421,10 +421,10 @@ sendClientMessages = do
     when (isJust msglen) $ do
       -- send a message to each connected client
       maxClientsValue <- liftM (truncate . (^.cvValue)) maxClientsCVar
-      void $ traverse (\idx -> sendMessage (ClientReference idx)) [0..maxClientsValue-1]
+      void $ traverse (\idx -> sendMessage (Ref idx)) [0..maxClientsValue-1]
 
-  where sendMessage :: ClientReference -> Quake ()
-        sendMessage clientRef@(ClientReference clientIdx) = do
+  where sendMessage :: Ref ClientT -> Quake ()
+        sendMessage clientRef@(Ref clientIdx) = do
           Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
           when ((client^.cState) /= 0) $ do

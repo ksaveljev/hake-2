@@ -41,8 +41,8 @@ recordDemoMessage = do
       io (putStrLn "SVEnts.recordDemoMessage") >> undefined -- TODO
 
 -- Writes a frame to a client system.
-writeFrameToClient :: ClientReference -> Lens' QuakeState SizeBufT -> Quake ()
-writeFrameToClient clientRef@(ClientReference clientIdx) sizeBufLens = do
+writeFrameToClient :: Ref ClientT -> Lens' QuakeState SizeBufT -> Quake ()
+writeFrameToClient clientRef@(Ref clientIdx) sizeBufLens = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     frameNum <- use $ svGlobals.svServer.sFrameNum
 
@@ -311,8 +311,8 @@ emitPacketEntities from to sizeBufLens = do
 - Decides which entities are going to be visible to the client, and copies
 - off the playerstat and areabits.
 -}
-buildClientFrame :: ClientReference -> Quake ()
-buildClientFrame (ClientReference clientIdx) = do
+buildClientFrame :: Ref ClientT -> Quake ()
+buildClientFrame (Ref clientIdx) = do
     -- io (print "buildClientFrame")
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     let Just clEntRef = client^.cEdict

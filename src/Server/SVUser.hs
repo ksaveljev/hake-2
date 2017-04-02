@@ -75,8 +75,8 @@ uCmds =
                , UCmdT "nextdl" nextDownloadF
                ]
 
-executeClientMessage :: ClientReference -> Quake ()
-executeClientMessage clientRef@(ClientReference clientIdx) = do
+executeClientMessage :: Ref ClientT -> Quake ()
+executeClientMessage clientRef@(Ref clientIdx) = do
     svGlobals.svClient .= Just clientRef
     Just edictRef <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
     svGlobals.svPlayer .= edictRef
@@ -182,15 +182,15 @@ executeClientMessage clientRef@(ClientReference clientIdx) = do
                  | otherwise -> do
                      io (putStrLn "SVUser.executeClientMessage#executeMessage") >> undefined -- TODO
 
-        execCmd :: ClientReference -> UserCmdT -> Int -> Quake Int
+        execCmd :: Ref ClientT -> UserCmdT -> Int -> Quake Int
         execCmd cr lastcmd netDrop
           | netDrop > 2 = do
               clientThink cr lastcmd
               execCmd cr lastcmd (netDrop - 1)
           | otherwise = return netDrop
 
-clientThink :: ClientReference -> UserCmdT -> Quake ()
-clientThink (ClientReference clientIdx) cmd = do
+clientThink :: Ref ClientT -> UserCmdT -> Quake ()
+clientThink (Ref clientIdx) cmd = do
     svGlobals.svServerStatic.ssClients.ix clientIdx.cCommandMsec -= (fromIntegral (cmd^.ucMsec) .&. 0xFF)
 
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
@@ -206,7 +206,7 @@ executeUserCommand str = do
 
     Cmd.tokenizeString str True
 
-    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just (Ref clientIdx) <- use $ svGlobals.svClient
     Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
 
     svGlobals.svPlayer .= Just edictRef
@@ -232,7 +232,7 @@ executeUserCommand str = do
 newF :: XCommandT
 newF =
   XCommandT "SVUser.newF" (do
-    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just (Ref clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     state <- use $ svGlobals.svServer.sState
 
@@ -288,7 +288,7 @@ newF =
 configStringsF :: XCommandT
 configStringsF =
   XCommandT "SVUser.configStringsF" (do
-    Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just clientRef@(Ref clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     Com.dprintf $ "Configstrings() from " `B.append` (client^.cName) `B.append` "\n"
 
@@ -320,8 +320,8 @@ configStringsF =
                 MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd configstrings " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
   )
 
-  where writeConfigStringsPacket :: V.Vector B.ByteString -> ClientReference -> Int -> Quake Int
-        writeConfigStringsPacket configStrings clientRef@(ClientReference clientIdx) start = do
+  where writeConfigStringsPacket :: V.Vector B.ByteString -> Ref ClientT -> Int -> Quake Int
+        writeConfigStringsPacket configStrings clientRef@(Ref clientIdx) start = do
           Just curSize <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage.sbCurSize
           if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxConfigStrings
             then do
@@ -337,7 +337,7 @@ configStringsF =
 baselinesF :: XCommandT
 baselinesF =
   XCommandT "SVUser.baselinesF" (do
-    Just clientRef@(ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just clientRef@(Ref clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
     Com.dprintf $ "Baselines() from " `B.append` (client^.cName) `B.append` "\n"
@@ -371,8 +371,8 @@ baselinesF =
                 MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) ("cmd baselines " `B.append` BC.pack (show spawnCount) `B.append` " " `B.append` BC.pack (show start') `B.append` "\n") -- IMPROVE?
   )
 
-  where writeBaselinePacket :: V.Vector EntityStateT -> ClientReference -> Int -> Quake Int
-        writeBaselinePacket baselines clientRef@(ClientReference clientIdx) start = do
+  where writeBaselinePacket :: V.Vector EntityStateT -> Ref ClientT -> Int -> Quake Int
+        writeBaselinePacket baselines clientRef@(Ref clientIdx) start = do
           Just curSize <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage.sbCurSize
           if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxEdicts
             then do
@@ -387,7 +387,7 @@ baselinesF =
 beginF :: XCommandT
 beginF =
   XCommandT "SVUser.beginF" (do
-    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just (Ref clientIdx) <- use $ svGlobals.svClient
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
     Com.dprintf $ "Begin() from " `B.append` (client^.cName) `B.append` "\n"
 
@@ -420,7 +420,7 @@ nextServerF =
   XCommandT "SVUser.nextServerF" (do
     c <- Cmd.argv 1
     spawnCount <- use $ svGlobals.svServerStatic.ssSpawnCount
-    Just (ClientReference clientIdx) <- use $ svGlobals.svClient
+    Just (Ref clientIdx) <- use $ svGlobals.svClient
     Just name <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cName
 
     if Lib.atoi c /= spawnCount

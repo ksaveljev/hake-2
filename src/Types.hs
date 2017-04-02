@@ -71,9 +71,6 @@ instance Eq KeyFuncT where
 
 data Ref a = Ref Int deriving (Eq, Show, Ord)
 
--- reference to svGlobals.svServerStatic.ssClients
-newtype ClientReference = ClientReference Int deriving Eq
-
 -- reference to cmGlobals.cmMapCModels
 newtype CModelReference = CModelReference Int deriving Eq
 
@@ -262,7 +259,7 @@ data FSGlobals =
 
 data SVGlobals =
   SVGlobals { _svMasterAdr            :: V.Vector NetAdrT
-            , _svClient               :: Maybe ClientReference
+            , _svClient               :: Maybe (Ref ClientT)
             , _svServer               :: ServerT
             , _svServerStatic         :: ServerStaticT
             , _svPlayer               :: Maybe (Ref EdictT)

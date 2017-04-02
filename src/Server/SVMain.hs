@@ -140,8 +140,8 @@ masterShutdown = do
 - unwillingly. This is NOT called if the entire server is quiting or
 - crashing.
 -}
-dropClient :: ClientReference -> Quake ()
-dropClient (ClientReference clientIdx) = do
+dropClient :: Ref ClientT -> Quake ()
+dropClient (Ref clientIdx) = do
     Just client <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx
 
     MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (fromIntegral Constants.svcDisconnect)
@@ -295,7 +295,7 @@ checkTimeouts = do
                 else
                   when (((client^.cState) == Constants.csConnected || (client^.cState) == Constants.csSpawned) && (client^.cLastMessage) < dropPoint) $ do
                     SVSend.broadcastPrintf Constants.printHigh $ (client^.cName) `B.append` " timed out\n"
-                    dropClient (ClientReference idx)
+                    dropClient (Ref idx)
                     svGlobals.svServerStatic.ssClients.ix idx.cState .= Constants.csFree -- don't bother with zombie state
 
               checkClientTimeout realTime dropPoint zombiePoint (idx + 1) maxIdx
@@ -352,7 +352,7 @@ readPackets = do
                        when ((client^.cState) /= Constants.csZombie) $ do
                          realTime <- use $ svGlobals.svServerStatic.ssRealTime
                          svGlobals.svServerStatic.ssClients.ix idx.cLastMessage .= realTime -- don't timeout
-                         SVUser.executeClientMessage (ClientReference idx)
+                         SVUser.executeClientMessage (Ref idx)
 
                      return idx
 
@@ -653,7 +653,7 @@ svcDirectConnect = do
                     NetChannel.outOfBandPrint Constants.nsServer adr "print\nServer is full.\n"
                     Com.dprintf "Rejected a connection.\n"
                   Just idx -> do
-                    gotNewClient (ClientReference idx) challenge userInfo adr qport
+                    gotNewClient (Ref idx) challenge userInfo adr qport
 
   where findAndReuseIPSlot :: V.Vector ClientT -> NetAdrT -> Int -> Int -> B.ByteString -> Int -> Int -> Quake Bool
         findAndReuseIPSlot clients adr qport challenge userInfo idx maxIdx
@@ -675,14 +675,14 @@ svcDirectConnect = do
                           return True
                         else do
                           Com.printf $ NET.adrToString adr `B.append` ":reconnect\n"
-                          gotNewClient (ClientReference idx) challenge userInfo adr qport
+                          gotNewClient (Ref idx) challenge userInfo adr qport
                           return True
                     else
                       findAndReuseIPSlot clients adr qport challenge userInfo (idx + 1) maxIdx
 
 -- Initializes player structures after successful connection.
-gotNewClient :: ClientReference -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
-gotNewClient clientRef@(ClientReference clientIdx) challenge userInfo adr qport = do
+gotNewClient :: Ref ClientT -> Int -> B.ByteString -> NetAdrT -> Int -> Quake ()
+gotNewClient clientRef@(Ref clientIdx) challenge userInfo adr qport = do
     -- build a new connection
     -- accept the new client
     -- this is the only place a client_t is ever initialized
@@ -739,8 +739,8 @@ svcRemoteCommand = io (putStrLn "SVMain.svcRemoteCommand") >> undefined -- TODO
 - Pull specific info from a newly changed userinfo string into a more C
 - freindly form.
 -}
-userInfoChanged :: ClientReference -> Quake ()
-userInfoChanged (ClientReference clientIdx) = do
+userInfoChanged :: Ref ClientT -> Quake ()
+userInfoChanged (Ref clientIdx) = do
     Just userInfo <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cUserInfo
     Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix clientIdx.cEdict
 

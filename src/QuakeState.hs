@@ -49,7 +49,6 @@ module QuakeState ( QuakeState(..)
                   , netChannelGlobals
                   , clTEntGlobals
                   , worldRef
-                  , ClientReference(..)
                   , CModelReference(..)
                   , LinkReference(..)
                   , GItemReference(..)
