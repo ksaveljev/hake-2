@@ -610,7 +610,7 @@ saveGameF =
     v1 <- Cmd.argv 1
     maxClientsValue <- liftM ((^.cvValue)) maxClientsCVar
     Just (Just edictRef) <- preuse $ svGlobals.svServerStatic.ssClients.ix 0.cEdict -- TODO: what if there are no clients? is it possible?
-    Just (GClientReference clientIdx) <- readRef edictRef >>= \e -> return (e^.eClient)
+    Just (Ref clientIdx) <- readRef edictRef >>= \e -> return (e^.eClient)
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
     let health = (client^.gcPlayerState.psStats) UV.! Constants.statHealth
 

@@ -87,7 +87,7 @@ spawnEntities mapName entities spawnPoint = do
 
     -- set client fields on player ents
     maxClients <- use $ gameBaseGlobals.gbGame.glMaxClients
-    mapM_ (\i -> modifyRef (Ref i) (\v -> v & eClient .~ Just (GClientReference (i - 1)))) [1..maxClients]
+    mapM_ (\i -> modifyRef (Ref i) (\v -> v & eClient .~ Just (Ref (i - 1)))) [1..maxClients]
 
     inhibited <- parseEntities True 0 0
 

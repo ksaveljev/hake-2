@@ -74,9 +74,6 @@ data Ref a = Ref Int deriving (Eq, Show, Ord)
 -- reference to svGlobals.svServerStatic.ssClients
 newtype ClientReference = ClientReference Int deriving Eq
 
--- reference to gameBaseGlobals.gbGame.glClients
-newtype GClientReference = GClientReference Int deriving Eq
-
 -- reference to cmGlobals.cmMapCModels
 newtype CModelReference = CModelReference Int deriving Eq
 
@@ -643,7 +640,7 @@ data EdictT =
          , _eItem                  :: Maybe GItemReference
          , _eMoveInfo              :: MoveInfoT
          , _eMonsterInfo           :: MonsterInfoT
-         , _eClient                :: Maybe GClientReference
+         , _eClient                :: Maybe (Ref GClientT)
          , _eOwner                 :: Maybe (Ref EdictT)
          , _eIndex                 :: Int
          , _eiModel                :: Maybe B.ByteString
@@ -935,7 +932,7 @@ data GameBaseGlobals =
                   , _gbIsQuad            :: Bool
                   , _gbIsSilenced        :: Int
                   , _gbCurrentPlayer     :: Maybe (Ref EdictT)
-                  , _gbCurrentClient     :: Maybe GClientReference
+                  , _gbCurrentClient     :: Maybe (Ref GClientT)
                   , _gbForward           :: V3 Float
                   , _gbRight             :: V3 Float
                   , _gbUp                :: V3 Float

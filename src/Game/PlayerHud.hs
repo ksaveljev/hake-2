@@ -27,7 +27,7 @@ moveClientToIntermission _ = do
 setStats :: Ref EdictT -> Quake ()
 setStats edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
 
     -- health
     setHealth gClientRef
@@ -60,8 +60,8 @@ setStats edictRef = do
 
   -- TODO: instead of using zoom + ix maybe use %= with V.//
   -- TODO: a good candidate for optimizations
-  where setHealth :: GClientReference -> Quake ()
-        setHealth (GClientReference gClientIdx) = do
+  where setHealth :: Ref GClientT -> Quake ()
+        setHealth (Ref gClientIdx) = do
           picHealth <- use $ gameBaseGlobals.gbLevel.llPicHealth
           edict <- readRef edictRef
 
@@ -69,8 +69,8 @@ setStats edictRef = do
             ix Constants.statHealthIcon .= fromIntegral picHealth
             ix Constants.statHealth .= fromIntegral (edict^.eHealth)
 
-        setAmmo :: GClientReference -> Quake ()
-        setAmmo (GClientReference gClientIdx) = do
+        setAmmo :: Ref GClientT -> Quake ()
+        setAmmo (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if (gClient^.gcAmmoIndex) == 0
@@ -87,8 +87,8 @@ setStats edictRef = do
                 ix Constants.statAmmoIcon .= fromIntegral idx
                 ix Constants.statAmmo .= fromIntegral ((gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex))
 
-        setArmor :: GClientReference -> Quake ()
-        setArmor (GClientReference gClientIdx) = do
+        setArmor :: Ref GClientT -> Quake ()
+        setArmor (Ref gClientIdx) = do
           edict <- readRef edictRef
           powerArmorType <- GameItems.powerArmorType edictRef
 
@@ -137,8 +137,8 @@ setStats edictRef = do
                    ix Constants.statArmorIcon .= fromIntegral 0
                    ix Constants.statArmor .= fromIntegral 0
 
-        setPickupMessage :: GClientReference -> Quake ()
-        setPickupMessage (GClientReference gClientIdx) = do
+        setPickupMessage :: Ref GClientT -> Quake ()
+        setPickupMessage (Ref gClientIdx) = do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -147,8 +147,8 @@ setStats edictRef = do
               ix Constants.statPickupIcon .= 0
               ix Constants.statPickupString .= 0
 
-        setTimers :: GClientReference -> Quake ()
-        setTimers (GClientReference gClientIdx) = do
+        setTimers :: Ref GClientT -> Quake ()
+        setTimers (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           imageIndex <- use $ gameBaseGlobals.gbGameImport.giImageIndex
           frameNum <- liftM fromIntegral $ use (gameBaseGlobals.gbLevel.llFrameNum)
@@ -175,8 +175,8 @@ setStats edictRef = do
             ix Constants.statTimerIcon .= fromIntegral icon
             ix Constants.statTimer .= timer
 
-        setSelectedItem :: GClientReference -> Quake ()
-        setSelectedItem (GClientReference gClientIdx) = do
+        setSelectedItem :: Ref GClientT -> Quake ()
+        setSelectedItem (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           imageIndex <- use $ gameBaseGlobals.gbGameImport.giImageIndex
 
@@ -191,8 +191,8 @@ setStats edictRef = do
             ix Constants.statSelectedIcon .= fromIntegral icon
             ix Constants.statSelectedItem .= fromIntegral (gClient^.gcPers.cpSelectedItem)
 
-        setLayouts :: GClientReference -> Quake ()
-        setLayouts (GClientReference gClientIdx) = do
+        setLayouts :: Ref GClientT -> Quake ()
+        setLayouts (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           deathmatchValue <- liftM (^.cvValue) deathmatchCVar
           let v = 0
@@ -218,13 +218,13 @@ setStats edictRef = do
 
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statLayouts .= v'
 
-        setFrags :: GClientReference -> Quake ()
-        setFrags (GClientReference gClientIdx) = do
+        setFrags :: Ref GClientT -> Quake ()
+        setFrags (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats.ix Constants.statFrags .= fromIntegral (gClient^.gcResp.crScore)
 
-        setHelpIcon :: GClientReference -> Quake ()
-        setHelpIcon (GClientReference gClientIdx) = do
+        setHelpIcon :: Ref GClientT -> Quake ()
+        setHelpIcon (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
           imageIndex <- use $ gameBaseGlobals.gbGameImport.giImageIndex
@@ -260,7 +260,7 @@ checkChaseStats edictRef = do
               let newEdictRef = Ref idx
               newEdict <- readRef newEdictRef
 
-              let Just (GClientReference gClientIdx) = newEdict^.eClient
+              let Just (Ref gClientIdx) = newEdict^.eClient
 
               if not(newEdict^.eInUse) || ((clients V.! gClientIdx)^.gcChaseTarget) /= Just edictRef
                 then
@@ -268,7 +268,7 @@ checkChaseStats edictRef = do
 
                 else do
                   edict <- readRef edictRef
-                  let Just (GClientReference edictClientIdx) = edict^.eClient
+                  let Just (Ref edictClientIdx) = edict^.eClient
 
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats .= ((clients V.! edictClientIdx)^.gcPlayerState.psStats)
 

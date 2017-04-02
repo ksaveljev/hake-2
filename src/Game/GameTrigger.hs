@@ -370,7 +370,7 @@ triggerKeyUse =
       let Just activatorRef = mActivatorRef
       activator <- readRef activatorRef
       
-      let Just (GClientReference gClientIdx) = activator^.eClient
+      let Just (Ref gClientIdx) = activator^.eClient
       Just activatorClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     
       let Just (GItemReference gItemIdx) = self^.eItem
@@ -446,7 +446,7 @@ triggerKeyUse =
               if | not (edict^.eInUse) -> updatePlayers edicts itemIndex cube (idx + 1) maxIdx
                  | isNothing (edict^.eClient) -> updatePlayers edicts itemIndex cube (idx + 1) maxIdx
                  | otherwise -> do
-                     let Just (GClientReference gClientIdx) = edict^.eClient
+                     let Just (Ref gClientIdx) = edict^.eClient
                      Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
                      
                      when ((gClient^.gcPers.cpPowerCubes) .&. (1 `shiftL` cube) /= 0) $ do
@@ -464,7 +464,7 @@ triggerKeyUse =
               if | not (edict^.eInUse) -> updatePlayers2 edicts itemIndex (idx + 1) maxIdx
                  | isNothing (edict^.eClient) -> updatePlayers2 edicts itemIndex (idx + 1) maxIdx
                  | otherwise -> do
-                     let Just (GClientReference gClientIdx) = edict^.eClient
+                     let Just (Ref gClientIdx) = edict^.eClient
                      gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix itemIndex .= 0
                      updatePlayers2 edicts itemIndex (idx + 1) maxIdx
 
@@ -589,7 +589,7 @@ triggerPushTouch =
            
            case other^.eClient of
              Nothing -> return ()
-             Just (GClientReference gClientIdx) -> do
+             Just (Ref gClientIdx) -> do
                -- don't take falling damage immediately from this
                gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcOldVelocity .= (other^.eVelocity)
                

@@ -288,7 +288,7 @@ pickupArmor = PickupArmor "pickup_armor" $ \edictRef otherRef -> do
   oldArmorIndex <- armorIndex otherRef
 
   other <- readRef otherRef
-  let Just (GClientReference otherGClientIdx) = other^.eClient
+  let Just (Ref otherGClientIdx) = other^.eClient
 
   GItemReference jacketArmorIndex <- use $ gameItemsGlobals.giJacketArmorIndex
 
@@ -317,7 +317,7 @@ pickupPowerArmor :: EntInteract
 pickupPowerArmor =
   PickupPowerArmor "pickup_powerarmor" $ \edictRef otherRef -> do
     other <- readRef otherRef
-    let Just (GClientReference gClientIdx) = other^.eClient
+    let Just (Ref gClientIdx) = other^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     edict <- readRef edictRef
@@ -360,7 +360,7 @@ usePowerArmor =
         Just (GItemReference cellsIdx) <- findItem "cells"
         Just cells <- preuse $ gameBaseGlobals.gbItemList.ix cellsIdx
 
-        let Just (GClientReference gClientIdx) = edict^.eClient
+        let Just (Ref gClientIdx) = edict^.eClient
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
         if (gClient^.gcPers.cpInventory) UV.! (cells^.giIndex) == 0
@@ -377,7 +377,7 @@ dropPowerArmor :: ItemDrop
 dropPowerArmor =
   GenericItemDrop "drop_powerarmor" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
@@ -394,7 +394,7 @@ pickupAmmo =
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     other <- readRef otherRef
-    let Just (GClientReference gClientIdx) = other^.eClient
+    let Just (Ref gClientIdx) = other^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
@@ -432,7 +432,7 @@ dropAmmo =
     droppedRef <- dropItem edictRef gItemRef
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let count = if (gClient^.gcPers.cpInventory) UV.! (gItem^.giIndex) >= (gItem^.giQuantity)
@@ -461,7 +461,7 @@ useQuad :: ItemUse
 useQuad =
   GenericItemUse "use_quad" $ \edictRef (GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -499,7 +499,7 @@ pickupPowerup =
     edict <- readRef edictRef
     other <- readRef otherRef
     let Just (GItemReference gItemIdx) = edict^.eItem
-    let Just (GClientReference gClientIdx) = other^.eClient
+    let Just (Ref gClientIdx) = other^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     skillValue <- liftM (^.cvValue) skillCVar
@@ -530,7 +530,7 @@ dropGeneral =
     dropItem edictRef gItemRef
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -540,7 +540,7 @@ useInvulnerability :: ItemUse
 useInvulnerability =
   GenericItemUse "use_invulnerability" $ \edictRef (GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -567,7 +567,7 @@ useSilencer :: ItemUse
 useSilencer =
   GenericItemUse "use_silencer" $ \edictRef (GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -587,7 +587,7 @@ useBreather :: ItemUse
 useBreather =
   GenericItemUse "use_breather" $ \edictRef (GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -614,7 +614,7 @@ useEnviroSuit :: ItemUse
 useEnviroSuit =
   GenericItemUse "use_envirosuit" $ \edictRef (GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) -= 1
@@ -695,8 +695,8 @@ pickupBandolier =
 
     return True
 
-  where checkMaxAmmo :: GClientReference -> Quake ()
-        checkMaxAmmo (GClientReference gClientIdx) = do
+  where checkMaxAmmo :: Ref GClientT -> Quake ()
+        checkMaxAmmo (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           when ((gClient^.gcPers.cpMaxBullets) < 250) $
@@ -737,8 +737,8 @@ pickupPack =
 
     return True
       
-  where checkMaxAmmo :: GClientReference -> Quake ()
-        checkMaxAmmo (GClientReference gClientIdx) = do
+  where checkMaxAmmo :: Ref GClientT -> Quake ()
+        checkMaxAmmo (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           when ((gClient^.gcPers.cpMaxBullets) < 300) $
@@ -759,8 +759,8 @@ pickupPack =
           when ((gClient^.gcPers.cpMaxSlugs) < 100) $
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpMaxSlugs .= 100
 
-checkBullets :: GClientReference -> Quake ()
-checkBullets (GClientReference gClientIdx) = do
+checkBullets :: Ref GClientT -> Quake ()
+checkBullets (Ref gClientIdx) = do
   foundItem <- findItem "Bullets"
 
   case foundItem of
@@ -772,8 +772,8 @@ checkBullets (GClientReference gClientIdx) = do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxBullets) then gClient^.gcPers.cpMaxBullets else v + (gItem^.giQuantity))
 
-checkShells :: GClientReference -> Quake ()
-checkShells (GClientReference gClientIdx) = do
+checkShells :: Ref GClientT -> Quake ()
+checkShells (Ref gClientIdx) = do
   foundItem <- findItem "Shells"
 
   case foundItem of
@@ -785,8 +785,8 @@ checkShells (GClientReference gClientIdx) = do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxShells) then gClient^.gcPers.cpMaxShells else v + (gItem^.giQuantity))
 
-checkCells :: GClientReference -> Quake ()
-checkCells (GClientReference gClientIdx) = do
+checkCells :: Ref GClientT -> Quake ()
+checkCells (Ref gClientIdx) = do
   foundItem <- findItem "Cells"
 
   case foundItem of
@@ -798,8 +798,8 @@ checkCells (GClientReference gClientIdx) = do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxCells) then gClient^.gcPers.cpMaxCells else v + (gItem^.giQuantity))
 
-checkGrenades :: GClientReference -> Quake ()
-checkGrenades (GClientReference gClientIdx) = do
+checkGrenades :: Ref GClientT -> Quake ()
+checkGrenades (Ref gClientIdx) = do
   foundItem <- findItem "Grenades"
 
   case foundItem of
@@ -811,8 +811,8 @@ checkGrenades (GClientReference gClientIdx) = do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxGrenades) then gClient^.gcPers.cpMaxGrenades else v + (gItem^.giQuantity))
 
-checkRockets :: GClientReference -> Quake ()
-checkRockets (GClientReference gClientIdx) = do
+checkRockets :: Ref GClientT -> Quake ()
+checkRockets (Ref gClientIdx) = do
   foundItem <- findItem "Rockets"
 
   case foundItem of
@@ -824,8 +824,8 @@ checkRockets (GClientReference gClientIdx) = do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (gItem^.giIndex) %= (\v -> if v + (gItem^.giQuantity) > (gClient^.gcPers.cpMaxRockets) then gClient^.gcPers.cpMaxRockets else v + (gItem^.giQuantity))
 
-checkSlugs :: GClientReference -> Quake ()
-checkSlugs (GClientReference gClientIdx) = do
+checkSlugs :: Ref GClientT -> Quake ()
+checkSlugs (Ref gClientIdx) = do
   foundItem <- findItem "Slugs"
 
   case foundItem of
@@ -844,7 +844,7 @@ pickupKey =
     edict <- readRef edictRef
     other <- readRef otherRef
 
-    let Just (GClientReference gClientIdx) = other^.eClient
+    let Just (Ref gClientIdx) = other^.eClient
         Just (GItemReference gItemIdx) = edict^.eItem
 
     Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
@@ -1080,7 +1080,7 @@ touchItem =
 
       when taken $ do
         -- flash the screen
-        let Just (GClientReference otherClientIdx) = other^.eClient
+        let Just (Ref otherClientIdx) = other^.eClient
         gameBaseGlobals.gbGame.glClients.ix otherClientIdx.gcBonusAlpha .= 0.25
 
         -- show icon and name on status bar
@@ -1242,7 +1242,7 @@ dropItem edictRef gItemRef@(GItemReference gItemIdx) = do
     setModel droppedRef (item^.giWorldModel)
     
     forward <- case edict^.eClient of
-                 Just (GClientReference gClientIdx) -> do
+                 Just (Ref gClientIdx) -> do
                    Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                    let (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
@@ -1302,7 +1302,7 @@ powerArmorType edictRef = do
       Nothing ->
         return Constants.powerArmorNone
 
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
         GItemReference powerShieldIndex <- use $ gameItemsGlobals.giPowerShieldIndex
@@ -1325,7 +1325,7 @@ armorIndex edictRef = do
       Nothing ->
         return 0
 
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
         (GItemReference jacketArmorIndex) <- use $ gameItemsGlobals.giJacketArmorIndex
@@ -1371,7 +1371,7 @@ addAmmo edictRef (GItemReference gItemIdx) count = do
       Nothing ->
         return False
 
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
         Just item <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
 

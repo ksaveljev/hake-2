@@ -320,7 +320,7 @@ buildClientFrame (ClientReference clientIdx) = do
 
     case clEnt^.eClient of
       Nothing -> return () -- not in game yet
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         frameNum <- use $ svGlobals.svServer.sFrameNum
         let frameIdx = frameNum .&. Constants.updateMask
             frame = svGlobals.svServerStatic.ssClients.ix clientIdx.cFrames.ix frameIdx :: Traversal' QuakeState ClientFrameT

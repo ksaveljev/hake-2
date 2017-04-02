@@ -781,7 +781,7 @@ clientTeam edictRef = do
       Nothing ->
         return ""
       
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
         value <- Info.valueForKey (gClient^.gcPers.cpUserInfo) "skin"
         
@@ -825,7 +825,7 @@ validateSelectedItem :: Ref EdictT -> Quake ()
 validateSelectedItem edictRef = do
     edict <- readRef edictRef
     
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     
     if (gClient^.gcPers.cpInventory) UV.! (gClient^.gcPers.cpSelectedItem) /= 0

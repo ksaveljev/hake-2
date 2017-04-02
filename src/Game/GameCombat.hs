@@ -117,7 +117,7 @@ damage targRef inflictorRef attackerRef dir point normal damage knockback dflags
       -- check for invincibility
       (take', save') <- if isJust client
                           then do
-                            let Just (GClientReference gClientIdx) = client
+                            let Just (Ref gClientIdx) = client
                             Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
                             levelFrameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
@@ -200,7 +200,7 @@ damage targRef inflictorRef attackerRef dir point normal damage knockback dflags
           -- the total will be turned into screen blends and view angle kicks
           -- at the end of the frame
           when (isJust client) $ do
-            let Just (GClientReference gClientIdx) = client
+            let Just (Ref gClientIdx) = client
             zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
               gcDamagePArmor += psave
               gcDamageArmor += asave'
@@ -336,7 +336,7 @@ checkPowerArmor edictRef point normal damage dflags = do
                       Just (GItemReference itemIdx) <- GameItems.findItem "Cells"
                       Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
 
-                      let Just (GClientReference gClientIdx) = edict^.eClient
+                      let Just (Ref gClientIdx) = edict^.eClient
                       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
                       let power = (gClient^.gcPers.cpInventory) UV.! (item^.giIndex)
 
@@ -392,7 +392,7 @@ checkPowerArmor edictRef point normal damage dflags = do
                            Nothing ->
                             modifyRef edictRef (\v -> v & eMonsterInfo.miPowerArmorPower -~ powerUsed)
 
-                           Just (GClientReference gClientIdx) -> do
+                           Just (Ref gClientIdx) -> do
                              Just (GItemReference itemIdx) <- GameItems.findItem "Cells"
                              Just item <- preuse $ gameBaseGlobals.gbItemList.ix itemIdx
                              gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers.cpInventory.ix (item^.giIndex) -= powerUsed
@@ -420,7 +420,7 @@ checkArmor edictRef point normal damage sparks dflags = do
                    save = if dflags .&. Constants.damageEnergy /= 0
                             then ceiling ((gArmor^.giaEnergyProtection) * (fromIntegral damage))
                             else ceiling ((gArmor^.giaNormalProtection) * (fromIntegral damage))
-                   Just (GClientReference gClientIdx) = edict^.eClient
+                   Just (Ref gClientIdx) = edict^.eClient
 
                Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
@@ -464,7 +464,7 @@ killed targRef inflictorRef attackerRef damage point = do
         attacker <- readRef attackerRef
 
         when (coopValue /= 0 && isJust (attacker^.eClient)) $ do
-          let Just (GClientReference attackerClientIdx) = attacker^.eClient
+          let Just (Ref attackerClientIdx) = attacker^.eClient
           gameBaseGlobals.gbGame.glClients.ix attackerClientIdx.gcResp.crScore += 1
           -- medics won't heal monsters that they kill themselves
           when ((attacker^.eClassName) == "monster_medic") $

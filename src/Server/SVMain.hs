@@ -181,7 +181,7 @@ statusString = do
                 then do
                   let Just edictRef = client^.cEdict
                   gClientRef <- readRef edictRef >>= \e -> return (e^.eClient)
-                  let Just (GClientReference gClientIdx) = gClientRef
+                  let Just (Ref gClientIdx) = gClientRef
                   Just clientStats <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psStats
 
                   let player = BC.pack (show $ clientStats UV.! Constants.statFrags) `B.append`
@@ -377,7 +377,7 @@ calcPings = do
                 -- let the game dll know about the ping
                 let Just edictRef = client^.cEdict
                 gClientRef <- readRef edictRef >>= \e -> return (e^.eClient)
-                let Just (GClientReference gClientIdx) = gClientRef
+                let Just (Ref gClientIdx) = gClientRef
                 gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPing .= ping
 
               updateClientPing (idx + 1) maxIdx

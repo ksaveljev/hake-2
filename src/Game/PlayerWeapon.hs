@@ -40,7 +40,7 @@ useWeapon :: ItemUse
 useWeapon =
   GenericItemUse "Use_Weapon" $ \edictRef gItemRef@(GItemReference gItemIdx) -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     -- see if we're already using it
@@ -89,7 +89,7 @@ weaponBlasterFire =
     blasterFire edictRef v3o damage False Constants.efBlaster
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psGunFrame += 1
 
     return True
@@ -108,7 +108,7 @@ pickupWeapon =
     coopValue <- liftM (^.cvValue) coopCVar
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
-    let Just (GClientReference otherClientIdx) = other^.eClient
+    let Just (Ref otherClientIdx) = other^.eClient
     Just otherClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix otherClientIdx
 
     let done = (dmFlagsValue .&. Constants.dfWeaponsStay /= 0 || coopValue /= 0) && (otherClient^.gcPers.cpInventory) UV.! index /= 0 && (edict^.eSpawnFlags) .&. (Constants.droppedItem .|. Constants.droppedPlayerItem) == 0
@@ -155,7 +155,7 @@ dropWeapon =
     when (dmFlagsValue .&. Constants.dfWeaponsStay == 0) $ do
       Just gItem <- preuse $ gameBaseGlobals.gbItemList.ix gItemIdx
       edict <- readRef edictRef
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       let index = gItem^.giIndex
@@ -181,7 +181,7 @@ weaponShotgunFire :: EntThink
 weaponShotgunFire =
   GenericEntThink "weapon_shotgun_fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     if (client^.gcPlayerState.psGunFrame) == 9
@@ -241,7 +241,7 @@ weaponSuperShotgunFire :: EntThink
 weaponSuperShotgunFire =
   GenericEntThink "weapon_supershotgun_fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let (Just forward, Just right, _) = Math3D.angleVectors (gClient^.gcVAngle) True True False
@@ -303,7 +303,7 @@ machinegunFire :: EntThink
 machinegunFire =
   GenericEntThink "Machinegun_Fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -411,7 +411,7 @@ chaingunFire :: EntThink
 chaingunFire =
   GenericEntThink "Chaingun_Fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -545,7 +545,7 @@ weaponGrenadeLauncherFire :: EntThink
 weaponGrenadeLauncherFire =
   GenericEntThink "weapon_grenadelauncher_fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     isQuad <- use $ gameBaseGlobals.gbIsQuad
@@ -597,7 +597,7 @@ weaponRocketLauncherFire :: EntThink
 weaponRocketLauncherFire =
   GenericEntThink "Weapon_RocketLauncher_Fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     r <- Lib.randomF
@@ -654,7 +654,7 @@ weaponHyperBlasterFire :: EntThink
 weaponHyperBlasterFire =
   GenericEntThink "Weapon_HyperBlaster_Fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -747,7 +747,7 @@ weaponRailgunFire =
                                   else (150, 250)
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let (Just forward, Just right, _) = Math3D.angleVectors (client^.gcVAngle) True True False
@@ -794,7 +794,7 @@ weaponBFGFire :: EntThink
 weaponBFGFire =
   GenericEntThink "weapon_bfg_fire" $ \edictRef -> do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     isQuad <- use $ gameBaseGlobals.gbIsQuad
@@ -859,7 +859,7 @@ weaponBFGFire =
 changeWeapon :: Ref EdictT -> Quake ()
 changeWeapon edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
 
     checkGrenadeTime gClientRef
 
@@ -887,8 +887,8 @@ changeWeapon edictRef = do
           modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain301)
           gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.framePain304
 
-  where checkGrenadeTime :: GClientReference -> Quake ()
-        checkGrenadeTime (GClientReference gClientIdx) = do
+  where checkGrenadeTime :: Ref GClientT -> Quake ()
+        checkGrenadeTime (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           when (gClient^.gcGrenadeTime /= 0) $ do
@@ -898,8 +898,8 @@ changeWeapon edictRef = do
             weaponGrenadeFire edictRef False
             gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcGrenadeTime .= 0
 
-        setVisibleModel :: GClientReference -> Quake ()
-        setVisibleModel (GClientReference gClientIdx) = do
+        setVisibleModel :: Ref GClientT -> Quake ()
+        setVisibleModel (Ref gClientIdx) = do
           edict <- readRef edictRef
 
           when ((edict^.eEntityState.esModelIndex) == 255) $ do
@@ -913,8 +913,8 @@ changeWeapon edictRef = do
 
             modifyRef edictRef (\v -> v & eEntityState.esSkinNum .~ ((edict^.eIndex) - 1) .|. i)
 
-        setAmmoAndGunIndex :: GClientReference -> Quake Bool
-        setAmmoAndGunIndex (GClientReference gClientIdx) = do
+        setAmmoAndGunIndex :: Ref GClientT -> Quake Bool
+        setAmmoAndGunIndex (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           case gClient^.gcPers.cpWeapon of
@@ -960,7 +960,7 @@ changeWeapon edictRef = do
 thinkWeapon :: Ref EdictT -> Quake ()
 thinkWeapon edictRef = do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
 
     -- if just died, put the weapon away
     when ((edict^.eHealth) < 1) $ do
@@ -986,7 +986,7 @@ thinkWeapon edictRef = do
 weaponGeneric :: Ref EdictT -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
 weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let frameFireFirst = frameActiveLast + 1
@@ -1107,8 +1107,8 @@ weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactiva
                  when (gunFrame == frameIdleFirst + 1) $
                    gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponState .= Constants.weaponReady
 
-  where checkFireFrames :: GClientReference -> UV.Vector Int -> Int -> Quake Int
-        checkFireFrames gClientRef@(GClientReference gClientIdx) fireFrames idx
+  where checkFireFrames :: Ref GClientT -> UV.Vector Int -> Int -> Quake Int
+        checkFireFrames gClientRef@(Ref gClientIdx) fireFrames idx
           | fireFrames UV.! idx == 0 = return idx
           | otherwise = do
               Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
@@ -1143,7 +1143,7 @@ weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactiva
 weaponGrenadeFire :: Ref EdictT -> Bool -> Quake ()
 weaponGrenadeFire edictRef held = do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     isQuad <- use $ gameBaseGlobals.gbIsQuad
@@ -1186,7 +1186,7 @@ blasterFire edictRef gOffset dmg hyper effect = do
     isSilenced <- use $ gameBaseGlobals.gbIsSilenced
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     let damage = if isQuad then dmg * 4 else dmg
@@ -1229,7 +1229,7 @@ blasterFire edictRef gOffset dmg hyper effect = do
 playerNoise :: Ref EdictT -> V3 Float -> Int -> Quake ()
 playerNoise whoRef noiseLocation noiseType = do
     who <- readRef whoRef
-    let Just (GClientReference gClientIdx) = who^.eClient
+    let Just (Ref gClientIdx) = who^.eClient
     Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
 
@@ -1295,13 +1295,13 @@ playerNoise whoRef noiseLocation noiseType = do
 noAmmoWeaponChange :: Ref EdictT -> Quake ()
 noAmmoWeaponChange edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     checkSlugsAndRailgun gClientRef gClient
 
-  where checkSlugsAndRailgun :: GClientReference -> GClientT -> Quake ()
-        checkSlugsAndRailgun gClientRef@(GClientReference gClientIdx) gClient = do
+  where checkSlugsAndRailgun :: Ref GClientT -> GClientT -> Quake ()
+        checkSlugsAndRailgun gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference slugsIdx) <- GameItems.findItem "slugs"
           Just railgunRef@(GItemReference railgunIdx) <- GameItems.findItem "railgun"
           Just slugs <- preuse $ gameBaseGlobals.gbItemList.ix slugsIdx
@@ -1312,8 +1312,8 @@ noAmmoWeaponChange edictRef = do
             then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just railgunRef
             else checkCellsAndHyperblaster gClientRef gClient
 
-        checkCellsAndHyperblaster :: GClientReference -> GClientT -> Quake ()
-        checkCellsAndHyperblaster gClientRef@(GClientReference gClientIdx) gClient = do
+        checkCellsAndHyperblaster :: Ref GClientT -> GClientT -> Quake ()
+        checkCellsAndHyperblaster gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference cellsIdx) <- GameItems.findItem "cells"
           Just hyperblasterRef@(GItemReference hyperblasterIdx) <- GameItems.findItem "hyperblaster"
           Just cells <- preuse $ gameBaseGlobals.gbItemList.ix cellsIdx
@@ -1324,8 +1324,8 @@ noAmmoWeaponChange edictRef = do
             then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just hyperblasterRef
             else checkBulletsAndChaingun gClientRef gClient
 
-        checkBulletsAndChaingun :: GClientReference -> GClientT -> Quake ()
-        checkBulletsAndChaingun gClientRef@(GClientReference gClientIdx) gClient = do
+        checkBulletsAndChaingun :: Ref GClientT -> GClientT -> Quake ()
+        checkBulletsAndChaingun gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference bulletsIdx) <- GameItems.findItem "bullets"
           Just chaingunRef@(GItemReference chaingunIdx) <- GameItems.findItem "chaingun"
           Just bullets <- preuse $ gameBaseGlobals.gbItemList.ix bulletsIdx
@@ -1336,8 +1336,8 @@ noAmmoWeaponChange edictRef = do
             then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just chaingunRef
             else checkBulletsAndMachinegun gClientRef gClient
 
-        checkBulletsAndMachinegun :: GClientReference -> GClientT -> Quake ()
-        checkBulletsAndMachinegun gClientRef@(GClientReference gClientIdx) gClient = do
+        checkBulletsAndMachinegun :: Ref GClientT -> GClientT -> Quake ()
+        checkBulletsAndMachinegun gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference bulletsIdx) <- GameItems.findItem "bullets"
           Just machinegunRef@(GItemReference machinegunIdx) <- GameItems.findItem "machinegun"
           Just bullets <- preuse $ gameBaseGlobals.gbItemList.ix bulletsIdx
@@ -1348,8 +1348,8 @@ noAmmoWeaponChange edictRef = do
             then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just machinegunRef
             else checkShellsAndSuperShotgun gClientRef gClient
 
-        checkShellsAndSuperShotgun :: GClientReference -> GClientT -> Quake ()
-        checkShellsAndSuperShotgun gClientRef@(GClientReference gClientIdx) gClient = do
+        checkShellsAndSuperShotgun :: Ref GClientT -> GClientT -> Quake ()
+        checkShellsAndSuperShotgun gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference shellsIdx) <- GameItems.findItem "shells"
           Just superShotgunRef@(GItemReference superShotgunIdx) <- GameItems.findItem "super shotgun"
           Just shells <- preuse $ gameBaseGlobals.gbItemList.ix shellsIdx
@@ -1360,8 +1360,8 @@ noAmmoWeaponChange edictRef = do
             then gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcNewWeapon .= Just superShotgunRef
             else checkShellsAndShotgun gClientRef gClient
 
-        checkShellsAndShotgun :: GClientReference -> GClientT -> Quake ()
-        checkShellsAndShotgun gClientRef@(GClientReference gClientIdx) gClient = do
+        checkShellsAndShotgun :: Ref GClientT -> GClientT -> Quake ()
+        checkShellsAndShotgun gClientRef@(Ref gClientIdx) gClient = do
           Just (GItemReference shellsIdx) <- GameItems.findItem "shells"
           Just shotgunRef@(GItemReference shotgunIdx)      <- GameItems.findItem "shotgun"
           Just blasterRef <- GameItems.findItem "blaster"

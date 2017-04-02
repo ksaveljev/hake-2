@@ -54,7 +54,7 @@ clientDisconnect edictRef = do
       Nothing ->
         return ()
 
-      Just (GClientReference gClientIdx) -> do
+      Just (Ref gClientIdx) -> do
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
         gameImport <- use $ gameBaseGlobals.gbGameImport
 
@@ -131,7 +131,7 @@ clientConnect edictRef userInfo = do
 
             -- they can connect
             let gClientIdx = (edict^.eIndex) - 1
-                gClientRef = GClientReference gClientIdx
+                gClientRef = Ref gClientIdx
 
             modifyRef edictRef (\v -> v & eClient .~ Just gClientRef)
 
@@ -328,7 +328,7 @@ clientBeginServerFrame edictRef = do
 
     unless (intermissionTime /= 0) $ do
       edict <- readRef edictRef
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       deathmatchValue <- liftM (^.cvValue) deathmatchCVar
       levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -369,8 +369,8 @@ clientBeginServerFrame edictRef = do
 
               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcLatchedButtons .= 0
 
-initClientResp :: GClientReference -> Quake ()
-initClientResp (GClientReference gClientIdx) = do
+initClientResp :: Ref GClientT -> Quake ()
+initClientResp (Ref gClientIdx) = do
     frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
     Just pers <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers
 
@@ -380,8 +380,8 @@ initClientResp (GClientReference gClientIdx) = do
 - This is only called when the game first initializes in single player, but
 - is called after each death and level change in deathmatch. 
 -}
-initClientPersistant :: GClientReference -> Quake ()
-initClientPersistant (GClientReference gClientIdx) = do
+initClientPersistant :: Ref GClientT -> Quake ()
+initClientPersistant (Ref gClientIdx) = do
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPers .= newClientPersistantT
 
     Just itemRef@(GItemReference itemIdx) <- GameItems.findItem "Blaster"
@@ -420,7 +420,7 @@ clientUserInfoChanged edictRef userInfo = do
 
       else do
         edict <- readRef edictRef
-        let Just (GClientReference gClientIdx) = edict^.eClient
+        let Just (Ref gClientIdx) = edict^.eClient
 
         -- set name
         name <- Info.valueForKey userInfo "name"
@@ -484,7 +484,7 @@ passwordOK p1 p2 =
 clientBegin :: Ref EdictT -> Quake ()
 clientBegin edictRef = do
     edict <- readRef edictRef
-    let gClientRef = GClientReference ((edict^.eIndex) - 1)
+    let gClientRef = Ref ((edict^.eIndex) - 1)
     modifyRef edictRef (\v -> v & eClient .~ Just gClientRef)
 
     deathmatchValue <- liftM (^.cvValue) deathmatchCVar
@@ -554,7 +554,7 @@ clientBeginDeathmatch edictRef = do
     edict <- readRef edictRef
 
     let gClientIdx = (edict^.eIndex) - 1
-    initClientResp (GClientReference gClientIdx) -- TODO: jake uses ent.client to get the client ref
+    initClientResp (Ref gClientIdx) -- TODO: jake uses ent.client to get the client ref
 
     -- locate ent at a spawn point
     putClientInServer edictRef
@@ -603,7 +603,7 @@ putClientInServer edictRef = do
                   Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                   let userInfo = gClient^.gcPers.cpUserInfo
-                  initClientPersistant (GClientReference gClientIdx)
+                  initClientPersistant (Ref gClientIdx)
                   void $ clientUserInfoChanged edictRef userInfo
                   return (gClient^.gcResp)
 
@@ -630,7 +630,7 @@ putClientInServer edictRef = do
     gameBaseGlobals.gbGame.glClients.ix gClientIdx .= (newGClientT gClientIdx) { _gcPers = saved }
 
     when ((saved^.cpHealth) <= 0) $
-      initClientPersistant (GClientReference gClientIdx)
+      initClientPersistant (Ref gClientIdx)
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcResp .= resp
 
@@ -641,7 +641,7 @@ putClientInServer edictRef = do
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
     modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing
-                                   & eClient       .~ Just (GClientReference gClientIdx)
+                                   & eClient       .~ Just (Ref gClientIdx)
                                    & eTakeDamage   .~ Constants.damageAim
                                    & eMoveType     .~ Constants.moveTypeWalk
                                    & eViewHeight   .~ 22
@@ -820,7 +820,7 @@ fetchClientEntData :: Ref EdictT -> Quake ()
 fetchClientEntData edictRef = do
     coopValue <- liftM (^.cvValue) coopCVar
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     modifyRef edictRef (\v -> v & eHealth .~ gClient^.gcPers.cpHealth
@@ -854,7 +854,7 @@ playerDie =
                                   & eSvFlags %~ (.|. Constants.svfDeadMonster))
 
     self <- readRef selfRef
-    let Just gClientRef@(GClientReference gClientIdx) = self^.eClient
+    let Just gClientRef@(Ref gClientIdx) = self^.eClient
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcWeaponSound .= 0
 
@@ -937,8 +937,8 @@ playerDie =
     modifyRef selfRef (\v -> v & eDeadFlag .~ Constants.deadDead)
     linkEntity selfRef
 
-  where clearInventory :: GClientReference -> GClientT -> Float -> V.Vector GItemT -> Int -> Int -> Quake ()
-        clearInventory gClientRef@(GClientReference gClientIdx) gClient coopValue itemList idx maxIdx
+  where clearInventory :: Ref GClientT -> GClientT -> Float -> V.Vector GItemT -> Int -> Int -> Quake ()
+        clearInventory gClientRef@(Ref gClientIdx) gClient coopValue itemList idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
               when (coopValue /= 0 && ((itemList V.! idx)^.giFlags) .&. Constants.itKey /= 0) $
@@ -954,7 +954,7 @@ playerDie =
 spectatorRespawn :: Ref EdictT -> Quake ()
 spectatorRespawn edictRef = do
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     gameImport <- use $ gameBaseGlobals.gbGameImport
@@ -1059,7 +1059,7 @@ spectatorRespawn edictRef = do
 
               if edict^.eInUse
                 then do
-                  let Just (GClientReference gClientIdx) = edict^.eClient
+                  let Just (Ref gClientIdx) = edict^.eClient
                   Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                   if gClient^.gcPers.cpSpectator
@@ -1087,7 +1087,7 @@ respawn selfRef = do
         -- add a teleportation effect
         modifyRef selfRef (\v -> v & eEntityState.esEvent .~ Constants.evPlayerTeleport)
 
-        let Just (GClientReference gClientIdx) = self^.eClient
+        let Just (Ref gClientIdx) = self^.eClient
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
 
         -- hold in place briefly
@@ -1171,7 +1171,7 @@ clientThink edictRef ucmd = do
     gameBaseGlobals.gbLevel.llCurrentEntity .= Just edictRef
 
     edict <- readRef edictRef
-    let Just (GClientReference gClientIdx) = edict^.eClient
+    let Just (Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     intermissionTime <- use $ gameBaseGlobals.gbLevel.llIntermissionTime
@@ -1339,7 +1339,7 @@ clientThink edictRef ucmd = do
           | otherwise = do
               other <- readRef (Ref idx)
               when (other^.eInUse) $ do
-                let Just (GClientReference gClientIdx) = other^.eClient
+                let Just (Ref gClientIdx) = other^.eClient
                 Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                 when ((client^.gcChaseTarget) == Just edictRef) $
@@ -1364,7 +1364,7 @@ tossClientWeapon selfRef = do
 
     unless (deathmatchValue == 0) $ do
       self <- readRef selfRef
-      let Just (GClientReference gClientIdx) = self^.eClient
+      let Just (Ref gClientIdx) = self^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       itemRef <- case gClient^.gcPers.cpWeapon of
@@ -1416,7 +1416,7 @@ lookAtKiller selfRef inflictorRef attackerRef = do
     self <- readRef selfRef
 
     let worldRef = Ref 0
-        Just (GClientReference gClientIdx) = self^.eClient
+        Just (Ref gClientIdx) = self^.eClient
 
     -- TODO: jake2 checks attacker and inflictor for != null, do we need that?
     mDir <- if | attackerRef /= worldRef && attackerRef /= selfRef -> do
@@ -1501,7 +1501,7 @@ clientObituary selfRef inflictorRef attackerRef = do
 
                 case message' of
                   Just msg -> do
-                    let Just (GClientReference gClientIdx) = self^.eClient
+                    let Just (Ref gClientIdx) = self^.eClient
                     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
                     bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
@@ -1543,9 +1543,9 @@ clientObituary selfRef inflictorRef attackerRef = do
                             return False
 
                           Just msg -> do
-                            let Just (GClientReference gClientIdx) = self^.eClient
+                            let Just (Ref gClientIdx) = self^.eClient
                             Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
-                            let Just (GClientReference attackerClientIdx) = attacker^.eClient
+                            let Just (Ref attackerClientIdx) = attacker^.eClient
                             Just attackerClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix attackerClientIdx
 
                             bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf
@@ -1565,7 +1565,7 @@ clientObituary selfRef inflictorRef attackerRef = do
                 return False
 
     unless done $ do
-      let Just (GClientReference gClientIdx) = self^.eClient
+      let Just (Ref gClientIdx) = self^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       bprintf <- use $ gameBaseGlobals.gbGameImport.giBprintf

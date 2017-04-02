@@ -50,7 +50,6 @@ module QuakeState ( QuakeState(..)
                   , clTEntGlobals
                   , worldRef
                   , ClientReference(..)
-                  , GClientReference(..)
                   , CModelReference(..)
                   , LinkReference(..)
                   , GItemReference(..)

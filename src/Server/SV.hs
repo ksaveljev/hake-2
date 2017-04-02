@@ -496,7 +496,7 @@ push pusherRef move amove = do
           let clientRef = pusher^.eClient
 
           when (isJust clientRef) $ do
-            let Just (GClientReference clientIdx) = clientRef
+            let Just (Ref clientIdx) = clientRef
             Just deltaAngles <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx.gcPlayerState.psPMoveState.pmsDeltaAngles
             gameBaseGlobals.gbPushed.ix pushedP.pDeltaYaw .= fromIntegral (deltaAngles^.(Math3D.v3Access Constants.yaw))
 
@@ -588,7 +588,7 @@ push pusherRef move amove = do
               clientRef <- readRef edictRef >>= \e -> return (e^.eClient)
 
               when (isJust clientRef) $ do
-                let Just (GClientReference clientIdx) = clientRef
+                let Just (Ref clientIdx) = clientRef
                     -- ugly :( i know i know
                     access = if | Constants.yaw == 0 -> _x
                                 | Constants.yaw == 1 -> _y
@@ -625,7 +625,7 @@ push pusherRef move amove = do
           clientRef <- readRef edictRef >>= \e -> return (e^.eClient)
 
           when (isJust clientRef) $ do -- FIXME: doesn't rotate monsters?
-            let Just (GClientReference clientIdx) = clientRef
+            let Just (Ref clientIdx) = clientRef
                 -- ugly :( i know i know
                 access = if | Constants.yaw == 0 -> _x
                             | Constants.yaw == 1 -> _y

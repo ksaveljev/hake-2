@@ -97,7 +97,7 @@ clientEndServerFrame edictRef = do
       setClientFrame edictRef
 
       edict <- readRef edictRef
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx) $ do
@@ -126,7 +126,7 @@ clientEndServerFrame edictRef = do
         updatePMoveValues :: Quake ()
         updatePMoveValues = do
           edict <- readRef edictRef
-          Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+          Just (Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
           zoom (gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psPMoveState) $ do
             pmsOrigin .= fmap (truncate . (* 8.0)) (edict^.eEntityState.esOrigin)
             pmsVelocity .= fmap (truncate . (* 8.0)) (edict^.eVelocity)
@@ -142,7 +142,7 @@ clientEndServerFrame edictRef = do
           if intermissionTime /= 0
             then do
               -- FIXME: add view drifting here?
-              Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+              Just (Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psBlend._z .= 0
               gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psFOV .= 90
               PlayerHud.setStats edictRef
@@ -152,7 +152,7 @@ clientEndServerFrame edictRef = do
 
         setupAngleVectors :: Quake ()
         setupAngleVectors = do
-          Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+          Just (Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let (Just forward, Just right, Just up) = Math3D.angleVectors (gClient^.gcVAngle) True True True
           gameBaseGlobals.gbForward .= forward
@@ -161,7 +161,7 @@ clientEndServerFrame edictRef = do
 
         setModelAngles :: Quake ()
         setModelAngles = do
-          Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+          Just (Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if (gClient^.gcVAngle.(Math3D.v3Access Constants.pitch)) > 180
@@ -184,7 +184,7 @@ clientEndServerFrame edictRef = do
         calculateSpeedAndCycle :: Quake ()
         calculateSpeedAndCycle = do
           edict <- readRef edictRef
-          Just (GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+          Just (Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
 
           let velocity = edict^.eVelocity
               xyspeed = sqrt ((velocity^._x) * (velocity^._x) + (velocity^._y) * (velocity^._y))
@@ -215,7 +215,7 @@ clientEndServerFrame edictRef = do
         setCameraStuff :: Quake ()
         setCameraStuff = do
           edict <- readRef edictRef
-          let Just (GClientReference gClientIdx) = edict^.eClient
+          let Just (Ref gClientIdx) = edict^.eClient
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if gClient^.gcResp.crSpectator
@@ -234,7 +234,7 @@ worldEffects = do
         levelTime <- use $ gameBaseGlobals.gbLevel.llTime
         modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 12)
       else do
-        Just gClientRef@(GClientReference gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+        Just gClientRef@(Ref gClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
         Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
         frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
@@ -343,8 +343,8 @@ worldEffects = do
 
                | otherwise -> return ()
 
-        checkForDrowning :: Ref EdictT -> GClientReference -> Int -> Bool -> Bool -> Quake ()
-        checkForDrowning edictRef gClientRef@(GClientReference gClientIdx) waterLevel breather enviroSuit =
+        checkForDrowning :: Ref EdictT -> Ref GClientT -> Int -> Bool -> Bool -> Quake ()
+        checkForDrowning edictRef gClientRef@(Ref gClientIdx) waterLevel breather enviroSuit =
           if waterLevel == 3
             then do
               levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -373,7 +373,7 @@ worldEffects = do
               edict <- readRef edictRef
               
               when ((edict^.eAirFinished) < levelTime) $ do -- drown!
-                let Just (GClientReference clientIdx) = edict^.eClient
+                let Just (Ref clientIdx) = edict^.eClient
                 Just client <- preuse $ gameBaseGlobals.gbGame.glClients.ix clientIdx
 
                 when ((client^.gcNextDrownTime) < levelTime && (edict^.eHealth) > 0) $ do
@@ -424,8 +424,8 @@ worldEffects = do
 
           sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnNorm 0
 
-        checkForSizzleDamage :: Ref EdictT -> GClientReference -> Int -> Bool -> Quake ()
-        checkForSizzleDamage edictRef gClientRef@(GClientReference gClientIdx) waterLevel enviroSuit = do
+        checkForSizzleDamage :: Ref EdictT -> Ref GClientT -> Int -> Bool -> Quake ()
+        checkForSizzleDamage edictRef gClientRef@(Ref gClientIdx) waterLevel enviroSuit = do
           edict <- readRef edictRef
 
           when (waterLevel /= 0 && (edict^.eWaterType) .&. (Constants.contentsLava .|. Constants.contentsSlime) /= 0) $ do
@@ -510,7 +510,7 @@ fallingDamage edictRef = do
     edict <- readRef edictRef
 
     unless ((edict^.eEntityState.esModelIndex) /= 255 || (edict^.eMoveType) == Constants.moveTypeNoClip) $ do
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       let maybeDelta = if (gClient^.gcOldVelocity._z) < 0 && (edict^.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eGroundEntity)
                          then Just (gClient^.gcOldVelocity._z)
@@ -588,7 +588,7 @@ damageFeedback :: Ref EdictT -> Quake ()
 damageFeedback playerRef = do
     player <- readRef playerRef
 
-    let Just (GClientReference gClientIdx) = player^.eClient
+    let Just (Ref gClientIdx) = player^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
     frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
     levelTime <- use $ gameBaseGlobals.gbLevel.llTime
@@ -731,7 +731,7 @@ damageFeedback playerRef = do
 calcViewOffset :: Ref EdictT -> Quake ()
 calcViewOffset edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
     Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
     -- if dead, fix the angle and don't add any kick
@@ -779,8 +779,8 @@ calcViewOffset edictRef = do
 
     gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcPlayerState.psViewOffset .= V3 a' b' c'
 
-  where addDamageKickAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
-        addDamageKickAngles (GClientReference gClientIdx) angles = do
+  where addDamageKickAngles :: Ref GClientT -> V3 Float -> Quake (V3 Float)
+        addDamageKickAngles (Ref gClientIdx) angles = do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let ratio = ((gClient^.gcVDmgTime) - levelTime) / Constants.damageTime
@@ -797,8 +797,8 @@ calcViewOffset edictRef = do
 
           return angles''
 
-        addFallKickAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
-        addFallKickAngles (GClientReference gClientIdx) angles = do
+        addFallKickAngles :: Ref GClientT -> V3 Float -> Quake (V3 Float)
+        addFallKickAngles (Ref gClientIdx) angles = do
           levelTime <- use $ gameBaseGlobals.gbLevel.llTime
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let ratio = ((gClient^.gcFallTime) - levelTime) / Constants.fallTime
@@ -822,8 +822,8 @@ calcViewOffset edictRef = do
 
           return angles''
 
-        addBobAngles :: GClientReference -> V3 Float -> Quake (V3 Float)
-        addBobAngles (GClientReference gClientIdx) angles = do
+        addBobAngles :: Ref GClientT -> V3 Float -> Quake (V3 Float)
+        addBobAngles (Ref gClientIdx) angles = do
           bobFracSin <- use $ gameBaseGlobals.gbBobFracSin
           bobCycle <- use $ gameBaseGlobals.gbBobCycle
           xyspeed <- use $ gameBaseGlobals.gbXYSpeed
@@ -856,7 +856,7 @@ calcViewOffset edictRef = do
 calcGunOffset :: Ref EdictT -> Quake ()
 calcGunOffset edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
 
     xyspeed <- use $ gameBaseGlobals.gbXYSpeed
     bobFracSin <- use $ gameBaseGlobals.gbBobFracSin
@@ -893,8 +893,8 @@ calcGunOffset edictRef = do
                          2 -> _z
                          _ -> undefined -- shouldn't happen
 
-        setGunAngles :: GClientReference -> GClientT -> Int -> Int -> Quake ()
-        setGunAngles gClientRef@(GClientReference gClientIdx) gClient idx maxIdx
+        setGunAngles :: Ref GClientT -> GClientT -> Int -> Int -> Quake ()
+        setGunAngles gClientRef@(Ref gClientIdx) gClient idx maxIdx
           | idx >= maxIdx = return ()
           | otherwise = do
               let delta = (gClient^.gcOldViewAngles.(Math3D.v3Access idx)) - (gClient^.gcPlayerState.psViewAngles.(Math3D.v3Access idx))
@@ -934,7 +934,7 @@ setClientEvent edictRef = do
       xyspeed <- use $ gameBaseGlobals.gbXYSpeed
 
       when (isJust (edict^.eGroundEntity) && xyspeed > 225) $ do
-        Just (GClientReference currentClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
+        Just (Ref currentClientIdx) <- use $ gameBaseGlobals.gbCurrentClient
         Just bobTime <- preuse $ gameBaseGlobals.gbGame.glClients.ix currentClientIdx.gcBobTime
         bobMove <- use $ gameBaseGlobals.gbBobMove
         bobCycle <- use $ gameBaseGlobals.gbBobCycle
@@ -964,7 +964,7 @@ setClientEffects edictRef = do
 
            | otherwise -> return ()
 
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
@@ -995,8 +995,8 @@ setClientSound edictRef = do
 
     setSound gClientRef
 
-  where checkHelpChanged :: GClientReference -> Quake ()
-        checkHelpChanged (GClientReference gClientIdx) = do
+  where checkHelpChanged :: Ref GClientT -> Quake ()
+        checkHelpChanged (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           helpChanged <- use $ gameBaseGlobals.gbGame.glHelpChanged
 
@@ -1005,8 +1005,8 @@ setClientSound edictRef = do
               cpGameHelpChanged .= helpChanged
               cpHelpChanged .= 1
 
-        helpBeep :: GClientReference -> Quake ()
-        helpBeep (GClientReference gClientIdx) = do
+        helpBeep :: Ref GClientT -> Quake ()
+        helpBeep (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           frameNum <- use $ gameBaseGlobals.gbLevel.llFrameNum
 
@@ -1020,8 +1020,8 @@ setClientSound edictRef = do
 
             sound (Just edictRef) Constants.chanVoice idx 1 Constants.attnStatic 0
 
-        setSound :: GClientReference -> Quake ()
-        setSound (GClientReference gClientIdx) = do
+        setSound :: Ref GClientT -> Quake ()
+        setSound (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           weap <- case gClient^.gcPers.cpWeapon of
@@ -1052,7 +1052,7 @@ setClientFrame edictRef = do
 
     -- only when we are in the player model
     when ((edict^.eEntityState.esModelIndex) == 255) $ do
-      let Just (GClientReference gClientIdx) = edict^.eClient
+      let Just (Ref gClientIdx) = edict^.eClient
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
       let duck = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. pmfDucked /= 0
@@ -1140,7 +1140,7 @@ setClientFrame edictRef = do
               if isNothing (edict^.eGroundEntity)
                 then return True -- stay there
                 else do
-                  let Just (GClientReference gClientIdx) = edict^.eClient
+                  let Just (Ref gClientIdx) = edict^.eClient
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimPriority .= Constants.animWave
                   modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump3)
                   gameBaseGlobals.gbGame.glClients.ix gClientIdx.gcAnimEnd .= MPlayer.frameJump6

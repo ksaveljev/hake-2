@@ -31,7 +31,7 @@ getChaseTarget edictRef = do
           | otherwise = do
               let otherRef = Ref idx
               other <- readRef otherRef
-              let Just (GClientReference gClientIdx) = other^.eClient
+              let Just (Ref gClientIdx) = other^.eClient
               Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
               if (other^.eInUse) && not (gClient^.gcResp.crSpectator)
@@ -49,7 +49,7 @@ getChaseTarget edictRef = do
 updateChaseCam :: Ref EdictT -> Quake ()
 updateChaseCam edictRef = do
     edict <- readRef edictRef
-    let Just gClientRef@(GClientReference gClientIdx) = edict^.eClient
+    let Just gClientRef@(Ref gClientIdx) = edict^.eClient
 
     -- is our chase target gone?
     gone <- isChaseTargetGone gClientRef
@@ -58,7 +58,7 @@ updateChaseCam edictRef = do
       Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
       let Just targRef = gClient^.gcChaseTarget
       targ <- readRef targRef
-      let Just (GClientReference targClientIdx) = targ^.eClient
+      let Just (Ref targClientIdx) = targ^.eClient
       Just targClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix targClientIdx
 
       let ownerV = (targ^.eEntityState.esOrigin) & _z +~ fromIntegral (targ^.eViewHeight)
@@ -69,12 +69,12 @@ updateChaseCam edictRef = do
           o = ownerV + fmap (* (-30)) forward
       io (putStrLn "GameChase.updateChaseCam") >> undefined -- TODO
 
-  where isChaseTargetGone :: GClientReference -> Quake Bool
-        isChaseTargetGone (GClientReference gClientIdx) = do
+  where isChaseTargetGone :: Ref GClientT -> Quake Bool
+        isChaseTargetGone (Ref gClientIdx) = do
           Just gClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
           let Just chaseTargetRef = gClient^.gcChaseTarget
           chaseTarget <- readRef chaseTargetRef
-          let Just (GClientReference chaseTargetClientIdx) = chaseTarget^.eClient
+          let Just (Ref chaseTargetClientIdx) = chaseTarget^.eClient
           Just chaseTargetClient <- preuse $ gameBaseGlobals.gbGame.glClients.ix gClientIdx
 
           if not (chaseTarget^.eInUse) || (chaseTargetClient^.gcResp.crSpectator)

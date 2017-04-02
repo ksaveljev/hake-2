@@ -377,7 +377,7 @@ writeEdict saveFile edict = do
     
     case edict^.eClient of
       Nothing -> writeInt saveFile (-1)
-      Just (GClientReference idx) -> writeInt saveFile idx
+      Just (Ref idx) -> writeInt saveFile idx
       
     writeEdictRef    saveFile (edict^.eOwner)
     
