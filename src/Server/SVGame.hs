@@ -124,7 +124,7 @@ setModel edictRef name = do
 
     -- if it is an inline model, get the size information for it
     when (BC.head modelName == '*') $ do
-      (CModelReference modelIdx) <- CM.inlineModel modelName
+      (Ref modelIdx) <- CM.inlineModel modelName
       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
       modifyRef edictRef (\v -> v & eMins .~ (model^.cmMins)

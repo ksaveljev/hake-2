@@ -199,7 +199,7 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
                           svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
                           CM.loadMap mapName False [0]
 
-    svGlobals.svServer.sModels %= (V.// [(1, CModelReference modelIdx)])
+    svGlobals.svServer.sModels %= (V.// [(1, Ref modelIdx)])
 
     let checksum = head iw
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csMapChecksum, BC.pack (show checksum))]) -- IMPROVE: convert Int to ByteString using binary package?

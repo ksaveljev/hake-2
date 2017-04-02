@@ -403,7 +403,7 @@ clearWorld = do
 
     svGlobals.svNumAreaNodes .= 0
 
-    Just (CModelReference modelIdx) <- preuse $ svGlobals.svServer.sModels.ix 1
+    Just (Ref modelIdx) <- preuse $ svGlobals.svServer.sModels.ix 1
     Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
 
     void $ createAreaNode 0 (model^.cmMins) (model^.cmMaxs)
@@ -518,7 +518,7 @@ hullForEntity edict = do
     if (edict^.eSolid) == Constants.solidBsp
       then do
         -- explicit hulls in the BSP model
-        Just (CModelReference modelIdx) <- preuse $ svGlobals.svServer.sModels.ix (edict^.eEntityState.esModelIndex)
+        Just (Ref modelIdx) <- preuse $ svGlobals.svServer.sModels.ix (edict^.eEntityState.esModelIndex)
         when (modelIdx == -1) $
           Com.comError Constants.errFatal "MOVETYPE_PUSH with a non bsp model"
         Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
@@ -529,7 +529,7 @@ hullForEntity edict = do
 pointContents :: V3 Float -> Quake Int
 pointContents p = do
     -- get base contents from world
-    Just (CModelReference cModelIdx) <- preuse $ svGlobals.svServer.sModels.ix 1
+    Just (Ref cModelIdx) <- preuse $ svGlobals.svServer.sModels.ix 1
     Just headNode <- preuse $ cmGlobals.cmMapCModels.ix cModelIdx.cmHeadNode
     contents <- CM.pointContents p headNode
     -- or in contents from all the other entities

@@ -71,9 +71,6 @@ instance Eq KeyFuncT where
 
 data Ref a = Ref Int deriving (Eq, Show, Ord)
 
--- reference to cmGlobals.cmMapCModels
-newtype CModelReference = CModelReference Int deriving Eq
-
 -- reference to cmGlobals.cmMapPlanes
 newtype CPlaneReference = CPlaneReference Int deriving Eq
 
@@ -789,7 +786,7 @@ data ServerT =
           , _sTime          :: Int
           , _sFrameNum      :: Int
           , _sName          :: B.ByteString
-          , _sModels        :: V.Vector CModelReference
+          , _sModels        :: V.Vector (Ref CModelT)
           , _sConfigStrings :: V.Vector B.ByteString
           , _sBaselines     :: V.Vector EntityStateT
           , _sMulticast     :: SizeBufT
@@ -1030,7 +1027,7 @@ data ClientStateT =
                , _csPlayerNum              :: Int
                , _csConfigStrings          :: V.Vector B.ByteString
                , _csModelDraw              :: V.Vector (Maybe (IORef ModelT))
-               , _csModelClip              :: V.Vector (Maybe CModelReference)
+               , _csModelClip              :: V.Vector (Maybe (Ref CModelT))
                , _csSoundPrecache          :: V.Vector (Maybe (IORef SfxT))
                , _csImagePrecache          :: V.Vector (Maybe (IORef ImageT))
                , _csClientInfo             :: V.Vector ClientInfoT

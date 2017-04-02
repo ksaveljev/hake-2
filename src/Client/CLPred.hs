@@ -137,7 +137,7 @@ clipMoveToEntities start mins maxs end tr = do
 
                                 case maybeCModel of
                                   Nothing -> return Nothing
-                                  Just (CModelReference modelIdx) -> do
+                                  Just (Ref modelIdx) -> do
                                     Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
                                     return (Just (model^.cmHeadNode, ent^.esAngles))
 
@@ -201,7 +201,7 @@ predPMPointContents point = do
 
                   case maybeCModel of
                     Nothing -> calcContents contents (idx + 1) maxIdx
-                    Just (CModelReference modelIdx) -> do
+                    Just (Ref modelIdx) -> do
                       Just model <- preuse $ cmGlobals.cmMapCModels.ix modelIdx
                       v <- CM.transformedPointContents point (model^.cmHeadNode) (ent^.esOrigin) (ent^.esAngles)
                       calcContents (contents .|. v) (idx + 1) maxIdx
