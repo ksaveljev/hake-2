@@ -10,6 +10,7 @@ import Linear (V3(..), _x, _z)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

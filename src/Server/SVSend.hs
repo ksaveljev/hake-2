@@ -16,7 +16,13 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 
+import Game.EdictT
 import Types
+import Server.ClientT
+import Server.ServerT
+import Server.ServerStaticT
+import QCommon.NetAdrT
+import QCommon.NetChanT
 import QuakeRef
 import QuakeState
 import CVarVariables

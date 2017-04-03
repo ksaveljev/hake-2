@@ -16,6 +16,11 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EdictT
+import Server.ClientFrameT
+import Server.ClientT
+import Server.ServerStaticT
+import Server.ServerT
 import Game.PlayerStateT
 import Game.GClientT
 import Types

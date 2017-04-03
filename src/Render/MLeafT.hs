@@ -1,10 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Render.MLeafT ( MLeafT(..)
-                     , module Render.MLeafT
-                     ) where
+module Render.MLeafT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''MLeafT

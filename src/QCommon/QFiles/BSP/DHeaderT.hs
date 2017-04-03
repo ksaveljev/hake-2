@@ -1,20 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-module QCommon.QFiles.BSP.DHeaderT ( module QCommon.QFiles.BSP.DHeaderT
-                                   , module QCommon.LumpT
-                                   ) where
+module QCommon.QFiles.BSP.DHeaderT where
 
-import Control.Applicative ((<*>))
-import Control.Lens (makeLenses)
-import Data.Functor ((<$>))
-import qualified Data.ByteString as B
+import           Control.Applicative  ((<*>))
+import           Control.Lens         (makeLenses)
+import           Data.Functor         ((<$>))
+import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
+import qualified Data.Vector          as V
 
-import Types
-import QCommon.LumpT
-import Util.Binary
 import qualified Constants
+import           QCommon.LumpT
+import           Types
+import           Util.Binary
 
 idBSPHeader :: B.ByteString
 idBSPHeader = "IBSP"
@@ -39,3 +36,9 @@ newDHeaderT = runGet getDHeaderT
 
         getLumpT :: Get LumpT
         getLumpT = LumpT <$> getInt <*> getInt
+
+getDHeaderT :: Get DHeaderT
+getDHeaderT =
+    DHeaderT <$> getInt <*> getInt <*> getLumps
+  where
+    getLumps = V.replicateM Constants.headerLumps getLumpT

@@ -21,6 +21,7 @@ import Sys.LoopMsgT
 import Types
 import QuakeState
 import CVarVariables
+import QCommon.NetAdrT
 import qualified Constants
 import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar

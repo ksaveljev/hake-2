@@ -21,6 +21,7 @@ import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
 import Game.GClientT
+import Game.EdictT
 import Game.ClientPersistantT
 import Game.ClientRespawnT
 import Game.MonsterInfoT

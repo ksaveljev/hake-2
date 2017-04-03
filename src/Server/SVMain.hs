@@ -14,6 +14,13 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import QCommon.NetChanT
+import Server.ServerT
+import QCommon.NetAdrT
+import Server.ServerStaticT
+import Server.ClientT
+import Game.EdictT
+import Server.ChallengeT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

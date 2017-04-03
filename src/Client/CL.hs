@@ -16,6 +16,8 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as Vec
 
+import QCommon.NetChanT
+import QCommon.NetAdrT
 import Types
 import QuakeState
 import CVarVariables

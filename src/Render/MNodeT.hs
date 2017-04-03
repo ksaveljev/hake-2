@@ -1,10 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Render.MNodeT ( MNodeT(..)
-                     , module Render.MNodeT
-                     ) where
+module Render.MNodeT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''MNodeT

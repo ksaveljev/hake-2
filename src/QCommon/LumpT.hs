@@ -1,13 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.LumpT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
+import           Data.Binary.Get (Get)
 
-import Types
+import           Types
+import           Util.Binary     (getInt)
 
-data LumpT =
-  LumpT { _lFileOfs :: Int
-        , _lFileLen :: Int
-        }
 
 makeLenses ''LumpT
+
+getLumpT :: Get LumpT
+getLumpT = LumpT <$> getInt <*> getInt

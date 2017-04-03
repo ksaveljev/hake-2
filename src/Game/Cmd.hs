@@ -16,6 +16,7 @@ import qualified Data.Vector as V
 
 import Types
 import QuakeState
+import QCommon.NetChanT
 import QCommon.XCommandT
 import QCommon.CmdFunctionT
 import qualified Constants

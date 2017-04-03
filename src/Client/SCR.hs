@@ -21,6 +21,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
+import QCommon.NetChanT
 import Game.MFrameT
 import Game.MMoveT
 import Game.MonsterInfoT

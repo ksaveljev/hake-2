@@ -12,6 +12,12 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.EdictT
+import Server.ClientFrameT
+import QCommon.NetChanT
+import Server.ServerT
+import Server.ServerStaticT
+import Server.ClientT
 import Types
 import Game.UserCmdT
 import QuakeState

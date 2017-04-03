@@ -14,11 +14,13 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EdictT
 import Game.GItemArmorT
 import Game.ClientPersistantT
 import Game.GClientT
 import Game.PlayerStateT
 import Types
+import Server.ClientT
 import QuakeState
 import CVarVariables
 import Game.Adapters

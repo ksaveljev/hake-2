@@ -8,6 +8,7 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
+import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

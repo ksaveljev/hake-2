@@ -15,6 +15,7 @@ import qualified Data.ByteString.Char8 as BC
 import Types
 import QuakeState
 import CVarVariables
+import QCommon.NetChanT
 import qualified Constants
 import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar

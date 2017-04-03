@@ -13,6 +13,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Game.CSurfaceT
 import Game.PMoveStateT
+import Game.UserCmdT
 import Types
 import QuakeState
 import qualified Constants

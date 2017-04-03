@@ -9,6 +9,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import QCommon.NetChanT
 import Types
 import QuakeState
 import CVarVariables

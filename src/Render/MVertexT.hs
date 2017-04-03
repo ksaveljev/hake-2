@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Render.MVertexT where
 
-import Control.Lens (makeLenses)
-import Data.Functor ((<$>))
-import Linear (V3(..))
+import           Control.Lens         (makeLenses)
 import qualified Data.ByteString.Lazy as BL
+import           Data.Functor         ((<$>))
+import           Linear               (V3(..))
 
-import Types
-import Util.Binary
 import qualified Constants
+import           Types
+import           Util.Binary
 
 mVertexDiskSize :: Int
 mVertexDiskSize = 3 * Constants.sizeOfFloat

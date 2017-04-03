@@ -1,11 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Render.GLPolyT ( GLPolyT(..)
-                      , module Render.GLPolyT
-                      ) where
+module Render.GLPolyT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''GLPolyT
 
@@ -25,10 +23,10 @@ maxBufferVertices :: Int
 maxBufferVertices = 120000
 
 newGLPolyT :: GLPolyT
-newGLPolyT =
-  GLPolyT { _glpNext           = Nothing
-          , _glpChain          = Nothing
-          , _glpNumVerts       = 0
-          , _glpFlags          = 0
-          , _glpPos            = 0
-          }
+newGLPolyT = GLPolyT
+    { _glpNext           = Nothing
+    , _glpChain          = Nothing
+    , _glpNumVerts       = 0
+    , _glpFlags          = 0
+    , _glpPos            = 0
+    }

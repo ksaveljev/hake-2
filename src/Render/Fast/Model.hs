@@ -24,6 +24,7 @@ import qualified Data.Vector.Unboxed as UV
 
 import Text.Printf (printf)
 
+import QCommon.LumpT
 import QCommon.QFiles.SP2.DSprFrameT
 import Types
 import Game.CPlaneT

@@ -11,6 +11,8 @@ import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import QCommon.NetChanT
+import Game.UserCmdT
 import Client.FrameT
 import Game.GClientT
 import Game.MoveInfoT

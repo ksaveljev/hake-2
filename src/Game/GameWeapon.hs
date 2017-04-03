@@ -8,6 +8,7 @@ import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3(..), normalize, norm, _x, _y, _z)
 
+import Game.EdictT
 import Game.MonsterInfoT
 import Types
 import Game.CSurfaceT

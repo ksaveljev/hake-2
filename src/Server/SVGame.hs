@@ -10,6 +10,11 @@ import Linear.V3 (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Game.EdictT
+import Server.ServerT
+import Server.ServerStaticT
+import QCommon.NetChanT
+import Server.ClientT
 import Types
 import QuakeRef
 import QuakeState

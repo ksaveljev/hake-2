@@ -16,6 +16,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EdictT
+import Game.UserCmdT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

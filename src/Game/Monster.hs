@@ -8,6 +8,7 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3, _x, _y, _z)
 import qualified Data.ByteString as B
 
+import Game.EdictT
 import Game.MMoveT
 import Game.MonsterInfoT
 import Types

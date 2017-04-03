@@ -12,6 +12,11 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.EdictT
+import Server.ServerT
+import Server.ServerStaticT
+import Server.ClientT
+import Game.UserCmdT
 import Types
 import QuakeRef
 import QuakeState
@@ -191,13 +196,13 @@ spawnServer server spawnPoint srvState attractLoop loadGame = do
     svGlobals.svServer.sTime .= 1000
     svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csName, server)])
 
-    (modelIdx, iw) <- if srvState /= Constants.ssGame
-                        then
-                          CM.loadMap "" False [0] -- no real map
-                        else do
-                          let mapName = "maps/" `B.append` server `B.append` ".bsp"
-                          svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
-                          CM.loadMap mapName False [0]
+    (Ref modelIdx, iw) <- if srvState /= Constants.ssGame
+                            then
+                              CM.loadMap "" False [0] -- no real map
+                            else do
+                              let mapName = "maps/" `B.append` server `B.append` ".bsp"
+                              svGlobals.svServer.sConfigStrings %= (V.// [(Constants.csModels + 1, mapName)])
+                              CM.loadMap mapName False [0]
 
     svGlobals.svServer.sModels %= (V.// [(1, Ref modelIdx)])
 

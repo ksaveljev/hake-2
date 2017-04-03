@@ -10,12 +10,13 @@ import Control.Monad (when, liftM, void, unless)
 import Data.Bits ((.&.), shiftR)
 import Data.Char (toLower)
 import Data.IORef (IORef)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, isJust)
 import System.IO (IOMode(ReadWriteMode), hFileSize, hClose)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import QCommon.NetChanT
 import Client.ClientInfoT
 import Types
 import QuakeState
@@ -499,7 +500,7 @@ checkOrDownloadFile fileName = do
             else do
               len <- FS.fileLength fileName
               -- if file exists then there is no need to download
-              return $ if len > 0 then True else False
+              return (isJust len)
 
 downloadFileName :: B.ByteString -> Quake B.ByteString
 downloadFileName fileName = do

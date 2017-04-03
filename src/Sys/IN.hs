@@ -10,6 +10,7 @@ import Client.FrameT
 import Game.PlayerStateT
 import Sys.KBD
 import Types
+import Game.UserCmdT
 import Game.PMoveStateT
 import QuakeState
 import CVarVariables

@@ -11,6 +11,7 @@ import Data.Maybe (fromJust)
 import Linear (V3(..), _x, _y, _z, norm)
 import qualified Data.ByteString as B
 
+import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

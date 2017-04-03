@@ -1,10 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Render.GLConfigT where
 
-import Control.Lens (makeLenses)
-import qualified Data.ByteString as B
+import           Control.Lens    (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''GLConfigT
 

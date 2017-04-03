@@ -1,11 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Sound.SfxCacheT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
 import qualified Data.ByteString as B
 
-import Types
+import           Types
 
 makeLenses ''SfxCacheT
 

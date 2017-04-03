@@ -24,6 +24,7 @@ import System.Random (StdGen)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
+import qualified Data.HashMap.Lazy as HM
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Mutable as MV
@@ -2407,7 +2408,7 @@ data PackT = PackT
     , _pHandle     :: Maybe Handle
     , _pBackBuffer :: B.ByteString
     , _pNumFiles   :: Int
-    , _pFiles      :: M.Map B.ByteString PackFileT
+    , _pFiles      :: HM.HashMap B.ByteString PackFileT
     } deriving (Eq)
 
 data DVisT = DVisT
@@ -2561,4 +2562,23 @@ data Socket -- = Socket Int
 data CheatVarT = CheatVarT
     { _chvName  :: B.ByteString
     , _chvValue :: B.ByteString
+    }
+
+data MoveClipT = MoveClipT
+    { _mcBoxMins     :: V3 Float
+    , _mcBoxMaxs     :: V3 Float
+    , _mcMins        :: V3 Float
+    , _mcMaxs        :: V3 Float
+    , _mcMins2       :: V3 Float
+    , _mcMaxs2       :: V3 Float
+    , _mcStart       :: V3 Float
+    , _mcEnd         :: V3 Float
+    , _mcTrace       :: TraceT
+    , _mcPassEdict   :: Maybe (Ref EdictT)
+    , _mcContentMask :: Int
+    }
+
+data LumpT = LumpT
+    { _lFileOfs :: Int
+    , _lFileLen :: Int
     }

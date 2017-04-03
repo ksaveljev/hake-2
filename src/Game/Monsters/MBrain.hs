@@ -9,6 +9,7 @@ import Data.Maybe (isNothing)
 import Linear (V3(..), _x, _z)
 import qualified Data.Vector as V
 
+import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT
