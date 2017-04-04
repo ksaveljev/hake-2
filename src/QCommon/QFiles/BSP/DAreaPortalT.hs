@@ -3,6 +3,7 @@ module QCommon.QFiles.BSP.DAreaPortalT where
 
 import           Control.Applicative  ((<*>))
 import           Control.Lens         (makeLenses)
+import           Data.Binary.Get      (Get)
 import           Data.Functor         ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
@@ -22,3 +23,6 @@ newDAreaPortalT = runGet getDAreaPortalT
   where
     getDAreaPortalT :: Get DAreaPortalT
     getDAreaPortalT = DAreaPortalT <$> getInt <*> getInt
+
+getDAreaPortalT :: Get DAreaPortalT
+getDAreaPortalT = DAreaPortalT <$> getInt <*> getInt

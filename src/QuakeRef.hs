@@ -51,3 +51,49 @@ instance QuakeRef CBrushT where
     writeRef (Ref idx) item = do
         brushes <- use (cmGlobals.cmMapBrushes)
         io (MV.write brushes idx item)
+
+instance QuakeRef CLeafT where
+    readRef (Ref idx) = do
+        leafs <- use (cmGlobals.cmMapLeafs)
+        return (leafs V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapLeafs.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapLeafs.ix idx .= item
+
+instance QuakeRef CBrushSideT where
+    readRef (Ref idx) = do
+        brushSides <- use (cmGlobals.cmMapBrushSides)
+        return (brushSides V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapBrushSides.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapBrushSides.ix idx .= item
+
+instance QuakeRef CNodeT where
+    readRef (Ref idx) = do
+        nodes <- use (cmGlobals.cmMapNodes)
+        return (nodes V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapNodes.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapNodes.ix idx .= item
+
+instance QuakeRef CAreaT where
+    readRef (Ref idx) = do
+        areas <- use (cmGlobals.cmMapAreas)
+        return (areas V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapAreas.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapAreas.ix idx .= item
+
+instance QuakeRef DAreaPortalT where
+    readRef (Ref idx) = do
+        areaPortals <- use (cmGlobals.cmMapAreaPortals)
+        return (areaPortals V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapAreaPortals.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapAreaPortals.ix idx .= item
+

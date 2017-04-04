@@ -18,3 +18,6 @@ newDAreaT :: BL.ByteString -> DAreaT
 newDAreaT = runGet getDAreaT
   where getDAreaT :: Get DAreaT
         getDAreaT = DAreaT <$> getInt <*> getInt
+
+getDAreaT :: Get DAreaT
+getDAreaT = DAreaT <$> getInt <*> getInt

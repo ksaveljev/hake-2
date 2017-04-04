@@ -63,111 +63,6 @@ distEpsilon = 0.03125
 nullSurface :: MapSurfaceT
 nullSurface = newMapSurfaceT
 
-{-
--- Loads in the map and all submodels.
-loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Ref CModelT, [Int]) -- return model index (cmGlobals.cmMapCModels) and checksum
-loadMap name clientLoad checksum = do
-    Com.dprintf $ "CM_LoadMap(" `B.append` name `B.append` ")...\n"
-
-    void $ CVar.get "map_noareas" "0" 0
-
-    mapName <- use $ cmGlobals.cmMapName
-    flushMapValue <- CVar.variableValue "flushmap"
-
-    if | mapName == name && (clientLoad || flushMapValue == 0) -> do
-           lastChecksum <- use $ cmGlobals.cmLastChecksum
-           let updatedChecksum = lastChecksum : tail checksum
-
-           unless clientLoad $ do
-             cmGlobals.cmPortalOpen %= UV.map (const False)
-             floodAreaConnections
-
-           -- still have the right version
-           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (Ref 0, updatedChecksum)
-
-       | B.length name == 0 -> do
-           resetSomeGlobals
-           cmGlobals.cmNumNodes .= 0
-           cmGlobals.cmNumLeafs .= 1
-           cmGlobals.cmNumClusters .= 1
-           cmGlobals.cmNumAreas .= 1
-
-           -- cinematic servers won't have anything at all
-           let updatedChecksum = 0 : tail checksum
-           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (Ref 0, updatedChecksum)
-
-       | otherwise -> do
-           resetSomeGlobals
-           cmGlobals.cmNumNodes .= 0
-           cmGlobals.cmNumLeafs .= 0
-
-           --
-           -- load the file
-           --
-           loadedFile <- FS.loadFile name
-
-           when (isNothing loadedFile) $
-             Com.comError Constants.errDrop ("Couldn't load " `B.append` name)
-
-           let Just buf = BL.fromStrict <$> loadedFile
-               len = BL.length buf
-               bufChecksum = MD4.blockChecksum buf len
-               updatedChecksum = bufChecksum : tail checksum
-
-           cmGlobals.cmLastChecksum .= bufChecksum
-
-           let header = newDHeaderT buf
-
-           when (header^.dhVersion /= Constants.bspVersion) $
-             Com.comError Constants.errDrop
-                          ("CMod_LoadBrushModel: " `B.append`
-                           name `B.append`
-                           " has wrong version number (" `B.append`
-                           BC.pack (show $ header^.dhVersion) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
-                           " should be " `B.append`
-                           BC.pack (show Constants.bspVersion) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
-                           ")")
-
-           cmGlobals.cmCModBase .= Just buf
-
-           let lumps = header^.dhLumps
-
-           loadSurfaces (lumps V.! Constants.lumpTexInfo)
-           loadLeafs (lumps V.! Constants.lumpLeafs)
-           loadLeafBrushes (lumps V.! Constants.lumpLeafBrushes)
-           loadPlanes (lumps V.! Constants.lumpPlanes)
-           loadBrushes (lumps V.! Constants.lumpBrushes)
-           loadBrushSides (lumps V.! Constants.lumpBrushSides)
-           loadSubmodels (lumps V.! Constants.lumpModels)
-
-           loadNodes (lumps V.! Constants.lumpNodes)
-           loadAreas (lumps V.! Constants.lumpAreas)
-           loadAreaPortals (lumps V.! Constants.lumpAreaPortals)
-           loadVisibility (lumps V.! Constants.lumpVisibility)
-           loadEntityString (lumps V.! Constants.lumpEntities)
-
-           initBoxHull
-
-           cmGlobals.cmPortalOpen %= UV.map (const False)
-
-           floodAreaConnections
-
-           cmGlobals.cmMapName .= name
-
-           --cModel <- liftM (V.! 0) (use $ cmGlobals.cmMapCModels)
-           return (Ref 0, updatedChecksum)
-
-  where resetSomeGlobals :: Quake ()
-        resetSomeGlobals = do
-           cmGlobals.cmNumCModels .= 0
-           cmGlobals.cmNumVisibility .= 0
-           cmGlobals.cmNumEntityChars .= 0
-           cmGlobals.cmMapEntityString .= ""
-           cmGlobals.cmMapName .= ""
--}
-
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Ref CModelT, [Int]) -- return model ref (cmGlobals.cmMapCModels) and checksum
 loadMap name clientLoad checksum = do
     Com.dprintf (B.concat ["CM_LoadMap(", name, ")...\n"])
@@ -221,7 +116,6 @@ loadBSP name checksum buf len header = do
     loadLeafs        buf (lumps V.! Constants.lumpLeafs)
     loadLeafBrushes  buf (lumps V.! Constants.lumpLeafBrushes)
     loadPlanes       buf (lumps V.! Constants.lumpPlanes)
-    {-
     loadBrushes      buf (lumps V.! Constants.lumpBrushes)
     loadBrushSides   buf (lumps V.! Constants.lumpBrushSides)
     loadSubmodels    buf (lumps V.! Constants.lumpModels)
@@ -234,8 +128,6 @@ loadBSP name checksum buf len header = do
     cmGlobals.cmPortalOpen %= UV.map (const False)
     floodAreaConnections
     cmGlobals.cmMapName .= name
-    -}
-    undefined -- TODO
     return (Ref 0, updatedChecksum)
   where
     checkHeader = when (header^.dhVersion /= Constants.bspVersion) $
@@ -245,94 +137,6 @@ loadBSP name checksum buf len header = do
     bufChecksum = MD4.blockChecksum buf (fromIntegral len)
     updatedChecksum = bufChecksum : tail checksum
     lumps = header^.dhLumps
-
-loadSubmodels :: LumpT -> Quake ()
-loadSubmodels lump = do
-    Com.dprintf "CMod_LoadSubmodels()\n"
-
-    when ((lump^.lFileLen) `mod` dModelTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dModelTSize
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no models"
-
-    when (count > Constants.maxMapModels) $
-      Com.comError Constants.errDrop "Map has too many models"
-
-    Com.dprintf $ " numcmodels=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
-
-    cmGlobals.cmNumCModels .= count
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "submodles(headnode, <origin>, <mins>, <maxs>)\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapCModels <- mapM (readMapCModel buf) [0..count-1]
-    cmGlobals.cmMapCModels %= (V.// updatedMapCModels)
-
-  where readMapCModel :: BL.ByteString -> Int -> Quake (Int, CModelT)
-        readMapCModel buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dModelTSize
-              model = newDModelT (BL.drop offset buf)
-              cmodel = CModelT { _cmMins     = fmap (\a -> a - 1) (model^.dmMins)
-                               , _cmMaxs     = fmap (+1) (model^.dmMaxs)
-                               , _cmOrigin   = model^.dmOrigin
-                               , _cmHeadNode = model^.dmHeadNode
-                               }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            io (putStrLn "CM.loadSubmodels#readMapCModel") >> undefined -- TODO
-
-          return (idx, cmodel)
-
-{-
-loadSurfaces :: LumpT -> Quake ()
-loadSurfaces lump = do
-    Com.dprintf "CMod_LoadSurfaces()\n"
-
-    when ((lump^.lFileLen) `mod` texInfoTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` texInfoTSize
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no surfaces"
-
-    when (count > Constants.maxMapTexInfo) $
-      Com.comError Constants.errDrop "Map has too many surfaces"
-
-    cmGlobals.cmNumTexInfo .= count
-    Com.dprintf $ " numtexinfo=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "surfaces:\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapSurfaces <- mapM (readMapSurface buf) [0..count-1]
-    cmGlobals.cmMapSurfaces %= (V.// updatedMapSurfaces)
-
-  where readMapSurface :: BL.ByteString -> Int -> Quake (Int, MapSurfaceT)
-        readMapSurface buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * texInfoTSize
-              tex = newTexInfoT (BL.drop offset buf)
-              csurface = CSurfaceT { _csName  = tex^.tiTexture
-                                   , _csFlags = tex^.tiFlags
-                                   , _csValue = tex^.tiValue
-                                   }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` (tex^.tiTexture) `B.append`
-                          "| " `B.append` (tex^.tiTexture) `B.append`
-                          "| " `B.append` BC.pack (show (tex^.tiValue)) `B.append` -- IMPROVE: convert Int to ByteString using binary package?
-                          "| " `B.append` BC.pack (show (tex^.tiFlags)) `B.append` -- IMPROVE: convert Bool to ByteString using binary package?
-                          "|\n"
-
-          return (idx, MapSurfaceT { _msCSurface = csurface, _msRName = Just (tex^.tiTexture) })
-          -}
 
 loadSurfaces :: BL.ByteString -> LumpT -> Quake ()
 loadSurfaces buf lump = do
@@ -429,8 +233,7 @@ loadPlanes buf lump = do
     Com.dprintf (B.concat [" numplanes=", encode count, "\n"])
     cmGlobals.cmNumPlanes .= count
     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
-    -- cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) readDPlanes))
-    undefined
+    V.imapM_ (\i p -> writeRef (Ref i) (toCPlane p)) readDPlanes
   where
     count = (lump^.lFileLen) `div` dPlaneTSize
     checkLump = do
@@ -456,529 +259,297 @@ toCPlane dPlane = CPlaneT { _cpNormal   = dPlane^.dpNormal
             c' = if c < 0 then 4 else 0
         in a' .|. b' .|. c'
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-loadNodes :: LumpT -> Quake ()
-loadNodes lump = do
-    Com.dprintf "CMod_LoadNodes()\n"
-
-    when ((lump^.lFileLen) `mod` dNodeTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dNodeTSize
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no nodes"
-
-    when (count > Constants.maxMapNodes) $
-      Com.comError Constants.errDrop "Map has too many nodes"
-
-    cmGlobals.cmNumNodes .= count
-
-    Com.dprintf $ " numnodes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "nodes(planenum, child[0], child[1])\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapNodes <- mapM (readMapNode buf) [0..count-1]
-    cmGlobals.cmMapNodes %= (V.// updatedMapNodes)
-
-  where readMapNode :: BL.ByteString -> Int -> Quake (Int, CNodeT)
-        readMapNode buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dNodeTSize
-              node = newDNodeT (BL.drop offset buf)
-              cnode = CNodeT { _cnPlane    = Just (node^.dnPlaneNum)
-                             , _cnChildren = node^.dnChildren
-                             }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            io (putStrLn "CM.loadNodes#readMapNode") >> undefined -- TODO
-
-          return (idx, cnode)
-
-loadBrushes :: LumpT -> Quake ()
-loadBrushes lump = do
+loadBrushes :: BL.ByteString -> LumpT -> Quake ()
+loadBrushes buf lump = do
     Com.dprintf "CMod_LoadBrushes()\n"
-
-    when ((lump^.lFileLen) `mod` dBrushTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dBrushTSize
-
-    when (count > Constants.maxMapBrushes) $
-      Com.comError Constants.errDrop "Map has too many brushes"
-
+    checkLump
+    Com.dprintf (B.concat [" numbrushes=", encode count, "\n"])
     cmGlobals.cmNumBrushes .= count
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    V.imapM_ (\i b -> writeRef (Ref i) (toCBrush b)) readDBrushes
+  where
+    count = (lump^.lFileLen) `div` dBrushTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dBrushTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count > Constants.maxMapBrushes) $
+            Com.comError Constants.errDrop "Map has too many brushes"
+    readDBrushes = runGet (V.replicateM count getDBrushT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
-    Com.dprintf $ " numbrushes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE
+toCBrush :: DBrushT -> CBrushT
+toCBrush dBrush = CBrushT { _cbContents       = dBrush^.dbContents
+                          , _cbNumSides       = dBrush^.dbNumSides
+                          , _cbFirstBrushSide = dBrush^.dbFirstSide
+                          , _cbCheckCount     = 0
+                          }
 
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "brushes:(firstbrushside, numsides, contents)\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-    mapM_ (\i -> readMapBrush buf i >>= writeRef (Ref i)) [0..count-1]
-
-  where readMapBrush :: BL.ByteString -> Int -> Quake CBrushT
-        readMapBrush buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dBrushTSize
-              brush = newDBrushT (BL.drop offset buf)
-              cbrush = CBrushT { _cbContents       = brush^.dbContents
-                               , _cbNumSides       = brush^.dbNumSides
-                               , _cbFirstBrushSide = brush^.dbFirstSide
-                               , _cbCheckCount     = 0
-                               }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` BC.pack (show $ brush^.dbFirstSide) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ brush^.dbNumSides) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ brush^.dbContents) `B.append` -- IMPROVE ?
-                          "|\n"
-
-          return cbrush
-
-{-
-loadLeafs :: LumpT -> Quake ()
-loadLeafs lump = do
-    Com.dprintf "CMod_LoadLeafs()\n"
-
-    when ((lump^.lFileLen) `mod` dLeafTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dLeafTSize
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no leafs"
-
-    -- need to save space for box planes
-    when (count > Constants.maxMapPlanes) $
-      Com.comError Constants.errDrop "Map has too many planes"
-
-    Com.dprintf $ " numleafes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
-
-    cmGlobals.cmNumLeafs .= count
-    cmGlobals.cmNumClusters .= 0
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "cleaf-list:(contents, cluster, area, firstleafbrush, numleafbrushes)\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapLeafs <- mapM (readMapLeaf buf) [0..count-1]
-    cmGlobals.cmMapLeafs %= (V.// updatedMapLeafs)
-
-    numClusters <- use $ cmGlobals.cmNumClusters
-    Com.dprintf $ " numclusters=" `B.append` BC.pack (show numClusters) `B.append` "\n" -- IMPROVE ?
-
-    Just lContents <- preuse $ cmGlobals.cmMapLeafs.ix 0.clContents
-    when (lContents /= Constants.contentsSolid) $
-      Com.comError Constants.errDrop "Map leaf 0 is not CONTENTS_SOLID"
-
-    cmGlobals.cmSolidLeaf .= 0
-    cmGlobals.cmEmptyLeaf .= (-1)
-
-    mapLeafs <- use $ cmGlobals.cmMapLeafs
-    let emptyLeaf = V.findIndex (\leaf -> leaf^.clContents == 0) mapLeafs
-
-    case emptyLeaf of
-      Nothing -> Com.comError Constants.errDrop "Map does not have an empty leaf"
-      Just idx -> cmGlobals.cmEmptyLeaf .= idx
-
-  where readMapLeaf :: BL.ByteString -> Int -> Quake (Int, CLeafT)
-        readMapLeaf buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dLeafTSize
-              leaf = newDLeafT (BL.drop offset buf)
-              cleaf = CLeafT { _clContents       = leaf^.dlContents
-                             , _clCluster        = fromIntegral $ leaf^.dlCluster
-                             , _clArea           = fromIntegral $ leaf^.dlArea
-                             , _clFirstLeafBrush = leaf^.dlFirstLeafBrush
-                             , _clNumLeafBrushes = leaf^.dlNumLeafBrushes
-                             }
-
-          numClusters <- use $ cmGlobals.cmNumClusters
-
-          when (fromIntegral (leaf^.dlCluster) >= numClusters) $
-            cmGlobals.cmNumClusters .= fromIntegral (leaf^.dlCluster) + 1
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` BC.pack (show (leaf^.dlContents)) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show (leaf^.dlCluster)) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show (leaf^.dlFirstLeafBrush)) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show (leaf^.dlNumLeafBrushes)) `B.append` -- IMPROVE ?
-                          "|\n"
-
-          return (idx, cleaf)
-          -}
-
-{-
-loadPlanes :: LumpT -> Quake ()
-loadPlanes lump = do
-    Com.dprintf "CMod_LoadPlanes()\n"
-
-    when ((lump^.lFileLen) `mod` dPlaneTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dPlaneTSize
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no planes"
-
-    -- need to save space for box planes
-    when (count > Constants.maxMapPlanes) $
-      Com.comError Constants.errDrop "Map has too many planes"
-
-    Com.dprintf $ " numplanes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
-
-    cmGlobals.cmNumPlanes .= count
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "cplanes(normal[0],normal[1],normal[2], dist, type, signbits)\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-    mapM_ (\i -> readMapPlane buf i >>= \p -> writeRef (Ref i) p) [0..count-1]
-
-  where readMapPlane :: BL.ByteString -> Int -> Quake CPlaneT
-        readMapPlane buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dPlaneTSize
-              plane = newDPlaneT (BL.drop offset buf)
-              cplane = CPlaneT { _cpNormal   = plane^.dpNormal
-                               , _cpDist     = plane^.dpDist
-                               , _cpType     = fromIntegral (plane^.dpType)
-                               , _cpSignBits = getBits (plane^.dpNormal)
-                               , _cpPad      = (0, 0)
-                               }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` BC.pack (show $ cplane^.cpNormal._x) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ cplane^.cpNormal._y) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ cplane^.cpNormal._z) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ cplane^.cpDist) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ cplane^.cpType) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show $ cplane^.cpSignBits) `B.append` -- IMPROVE ?
-                          "|\n"
-
-          return cplane
-
-        getBits :: V3 Float -> Int8
-        getBits (V3 a b c) =
-          let a' = if a < 0 then 1 else 0
-              b' = if b < 0 then 2 else 0
-              c' = if c < 0 then 4 else 0
-          in a' .|. b' .|. c'
--}
-
-{-
-loadLeafBrushes :: LumpT -> Quake ()
-loadLeafBrushes lump = do
-    Com.dprintf "CMod_LoadLeafBrushes()\n"
-
-    when ((lump^.lFileLen) `mod` 2 /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` 2
-
-    Com.dprintf $ " numbrushes=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE: convert Int to ByteString using binary package?
-
-    when (count < 1) $
-      Com.comError Constants.errDrop "Map with no planes"
-
-    -- need to save space for box planes
-    when (count > Constants.maxMapLeafBrushes) $
-      Com.comError Constants.errDrop "Map has too many leafbrushes"
-
-    cmGlobals.cmNumLeafBrushes .= count
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "map_brushes:\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapLeafBrushes <- mapM (readMapLeafBrush buf) [0..count-1]
-    cmGlobals.cmMapLeafBrushes %= (UV.// updatedMapLeafBrushes)
-
-  where readMapLeafBrush :: BL.ByteString -> Int -> Quake (Int, Word16)
-        readMapLeafBrush buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * 2
-              val = runGet getWord16le (BL.drop offset buf)
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` BC.pack (show idx) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show val) `B.append` -- IMPROVE ?
-                          "|\n"
-
-          return (idx, val)
-          -}
-
-loadBrushSides :: LumpT -> Quake ()
-loadBrushSides lump = do
+loadBrushSides :: BL.ByteString -> LumpT -> Quake ()
+loadBrushSides buf lump = do
     Com.dprintf "CMod_LoadBrushSides()\n"
-
-    when ((lump^.lFileLen) `mod` dBrushSideTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dBrushSideTSize
-
-    when (count > Constants.maxMapBrushSides) $
-      Com.comError Constants.errDrop "Map has too many planes"
-
+    checkLump
     cmGlobals.cmNumBrushSides .= count
-
-    Com.dprintf $ " numbrushsides=" `B.append` BC.pack (show count) `B.append` "\n" -- IMPROVE ?
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "brushside(planenum, surfacenum):\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapBrushSides <- mapM (readMapBrushSide buf) [0..count-1]
-    cmGlobals.cmMapBrushSides %= (V.// updatedMapBrushSides)
-
-  where readMapBrushSide :: BL.ByteString -> Int -> Quake (Int, CBrushSideT)
-        readMapBrushSide buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dBrushSideTSize
-              brushSide = newDBrushSideT (BL.drop offset buf)
-              num = fromIntegral $ brushSide^.dbsPlaneNum
-              j = fromIntegral $ brushSide^.dbsTexInfo
-
-          numTexInfo <- use $ cmGlobals.cmNumTexInfo
-
-          when (j >= numTexInfo) $
+    Com.dprintf (B.concat [" numbrushsides=", encode count, "\n"])
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    let brushSides = readDBrushSides
+    validateBrushSides brushSides =<< use (cmGlobals.cmNumTexInfo)
+    cmGlobals.cmMapBrushSides %= (\v -> V.update v (V.imap (\i b -> (i, toCBrushSide b)) brushSides))
+  where
+    count = (lump^.lFileLen) `div` dBrushSideTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dBrushSideTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count > Constants.maxMapBrushSides) $
+            Com.comError Constants.errDrop "Map has too many planes"
+    readDBrushSides = runGet (V.replicateM count getDBrushSideT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
+    validateBrushSides brushSides numTexInfo =
+        mapM_ (checkBrushSide numTexInfo) brushSides
+    checkBrushSide numTexInfo brushSide
+        | fromIntegral (brushSide^.dbsTexInfo) >= numTexInfo =
             Com.comError Constants.errDrop "Bad brushside texinfo"
+        | otherwise = return ()
 
-          -- j == -1 case should be handled someway
-          -- we simply point to a hacky empty MapSurfaceT
-          let cbrushside = CBrushSideT { _cbsPlane   = Just num
-                                       , _cbsSurface = Just (if j == -1 then Constants.maxMapTexInfo else j)
-                                       }
+toCBrushSide :: DBrushSideT -> CBrushSideT
+toCBrushSide dBrushSide = CBrushSideT { _cbsPlane   = Just planeRef
+                                      , _cbsSurface = Just surfaceRef
+                                      }
+  where
+    j = fromIntegral (dBrushSide^.dbsTexInfo)
+    planeRef = Ref (fromIntegral (dBrushSide^.dbsPlaneNum))
+    surfaceRef | j == -1 = Ref Constants.maxMapTexInfo
+               | otherwise = Ref j
 
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            Com.dprintf $ "| " `B.append` BC.pack (show num) `B.append` -- IMPROVE ?
-                          "| " `B.append` BC.pack (show j) `B.append` -- IMPROVE ?
-                          "|\n"
+loadSubmodels :: BL.ByteString -> LumpT -> Quake ()
+loadSubmodels buf lump = do
+    Com.dprintf "CMod_LoadSubmodels()\n"
+    checkLump
+    Com.dprintf (B.concat [" numcmodels=", encode count, "\n"])
+    cmGlobals.cmNumCModels .= count
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    cmGlobals.cmMapCModels %= (\v -> V.update v (V.imap (\i m -> (i, toCModel m)) readDModels))
+  where
+    count = (lump^.lFileLen) `div` dModelTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dModelTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count < 1) $
+            Com.comError Constants.errDrop "Map with no models"
+        when (count > Constants.maxMapModels) $
+            Com.comError Constants.errDrop "Map has too many models"
+    readDModels = runGet (V.replicateM count getDModelT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
-          return (idx, cbrushside)
+toCModel :: DModelT -> CModelT
+toCModel dModel = CModelT { _cmMins     = fmap (\a -> a - 1) (dModel^.dmMins)
+                          , _cmMaxs     = fmap (+1) (dModel^.dmMaxs)
+                          , _cmOrigin   = dModel^.dmOrigin
+                          , _cmHeadNode = dModel^.dmHeadNode
+                          }
 
-loadAreas :: LumpT -> Quake ()
-loadAreas lump = do
+loadNodes :: BL.ByteString -> LumpT -> Quake ()
+loadNodes buf lump = do
+    Com.dprintf "CMod_LoadNodes()\n"
+    checkLump
+    Com.dprintf (B.concat [" numnodes=", encode count, "\n"])
+    cmGlobals.cmNumNodes .= count
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    cmGlobals.cmMapNodes %= (\v -> V.update v (V.imap (\i n -> (i, toCNode n)) readDNodes))
+  where
+    count = (lump^.lFileLen) `div` dNodeTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dNodeTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count < 1) $
+            Com.comError Constants.errDrop "Map with no nodes"
+        when (count > Constants.maxMapNodes) $
+            Com.comError Constants.errDrop "Map has too many nodes"
+    readDNodes = runGet (V.replicateM count getDNodeT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
+
+toCNode :: DNodeT -> CNodeT
+toCNode dNode = CNodeT { _cnPlane    = Just (Ref (dNode^.dnPlaneNum))
+                       , _cnChildren = dNode^.dnChildren
+                       }
+
+loadAreas :: BL.ByteString -> LumpT -> Quake ()
+loadAreas buf lump = do
     Com.dprintf "CMod_LoadAreas()\n"
-
-    when ((lump^.lFileLen) `mod` dAreaTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dAreaTSize
-
-    when (count > Constants.maxMapAreas) $
-      Com.comError Constants.errDrop "Map has too many areas"
-
-    Com.dprintf $ " numareas=" `B.append` BC.pack (show count) `B.append` "\n"
-
+    checkLump
+    Com.dprintf (B.concat [" numareas=", encode count, "\n"])
     cmGlobals.cmNumAreas .= count
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    cmGlobals.cmMapAreas %= (\v -> V.update v (V.imap (\i a -> (i, toCArea a)) readDAreas))
+  where
+    count = (lump^.lFileLen) `div` dAreaTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dAreaTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count > Constants.maxMapAreas) $
+            Com.comError Constants.errDrop "Map has too many areas"
+    readDAreas = runGet (V.replicateM count getDAreaT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "areas(numportals, firstportal)\n"
+toCArea :: DAreaT -> CAreaT
+toCArea dArea = CAreaT { _caNumAreaPortals  = dArea^.daNumAreaPortals
+                       , _caFirstAreaPortal = dArea^.daFirstAreaPortal
+                       , _caFloodNum        = 0
+                       , _caFloodValid      = 0
+                       }
 
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapAreas <- mapM (readMapArea buf) [0..count-1]
-    cmGlobals.cmMapAreas %= (V.// updatedMapAreas)
-
-  where readMapArea :: BL.ByteString -> Int -> Quake (Int, CAreaT)
-        readMapArea buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dAreaTSize
-              area = newDAreaT (BL.drop offset buf)
-              carea = CAreaT { _caNumAreaPortals  = area^.daNumAreaPortals
-                             , _caFirstAreaPortal = area^.daFirstAreaPortal
-                             , _caFloodNum        = 0
-                             , _caFloodValid      = 0
-                             }
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            io (putStrLn "CM.loadAreas#readMapArea") >> undefined -- TODO
-
-          return (idx, carea)
-
-loadAreaPortals :: LumpT -> Quake ()
-loadAreaPortals lump = do
+loadAreaPortals :: BL.ByteString -> LumpT -> Quake ()
+loadAreaPortals buf lump = do
     Com.dprintf "CMod_LoadAreaPortals()\n"
-
-    when ((lump^.lFileLen) `mod` dAreaPortalTSize /= 0) $
-      Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
-
-    let count = (lump^.lFileLen) `div` dAreaPortalTSize
-
-    when (count > Constants.maxMapAreas) $
-      Com.comError Constants.errDrop "Map has too many areas"
-
+    checkLump
+    Com.dprintf (B.concat [" numareaportals=", encode count, "\n"])
     cmGlobals.cmNumAreaPortals .= count
+    -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
+    cmGlobals.cmMapAreaPortals %= (\v -> V.update v (V.imap (\i ap -> (i, ap)) readDAreaPortals))
+  where
+    count = (lump^.lFileLen) `div` dAreaPortalTSize
+    checkLump = do
+        when ((lump^.lFileLen) `mod` dAreaPortalTSize /= 0) $
+            Com.comError Constants.errDrop "MOD_LoadBmodel: funny lump size"
+        when (count > Constants.maxMapAreas) $
+            Com.comError Constants.errDrop "Map has too many areas"
+    readDAreaPortals = runGet (V.replicateM count getDAreaPortalT) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
-    Com.dprintf $ " numareaportals=" `B.append` BC.pack (show count) `B.append` "\n"
-
-    whenM (use $ cmGlobals.cmDebugLoadMap) $
-      Com.dprintf "areaportals(portalnum, otherarea)\n"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    updatedMapAreaPortals <- mapM (readMapAreaPortal buf) [0..count-1]
-    cmGlobals.cmMapAreaPortals %= (V.// updatedMapAreaPortals)
-
-  where readMapAreaPortal :: BL.ByteString -> Int -> Quake (Int, DAreaPortalT)
-        readMapAreaPortal buf idx = do
-          let offset = fromIntegral $ (lump^.lFileOfs) + idx * dAreaPortalTSize
-              areaPortal = newDAreaPortalT (BL.drop offset buf)
-
-          whenM (use $ cmGlobals.cmDebugLoadMap) $
-            io (putStrLn "CM.loadAreaPortals#readMapAreaPortal") >> undefined -- TODO
-
-          return (idx, areaPortal)
-
-loadVisibility :: LumpT -> Quake ()
-loadVisibility lump = do
+loadVisibility :: BL.ByteString -> LumpT -> Quake ()
+loadVisibility buf lump = do
     Com.dprintf "CMod_LoadVisibility()\n"
-
+    checkLump
     cmGlobals.cmNumVisibility .= lump^.lFileLen
+    Com.dprintf (B.concat [" numvisibility=", encode (lump^.lFileLen), "\n"])
+    cmGlobals.cmMapVisibility .= BL.toStrict visData
+    cmGlobals.cmMapVis .= runGet getDVisT visData
+  where
+    checkLump = when ((lump^.lFileLen) > Constants.maxMapVisibility) $
+        Com.comError Constants.errDrop "Map has too large visibility lump"
+    visData = BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf)
 
-    Com.dprintf $ " numvisibility=" `B.append` BC.pack (show (lump^.lFileLen)) `B.append` "\n"
-
-    when ((lump^.lFileLen) > Constants.maxMapVisibility) $
-      Com.comError Constants.errDrop "Map has too large visibility lump"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    let visData = BL.take (fromIntegral (lump^.lFileLen)) $ BL.drop (fromIntegral (lump^.lFileOfs)) buf
-
-    cmGlobals.cmMapVisibility .= visData
-    cmGlobals.cmMapVis .= newDVisT visData
-
-loadEntityString :: LumpT -> Quake ()
-loadEntityString lump = do
+loadEntityString :: BL.ByteString -> LumpT -> Quake ()
+loadEntityString buf lump = do
     Com.dprintf "CMod_LoadEntityString()\n"
-
+    checkLump
     cmGlobals.cmNumEntityChars .= (lump^.lFileLen)
+    cmGlobals.cmMapEntityString .= BL.toStrict str
+    Com.dprintf (B.concat [ "entitystring=", encode (BL.length str)
+                          , " bytes, [", BL.toStrict (BL.take 100 str), "\n"])
+  where
+    checkLump = when ((lump^.lFileLen) > Constants.maxMapEntString) $
+        Com.comError Constants.errDrop "Map has too large entity lump"
+    str = BL.takeWhile (/= 0) (BL.take (fromIntegral (lump^.lFileLen)) (BL.drop (fromIntegral (lump^.lFileOfs)) buf))
 
-    when ((lump^.lFileLen) > Constants.maxMapEntString) $
-      Com.comError Constants.errDrop "Map has too large entity lump"
-
-    Just buf <- use $ cmGlobals.cmCModBase
-
-    let entitystring = B.takeWhile (/= 0) $ B.take (lump^.lFileLen) (B.drop (lump^.lFileOfs) (BL.toStrict buf))
-
-    cmGlobals.cmMapEntityString .= entitystring
-
-    Com.dprintf $ "entitystring=" `B.append` BC.pack (show $ B.length entitystring) `B.append`
-                  " bytes, [" `B.append` B.take 15 entitystring `B.append` "\n" -- TODO
-
-{- Set up the planes and nodes so that the six floats of a bounding box can
-- just be stored out and get a proper clipping hull structure.
--}
 initBoxHull :: Quake ()
 initBoxHull = do
-    numNodes <- use $ cmGlobals.cmNumNodes
-    numBrushes <- use $ cmGlobals.cmNumBrushes
-    numLeafBrushes <- use $ cmGlobals.cmNumLeafBrushes
-    numBrushSides <- use $ cmGlobals.cmNumBrushSides
-    numPlanes <- use $ cmGlobals.cmNumPlanes
+    numNodes <- use (cmGlobals.cmNumNodes)
+    numBrushes <- use (cmGlobals.cmNumBrushes)
+    numLeafBrushes <- use (cmGlobals.cmNumLeafBrushes)
+    numBrushSides <- use (cmGlobals.cmNumBrushSides)
+    numPlanes <- use (cmGlobals.cmNumPlanes)
+    numLeafs <- use (cmGlobals.cmNumLeafs)
+    verifyModel numNodes numBrushes numLeafBrushes numBrushSides numPlanes
+    cmGlobals.cmBoxHeadNode .= numNodes
+    writeRef (Ref numBrushes) (boxBrush numBrushSides)
+    writeRef (Ref numLeafs) (boxLeaf numLeafBrushes)
+    cmGlobals.cmMapLeafBrushes %= (UV.// [(numLeafBrushes, fromIntegral numBrushes)])
+    mapM_ (setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs) [0..5]
+  where
+    boxBrush numBrushSides = CBrushT
+        { _cbContents       = Constants.contentsMonster
+        , _cbNumSides       = 6
+        , _cbFirstBrushSide = numBrushSides
+        , _cbCheckCount     = 0
+        }
+    boxLeaf numLeafBrushes = CLeafT
+        { _clContents       = Constants.contentsMonster
+        , _clCluster        = 0
+        , _clArea           = 0
+        , _clFirstLeafBrush = fromIntegral numLeafBrushes
+        , _clNumLeafBrushes = 1
+        }
 
+verifyModel :: Int -> Int -> Int -> Int -> Int -> Quake ()
+verifyModel numNodes numBrushes numLeafBrushes numBrushSides numPlanes =
     when ( numNodes + 6 > Constants.maxMapNodes
         || numBrushes + 1 > Constants.maxMapBrushes
         || numLeafBrushes + 1 > Constants.maxMapLeafBrushes
         || numBrushSides + 6 > Constants.maxMapBrushSides
         || numPlanes + 12 > Constants.maxMapPlanes
         ) $
-      Com.comError Constants.errDrop "Not enough room for box tree"
+        Com.comError Constants.errDrop "Not enough room for box tree"
 
-    cmGlobals.cmBoxHeadNode .= numNodes
+setBrushSidesNodesAndPlanes :: Int -> Int -> Int -> Int -> Quake ()
+setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx = do
+    writeRef (Ref (numBrushSides + idx)) s
+    emptyLeaf <- use (cmGlobals.cmEmptyLeaf)
+    boxHeadNode <- use (cmGlobals.cmBoxHeadNode)
+    writeRef (Ref (boxHeadNode + idx)) (buildNode emptyLeaf boxHeadNode)
+    writeRef (Ref (numPlanes + idx * 2)) p1
+    writeRef (Ref (numPlanes + idx * 2 + 1)) p2
+  where
+    side = idx .&. 1
+    s = CBrushSideT { _cbsPlane   = Just (Ref (numPlanes + idx * 2 + side))
+                    , _cbsSurface = Nothing
+                    }
+    buildNode emptyLeaf boxHeadNode =
+        CNodeT { _cnPlane    = Just (Ref (numPlanes + idx * 2))
+               , _cnChildren = calcChildren emptyLeaf boxHeadNode
+               }
+    calcChildren emptyLeaf boxHeadNode =
+        let a = (-1) - emptyLeaf
+            b = if idx == 5 then (-1) - numLeafs else boxHeadNode + idx + 1
+        in if side == 0 then (a, b) else (b, a)
+    p1 = CPlaneT { _cpNormal   = getNormal 1
+                 , _cpDist     = 0
+                 , _cpType     = fromIntegral (idx `shiftR` 1)
+                 , _cpSignBits = 0
+                 , _cpPad      = (0, 0)
+                 }
+    p2 = CPlaneT { _cpNormal   = getNormal (-1)
+                 , _cpDist     = 0
+                 , _cpType     = fromIntegral (3 + (idx `shiftR` 1))
+                 , _cpSignBits = 0
+                 , _cpPad      = (0, 0)
+                 }
+    getNormal v
+        | x == 0 = V3 v 0 0
+        | x == 1 = V3 0 v 0
+        | otherwise = V3 0 0 v
+      where
+        x = idx `shiftR` 1
 
-    let boxBrush = CBrushT { _cbContents       = Constants.contentsMonster
-                           , _cbNumSides       = 6
-                           , _cbFirstBrushSide = numBrushSides
-                           , _cbCheckCount     = 0
-                           }
+floodAreaConnections :: Quake ()
+floodAreaConnections = do
+    Com.dprintf "FloodAreaConnections...\n"
+    cmGlobals.cmFloodValid += 1
+    floodValid <- use (cmGlobals.cmFloodValid)
+    numAreas <- use (cmGlobals.cmNumAreas)
+    areas <- use (cmGlobals.cmMapAreas)
+    V.ifoldM_ (flood floodValid) 0 (V.take numAreas areas)
 
-    writeRef (Ref numBrushes) boxBrush
+flood :: Int -> Int -> Int -> CAreaT -> Quake Int
+flood floodValid floodNum idx area
+    | idx == 0 = return floodNum -- area 0 is not used
+    | (area^.caFloodValid) == floodValid = return floodNum
+    | otherwise = do
+        floodAreaR (Ref idx) floodValid (floodNum + 1)
+        return (floodNum + 1)
 
-    let boxLeaf = CLeafT { _clContents       = Constants.contentsMonster
-                         , _clCluster        = 0
-                         , _clArea           = 0
-                         , _clFirstLeafBrush = fromIntegral numLeafBrushes
-                         , _clNumLeafBrushes = 1
-                         }
-
-    numLeafs <- use $ cmGlobals.cmNumLeafs
-    cmGlobals.cmMapLeafs %= (V.// [(numLeafs, boxLeaf)])
-
-    cmGlobals.cmMapLeafBrushes %= (UV.// [(numLeafBrushes, fromIntegral numBrushes)])
-
-    mapM_ (setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs) [0..5]
-
-  where setBrushSidesNodesAndPlanes :: Int -> Int -> Int -> Int -> Quake ()
-        setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx = do
-          let side = idx .&. 1
-
-          -- brush sides
-          let s = CBrushSideT { _cbsPlane   = Just (numPlanes + idx * 2 + side)
-                              , _cbsSurface = Nothing
-                              }
-
-          cmGlobals.cmMapBrushSides %= (V.// [(numBrushSides + idx, s)])
-
-          -- nodes
-          emptyLeaf <- use $ cmGlobals.cmEmptyLeaf
-          boxHeadNode <- use $ cmGlobals.cmBoxHeadNode
-
-          let c = CNodeT { _cnPlane    = Just (numPlanes + idx * 2)
-                         , _cnChildren = calcChildren idx side numLeafs emptyLeaf boxHeadNode
-                         }
-
-          cmGlobals.cmMapNodes %= (V.// [(boxHeadNode + idx, c)])
-
-          -- planes
-          let p1 = CPlaneT { _cpNormal   = getNormal idx 1
-                           , _cpDist     = 0
-                           , _cpType     = fromIntegral (idx `shiftR` 1)
-                           , _cpSignBits = 0
-                           , _cpPad      = (0, 0)
-                           }
-
-          let p2 = CPlaneT { _cpNormal   = getNormal idx (-1)
-                           , _cpDist     = 0
-                           , _cpType     = fromIntegral (3 + (idx `shiftR` 1))
-                           , _cpSignBits = 0
-                           , _cpPad      = (0, 0)
-                           }
-
-          writeRef (Ref (numPlanes + idx * 2)) p1
-          writeRef (Ref (numPlanes + idx * 2 + 1)) p2
-
-        calcChildren :: Int -> Int -> Int -> Int -> Int -> (Int, Int)
-        calcChildren idx side numLeafs emptyLeaf boxHeadNode =
-          let a = (-1) - emptyLeaf
-              b = if idx == 5 then (-1) - numLeafs else boxHeadNode + idx + 1
-          in if side == 0 then (a, b) else (b, a)
-
-        getNormal :: Int -> Float -> V3 Float
-        getNormal idx v =
-          let x = idx `shiftR` 1
-          in if | x == 0 -> V3 v 0 0
-                | x == 1 -> V3 0 v 0
-                | otherwise -> V3 0 0 v
+floodAreaR :: Ref CAreaT -> Int -> Int -> Quake ()
+floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
+  where
+    recFlood area
+        | (area^.caFloodValid) == floodValid =
+            when ((area^.caFloodNum) == floodNum) $
+                Com.comError Constants.errDrop "FloodArea_r: reflooded"
+        | otherwise = do
+            modifyRef areaRef (\v -> v & caFloodNum .~ floodNum
+                                       & caFloodValid .~ floodValid)
+            portalOpen <- use (cmGlobals.cmPortalOpen)
+            floodPortals area portalOpen 0 (area^.caNumAreaPortals)
+    floodPortals area portalOpen idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            areaPortal <- readRef (Ref ((area^.caFirstAreaPortal) + idx))
+            when (portalOpen UV.! (areaPortal^.dapPortalNum)) $
+                floodAreaR (Ref (areaPortal^.dapOtherArea)) floodValid floodNum
+            floodPortals area portalOpen (idx + 1) maxIdx
 
 inlineModel :: B.ByteString -> Quake (Ref CModelT)
 inlineModel name = do
@@ -1050,56 +621,6 @@ areasConnected area1 area2 = do
           then return True
           else return False
 
-floodAreaR :: Int -> Int -> Quake ()
-floodAreaR areaIdx floodNum = do
-    floodValid <- use $ cmGlobals.cmFloodValid
-    Just area <- preuse $ cmGlobals.cmMapAreas.ix areaIdx
-
-    if (area^.caFloodValid) == floodValid
-      then when ((area^.caFloodNum) == floodNum) $
-             Com.comError Constants.errDrop "FloodArea_r: reflooded"
-      else do
-        let updatedArea = area { _caFloodNum = floodNum, _caFloodValid = floodValid }
-        cmGlobals.cmMapAreas %= (V.// [(areaIdx, updatedArea)])
-
-        continueFlood area 0 ((area^.caNumAreaPortals)-1)
-
-  where continueFlood :: CAreaT -> Int -> Int -> Quake ()
-        continueFlood area idx maxIdx
-          | idx >= maxIdx = return ()
-          | otherwise = do
-              portalOpen <- use $ cmGlobals.cmPortalOpen
-              Just p <- preuse $ cmGlobals.cmMapAreaPortals.ix ((area^.caFirstAreaPortal) + idx)
-
-              when (portalOpen UV.! (p^.dapPortalNum)) $
-                floodAreaR (p^.dapOtherArea) floodNum
-
-              continueFlood area (idx + 1) maxIdx
-
-floodAreaConnections :: Quake ()
-floodAreaConnections = do
-    Com.dprintf "FloodAreaConnections...\n"
-
-    -- all current floods are not invalid
-    cmGlobals.cmFloodValid += 1
-
-    floodValid <- use $ cmGlobals.cmFloodValid
-    numAreas <- use $ cmGlobals.cmNumAreas
-
-    -- area 0 is not used
-    flood floodValid 1 (numAreas - 1) 0
-
-  where flood :: Int -> Int -> Int -> Int -> Quake ()
-        flood floodValid idx maxIdx floodNum
-          | idx >= maxIdx = return ()
-          | otherwise = do
-              Just area <- preuse $ cmGlobals.cmMapAreas.ix idx
-              if (area^.caFloodValid) == floodValid
-                then flood floodValid (idx + 1) maxIdx floodNum
-                else do
-                  floodAreaR idx (floodNum + 1)
-                  flood floodValid (idx + 1) maxIdx (floodNum + 1)
-
 -- fills in a list of all the leafs touched
 boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
 boxLeafNums mins maxs list listSize topnode = do
@@ -1136,8 +657,8 @@ boxLeafNumsR mins maxs leafList leafMaxCount nodenum
 
   | otherwise = do
       Just node <- preuse $ cmGlobals.cmMapNodes.ix nodenum
-      let planeIdx = fromJust (node^.cnPlane)
-      p <- readRef (Ref planeIdx)
+      let planeRef = fromJust (node^.cnPlane)
+      p <- readRef planeRef
       let s = Math3D.boxOnPlaneSide mins maxs p
 
       if | s == 1 -> boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
@@ -1317,8 +838,8 @@ recursiveHullCheck num p1f p2f p1 p2 = do
           -- find the point distances to the separating plane
           -- and the offset for the size of the box
           Just node <- preuse $ cmGlobals.cmMapNodes.ix num
-          let Just planeIdx = node^.cnPlane
-          plane <- readRef (Ref planeIdx)
+          let Just planeRef = node^.cnPlane
+          plane <- readRef planeRef
 
           (t1, t2, offset) <- findDistancesAndOffset plane
 
@@ -1443,12 +964,12 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
               traceT <- use $ traceLens
 
               when (enterFrac > (-1) && enterFrac < (traceT^.tFraction)) $ do
-                plane <- readRef (Ref (fromJust $ clipPlane))
+                plane <- readRef (fromJust $ clipPlane)
                 Just brushSide <- preuse $ cmGlobals.cmMapBrushSides.ix (fromJust $ leadSide)
                 let Just surfaceIdx = brushSide^.cbsSurface
                 surface <- case brushSide^.cbsSurface of
                              Nothing -> return nullSurface
-                             Just surfaceIdx -> do
+                             Just (Ref surfaceIdx) -> do
                                Just surface <- preuse $ cmGlobals.cmMapSurfaces.ix surfaceIdx
                                return surface
 
@@ -1459,12 +980,12 @@ clipBoxToBrush mins maxs p1 p2 traceLens brush = do
         
         -- 3rd argument is index of cmGlobals.cmMapPlanes
         -- 6th argument is index of cmGlobals.cmMapBrushSides
-  where findIntersections :: Float -> Float -> Maybe Int -> Bool -> Bool -> Maybe Int -> Int -> Int -> Quake (Bool, Float, Float, Maybe Int, Bool, Bool, Maybe Int)
+  where findIntersections :: Float -> Float -> Maybe (Ref CPlaneT) -> Bool -> Bool -> Maybe Int -> Int -> Int -> Quake (Bool, Float, Float, Maybe (Ref CPlaneT), Bool, Bool, Maybe Int)
         findIntersections enterFrac leaveFrac clipPlane getOut startOut leadSide idx maxIdx
           | idx >= maxIdx = return (False, enterFrac, leaveFrac, clipPlane, getOut, startOut, leadSide)
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix ((brush^.cbFirstBrushSide) + idx)
-              plane <- readRef (Ref (fromJust $ side^.cbsPlane))
+              plane <- readRef (fromJust $ side^.cbsPlane)
 
               -- FIXME: special case for axial
               traceIsPoint <- use $ cmGlobals.cmTraceIsPoint
@@ -1630,8 +1151,8 @@ pointLeafNumR p num = do
         findNum n
           | n >= 0 = do
               Just node <- preuse $ cmGlobals.cmMapNodes.ix n
-              let Just planeIdx = node^.cnPlane
-              plane <- readRef (Ref planeIdx)
+              let Just planeRef = node^.cnPlane
+              plane <- readRef planeRef
 
               let d = if plane^.cpType < 3
                         then p^.(Math3D.v3Access (fromIntegral $ plane^.cpType)) - (plane^.cpDist)
@@ -1675,7 +1196,7 @@ clusterPHS cluster = do
         res <- decompressVis mapVisibility offset
         return $ res `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - (B.length res)) 0
 
-decompressVis :: BL.ByteString -> Int -> Quake B.ByteString
+decompressVis :: B.ByteString -> Int -> Quake B.ByteString
 decompressVis mapVisibility offset = do
     numClusters <- use $ cmGlobals.cmNumClusters
     numVisibility <- use $ cmGlobals.cmNumVisibility
@@ -1685,18 +1206,18 @@ decompressVis mapVisibility offset = do
     -- no vis info, so make all visible
     if mapVisibility == "" || numVisibility == 0
       then return $ B.replicate row 0xFF
-      else decompress row (fromIntegral offset) 0 ""
+      else decompress row offset 0 ""
 
         -- IMPROVE: performance? is it needed? are we decompressing often?
-  where decompress :: Int -> Int64 -> Int -> B.ByteString -> Quake B.ByteString
+  where decompress :: Int -> Int -> Int -> B.ByteString -> Quake B.ByteString
         decompress row inp outp acc
           | outp >= row = return acc
           | otherwise = do
-              let b = BL.index mapVisibility inp
+              let b = B.index mapVisibility inp
               if b /= 0
                 then decompress row (inp + 1) (outp + 1) (acc `B.snoc` b)
                 else do
-                  let c = fromIntegral $ BL.index mapVisibility (inp + 1)
+                  let c = fromIntegral $ B.index mapVisibility (inp + 1)
                   c' <- if outp + c > row
                           then do
                             Com.dprintf "warning: Vis decompression overrun\n"
@@ -1722,8 +1243,8 @@ testBoxInBrush mins maxs p1 traceLens brush = do
           | idx >= maxIdx = return False
           | otherwise = do
               Just side <- preuse $ cmGlobals.cmMapBrushSides.ix (firstBrushSide + idx)
-              let Just planeIdx = side^.cbsPlane
-              plane <- readRef (Ref planeIdx)
+              let Just planeRef = side^.cbsPlane
+              plane <- readRef planeRef
 
               -- FIXME: special case for axial
               -- general box case

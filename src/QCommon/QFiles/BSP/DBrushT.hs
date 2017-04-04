@@ -3,6 +3,7 @@ module QCommon.QFiles.BSP.DBrushT where
 
 import Control.Applicative ((<*>))
 import Control.Lens (makeLenses)
+import Data.Binary (Get)
 import Data.Functor ((<$>))
 import qualified Data.ByteString.Lazy as BL
 
@@ -20,3 +21,6 @@ newDBrushT = runGet getDBrushT
         getDBrushT = DBrushT <$> getInt
                              <*> getInt
                              <*> getInt
+
+getDBrushT :: Get DBrushT
+getDBrushT = DBrushT <$> getInt <*> getInt <*> getInt

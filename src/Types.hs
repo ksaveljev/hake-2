@@ -1496,7 +1496,7 @@ data CMGlobals =
             , _cmNumBrushes      :: Int
             , _cmMapBrushes      :: MV.IOVector CBrushT
             , _cmNumVisibility   :: Int
-            , _cmMapVisibility   :: BL.ByteString
+            , _cmMapVisibility   :: B.ByteString
             , _cmMapVis          :: DVisT
             , _cmNumEntityChars  :: Int
             , _cmMapEntityString :: B.ByteString
@@ -2321,8 +2321,8 @@ data CAreaT = CAreaT
     }
 
 data CBrushSideT = CBrushSideT
-    { _cbsPlane   :: Maybe Int -- index of cmGlobals.cmMapPlanes
-    , _cbsSurface :: Maybe Int -- index of cmGlobals.cmMapSurfaces, Nothing means nullsurface (from jake2)
+    { _cbsPlane   :: Maybe (Ref CPlaneT)
+    , _cbsSurface :: Maybe (Ref MapSurfaceT) -- Nothing means nullsurface (from jake2)
     }
 
 data CBrushT = CBrushT
@@ -2341,7 +2341,7 @@ data CLeafT = CLeafT
     }
 
 data CNodeT = CNodeT
-    { _cnPlane    :: Maybe Int -- index of cmGlobals.cmMapPlanes
+    { _cnPlane    :: Maybe (Ref CPlaneT)
     , _cnChildren :: (Int, Int)
     }
 
@@ -2656,3 +2656,5 @@ data DPlaneT = DPlaneT
     , _dpDist   :: Float
     , _dpType   :: Int
     }
+=======
+>>>>>>> CM.loadMap
