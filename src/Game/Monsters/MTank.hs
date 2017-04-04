@@ -8,6 +8,7 @@ import Data.Bits ((.&.), (.|.), complement)
 import Linear (V3(..), normalize)
 import qualified Data.Vector as V
 
+import Game.EntityStateT
 import Game.EdictT
 import Game.MMoveT
 import Game.GClientT

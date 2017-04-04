@@ -2656,5 +2656,3 @@ data DPlaneT = DPlaneT
     , _dpDist   :: Float
     , _dpType   :: Int
     }
-=======
->>>>>>> CM.loadMap

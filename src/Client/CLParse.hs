@@ -16,6 +16,14 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Client.ConsoleT
+import Client.ClientStateT
+import Client.ClientStaticT
+import Game.EntityStateT
+import Client.CEntityT
+import Client.RefExportT
+import Render.Renderer
+import QCommon.SizeBufT
 import QCommon.NetChanT
 import Client.ClientInfoT
 import Types

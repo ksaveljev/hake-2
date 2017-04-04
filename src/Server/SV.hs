@@ -11,6 +11,8 @@ import Linear (V3(..), _x, _y, _z, dot, cross)
 import qualified Data.Vector as V
 import qualified Data.ByteString as B
 
+import Game.EntityStateT
+import Game.TraceT
 import Game.EdictT
 import Server.ServerT
 import Server.ServerStaticT

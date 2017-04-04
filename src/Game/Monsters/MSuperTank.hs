@@ -8,6 +8,7 @@ import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _y, normalize, norm)
 import qualified Data.Vector as V
 
+import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT

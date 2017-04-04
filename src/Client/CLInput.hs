@@ -11,6 +11,10 @@ import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Game.EntityStateT
+import QCommon.SizeBufT
 import Client.KButtonT
 import QCommon.NetChanT
 import Game.UserCmdT

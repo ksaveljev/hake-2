@@ -14,6 +14,10 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Client.RefExportT
+import Render.Renderer
+import Client.ClientStateT
+import Client.ClientStaticT
 import Client.MenuItem
 import Client.KeyFuncT
 import Client.MenuCommonS

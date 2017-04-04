@@ -9,6 +9,8 @@ import Data.Maybe (isJust)
 import Linear (V3(..), norm, normalize, _x, _y, _z)
 import qualified Data.Vector as V
 
+import Game.TraceT
+import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT

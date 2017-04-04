@@ -16,6 +16,13 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as Vec
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.RefExportT
+import Client.CEntityT
+import Render.Renderer
+import Game.MapSurfaceT
+import QCommon.SizeBufT
 import QCommon.NetChanT
 import QCommon.NetAdrT
 import Types

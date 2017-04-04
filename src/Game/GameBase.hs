@@ -14,6 +14,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 import Game.EdictT
+import Game.EntityStateT
 import Game.GClientT
 import Game.MoveInfoT
 import Game.ClientPersistantT

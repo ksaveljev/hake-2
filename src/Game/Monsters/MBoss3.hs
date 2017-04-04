@@ -5,6 +5,7 @@ import Control.Lens (preuse, use, ix, (^.), (.=), (+=), zoom, (&), (.~), (%~), (
 import Control.Monad (liftM, void)
 import Linear (V3(..))
 
+import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT

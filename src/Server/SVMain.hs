@@ -14,6 +14,8 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EntityStateT
+import QCommon.SizeBufT
 import QCommon.NetChanT
 import Server.ServerT
 import QCommon.NetAdrT
