@@ -1,11 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-module QCommon.CmdFunctionT ( CmdFunctionT(..)
-                            , cfFunction
-                            , cfName
-                            ) where
+module QCommon.CmdFunctionT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens (makeLenses)
 
-import Types
+import           Types
 
 makeLenses ''CmdFunctionT

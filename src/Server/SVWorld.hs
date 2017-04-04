@@ -15,6 +15,9 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Game.TraceT
+import Game.EntityStateT
+import Game.CModelT
 import Game.EdictT
 import Game.LinkT
 import Server.AreaNodeT

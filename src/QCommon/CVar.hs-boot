@@ -11,7 +11,7 @@ get :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
 
 update :: CVarT -> Quake ()
 
-init :: Quake ()
+initialize :: Quake ()
 
 variableString :: B.ByteString -> Quake B.ByteString
 

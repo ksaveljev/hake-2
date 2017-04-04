@@ -8,14 +8,15 @@ import Control.Monad (when, liftM)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import QCommon.SizeBufT
 import Types
 import QuakeState
 import qualified QCommon.SZ as SZ
 import {-# SOURCE #-} qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
 
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     bufData <- use $ globals.gCmdTextBuf
     SZ.init (globals.gCmdText) bufData 8192
 

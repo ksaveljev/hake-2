@@ -11,6 +11,8 @@ import Linear (V3(..), _x, _y, _z, dot, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Game.PMoveT
+import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT
 import Game.ClientPersistantT

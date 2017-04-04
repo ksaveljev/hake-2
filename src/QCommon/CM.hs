@@ -21,6 +21,15 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
+import QCommon.QFiles.BSP.DAreaPortalT
+import Game.CModelT
+import Game.MapSurfaceT
+import Game.TraceT
+import QCommon.CBrushSideT
+import QCommon.CBrushT
+import QCommon.CAreaT
+import QCommon.CLeafT
+import QCommon.CNodeT
 import Types
 import QuakeState
 import CVarVariables
@@ -420,7 +429,8 @@ loadPlanes buf lump = do
     Com.dprintf (B.concat [" numplanes=", encode count, "\n"])
     cmGlobals.cmNumPlanes .= count
     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
-    cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) readDPlanes))
+    -- cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) readDPlanes))
+    undefined
   where
     count = (lump^.lFileLen) `div` dPlaneTSize
     checkLump = do

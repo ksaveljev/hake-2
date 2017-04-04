@@ -16,6 +16,14 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.PMoveT
+import QCommon.SizeBufT
+import Render.Renderer
+import Client.RefExportT
+import Client.ClientStateT
+import Client.ClientStaticT
+import Game.EntityStateT
+import Client.CEntityT
 import Game.PlayerStateT
 import Client.FrameT
 import Client.ClientInfoT

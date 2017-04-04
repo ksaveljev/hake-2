@@ -15,15 +15,6 @@ import Util.Binary
 dNodeTSize :: Int
 dNodeTSize = 4 + 8 + 6 + 6 + 2 + 2
 
-data DNodeT =
-  DNodeT { _dnPlaneNum  :: Int
-         , _dnChildren  :: (Int, Int)
-         , _dnMins      :: V3 Int16
-         , _dnMaxs      :: V3 Int16
-         , _dnFirstFace :: Word16
-         , _dnNumFaces  :: Word16
-         }
-
 makeLenses ''DNodeT
 
 newDNodeT :: BL.ByteString -> DNodeT

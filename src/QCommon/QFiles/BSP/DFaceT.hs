@@ -16,16 +16,6 @@ import qualified Constants
 dFaceTSize :: Int
 dFaceTSize = 4 * Constants.sizeOfShort + 2 * Constants.sizeOfInt + Constants.maxLightMaps
 
-data DFaceT =
-  DFaceT { _dfPlaneNum  :: Word16
-         , _dfSide      :: Int16
-         , _dfFirstEdge :: Int
-         , _dfNumEdges  :: Int16
-         , _dfTexInfo   :: Int16
-         , _dfStyles    :: B.ByteString
-         , _dfLightOfs  :: Int
-         }
-
 makeLenses ''DFaceT
 
 newDFaceT :: BL.ByteString -> DFaceT

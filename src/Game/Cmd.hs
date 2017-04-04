@@ -14,6 +14,10 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Sequence as Seq
 import qualified Data.Vector as V
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Game.CmdAliasT
+import Game.EntityStateT
 import Types
 import QuakeState
 import QCommon.NetChanT
@@ -30,8 +34,8 @@ import {-# SOURCE #-} qualified QCommon.FS as FS
 aliasLoopCount :: Int
 aliasLoopCount = 16
 
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     addCommand "exec" (Just execF)
     addCommand "echo" (Just echoF)
     addCommand "cmdlist" (Just listF)

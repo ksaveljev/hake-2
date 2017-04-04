@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
 
+import QCommon.SizeBufT
 import Sys.LoopbackT
 import Sys.LoopMsgT
 import Types
@@ -35,8 +36,8 @@ maxLoopback = 4
 netLocalAdr :: NetAdrT
 netLocalAdr = newNetAdrT
 
-init :: Quake ()
-init = return () -- nothing to do
+initialize :: Quake ()
+initialize = return () -- nothing to do
 
 -- Config multi or singlepalyer - A single player game will only use the loopback code.
 config :: Bool -> Quake ()

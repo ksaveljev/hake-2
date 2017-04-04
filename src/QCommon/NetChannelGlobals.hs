@@ -1,18 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-module QCommon.NetChannelGlobals ( module QCommon.NetChannelGlobals
-                                 , module QCommon.SizeBufT
-                                 ) where
+module QCommon.NetChannelGlobals where
 
-import Control.Lens (makeLenses)
+import           Control.Lens     (makeLenses)
 
-import Types
-import QCommon.SizeBufT
+import           QCommon.SizeBufT
+import           Types
 
 makeLenses ''NetChannelGlobals
 
 initialNetChannelGlobals :: NetChannelGlobals
-initialNetChannelGlobals =
-  NetChannelGlobals { _ncSendBuf = "" -- max length Constants.maxMsgLen
-                    , _ncSend    = newSizeBufT
-                    }
+initialNetChannelGlobals = NetChannelGlobals
+    { _ncSendBuf = "" -- max length Constants.maxMsgLen
+    , _ncSend    = newSizeBufT
+    }

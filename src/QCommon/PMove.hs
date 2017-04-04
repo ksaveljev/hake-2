@@ -11,6 +11,9 @@ import Linear (V3(..), _x, _y, _z, normalize, norm, dot, cross)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.TraceT
+import Game.PMoveT
+import QCommon.PmlT
 import Game.CSurfaceT
 import Game.PMoveStateT
 import Game.UserCmdT

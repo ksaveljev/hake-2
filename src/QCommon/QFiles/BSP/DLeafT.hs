@@ -15,18 +15,6 @@ import Util.Binary
 dLeafTSize :: Int
 dLeafTSize = 4 + 8 * 2 + 4 * 2
 
-data DLeafT =
-  DLeafT { _dlContents       :: Int
-         , _dlCluster        :: Int16
-         , _dlArea           :: Int16
-         , _dlMins           :: V3 Int16
-         , _dlMaxs           :: V3 Int16
-         , _dlFirstLeafFace  :: Word16
-         , _dlNumLeafFaces   :: Word16
-         , _dlFirstLeafBrush :: Word16
-         , _dlNumLeafBrushes :: Word16
-         }
-
 makeLenses ''DLeafT
 
 newDLeafT :: BL.ByteString -> DLeafT

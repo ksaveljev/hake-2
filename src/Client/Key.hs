@@ -12,6 +12,9 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.ConsoleT
 import Game.PlayerStateT
 import Client.FrameT
 import Types
@@ -25,8 +28,8 @@ import qualified Game.Cmd as Cmd
 import qualified QCommon.CBuf as CBuf
 import {-# SOURCE #-} qualified QCommon.Com as Com
 
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     let kl = V.replicate 32 $ B.pack [93, 0] -- 93 is ']'
     globals.gKeyLines .= kl
     globals.gKeyLinePos .= 1

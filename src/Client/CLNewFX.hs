@@ -7,6 +7,9 @@ import Data.IORef (IORef, readIORef, modifyIORef')
 import Linear (V3(..), normalize, norm, _z, dot)
 import qualified Data.Vector.Unboxed as UV
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.CParticleT
 import Types
 import QuakeState
 import qualified Client.CLFX as CLFX

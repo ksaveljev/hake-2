@@ -7,7 +7,7 @@ import qualified Data.Vector.Unboxed as UV
 import Types
 import QCommon.XCommandT
 
-initArgv :: [String] -> Quake ()
+initializeArgv :: [String] -> Quake ()
 
 comError :: Int -> B.ByteString -> Quake ()
 

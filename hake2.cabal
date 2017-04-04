@@ -232,6 +232,7 @@ executable hake2
                      , QCommon.TexInfoT
                      , QCommon.XCommandT
                      , Quake
+                     , QuakeRef
                      , QuakeState
                      , Render.Basic.BasicRenderAPIGlobals
                      , Render.DummyRenderer

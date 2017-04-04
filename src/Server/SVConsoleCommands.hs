@@ -354,7 +354,7 @@ writeServerFile autosave = do
       QuakeFile.writeString qf (Just comment)
       QuakeFile.writeString qf (Just mapCmd)
 
-    vars <- use $ globals.gCvarVars
+    vars <- use $ globals.gCVars
 
     void $ traverse (writeCVar qf) vars
 

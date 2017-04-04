@@ -187,7 +187,7 @@ data Globals =
           , _gClEntities         :: V.Vector CEntityT
           , _gClParseEntities    :: V.Vector EntityStateT
           , _gUserInfoModified   :: Bool
-          , _gCvarVars           :: M.Map B.ByteString CVarT
+          , _gCVars              :: HM.HashMap B.ByteString CVarT
           , _gCon                :: ConsoleT
           , _gVidDef             :: VidDefT
           , _gRenderer           :: Maybe Renderer
@@ -2581,4 +2581,78 @@ data MoveClipT = MoveClipT
 data LumpT = LumpT
     { _lFileOfs :: Int
     , _lFileLen :: Int
+    }
+
+data DPackHeaderT = DPackHeaderT
+    { _dphIdent  :: Int -- IDPAKHEADER
+    , _dphDirOfs :: Int
+    , _dphDirLen :: Int
+    }
+
+data DAreaT = DAreaT
+    { _daNumAreaPortals  :: Int
+    , _daFirstAreaPortal :: Int
+    }
+
+data DBrushSideT = DBrushSideT
+    { _dbsPlaneNum :: Word16
+    , _dbsTexInfo  :: Int16
+    }
+
+data DBrushT = DBrushT
+    { _dbFirstSide :: Int
+    , _dbNumSides  :: Int
+    , _dbContents  :: Int
+    }
+
+data DFaceT = DFaceT
+    { _dfPlaneNum  :: Word16
+    , _dfSide      :: Int16
+    , _dfFirstEdge :: Int
+    , _dfNumEdges  :: Int16
+    , _dfTexInfo   :: Int16
+    , _dfStyles    :: B.ByteString
+    , _dfLightOfs  :: Int
+    }
+
+data DHeaderT = DHeaderT
+    { _dhIdent   :: Int
+    , _dhVersion :: Int
+    , _dhLumps   :: V.Vector LumpT
+    }
+
+data DLeafT = DLeafT
+    { _dlContents       :: Int
+    , _dlCluster        :: Int16
+    , _dlArea           :: Int16
+    , _dlMins           :: V3 Int16
+    , _dlMaxs           :: V3 Int16
+    , _dlFirstLeafFace  :: Word16
+    , _dlNumLeafFaces   :: Word16
+    , _dlFirstLeafBrush :: Word16
+    , _dlNumLeafBrushes :: Word16
+    }
+
+data DModelT = DModelT
+    { _dmMins      :: V3 Float
+    , _dmMaxs      :: V3 Float
+    , _dmOrigin    :: V3 Float
+    , _dmHeadNode  :: Int
+    , _dmFirstFace :: Int
+    , _dmNumFaces  :: Int
+    }
+
+data DNodeT = DNodeT
+    { _dnPlaneNum  :: Int
+    , _dnChildren  :: (Int, Int)
+    , _dnMins      :: V3 Int16
+    , _dnMaxs      :: V3 Int16
+    , _dnFirstFace :: Word16
+    , _dnNumFaces  :: Word16
+    }
+
+data DPlaneT = DPlaneT
+    { _dpNormal :: V3 Float
+    , _dpDist   :: Float
+    , _dpType   :: Int
     }

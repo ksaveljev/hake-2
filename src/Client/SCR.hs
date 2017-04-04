@@ -21,6 +21,14 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
+import Client.ConsoleT
+import Client.VRectT
+import Client.RefDefT
+import Client.ClientStateT
+import Client.ClientStaticT
+import Render.Renderer
+import Client.DirtyT
+import Client.CinematicsT
 import QCommon.NetChanT
 import Game.MFrameT
 import Game.MMoveT

@@ -18,6 +18,10 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Game.EntityStateT
+import QCommon.SizeBufT
 import Types
 import Game.UserCmdT
 import QuakeState

@@ -2,7 +2,6 @@
 module QCommon.CLeafT where
 
 import           Control.Lens (makeLenses)
-import           Data.Word    (Word16)
 
 import           Types
 

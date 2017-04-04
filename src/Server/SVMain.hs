@@ -58,8 +58,8 @@ heartbeatSeconds :: Int
 heartbeatSeconds = 300
 
 -- only called at quake2.exe startup, not for each game
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     SVConsoleCommands.initOperatorCommands
 
     void $ CVar.get "rcon_password" "" 0

@@ -11,7 +11,13 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.RefExportT
+import Client.VidModeT
+import Client.MenuItem
 import Client.MenuCommonS
+import Render.Renderer
 import Sys.KBD
 import Types
 import QuakeState

@@ -14,6 +14,12 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed as UV
 
+import Client.RefExportT
+import Render.Renderer
+import Client.VRectT
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.DLightT
 import Game.PlayerStateT
 import Client.ClientInfoT
 import Client.FrameT

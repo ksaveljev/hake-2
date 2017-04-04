@@ -12,6 +12,7 @@ import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import QCommon.SizeBufT
 import Types
 import QuakeState
 import CVarVariables
@@ -24,8 +25,8 @@ import qualified Sys.NET as NET
 import qualified QCommon.SZ as SZ
 import qualified Sys.Timer as Timer
 
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     msec <- Timer.milliseconds
     
     let port = msec .&. 0xFFFF

@@ -12,12 +12,6 @@ import Util.Binary
 dBrushTSize :: Int
 dBrushTSize = 4 + 4 + 4
 
-data DBrushT =
-  DBrushT { _dbFirstSide :: Int
-          , _dbNumSides  :: Int
-          , _dbContents  :: Int
-          }
-
 makeLenses ''DBrushT
 
 newDBrushT :: BL.ByteString -> DBrushT

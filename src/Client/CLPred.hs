@@ -6,6 +6,12 @@ import Control.Monad (liftM, unless, when)
 import Data.Bits ((.&.), shiftR, (.|.))
 import Linear (V3(..), _x, _y, _z)
 
+import Game.PMoveT
+import Game.EntityStateT
+import Game.TraceT
+import Game.CModelT
+import Client.ClientStateT
+import Client.ClientStaticT
 import QCommon.NetChanT
 import Game.PlayerStateT
 import Client.FrameT

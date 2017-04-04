@@ -16,6 +16,13 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EntityStateT
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.CEntityT
+import Client.CDLightT
+import Client.CLightStyleT
+import Client.CParticleT
 import Types
 import QuakeState
 import CVarVariables

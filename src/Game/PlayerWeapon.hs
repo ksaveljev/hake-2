@@ -11,6 +11,8 @@ import Linear (V3(..), _x, _y)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import Game.PMoveT
+import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT
 import Game.PlayerStateT

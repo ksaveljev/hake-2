@@ -6,8 +6,13 @@ import Control.Monad (void, when, liftM)
 import Data.Bits ((.&.), shiftL)
 import Linear (_x, _y, _z)
 
+import Client.ClientStateT
+import Client.ClientStaticT
+import Client.KButtonT
 import Client.FrameT
+import Client.RefExportT
 import Game.PlayerStateT
+import Render.Renderer
 import Sys.KBD
 import Types
 import Game.UserCmdT

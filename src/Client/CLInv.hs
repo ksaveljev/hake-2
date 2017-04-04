@@ -2,6 +2,8 @@ module Client.CLInv where
 
 import Control.Lens ((.=), ix)
 
+import Client.ClientStateT
+import Client.ClientStaticT
 import Types
 import QuakeState
 import qualified Constants

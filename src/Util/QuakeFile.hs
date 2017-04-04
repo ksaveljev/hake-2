@@ -31,6 +31,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.EntityStateT
 import Game.MFrameT
 import Game.MMoveT
 import Game.MonsterInfoT

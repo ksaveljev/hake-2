@@ -16,12 +16,6 @@ import           Util.Binary
 idBSPHeader :: B.ByteString
 idBSPHeader = "IBSP"
 
-data DHeaderT =
-  DHeaderT { _dhIdent   :: Int
-           , _dhVersion :: Int
-           , _dhLumps   :: V.Vector LumpT
-           }
-
 makeLenses ''DHeaderT
 
 newDHeaderT :: BL.ByteString -> DHeaderT

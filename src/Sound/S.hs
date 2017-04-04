@@ -6,6 +6,7 @@ import System.IO (Handle)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import Sound.SfxT
 import Types
 import QuakeState
 

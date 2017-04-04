@@ -24,8 +24,8 @@ import qualified Util.Lib as Lib
 
 -- checks the number of command line arguments and
 -- copies all arguments with valid length into comArgv
-initArgv :: [String] -> Quake ()
-initArgv args = do
+initializeArgv :: [String] -> Quake ()
+initializeArgv args = do
     let len = length args
 
     when (len > Constants.maxNumArgvs) $ comError Constants.errFatal "argc > MAX_NUM_ARGVS"

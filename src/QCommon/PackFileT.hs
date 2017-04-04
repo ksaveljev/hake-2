@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 module QCommon.PackFileT where
 
-import Control.Lens (makeLenses)
+import           Control.Lens    (makeLenses)
 import qualified Data.ByteString as B
 
-import Types
+import           Types
 
 packFileSize :: Int
 packFileSize = 64

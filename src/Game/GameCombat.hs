@@ -12,6 +12,8 @@ import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import Game.TraceT
+import Game.EntityStateT
 import Game.EdictT
 import Game.GItemArmorT
 import Game.GClientT

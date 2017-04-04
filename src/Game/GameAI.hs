@@ -20,6 +20,8 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
+import Game.TraceT
+import Game.EntityStateT
 import Game.GClientT
 import Game.EdictT
 import Game.ClientPersistantT

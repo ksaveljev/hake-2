@@ -23,6 +23,8 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Lazy as HM
 
+import QCommon.FileLinkT
+import QCommon.SearchPathT
 import Types
 import QCommon.PackFileT
 import QCommon.PackT
@@ -39,8 +41,8 @@ import {-# SOURCE #-} qualified QCommon.Com as Com
 import qualified QCommon.CVar as CVar
 import qualified QCommon.FSConstants as FSConstants
 
-initFileSystem :: Quake ()
-initFileSystem = do
+initializeFileSystem :: Quake ()
+initializeFileSystem = do
     Cmd.addCommand "path" (Just pathF)
     Cmd.addCommand "link" (Just linkF)
     Cmd.addCommand "dir" (Just dirF)

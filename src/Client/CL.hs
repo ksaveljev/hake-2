@@ -84,8 +84,8 @@ cheatVars =
                  ]
 
 -- Initialize client subsystem.
-init :: Quake ()
-init = do
+initialize :: Quake ()
+initialize = do
     dedicatedValue <- liftM (^.cvValue) dedicatedCVar
 
     unless (dedicatedValue /= 0) $ do

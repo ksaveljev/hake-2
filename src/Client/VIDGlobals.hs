@@ -1,29 +1,22 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.VIDGlobals ( module Client.VIDGlobals
-                         , module Client.VidModeT
-                         , module Client.MenuFrameworkS
-                         , module Client.MenuItem
-                         ) where
+module Client.VIDGlobals where
 
-import Control.Lens (makeLenses)
-import qualified Data.Vector as V
+import           Control.Lens    (makeLenses)
+import qualified Data.Vector     as V
 
-import Types
-import Client.MenuFrameworkS
-import Client.MenuItem
-import Client.VidModeT
-import qualified Client.VidModes as VidModes
+import           Client.VidModes (vidModes)
+import           Types
 
 makeLenses ''VIDGlobals
 
 initialVIDGlobals :: VIDGlobals
-initialVIDGlobals =
-  VIDGlobals { _vgVidModes           = VidModes.vidModes
-             , _vgRefLibActive       = False
-             , _vgFSModes            = Nothing
-             , _vgFSResolutions      = V.empty
-             , _vgModeX              = 0
-             , _vgRefs               = V.empty
-             , _vgDrivers            = V.empty
-             , _vgCurrentMenu        = Nothing
-             }
+initialVIDGlobals = VIDGlobals
+    { _vgVidModes           = vidModes
+    , _vgRefLibActive       = False
+    , _vgFSModes            = Nothing
+    , _vgFSResolutions      = V.empty
+    , _vgModeX              = 0
+    , _vgRefs               = V.empty
+    , _vgDrivers            = V.empty
+    , _vgCurrentMenu        = Nothing
+    }

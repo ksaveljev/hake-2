@@ -14,11 +14,6 @@ import Util.Binary
 dBrushSideTSize :: Int
 dBrushSideTSize = 4
 
-data DBrushSideT =
-  DBrushSideT { _dbsPlaneNum :: Word16
-              , _dbsTexInfo  :: Int16
-              }
-
 makeLenses ''DBrushSideT
 
 newDBrushSideT :: BL.ByteString -> DBrushSideT

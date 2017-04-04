@@ -13,15 +13,6 @@ import Util.Binary
 dModelTSize :: Int
 dModelTSize = 3 * 4 + 3 * 4 + 3 * 4 + 4 + 4 + 4
 
-data DModelT =
-  DModelT { _dmMins      :: V3 Float
-          , _dmMaxs      :: V3 Float
-          , _dmOrigin    :: V3 Float
-          , _dmHeadNode  :: Int
-          , _dmFirstFace :: Int
-          , _dmNumFaces  :: Int
-          }
-
 makeLenses ''DModelT
 
 newDModelT :: BL.ByteString -> DModelT

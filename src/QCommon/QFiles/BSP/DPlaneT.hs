@@ -13,12 +13,6 @@ import Util.Binary
 dPlaneTSize :: Int
 dPlaneTSize = 3 * 4 + 4 + 4
 
-data DPlaneT =
-  DPlaneT { _dpNormal :: V3 Float
-          , _dpDist   :: Float
-          , _dpType   :: Int
-          }
-
 makeLenses ''DPlaneT
 
 newDPlaneT :: BL.ByteString -> DPlaneT
