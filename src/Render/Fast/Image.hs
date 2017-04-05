@@ -1015,7 +1015,7 @@ glSelectTexture texture = do
     doSelectTexture texture texture0 glState
 
 doSelectTexture :: Int -> Int -> GLStateT -> Quake ()
-doSelectTexture texture0 texture glState
+doSelectTexture texture texture0 glState
     | tmu /= (glState^.glsCurrentTmu) = do
         fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
         io $ do
