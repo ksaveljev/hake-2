@@ -11,6 +11,7 @@ import Linear (_x, _y, _z)
 import qualified Data.ByteString as B
 import qualified Data.Vector as V
 
+import Game.CVarT
 import Client.ClientStateT
 import Client.ClientStaticT
 import Game.EntityStateT

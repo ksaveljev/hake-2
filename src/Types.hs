@@ -75,30 +75,12 @@ data Ref a = Ref Int deriving (Eq, Show, Ord)
 -- reference to gameBaseGlobals.gbItemList
 newtype GItemReference = GItemReference Int deriving Eq
 
--- reference to menuGlobals.mgMenuFrameworks
-newtype MenuFrameworkSReference = MenuFrameworkSReference Int deriving Eq
-
--- reference to menuGlobals.mgMenuListSItems
-newtype MenuListSReference = MenuListSReference Int deriving Eq
-
--- reference to menuGlobals.mgMenuActionSItems
-newtype MenuActionSReference = MenuActionSReference Int deriving Eq
-
--- reference to menuGlobals.mgMenuSliderSItems
-newtype MenuSliderSReference = MenuSliderSReference Int deriving Eq
-
--- reference to menuGlobals.mgMenuSeparatorSItems
-newtype MenuSeparatorSReference = MenuSeparatorSReference Int deriving Eq
-
--- reference to menuGlobals.mgMenuFieldSItems
-newtype MenuFieldSReference = MenuFieldSReference Int deriving Eq
-
-data MenuItemReference = MenuListRef MenuListSReference
-                       | MenuActionRef MenuActionSReference
-                       | MenuSliderRef MenuSliderSReference
-                       | MenuSeparatorRef MenuSeparatorSReference
-                       | MenuFieldRef MenuFieldSReference
-                       deriving Eq
+data MenuItemRef = MenuListRef (Ref MenuListS)
+                 | MenuActionRef (Ref MenuActionS)
+                 | MenuSliderRef (Ref MenuSliderS)
+                 | MenuSeparatorRef (Ref MenuSeparatorS)
+                 | MenuFieldRef (Ref MenuFieldS)
+                 deriving Eq
 
 -- reference to globals.cl.cmds
 newtype UserCmdReference = UserCmdReference Int deriving Eq
@@ -1655,7 +1637,7 @@ data VIDGlobals =
              , _vgModeX              :: Int
              , _vgRefs               :: V.Vector B.ByteString
              , _vgDrivers            :: V.Vector B.ByteString
-             , _vgCurrentMenu        :: Maybe MenuFrameworkSReference
+             , _vgCurrentMenu        :: Maybe (Ref MenuFrameworkS)
              }
 
 data KBD =
@@ -1853,7 +1835,7 @@ data MenuFrameworkS =
                  , _mfCursor     :: Int
                  , _mfNItems     :: Int
                  , _mfNSlots     :: Int
-                 , _mfItems      :: V.Vector MenuItemReference
+                 , _mfItems      :: V.Vector MenuItemRef
                  , _mfStatusBar  :: Maybe B.ByteString
                  , _mfCursorDraw :: Maybe (Quake ())
                  }
@@ -1863,7 +1845,7 @@ data MenuCommonS =
               , _mcName          :: Maybe B.ByteString
               , _mcX             :: Int
               , _mcY             :: Int
-              , _mcParent        :: Maybe MenuFrameworkSReference
+              , _mcParent        :: Maybe (Ref MenuFrameworkS)
               , _mcCursorOffset  :: Int
               , _mcLocalData     :: V4 Int
               , _mcFlags         :: Int

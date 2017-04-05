@@ -19,6 +19,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.GameLocalsT
 import Game.EdictT
 import Server.ServerT
 import Server.ServerStaticT

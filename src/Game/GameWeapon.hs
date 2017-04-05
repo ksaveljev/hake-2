@@ -8,6 +8,9 @@ import Data.Bits ((.|.), (.&.), complement)
 import Data.Maybe (isJust, isNothing, fromJust)
 import Linear (V3(..), normalize, norm, _x, _y, _z)
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.CVarT
+import Game.LevelLocalsT
 import Game.TraceT
 import Game.EdictT
 import Game.EntityStateT

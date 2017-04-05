@@ -16,6 +16,8 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CVarT
+import Game.GameLocalsT
 import Game.EntityStateT
 import Game.EdictT
 import Server.ClientFrameT

@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as Vec
 
+import Game.CVarT
 import Client.ClientStateT
 import Client.ClientStaticT
 import Client.RefExportT

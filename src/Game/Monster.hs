@@ -8,6 +8,10 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3, _x, _y, _z)
 import qualified Data.ByteString as B
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.SpawnTempT
+import Game.LevelLocalsT
+import Game.CVarT
 import Game.EntityStateT
 import Game.EdictT
 import Game.MMoveT

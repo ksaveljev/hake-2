@@ -25,6 +25,7 @@ import qualified Debug.Trace as DT
 import qualified Graphics.GL as GL
 import qualified Graphics.UI.GLFW as GLFW
 
+import Game.CVarT
 import Types
 import Game.CPlaneT
 import QuakeState

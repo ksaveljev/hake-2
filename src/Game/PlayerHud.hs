@@ -9,6 +9,11 @@ import Data.Maybe (isJust)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CVarT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.GItemT
+import {-# SOURCE #-} Game.GameImportT
 import Game.PlayerStateT
 import Game.EdictT
 import Game.GClientT

@@ -11,6 +11,10 @@ import Data.Maybe (fromJust)
 import Linear (V3(..), _x, _y, _z, norm)
 import qualified Data.ByteString as B
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.SpawnTempT
+import Game.LevelLocalsT
+import Game.CVarT
 import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT

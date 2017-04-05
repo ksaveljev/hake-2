@@ -10,6 +10,11 @@ import Linear.V3 (V3)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.SpawnTempT
 import Game.EntityStateT
 import QCommon.SizeBufT
 import Game.CModelT

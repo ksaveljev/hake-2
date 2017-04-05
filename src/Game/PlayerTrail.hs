@@ -6,6 +6,7 @@ import Control.Monad (liftM, when)
 import Linear (V3)
 import qualified Data.Vector as V
 
+import Game.CVarT
 import Game.EdictT
 import Types
 import QuakeRef

@@ -8,6 +8,11 @@ import Data.Bits ((.&.), (.|.))
 import Linear (V3(..), _y, normalize, norm)
 import qualified Data.Vector as V
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.SpawnTempT
 import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT

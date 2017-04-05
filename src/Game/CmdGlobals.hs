@@ -1,26 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE OverloadedStrings #-}
-module Game.CmdGlobals ( CmdGlobals
-                       , initialCmdGlobals
-                       , cgCmdFunctions
-                       , cgCmdArgc
-                       , cgCmdArgv
-                       , cgCmdArgs
-                       ) where
+module Game.CmdGlobals where
 
-import Control.Lens (makeLenses)
+import           Control.Lens  (makeLenses)
 import qualified Data.Sequence as Seq
-import qualified Data.Vector as V
+import qualified Data.Vector   as V
 
-import Types
 import qualified Constants
+import           Types
 
 makeLenses ''CmdGlobals
 
 initialCmdGlobals :: CmdGlobals
-initialCmdGlobals =
-  CmdGlobals { _cgCmdFunctions = Seq.empty
-             , _cgCmdArgc      = 0
-             , _cgCmdArgv      = V.replicate Constants.maxStringTokens ""
-             , _cgCmdArgs      = ""
-             }
+initialCmdGlobals = CmdGlobals
+    { _cgCmdFunctions = Seq.empty
+    , _cgCmdArgc      = 0
+    , _cgCmdArgv      = V.replicate Constants.maxStringTokens ""
+    , _cgCmdArgs      = ""
+    }

@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Network.BSD as NBSD
 import qualified Network.Socket as NS
 
+import Game.CVarT
 import QCommon.SizeBufT
 import Sys.LoopbackT
 import Sys.LoopMsgT

@@ -26,6 +26,7 @@ import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Graphics.GL as GL
 
+import Game.CVarT
 import Types
 import QuakeState
 import CVarVariables

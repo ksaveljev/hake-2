@@ -6,6 +6,9 @@ import Control.Monad (unless, liftM)
 import Data.Bits ((.&.), complement)
 import Linear (_x, _z, normalize)
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.CVarT
+import Game.GameLocalsT
 import Game.PMoveT
 import Game.EntityStateT
 import Game.EdictT

@@ -18,17 +18,14 @@ Client.Console
 Client.Key
 Client.M
 Client.Menu
-Client.MenuGlobals
 Client.SCR
 Client.V
 Client.VID
 Constants
 Game.Adapters
 Game.Cmd
-Game.CmdGlobals
 Game.GameAI
 Game.GameBase
-Game.GameBaseGlobals
 Game.GameChase
 Game.GameCombat
 Game.GameFunc

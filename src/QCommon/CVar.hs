@@ -13,6 +13,7 @@ import           System.IO             (Handle, IOMode(ReadWriteMode), hSeek, hF
 
 import qualified Constants
 import {-# SOURCE #-} qualified Game.Cmd as Cmd
+import           Game.CVarT
 import qualified Game.Info as Info
 import {-# SOURCE #-} qualified QCommon.Com as Com
 import {-# SOURCE #-} qualified QCommon.FS as FS

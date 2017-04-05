@@ -11,6 +11,11 @@ import Linear (V3(..), _x, _y, _z, dot, normalize)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.CVarT
+import Game.GItemT
+import Game.GameLocalsT
 import Game.PMoveT
 import Game.EntityStateT
 import Game.EdictT

@@ -15,6 +15,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Storable.Mutable as MSV
 
+import Game.CVarT
 import Client.ClientStateT
 import Client.ClientStaticT
 import Client.ConsoleT

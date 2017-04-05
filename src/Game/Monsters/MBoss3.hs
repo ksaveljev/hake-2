@@ -5,6 +5,11 @@ import Control.Lens (preuse, use, ix, (^.), (.=), (+=), zoom, (&), (.~), (%~), (
 import Control.Monad (liftM, void)
 import Linear (V3(..))
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.SpawnTempT
 import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT

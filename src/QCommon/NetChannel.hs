@@ -12,6 +12,7 @@ import Data.Word (Word32)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import Game.CVarT
 import QCommon.SizeBufT
 import Types
 import QuakeState

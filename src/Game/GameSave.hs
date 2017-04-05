@@ -8,6 +8,11 @@ import qualified Data.ByteString as B
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.SpawnTempT
 import Game.EdictT
 import Game.GClientT
 import Game.MoveInfoT

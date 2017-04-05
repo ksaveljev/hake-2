@@ -12,6 +12,11 @@ import Linear (V3(..), norm, normalize, dot)
 import qualified Data.ByteString as B
 import qualified Data.Vector.Unboxed as UV
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.LevelLocalsT
+import Game.GItemT
 import Game.TraceT
 import Game.EntityStateT
 import Game.EdictT

@@ -6,6 +6,7 @@ import Control.Monad (void, when, liftM)
 import Data.Bits ((.&.), shiftL)
 import Linear (_x, _y, _z)
 
+import Game.CVarT
 import Client.ClientStateT
 import Client.ClientStaticT
 import Client.KButtonT

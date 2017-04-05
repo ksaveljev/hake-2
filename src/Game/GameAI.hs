@@ -20,6 +20,10 @@ import Data.Maybe (isNothing, isJust, fromJust)
 import Linear (V3(..), norm, _y)
 import qualified Data.ByteString as B
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
 import Game.TraceT
 import Game.EntityStateT
 import Game.GClientT

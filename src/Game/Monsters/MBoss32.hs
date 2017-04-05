@@ -9,6 +9,11 @@ import Data.Maybe (isJust)
 import Linear (V3(..), norm, normalize, _x, _y, _z)
 import qualified Data.Vector as V
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
+import Game.GameLocalsT
+import Game.CVarT
+import Game.SpawnTempT
 import Game.TraceT
 import Game.EntityStateT
 import Game.EdictT

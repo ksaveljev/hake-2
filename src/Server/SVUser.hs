@@ -12,6 +12,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.CVarT
 import Game.EdictT
 import Game.EntityStateT
 import QCommon.SizeBufT

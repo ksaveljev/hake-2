@@ -24,6 +24,7 @@ import qualified Graphics.GL as GL
 import Numeric (showHex)
 import Text.Printf (printf)
 
+import Game.CVarT
 import Client.LightStyleT
 import Types
 import QuakeState

@@ -8,11 +8,11 @@ import QCommon.XCommandT
 
 init :: Quake ()
 
-menuAddItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
+menuAddItem :: Ref MenuFrameworkS -> MenuItemRef -> Quake ()
 
-menuCenter :: MenuFrameworkSReference -> Quake ()
+menuCenter :: Ref MenuFrameworkS -> Quake ()
 
-menuTallySlots :: MenuFrameworkSReference -> Quake Int
+menuTallySlots :: Ref MenuFrameworkS -> Quake Int
 
 pushMenu :: XCommandT -> KeyFuncT -> Quake ()
 
@@ -68,10 +68,10 @@ popMenu :: Quake ()
 
 forceMenuOff :: Quake ()
 
-menuAdjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
+menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
 
-menuDraw :: MenuFrameworkSReference -> Quake ()
+menuDraw :: Ref MenuFrameworkS -> Quake ()
 
-menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
+menuSlideItem :: Ref MenuFrameworkS -> Int -> Quake ()
 
-menuSelectItem :: MenuFrameworkSReference -> Quake Bool
+menuSelectItem :: Ref MenuFrameworkS -> Quake Bool

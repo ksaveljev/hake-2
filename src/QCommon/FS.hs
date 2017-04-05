@@ -23,6 +23,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Lazy as HM
 
+import Game.CVarT
 import QCommon.FileLinkT
 import QCommon.SearchPathT
 import Types

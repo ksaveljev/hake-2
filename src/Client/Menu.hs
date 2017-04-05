@@ -14,6 +14,10 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.CVarT
+import Client.MenuLayerT
+import Client.MenuFrameworkS
+import QuakeRef
 import Client.RefExportT
 import Render.Renderer
 import Client.ClientStateT
@@ -122,68 +126,68 @@ init = do
 
     menuGlobals.mgLayers .= V.replicate maxMenuDepth newMenuLayerT
 
-menuAddItem :: MenuFrameworkSReference -> MenuItemReference -> Quake ()
+menuAddItem :: Ref MenuFrameworkS -> MenuItemRef -> Quake ()
 menuAddItem menuFrameworkRef menuItemRef = do
-    menu <- readMenuFrameworkSReference menuFrameworkRef
+    menu <- readRef menuFrameworkRef
     let nItems = menu^.mfNItems
 
     when (nItems == 0) $
-      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNSlots .~ 0)
+      modifyRef menuFrameworkRef (\v -> v & mfNSlots .~ 0)
 
     when (nItems < Constants.maxMenuItems) $ do
-      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfItems %~ (`V.snoc` menuItemRef))
+      modifyRef menuFrameworkRef (\v -> v & mfItems %~ (`V.snoc` menuItemRef))
 
       case menuItemRef of
         MenuListRef ref ->
-          modifyMenuListSReference ref (\v -> v & mlGeneric.mcParent .~ Just menuFrameworkRef)
+          modifyRef ref (\v -> v & mlGeneric.mcParent .~ Just menuFrameworkRef)
 
         MenuActionRef ref ->
-          modifyMenuActionSReference ref (\v -> v & maGeneric.mcParent .~ Just menuFrameworkRef)
+          modifyRef ref (\v -> v & maGeneric.mcParent .~ Just menuFrameworkRef)
 
         MenuSliderRef ref ->
-          modifyMenuSliderSReference ref (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
+          modifyRef ref (\v -> v & msGeneric.mcParent .~ Just menuFrameworkRef)
 
         MenuSeparatorRef ref ->
-          modifyMenuSeparatorSReference ref (\v -> v & mspGeneric.mcParent .~ Just menuFrameworkRef)
+          modifyRef ref (\v -> v & mspGeneric.mcParent .~ Just menuFrameworkRef)
 
         MenuFieldRef ref ->
-          modifyMenuFieldSReference ref (\v -> v & mflGeneric.mcParent .~ Just menuFrameworkRef)
+          modifyRef ref (\v -> v & mflGeneric.mcParent .~ Just menuFrameworkRef)
 
-      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNItems +~ 1)
+      modifyRef menuFrameworkRef (\v -> v & mfNItems +~ 1)
 
     menuTallySlots menuFrameworkRef >>= \n ->
-      modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfNSlots .~ n)
+      modifyRef menuFrameworkRef (\v -> v & mfNSlots .~ n)
 
-menuCenter :: MenuFrameworkSReference -> Quake ()
+menuCenter :: Ref MenuFrameworkS -> Quake ()
 menuCenter menuFrameworkRef = do
-    menu <- readMenuFrameworkSReference menuFrameworkRef
+    menu <- readRef menuFrameworkRef
     let menuItemRef = V.last (menu^.mfItems)
     height <- case menuItemRef of
                 MenuListRef ref -> do
-                  menuItem <- readMenuListSReference ref
+                  menuItem <- readRef ref
                   return (menuItem^.mlGeneric.mcY)
 
                 MenuSliderRef ref -> do
-                  menuItem <- readMenuSliderSReference ref
+                  menuItem <- readRef ref
                   return (menuItem^.msGeneric.mcY)
 
                 MenuActionRef ref -> do
-                  menuItem <- readMenuActionSReference ref
+                  menuItem <- readRef ref
                   return (menuItem^.maGeneric.mcY)
     h <- use $ globals.gVidDef.vdHeight
 
-    modifyMenuFrameworkSReference menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
+    modifyRef menuFrameworkRef (\v -> v & mfY .~ (h - (height + 10)) `div` 2)
 
-menuTallySlots :: MenuFrameworkSReference -> Quake Int
+menuTallySlots :: Ref MenuFrameworkS -> Quake Int
 menuTallySlots menuFrameworkRef = do
-    menu <- readMenuFrameworkSReference menuFrameworkRef
+    menu <- readRef menuFrameworkRef
 
     itemsNum <- V.mapM numberOfItems (menu^.mfItems)
     return $ V.foldl' (+) 0 itemsNum
 
-  where numberOfItems :: MenuItemReference -> Quake Int
+  where numberOfItems :: MenuItemRef -> Quake Int
         numberOfItems (MenuListRef ref) = do
-          menuItem <- readMenuListSReference ref
+          menuItem <- readRef ref
           return (V.length (menuItem^.mlItemNames))
         numberOfItems _ =
           return 1 -- MenuSliderRef and MenuActionRef
@@ -326,11 +330,11 @@ gameMenuInit :: Quake ()
 gameMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference gameMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+    modifyRef gameMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                        & mfNItems .~ 0
                                                        )
 
-    modifyMenuActionSReference easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef easyGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                           & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 0
@@ -338,7 +342,7 @@ gameMenuInit = do
                                                           & maGeneric.mcCallback .~ Just easyGameFunc
                                                           )
 
-    modifyMenuActionSReference mediumGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef mediumGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 10
@@ -346,7 +350,7 @@ gameMenuInit = do
                                                             & maGeneric.mcCallback .~ Just mediumGameFunc
                                                             )
 
-    modifyMenuActionSReference hardGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef hardGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                           & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 20
@@ -354,9 +358,9 @@ gameMenuInit = do
                                                           & maGeneric.mcCallback .~ Just hardGameFunc
                                                           )
 
-    modifyMenuSeparatorSReference blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
+    modifyRef blankLineRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator)
 
-    modifyMenuActionSReference loadGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef loadGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                           & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 40
@@ -364,7 +368,7 @@ gameMenuInit = do
                                                           & maGeneric.mcCallback .~ Just (menuLoadGameF^.xcCmd)
                                                           )
 
-    modifyMenuActionSReference saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef saveGameActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                           & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 50
@@ -372,7 +376,7 @@ gameMenuInit = do
                                                           & maGeneric.mcCallback .~ Just (menuSaveGameF^.xcCmd)
                                                           )
 
-    modifyMenuActionSReference creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef creditsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                          & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                          & maGeneric.mcX .~ 0
                                                          & maGeneric.mcY .~ 60
@@ -417,7 +421,7 @@ loadGameMenuInit :: Quake ()
 loadGameMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference loadGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
+    modifyRef loadGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                            & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                            & mfNItems .~ 0
                                                            )
@@ -434,7 +438,7 @@ loadGameMenuInit = do
               
               saveStrings <- use $ menuGlobals.mgSaveStrings
               
-              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ Just (saveStrings V.! idx)
+              modifyRef actionRef (\v -> v & maGeneric.mcName .~ Just (saveStrings V.! idx)
                                                             & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                             & maGeneric.mcLocalData._x .~ idx
                                                             & maGeneric.mcCallback .~ Just (loadGameCallback actionRef)
@@ -497,8 +501,8 @@ loadGameMenuKeyF :: KeyFuncT
 loadGameMenuKeyF =
   KeyFuncT "Menu.loadGameMenuKeyF" (\key -> do
     when (key == KeyConstants.kEscape || key == KeyConstants.kEnter) $ do
-      loadGameMenu <- readMenuFrameworkSReference loadGameMenuRef
-      modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfCursor .~ if (loadGameMenu^.mfCursor) - 1 < 0 then 0 else (loadGameMenu^.mfCursor) - 1)
+      loadGameMenu <- readRef loadGameMenuRef
+      modifyRef saveGameMenuRef (\v -> v & mfCursor .~ if (loadGameMenu^.mfCursor) - 1 < 0 then 0 else (loadGameMenu^.mfCursor) - 1)
 
     defaultMenuKey loadGameMenuRef key
   )
@@ -581,11 +585,11 @@ joinServerMenuInit :: Quake ()
 joinServerMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference joinServerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
+    modifyRef joinServerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                              & mfNItems .~ 0
                                                              )
 
-    modifyMenuActionSReference joinServerAddressBookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef joinServerAddressBookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                        & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                        & maGeneric.mcX .~ 0
                                                                        & maGeneric.mcY .~ 0
@@ -593,7 +597,7 @@ joinServerMenuInit = do
                                                                        & maGeneric.mcCallback .~ Just (menuAddressBookF^.xcCmd)
                                                                        )
 
-    modifyMenuActionSReference joinServerSearchActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef joinServerSearchActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                   & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                   & maGeneric.mcX .~ 0
                                                                   & maGeneric.mcY .~ 10
@@ -602,7 +606,7 @@ joinServerMenuInit = do
                                                                   & maGeneric.mcStatusBar .~ Just "search for servers"
                                                                   )
 
-    modifyMenuSeparatorSReference joinServerServerTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
+    modifyRef joinServerServerTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
                                                                     & mspGeneric.mcName .~ Just "connect to..."
                                                                     & mspGeneric.mcX .~ 80
                                                                     & mspGeneric.mcY .~ 30
@@ -625,7 +629,7 @@ joinServerMenuInit = do
           | idx >= maxIdx = return ()
           | otherwise = do
               let actionRef = joinServerActions V.! idx
-              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+              modifyRef actionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 40 + idx * 10
@@ -807,7 +811,7 @@ addToServerList adr info = do
       -- ignore if duplicated
       unless (info' `V.elem` localServerNames) $ do
         let actionRef = joinServerActions V.! numServers
-        modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ Just info')
+        modifyRef actionRef (\v -> v & maGeneric.mcName .~ Just info')
         
         zoom menuGlobals $ do
           mgLocalServerNetAdr.ix numServers .= adr
@@ -895,7 +899,7 @@ banner name = do
 - to adjust the menu's cursor so that it's at the next available 
 - slot.
 -}
-menuAdjustCursor :: MenuFrameworkSReference -> Int -> Quake ()
+menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
 menuAdjustCursor menuRef dir = do
     menuItemRef <- menuItemAtCursor menuRef
     
@@ -918,24 +922,24 @@ menuAdjustCursor menuRef dir = do
             
         updateCursor :: Quake ()
         updateCursor = do
-          menu <- readMenuFrameworkSReference menuRef
+          menu <- readRef menuRef
           let cursor = (menu^.mfCursor) + dir
               newCursor = if dir == 1
                             then if cursor >= (menu^.mfNItems) then 0 else cursor
                             else if cursor < 0 then (menu^.mfNItems) - 1 else cursor
-          modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor .~ newCursor)
+          modifyRef menuRef (\v -> v & mfCursor .~ newCursor)
     
-menuItemAtCursor :: MenuFrameworkSReference -> Quake (Maybe MenuItemReference)
+menuItemAtCursor :: Ref MenuFrameworkS -> Quake (Maybe MenuItemRef)
 menuItemAtCursor menuRef = do
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
     
     return $ if (menu^.mfCursor) < 0 || (menu^.mfCursor) >= (menu^.mfNItems)
                then Nothing
                else Just ((menu^.mfItems) V.! (menu^.mfCursor))
 
-menuDraw :: MenuFrameworkSReference -> Quake ()
+menuDraw :: Ref MenuFrameworkS -> Quake ()
 menuDraw menuRef = do
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
 
     drawContents menu 0 (menu^.mfNItems)
     
@@ -991,53 +995,53 @@ menuDraw menuRef = do
 
               if | (menuCommon^.mcType) == Constants.mtypeField -> do
                      let MenuFieldRef menuItemRef = itemRef
-                     menuItem <- readMenuFieldSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      fieldDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSlider -> do
                      let MenuSliderRef menuItemRef = itemRef
-                     menuItem <- readMenuSliderSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      sliderDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeList -> do
                      let MenuListRef menuItemRef = itemRef
-                     menuItem <- readMenuListSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      menuListDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSpinControl -> do
                      let MenuListRef menuItemRef = itemRef
-                     menuItem <- readMenuListSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      spinControlDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeAction -> do
                      let MenuActionRef menuItemRef = itemRef
-                     menuItem <- readMenuActionSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      actionDraw menuItemRef
 
                  | (menuCommon^.mcType) == Constants.mtypeSeparator -> do
                      let MenuSeparatorRef menuItemRef = itemRef
-                     menuItem <- readMenuSeparatorSReference menuItemRef
+                     menuItem <- readRef menuItemRef
                      separatorDraw menuItemRef
 
               drawContents menu (idx + 1) maxIdx
 
-menuItemCommon :: MenuItemReference -> Quake MenuCommonS
+menuItemCommon :: MenuItemRef -> Quake MenuCommonS
 menuItemCommon menuItemRef = do
     case menuItemRef of
       MenuListRef itemRef -> do
-        menuItem <- readMenuListSReference itemRef
+        menuItem <- readRef itemRef
         return (menuItem^.mlGeneric)
       MenuActionRef itemRef -> do
-        menuItem <- readMenuActionSReference itemRef
+        menuItem <- readRef itemRef
         return (menuItem^.maGeneric)
       MenuSliderRef itemRef -> do
-        menuItem <- readMenuSliderSReference itemRef
+        menuItem <- readRef itemRef
         return (menuItem^.msGeneric)
       MenuSeparatorRef itemRef -> do
-        menuItem <- readMenuSeparatorSReference itemRef
+        menuItem <- readRef itemRef
         return (menuItem^.mspGeneric)
 
-defaultMenuKey :: MenuFrameworkSReference -> Int -> Quake (Maybe B.ByteString)
+defaultMenuKey :: Ref MenuFrameworkS -> Int -> Quake (Maybe B.ByteString)
 defaultMenuKey menuRef key = do
     done <- checkFieldKey
     
@@ -1051,17 +1055,17 @@ defaultMenuKey menuRef key = do
                return (Just menuOutSound)
 
            | key `elem` [KeyConstants.kKpUpArrow, KeyConstants.kUpArrow] -> do
-               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor -~ 1)
+               modifyRef menuRef (\v -> v & mfCursor -~ 1)
                menuAdjustCursor menuRef (-1)
                return (Just menuMoveSound)
 
            | key == KeyConstants.kTab -> do
-               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+               modifyRef menuRef (\v -> v & mfCursor +~ 1)
                menuAdjustCursor menuRef 1
                return (Just menuMoveSound)
 
            | key `elem` [KeyConstants.kKpDownArrow, KeyConstants.kDownArrow] -> do
-               modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+               modifyRef menuRef (\v -> v & mfCursor +~ 1)
                menuAdjustCursor menuRef 1
                return (Just menuMoveSound)
 
@@ -1103,7 +1107,7 @@ defaultMenuKey menuRef key = do
                 else
                   return False
 
-fieldKey :: MenuFieldSReference -> Int -> Quake Bool
+fieldKey :: Ref MenuFieldS -> Int -> Quake Bool
 fieldKey fieldRef key = do
     let k = if | key == KeyConstants.kKpSlash -> '/'
                | key == KeyConstants.kKpMinus -> '-'
@@ -1133,7 +1137,7 @@ searchLocalGames :: Quake ()
 searchLocalGames = do
     io (putStrLn "Menu.searchLocalGames") >> undefined -- TODO
 
-joinServerFunc :: MenuActionSReference -> Quake ()
+joinServerFunc :: Ref MenuActionS -> Quake ()
 joinServerFunc _ = do
     io (putStrLn "Menu.joinServerFunc") >> undefined -- TODO
 
@@ -1155,7 +1159,7 @@ addressBookMenuInit :: Quake ()
 addressBookMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference addressBookMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 142
+    modifyRef addressBookMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 142
                                                               & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                               & mfNItems .~ 0
                                                               )
@@ -1169,7 +1173,7 @@ addressBookMenuInit = do
               Just adr <- CVar.get ("adr" `B.append` (BC.pack (show idx))) "" Constants.cvarArchive
               let fieldRef = addressBookFields V.! idx
               
-              modifyMenuFieldSReference fieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
+              modifyRef fieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
                                                           & mflGeneric.mcName .~ Nothing
                                                           & mflGeneric.mcCallback .~ Nothing
                                                           & mflGeneric.mcX .~ 0
@@ -1206,7 +1210,7 @@ addressBookMenuKeyF =
           | idx >= maxIdx = return ()
           | otherwise = do
               let fieldRef = addressBookFields V.! idx
-              field <- readMenuFieldSReference fieldRef
+              field <- readRef fieldRef
               CVar.set ("adr" `B.append` BC.pack (show idx)) (field^.mflBuffer)
               setAddressBookCVars (idx + 1) maxIdx
 
@@ -1252,11 +1256,11 @@ startServerMenuInit = do
         -- initialize the menu stuff
         vidDef' <- use $ globals.gVidDef
 
-        modifyMenuFrameworkSReference startServerMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+        modifyRef startServerMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                                   & mfNItems .~ 0
                                                                   )
                                                                   
-        modifyMenuListSReference startMapListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+        modifyRef startMapListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                           & mlGeneric.mcX .~ 0
                                                           & mlGeneric.mcY .~ 0
                                                           & mlGeneric.mcName .~ Just "initial map"
@@ -1266,7 +1270,7 @@ startServerMenuInit = do
         dev <- FS.developerSearchPath 2
         coopValue <- liftM (^.cvValue) coopCVar
         
-        modifyMenuListSReference rulesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+        modifyRef rulesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                       & mlGeneric.mcX .~ 0
                                                       & mlGeneric.mcY .~ 20
                                                       & mlGeneric.mcName .~ Just "rules"
@@ -1277,7 +1281,7 @@ startServerMenuInit = do
                                                       
         timeLimitStr <- CVar.variableString "timelimit"
                                                       
-        modifyMenuFieldSReference timeLimitFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
+        modifyRef timeLimitFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
                                                              & mflGeneric.mcName .~ Just "time limit"
                                                              & mflGeneric.mcFlags .~ Constants.qmfNumbersOnly
                                                              & mflGeneric.mcX .~ 0
@@ -1290,7 +1294,7 @@ startServerMenuInit = do
         
         fragLimitStr <- CVar.variableString "fraglimit"
                                                              
-        modifyMenuFieldSReference fragLimitFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
+        modifyRef fragLimitFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
                                                              & mflGeneric.mcName .~ Just "frag limit"
                                                              & mflGeneric.mcFlags .~ Constants.qmfNumbersOnly
                                                              & mflGeneric.mcX .~ 0
@@ -1308,7 +1312,7 @@ startServerMenuInit = do
         maxClientsValue <- CVar.variableValue "maxclients"
         maxClientsStr <- CVar.variableString "maxclients"
         
-        modifyMenuFieldSReference maxClientsFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
+        modifyRef maxClientsFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
                                                               & mflGeneric.mcName .~ Just "max players"
                                                               & mflGeneric.mcFlags .~ Constants.qmfNumbersOnly
                                                               & mflGeneric.mcX .~ 0
@@ -1321,7 +1325,7 @@ startServerMenuInit = do
                                                               
         hostnameStr <- CVar.variableString "hostname"
                                                               
-        modifyMenuFieldSReference hostnameFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
+        modifyRef hostnameFieldRef (\v -> v & mflGeneric.mcType .~ Constants.mtypeField
                                                             & mflGeneric.mcName .~ Just "hostname"
                                                             & mflGeneric.mcFlags .~ 0
                                                             & mflGeneric.mcX .~ 0
@@ -1333,7 +1337,7 @@ startServerMenuInit = do
                                                             & mflCursor .~ B.length hostnameStr
                                                             )
                                                             
-        modifyMenuActionSReference startServerDMOptionsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+        modifyRef startServerDMOptionsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                           & maGeneric.mcName .~ Just " deathmatch flags"
                                                                           & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                           & maGeneric.mcX .~ 24
@@ -1342,7 +1346,7 @@ startServerMenuInit = do
                                                                           & maGeneric.mcCallback .~ Just dmOptionsFunc
                                                                           )
                                                                           
-        modifyMenuActionSReference startServerStartActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+        modifyRef startServerStartActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                       & maGeneric.mcName .~ Just " begin"
                                                                       & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                       & maGeneric.mcX .~ 24
@@ -1397,7 +1401,7 @@ saveGameMenuInit :: Quake ()
 saveGameMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference saveGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
+    modifyRef saveGameMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 120
                                                            & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                            & mfNItems .~ 0
                                                           )
@@ -1413,7 +1417,7 @@ saveGameMenuInit = do
           | idx >= maxIdx = return ()
           | otherwise = do
               let actionRef = saveGameActions V.! idx
-              modifyMenuActionSReference actionRef (\v -> v & maGeneric.mcName .~ Just (saveStrings V.! (idx + 1))
+              modifyRef actionRef (\v -> v & maGeneric.mcName .~ Just (saveStrings V.! (idx + 1))
                                                             & maGeneric.mcLocalData .~ V4 (idx + 1) 0 0 0
                                                             & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                             & maGeneric.mcCallback .~ Just (saveGameCallback actionRef)
@@ -1437,8 +1441,8 @@ saveGameMenuKey :: KeyFuncT
 saveGameMenuKey =
   KeyFuncT "Menu.saveGameMenuKey" (\key -> do
     when (key == KeyConstants.kEnter || key == KeyConstants.kEscape) $ do
-      saveGameMenu <- readMenuFrameworkSReference saveGameMenuRef
-      modifyMenuFrameworkSReference loadGameMenuRef (\v -> v & mfCursor .~ if (saveGameMenu^.mfCursor) - 1 < 0 then 0 else (saveGameMenu^.mfCursor) - 1)
+      saveGameMenu <- readRef saveGameMenuRef
+      modifyRef loadGameMenuRef (\v -> v & mfCursor .~ if (saveGameMenu^.mfCursor) - 1 < 0 then 0 else (saveGameMenu^.mfCursor) - 1)
       
     defaultMenuKey saveGameMenuRef key
   )
@@ -1447,8 +1451,8 @@ playerConfigMenuInit :: Quake Bool
 playerConfigMenuInit = do
     io (putStrLn "Menu.playerConfigMenuInit") >> undefined -- TODO
   
-menuSetStatusBar :: MenuFrameworkSReference -> Maybe B.ByteString -> Quake ()
-menuSetStatusBar menuRef str = modifyMenuFrameworkSReference menuRef (\v -> v & mfStatusBar .~ str)
+menuSetStatusBar :: Ref MenuFrameworkS -> Maybe B.ByteString -> Quake ()
+menuSetStatusBar menuRef str = modifyRef menuRef (\v -> v & mfStatusBar .~ str)
   
 playerConfigMenuDraw :: XCommandT
 playerConfigMenuDraw =
@@ -1466,11 +1470,11 @@ downloadOptionsMenuInit :: Quake ()
 downloadOptionsMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2)
+    modifyRef downloadOptionsMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2)
                                                                   & mfNItems .~ 0
                                                                   )
 
-    modifyMenuSeparatorSReference downloadTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
+    modifyRef downloadTitleRef (\v -> v & mspGeneric.mcType .~ Constants.mtypeSeparator
                                                             & mspGeneric.mcName .~ Just "Download Options"
                                                             & mspGeneric.mcX .~ 48
                                                             & mspGeneric.mcY .~ 0
@@ -1478,7 +1482,7 @@ downloadOptionsMenuInit = do
 
     allowDownload <- CVar.variableValue "allow_download"
 
-    modifyMenuListSReference allowDownloadBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowDownloadBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                           & mlGeneric.mcX .~ 0
                                                           & mlGeneric.mcY .~ 20
                                                           & mlGeneric.mcName .~ Just "allow downloading"
@@ -1489,7 +1493,7 @@ downloadOptionsMenuInit = do
 
     allowDownloadMaps <- CVar.variableValue "allow_download_maps"
 
-    modifyMenuListSReference allowDownloadMapsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowDownloadMapsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                               & mlGeneric.mcX .~ 0
                                                               & mlGeneric.mcY .~ 40
                                                               & mlGeneric.mcName .~ Just "maps"
@@ -1500,7 +1504,7 @@ downloadOptionsMenuInit = do
 
     allowDownloadPlayers <- CVar.variableValue "allow_download_players"
 
-    modifyMenuListSReference allowDownloadPlayersBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowDownloadPlayersBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                                  & mlGeneric.mcX .~ 0
                                                                  & mlGeneric.mcY .~ 50
                                                                  & mlGeneric.mcName .~ Just "player models/skins"
@@ -1511,7 +1515,7 @@ downloadOptionsMenuInit = do
 
     allowDownloadModels <- CVar.variableValue "allow_download_models"
 
-    modifyMenuListSReference allowDownloadModelsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowDownloadModelsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                                 & mlGeneric.mcX .~ 0
                                                                 & mlGeneric.mcY .~ 60
                                                                 & mlGeneric.mcName .~ Just "models"
@@ -1522,7 +1526,7 @@ downloadOptionsMenuInit = do
 
     allowDownloadSounds <- CVar.variableValue "allow_download_sounds"
 
-    modifyMenuListSReference allowDownloadSoundsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowDownloadSoundsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                                 & mlGeneric.mcX .~ 0
                                                                 & mlGeneric.mcY .~ 70
                                                                 & mlGeneric.mcName .~ Just "sounds"
@@ -1541,7 +1545,7 @@ downloadOptionsMenuInit = do
     menuCenter downloadOptionsMenuRef
 
     -- skip over title
-    modifyMenuFrameworkSReference downloadOptionsMenuRef (\v -> v & mfCursor %~ (\c -> if c == 0 then 1 else c))
+    modifyRef downloadOptionsMenuRef (\v -> v & mfCursor %~ (\c -> if c == 0 then 1 else c))
   
 downloadOptionsMenuDraw :: XCommandT
 downloadOptionsMenuDraw =
@@ -1557,11 +1561,11 @@ multiplayerMenuInit :: Quake ()
 multiplayerMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference multiplayerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 64
+    modifyRef multiplayerMenuRef (\v -> v & mfX .~ ((vidDef'^.vdWidth) `div` 2) - 64
                                                               & mfNItems .~ 0
                                                               )
 
-    modifyMenuActionSReference joinNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef joinNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                    & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                    & maGeneric.mcX .~ 0
                                                                    & maGeneric.mcY .~ 0
@@ -1569,7 +1573,7 @@ multiplayerMenuInit = do
                                                                    & maGeneric.mcCallback .~ Just (menuJoinServerF^.xcCmd)
                                                                    )
 
-    modifyMenuActionSReference startNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef startNetworkServerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                     & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                                     & maGeneric.mcX .~ 0
                                                                     & maGeneric.mcY .~ 10
@@ -1577,7 +1581,7 @@ multiplayerMenuInit = do
                                                                     & maGeneric.mcCallback .~ Just (menuStartServerF^.xcCmd)
                                                                     )
 
-    modifyMenuActionSReference playerSetupActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef playerSetupActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                              & maGeneric.mcFlags .~ Constants.qmfLeftJustify
                                                              & maGeneric.mcX .~ 0
                                                              & maGeneric.mcY .~ 20
@@ -1616,14 +1620,14 @@ optionsMenuInit = do
     
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference optionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+    modifyRef optionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                           & mfY .~ ((vidDef'^.vdHeight) `div` 2) - 58
                                                           & mfNItems .~ 0
                                                           )
     
     volumeValue <- liftM (* 10) (CVar.variableValue "s_volume")
     
-    modifyMenuSliderSReference optionsSfxVolumeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+    modifyRef optionsSfxVolumeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                                   & msGeneric.mcX .~ 0
                                                                   & msGeneric.mcY .~ 0
                                                                   & msGeneric.mcName .~ Just "effects volume"
@@ -1635,7 +1639,7 @@ optionsMenuInit = do
     
     cdnocd <- CVar.variableValue "cd_nocd"
     
-    modifyMenuListSReference optionsCdVolumeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsCdVolumeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                             & mlGeneric.mcX .~ 0
                                                             & mlGeneric.mcY .~ 10
                                                             & mlGeneric.mcName .~ Just "CD music"
@@ -1644,7 +1648,7 @@ optionsMenuInit = do
                                                             & mlCurValue .~ 1 - truncate cdnocd
                                                             )
                                                             
-    modifyMenuListSReference optionsQualityListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsQualityListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                             & mlGeneric.mcX .~ 0
                                                             & mlGeneric.mcY .~ 20
                                                             & mlGeneric.mcName .~ Just "sound"
@@ -1652,7 +1656,7 @@ optionsMenuInit = do
                                                             & mlItemNames .~ labels
                                                             )
                                                          
-    modifyMenuSliderSReference optionsSensitivitySliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+    modifyRef optionsSensitivitySliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                                     & msGeneric.mcX .~ 0
                                                                     & msGeneric.mcY .~ 50
                                                                     & msGeneric.mcName .~ Just "mouse speed"
@@ -1661,7 +1665,7 @@ optionsMenuInit = do
                                                                     & msMaxValue .~ 22
                                                                     )
                                                                     
-    modifyMenuListSReference optionsAlwaysRunBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsAlwaysRunBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                              & mlGeneric.mcX .~ 0
                                                              & mlGeneric.mcY .~ 60
                                                              & mlGeneric.mcName .~ Just "always run"
@@ -1669,7 +1673,7 @@ optionsMenuInit = do
                                                              & mlItemNames .~ yesNoNames
                                                              )
                                                              
-    modifyMenuListSReference optionsInvertMouseBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsInvertMouseBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                                & mlGeneric.mcX .~ 0
                                                                & mlGeneric.mcY .~ 70
                                                                & mlGeneric.mcName .~ Just "invert mouse"
@@ -1677,7 +1681,7 @@ optionsMenuInit = do
                                                                & mlItemNames .~ yesNoNames
                                                                )
                                                                
-    modifyMenuListSReference optionsLookSpringBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsLookSpringBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                              & mlGeneric.mcX .~ 0
                                                              & mlGeneric.mcY .~ 80
                                                              & mlGeneric.mcName .~ Just "lookspring"
@@ -1685,7 +1689,7 @@ optionsMenuInit = do
                                                              & mlItemNames .~ yesNoNames
                                                              )
                                                              
-    modifyMenuListSReference optionsLookStrafeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsLookStrafeBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                               & mlGeneric.mcX .~ 0
                                                               & mlGeneric.mcY .~ 90
                                                               & mlGeneric.mcName .~ Just "lookstrafe"
@@ -1693,7 +1697,7 @@ optionsMenuInit = do
                                                               & mlItemNames .~ yesNoNames
                                                               )
                                                               
-    modifyMenuListSReference optionsFreeLookBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsFreeLookBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                             & mlGeneric.mcX .~ 0
                                                             & mlGeneric.mcY .~ 100
                                                             & mlGeneric.mcName .~ Just "free look"
@@ -1701,7 +1705,7 @@ optionsMenuInit = do
                                                             & mlItemNames .~ yesNoNames
                                                             )
                                                             
-    modifyMenuListSReference optionsCrosshairBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsCrosshairBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                              & mlGeneric.mcX .~ 0
                                                              & mlGeneric.mcY .~ 110
                                                              & mlGeneric.mcName .~ Just "crosshair"
@@ -1709,7 +1713,7 @@ optionsMenuInit = do
                                                              & mlItemNames .~ yesNoNames
                                                              )
                                                              
-    modifyMenuListSReference optionsJoystickBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef optionsJoystickBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                             & mlGeneric.mcX .~ 0
                                                             & mlGeneric.mcY .~ 120
                                                             & mlGeneric.mcName .~ Just "use joystick"
@@ -1717,21 +1721,21 @@ optionsMenuInit = do
                                                             & mlItemNames .~ yesNoNames
                                                             )
                                                             
-    modifyMenuActionSReference optionsCustomizeOptionsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef optionsCustomizeOptionsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                          & maGeneric.mcX .~ 0
                                                                          & maGeneric.mcY .~ 140
                                                                          & maGeneric.mcName .~ Just "customize controls"
                                                                          & maGeneric.mcCallback .~ Just customizeControlsFunc
                                                                          )
                                                                          
-    modifyMenuActionSReference optionsDefaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef optionsDefaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                  & maGeneric.mcX .~ 0
                                                                  & maGeneric.mcY .~ 150
                                                                  & maGeneric.mcName .~ Just "reset defaults"
                                                                  & maGeneric.mcCallback .~ Just controlsResetDefaultsFunc
                                                                  )
                                                                  
-    modifyMenuActionSReference optionsConsoleActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef optionsConsoleActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                 & maGeneric.mcX .~ 0
                                                                 & maGeneric.mcY .~ 160
                                                                 & maGeneric.mcName .~ Just "go to console"
@@ -1773,12 +1777,12 @@ keysMenuInit :: Quake ()
 keysMenuInit = do
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference keysMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+    modifyRef keysMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                        & mfNItems .~ 0
                                                        & mfCursorDraw .~ Just (keyCursorDrawFunc keysMenuRef)
                                                        )
     
-    modifyMenuActionSReference keysAttackActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysAttackActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 0
@@ -1787,7 +1791,7 @@ keysMenuInit = do
                                                             & maGeneric.mcName .~ Just ((bindNames V.! 0)^._2)
                                                             )
                                                             
-    modifyMenuActionSReference keysChangeWeaponActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysChangeWeaponActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                   & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                   & maGeneric.mcX .~ 0
                                                                   & maGeneric.mcY .~ 9
@@ -1796,7 +1800,7 @@ keysMenuInit = do
                                                                   & maGeneric.mcName .~ Just ((bindNames V.! 1)^._2)
                                                                   )
                                                                   
-    modifyMenuActionSReference keysWalkForwardActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysWalkForwardActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                  & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                  & maGeneric.mcX .~ 0
                                                                  & maGeneric.mcY .~ 18
@@ -1805,7 +1809,7 @@ keysMenuInit = do
                                                                  & maGeneric.mcName .~ Just ((bindNames V.! 2)^._2)
                                                                  )
                                                                  
-    modifyMenuActionSReference keysBackpedalActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysBackpedalActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                & maGeneric.mcX .~ 0
                                                                & maGeneric.mcY .~ 27
@@ -1814,7 +1818,7 @@ keysMenuInit = do
                                                                & maGeneric.mcName .~ Just ((bindNames V.! 3)^._2)
                                                                )
                                                                
-    modifyMenuActionSReference keysTurnLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysTurnLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                               & maGeneric.mcX .~ 0
                                                               & maGeneric.mcY .~ 36 
@@ -1823,7 +1827,7 @@ keysMenuInit = do
                                                               & maGeneric.mcName .~ Just ((bindNames V.! 4)^._2)
                                                               )
                                                               
-    modifyMenuActionSReference keysTurnRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysTurnRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                & maGeneric.mcX .~ 0
                                                                & maGeneric.mcY .~ 45 
@@ -1832,7 +1836,7 @@ keysMenuInit = do
                                                                & maGeneric.mcName .~ Just ((bindNames V.! 5)^._2)
                                                                )
                                                                
-    modifyMenuActionSReference keysRunActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysRunActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                          & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                          & maGeneric.mcX .~ 0
                                                          & maGeneric.mcY .~ 54 
@@ -1841,7 +1845,7 @@ keysMenuInit = do
                                                          & maGeneric.mcName .~ Just ((bindNames V.! 6)^._2)
                                                          )
                                                          
-    modifyMenuActionSReference keysStepLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysStepLeftActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                               & maGeneric.mcX .~ 0
                                                               & maGeneric.mcY .~ 63 
@@ -1850,7 +1854,7 @@ keysMenuInit = do
                                                               & maGeneric.mcName .~ Just ((bindNames V.! 7)^._2)
                                                               )
                                                               
-    modifyMenuActionSReference keysStepRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysStepRightActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                & maGeneric.mcX .~ 0
                                                                & maGeneric.mcY .~ 72 
@@ -1859,7 +1863,7 @@ keysMenuInit = do
                                                                & maGeneric.mcName .~ Just ((bindNames V.! 8)^._2)
                                                                )
                                                                
-    modifyMenuActionSReference keysSidestepActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysSidestepActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                               & maGeneric.mcX .~ 0
                                                               & maGeneric.mcY .~ 81 
@@ -1868,7 +1872,7 @@ keysMenuInit = do
                                                               & maGeneric.mcName .~ Just ((bindNames V.! 9)^._2)
                                                               )
                                                               
-    modifyMenuActionSReference keysLookUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysLookUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 90 
@@ -1877,7 +1881,7 @@ keysMenuInit = do
                                                             & maGeneric.mcName .~ Just ((bindNames V.! 10)^._2)
                                                             )
                                                             
-    modifyMenuActionSReference keysLookDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysLookDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                               & maGeneric.mcX .~ 0
                                                               & maGeneric.mcY .~ 99 
@@ -1886,7 +1890,7 @@ keysMenuInit = do
                                                               & maGeneric.mcName .~ Just ((bindNames V.! 11)^._2)
                                                               )
                                                               
-    modifyMenuActionSReference keysCenterViewActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysCenterViewActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                 & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                 & maGeneric.mcX .~ 0
                                                                 & maGeneric.mcY .~ 108 
@@ -1895,7 +1899,7 @@ keysMenuInit = do
                                                                 & maGeneric.mcName .~ Just ((bindNames V.! 12)^._2)
                                                                 )
                                                               
-    modifyMenuActionSReference keysMouseLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysMouseLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                & maGeneric.mcX .~ 0
                                                                & maGeneric.mcY .~ 117
@@ -1904,7 +1908,7 @@ keysMenuInit = do
                                                                & maGeneric.mcName .~ Just ((bindNames V.! 13)^._2)
                                                                )
                                                                
-    modifyMenuActionSReference keysKeyboardLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysKeyboardLookActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                   & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                   & maGeneric.mcX .~ 0
                                                                   & maGeneric.mcY .~ 126
@@ -1913,7 +1917,7 @@ keysMenuInit = do
                                                                   & maGeneric.mcName .~ Just ((bindNames V.! 14)^._2)
                                                                   )
                                                                   
-    modifyMenuActionSReference keysMoveUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysMoveUpActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 135
@@ -1922,7 +1926,7 @@ keysMenuInit = do
                                                             & maGeneric.mcName .~ Just ((bindNames V.! 15)^._2)
                                                             )
                                                             
-    modifyMenuActionSReference keysMoveDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysMoveDownActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                               & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                               & maGeneric.mcX .~ 0
                                                               & maGeneric.mcY .~ 144
@@ -1931,7 +1935,7 @@ keysMenuInit = do
                                                               & maGeneric.mcName .~ Just ((bindNames V.! 16)^._2)
                                                               )
                                                               
-    modifyMenuActionSReference keysInventoryActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysInventoryActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                & maGeneric.mcX .~ 0
                                                                & maGeneric.mcY .~ 153
@@ -1940,7 +1944,7 @@ keysMenuInit = do
                                                                & maGeneric.mcName .~ Just ((bindNames V.! 17)^._2)
                                                                )
                                                                
-    modifyMenuActionSReference keysInvUseActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysInvUseActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                             & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                             & maGeneric.mcX .~ 0
                                                             & maGeneric.mcY .~ 162
@@ -1949,7 +1953,7 @@ keysMenuInit = do
                                                             & maGeneric.mcName .~ Just ((bindNames V.! 18)^._2)
                                                             )
                                                             
-    modifyMenuActionSReference keysInvDropActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysInvDropActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                              & maGeneric.mcX .~ 0
                                                              & maGeneric.mcY .~ 171
@@ -1958,7 +1962,7 @@ keysMenuInit = do
                                                              & maGeneric.mcName .~ Just ((bindNames V.! 19)^._2)
                                                              )
                                                              
-    modifyMenuActionSReference keysInvPrevActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysInvPrevActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                              & maGeneric.mcX .~ 0
                                                              & maGeneric.mcY .~ 180
@@ -1967,7 +1971,7 @@ keysMenuInit = do
                                                              & maGeneric.mcName .~ Just ((bindNames V.! 20)^._2)
                                                              )
                                                              
-    modifyMenuActionSReference keysInvNextActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysInvNextActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                              & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                              & maGeneric.mcX .~ 0
                                                              & maGeneric.mcY .~ 189
@@ -1976,7 +1980,7 @@ keysMenuInit = do
                                                              & maGeneric.mcName .~ Just ((bindNames V.! 21)^._2)
                                                              )
                                                              
-    modifyMenuActionSReference keysHelpComputerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef keysHelpComputerActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                                   & maGeneric.mcFlags .~ Constants.qmfGrayed
                                                                   & maGeneric.mcX .~ 0
                                                                   & maGeneric.mcY .~ 198
@@ -2023,7 +2027,7 @@ keysMenuKeyF :: KeyFuncT
 keysMenuKeyF =
   KeyFuncT "Menu.keysMenuKeyF" (\key -> do
     Just (MenuActionRef actionItemRef) <- menuItemAtCursor keysMenuRef
-    item <- readMenuActionSReference actionItemRef
+    item <- readRef actionItemRef
     bindGrab <- use $ menuGlobals.mgBindGrab
 
     if bindGrab
@@ -2058,11 +2062,11 @@ dmOptionsMenuInit = do
     dmFlagsValue <- liftM (truncate . (^.cvValue)) dmFlagsCVar
     vidDef' <- use $ globals.gVidDef
 
-    modifyMenuFrameworkSReference dmOptionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
+    modifyRef dmOptionsMenuRef (\v -> v & mfX .~ (vidDef'^.vdWidth) `div` 2
                                                             & mfNItems .~ 0
                                                             )
 
-    modifyMenuListSReference fallsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef fallsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                   & mlGeneric.mcX .~ 0
                                                   & mlGeneric.mcY .~ 0
                                                   & mlGeneric.mcName .~ Just "falling damage"
@@ -2071,7 +2075,7 @@ dmOptionsMenuInit = do
                                                   & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoFalling == 0 then 1 else 0)
                                                   )
 
-    modifyMenuListSReference weaponsStayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef weaponsStayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                         & mlGeneric.mcX .~ 0
                                                         & mlGeneric.mcY .~ 10
                                                         & mlGeneric.mcName .~ Just "weapons stay"
@@ -2080,7 +2084,7 @@ dmOptionsMenuInit = do
                                                         & mlCurValue .~ (if dmFlagsValue .&. Constants.dfWeaponsStay /= 0 then 1 else 0)
                                                         )
 
-    modifyMenuListSReference instantPowerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef instantPowerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                             & mlGeneric.mcX .~ 0
                                                             & mlGeneric.mcY .~ 20
                                                             & mlGeneric.mcName .~ Just "instant powerups"
@@ -2089,7 +2093,7 @@ dmOptionsMenuInit = do
                                                             & mlCurValue .~ (if dmFlagsValue .&. Constants.dfInstantItems /= 0 then 1 else 0)
                                                             )
 
-    modifyMenuListSReference powerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef powerUpsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                      & mlGeneric.mcX .~ 0
                                                      & mlGeneric.mcY .~ 30
                                                      & mlGeneric.mcName .~ Just "allow powerups"
@@ -2098,7 +2102,7 @@ dmOptionsMenuInit = do
                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoItems == 0 then 1 else 0)
                                                      )
 
-    modifyMenuListSReference healthBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef healthBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                    & mlGeneric.mcX .~ 0
                                                    & mlGeneric.mcY .~ 40
                                                    & mlGeneric.mcName .~ Just "allow health"
@@ -2107,7 +2111,7 @@ dmOptionsMenuInit = do
                                                    & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoHealth == 0 then 1 else 0)
                                                    )
 
-    modifyMenuListSReference armorBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef armorBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                   & mlGeneric.mcX .~ 0
                                                   & mlGeneric.mcY .~ 50
                                                   & mlGeneric.mcName .~ Just "allow armor"
@@ -2116,7 +2120,7 @@ dmOptionsMenuInit = do
                                                   & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoArmor == 0 then 1 else 0)
                                                   )
 
-    modifyMenuListSReference spawnFarthestBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef spawnFarthestBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                           & mlGeneric.mcX .~ 0
                                                           & mlGeneric.mcY .~ 60
                                                           & mlGeneric.mcName .~ Just "spawn farthest"
@@ -2125,7 +2129,7 @@ dmOptionsMenuInit = do
                                                           & mlCurValue .~ (if dmFlagsValue .&. Constants.dfSpawnFarthest /= 0 then 1 else 0)
                                                           )
 
-    modifyMenuListSReference sameLevelBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef sameLevelBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                       & mlGeneric.mcX .~ 0
                                                       & mlGeneric.mcY .~ 70
                                                       & mlGeneric.mcName .~ Just "same map"
@@ -2134,7 +2138,7 @@ dmOptionsMenuInit = do
                                                       & mlCurValue .~ (if dmFlagsValue .&. Constants.dfSameLevel /= 0 then 1 else 0)
                                                       )
 
-    modifyMenuListSReference forceRespawnBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef forceRespawnBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                          & mlGeneric.mcX .~ 0
                                                          & mlGeneric.mcY .~ 80
                                                          & mlGeneric.mcName .~ Just "force respawn"
@@ -2143,7 +2147,7 @@ dmOptionsMenuInit = do
                                                          & mlCurValue .~ (if dmFlagsValue .&. Constants.dfForceRespawn /= 0 then 1 else 0)
                                                          )
 
-    modifyMenuListSReference teamPlayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef teamPlayBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                      & mlGeneric.mcX .~ 0
                                                      & mlGeneric.mcY .~ 90
                                                      & mlGeneric.mcName .~ Just "teamplay"
@@ -2151,7 +2155,7 @@ dmOptionsMenuInit = do
                                                      & mlItemNames .~ teamPlayNames
                                                      )
 
-    modifyMenuListSReference allowExitBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef allowExitBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                       & mlGeneric.mcX .~ 0
                                                       & mlGeneric.mcY .~ 90
                                                       & mlGeneric.mcName .~ Just "allow exit"
@@ -2160,7 +2164,7 @@ dmOptionsMenuInit = do
                                                       & mlCurValue .~ (if dmFlagsValue .&. Constants.dfAllowExit /= 0 then 1 else 0)
                                                       )
 
-    modifyMenuListSReference infiniteAmmoBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef infiniteAmmoBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                          & mlGeneric.mcX .~ 0
                                                          & mlGeneric.mcY .~ 100
                                                          & mlGeneric.mcName .~ Just "infinite ammo"
@@ -2169,7 +2173,7 @@ dmOptionsMenuInit = do
                                                          & mlCurValue .~ (if dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0 then 1 else 0)
                                                          )
 
-    modifyMenuListSReference fixedFovBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef fixedFovBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                      & mlGeneric.mcX .~ 0
                                                      & mlGeneric.mcY .~ 110
                                                      & mlGeneric.mcName .~ Just "fixed FOV"
@@ -2178,7 +2182,7 @@ dmOptionsMenuInit = do
                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfFixedFov /= 0 then 1 else 0)
                                                      )
 
-    modifyMenuListSReference quadDropBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef quadDropBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                      & mlGeneric.mcX .~ 0
                                                      & mlGeneric.mcY .~ 120
                                                      & mlGeneric.mcName .~ Just "quad drop"
@@ -2187,7 +2191,7 @@ dmOptionsMenuInit = do
                                                      & mlCurValue .~ (if dmFlagsValue .&. Constants.dfQuadDrop /= 0 then 1 else 0)
                                                      )
 
-    modifyMenuListSReference friendlyFireBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef friendlyFireBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                          & mlGeneric.mcX .~ 0
                                                          & mlGeneric.mcY .~ 130
                                                          & mlGeneric.mcName .~ Just "friendly fire"
@@ -2199,7 +2203,7 @@ dmOptionsMenuInit = do
     dev <- FS.developerSearchPath 2
 
     when (dev == 2) $ do
-      modifyMenuListSReference noMinesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef noMinesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                       & mlGeneric.mcX .~ 0
                                                       & mlGeneric.mcY .~ 140
                                                       & mlGeneric.mcName .~ Just "remove mines"
@@ -2208,7 +2212,7 @@ dmOptionsMenuInit = do
                                                       & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoMines /= 0 then 1 else 0)
                                                       )
 
-      modifyMenuListSReference noNukesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef noNukesBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                       & mlGeneric.mcX .~ 0
                                                       & mlGeneric.mcY .~ 150
                                                       & mlGeneric.mcName .~ Just "remove nukes"
@@ -2217,7 +2221,7 @@ dmOptionsMenuInit = do
                                                       & mlCurValue .~ (if dmFlagsValue .&. Constants.dfNoNukes /= 0 then 1 else 0)
                                                       )
 
-      modifyMenuListSReference stackDoubleBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef stackDoubleBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                           & mlGeneric.mcX .~ 0
                                                           & mlGeneric.mcY .~ 160
                                                           & mlGeneric.mcName .~ Just "2x/4x stacking off"
@@ -2226,7 +2230,7 @@ dmOptionsMenuInit = do
                                                           & mlCurValue .~ (dmFlagsValue .&. Constants.dfNoStackDouble)
                                                           )
 
-      modifyMenuListSReference noSpheresBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef noSpheresBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                         & mlGeneric.mcX .~ 0
                                                         & mlGeneric.mcY .~ 170
                                                         & mlGeneric.mcName .~ Just "remove spheres"
@@ -2264,18 +2268,18 @@ dmOptionsMenuInit = do
     dmOptionsStatusBar <- use $ menuGlobals.mgDmOptionsStatusBar
     menuSetStatusBar dmOptionsMenuRef dmOptionsStatusBar
 
-saveGameCallback :: MenuActionSReference -> Quake ()
+saveGameCallback :: Ref MenuActionS -> Quake ()
 saveGameCallback menuActionRef = do
-    action <- readMenuActionSReference menuActionRef
+    action <- readRef menuActionRef
     CBuf.addText ("save save" `B.append` BC.pack (show (action^.maGeneric.mcLocalData._x)) `B.append` "\n")
     forceMenuOff
 
-fieldDraw :: MenuFieldSReference -> Quake ()
+fieldDraw :: Ref MenuFieldS -> Quake ()
 fieldDraw fieldRef = do
     Just renderer <- use $ globals.gRenderer
-    field <- readMenuFieldSReference fieldRef
+    field <- readRef fieldRef
     let Just menuRef = field^.mflGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
     
     menuDrawStringR2LDark ((field^.mflGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((field^.mflGeneric.mcY) + (menu^.mfY)) (field^.mflGeneric.mcName)
         
@@ -2370,11 +2374,11 @@ menuDrawStringR2LDark x y (Just str) = do
               (renderer^.rRefExport.reDrawChar) (x - idx * 8) y ch
               drawString renderer (idx + 1) maxIdx
 
-sliderDraw :: MenuSliderSReference -> Quake ()
+sliderDraw :: Ref MenuSliderS -> Quake ()
 sliderDraw sliderRef = do
-    slider <- readMenuSliderSReference sliderRef
+    slider <- readRef sliderRef
     let Just menuRef = slider^.msGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
 
     menuDrawStringR2LDark ((slider^.msGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((slider^.msGeneric.mcY) + (menu^.mfY)) (slider^.msGeneric.mcName)
 
@@ -2399,11 +2403,11 @@ sliderDraw sliderRef = do
               (renderer^.rRefExport.reDrawChar) (Constants.rColumnOffset + (slider^.msGeneric.mcX) + idx * 8 + (menu^.mfX) + 8) ((slider^.msGeneric.mcY) + (menu^.mfY)) 129
               drawSliderRange renderer menu slider (idx + 1) maxIdx
 
-menuListDraw :: MenuListSReference -> Quake ()
+menuListDraw :: Ref MenuListS -> Quake ()
 menuListDraw menuListRef = do
-    menuList <- readMenuListSReference menuListRef
+    menuList <- readRef menuListRef
     let Just menuRef = menuList^.mlGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
 
     menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (menuList^.mlGeneric.mcName)
 
@@ -2417,11 +2421,11 @@ menuListDraw menuListRef = do
           let y = idx * 10
           menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + y + 10) (Just name)
 
-spinControlDraw :: MenuListSReference -> Quake ()
+spinControlDraw :: Ref MenuListS -> Quake ()
 spinControlDraw menuListRef = do
-    menuList <- readMenuListSReference menuListRef
+    menuList <- readRef menuListRef
     let Just menuRef = menuList^.mlGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
 
     menuDrawStringR2LDark ((menuList^.mlGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (menuList^.mlGeneric.mcName)
 
@@ -2440,11 +2444,11 @@ spinControlDraw menuListRef = do
         menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY)) (Just line1)
         menuDrawString (Constants.rColumnOffset + (menuList^.mlGeneric.mcX) + (menu^.mfX)) ((menuList^.mlGeneric.mcY) + (menu^.mfY) + 10) (Just line2')
 
-actionDraw :: MenuActionSReference -> Quake ()
+actionDraw :: Ref MenuActionS -> Quake ()
 actionDraw actionRef = do
-    action <- readMenuActionSReference actionRef
+    action <- readRef actionRef
     let Just menuRef = action^.maGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
     
     let drawingFunc = if (action^.maGeneric.mcFlags) .&. Constants.qmfLeftJustify /= 0
                         then if (action^.maGeneric.mcFlags) .&. Constants.qmfGrayed /= 0
@@ -2460,17 +2464,17 @@ actionDraw actionRef = do
       Nothing -> return ()
       Just ownerDraw -> ownerDraw
 
-separatorDraw :: MenuSeparatorSReference -> Quake ()
+separatorDraw :: Ref MenuSeparatorS -> Quake ()
 separatorDraw separatorRef = do
-    separator <- readMenuSeparatorSReference separatorRef
+    separator <- readRef separatorRef
     let Just menuRef = separator^.mspGeneric.mcParent
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
     
     menuDrawStringR2LDark ((separator^.mspGeneric.mcX) + (menu^.mfX)) ((separator^.mspGeneric.mcY) + (menu^.mfY)) (separator^.mspGeneric.mcName)
 
-downloadCallback :: MenuListSReference -> Quake ()
+downloadCallback :: Ref MenuListS -> Quake ()
 downloadCallback menuListRef = do
-    item <- readMenuListSReference menuListRef
+    item <- readRef menuListRef
 
     if | menuListRef == allowDownloadBoxRef ->
            CVar.setValueI "allow_download" (item^.mlCurValue)
@@ -2492,18 +2496,18 @@ downloadCallback menuListRef = do
 
 updateVolumeFunc :: Quake ()
 updateVolumeFunc = do
-    slider <- readMenuSliderSReference optionsSfxVolumeSliderRef
+    slider <- readRef optionsSfxVolumeSliderRef
     CVar.setValueF "s_volume" ((slider^.msCurValue) / 10)
 
 updateCdVolumeFunc :: Quake ()
 updateCdVolumeFunc = do
-    slider <- readMenuListSReference optionsCdVolumeBoxRef
+    slider <- readRef optionsCdVolumeBoxRef
     CVar.setValueI "cd_nocd" (1 - (slider^.mlCurValue))
 
 updateSoundQualityFunc :: Quake ()
 updateSoundQualityFunc = do
     drivers <- S.getDriverNames
-    qualityList <- readMenuListSReference optionsQualityListRef
+    qualityList <- readRef optionsQualityListRef
     let selectedDriver = drivers V.! (qualityList^.mlCurValue)
     currentDriver <- S.getDriverName
     Just renderer <- use $ globals.gRenderer
@@ -2527,12 +2531,12 @@ updateSoundQualityFunc = do
 
 mouseSpeedFunc :: Quake ()
 mouseSpeedFunc = do
-    slider <- readMenuSliderSReference optionsSensitivitySliderRef
+    slider <- readRef optionsSensitivitySliderRef
     CVar.setValueF "sensitivity" ((slider^.msCurValue) / 2)
 
 alwaysRunFunc :: Quake ()
 alwaysRunFunc = do
-    box <- readMenuListSReference optionsAlwaysRunBoxRef
+    box <- readRef optionsAlwaysRunBoxRef
     CVar.setValueI "cl_run" (box^.mlCurValue)
 
 invertMouseFunc :: Quake ()
@@ -2552,17 +2556,17 @@ lookStrafeFunc = do
 
 freeLookFunc :: Quake ()
 freeLookFunc = do
-    box <- readMenuListSReference optionsFreeLookBoxRef
+    box <- readRef optionsFreeLookBoxRef
     CVar.setValueI "freelook" (box^.mlCurValue)
 
 crosshairFunc :: Quake ()
 crosshairFunc = do
-    box <- readMenuListSReference optionsCrosshairBoxRef
+    box <- readRef optionsCrosshairBoxRef
     CVar.setValueI "crosshair" (box^.mlCurValue)
 
 joystickFunc :: Quake ()
 joystickFunc = do
-    box <- readMenuListSReference optionsJoystickBoxRef
+    box <- readRef optionsJoystickBoxRef
     CVar.setValueI "in_joystick" (box^.mlCurValue)
   
 customizeControlsFunc :: Quake ()
@@ -2596,9 +2600,9 @@ controlsSetMenuItemValues :: Quake ()
 controlsSetMenuItemValues = do
     io (putStrLn "Menu.controlsSetMenuItemValues") >> undefined -- TODO
 
-keyCursorDrawFunc :: MenuFrameworkSReference -> Quake ()
+keyCursorDrawFunc :: Ref MenuFrameworkS -> Quake ()
 keyCursorDrawFunc menuRef = do
-    menu <- readMenuFrameworkSReference menuRef
+    menu <- readRef menuRef
     bindGrab <- use $ menuGlobals.mgBindGrab
     
     ch <- if bindGrab
@@ -2611,13 +2615,13 @@ keyCursorDrawFunc menuRef = do
     Just renderer <- use $ globals.gRenderer
     (renderer^.rRefExport.reDrawChar) (menu^.mfX) ((menu^.mfY) + 9 * (menu^.mfCursor)) ch
 
-drawKeyBindingFunc :: MenuActionSReference -> Quake ()
+drawKeyBindingFunc :: Ref MenuActionS -> Quake ()
 drawKeyBindingFunc _ = do
     io (putStrLn "Menu.drawKeyBindingFunc") >> undefined -- TODO
 
-loadGameCallback :: MenuActionSReference -> Quake ()
+loadGameCallback :: Ref MenuActionS -> Quake ()
 loadGameCallback actionRef = do
-    action <- readMenuActionSReference actionRef
+    action <- readRef actionRef
 
     saveValid <- use $ menuGlobals.mgSaveValid
 
@@ -2649,9 +2653,9 @@ dmOptionsMenuKey =
     defaultMenuKey dmOptionsMenuRef key
   )
 
-keyBindingFunc :: MenuActionSReference -> Quake ()
+keyBindingFunc :: Ref MenuActionS -> Quake ()
 keyBindingFunc actionRef = do
-    action <- readMenuActionSReference actionRef
+    action <- readRef actionRef
     let command = (bindNames V.! (action^.maGeneric.mcLocalData._x))^._1
     (_, key) <- findKeysForCommand command
     
@@ -2692,7 +2696,7 @@ unbindCommand command = do
                 
               unbind kb (idx + 1) maxIdx
 
-dmFlagCallback :: Maybe MenuListSReference -> Quake ()
+dmFlagCallback :: Maybe (Ref MenuListS) -> Quake ()
 dmFlagCallback _ = do
     io (putStrLn "Menu.dmFlagCallback") >> undefined -- TODO
 
@@ -2702,7 +2706,7 @@ rulesChangeFunc = do
 
 dmOptionsFunc :: Quake ()
 dmOptionsFunc = do
-    rulesBox <- readMenuListSReference rulesBoxRef
+    rulesBox <- readRef rulesBoxRef
 
     unless ((rulesBox^.mlCurValue) == 1) $
       menuDMOptionsF^.xcCmd
@@ -2737,7 +2741,7 @@ drawCharacter cx cy num = do
     vidDef' <- use $ globals.gVidDef
     (renderer^.rRefExport.reDrawChar) (cx + (((vidDef'^.vdWidth) - 320) `shiftR` 1)) (cy + (((vidDef'^.vdHeight) - 240) `shiftR` 1)) num
 
-menuSlideItem :: MenuFrameworkSReference -> Int -> Quake ()
+menuSlideItem :: Ref MenuFrameworkS -> Int -> Quake ()
 menuSlideItem menuRef dir = do
     menuItemRef <- menuItemAtCursor menuRef
     
@@ -2763,10 +2767,10 @@ menuSlideItem menuRef dir = do
            | otherwise ->
                return ()
 
-sliderDoSlide :: MenuSliderSReference -> Int -> Quake ()
+sliderDoSlide :: Ref MenuSliderS -> Int -> Quake ()
 sliderDoSlide menuSliderRef dir = do
-    slider <- readMenuSliderSReference menuSliderRef
-    modifyMenuSliderSReference menuSliderRef (\v -> v & msCurValue %~ (updateCurValue slider))
+    slider <- readRef menuSliderRef
+    modifyRef menuSliderRef (\v -> v & msCurValue %~ (updateCurValue slider))
 
     case slider^.msGeneric.mcCallback of
       Nothing -> return ()
@@ -2779,10 +2783,10 @@ sliderDoSlide menuSliderRef dir = do
                     | newValue < (slider^.msMinValue) -> slider^.msMinValue
                     | otherwise -> newValue
 
-spinControlDoSlide :: MenuListSReference -> Int -> Quake ()
+spinControlDoSlide :: Ref MenuListS -> Int -> Quake ()
 spinControlDoSlide menuListRef dir = do
-    menuList <- readMenuListSReference menuListRef
-    modifyMenuListSReference menuListRef (\v -> v & mlCurValue %~ (updateCurValue menuList))
+    menuList <- readRef menuListRef
+    modifyRef menuListRef (\v -> v & mlCurValue %~ (updateCurValue menuList))
     
     case menuList^.mlGeneric.mcCallback of
       Nothing -> return ()
@@ -2795,7 +2799,7 @@ spinControlDoSlide menuListRef dir = do
                 | newValue >= V.length (menuList^.mlItemNames) -> curValue
                 | otherwise -> newValue
 
-menuSelectItem :: MenuFrameworkSReference -> Quake Bool
+menuSelectItem :: Ref MenuFrameworkS -> Quake Bool
 menuSelectItem menuRef = do
     menuItemRef <- menuItemAtCursor menuRef
     
@@ -2821,17 +2825,17 @@ menuSelectItem menuRef = do
            | otherwise -> 
                return False
 
-fieldDoEnter :: MenuFieldSReference -> Quake Bool
+fieldDoEnter :: Ref MenuFieldS -> Quake Bool
 fieldDoEnter fieldRef = do
-    field <- readMenuFieldSReference fieldRef
+    field <- readRef fieldRef
     
     case field^.mflGeneric.mcCallback of
       Nothing -> return False
       Just callback -> callback >> return True
     
-actionDoEnter :: MenuActionSReference -> Quake ()
+actionDoEnter :: Ref MenuActionS -> Quake ()
 actionDoEnter actionRef = do
-    action <- readMenuActionSReference actionRef
+    action <- readRef actionRef
     
     case action^.maGeneric.mcCallback of
       Nothing -> return ()

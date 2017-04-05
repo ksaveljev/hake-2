@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CVarT
 import Game.EntityStateT
 import Client.ClientStateT
 import Client.ClientStaticT

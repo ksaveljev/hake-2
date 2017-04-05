@@ -11,6 +11,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector as V
 
+import Game.CVarT
+import QuakeRef
+import Client.MenuFrameworkS
 import Client.ClientStateT
 import Client.ClientStaticT
 import Client.RefExportT
@@ -258,31 +261,31 @@ menuInit = do
     setNonExistingCVar "gl_swapinterval" "0" Constants.cvarArchive
 
     liftM (truncate . (^.cvValue)) glModeCVar >>= \n ->
-      modifyMenuListSReference modeListRef (\v -> v & mlCurValue .~ n)
+      modifyRef modeListRef (\v -> v & mlCurValue .~ n)
 
     liftM (^.cvValue) vidFullScreenCVar >>= \fullscreenValue ->
       if fullscreenValue /= 0
         then do
           res <- use $ vidGlobals.vgFSResolutions
 
-          menuItem <- readMenuListSReference modeListRef
+          menuItem <- readRef modeListRef
           let curValue = if (menuItem^.mlCurValue) >= V.length res - 1
                            then 0
                            else menuItem^.mlCurValue
 
-          modifyMenuListSReference modeListRef (\v -> v & mlCurValue .~ curValue
+          modifyRef modeListRef (\v -> v & mlCurValue .~ curValue
                                                         & mlItemNames .~ res
                                                         )
           Just fsModes <- use $ vidGlobals.vgFSModes
           vidGlobals.vgModeX .= (fsModes V.! curValue)^.vmWidth
 
         else do
-          menuItem <- readMenuListSReference modeListRef
+          menuItem <- readRef modeListRef
           let curValue = if (menuItem^.mlCurValue) >= V.length resolutions - 1
                            then 0
                            else menuItem^.mlCurValue
 
-          modifyMenuListSReference modeListRef (\v -> v & mlCurValue .~ curValue
+          modifyRef modeListRef (\v -> v & mlCurValue .~ curValue
                                                         & mlItemNames .~ resolutions
                                                         )
 
@@ -293,22 +296,22 @@ menuInit = do
 
     liftM (^.cvValue) viewSizeCVar >>= \v -> do
       let intv = truncate (v / 10) :: Int
-      modifyMenuSliderSReference screenSizeSliderRef (\v -> v & msCurValue .~ fromIntegral intv)
+      modifyRef screenSizeSliderRef (\v -> v & msCurValue .~ fromIntegral intv)
 
     use (vidGlobals.vgDrivers) >>= \drivers -> do
       str <- liftM (^.cvString) vidRefCVar
       case V.findIndex (== str) drivers of
         Nothing -> return ()
-        Just idx -> modifyMenuListSReference refListRef (\v -> v & mlCurValue .~ idx)
+        Just idx -> modifyRef refListRef (\v -> v & mlCurValue .~ idx)
 
     use (globals.gVidDef.vdWidth) >>= \width -> do
       let widthF = fromIntegral width :: Float
-      modifyMenuFrameworkSReference openGLMenuRef (\v -> v & mfX .~ truncate (widthF * 0.5)
+      modifyRef openGLMenuRef (\v -> v & mfX .~ truncate (widthF * 0.5)
                                                            & mfNItems .~ 0
                                                            )
 
     use (vidGlobals.vgRefs) >>= \refs -> do
-      modifyMenuListSReference refListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef refListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                    & mlGeneric.mcName .~ Just "driver"
                                                    & mlGeneric.mcX .~ 0
                                                    & mlGeneric.mcY .~ 0
@@ -316,13 +319,13 @@ menuInit = do
                                                    & mlItemNames .~ refs
                                                    )
 
-    modifyMenuListSReference modeListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+    modifyRef modeListRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                   & mlGeneric.mcName .~ Just "video mode"
                                                   & mlGeneric.mcX .~ 0
                                                   & mlGeneric.mcY .~ 10
                                                   )
 
-    modifyMenuSliderSReference screenSizeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+    modifyRef screenSizeSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                             & msGeneric.mcX .~ 0
                                                             & msGeneric.mcY .~ 20
                                                             & msGeneric.mcName .~ Just "screen size"
@@ -332,7 +335,7 @@ menuInit = do
                                                             )
 
     liftM (^.cvValue) vidGammaCVar >>= \gammaValue ->
-      modifyMenuSliderSReference brightnessSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+      modifyRef brightnessSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                               & msGeneric.mcX .~ 0
                                                               & msGeneric.mcY .~ 30
                                                               & msGeneric.mcName .~ Just "brightness"
@@ -343,7 +346,7 @@ menuInit = do
                                                               )
 
     liftM (truncate . (^.cvValue)) vidFullScreenCVar >>= \fullscreenValue ->
-      modifyMenuListSReference fsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef fsBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                  & mlGeneric.mcX .~ 0
                                                  & mlGeneric.mcY .~ 40
                                                  & mlGeneric.mcName .~ Just "fullscreen"
@@ -353,7 +356,7 @@ menuInit = do
                                                  )
 
     liftM (^.cvValue) glPicMipCVar >>= \picmipValue ->
-      modifyMenuSliderSReference tqSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
+      modifyRef tqSliderRef (\v -> v & msGeneric.mcType .~ Constants.mtypeSlider
                                                       & msGeneric.mcX .~ 0
                                                       & msGeneric.mcY .~ 60
                                                       & msGeneric.mcName .~ Just "texture quality"
@@ -363,7 +366,7 @@ menuInit = do
                                                       )
 
     liftM (truncate . (^.cvValue)) glExtPalettedTextureCVar >>= \palettedTextureValue ->
-      modifyMenuListSReference palettedTextureBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef palettedTextureBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                               & mlGeneric.mcX .~ 0
                                                               & mlGeneric.mcY .~ 70
                                                               & mlGeneric.mcName .~ Just "8-bit textures"
@@ -372,7 +375,7 @@ menuInit = do
                                                               )
 
     liftM (truncate . (^.cvValue)) glSwapIntervalCVar >>= \swapIntervalValue ->
-      modifyMenuListSReference vSyncBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
+      modifyRef vSyncBoxRef (\v -> v & mlGeneric.mcType .~ Constants.mtypeSpinControl
                                                     & mlGeneric.mcX .~ 0
                                                     & mlGeneric.mcY .~ 80
                                                     & mlGeneric.mcName .~ Just "sync every frame"
@@ -380,14 +383,14 @@ menuInit = do
                                                     & mlCurValue .~ swapIntervalValue
                                                     )
 
-    modifyMenuActionSReference defaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef defaultsActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                           & maGeneric.mcName .~ Just "reset to default"
                                                           & maGeneric.mcX .~ 0
                                                           & maGeneric.mcY .~ 100
                                                           & maGeneric.mcCallback .~ Just menuInit
                                                           )
 
-    modifyMenuActionSReference applyActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
+    modifyRef applyActionRef (\v -> v & maGeneric.mcType .~ Constants.mtypeAction
                                                        & maGeneric.mcName .~ Just "apply"
                                                        & maGeneric.mcX .~ 0
                                                        & maGeneric.mcY .~ 110
@@ -408,7 +411,7 @@ menuInit = do
     Menu.menuAddItem openGLMenuRef (MenuActionRef applyActionRef)
 
     Menu.menuCenter openGLMenuRef
-    modifyMenuFrameworkSReference openGLMenuRef (\v -> v & mfX -~ 8)
+    modifyRef openGLMenuRef (\v -> v & mfX -~ 8)
 
   where setNonExistingCVar :: B.ByteString -> B.ByteString -> Int -> Quake ()
         setNonExistingCVar name value flags =
@@ -418,7 +421,7 @@ menuInit = do
 
         screenSizeCallback :: Quake ()
         screenSizeCallback = do
-          menuItem <- readMenuSliderSReference screenSizeSliderRef
+          menuItem <- readRef screenSizeSliderRef
           CVar.setValueF "viewsize" ((menuItem^.msCurValue) * 10)
 
         brightnessCallback :: Quake ()
@@ -426,7 +429,7 @@ menuInit = do
           str <- liftM ((BC.map toLower) . (^.cvString)) vidRefCVar
 
           when (str == "soft" || str == "softx") $ do
-            menuItem <- readMenuSliderSReference brightnessSliderRef
+            menuItem <- readRef brightnessSliderRef
             CVar.setValueF "vid_gamma" ((0.8 - ((menuItem^.msCurValue) / 10 - 0.5)) + 0.5)
 
         fsBoxCallback :: Quake ()
@@ -435,13 +438,13 @@ menuInit = do
 
 applyChanges :: Quake ()
 applyChanges = do
-    brightnessSlider <- readMenuSliderSReference brightnessSliderRef
-    tqSlider <- readMenuSliderSReference tqSliderRef
-    fsBox <- readMenuListSReference fsBoxRef
-    vSyncBox <- readMenuListSReference vSyncBoxRef
-    palettedTextureBox <- readMenuListSReference palettedTextureBoxRef
-    modeList <- readMenuListSReference modeListRef
-    refList <- readMenuListSReference refListRef
+    brightnessSlider <- readRef brightnessSliderRef
+    tqSlider <- readRef tqSliderRef
+    fsBox <- readRef fsBoxRef
+    vSyncBox <- readRef vSyncBoxRef
+    palettedTextureBox <- readRef palettedTextureBoxRef
+    modeList <- readRef modeListRef
+    refList <- readRef refListRef
 
     -- invert sense so greater = brighter, and scale to a range of 0.5 to 1.3
     --
@@ -573,12 +576,12 @@ menuKey =
            return Nothing
 
        | key == KeyConstants.kUpArrow -> do
-           modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor -~ 1)
+           modifyRef menuRef (\v -> v & mfCursor -~ 1)
            Menu.menuAdjustCursor menuRef (-1)
            return sound
 
        | key == KeyConstants.kDownArrow -> do
-           modifyMenuFrameworkSReference menuRef (\v -> v & mfCursor +~ 1)
+           modifyRef menuRef (\v -> v & mfCursor +~ 1)
            Menu.menuAdjustCursor menuRef 1
            return sound
 

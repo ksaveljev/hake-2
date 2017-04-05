@@ -22,6 +22,12 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.SpawnTempT
+import Game.CVarT
+import Game.GItemT
+import Game.GameLocalsT
+import Game.LevelLocalsT
 import Game.EntityStateT
 import Game.EdictT
 import Game.GClientT

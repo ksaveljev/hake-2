@@ -7,6 +7,7 @@ import Data.Maybe (isJust, fromJust)
 import System.Exit (exitSuccess)
 import qualified Data.ByteString as B
 
+import Game.CVarT
 import Client.RefExportT
 import Render.Renderer
 import Sys.KBD

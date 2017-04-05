@@ -10,6 +10,8 @@ import Data.Maybe (isNothing, fromJust, isJust)
 import Linear (V3(..), _x, _y, _z)
 import qualified Data.Vector as V
 
+import {-# SOURCE #-} Game.GameImportT
+import Game.LevelLocalsT
 import Game.TraceT
 import Game.EntityStateT
 import Game.EdictT

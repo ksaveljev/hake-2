@@ -21,6 +21,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CVarT
 import QCommon.QFiles.BSP.DAreaPortalT
 import Game.CModelT
 import Game.MapSurfaceT

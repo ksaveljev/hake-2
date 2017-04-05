@@ -11,6 +11,7 @@ import Linear (V3(..), _x, _y, _z, norm, normalize)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
 
+import Game.CVarT
 import Client.RefExportT
 import Render.Renderer
 import Client.ClientStateT

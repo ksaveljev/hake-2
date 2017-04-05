@@ -8,6 +8,7 @@ import Data.Char (toLower)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
+import {-# SOURCE #-} Game.GameImportT
 import Types
 import QuakeState
 import qualified Constants
