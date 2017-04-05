@@ -31,7 +31,7 @@ import Game.CPlaneT
 import QuakeState
 import CVarVariables
 import QCommon.XCommandT
-import Render.OpenGL.GLDriver
+import           Render.OpenGL.GLDriver
 import qualified Constants
 import qualified Client.VID as VID
 import {-# SOURCE #-} qualified Game.Cmd as Cmd

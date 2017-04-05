@@ -2638,3 +2638,15 @@ data DPlaneT = DPlaneT
     , _dpDist   :: Float
     , _dpType   :: Int
     }
+
+data MiptexT = MiptexT
+    { _mtName      :: B.ByteString
+    , _mtWidth     :: Int
+    , _mtHeight    :: Int
+    , _mtOffsets   :: UV.Vector Int
+    , _mtAnimFrame :: B.ByteString
+    , _mtFlags     :: Int
+    , _mtContents  :: Int
+    , _mtValue     :: Int
+    , _mtBuf       :: B.ByteString
+    }

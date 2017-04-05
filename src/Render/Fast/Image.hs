@@ -4,6 +4,11 @@
 {-# LANGUAGE BangPatterns #-}
 module Render.Fast.Image where
 
+import           Control.Monad.State.Strict   (runStateT)
+import qualified Pipes.Binary                 as PB
+import qualified Pipes.ByteString             as PBS
+import           System.IO                    (Handle)
+
 import Control.Lens ((^.), (.=), (+=), use, preuse, ix, _1, _2, zoom, (%=))
 import Control.Monad (when, void, liftM, unless)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
@@ -21,6 +26,7 @@ import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Unsafe as BU
 import qualified Data.Vector as V
+import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Storable.Mutable as MSV
@@ -880,20 +886,22 @@ glFindImage imgName imgType = do
                 else findImage textures (idx + 1) maxIdx
 
 glLoadWal :: B.ByteString -> Quake (IORef ImageT)
-glLoadWal name = do
-    raw <- FS.loadFile name
+glLoadWal name = FS.fOpenFile name >>= loadMiptexT >>= uploadMiptexT name
 
-    case raw of
-      Nothing -> do
-        VID.printf Constants.printAll ("GL_FindImage: can't load " `B.append` name `B.append` "\n")
-        use $ fastRenderAPIGlobals.frNoTexture
-      Just buf -> do
-        let miptexT = newMiptexT (BL.fromStrict buf)
-            sz = (miptexT^.mWidth) * (miptexT^.mHeight)
-            offset = (miptexT^.mOffsets) UV.! 0
-            imgBuf = B.take sz (B.drop offset buf)
+loadMiptexT :: Maybe Handle -> Quake (Maybe MiptexT)
+loadMiptexT Nothing = return Nothing
+loadMiptexT (Just fileHandle) = do
+    (res, _) <- parseMiptexT
+    either (const (return Nothing)) (return . Just) res
+  where
+    parseMiptexT = runStateT (PB.decodeGet getMiptexT) (PBS.fromHandle fileHandle)
 
-        glLoadPic name imgBuf (miptexT^.mWidth) (miptexT^.mHeight) RenderAPIConstants.itWall 8
+uploadMiptexT :: B.ByteString -> Maybe MiptexT -> Quake (IORef ImageT)
+uploadMiptexT name Nothing = do
+    VID.printf Constants.printAll (B.concat ["GL_FindImage: can't load ", name, "\n"])
+    use (fastRenderAPIGlobals.frNoTexture)
+uploadMiptexT name (Just miptex) =
+    glLoadPic name (miptex^.mtBuf) (miptex^.mtWidth) (miptex^.mtHeight) RenderAPIConstants.itWall 8
 
 loadTGA :: B.ByteString -> Quake (Maybe (B.ByteString, (Int, Int)))
 loadTGA name = do
@@ -953,32 +961,34 @@ loadTGA name = do
 scrapUpload :: Quake ()
 scrapUpload = io (putStrLn "Image.scrapUpload") >> undefined -- TODO
 
-glEnableMultiTexture :: Bool -> Quake ()
-glEnableMultiTexture enable = do
-    if enable
-      then do
-        use (fastRenderAPIGlobals.frTexture1) >>= glSelectTexture
-        GL.glEnable GL.GL_TEXTURE_2D
-        glTexEnv GL.GL_REPLACE
-      else do
-        use (fastRenderAPIGlobals.frTexture1) >>= glSelectTexture
-        GL.glDisable GL.GL_TEXTURE_2D
-        glTexEnv GL.GL_REPLACE
-
-    use (fastRenderAPIGlobals.frTexture0) >>= glSelectTexture
-    glTexEnv GL.GL_REPLACE
-
 glSelectTexture :: Int -> Quake ()
 glSelectTexture texture = do
-    texture0 <- use $ fastRenderAPIGlobals.frTexture0
-    glState <- use $ fastRenderAPIGlobals.frGLState
+    texture0 <- use (fastRenderAPIGlobals.frTexture0)
+    glState <- use (fastRenderAPIGlobals.frGLState)
+    doSelectTexture texture texture0 glState
 
-    let tmu = if texture0 == texture then 0 else 1
+doSelectTexture :: Int -> Int -> GLStateT -> Quake ()
+doSelectTexture texture texture0 glState
+    | tmu /= (glState^.glsCurrentTmu) = do
+        fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
+        io $ do
+            GL.glActiveTextureARB (fromIntegral texture)
+            GL.glClientActiveTextureARB (fromIntegral texture)
+    | otherwise = return ()
+  where
+    tmu | texture0 == texture = 0
+        | otherwise = 1
 
-    when (tmu /= (glState^.glsCurrentTmu)) $ do
-      fastRenderAPIGlobals.frGLState.glsCurrentTmu .= tmu
-      GL.glActiveTextureARB (fromIntegral texture)
-      GL.glClientActiveTextureARB (fromIntegral texture)
+glEnableMultiTexture :: Bool -> Quake ()
+glEnableMultiTexture enable = do
+    glSelectTexture =<< use (fastRenderAPIGlobals.frTexture1)
+    io (glFunc GL.GL_TEXTURE_2D)
+    glTexEnv GL.GL_REPLACE
+    glSelectTexture =<< use (fastRenderAPIGlobals.frTexture0)
+    glTexEnv GL.GL_REPLACE
+  where
+    glFunc | enable = GL.glEnable
+           | otherwise = GL.glDisable
 
 rRegisterSkin :: B.ByteString -> Quake (Maybe (IORef ImageT))
 rRegisterSkin name = glFindImage name RenderAPIConstants.itSkin
