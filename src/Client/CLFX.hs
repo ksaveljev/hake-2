@@ -40,7 +40,7 @@ import           Data.Char             (ord)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
 import qualified Data.Vector.Mutable   as MV
-import           Linear                (V3(..), normalize, _x, _y, _z)
+import           Linear                (V3(..), norm, normalize, _x, _y, _z)
 
 import           Client.CDLightT
 import           Client.CEntityT
@@ -1003,7 +1003,36 @@ rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
 rocketTrail = error "CLFX.rocketTrail" -- TODO
 
 blasterTrail :: V3 Float -> V3 Float -> Quake ()
-blasterTrail = error "CLFX.blasterTrail" -- TODO
+blasterTrail start end = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    trailParticles freeParticles start (fmap (* 5) (normalize (end - start))) (norm (end - start))
+  where
+    trailParticles Nothing _ _ _ = return ()
+    trailParticles (Just pRef) move vec len
+        | len <= 0 = return ()
+        | otherwise = do
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            time <- use (globals.gCl.csTime)
+            p <- readRef pRef
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            modifyRef pRef (\v -> v & cpNext .~ activeParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            f <- Lib.randomF
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            modifyRef pRef (\v -> v & cpTime     .~ fromIntegral time
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (0.3 + f * 0.2)
+                                    & cpColor    .~ 0xE0
+                                    & cpOrg      .~ move + V3 o1 o2 o3
+                                    & cpVel      .~ V3 (5 * v1) (5 * v2) (5 * v3)
+                                    & cpAccel    .~ V3 0 0 0)
+
+            trailParticles (p^.cpNext) (move + vec) vec (len - 5)
 
 diminishingTrail :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 diminishingTrail = error "CLFX.diminishingTrail" -- TODO
