@@ -1124,10 +1124,10 @@ addAutomaticParticleTrails effects s1 ent
               else ClientV.addLight (ent^.eOrigin) 200 1 1 0
             return ent
         | effects .&. Constants.efGib /= 0 = do
-            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (Ref (s1^.esNumber)) effects
             return ent
         | effects .&. Constants.efGrenade /= 0 = do
-            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (Ref (s1^.esNumber)) effects
             return ent
         | effects .&. Constants.efFlies /= 0 = do
             CLFX.flyEffect (s1^.esNumber) (ent^.eOrigin)
@@ -1181,7 +1181,7 @@ addAutomaticParticleTrails effects s1 ent
             ClientV.addLight (ent^.eOrigin) 200 (-1) (-1) (-1)
             return ent
         | effects .&. Constants.efGreenGib /= 0 = do
-            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber) effects
+            CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (Ref (s1^.esNumber)) effects
             return ent
         | effects .&. Constants.efIonRipper /= 0 = do
             CLFX.ionRipperTrail (cent^.ceLerpOrigin) (ent^.eOrigin)

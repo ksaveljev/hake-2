@@ -31,7 +31,7 @@ module Client.CLFX
     ) where
 
 import           Control.Lens          (preuse, use, ix)
-import           Control.Lens          ((^.), (%=), (.=), (&), (.~))
+import           Control.Lens          ((^.), (%=), (.=), (&), (.~), (%~), (-~))
 import           Control.Monad         (unless, when)
 import           Data.Bits             (complement, (.&.))
 import qualified Data.ByteString       as B
@@ -1034,8 +1034,72 @@ blasterTrail start end = do
 
             trailParticles (p^.cpNext) (move + vec) vec (len - 5)
 
-diminishingTrail :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
-diminishingTrail = error "CLFX.diminishingTrail" -- TODO
+diminishingTrail :: V3 Float -> V3 Float -> Ref CEntityT -> Int -> Quake ()
+diminishingTrail start end oldRef flags = do
+    old <- readRef oldRef
+    let (orgScale, velScale) = checkTrailCount old
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addDiminishingTrail freeParticles old (fmap (* 0.5) (normalize (end - start))) start orgScale velScale (norm (end - start))
+  where
+    checkTrailCount old
+        | (old^.ceTrailCount) > 900 = (4, 15)
+        | (old^.ceTrailCount) > 800 = (2, 10)
+        | otherwise                 = (1, 5)
+    addDiminishingTrail Nothing _ _ _ _ _ _ = return ()
+    addDiminishingTrail (Just pRef) old vec move orgScale velScale len
+        | len <= 0 = return ()
+        | otherwise = do
+            r <- Lib.rand
+            doAddDiminishingTrail pRef old vec move orgScale velScale len r
+    doAddDiminishingTrail pRef old vec move orgScale velScale len r
+        | fromIntegral (r .&. 1023) < (old^.ceTrailCount) = do
+            p <- readRef pRef
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            f <- Lib.randomF
+            color <- Lib.rand
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            updateParticle pRef activeParticles move orgScale velScale time f color o1 o2 o3 v1 v2 v3
+            modifyRef oldRef (\v -> v & ceTrailCount %~ (\v -> if v - 5 < 100 then 100 else v - 5)) 
+            addDiminishingTrail (p^.cpNext) old vec (move + vec) orgScale velScale (len - 0.5)
+        | otherwise = do
+            modifyRef oldRef (\v -> v & ceTrailCount %~ (\v -> if v - 5 < 100 then 100 else v - 5))
+            addDiminishingTrail (Just pRef) old vec (move + vec) orgScale velScale (len - 0.5)
+    updateParticle pRef activeParticles move orgScale velScale time f color o1 o2 o3 v1 v2 v3
+        | flags .&. Constants.efGib /= 0 =
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAccel    .~ V3 0 0 0
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.4)
+                                    & cpColor    .~ 0xE8 + fromIntegral (color .&. 7)
+                                    & cpOrg      .~ move + fmap (* orgScale) (V3 o1 o2 o3)
+                                    & cpVel      .~ ((fmap (* velScale) (V3 v1 v2 v3)) & _z -~ particleGravity))
+        | flags .&. Constants.efGreenGib /= 0 =
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAccel    .~ V3 0 0 0
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.4)
+                                    & cpColor    .~ 0xDB + fromIntegral (color .&. 7)
+                                    & cpOrg      .~ move + fmap (* orgScale) (V3 o1 o2 o3)
+                                    & cpVel      .~ ((fmap (* velScale) (V3 v1 v2 v3)) & _z -~ particleGravity))
+        | otherwise =
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAccel    .~ V3 0 0 20
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.2)
+                                    & cpColor    .~ 4 + fromIntegral (color .&. 7)
+                                    & cpOrg      .~ move + fmap (* orgScale) (V3 o1 o2 o3)
+                                    & cpVel      .~ fmap (* velScale) (V3 v1 v2 v3))
 
 flyEffect :: Int -> V3 Float -> Quake ()
 flyEffect = error "CLFX.flyEffect" -- TODO
