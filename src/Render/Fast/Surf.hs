@@ -973,7 +973,7 @@ drawInlineBModel currentModelRef@(Ref modelIdx) = do
   where
     markLights currentModel newRefDef firstNodeRef = do
         mapM_ (markLight currentModel (MNodeChildRef firstNodeRef) newRefDef) [0..(newRefDef^.rdNumDLights)-1]
-    markLight currentModel nodeChild newRefDef idx = do
+    markLight currentModel nodeChild newRefDef idx =
         Light.rMarkLights currentModel ((newRefDef^.rdDLights) V.! idx) (1 `shiftL` idx) nodeChild
     entityError = do
         Com.fatalError "Surf.drawInlineBModel fastRenderAPIGlobals.frCurrentEntity is Nothing"

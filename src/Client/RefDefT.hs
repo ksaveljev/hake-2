@@ -1,12 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Client.RefDefT
-    ( module Client.RefDefT
-    ) where
+module Client.RefDefT where
 
-import           Control.Lens (makeLenses)
-import qualified Data.Vector as V
+import           Control.Lens        (makeLenses)
+import qualified Data.Vector         as V
 import qualified Data.Vector.Unboxed as UV
-import           Linear (V3(..), V4(..))
+import           Linear              (V3(..), V4(..))
 
 import           Types
 

@@ -62,7 +62,7 @@ rPushDLights = do
     doPushDLights newRefDef (Just worldModelRef) = do
         worldModel <- readRef worldModelRef
         mapM_ (markLight newRefDef worldModel) [0..(newRefDef^.rdNumDLights)-1]
-    markLight newRefDef worldModel idx = do
+    markLight newRefDef worldModel idx =
         rMarkLights worldModel ((newRefDef^.rdDLights) V.! idx) (1 `shiftL` idx) (MNodeChildRef ((worldModel^.mNodes) V.! 0))
 
 rMarkLights :: ModelT -> DLightT -> Int -> MNodeChild -> Quake ()
@@ -191,13 +191,13 @@ lightPoint p@(V3 a b c) worldModelRef = do
 addDynamicLights :: EntityT -> RefDefT -> V3 Float -> Int -> Int -> V3 Float
 addDynamicLights currentEntity newRefDef color idx maxIdx
     | idx >= maxIdx = color
-    | otherwise =
+    | otherwise = do
         let dlight = (newRefDef^.rdDLights) V.! idx
             end = (currentEntity^.eOrigin) - (dlight^.dlOrigin)
             add = ((dlight^.dlIntensity) - norm end) * (1 / 256)
             color' | add > 0   = color + fmap (* add) (dlight^.dlColor)
                    | otherwise = color
-        in addDynamicLights currentEntity newRefDef color' (idx + 1) maxIdx
+        addDynamicLights currentEntity newRefDef color' (idx + 1) maxIdx
 
 recursiveLightPoint :: Ref ModelT -> MNodeChild -> V3 Float -> V3 Float -> Quake Int
 recursiveLightPoint _ (MLeafChildRef _) _ _ = return (-1) -- didn't hit anything
@@ -324,11 +324,12 @@ rBuildLightMap surf buffer offset stride = do
         texInfo <- io (readIORef (surf^.msTexInfo))
         when ((texInfo^.mtiFlags) .&. (Constants.surfSky .|. Constants.surfTrans33 .|. Constants.surfTrans66 .|. Constants.surfWarp) /= 0) $
             Com.comError Constants.errDrop "R_BuildLightMap called for non-lit surface"
-        when (size > ((UV.length blockLights) * Constants.sizeOfFloat) `shiftR` 4) $
+        when (size > ((MUV.length blockLights) * Constants.sizeOfFloat) `shiftR` 4) $
             Com.comError Constants.errDrop "Bad s_blocklights size"
     checkLightData Nothing = do
         -- fastRenderAPIGlobals.frBlockLights %= (UV.// (zip [0..size * 3 - 1] (repeat 255)))
-        fastRenderAPIGlobals.frBlockLights .= UV.replicate (34 * 34 * 3) 255
+        blockLights <- io (MUV.replicate (34 * 34 * 3) 255)
+        fastRenderAPIGlobals.frBlockLights .= blockLights
         return True
     checkLightData _ = return False
 
@@ -338,9 +339,7 @@ addUpdateLightMaps surf size = do
     newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
     glModulate <- fmap (^.cvValue) glModulateCVar
     blockLights <- use (fastRenderAPIGlobals.frBlockLights)
-    let !blockLights' = doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
-    -- fastRenderAPIGlobals.frBlockLights .= doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
-    fastRenderAPIGlobals.frBlockLights .= blockLights'
+    doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
     frameCount <- use (fastRenderAPIGlobals.frFrameCount)
     when ((surf^.msDLightFrame) == frameCount) $
         rAddDynamicLights surf
@@ -350,17 +349,13 @@ addUpdateLightMaps surf size = do
         Com.fatalError "Light.addUpdateLightMaps surf^.msSamples cannot be Nothing"
         return B.empty
     doAddUpdateLightMaps blockLights lightmap newRefDef glModulate
-        | numMaps == 1 = runST $ do
-            bl <- UV.unsafeThaw blockLights
-            addLightMaps surf bl lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
-            UV.unsafeFreeze bl
-        | otherwise = runST $ do
-            bl <- UV.unsafeThaw blockLights
-            MUV.set bl 0
-            updateLightMaps surf bl lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
-            UV.unsafeFreeze bl
+        | numMaps == 1 =
+            io (addLightMaps surf blockLights lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps)
+        | otherwise = io $ do
+            MUV.set blockLights 0
+            updateLightMaps surf blockLights lightmap 0 newRefDef glModulate size 0 Constants.maxLightMaps
 
-addLightMaps :: MSurfaceT -> MUV.STVector s Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> ST s ()
+addLightMaps :: MSurfaceT -> MUV.IOVector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> IO ()
 addLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
     | idx >= maxIdx = return ()
     | (surf^.msStyles) `B.index` idx == 255 = return ()
@@ -376,7 +371,7 @@ addLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size i
         | all (== 1) [scale0, scale1, scale2] = setLightmap blockLights lightmap lightmapIndex 0 size
         | otherwise = setLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size
 
-updateLightMaps :: MSurfaceT -> MUV.STVector s Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> ST s ()
+updateLightMaps :: MSurfaceT -> MUV.IOVector Float -> B.ByteString -> Int -> RefDefT -> Float -> Int -> Int -> Int -> IO ()
 updateLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate size idx maxIdx
     | idx >= maxIdx = return ()
     | (surf^.msStyles) `B.index` idx == 255 = return ()
@@ -392,7 +387,7 @@ updateLightMaps surf blockLights lightmap lightmapIndex newRefDef glModulate siz
         | all (== 1) [scale0, scale1, scale2] = updateLightmap blockLights lightmap lightmapIndex 0 size
         | otherwise = updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 0 size
 
-setLightmap :: MUV.STVector s Float -> B.ByteString -> Int -> Int -> Int -> ST s Int
+setLightmap :: MUV.IOVector Float -> B.ByteString -> Int -> Int -> Int -> IO Int
 setLightmap blockLights lightmap lightmapIndex idx maxIdx
     | idx >= maxIdx = return lightmapIndex
     | otherwise = do
@@ -404,7 +399,7 @@ setLightmap blockLights lightmap lightmapIndex idx maxIdx
         MUV.write blockLights (idx * 3 + 2) c
         setLightmap blockLights lightmap (lightmapIndex + 3) (idx + 1) maxIdx
 
-setLightmapScale :: MUV.STVector s Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> ST s Int
+setLightmapScale :: MUV.IOVector Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> IO Int
 setLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx
     | idx >= maxIdx = return lightmapIndex
     | otherwise = do
@@ -416,7 +411,7 @@ setLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx max
         MUV.write blockLights (idx * 3 + 2) c
         setLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx
 
-updateLightmap :: MUV.STVector s Float -> B.ByteString -> Int -> Int -> Int -> ST s Int
+updateLightmap :: MUV.IOVector Float -> B.ByteString -> Int -> Int -> Int -> IO Int
 updateLightmap blockLights lightmap lightmapIndex idx maxIdx
     | idx >= maxIdx = return lightmapIndex
     | otherwise = do
@@ -428,7 +423,7 @@ updateLightmap blockLights lightmap lightmapIndex idx maxIdx
         MUV.modify blockLights (c +) (idx * 3 + 2)
         updateLightmap blockLights lightmap (lightmapIndex + 3) (idx + 1) maxIdx
 
-updateLightmapScale :: MUV.STVector s Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> ST s Int
+updateLightmapScale :: MUV.IOVector Float -> B.ByteString -> Int -> Float -> Float -> Float -> Int -> Int -> IO Int
 updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx maxIdx
     | idx >= maxIdx = return lightmapIndex
     | otherwise = do
@@ -441,7 +436,52 @@ updateLightmapScale blockLights lightmap lightmapIndex scale0 scale1 scale2 idx 
         updateLightmapScale blockLights lightmap (lightmapIndex + 3) scale0 scale1 scale2 (idx + 1) maxIdx
 
 rAddDynamicLights :: MSurfaceT -> Quake ()
-rAddDynamicLights = error "Light.rAddDynamicLights" -- TODO
+rAddDynamicLights surf = do
+    newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+    maybe cPlaneError (proceedAddDynamicLights newRefDef) (surf^.msPlane)
+  where
+    smax = fromIntegral (((surf^.msExtents._1) `shiftR` 4) + 1)
+    tmax = fromIntegral (((surf^.msExtents._2) `shiftR` 4) + 1)
+    cPlaneError = Com.fatalError "Light.rAddDynamicLights surf^.msPlane is Nothing"
+    proceedAddDynamicLights newRefDef planeRef = do
+        plane <- io (readIORef planeRef)
+        mapM_ (addDynamicLight surf plane newRefDef smax tmax) [0..(newRefDef^.rdNumDLights)-1]
+
+addDynamicLight :: MSurfaceT -> CPlaneT -> RefDefT -> Int -> Int -> Int -> Quake ()
+addDynamicLight surf plane newRefDef smax tmax idx
+    | (surf^.msDLightBits) .&. (1 `shiftL` idx) == 0 = return ()
+    | otherwise = do
+        let dLight = (newRefDef^.rdDLights) V.! idx
+            fdist = (dLight^.dlOrigin) `dot` (plane^.cpNormal) - (plane^.cpDist)
+            frad = (dLight^.dlIntensity) - abs fdist
+        doAddDynamicLight dLight frad fdist
+  where
+    doAddDynamicLight dLight frad fdist
+        | frad < dLightCutoff = return ()
+        | otherwise = do
+            blockLights <- use (fastRenderAPIGlobals.frBlockLights)
+            texInfo <- io (readIORef (surf^.msTexInfo))
+            let fminlight = frad - dLightCutoff
+                impact = (dLight^.dlOrigin) - fmap (* fdist) (plane^.cpNormal)
+                local0 = impact `dot` (texInfo^.mtiVecs._1._xyz) + (texInfo^.mtiVecs._1._w) - (fromIntegral (surf^.msTextureMins._1))
+                local1 = impact `dot` (texInfo^.mtiVecs._2._xyz) + (texInfo^.mtiVecs._2._w) - (fromIntegral (surf^.msTextureMins._2))
+            updateBlockLights blockLights fminlight dLight frad local0 local1 0 0 0
+    updateBlockLights blockLights fminlight dLight frad local0 local1 blIndex t ftacc
+        | t >= tmax = return ()
+        | otherwise = do
+            let td = (\x -> if x < 0 then negate x else x) (truncate (local1 - ftacc)) :: Int
+            doUpdateBlockLights blockLights fminlight dLight frad local0 local1 blIndex t ftacc td 0 0
+    doUpdateBlockLights blockLights fminlight dLight frad local0 local1 blIndex t ftacc td s fsacc
+        | s >= smax = updateBlockLights blockLights fminlight dLight frad local0 local1 blIndex (t + 1) (ftacc + 16)
+        | otherwise = do
+            let sd = (\x -> if x < 0 then negate x else x) (truncate (local0 - fsacc)) :: Int
+                fdist | sd > td = fromIntegral (sd + (td `shiftR` 1))
+                      | otherwise = fromIntegral (td + (sd `shiftR` 1))
+            when (fdist < fminlight) $ io $ do
+                MUV.modify blockLights (\v -> v + (frad - fdist) * (dLight^.dlColor._x)) (blIndex + 0)
+                MUV.modify blockLights (\v -> v + (frad - fdist) * (dLight^.dlColor._y)) (blIndex + 1)
+                MUV.modify blockLights (\v -> v + (frad - fdist) * (dLight^.dlColor._z)) (blIndex + 2)
+            doUpdateBlockLights blockLights fminlight dLight frad local0 local1 (blIndex + 3) t ftacc td (s + 1) (fsacc + 16)
 
 putIntoTextureFormat :: MSV.IOVector Word8 -> Int -> Int -> Int -> Int -> Quake ()
 putIntoTextureFormat buffer offset stride tmax smax = do
@@ -456,16 +496,16 @@ putIntoTextureFormat buffer offset stride tmax smax = do
         | otherwise =
             doBuildLightMapAlpha buffer monoLightMap blockLights 0 stride' offset 0 tmax 0 smax
 
-doBuildLightMap :: MSV.IOVector Word8 -> UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+doBuildLightMap :: MSV.IOVector Word8 -> MUV.IOVector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 doBuildLightMap buffer blockLights blp stride currentOffset i tmax j smax
     | i >= tmax = return ()
     | j >= smax = doBuildLightMap buffer blockLights blp stride (currentOffset + stride) (i + 1) tmax 0 smax
     | otherwise = do
-        let r = (truncate (blockLights UV.! (blp + 0))) :: Int
-            g = (truncate (blockLights UV.! (blp + 1))) :: Int
-            b = (truncate (blockLights UV.! (blp + 2))) :: Int
+        r <- fmap truncate (MUV.read blockLights (blp + 0)) :: IO Int
+        g <- fmap truncate (MUV.read blockLights (blp + 1)) :: IO Int
+        b <- fmap truncate (MUV.read blockLights (blp + 2)) :: IO Int
             -- catch negative lights
-            r' = if r < 0 then 0 else r
+        let r' = if r < 0 then 0 else r
             g' = if g < 0 then 0 else g
             b' = if b < 0 then 0 else b
             -- determine the brightest of the three color components
@@ -487,16 +527,16 @@ doBuildLightMap buffer blockLights blp stride currentOffset i tmax j smax
         MSV.write buffer (currentOffset + 3) a'
         doBuildLightMap buffer blockLights (blp + 3) stride (currentOffset + 4) i tmax (j + 1) smax
 
-doBuildLightMapAlpha :: MSV.IOVector Word8 -> B.ByteString -> UV.Vector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
+doBuildLightMapAlpha :: MSV.IOVector Word8 -> B.ByteString -> MUV.IOVector Float -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> IO ()
 doBuildLightMapAlpha buffer monoLightMap blockLights blp stride currentOffset i tmax j smax
     | i >= tmax = return ()
     | j >= smax = doBuildLightMapAlpha buffer monoLightMap blockLights blp stride (currentOffset + stride) (i + 1) tmax 0 smax
     | otherwise = do
-        let r = (truncate (blockLights UV.! (blp + 0))) :: Int
-            g = (truncate (blockLights UV.! (blp + 1))) :: Int
-            b = (truncate (blockLights UV.! (blp + 2))) :: Int
+        r <- fmap truncate (MUV.read blockLights (blp + 0)) :: IO Int
+        g <- fmap truncate (MUV.read blockLights (blp + 1)) :: IO Int
+        b <- fmap truncate (MUV.read blockLights (blp + 2)) :: IO Int
             -- catch negative lights
-            r' = if r < 0 then 0 else r
+        let r' = if r < 0 then 0 else r
             g' = if g < 0 then 0 else g
             b' = if b < 0 then 0 else b
             -- determine the brightest of the three color components

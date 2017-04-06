@@ -9,6 +9,7 @@ import qualified Data.Vector                  as V
 import qualified Data.Vector.Mutable          as MV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed          as UV
+import qualified Data.Vector.Unboxed.Mutable  as MUV
 import           Linear                       (V3(..), V4(..))
 import           System.IO.Unsafe             (unsafePerformIO)
 
@@ -113,7 +114,7 @@ initialFastRenderAPIGlobals = FastRenderAPIGlobals
     , _frSkyMins              = (UV.empty, UV.empty)
     , _frSkyMaxs              = (UV.empty, UV.empty)
     , _frAlphaSurfaces        = Nothing
-    , _frBlockLights          = UV.replicate (34 * 34 * 3) 0
+    , _frBlockLights          = unsafePerformIO (MUV.replicate (34 * 34 * 3) 0)
     , _frPointColor           = V3 0 0 0
     , _frLightSpot            = V3 0 0 0
     , _frRawPalette           = UV.replicate 0 256

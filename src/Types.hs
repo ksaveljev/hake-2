@@ -15,6 +15,7 @@ import qualified Data.Vector.Mutable          as MV
 import qualified Data.Vector.Storable         as SV
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed          as UV
+import qualified Data.Vector.Unboxed.Mutable  as MUV
 import           Data.Word                    (Word8, Word16, Word32)
 import qualified Graphics.UI.GLFW             as GLFW
 import qualified Graphics.GL                  as GL
@@ -331,7 +332,7 @@ data FastRenderAPIGlobals = FastRenderAPIGlobals
     , _frSkyMins              :: (UV.Vector Float, UV.Vector Float)
     , _frSkyMaxs              :: (UV.Vector Float, UV.Vector Float)
     , _frAlphaSurfaces        :: Maybe (IORef MSurfaceT)
-    , _frBlockLights          :: UV.Vector Float
+    , _frBlockLights          :: MUV.IOVector Float
     , _frPointColor           :: V3 Float
     , _frLightSpot            :: V3 Float
     , _frRawPalette           :: UV.Vector Int
