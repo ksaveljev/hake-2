@@ -28,13 +28,14 @@ import qualified Constants
 import qualified Game.Cmd           as Cmd
 import qualified Game.Info          as Info
 import           Game.CVarT
-import qualified QCommon.Com        as Com
 import           QCommon.CVarShared
 import qualified QCommon.Shared     as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib           as Lib
 import           Util.Binary        (encode)
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 initialize :: Quake ()
 initialize = do

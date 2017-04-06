@@ -7,12 +7,12 @@ import           Control.Lens     (use, (^.))
 import           Control.Monad    (when)
 import qualified Data.ByteString  as B
 
-import qualified QCommon.Com      as Com
 import           QCommon.SizeBufT
 import qualified QCommon.SZ       as SZ
 import           QuakeState
 import           Types
 
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 insertText :: B.ByteString -> Quake ()
 insertText text = do

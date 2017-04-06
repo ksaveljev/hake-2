@@ -11,7 +11,7 @@ module QCommon.Com
     , quit
     ) where
 
-import           Control.Lens          (use, (.=), (%=))
+import           Control.Lens          (use, (.=), (^.), (%=))
 import           Control.Monad         (when)
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
@@ -20,7 +20,10 @@ import           Data.Maybe            (fromMaybe)
 import qualified Data.Vector           as V
 import           Data.Word             (Word8)
 
+import qualified Client.Console        as Console
 import qualified Constants
+import           Game.CVarT
+import qualified QCommon.CVar          as CVar
 import           QuakeState
 import qualified Sys.Sys               as Sys
 import           Types
@@ -52,9 +55,19 @@ initializeArgv args = do
         | otherwise = BC.pack s 
 
 printf :: B.ByteString -> Quake ()
-printf str = io $ do
-    B.putStr str -- TODO
-    B.putStr "IMPLEMENT Com.printf!!\n"
+printf msg = do
+    checkRdTarget =<< use (comGlobals.cgRdTarget)
+    Console.printConsole msg
+    Sys.consoleOutput msg
+    checkLogFile =<< CVar.findVar "logfile"
+  where
+    checkRdTarget rdTarget
+        | rdTarget /= 0 = error "Com.printf#checkRdTarget" -- TODO
+        | otherwise = return ()
+    checkLogFile Nothing = return ()
+    checkLogFile (Just logFile)
+        | (logFile^.cvValue) /= 0 = error "Com.printf#checkLogFile" -- TODO
+        | otherwise = return ()
 
 dprintf :: B.ByteString -> Quake ()
 dprintf str = io (B.putStr str) -- TODO: use printf $ str -- memory is going crazy here, need optimizations

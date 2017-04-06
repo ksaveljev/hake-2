@@ -30,7 +30,6 @@ import qualified Constants
 import           Game.CmdAliasT
 import qualified QCommon.CBufShared      as CBuf
 import           QCommon.CmdFunctionT
-import qualified QCommon.Com             as Com
 import qualified QCommon.CVarShared      as CVar
 import qualified QCommon.FSShared        as FS
 import qualified QCommon.MSG             as MSG
@@ -40,6 +39,8 @@ import           QCommon.XCommandT
 import           QuakeState
 import           Types
 import           Util.Binary             (encode)
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 aliasLoopCount :: Int
 aliasLoopCount = 16

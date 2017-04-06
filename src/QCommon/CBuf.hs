@@ -17,11 +17,12 @@ import qualified Data.Vector           as V
 
 import qualified Game.Cmd              as Cmd
 import           QCommon.CBufShared
-import qualified QCommon.Com           as Com
 import           QCommon.SizeBufT
 import qualified QCommon.SZ            as SZ
 import           QuakeState
 import           Types
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 addEarlyCommands :: Bool -> Quake ()
 addEarlyCommands shouldClear = do

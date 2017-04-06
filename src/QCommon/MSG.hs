@@ -38,11 +38,12 @@ import           Linear                  (V3(..), _x, _y, _z)
 
 import qualified Constants
 import           Game.UserCmdT
-import qualified QCommon.Com             as Com
 import           QCommon.SizeBufT
 import qualified QCommon.SZ              as SZ
 import           Types
 import qualified Util.Math3D             as Math3D
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1

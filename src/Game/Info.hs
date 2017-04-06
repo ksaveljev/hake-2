@@ -12,8 +12,9 @@ import qualified Data.ByteString.Lazy    as BL
 import           Data.Monoid             ((<>))
 
 import qualified Constants
-import qualified QCommon.Com             as Com
 import           Types
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 printInfo :: B.ByteString -> Quake ()
 printInfo str =

@@ -10,10 +10,11 @@ import           Control.Lens     (ASetter', Lens', Traversal', preuse, (.=), (%
 import           Control.Monad    (when, unless)
 import qualified Data.ByteString  as B
 
-import qualified QCommon.Com      as Com
 import           QCommon.SizeBufT
 import           Types
 import           Util.Binary      (encode)
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 initialize :: Traversal' QuakeState SizeBufT -> B.ByteString -> Int -> Quake ()
 initialize bufLens bufData maxLen =

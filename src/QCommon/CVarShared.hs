@@ -20,11 +20,12 @@ import           Data.Maybe            (isNothing, isJust)
 
 import qualified Constants
 import           Game.CVarT
-import qualified QCommon.Com           as Com
-import {-# SOURCE #-} qualified QCommon.Shared as FS
 import           QuakeState
 import           Types
 import qualified Util.Lib              as Lib
+
+import {-# SOURCE #-} qualified QCommon.Shared as FS
+import {-# SOURCE #-} qualified QCommon.Com    as Com
 
 get :: B.ByteString -> B.ByteString -> Int -> Quake (Maybe CVarT)
 get name value flags = do

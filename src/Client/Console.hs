@@ -6,6 +6,7 @@ module Client.Console
     , drawNotify
     , drawString
     , initialize
+    , printConsole
     , toggleConsoleF
     ) where
 
@@ -29,11 +30,12 @@ import           Client.VidDefT
 import qualified Constants
 import qualified Game.Cmd                     as Cmd
 import qualified QCommon.CVar                 as CVar
-import qualified QCommon.Com                  as Com
 import           QuakeState
 import           Render.Renderer
 import           Types
 import           Util.Unsafe
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 checkResize :: VidDefT -> Quake ()
 checkResize vidDef = do
@@ -333,3 +335,6 @@ toggleChatF = XCommandT "Console.toggleChatF" $
 toggleConsoleF :: XCommandT
 toggleConsoleF = XCommandT "Console.toggleConsoleF" $
     error "Console.toggleConsoleF" -- TODO
+
+printConsole :: B.ByteString -> Quake ()
+printConsole = error "Console.print" -- TODO

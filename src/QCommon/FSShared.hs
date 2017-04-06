@@ -19,13 +19,14 @@ import           System.Directory
 import           System.PosixCompat.Files (getFileStatus, fileSize)
 
 import qualified Constants
-import qualified QCommon.Com              as Com
 import           QCommon.FileLinkT
 import           QCommon.PackFileT
 import           QCommon.PackT
 import           QCommon.SearchPathT
 import           QuakeState
 import           Types
+
+import {-# SOURCE #-} qualified QCommon.Com as Com
 
 loadFile :: B.ByteString -> Quake (Maybe B.ByteString)
 loadFile path = do
