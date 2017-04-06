@@ -1059,7 +1059,38 @@ particleEffect3 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
 particleEffect3 = error "CLFX.particleEffect3" -- TODO
 
 blasterParticles :: V3 Float -> V3 Float -> Quake ()
-blasterParticles = error "CLFX.blasterParticles" -- TODO
+blasterParticles org dir = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    drawParticles freeParticles 0 40
+  where
+    drawParticles :: Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+    drawParticles Nothing _ _ = return ()
+    drawParticles (Just pRef) idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            modifyRef pRef (\v -> v & cpNext .~ activeParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            r <- Lib.rand
+            d <- fmap (fromIntegral . (.&. 15)) Lib.rand
+            o1 <- Lib.rand
+            o2 <- Lib.rand
+            o3 <- Lib.rand
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            f <- Lib.randomF
+            modifyRef pRef (\v -> v & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ 0xE0 + fromIntegral (r .&. 7)
+                                    & cpOrg      .~ org + (V3 (fromIntegral ((o1 .&. 7) - 4)) (fromIntegral ((o2 .&. 7) - 4)) (fromIntegral ((o3 .&. 7) - 4))) + fmap (* d) dir
+                                    & cpVel      .~ fmap (* 30) dir + fmap (* 40) (V3 v1 v2 v3)
+                                    & cpAccel    .~ V3 0 0 (- particleGravity)
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (0.5 + f * 0.3))
+            drawParticles (p^.cpNext) (idx + 1) maxIdx
 
 railTrail :: V3 Float -> V3 Float -> Quake ()
 railTrail = error "CLFX.railTrail" -- TODO
