@@ -523,21 +523,13 @@ drawLeafStuff worldModel leafRef = do
         unless (((newRefDef^.rdAreaBits) UV.! ((leaf^.mlArea) `shiftR` 3)) .&. (1 `shiftL` ((leaf^.mlArea) .&. 7)) == 0) $ do -- unless not visible
             frameCount <- use (fastRenderAPIGlobals.frFrameCount)
             -- io (V.imapM_ (updateSurfaceFrameCount leaf frameCount) (worldModel^.mMarkSurfaces)) -- huge allocation rate :(
-            io $ updateSurfaceFrameCount leaf frameCount 0 (V.length (worldModel^.mMarkSurfaces))
+            io $ updateSurfaceFrameCount frameCount (leaf^.mlMarkIndex) ((leaf^.mlMarkIndex) + (leaf^.mlNumMarkSurfaces))
   where
-    updateSurfaceFrameCount leaf frameCount idx maxIdx
+    updateSurfaceFrameCount frameCount idx maxIdx
         | idx >= maxIdx = return ()
-        | idx >= (leaf^.mlMarkIndex) && idx < (leaf^.mlMarkIndex) + (leaf^.mlNumMarkSurfaces) = do
+        | otherwise = do
             modifyIORef' ((worldModel^.mMarkSurfaces) V.! idx) (\v -> v & msVisFrame .~ frameCount)
-            updateSurfaceFrameCount leaf frameCount (idx + 1) maxIdx
-        | otherwise =
-            updateSurfaceFrameCount leaf frameCount (idx + 1) maxIdx
-  {-
-    updateSurfaceFrameCount leaf frameCount i surfRef
-        | i >= (leaf^.mlMarkIndex) && i < (leaf^.mlMarkIndex) + (leaf^.mlNumMarkSurfaces) = do
-            modifyIORef' surfRef (\v -> v & msVisFrame .~ frameCount)
-        | otherwise = return ()
-        -}
+            updateSurfaceFrameCount frameCount (idx + 1) maxIdx
 
 -- TODO: try doing everything related to worldModel^.mSurfaces via QuakeRef (see if it is possible to use loadModelRef)
 drawNodeStuff :: Ref ModelT -> ModelT -> MNodeT -> Int -> Int -> Int -> Int -> Quake ()

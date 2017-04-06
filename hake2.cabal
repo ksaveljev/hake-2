@@ -275,7 +275,6 @@ executable hake2
                      Server.SVGame
                      Server.SVGlobals
                      Server.SVInit
-                     Server.SVMainShared
                      Server.SVSend
                      Server.SVUser
                      Server.SVWorld
@@ -295,3 +294,4 @@ executable hake2
                      Util.QuakeFile
                      Util.Unsafe
                      Render.GLFWbGlobals
+                     Client.CLTEntShared

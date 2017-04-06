@@ -36,11 +36,12 @@ import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
-import qualified Server.SVMainShared   as SVMain
 import qualified Server.SVUser         as SVUser
 import qualified Sys.Timer             as Timer
 import           Types
 import           Util.Binary           (encode, getInt)
+
+import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 broadcastCommand :: B.ByteString -> Quake ()
 broadcastCommand cmd = broadcast =<< use (svGlobals.svServer.sState)

@@ -1,18 +1,18 @@
 module Quake where
 
-import           Control.Lens        ((.=), (&), (.~))
-import           Control.Monad       (when, void)
-import           Control.Monad.State (evalStateT)
-import           System.Environment  (getArgs)
-import           System.Random       (newStdGen)
+import           Control.Lens               ((.=), (&), (.~))
+import           Control.Monad              (when, void)
+import           Control.Monad.State.Strict (evalStateT)
+import           System.Environment         (getArgs)
+import           System.Random              (newStdGen)
 
 import qualified Constants
 import           Game.CVarT
-import qualified QCommon.Com         as Com
-import qualified QCommon.CVar        as CVar
-import qualified QCommon.QCommon     as QCommon
+import qualified QCommon.Com                as Com
+import qualified QCommon.CVar               as CVar
+import qualified QCommon.QCommon            as QCommon
 import           QuakeState
-import qualified Sys.Timer           as Timer
+import qualified Sys.Timer                  as Timer
 import           Types
 
 

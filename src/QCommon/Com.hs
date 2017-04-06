@@ -20,14 +20,15 @@ import           Data.Maybe            (fromMaybe)
 import qualified Data.Vector           as V
 import           Data.Word             (Word8)
 
-import {-# SOURCE #-} qualified Client.CL as CL
 import qualified Constants
 import           QuakeState
-import qualified Server.SVMainShared   as SVMain
 import qualified Sys.Sys               as Sys
 import           Types
 import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
+
+import {-# SOURCE #-} qualified Client.CL     as CL
+import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 argv :: Int -> Quake B.ByteString
 argv idx = do

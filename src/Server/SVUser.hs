@@ -4,8 +4,8 @@ module Server.SVUser
     ) where
 
 import           Control.Lens          (Traversal', preuse, use, ix)
-import           Control.Lens          ((^.), (.=), (&), (.~), (-~))
-import           Control.Monad         (when, unless, (>=>))
+import           Control.Lens          ((^.), (.=), (+=), (&), (.~), (-~))
+import           Control.Monad         (when, unless, void, (>=>))
 import           Data.Bits             ((.&.))
 import qualified Data.ByteString       as B
 import qualified Data.Vector           as V
@@ -33,11 +33,12 @@ import           Server.ClientFrameT
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
-import qualified Server.SVMainShared   as SVMain
 import           Server.UCmdT
 import           Types
 import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
+
+import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 maxStringCmds :: Int
 maxStringCmds = 8
@@ -290,7 +291,17 @@ nextServer :: Quake ()
 nextServer = do
     state <- use (svGlobals.svServer.sState)
     coopValue <- CVar.variableValue "coop"
-    error "SVUser.nextServer" -- TODO
+    unless (state == Constants.ssGame || (state == Constants.ssPic && coopValue == 0)) $ do
+        svGlobals.svServerStatic.ssSpawnCount += 1 -- make sure another doesn't sneak in
+        v <- CVar.variableString "nextserver"
+        addText v
+        void (CVar.set "nextserver" B.empty)
+  where
+    addText v
+        | B.null v = CBuf.addText "killserver\n"
+        | otherwise = do
+            CBuf.addText v
+            CBuf.addText "\n"
 
 clientThink :: Ref ClientT -> UserCmdT -> Quake ()
 clientThink clientRef cmd = do

@@ -34,13 +34,14 @@ import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
 import qualified Server.SVGame         as SVGame
-import qualified Server.SVMainShared   as SVMain
 import qualified Server.SVSend         as SVSend
 import qualified Server.SVWorld        as SVWorld
 import qualified Sys.NET               as NET
 import           Types
 import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
+
+import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 svMap :: Bool -> B.ByteString -> Bool -> Quake ()
 svMap attractLoop levelString loadGame = do

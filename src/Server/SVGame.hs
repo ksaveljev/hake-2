@@ -7,6 +7,7 @@ module Server.SVGame
     , inPHS
     , pfError2
     , setModel
+    , shutdownGameProgs
     , startSound
     , unicast
     , writeByte

@@ -25,10 +25,11 @@ import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
 import qualified Server.SVInit         as SVInit
-import qualified Server.SVMainShared   as SVMain
 import qualified Server.SVSend         as SVSend
 import qualified Sys.NET               as NET
 import           Types
+
+import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands =

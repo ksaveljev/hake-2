@@ -1243,7 +1243,8 @@ drawField x y color width value
     x' = x + 2 + charWidth * (w - len)
 
 doDrawField :: Renderer -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
-doDrawField renderer num color x y idx = (renderer^.rRefExport.reDrawPic) x y pic
+doDrawField renderer num color x y idx =
+    (renderer^.rRefExport.reDrawPic) (x + idx * charWidth) y pic
   where
     ptr = num `BC.index` idx
     frame | ptr == '-' = statMinus

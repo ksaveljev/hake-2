@@ -41,7 +41,7 @@ import           Server.ServerStaticT
 import           Server.ServerT
 import qualified Server.SVConsoleCommands as SVConsoleCommands
 import qualified Server.SVEnts            as SVEnts
-import           Server.SVMainShared
+import qualified Server.SVGame            as SVGame
 import qualified Server.SVSend            as SVSend
 import qualified Server.SVUser            as SVUser
 import qualified Sys.NET                  as NET
@@ -542,3 +542,34 @@ userInfoChanged clientRef = do
         | val < 100 = 100
         | val > 15000 = 15000
         | otherwise = val
+
+shutdown :: B.ByteString -> Bool -> Quake ()
+shutdown finalMsg reconnect = do
+    clients <- use (svGlobals.svServerStatic.ssClients)
+    when (V.null clients) $ 
+        finalMessage finalMsg reconnect
+    masterShutdown
+    SVGame.shutdownGameProgs
+    -- free current level
+    sDemoFileHandle <- use (svGlobals.svServer.sDemoFile)
+    maybe (return ()) Lib.fClose sDemoFileHandle
+    svGlobals.svServer .= newServer
+    globals.gServerState .= (newServer^.sState)
+    ssDemoFileHandle <- use (svGlobals.svServerStatic.ssDemoFile)
+    maybe (return ()) Lib.fClose ssDemoFileHandle
+    svGlobals.svServerStatic .= newServerStaticT
+  where
+    newServer = newServerT
+
+finalMessage :: B.ByteString -> Bool -> Quake ()
+finalMessage = error "SVMainShared.finalMessage" -- TODO
+
+masterShutdown :: Quake ()
+masterShutdown = do
+    dedicated <- fmap (^.cvValue) dedicatedCVar
+    publicServer <- fmap (^.cvValue) publicServerCVar
+    unless (dedicated == 0 || publicServer == 0) $ do
+        error "SVMainShared.masterShutdown" -- TODO
+
+dropClient :: Ref ClientT -> Quake ()
+dropClient = error "SVMain.dropClient" -- TODO

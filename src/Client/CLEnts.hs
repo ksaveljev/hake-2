@@ -12,7 +12,7 @@ import           Data.Bits             (complement, shiftL, shiftR, (.&.), (.|.)
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (toLower)
-import           Data.IORef            (IORef, newIORef, modifyIORef')
+import           Data.IORef            (newIORef)
 import           Data.Maybe            (isNothing)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
@@ -1106,7 +1106,7 @@ addAutomaticParticleTrails effects s1 ent
   where
     doAddAutomaticParticleTrails cent
         | effects .&. Constants.efRocket /= 0 = do
-            CLFX.rocketTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (s1^.esNumber)
+            CLFX.rocketTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (Ref (s1^.esNumber))
             ClientV.addLight (ent^.eOrigin) 200 1 1 0
             return ent
         | effects .&. Constants.efBlaster /= 0 = do
@@ -1130,7 +1130,7 @@ addAutomaticParticleTrails effects s1 ent
             CLFX.diminishingTrail (cent^.ceLerpOrigin) (ent^.eOrigin) (Ref (s1^.esNumber)) effects
             return ent
         | effects .&. Constants.efFlies /= 0 = do
-            CLFX.flyEffect (s1^.esNumber) (ent^.eOrigin)
+            CLFX.flyEffect (Ref (s1^.esNumber)) (ent^.eOrigin)
             return ent
         | effects .&. Constants.efBFG /= 0 = do
             i <- if effects .&. Constants.efAnimAllFast /= 0
@@ -1142,7 +1142,7 @@ addAutomaticParticleTrails effects s1 ent
             ClientV.addLight (ent^.eOrigin) (fromIntegral i) 0 1 0
             return ent
         | effects .&. Constants.efTrap /= 0 = do
-            let origin@(V3 a b c) = ent^.eOrigin
+            let (V3 a b c) = ent^.eOrigin
                 ent' = ent { _eOrigin = V3 a b (c + 32) }
             CLFX.trapParticles ent'
             r <- Lib.rand

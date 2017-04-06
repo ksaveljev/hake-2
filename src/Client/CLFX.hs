@@ -64,6 +64,9 @@ import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
+beamLength :: Float
+beamLength = 16
+
 particleGravity :: Float
 particleGravity = 40
 
@@ -999,8 +1002,44 @@ addLightStyles = do
   where
     toMLightStyle lightStyle = LightStyleT (lightStyle^.clsValue) (sum (lightStyle^.clsValue))
 
-rocketTrail :: V3 Float -> V3 Float -> Int -> Quake ()
-rocketTrail = error "CLFX.rocketTrail" -- TODO
+rocketTrail :: V3 Float -> V3 Float -> Ref CEntityT -> Quake ()
+rocketTrail start end oldRef = do
+    diminishingTrail start end oldRef Constants.efRocket
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addRocketTrail freeParticles (normalize (end - start)) start (norm (end - start))
+  where
+    addRocketTrail Nothing _ _ _ = return ()
+    addRocketTrail (Just pRef) vec move len
+        | len <= 0 = return ()
+        | otherwise = do
+            r <- Lib.rand
+            doAddRocketTrail pRef vec move len r
+    doAddRocketTrail pRef vec move len r
+        | r .&. 7 == 0 = do
+            p <- readRef pRef
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            rr <- Lib.rand
+            f <- Lib.randomF
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpAccel    .~ V3 0 0 (- particleGravity)
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.2)
+                                    & cpColor    .~ 0xDC + fromIntegral (rr .&. 3)
+                                    & cpOrg      .~ move + fmap (* 5) (V3 o1 o2 o3)
+                                    & cpVel      .~ fmap (* 20) (V3 v1 v2 v3))
+            addRocketTrail (p^.cpNext) vec (move + vec) (len - 1)
+        | otherwise =
+            addRocketTrail (Just pRef) vec (move + vec) (len - 1)
 
 blasterTrail :: V3 Float -> V3 Float -> Quake ()
 blasterTrail start end = do
@@ -1101,8 +1140,66 @@ diminishingTrail start end oldRef flags = do
                                     & cpOrg      .~ move + fmap (* orgScale) (V3 o1 o2 o3)
                                     & cpVel      .~ fmap (* velScale) (V3 v1 v2 v3))
 
-flyEffect :: Int -> V3 Float -> Quake ()
-flyEffect = error "CLFX.flyEffect" -- TODO
+flyEffect :: Ref CEntityT -> V3 Float -> Quake ()
+flyEffect entRef origin = do
+    ent <- readRef entRef
+    time <- use (globals.gCl.csTime)
+    let (startTime, flyStopTime) = entTimings ent time
+        n = time - startTime
+        count = getCount n flyStopTime time
+    modifyRef entRef (\v -> v & ceFlyStopTime .~ flyStopTime)
+    flyParticles origin count
+  where
+    entTimings ent time
+        | (ent^.ceFlyStopTime) < time = (time, time + 60000)
+        | otherwise                   = ((ent^.ceFlyStopTime) - 60000, ent^.ceFlyStopTime)
+    getCount n flyStopTime time
+        | n < 2000                   = (n * 162) `div` 20000
+        | flyStopTime - time < 20000 = ((flyStopTime - time) * 162) `div` 20000
+        | otherwise                  = 162
+
+flyParticles :: V3 Float -> Int -> Quake ()
+flyParticles origin count = do
+    velocities <- use (clientGlobals.cgAVelocities)
+    time <- use (globals.gCl.csTime)
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    when (((V.head velocities)^._x) == 0) $ do
+        aVelocities <- V.replicateM Constants.numVertexNormals genAVelocity
+        clientGlobals.cgAVelocities .= aVelocities
+    aVelocities <- use (clientGlobals.cgAVelocities)
+    addFlyParticles freeParticles aVelocities time (fromIntegral time / 1000) 0 (min count Constants.numVertexNormals)
+  where
+    genAVelocity = do
+        a1 <- Lib.rand
+        a2 <- Lib.rand
+        a3 <- Lib.rand
+        return (V3 (fromIntegral (a1 .&. 255) * 0.01) (fromIntegral (a2 .&. 255) * 0.01) (fromIntegral (a3 .&. 255) * 0.01))
+    addFlyParticles :: Maybe (Ref CParticleT) -> V.Vector (V3 Float) -> Int -> Float -> Int -> Int -> Quake ()
+    addFlyParticles Nothing _ _ _ _ _ = return ()
+    addFlyParticles (Just pRef) aVelocities time lTime idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            let angle1 = lTime * ((aVelocities V.! idx)^._x)
+                sy = sin angle1
+                cy = cos angle1
+                angle2 = lTime * ((aVelocities V.! idx)^._y)
+                sp = sin angle2
+                cp = cos angle2
+                forward = V3 (cp * cy) (cp * sy) (negate sp)
+                dist = (sin (lTime + fromIntegral idx)) * 64
+            p <- readRef pRef
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ -100
+                                    & cpColor    .~ 0
+                                    & cpOrg      .~ origin + fmap (* dist) (Constants.byteDirs V.! idx) + fmap (* beamLength) forward
+                                    & cpVel      .~ V3 0 0 0
+                                    & cpAccel    .~ V3 0 0 0)
+            addFlyParticles (p^.cpNext) aVelocities time lTime (idx + 2) maxIdx
 
 flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
 flagTrail = error "CLFX.flagTrail" -- TODO
