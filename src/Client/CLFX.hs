@@ -1160,7 +1160,44 @@ railTrail :: V3 Float -> V3 Float -> Quake ()
 railTrail = error "CLFX.railTrail" -- TODO
 
 explosionParticles :: V3 Float -> Quake ()
-explosionParticles = error "CLFX.explosionParticles" -- TODO
+explosionParticles org = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addExplosionParticles freeParticles 0 256
+  where
+    addExplosionParticles :: Maybe (Ref CParticleT) -> Int -> Int -> Quake ()
+    addExplosionParticles Nothing _ _ = return ()
+    addExplosionParticles (Just pRef) idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            p <- readRef pRef
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            r <- Lib.rand
+            r' <- Lib.randomF
+            o1 <- Lib.rand
+            v1 <- Lib.rand
+            o2 <- Lib.rand
+            v2 <- Lib.rand
+            o3 <- Lib.rand
+            v3 <- Lib.rand
+            let oRand = V3 o1 o2 o3
+                vRand = V3 v1 v2 v3
+                pOrg = org + fmap (fromIntegral . (subtract 16) . (`mod` 32)) oRand
+                pVel = fmap (fromIntegral . (subtract 192) . (`mod` 384)) vRand
+                pAccel = V3 0 0 (- particleGravity)
+                pAlpha = 1.0
+                pAlphaVel = -0.8 / (0.5 + r' * 0.3)
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ fromIntegral (0xE0 + fromIntegral (r .&. 7) :: Int)
+                                    & cpOrg      .~ pOrg
+                                    & cpVel      .~ pVel
+                                    & cpAccel    .~ pAccel
+                                    & cpAlpha    .~ pAlpha
+                                    & cpAlphaVel .~ pAlphaVel)
+            addExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 bfgExplosionParticles :: V3 Float -> Quake ()
 bfgExplosionParticles = error "CLFX.bfgExplosionParticles" -- TODO
