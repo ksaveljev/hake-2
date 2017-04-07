@@ -130,18 +130,17 @@ drawText :: Renderer -> ConsoleT -> Int -> Int -> Int -> Int -> Quake ()
 drawText renderer console row y idx maxIdx
     | idx >= maxIdx || row < 0 || (console^.cCurrent) - row >= (console^.cTotalLines) = return ()
     | otherwise = do
-        let text = mVectorToByteString 'a' (console^.cText)
-        drawLine drawChar text first y 0 (console^.cLineWidth)
+        drawLine drawChar (console^.cText) first y 0 (console^.cLineWidth)
         drawText renderer console (row - 1) (y - 8) (idx + 1) maxIdx
   where
     first = (row `mod` (console^.cTotalLines)) * (console^.cLineWidth)
     drawChar = renderer^.rRefExport.reDrawChar
 
-drawLine :: (Int -> Int -> Int -> Quake ()) -> B.ByteString -> Int -> Int -> Int -> Int -> Quake ()
+drawLine :: (Int -> Int -> Int -> Quake ()) -> MSV.IOVector Char -> Int -> Int -> Int -> Int -> Quake ()
 drawLine drawChar text first y idx maxIdx
     | idx >= maxIdx = return ()
     | otherwise = do
-        let ch = text `BC.index` (idx + first)
+        ch <- io (MSV.read text (idx + first))
         drawChar ((idx + 1) `shiftL` 3) y $! (ord ch)
         drawLine drawChar text first y (idx + 1) maxIdx
 
