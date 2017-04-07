@@ -10,12 +10,12 @@ module Client.Console
     , toggleConsoleF
     ) where
 
-import           Control.Lens                 (preuse, use, ix, (.=), (^.))
-import           Control.Monad                (void, unless)
-import           Data.Bits                    (shiftR, shiftL, xor, (.&.))
+import           Control.Lens                 (preuse, use, ix, (.=), (^.), (+=), (-=))
+import           Control.Monad                (void, unless, when)
+import           Data.Bits                    (shiftR, shiftL, xor, (.&.), (.|.))
 import qualified Data.ByteString              as B
 import qualified Data.ByteString.Char8        as BC
-import           Data.Char                    (ord)
+import           Data.Char                    (ord, chr)
 import qualified Data.Vector.Storable.Mutable as MSV
 import qualified Data.Vector.Unboxed          as UV
 import           Data.Word                    (Word8)
@@ -337,4 +337,77 @@ toggleConsoleF = XCommandT "Console.toggleConsoleF" $
     error "Console.toggleConsoleF" -- TODO
 
 printConsole :: B.ByteString -> Quake ()
-printConsole = error "Console.print" -- TODO
+printConsole txt = do
+    initialized <- use (globals.gCon.cInitialized)
+    when initialized (doPrintConsole txtPos' mask')
+  where
+    (mask', txtPos')
+        | B.head txt == 1 || B.head txt == 2 = (128, 1)
+        | otherwise                          = (0, 0)
+    doPrintConsole txtPos mask
+        | txtPos >= B.length txt = return ()
+        | otherwise = do
+            console <- use (globals.gCon)
+            let c = txt `BC.index` txtPos
+                len = findWordLen (console^.cLineWidth) txtPos 0
+            -- word wrap
+            when (len /= (console^.cLineWidth) && (console^.cX) + len > (console^.cLineWidth)) $
+                globals.gCon.cX .= 0
+            checkCarriageReturn =<< use (clientGlobals.cgCR)
+            checkLineFeed =<< use (globals.gCon)
+            case c of
+                '\n' -> do
+                    globals.gCon.cX .= 0
+                '\r' -> do
+                    globals.gCon.cX .= 0
+                    clientGlobals.cgCR .= 1
+                _ -> -- display character and advance
+                    displayCharacter c mask =<< use (globals.gCon)
+            doPrintConsole (txtPos + 1) mask
+    findWordLen lineWidth txtpos idx
+        | idx >= lineWidth || idx >= (B.length txt - txtpos) = idx
+        | txt `BC.index` (idx + txtpos) <= ' ' = idx
+        | otherwise = findWordLen lineWidth txtpos (idx + 1)
+    checkCarriageReturn :: Int -> Quake ()
+    checkCarriageReturn v
+        | v /= 0 = do
+            globals.gCon.cCurrent -= 1
+            clientGlobals.cgCR .= 0
+        | otherwise = return ()
+    checkLineFeed console = do
+        when ((console^.cX) == 0) $ do
+            lineFeed
+            -- mark time for transparent overlay
+            when ((console^.cCurrent) >= 0) $ do
+                realTime <- use (globals.gCls.csRealTime)
+                globals.gCon.cTimes.ix ((console^.cCurrent) `mod` Constants.numConTimes) .= fromIntegral realTime
+    displayCharacter :: Char -> Int -> ConsoleT -> Quake ()
+    displayCharacter c mask console = do
+        let y = (console^.cCurrent) `mod` (console^.cTotalLines)
+            idx = y * (console^.cLineWidth) + (console^.cX)
+            b = (ord c) .|. mask .|. (console^.cOrMask)
+        io (MSV.write (console^.cText) idx (chr b))
+        globals.gCon.cX += 1
+        when ((console^.cX) + 1 >= (console^.cLineWidth)) $
+            globals.gCon.cX .= 0
+
+lineFeed :: Quake ()
+lineFeed = do
+    globals.gCon.cX .= 0
+    checkDisplay =<< use (globals.gCon)
+    globals.gCon.cCurrent += 1
+    fillSpaces =<< use (globals.gCon)
+  where
+    checkDisplay :: ConsoleT -> Quake ()
+    checkDisplay console
+        | (console^.cDisplay) == (console^.cCurrent) = globals.gCon.cDisplay += 1
+        | otherwise                                 = return ()
+    fillSpaces console = do
+        let i = ((console^.cCurrent) `mod` (console^.cTotalLines)) * (console^.cLineWidth)
+            e = i + (console^.cLineWidth)
+        doFillSpaces (console^.cText) i e
+    doFillSpaces text i e
+        | i >= e = return ()
+        | otherwise = do
+            io (MSV.write text i ' ')
+            doFillSpaces text (i + 1) e
