@@ -1517,7 +1517,18 @@ creditsKey key = do
     return (Just menuOutSound)
 
 drawCursor :: Int -> Int -> Int -> Quake ()
-drawCursor = error "Menu.drawCursor" -- TODO
+drawCursor x y v = do
+    when (v < 0) $
+        Com.fatalError "negative time and cursor bug"
+    cached <- use (menuGlobals.mgCached)
+    renderer <- use (globals.gRenderer)
+    unless cached $ do
+        mapM_ (registerCursorPic renderer) [0..numCursorFrames-1]
+        menuGlobals.mgCached .= True
+    (renderer^.rRefExport.reDrawPic) x y ("m_cursor" `B.append` encode v)
+  where
+    registerCursorPic renderer idx =
+        (renderer^.rRefExport.reRegisterPic) ("m_cursor" `B.append` encode idx)
 
 updateVolumeFunc :: Quake ()
 updateVolumeFunc = do
