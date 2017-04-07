@@ -84,6 +84,7 @@ data Globals = Globals
     , _gVidDef           :: VidDefT
     , _gRenderer         :: Renderer
     , _gKeyBindings      :: V.Vector (Maybe B.ByteString)
+    , _gKeyDown          :: UV.Vector Bool
     , _gKeyLines         :: V.Vector B.ByteString
     , _gKeyLinePos       :: !Int
     , _gEditLine         :: !Int
@@ -95,6 +96,8 @@ data Globals = Globals
     , _gLogFile          :: Maybe Handle
     , _gVec3Origin       :: V3 Float
     , _gRnd              :: StdGen
+    , _gChatTeam         :: !Bool
+    , _gChatBuffer       :: B.ByteString -- IMPROVE ?
     }
 
 data ComGlobals = ComGlobals

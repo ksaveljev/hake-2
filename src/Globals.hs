@@ -9,6 +9,7 @@ import qualified Data.HashMap.Lazy    as HM
 import           Data.IORef           (newIORef)
 import qualified Data.Sequence        as Seq
 import qualified Data.Vector          as V
+import qualified Data.Vector.Unboxed  as UV
 import           Linear               (V3(..))
 import           Render.DummyRenderer (dummyRenderer)
 import           System.IO.Unsafe     (unsafePerformIO)
@@ -57,6 +58,7 @@ initialGlobals =
           , _gVidDef           = newVidDefT
           , _gRenderer         = dummyRenderer
           , _gKeyBindings      = V.replicate 256 Nothing
+          , _gKeyDown          = UV.replicate 256 False
           , _gKeyLines         = V.replicate 32 B.empty
           , _gKeyLinePos       = 0
           , _gEditLine         = 0
@@ -68,4 +70,6 @@ initialGlobals =
           , _gLogFile          = Nothing
           , _gVec3Origin       = V3 0 0 0
           , _gRnd              = mkStdGen 0
+          , _gChatTeam         = False
+          , _gChatBuffer       = B.empty
           }

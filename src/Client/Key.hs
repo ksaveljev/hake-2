@@ -6,21 +6,31 @@ module Client.Key
     , writeBindings
     ) where
 
-import           Control.Lens          (use, ix, (.=), (%=))
-import           Control.Monad         (unless)
+import           Control.Lens          (use, ix, (.=), (^.), (%=), (+=), (-=))
+import           Control.Monad         (unless, when)
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (ord, toUpper, chr)
-import           Data.Maybe            (fromMaybe)
+import           Data.Maybe            (fromMaybe, isNothing)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
 import           System.IO             (Handle)
 
+import           Client.ClientStateT
+import           Client.ClientStaticT
+import qualified Client.Console        as Console
+import           Client.FrameT
 import           Client.KeyConstants
+import qualified Client.Menu           as Menu
+import qualified Constants
 import qualified Game.Cmd              as Cmd
+import           Game.PlayerStateT
+import qualified QCommon.CBufShared    as CBuf
 import qualified QCommon.Com           as Com
+import           QCommon.XCommandT     (runXCommandT)
 import           QuakeState
 import           Types
+import           Util.Binary           (encode)
 
 keyboardButtons :: [Int]
 keyboardButtons = 
@@ -148,7 +158,114 @@ writeKeyBinding fileHandle num (Just binding) = do
     io (B.hPut fileHandle (B.concat ["bind ", keyStr, " \"", binding, "\"\n"]))
 
 event :: Int -> Bool -> Int -> Quake ()
-event = error "Key.event" -- TODO
+event key down time = do
+    -- TODO: do we need this?
+    -- // hack for modal presses
+    -- if (key_waiting == -1) {
+    --     if (down)
+    --         key_waiting = key;
+    --     return;
+    -- }
+    cls <- use (globals.gCls)
+    done <- updateAutoRepeatStatus cls
+    unless done $ do
+        when (key == kShift) $
+            keyGlobals.kgShiftDown .= down
+        -- console key is hardcoded, so the user can never unbind it
+        done' <- checkConsoleKey
+        unless done' $ do
+            cl <- use (globals.gCl)
+            let k = if (cl^.csAttractLoop) && (cls^.csKeyDest) /= Constants.keyMenu && not (key >= kF1 && key <= kF12)
+                        then kEscape
+                        else key
+            processEvent cl cls k down time
+  where
+    updateAutoRepeatStatus cls
+        | down = do
+            keyGlobals.kgKeyRepeats.ix key += 1
+            keyRepeats <- use (keyGlobals.kgKeyRepeats)
+            keyBindings <- use (globals.gKeyBindings)
+            checkAutoRepeatStatus cls keyRepeats keyBindings
+        | otherwise = do
+            keyGlobals.kgKeyRepeats.ix key .= 0
+            return False
+    checkAutoRepeatStatus cls keyRepeats keyBindings
+        | keyRepeats UV.! key > 1 && (cls^.csKeyDest) == Constants.keyGame && not ((cls^.csState) == Constants.caDisconnected) = -- ignore most autorepeats
+            return True
+        | key >= 200 && isNothing (keyBindings V.! key) = do
+            v <- keynumToString key
+            Com.printf (v `B.append` " is unbound, hit F4 to set.\n")
+            return False
+        | otherwise =
+            return False
+    checkConsoleKey
+        | key == ord '`' || key == ord '~' = consoleEvent
+        | otherwise = return False
+    consoleEvent
+        | not down = return True
+        | otherwise = do
+            runXCommandT Console.toggleConsoleF
+            return True
+processEvent :: ClientStateT -> ClientStaticT -> Int -> Bool -> Int -> Quake ()
+processEvent cl cls key down time
+    | key == kEscape && down = processEscapeKey cl cls key
+    | key == kEscape = return ()
+    | otherwise = do
+        globals.gKeyDown.ix key .= down
+        checkAnyKeyDown
+        checkKeyUpAndDown
+        error "Key.processEvent" -- TODO
+  where
+    checkAnyKeyDown
+        | down = do
+            keyRepeats <- use (keyGlobals.kgKeyRepeats)
+            when (keyRepeats UV.! key == 1) $
+                keyGlobals.kgAnyKeyDown += 1
+        | otherwise = do
+            anyKeyDown <- use (keyGlobals.kgAnyKeyDown)
+            when (anyKeyDown > 0) $
+                keyGlobals.kgAnyKeyDown -= 1
+    checkKeyUpAndDown
+        | not down = do
+            keyBindings <- use (globals.gKeyBindings)
+            maybe (return ()) checkUpEvent (keyBindings V.! key)
+        | otherwise = do
+            menuBound <- use (keyGlobals.kgMenuBound)
+            consoleKeys <- use (keyGlobals.kgConsoleKeys)
+            doProcessEvent cl cls key down time (menuBound UV.! key) (consoleKeys UV.! key)
+    checkUpEvent binding =
+        when (B.length binding > 0 && binding `BC.index` 0 == '+') $
+            CBuf.addText (B.concat ["-", B.drop 1 binding, " ", encode key, " ", encode time, "\n"])
+
+doProcessEvent :: ClientStateT -> ClientStaticT -> Int -> Bool -> Int -> Bool -> Bool -> Quake ()
+doProcessEvent cl cls key down time menuBound consoleKey
+    | ((cls^.csKeyDest) == Constants.keyMenu && menuBound) ||
+      ((cls^.csKeyDest) == Constants.keyConsole && not consoleKey) ||
+      ((cls^.csKeyDest) == Constants.keyGame && ((cls^.csState) == Constants.caActive || not consoleKey)) = do
+        keyBindings <- use (globals.gKeyBindings)
+        maybe (return ()) addKeyCommand (keyBindings V.! key)
+    | otherwise =
+        when down processKeyDownEvent
+  where
+    addKeyCommand binding
+        | B.length binding > 0 && binding `BC.index` 0 == '+' =
+            CBuf.addText (B.concat [binding, " ", encode key, " ", encode time, "\n"])
+        | otherwise =
+            CBuf.addText (binding `B.append` "\n")
+    processKeyDownEvent
+        | (cls^.csKeyDest) == Constants.keyMessage = message key
+        | (cls^.csKeyDest) == Constants.keyMenu = Menu.keyDown key
+        | (cls^.csKeyDest) == Constants.keyGame || (cls^.csKeyDest) == Constants.keyConsole = console key
+        | otherwise = Com.fatalError "Bad cls.key_dest"
+
+processEscapeKey :: ClientStateT -> ClientStaticT -> Int -> Quake ()
+processEscapeKey cl cls key
+    | (cl^.csFrame.fPlayerState.psStats) UV.! Constants.statLayouts /= 0 && (cls^.csKeyDest) == Constants.keyGame =
+        CBuf.addText "cmd putaway\n"
+    | (cls^.csKeyDest) == Constants.keyMessage = message key
+    | (cls^.csKeyDest) == Constants.keyMenu = Menu.keyDown key
+    | (cls^.csKeyDest) == Constants.keyGame || (cls^.csKeyDest) == Constants.keyConsole = runXCommandT Menu.menuMainF
+    | otherwise = Com.fatalError "Bad cls.key_dest"
 
 clearStates :: Quake ()
 clearStates = error "Key.clearStates" -- TODO
@@ -158,3 +275,30 @@ clearTyping = do
     editLine <- use (globals.gEditLine)
     globals.gKeyLines.ix editLine .= B.pack [93, 0] -- clear any typing
     globals.gKeyLinePos .= 1
+
+message :: Int -> Quake ()
+message key
+    | key `elem` [kEnter, kKpEnter] = do
+        chatTeam <- use (globals.gChatTeam)
+        CBuf.addText (if chatTeam then "say_team \"" else "say \"")
+        chatBuffer <- use (globals.gChatBuffer)
+        CBuf.addText chatBuffer
+        CBuf.addText "\"\n"
+        globals.gCls.csKeyDest .= Constants.keyGame
+        globals.gChatBuffer .= B.empty
+    | key == kEscape = do
+        globals.gCls.csKeyDest .= Constants.keyGame
+        globals.gChatBuffer .= B.empty
+    | key < 32 || key > 127 =
+        return () -- non printable
+    | key == kBackspace = do
+        chatBuffer <- use (globals.gChatBuffer)
+        globals.gChatBuffer .= (if B.length chatBuffer > 2 then B.init chatBuffer else B.empty)
+    | otherwise = do
+        chatBuffer <- use (globals.gChatBuffer)
+        unless (B.length chatBuffer > Constants.maxCmdLine) $
+            globals.gChatBuffer %= (\v -> v `B.append` encode key) -- IMPROVE?
+
+-- Interactive line editing and console scrollback
+console :: Int -> Quake ()
+console = error "Key.console" -- TODO

@@ -3,8 +3,10 @@ module Client.Menu
     ( addToServerList
     , draw
     , initialize
+    , keyDown
     , menuAddItem
     , menuCenter
+    , menuMainF
     ) where
 
 import           Control.Applicative       (liftA2)
@@ -21,9 +23,7 @@ import           System.IO                 (Handle, IOMode(ReadMode))
 
 import           Client.ClientStateT
 import           Client.ClientStaticT
-import {-# SOURCE #-} qualified Client.CL  as CL
 import qualified Client.Console            as Console
-import qualified Client.Key                as Key
 import qualified Client.KeyConstants       as KeyConstants
 import           Client.MenuActionS
 import           Client.MenuCommonS
@@ -35,7 +35,6 @@ import           Client.MenuSeparatorS
 import           Client.MenuSliderS
 import           Client.RefExportT
 import qualified Client.SCRShared          as SCR
-import {-# SOURCE #-} qualified Client.VID as VID
 import           Client.VidDefT
 import qualified Constants
 import qualified Game.Cmd                  as Cmd
@@ -56,6 +55,10 @@ import           Types
 import           Util.Binary               (encode)
 import qualified Util.Lib                  as Lib
 import qualified Util.QuakeFile            as QuakeFile
+
+import {-# SOURCE #-} qualified Client.CL  as CL
+import {-# SOURCE #-} qualified Client.Key as Key
+import {-# SOURCE #-} qualified Client.VID as VID
 
 mainItems :: Int
 mainItems = 5
@@ -1798,3 +1801,6 @@ drawCharacter renderer cx cy num = do
 
 drawTextBox :: Renderer -> Int -> Int -> Int -> Int -> Quake ()
 drawTextBox = error "Menu.drawTextBox" -- TODO
+
+keyDown :: Int -> Quake ()
+keyDown = error "Menu.keyDown" -- TODO
