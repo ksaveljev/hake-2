@@ -25,6 +25,7 @@ import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.Console            as Console
 import qualified Client.KeyConstants       as KeyConstants
+import           Client.KeyFuncT
 import           Client.MenuActionS
 import           Client.MenuCommonS
 import           Client.MenuFieldS
@@ -1814,4 +1815,10 @@ drawTextBox :: Renderer -> Int -> Int -> Int -> Int -> Quake ()
 drawTextBox = error "Menu.drawTextBox" -- TODO
 
 keyDown :: Int -> Quake ()
-keyDown = error "Menu.keyDown" -- TODO
+keyDown key = do
+    keyFunc <- use (menuGlobals.mgKeyFunc)
+    maybe (return ()) doKeyDown keyFunc
+  where
+    doKeyDown kf = do
+        s <- (kf^.kfFunc) key
+        maybe (return ()) S.startLocalSound s
