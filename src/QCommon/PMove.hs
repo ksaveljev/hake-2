@@ -2,12 +2,13 @@ module QCommon.PMove
     ( pMove
     ) where
 
-import           Control.Lens     (use, ix, (^.), (.=), (%=), (+=), (&), (.~), (%~), (+~))
-import           Control.Monad    (when, unless)
-import           Data.Bits        (complement, shiftR, (.&.), (.|.))
-import           Data.Int         (Int16)
-import           Data.Maybe       (isJust, isNothing, fromJust)
-import           Linear           (V3(..), dot, norm, normalize, _x, _y, _z)
+import           Control.Lens        (use, ix, (^.), (.=), (%=), (+=), (-=), (&), (.~), (%~), (+~))
+import           Control.Monad       (when, unless)
+import           Data.Bits           (complement, shiftR, shiftL, (.&.), (.|.))
+import           Data.Int            (Int16)
+import           Data.Maybe          (isJust, isNothing, fromJust)
+import qualified Data.Vector.Unboxed as UV
+import           Linear              (V3(..), dot, norm, normalize, _x, _y, _z)
 
 import qualified Constants
 import           Game.CPlaneT
@@ -16,14 +17,18 @@ import           Game.PMoveStateT
 import           Game.PMoveT
 import           Game.TraceT
 import           Game.UserCmdT
-import qualified QCommon.Com      as Com
+import qualified QCommon.Com         as Com
 import           QCommon.PmlT
 import           QuakeState
 import           Types
-import qualified Util.Math3D      as Math3D
+import qualified Util.Math3D         as Math3D
 
 offset :: V3 Int16
 offset = V3 0 (-1) 1
+
+-- try all single bits first
+jitterBits :: UV.Vector Int
+jitterBits = UV.fromList [ 0, 4, 1, 2, 3, 5, 6, 7 ]
 
 pMove :: PMoveT -> Quake PMoveT
 pMove pmove = do
@@ -279,7 +284,36 @@ checkPMFlags pm
             airMove
 
 snapPosition :: Quake ()
-snapPosition = error "PMove.snapPosition" -- TODO
+snapPosition = do
+    pml <- use (pMoveGlobals.pmPML)
+    -- snap velocity to eights
+    let vel = fmap (truncate . (* 8)) (pml^.pmlVelocity)
+        sign = fmap (\x -> if x >= 0 then 1 else -1) (pml^.pmlOrigin) :: V3 Int
+        origin = fmap (truncate . (* 8)) (pml^.pmlOrigin)
+        sign' = let a = if fromIntegral (origin^._x) * 0.125 == (pml^.pmlOrigin._x) then 0 else sign^._x
+                    b = if fromIntegral (origin^._y) * 0.125 == (pml^.pmlOrigin._y) then 0 else sign^._y
+                    c = if fromIntegral (origin^._z) * 0.125 == (pml^.pmlOrigin._z) then 0 else sign^._z
+                in V3 a b c
+        base = origin
+    pMoveGlobals.pmPM.pmState.pmsVelocity .= vel
+    pMoveGlobals.pmPM.pmState.pmsOrigin .= origin
+    -- try all combinations
+    tryFindingGoodPosition base sign' 0 8
+  where
+    tryFindingGoodPosition base sign idx maxIdx
+        | idx >= maxIdx = do
+            -- go back to the last position
+            previousOrigin <- use (pMoveGlobals.pmPML.pmlPreviousOrigin)
+            pMoveGlobals.pmPM.pmState.pmsOrigin .= fmap truncate previousOrigin
+        | otherwise = do
+            let bits = jitterBits UV.! idx
+                a = if (bits .&. (1 `shiftL` 0)) /= 0 then (base^._x) + fromIntegral (sign^._x) else base^._x
+                b = if (bits .&. (1 `shiftL` 1)) /= 0 then (base^._y) + fromIntegral (sign^._y) else base^._y
+                c = if (bits .&. (1 `shiftL` 2)) /= 0 then (base^._z) + fromIntegral (sign^._z) else base^._z
+            pMoveGlobals.pmPM.pmState.pmsOrigin .= V3 a b c
+            ok <- goodPosition
+            unless ok $
+                tryFindingGoodPosition base sign (idx + 1) maxIdx
 
 flyMove :: Bool -> Quake ()
 flyMove doClip = do
@@ -458,7 +492,104 @@ handleFriction = do
             pMoveGlobals.pmPML.pmlVelocity %= (fmap (* newSpeed))
 
 waterMove :: Quake ()
-waterMove = error "PMove.waterMove" -- TODO
+waterMove = do
+    pm <- use (pMoveGlobals.pmPM)
+    pml <- use (pMoveGlobals.pmPML)
+    waterSpeed <- use (pMoveGlobals.pmWaterSpeed)
+    -- user intentions
+    let wishVel = let vel = fmap (* (fromIntegral $ pm^.pmCmd.ucForwardMove)) (pml^.pmlForward) + fmap (* (fromIntegral $ pm^.pmCmd.ucSideMove)) (pml^.pmlRight)
+                  in if (pm^.pmCmd.ucForwardMove) == 0 && (pm^.pmCmd.ucSideMove) == 0 && (pm^.pmCmd.ucUpMove) == 0
+                         then vel & _z -~ 60 -- drift towards bottom
+                         else vel & _z +~ fromIntegral (pm^.pmCmd.ucUpMove)
+        wishVel' = addCurrents pm pml wishVel waterSpeed
+        wishDir = normalize wishVel'
+        wishSpeed = norm wishVel'
+    maxSpeed <- use (pMoveGlobals.pmMaxSpeed)
+    let (wishVel'', wishSpeed') = if wishSpeed > maxSpeed
+                                      then (fmap (* (maxSpeed / wishSpeed)) wishVel', maxSpeed * 0.5)
+                                      else (wishVel', wishSpeed * 0.5)
+    accel <- use (pMoveGlobals.pmWaterAccelerate)
+    accelerate wishDir wishSpeed' accel
+    stepSlideMove
 
 airMove :: Quake ()
-airMove = error "PMove.airMove" -- TODO
+airMove = do
+    pm <- use (pMoveGlobals.pmPM)
+    pml <- use (pMoveGlobals.pmPML)
+    waterSpeed <- use (pMoveGlobals.pmWaterSpeed)
+    let fmove = fromIntegral (pm^.pmCmd.ucForwardMove)
+        smove = fromIntegral (pm^.pmCmd.ucSideMove)
+        wishVel = V3 ((pml^.pmlForward._x) * fmove + (pml^.pmlRight._x) * smove) ((pml^.pmlForward._y) * fmove + (pml^.pmlRight._y) * smove) 0
+        wishVel' = addCurrents pm pml wishVel waterSpeed
+        wishDir = normalize wishVel'
+        wishSpeed = norm wishVel'
+    -- clamp to server defined max speed
+    maxSpeed <- if (pm^.pmState.pmsPMFlags) .&. Constants.pmfDucked /= 0
+                    then use (pMoveGlobals.pmDuckSpeed)
+                    else use (pMoveGlobals.pmMaxSpeed)
+    let (wishVel'', wishSpeed') = if wishSpeed > maxSpeed
+                                      then (fmap (* (maxSpeed / wishSpeed)) wishVel', maxSpeed)
+                                      else (wishVel', wishSpeed)
+    doAirMove pm pml wishDir wishVel'' wishSpeed'
+  where
+    doAirMove pm pml wishDir wishVel wishSpeed
+        | pml^.pmlLadder = do
+            accel <- use (pMoveGlobals.pmAccelerate)
+            accelerate wishDir wishSpeed accel
+            when ((wishVel^._z) == 0) $
+                if (pml^.pmlVelocity._z) > 0
+                    then do
+                        pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral (pm^.pmState.pmsGravity)) * (pml^.pmlFrameTime)
+                        velocityZ <- use (pMoveGlobals.pmPML.pmlVelocity._z)
+                        when (velocityZ < 0) $
+                            pMoveGlobals.pmPML.pmlVelocity._z .= 0
+                    else do
+                        pMoveGlobals.pmPML.pmlVelocity._z += (fromIntegral (pm^.pmState.pmsGravity)) * (pml^.pmlFrameTime)
+                        velocityZ <- use (pMoveGlobals.pmPML.pmlVelocity._z)
+                        when (velocityZ > 0) $
+                            pMoveGlobals.pmPML.pmlVelocity._z .= 0
+            stepSlideMove
+        | isJust (pm^.pmGroundEntity) = do -- walking on ground
+            pMoveGlobals.pmPML.pmlVelocity._z .= 0 -- !!! this is before the accel
+            accel <- use (pMoveGlobals.pmAccelerate)
+            accelerate wishDir wishSpeed accel
+            if (pm^.pmState.pmsGravity) > 0
+                then pMoveGlobals.pmPML.pmlVelocity._z .= 0 -- !!! this is before the accel
+                else pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral (pm^.pmState.pmsGravity)) * (pml^.pmlFrameTime)
+            velocity <- use (pMoveGlobals.pmPML.pmlVelocity)
+            unless ((velocity^._x) == 0 && (velocity^._y) == 0) $
+                stepSlideMove
+        | otherwise = do -- not on ground, so little effect on velocity
+            airAccel <- use (pMoveGlobals.pmAirAccelerate)
+            if airAccel /= 0
+                then do
+                    accel <- use (pMoveGlobals.pmAccelerate)
+                    airAccelerate wishDir wishSpeed accel
+                else
+                    accelerate wishDir wishSpeed 1
+            -- add gravity
+            pMoveGlobals.pmPML.pmlVelocity._z -= (fromIntegral $ pm^.pmState.pmsGravity) * (pml^.pmlFrameTime)
+            stepSlideMove
+
+addCurrents :: PMoveT -> PmlT -> V3 Float -> Float -> V3 Float
+addCurrents = error "PMove.addCurrents" -- TODO
+
+-- Handles user intended acceleration
+accelerate :: V3 Float -> Float -> Float -> Quake ()
+accelerate wishDir wishSpeed accel = do
+    pml <- use (pMoveGlobals.pmPML)
+    let currentSpeed = (pml^.pmlVelocity) `dot` wishDir
+        addSpeed = wishSpeed - currentSpeed
+    unless (addSpeed <= 0) $ do
+        let accelSpeed = min (accel * (pml^.pmlFrameTime) * wishSpeed) addSpeed
+        pMoveGlobals.pmPML.pmlVelocity += (fmap (* accelSpeed) wishDir)
+
+airAccelerate :: V3 Float -> Float -> Float -> Quake ()
+airAccelerate wishDir wishSpeed accel = do
+    pml <- use (pMoveGlobals.pmPML)
+    let wishSpd = if wishSpeed > 30 then 30 else wishSpeed
+        currentSpeed = (pml^.pmlVelocity) `dot` wishDir
+        addSpeed = wishSpd - currentSpeed
+    unless (addSpeed <= 0) $ do
+        let accelSpeed = min (accel * wishSpeed * (pml^.pmlFrameTime)) addSpeed
+        pMoveGlobals.pmPML.pmlVelocity += (fmap (* accelSpeed) wishDir)
