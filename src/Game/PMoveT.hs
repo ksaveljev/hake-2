@@ -9,6 +9,7 @@ import           Linear           (V3(..))
 
 import qualified Constants
 import           Game.PMoveStateT (newPMoveStateT)
+import           Game.TraceT      (newTraceT)
 import           Game.UserCmdT    (newUserCmdT)
 import           Types
 
@@ -28,6 +29,6 @@ newPMoveT = PMoveT
     , _pmGroundEntity  = Nothing
     , _pmWaterType     = 0
     , _pmWaterLevel    = 0
-    , _pmTrace         = \_ _ _ _ -> return Nothing
+    , _pmTrace         = \_ _ _ _ -> return newTraceT
     , _pmPointContents = \_ -> return 0
     }

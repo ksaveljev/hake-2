@@ -6,8 +6,9 @@ module Client.CLPred
 
 import           Control.Lens          (preuse, use, ix, (^.), (.=), (&), (.~))
 import           Control.Monad         (when, unless)
-import           Data.Bits             ((.&.))
+import           Data.Bits             ((.&.), (.|.))
 import           Data.Int              (Int8, Int16)
+import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
 import           Linear                (V3(..), _x, _y, _z)
 
@@ -15,11 +16,15 @@ import           Client.ClientStateT
 import           Client.ClientStaticT
 import           Client.FrameT
 import qualified Constants
+import           Game.CModelT
 import           Game.CVarT
+import           Game.EntityStateT
 import           Game.PlayerStateT
 import           Game.PMoveStateT
 import           Game.PMoveT
+import           Game.TraceT
 import qualified QCommon.Com           as Com
+import qualified QCommon.CM            as CM
 import           QCommon.CVarVariables
 import           QCommon.NetChanT
 import qualified QCommon.PMove         as PMove
@@ -105,11 +110,52 @@ doCheckStep pm oldZ
   where
     step = (pm^.pmState.pmsOrigin._z) - oldZ
 
-predPMTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
-predPMTrace = error "CLPred.predPMTrace" -- TODO
+predPMTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake TraceT
+predPMTrace start mins maxs end = do
+    -- check against world
+    t <- CM.boxTrace start end mins maxs 0 Constants.maskPlayerSolid
+    let t' = if (t^.tFraction) < 1 then t & tEnt .~ Just (Ref Constants.maxEdicts) else t -- don't forget about this dummy edict
+    clipMoveToEntities start mins maxs end t'
+
+clipMoveToEntities :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> TraceT -> Quake TraceT
+clipMoveToEntities start mins maxs end t = do
+    numEntities <- use (globals.gCl.csFrame.fNumEntities)
+    doClipMoveToEntities t 0 numEntities
+  where
+    doClipMoveToEntities traceT idx maxIdx
+        | idx >= maxIdx = return traceT
+        | otherwise = do
+            error "CLPred.clipMoveToEntities" -- TODO
 
 predPMPointContents :: V3 Float -> Quake Int
-predPMPointContents = error "CLPred.predPMPointContents" -- TODO
+predPMPointContents point = do
+    contents <- CM.pointContents point 0
+    numEntities <- use (globals.gCl.csFrame.fNumEntities)
+    calcContents point contents 0 numEntities
+
+calcContents :: V3 Float -> Int -> Int -> Int -> Quake Int
+calcContents point contents idx maxIdx
+    | idx >= maxIdx = return contents
+    | otherwise = do
+        parseEntities <- use (globals.gCl.csFrame.fParseEntities)
+        entityState <- getEntityState parseEntities
+        doCalcContents entityState
+  where
+    getEntityState parseEntities = do
+        entityStates <- use (globals.gClParseEntities)
+        return (entityStates V.! ((parseEntities + idx) .&. (Constants.maxParseEntities - 1)))
+    doCalcContents entityState
+        | (entityState^.esSolid) /= 31 = -- special value for bmodel
+            calcContents point contents (idx + 1) maxIdx
+        | otherwise = do
+            modelClips <- use (globals.gCl.csModelClip)
+            maybe (calcContents point contents (idx + 1) maxIdx)
+                  (proceedCalcContents entityState)
+                  (modelClips V.! (entityState^.esModelIndex))
+    proceedCalcContents entityState modelRef = do
+        model <- readRef modelRef
+        v <- CM.transformedPointContents point (model^.cmHeadNode) (entityState^.esOrigin) (entityState^.esAngles)
+        calcContents point (contents .|. v) (idx + 1) maxIdx
 
 checkPredictionError :: Quake ()
 checkPredictionError = do

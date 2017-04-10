@@ -5,9 +5,9 @@ module Client.CLInput
     , sendCmd
     ) where
 
-import           Control.Lens          (Lens', use, ix, (^.), (.=), (%=)) 
+import           Control.Lens          (Lens', use, ix, (^.), (.=), (%=), (+=), _1, _2) 
 import           Control.Lens          ((&), (.~), (+~), (-~), (*~), (%~))
-import           Control.Monad         (void, when)
+import           Control.Monad         (void, when, unless)
 import           Data.Bits             (complement, xor, (.&.), (.|.))
 import qualified Data.ByteString       as B
 import           Data.Int              (Int64)
@@ -184,7 +184,40 @@ inputKeyDown :: Lens' QuakeState KButtonT -> Quake ()
 inputKeyDown = error "CLInput.inputKeyDown" -- TODO
 
 inputKeyUp :: Lens' QuakeState KButtonT -> Quake ()
-inputKeyUp = error "CLInput.inputKeyUp" -- TODO
+inputKeyUp buttonLens = do
+    c <- Cmd.argv 1
+    doInputKeyUp c
+  where
+    doInputKeyUp c
+        | B.length c <= 0 = do
+            buttonLens.kbDown .= (0, 0)
+            buttonLens.kbState .= 4
+        | otherwise = do
+            let k = Lib.atoi c
+            button <- use buttonLens
+            done <- checkIfDone button k
+            skip <- shouldSkip =<< use buttonLens
+            unless (done || skip) $ do
+                -- save timestamp
+                t <- Cmd.argv 2
+                setMsec (Lib.atoi t) =<< use buttonLens
+                buttonLens.kbState %= (.&. (complement 1)) -- now up
+                buttonLens.kbState %= (.|. 4) -- impulse up
+    checkIfDone button k
+        | (button^.kbDown._1) == k = do
+            buttonLens.kbDown._1 .= 0
+            return False
+        | (button^.kbDown._2) == k = do
+            buttonLens.kbDown._2 .= 0
+            return False
+        | otherwise = return True -- key up without coresponding down (menu pass through)
+    shouldSkip button
+        | (button^.kbDown._1) /= 0 || (button^.kbDown._2) /= 0 = return True -- some other key is still hoding it down
+        | (button^.kbState) .&. 1 == 0 = return True -- still up (this should not happen)
+        | otherwise = return False
+    setMsec uptime button
+        | uptime /= 0 = buttonLens.kbMsec += fromIntegral uptime - (button^.kbDownTime)
+        | otherwise = buttonLens.kbMsec += 10
 
 sendCmd :: Quake ()
 sendCmd = do

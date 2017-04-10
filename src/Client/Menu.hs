@@ -1413,7 +1413,32 @@ menuDraw :: Ref MenuFrameworkS -> Quake ()
 menuDraw = error "Menu.menuDraw" -- TODO
 
 menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
-menuAdjustCursor = error "Menu.menuAdjustCursor" -- TODO
+menuAdjustCursor menuRef dir = do
+    menuItemRef <- menuItemAtCursor menuRef
+    maybe findValidSpot checkSeparatorSpot menuItemRef
+  where
+    checkSeparatorSpot (MenuSeparatorRef _) = findValidSpot
+    checkSeparatorSpot _ = return ()
+    findValidSpot = do
+        menuItemRef <- menuItemAtCursor menuRef
+        maybe updateCursor checkSeparatorCursor menuItemRef
+    checkSeparatorCursor (MenuSeparatorRef _) = updateCursor
+    checkSeparatorCursor _ = return ()
+    updateCursor = do
+        menu <- readRef menuRef
+        let cursor = (menu^.mfCursor) + dir
+            newCursor | dir == 1 = if cursor >= (menu^.mfNItems) then 0 else cursor
+                      | otherwise = if cursor < 0 then (menu^.mfNItems) - 1 else cursor
+        modifyRef menuRef (\v -> v & mfCursor .~ newCursor)
+
+menuItemAtCursor :: Ref MenuFrameworkS -> Quake (Maybe MenuItemRef)
+menuItemAtCursor menuRef = do
+    menu <- readRef menuRef
+    return (getMenuItemAtCursor menu)
+  where
+    getMenuItemAtCursor menu
+        | (menu^.mfCursor) < 0 || (menu^.mfCursor) >= (menu^.mfNItems) = Nothing
+        | otherwise = Just ((menu^.mfItems) V.! (menu^.mfCursor))
 
 popMenu :: Quake ()
 popMenu = do

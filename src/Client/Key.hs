@@ -214,7 +214,6 @@ processEvent cl cls key down time
         globals.gKeyDown.ix key .= down
         checkAnyKeyDown
         checkKeyUpAndDown
-        error "Key.processEvent" -- TODO
   where
     checkAnyKeyDown
         | down = do
@@ -232,13 +231,13 @@ processEvent cl cls key down time
         | otherwise = do
             menuBound <- use (keyGlobals.kgMenuBound)
             consoleKeys <- use (keyGlobals.kgConsoleKeys)
-            doProcessEvent cl cls key down time (menuBound UV.! key) (consoleKeys UV.! key)
+            doProcessEvent cls key down time (menuBound UV.! key) (consoleKeys UV.! key)
     checkUpEvent binding =
         when (B.length binding > 0 && binding `BC.index` 0 == '+') $
             CBuf.addText (B.concat ["-", B.drop 1 binding, " ", encode key, " ", encode time, "\n"])
 
-doProcessEvent :: ClientStateT -> ClientStaticT -> Int -> Bool -> Int -> Bool -> Bool -> Quake ()
-doProcessEvent cl cls key down time menuBound consoleKey
+doProcessEvent :: ClientStaticT -> Int -> Bool -> Int -> Bool -> Bool -> Quake ()
+doProcessEvent cls key down time menuBound consoleKey
     | ((cls^.csKeyDest) == Constants.keyMenu && menuBound) ||
       ((cls^.csKeyDest) == Constants.keyConsole && not consoleKey) ||
       ((cls^.csKeyDest) == Constants.keyGame && ((cls^.csState) == Constants.caActive || not consoleKey)) = do
@@ -268,7 +267,17 @@ processEscapeKey cl cls key
     | otherwise = Com.fatalError "Bad cls.key_dest"
 
 clearStates :: Quake ()
-clearStates = error "Key.clearStates" -- TODO
+clearStates = do
+    keyGlobals.kgAnyKeyDown .= 0
+    mapM_ clearState [0..255]
+  where
+    clearState idx = do
+        keyDown <- use (globals.gKeyDown)
+        keyRepeats <- use (keyGlobals.kgKeyRepeats)
+        when ((keyDown UV.! idx) || (keyRepeats UV.! idx) /= 0) $
+            event idx False 0
+        globals.gKeyDown.ix idx .= False
+        keyGlobals.kgKeyRepeats.ix idx .= 0
 
 clearTyping :: Quake ()
 clearTyping = do

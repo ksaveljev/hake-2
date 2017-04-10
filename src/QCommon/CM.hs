@@ -1,3 +1,4 @@
+{-# LANGUAGE Rank2Types #-}
 module QCommon.CM
     ( areasConnected
     , boxTrace
@@ -9,11 +10,13 @@ module QCommon.CM
     , leafCluster
     , loadMap
     , numInlineModels
+    , pointContents
     , pointLeafNum
     , setAreaPortalState
+    , transformedPointContents
     ) where
 
-import           Control.Lens                    (use, (.=), (%=), (+=), (^.), (&), (.~))
+import           Control.Lens                    (Lens', use, (.=), (%=), (+=), (^.), (&), (.~))
 import           Control.Monad                   (void, unless, when)
 import           Data.Binary.Get                 (runGet, getWord16le)
 import           Data.Bits                       (shiftR, (.&.), (.|.))
@@ -22,9 +25,12 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Vector                     as V
 import qualified Data.Vector.Unboxed             as UV
-import           Linear                          (V3(..))
+import           Linear                          (V3(..), dot, _x, _y, _z)
 import           System.IO                       (Handle)
 
+import qualified Constants
+import           Game.MapSurfaceT
+import           Game.TraceT
 import           QCommon.CAreaT
 import           QCommon.CLeafT
 import qualified QCommon.Com                     as Com
@@ -43,12 +49,18 @@ import           QCommon.QFiles.BSP.DModelT
 import           QCommon.QFiles.BSP.DNodeT
 import           QCommon.QFiles.BSP.DPlaneT
 import           QCommon.QFiles.BSP.DVisT
-import qualified Constants
 import           QuakeRef
 import           QuakeState
 import           Types
 import           Util.Binary                     (encode)
 import qualified Util.Lib                        as Lib
+import qualified Util.Math3D                     as Math3D
+
+nullV3 :: V3 Float
+nullV3 = V3 0 0 0
+
+nullSurface :: MapSurfaceT
+nullSurface = newMapSurfaceT
 
 setAreaPortalState :: Int -> Bool -> Quake ()
 setAreaPortalState = error "CM.setAreaPortalState" -- TODO
@@ -190,9 +202,6 @@ floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
             when (portalOpen UV.! (areaPortal^.dapPortalNum)) $
                 floodAreaR (Ref (areaPortal^.dapOtherArea)) floodValid floodNum
             floodPortals area portalOpen (idx + 1) maxIdx
-
-pointLeafNum :: V3 Float -> Quake Int
-pointLeafNum = error "CM.pointLeafNum" -- TODO
 
 leafArea :: Int -> Quake Int
 leafArea leafNum = do
@@ -605,4 +614,110 @@ setBrushSidesNodesAndPlanes numBrushSides numPlanes numLeafs idx = do
       where x = idx `shiftR` 1
 
 boxTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Int -> Int -> Quake TraceT
-boxTrace = error "CM.boxTrace" -- TODO
+boxTrace start end mins maxs headNode brushMask = do
+    -- for multi-check avoidance
+    cmGlobals.cmCheckCount += 1
+    -- for statistics, may be zeroed
+    globals.gCTraces += 1
+    -- fill in a default trace
+    -- was: memset(& trace_trace, 0, sizeof(trace_trace));
+    cmGlobals.cmTraceTrace .= (newTraceT & tFraction .~ 1
+                                         & tSurface  .~ Just (nullSurface^.msCSurface))
+    numNodes <- use (cmGlobals.cmNumNodes)
+    doBoxTrace numNodes
+  where
+    doBoxTrace numNodes
+        | numNodes == 0 = -- map not loaded
+            use (cmGlobals.cmTraceTrace)
+        | otherwise = do
+            cmGlobals.cmTraceContents .= brushMask
+            cmGlobals.cmTraceStart .= start
+            cmGlobals.cmTraceEnd .= end
+            cmGlobals.cmTraceMins .= mins
+            cmGlobals.cmTraceMaxs .= maxs
+            proceedBoxTrace
+    proceedBoxTrace
+        | start == end = do
+            -- check for position test special case
+            let c1 = fmap (subtract 1) (start + mins)
+                c2 = fmap (+ 1) (start + maxs)
+            (numLeafs, _) <- boxLeafNumsHeadnode c1 c2 (cmGlobals.cmLeafs) 1024 headNode (Just [0])
+            checkLeafs 0 numLeafs
+            cmGlobals.cmTraceTrace.tEndPos .= start
+            use (cmGlobals.cmTraceTrace)
+        | otherwise = do
+            setTracePointAndExtents
+            -- general sweeping through world
+            recursiveHullCheck headNode 0 1 start end
+            traceFraction <- use (cmGlobals.cmTraceTrace.tFraction)
+            cmGlobals.cmTraceTrace.tEndPos .= if traceFraction == 1 then end else start + fmap (* traceFraction) (end - start)
+            traceTrace <- use (cmGlobals.cmTraceTrace)
+            return traceTrace
+    setTracePointAndExtents
+        | (mins == nullV3) && (maxs == nullV3) = do
+            cmGlobals.cmTraceIsPoint .= True
+            cmGlobals.cmTraceExtents .= nullV3
+        | otherwise = do
+            cmGlobals.cmTraceIsPoint .= False
+            let a = if (- (mins^._x)) > (maxs^._x) then (- (mins^._x)) else maxs^._x
+                b = if (- (mins^._y)) > (maxs^._y) then (- (mins^._y)) else maxs^._y
+                c = if (- (mins^._z)) > (maxs^._z) then (- (mins^._z)) else maxs^._z
+            cmGlobals.cmTraceExtents .= V3 a b c
+    checkLeafs idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            leafs <- use (cmGlobals.cmLeafs)
+            testInLeaf (leafs UV.! idx)
+            allSolid <- use (cmGlobals.cmTraceTrace.tAllSolid)
+            unless allSolid $
+                checkLeafs (idx + 1) maxIdx
+
+testInLeaf :: Int -> Quake ()
+testInLeaf = error "CM.testInLeaf" -- TODO
+
+boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
+boxLeafNumsHeadnode = error "CM.boxLeafNumsHeadnode" -- TODO
+
+recursiveHullCheck :: Int -> Float -> Float -> V3 Float -> V3 Float -> Quake ()
+recursiveHullCheck = error "CM.recursiveHullCheck" -- TODO
+
+-- Returns a tag that describes the content of the point
+pointContents :: V3 Float -> Int -> Quake Int
+pointContents p headNode = do
+    numNodes <- use (cmGlobals.cmNumNodes)
+    getPointContents numNodes
+  where
+    getPointContents numNodes
+        | numNodes == 0 = return 0 -- map not loaded
+        | otherwise = do
+            idx <- pointLeafNumR p headNode
+            mapLeafs <- use (cmGlobals.cmMapLeafs)
+            return ((mapLeafs V.! idx)^.clContents)
+
+-- Searches the leaf number that contains the 3d point
+pointLeafNum :: V3 Float -> Quake Int
+pointLeafNum p = do
+    -- sound may call this without map loaded
+    numPlanes <- use (cmGlobals.cmNumPlanes)
+    getPointLeafNum numPlanes
+  where
+    getPointLeafNum numPlanes
+        | numPlanes == 0 = return 0
+        | otherwise = pointLeafNumR p 0
+
+pointLeafNumR :: V3 Float -> Int -> Quake Int
+pointLeafNumR = error "CM.pointLeafNumR" -- TODO
+
+transformedPointContents :: V3 Float -> Int -> V3 Float -> V3 Float -> Quake Int
+transformedPointContents p headNode origin angles = do
+    boxHeadNode <- use (cmGlobals.cmBoxHeadNode)
+    -- rotate start and end into the models frame of reference
+    let pL' = if headNode /= boxHeadNode && ((angles^._x) /= 0 || (angles^._y) /= 0 || (angles^._z) /= 0)
+                  then let (forward, right, up) = Math3D.angleVectors angles True True True
+                       in V3 (pL `dot` forward) (-(pL `dot` right)) (pL `dot` up)
+                  else pL
+    idx <- pointLeafNumR pL' headNode
+    mapLeafs <- use (cmGlobals.cmMapLeafs)
+    return ((mapLeafs V.! idx)^.clContents)
+  where
+    pL = p - origin

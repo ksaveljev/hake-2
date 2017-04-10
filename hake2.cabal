@@ -295,3 +295,4 @@ executable hake2
                      Util.Unsafe
                      Render.GLFWbGlobals
                      Client.CLTEntShared
+                     Client.KeyFuncT

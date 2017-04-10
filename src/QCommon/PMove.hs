@@ -2,13 +2,16 @@ module QCommon.PMove
     ( pMove
     ) where
 
-import           Control.Lens     (use, (^.), (.=), (%=), (&), (.~), (%~))
-import           Control.Monad    (when)
+import           Control.Lens     (use, ix, (^.), (.=), (%=), (+=), (&), (.~), (%~), (+~))
+import           Control.Monad    (when, unless)
 import           Data.Bits        (complement, shiftR, (.&.), (.|.))
 import           Data.Int         (Int16)
-import           Linear           (V3(..), norm, normalize, _x, _y, _z)
+import           Data.Maybe       (isJust, isNothing, fromJust)
+import           Linear           (V3(..), dot, norm, normalize, _x, _y, _z)
 
 import qualified Constants
+import           Game.CPlaneT
+import           Game.CSurfaceT
 import           Game.PMoveStateT
 import           Game.PMoveT
 import           Game.TraceT
@@ -53,7 +56,7 @@ proceedPMove pmove
                 deadMove
             checkSpecialMovement
             dropTimingCounter
-            checkPMFlags
+            checkPMFlags =<< use (pMoveGlobals.pmPM)
             catagorizePosition
             snapPosition
             use (pMoveGlobals.pmPM)
@@ -117,12 +120,9 @@ checkDuck pm
         | (pm^.pmState.pmsPMFlags) .&. Constants.pmfDucked /= 0 = do -- stand up if possible
             pml <- use (pMoveGlobals.pmPML)
             traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (V3 (-16) (-16) (-24)) (V3 16 16 32) (pml^.pmlOrigin)
-            maybe traceError standUp traceT
+            standUp traceT
         | otherwise =
             return pm
-    traceError = do
-        Com.fatalError "PMove.checkDuck traceT is Nothing"
-        return pm
     standUp traceT
         | traceT^.tAllSolid = return pm
         | otherwise = return (pm & pmState.pmsPMFlags .~ (pm^.pmState.pmsPMFlags) .&. (complement Constants.pmfDucked))
@@ -163,7 +163,71 @@ checkPosition base z maxZ y maxY x maxX
             checkPosition base z maxZ y maxY (x + 1) maxX
 
 catagorizePosition :: Quake ()
-catagorizePosition = error "PMove.catagorizePosition" -- TODO
+catagorizePosition = do
+    point <- getStandingPoint
+    checkSolidGround point =<< use (pMoveGlobals.pmPML)
+    pMoveGlobals.pmPM.pmWaterLevel .= 0
+    pMoveGlobals.pmPM.pmWaterType .= 0
+    pm <- use (pMoveGlobals.pmPM)
+    pml <- use (pMoveGlobals.pmPML)
+    let sample2 = truncate ((pm^.pmViewHeight) - (pm^.pmMins._z)) :: Int
+        sample1 = sample2 `div` 2
+        V3 a b c = point
+        point' = V3 a b ((pml^.pmlOrigin._z) + (pm^.pmMins._z) + 1)
+    cont <- (pm^.pmPointContents) point'
+    when (cont .&. Constants.maskWater /= 0) $ do
+        pMoveGlobals.pmPM.pmWaterType .= cont
+        pMoveGlobals.pmPM.pmWaterLevel .= 1
+        let c' = ((pml^.pmlOrigin._z) + (pm^.pmMins._z) + fromIntegral sample1)
+            point'' = V3 a b c'
+        cont' <- (pm^.pmPointContents) point''
+        when (cont' .&. Constants.maskWater /= 0) $ do
+            pMoveGlobals.pmPM.pmWaterLevel .= 2
+            let c'' = ((pml^.pmlOrigin._z) + (pm^.pmMins._z) + fromIntegral sample2)
+                point''' = V3 a b c''
+            cont'' <- (pm^.pmPointContents) point'''
+            when (cont'' .&. Constants.maskWater /= 0) $
+                pMoveGlobals.pmPM.pmWaterLevel .= 3
+  where
+    getStandingPoint = do
+        pml <- use (pMoveGlobals.pmPML)
+        return (V3 (pml^.pmlOrigin._x) (pml^.pmlOrigin._y) ((pml^.pmlOrigin._z) - 0.25))
+    checkSolidGround point pml
+        | (pml^.pmlVelocity._z) > 180 = do
+            pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement Constants.pmfOnGround))
+            pMoveGlobals.pmPM.pmGroundEntity .= Nothing
+        | otherwise = do
+            pm <- use (pMoveGlobals.pmPM)
+            traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) point
+            pMoveGlobals.pmPML.pmlGroundSurface .= (traceT^.tSurface)
+            pMoveGlobals.pmPML.pmlGroundContents .= (traceT^.tContents)
+            checkTraceEntity traceT
+            pm' <- use (pMoveGlobals.pmPM)
+            when ((pm'^.pmNumTouch) < Constants.maxTouch && isJust (traceT^.tEnt)) $ do
+                pMoveGlobals.pmPM.pmTouchEnts.ix (pm'^.pmNumTouch) .= fromJust (traceT^.tEnt)
+                pMoveGlobals.pmPM.pmNumTouch += 1
+    checkTraceEntity :: TraceT -> Quake ()
+    checkTraceEntity traceT
+        | isNothing (traceT^.tEnt) || ((traceT^.tPlane.cpNormal._z) < 0.7 && not (traceT^.tStartSolid)) = do
+            pMoveGlobals.pmPM.pmGroundEntity .= Nothing
+            pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement Constants.pmfOnGround))
+        | otherwise = do
+            pMoveGlobals.pmPM.pmGroundEntity .= (traceT^.tEnt)
+            pm <- use (pMoveGlobals.pmPM)
+            -- hitting solid ground will end a waterjump
+            when ((pm^.pmState.pmsPMFlags) .&. Constants.pmfTimeWaterJump /= 0) $ do
+                pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement (Constants.pmfTimeWaterJump .|. Constants.pmfTimeLand .|. Constants.pmfTimeTeleport)))
+                pMoveGlobals.pmPM.pmState.pmsPMTime .= 0
+            pm' <- use (pMoveGlobals.pmPM)
+            when ((pm'^.pmState.pmsPMFlags) .&. Constants.pmfOnGround == 0) $ do
+                -- just hit the ground
+                pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. Constants.pmfOnGround)
+                pml <- use (pMoveGlobals.pmPML)
+                -- don't do landing time if we were just going down a slope
+                when ((pml^.pmlVelocity._z) < -200) $ do
+                    pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. Constants.pmfTimeLand)
+                    -- don't allow another jump for a little while
+                    pMoveGlobals.pmPM.pmState.pmsPMTime .= (if (pml^.pmlVelocity._z) < -400 then 25 else 18)
 
 dropTimingCounter :: Quake ()
 dropTimingCounter = do
@@ -184,14 +248,94 @@ proceedDropTimingCounter pm
           | otherwise = fromIntegral msec
     pmTime = fromIntegral (pm^.pmState.pmsPMTime) .&. 0xFF :: Int
 
-checkPMFlags :: Quake ()
-checkPMFlags = error "PMove.checkPMFlags" -- TODO
+checkPMFlags :: PMoveT -> Quake ()
+checkPMFlags pm
+    | (pm^.pmState.pmsPMFlags) .&. Constants.pmfTimeTeleport /= 0 =
+        -- teleport pause stays exactly in place
+        return ()
+    | (pm^.pmState.pmsPMFlags) .&. Constants.pmfTimeWaterJump /= 0 = do
+        -- waterjump has no control, but falls
+        pml <- use (pMoveGlobals.pmPML)
+        let v = (pml^.pmlVelocity._z) - (fromIntegral (pm^.pmState.pmsGravity)) * (pml^.pmlFrameTime)
+        pMoveGlobals.pmPML.pmlVelocity._z .= v
+        when (v < 0) $ do
+            pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement (Constants.pmfTimeWaterJump .|. Constants.pmfTimeLand .|. Constants.pmfTimeTeleport)))
+            pMoveGlobals.pmPM.pmState.pmsPMTime .= 0
+        stepSlideMove
+    | otherwise = do
+        checkJump =<< use (pMoveGlobals.pmPM)
+        handleFriction
+        checkWaterOrAir
+  where
+    checkWaterOrAir
+        | (pm^.pmWaterLevel) >= 2 = waterMove
+        | otherwise = do
+            let V3 a b c = pm^.pmViewAngles
+                a' = (if a > 180 then (a - 360) else a) / 3
+                (f, r, u) = Math3D.angleVectors (V3 a' b c) True True True
+            pMoveGlobals.pmPML.pmlForward .= f
+            pMoveGlobals.pmPML.pmlRight .= r
+            pMoveGlobals.pmPML.pmlUp .= u
+            airMove
 
 snapPosition :: Quake ()
 snapPosition = error "PMove.snapPosition" -- TODO
 
 flyMove :: Bool -> Quake ()
-flyMove = error "PMove.flyMove" -- TODO
+flyMove doClip = do
+    pMoveGlobals.pmPM.pmViewHeight .= 22
+    -- friction
+    speed <- getSpeed
+    setVelocity speed
+    -- accelerate
+    fmove <- use (pMoveGlobals.pmPM.pmCmd.ucForwardMove)
+    smove <- use (pMoveGlobals.pmPM.pmCmd.ucSideMove)
+    pMoveGlobals.pmPML.pmlForward %= normalize
+    pMoveGlobals.pmPML.pmlRight %= normalize
+    pm <- use (pMoveGlobals.pmPM)
+    pml <- use (pMoveGlobals.pmPML)
+    maxSpeed <- use (pMoveGlobals.pmMaxSpeed)
+    let wishVel = let v = fmap (* (fromIntegral fmove)) (pml^.pmlForward) + fmap (* (fromIntegral smove)) (pml^.pmlRight)
+                  in v & _z +~ (fromIntegral $ pm^.pmCmd.ucUpMove)
+        wishSpeed = norm wishVel
+        wishDir = normalize wishVel
+        (wishVel', wishSpeed') = if wishSpeed > maxSpeed
+                                     then (fmap (* (maxSpeed / wishSpeed)) wishVel, maxSpeed)
+                                     else (wishVel, wishSpeed)
+        currentSpeed = (pml^.pmlVelocity) `dot` wishDir
+        addSpeed = wishSpeed' - currentSpeed
+    unless (addSpeed <= 0) $ do
+        accelerate <- use (pMoveGlobals.pmAccelerate)
+        let accelSpeed = let a = accelerate * (pml^.pmlFrameTime) * wishSpeed'
+                         in if a > addSpeed then addSpeed else a
+            velocity = (fmap (* accelSpeed) wishDir) + (pml^.pmlVelocity)
+        pMoveGlobals.pmPML.pmlVelocity .= velocity
+        setOrigin pm pml velocity
+  where
+    getSpeed = do
+      velocity <- use (pMoveGlobals.pmPML.pmlVelocity)
+      return (norm velocity)
+    setVelocity :: Float -> Quake ()
+    setVelocity speed
+        | speed < 1 = do
+            v3o <- use (globals.gVec3Origin)
+            pMoveGlobals.pmPML.pmlVelocity .= v3o
+        | otherwise = do
+            friction <- fmap (* 1.5) (use (pMoveGlobals.pmFriction)) -- extra friction
+            stopSpeed <- use (pMoveGlobals.pmStopSpeed)
+            frameTime <- use (pMoveGlobals.pmPML.pmlFrameTime)
+            let control = if speed < stopSpeed then stopSpeed else speed
+                drop = control * friction * frameTime
+                -- scale the velocity
+                newSpeed = if speed - drop < 0 then 0 else (speed - drop) / speed
+            pMoveGlobals.pmPML.pmlVelocity %= fmap (* newSpeed)
+    setOrigin pm pml velocity
+        | doClip = do
+            let end = (pml^.pmlOrigin) + fmap (* (pml^.pmlFrameTime)) velocity
+            traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) end
+            pMoveGlobals.pmPML.pmlOrigin .= (traceT^.tEndPos)
+        | otherwise =
+            pMoveGlobals.pmPML.pmlOrigin += fmap (* (pml^.pmlFrameTime)) velocity
 
 deadMove :: Quake ()
 deadMove = do
@@ -222,10 +366,99 @@ goodPosition = do
         | otherwise = do
             let origin = fmap ((* 0.125) . fromIntegral) (pm^.pmState.pmsOrigin)
             traceT <- (pm^.pmTrace) origin (pm^.pmMins) (pm^.pmMaxs) origin
-            maybe traceError (\v -> return (not (v^.tAllSolid))) traceT
-    traceError = do
-        Com.fatalError "PMove.goodPosition traceT is Nothing"
-        return False
+            return (not (traceT^.tAllSolid))
 
 checkSpecialMovement :: Quake ()
-checkSpecialMovement = error "PMove.checkSpecialMovement" -- TODO
+checkSpecialMovement = do
+    pm <- use (pMoveGlobals.pmPM)
+    when ((pm^.pmState.pmsPMTime) == 0) $ do
+        pMoveGlobals.pmPML.pmlLadder .= False
+        -- check for ladder
+        pml <- use (pMoveGlobals.pmPML)
+        let flatForward = normalize (V3 (pml^.pmlForward._x) (pml^.pmlForward._y) 0)
+            spot = (pml^.pmlOrigin) + flatForward
+        traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) spot
+        when ((traceT^.tFraction) < 1 && ((traceT^.tContents) .&. Constants.contentsLadder /= 0)) $
+            pMoveGlobals.pmPML.pmlLadder .= True
+        -- check for water jump
+        when ((pm^.pmWaterLevel) == 2) $ do
+            let V3 a b c = (pml^.pmlOrigin) + fmap (* 30) flatForward
+                spot' = V3 a b (c + 4)
+            cont <- (pm^.pmPointContents) spot'
+            unless (cont .&. Constants.contentsSolid == 0) $ do
+                cont' <- (pm^.pmPointContents) (V3 a b (c + 20))
+                when (cont' == 0) $ do
+                    -- jump out of water
+                    pMoveGlobals.pmPML.pmlVelocity .= V3 (50 * (flatForward^._x)) (50 * (flatForward^._y)) 350
+                    pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. Constants.pmfTimeWaterJump)
+                    pMoveGlobals.pmPM.pmState.pmsPMTime .= -1 -- was 255
+
+stepSlideMove :: Quake ()
+stepSlideMove = error "PMove.stepSlideMove" -- TODO
+
+checkJump :: PMoveT -> Quake ()
+checkJump pm
+    | (pm^.pmState.pmsPMFlags) .&. Constants.pmfTimeLand /= 0 =
+        -- hasn't been long enough since landing to jump again
+        return ()
+    | (pm^.pmCmd.ucUpMove) < 10 = -- not holding jump
+        pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.&. (complement Constants.pmfJumpHeld))
+    | (pm^.pmState.pmsPMFlags) .&. Constants.pmfJumpHeld /= 0 =
+        -- must wait for jump to be released
+        return ()
+    | (pm^.pmState.pmsPMType) == Constants.pmDead =
+        return ()
+    | (pm^.pmWaterLevel) >= 2 = do
+        -- swimming, not jumping
+        pMoveGlobals.pmPM.pmGroundEntity .= Nothing
+        pml <- use (pMoveGlobals.pmPML)
+        unless ((pml^.pmlVelocity._z) <= -300) $ do
+            let v | (pm^.pmWaterType) == Constants.contentsWater = 100
+                  | (pm^.pmWaterType) == Constants.contentsSlime = 80
+                  | otherwise = 50
+            pMoveGlobals.pmPML.pmlVelocity._z .= v
+    | isNothing (pm^.pmGroundEntity) =
+        -- in air, so no effect
+        return ()
+    | otherwise = do
+        pml <- use (pMoveGlobals.pmPML)
+        let v = max ((pml^.pmlVelocity._z) + 270) 270
+        pMoveGlobals.pmPM.pmState.pmsPMFlags %= (.|. Constants.pmfJumpHeld)
+        pMoveGlobals.pmPM.pmGroundEntity .= Nothing
+        pMoveGlobals.pmPML.pmlVelocity._z .= v
+
+-- Handles both ground friction and water friction.
+handleFriction :: Quake ()
+handleFriction = do
+    pml <- use (pMoveGlobals.pmPML)
+    doHandleFriction pml (norm (pml^.pmlVelocity))
+  where
+    doHandleFriction :: PmlT -> Float -> Quake ()
+    doHandleFriction pml speed
+        | speed < 1 =
+            pMoveGlobals.pmPML.pmlVelocity .= V3 0 0 (pml^.pmlVelocity._z)
+        | otherwise = do
+            pm <- use (pMoveGlobals.pmPM)
+            f <- use (pMoveGlobals.pmFriction)
+            stopSpeed <- use (pMoveGlobals.pmStopSpeed)
+            -- apply ground friction
+            let (control, drop)
+                    | isJust (pm^.pmGroundEntity) && isJust (pml^.pmlGroundSurface) && (((fromJust (pml^.pmlGroundSurface))^.csFlags) .&. Constants.surfSlick) == 0 =
+                        let ctrl = if speed < stopSpeed then stopSpeed else speed
+                            drop = ctrl * f * (pml^.pmlFrameTime)
+                        in (ctrl, drop)
+                    | otherwise = (0, 0)
+            -- apply water friction
+            waterFriction <- use (pMoveGlobals.pmWaterFriction)
+            let drop' | (pm^.pmWaterLevel) /= 0 && not (pml^.pmlLadder) =
+                          drop + speed * waterFriction * (fromIntegral $ pm^.pmWaterLevel) * (pml^.pmlFrameTime)
+                      | otherwise = drop
+            -- scale the velocity
+            let newSpeed = if speed - drop' < 0 then 0 else (speed - drop') / speed
+            pMoveGlobals.pmPML.pmlVelocity %= (fmap (* newSpeed))
+
+waterMove :: Quake ()
+waterMove = error "PMove.waterMove" -- TODO
+
+airMove :: Quake ()
+airMove = error "PMove.airMove" -- TODO

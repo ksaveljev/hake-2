@@ -1403,7 +1403,7 @@ data PMoveT = PMoveT
     , _pmGroundEntity  :: Maybe (Ref EdictT)
     , _pmWaterType     :: !Int
     , _pmWaterLevel    :: !Int
-    , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake (Maybe TraceT)
+    , _pmTrace         :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake TraceT
     , _pmPointContents :: V3 Float -> Quake Int
     }
 

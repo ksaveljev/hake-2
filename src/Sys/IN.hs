@@ -17,12 +17,15 @@ import           Linear                (_x, _y)
 
 import           Client.ClientStateT
 import           Client.ClientStaticT
+import           Client.FrameT
 import           Client.KButtonT
 import qualified Client.KeyConstants   as KeyConstants
 import           Client.RefExportT
 import qualified Constants
 import qualified Game.Cmd              as Cmd
 import           Game.CVarT
+import           Game.PlayerStateT
+import           Game.PMoveStateT
 import           Game.UserCmdT
 import qualified QCommon.CVar          as CVar
 import           QCommon.CVarVariables
@@ -32,6 +35,7 @@ import           QuakeState
 import           Render.Renderer
 import           Sys.KBD
 import           Types
+import qualified Util.Math3D           as Math3D
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
@@ -61,7 +65,9 @@ initialCommands =
     ]
 
 centerView :: XCommandT
-centerView = error "IN.centerView" -- TODO
+centerView = XCommandT "IN.centerView" $ do
+    deltaAngles <- use (globals.gCl.csFrame.fPlayerState.psPMoveState.pmsDeltaAngles)
+    globals.gCl.csViewAngles._x .= (negate (Math3D.shortToAngle (fromIntegral (deltaAngles^._x))))
 
 commands :: Quake ()
 commands = do
@@ -196,10 +202,20 @@ mLookUp = XCommandT "IN.mLookUp" $ do
     runXCommandT centerView
 
 forceCenterViewF :: XCommandT
-forceCenterViewF = error "IN.forceCenterViewF" -- TODO
+forceCenterViewF = XCommandT "IN.forceCenterViewF" $
+    globals.gCl.csViewAngles._x .= 0
 
 toggleMouse :: XCommandT
-toggleMouse = error "IN.toggleMouse" -- TODO
+toggleMouse = XCommandT "IN.toggleMouse" $ do
+    mouseAvail <- use (inGlobals.inMouseAvail)
+    doToggleMouse mouseAvail
+  where
+    doToggleMouse True = do
+        inGlobals.inMouseAvail .= False
+        deactivateMouse
+    doToggleMouse False = do
+        inGlobals.inMouseAvail .= True
+        activateMouse
 
 shutdown :: Quake ()
-shutdown = error "IN.shutdown" -- TODO
+shutdown = inGlobals.inMouseAvail .= False
