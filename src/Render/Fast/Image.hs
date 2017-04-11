@@ -992,16 +992,16 @@ readUncompressedTGARow :: B.ByteString -> MSV.STVector s Word8 -> Word8 -> Int -
 readUncompressedTGARow buf pic pixelSize idx pixbuf column maxColumn
     | column >= maxColumn = return idx
     | pixelSize == 24 = do
-        MSV.write pic (pixbuf + 0) (buf `B.index` (idx + 2))
-        MSV.write pic (pixbuf + 1) (buf `B.index` (idx + 1))
-        MSV.write pic (pixbuf + 2) (buf `B.index` (idx + 0))
-        MSV.write pic (pixbuf + 3) 255
+        MSV.write pic (pixbuf + 0) 255
+        MSV.write pic (pixbuf + 1) (buf `B.index` (idx + 0))
+        MSV.write pic (pixbuf + 2) (buf `B.index` (idx + 1))
+        MSV.write pic (pixbuf + 3) (buf `B.index` (idx + 2))
         readUncompressedTGARow buf pic pixelSize (idx + 3) (pixbuf + 4) (column + 1) maxColumn
     | pixelSize == 32 = do
-        MSV.write pic (pixbuf + 0) (buf `B.index` (idx + 2))
-        MSV.write pic (pixbuf + 1) (buf `B.index` (idx + 1))
-        MSV.write pic (pixbuf + 2) (buf `B.index` (idx + 0))
-        MSV.write pic (pixbuf + 3) (buf `B.index` (idx + 3))
+        MSV.write pic (pixbuf + 0) (buf `B.index` (idx + 3))
+        MSV.write pic (pixbuf + 1) (buf `B.index` (idx + 0))
+        MSV.write pic (pixbuf + 2) (buf `B.index` (idx + 1))
+        MSV.write pic (pixbuf + 3) (buf `B.index` (idx + 2))
         readUncompressedTGARow buf pic pixelSize (idx + 4) (pixbuf + 4) (column + 1) maxColumn
     | otherwise = error "Image.readUncompressedTGARow shouldn't happen"
 

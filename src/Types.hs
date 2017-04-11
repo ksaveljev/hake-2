@@ -1395,7 +1395,7 @@ data PMoveT = PMoveT
     , _pmCmd           :: UserCmdT
     , _pmSnapInitial   :: !Bool
     , _pmNumTouch      :: !Int
-    , _pmTouchEnts     :: V.Vector (Ref EdictT)
+    , _pmTouchEnts     :: V.Vector (Maybe (Ref EdictT))
     , _pmViewAngles    :: V3 Float
     , _pmViewHeight    :: !Float
     , _pmMins          :: V3 Float

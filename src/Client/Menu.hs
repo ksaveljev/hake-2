@@ -10,13 +10,13 @@ module Client.Menu
     ) where
 
 import           Control.Applicative       (liftA2)
-import           Control.Lens              (use, ix, (^.), (.=), (%=), (-=), (&), (.~), (%~), (+~), _2)
+import           Control.Lens              (use, ix, (^.), (.=), (%=), (-=), (&), (.~), (-~), (%~), (+~), _2)
 import           Control.Monad             (void, join, when, unless)
 import           Data.Bits                 (shiftR, (.&.))
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Char8     as BC
-import           Data.Char                 (ord, toLower)
-import           Data.Maybe                (fromMaybe)
+import           Data.Char                 (ord, toLower, chr)
+import           Data.Maybe                (fromMaybe, isJust)
 import qualified Data.Vector               as V
 import           Linear                    (V4(..), _x)
 import           System.IO                 (Handle, IOMode(ReadMode))
@@ -1407,10 +1407,108 @@ banner name = do
     dimError = Com.fatalError "Menu.banner reDrawGetPicSize returned Nothing"
 
 defaultMenuKey :: Ref MenuFrameworkS -> Int -> Quake (Maybe B.ByteString)
-defaultMenuKey = error "Menu.defaultMenuKey" -- TODO
+defaultMenuKey menuRef key = do
+    done <- checkFieldKey
+    if done then return Nothing else processKey
+  where
+    processKey
+        | key == KeyConstants.kEscape = do
+            popMenu
+            return (Just menuOutSound)
+        | key `elem` [KeyConstants.kKpUpArrow, KeyConstants.kUpArrow] = do
+            modifyRef menuRef (\v -> v & mfCursor -~ 1)
+            menuAdjustCursor menuRef (-1)
+            return (Just menuMoveSound)
+        | key == KeyConstants.kTab = do
+            modifyRef menuRef (\v -> v & mfCursor +~ 1)
+            menuAdjustCursor menuRef 1
+            return (Just menuMoveSound)
+        | key `elem` [KeyConstants.kKpDownArrow, KeyConstants.kDownArrow] = do
+            modifyRef menuRef (\v -> v & mfCursor +~ 1)
+            menuAdjustCursor menuRef 1
+            return (Just menuMoveSound)
+        | key `elem` [KeyConstants.kKpLeftArrow, KeyConstants.kLeftArrow] = do
+            menuSlideItem menuRef (-1)
+            return (Just menuMoveSound)
+        | key `elem` [KeyConstants.kKpRightArrow, KeyConstants.kRightArrow] = do
+            menuSlideItem menuRef 1
+            return (Just menuMoveSound)
+        | key `elem` [KeyConstants.kMouse1, KeyConstants.kMouse2, KeyConstants.kMouse3
+                     , KeyConstants.kJoy1, KeyConstants.kJoy2, KeyConstants.kJoy3
+                     , KeyConstants.kJoy4, KeyConstants.kKpEnter, KeyConstants.kEnter] = do
+            void (menuSelectItem menuRef)
+            return (Just menuMoveSound)
+        | otherwise = return Nothing
+    checkFieldKey = do
+        menuItemRef <- menuItemAtCursor menuRef
+        mItem <- maybe (return Nothing) ((fmap Just) . menuItemCommon) menuItemRef
+        maybe (return False) (checkItemField menuItemRef) mItem
+    checkItemField menuItemRef item
+        | (item^.mcType) == Constants.mtypeField = do
+            let Just (MenuFieldRef fieldRef) = menuItemRef -- TODO: fix this, ugly
+            fieldKey fieldRef key
+        | otherwise = return False
 
 menuDraw :: Ref MenuFrameworkS -> Quake ()
-menuDraw = error "Menu.menuDraw" -- TODO
+menuDraw menuRef = do
+    menu <- readRef menuRef
+    mapM_ (drawContents menu) [0..(menu^.mfNItems)-1]
+    menuItemRef <- menuItemAtCursor menuRef
+    mItem <- maybe (return Nothing) ((fmap Just) . menuItemCommon) menuItemRef
+    cursorDraw menu mItem
+    drawStatusBar menu mItem
+  where
+    cursorDraw menu Nothing =
+        maybe (return ()) (\f -> f) (menu^.mfCursorDraw)
+    cursorDraw menu (Just item) =
+        maybe (menuCursorDraw menu item) (\f -> f) (item^.mcCursorDraw)
+    menuCursorDraw menu item =
+        when ((item^.mcType) /= Constants.mtypeField) $ do
+            renderer <- use (globals.gRenderer)
+            ms <- Timer.milliseconds
+            if (item^.mcFlags) .&. Constants.qmfLeftJustify /= 0
+                then
+                    (renderer^.rRefExport.reDrawChar) ((menu^.mfX) + (item^.mcX) - 24 + (item^.mcCursorOffset))
+                                                      ((menu^.mfY) + (item^.mcY))
+                                                      (12 + ((ms `div` 250) .&. 1))
+                else
+                    (renderer^.rRefExport.reDrawChar) ((menu^.mfX) + (item^.mcCursorOffset))
+                                                      ((menu^.mfY) + (item^.mcY))
+                                                      (12 + ((ms `div` 250) .&. 1))
+    drawStatusBar menu Nothing = menuDrawStatusBar (menu^.mfStatusBar)
+    drawStatusBar menu (Just item) =
+        maybe (drawItemStatusBar menu item) (\f -> f) (item^.mcStatusBarFunc)
+    drawItemStatusBar menu item
+        | isJust (item^.mcStatusBar) = menuDrawStatusBar (item^.mcStatusBar)
+        | otherwise = menuDrawStatusBar (menu^.mfStatusBar)
+
+drawContents :: MenuFrameworkS -> Int -> Quake ()
+drawContents menu idx = do
+    let itemRef = (menu^.mfItems) V.! idx
+    menuCommon <- menuItemCommon itemRef
+    doDrawContents itemRef menuCommon
+  where
+    doDrawContents itemRef menuCommon
+        | (menuCommon^.mcType) == Constants.mtypeField = do
+            let MenuFieldRef menuItemRef = itemRef
+            fieldDraw menuItemRef
+        | (menuCommon^.mcType) == Constants.mtypeSlider = do
+            let MenuSliderRef menuItemRef = itemRef
+            sliderDraw menuItemRef
+        | (menuCommon^.mcType) == Constants.mtypeList = do
+            let MenuListRef menuItemRef = itemRef
+            menuListDraw menuItemRef
+        | (menuCommon^.mcType) == Constants.mtypeSpinControl = do
+            let MenuListRef menuItemRef = itemRef
+            spinControlDraw menuItemRef
+        | (menuCommon^.mcType) == Constants.mtypeAction = do
+            let MenuActionRef menuItemRef = itemRef
+            actionDraw menuItemRef
+        | (menuCommon^.mcType) == Constants.mtypeSeparator = do
+            let MenuSeparatorRef menuItemRef = itemRef
+            separatorDraw menuItemRef
+        | otherwise =
+            return () -- IMPROVE: maybe log something?
 
 menuAdjustCursor :: Ref MenuFrameworkS -> Int -> Quake ()
 menuAdjustCursor menuRef dir = do
@@ -1847,3 +1945,149 @@ keyDown key = do
     doKeyDown kf = do
         s <- (kf^.kfFunc) key
         maybe (return ()) S.startLocalSound s
+
+menuItemCommon :: MenuItemRef -> Quake MenuCommonS
+menuItemCommon menuItemRef =
+    case menuItemRef of
+        MenuListRef itemRef -> do
+            menuItem <- readRef itemRef
+            return (menuItem^.mlGeneric)
+        MenuActionRef itemRef -> do
+            menuItem <- readRef itemRef
+            return (menuItem^.maGeneric)
+        MenuSliderRef itemRef -> do
+            menuItem <- readRef itemRef
+            return (menuItem^.msGeneric)
+        MenuSeparatorRef itemRef -> do
+            menuItem <- readRef itemRef
+            return (menuItem^.mspGeneric)
+        MenuFieldRef itemRef -> do
+            menuItem <- readRef itemRef
+            return (menuItem^.mflGeneric)
+
+menuDrawStatusBar :: Maybe B.ByteString -> Quake ()
+menuDrawStatusBar mStatusBar = do
+    renderer <- use (globals.gRenderer)
+    vidDef <- use (globals.gVidDef)
+    case mStatusBar of
+        Just statusBar -> do
+            let len = B.length statusBar
+                maxRow = (vidDef^.vdHeight) `div` 8
+                maxCol = (vidDef^.vdWidth) `div` 8
+                col = maxCol `div` 2 - len `div` 2
+            (renderer^.rRefExport.reDrawFill) 0 ((vidDef^.vdHeight) - 8) (vidDef^.vdWidth) 8 4
+            menuDrawString renderer (col * 8) ((vidDef^.vdHeight) - 8) mStatusBar
+        Nothing ->
+            (renderer^.rRefExport.reDrawFill) 0 ((vidDef^.vdHeight) - 8) (vidDef^.vdWidth) 8 0
+
+fieldDraw :: Ref MenuFieldS -> Quake ()
+fieldDraw = error "Menu.fieldDraw" -- TODO
+
+sliderDraw :: Ref MenuSliderS -> Quake ()
+sliderDraw = error "Menu.sliderDraw" -- TODO
+
+menuListDraw :: Ref MenuListS -> Quake ()
+menuListDraw = error "Menu.menuListDraw" -- TODO
+
+spinControlDraw :: Ref MenuListS -> Quake ()
+spinControlDraw = error "Menu.spinControlDraw" -- TODO
+
+actionDraw :: Ref MenuActionS -> Quake ()
+actionDraw actionRef = do
+    action <- readRef actionRef
+    maybe actionError (doActionDraw action) (action^.maGeneric.mcParent)
+  where
+    actionError = Com.fatalError "Menu.actionDraw parent is Nothing"
+
+doActionDraw :: MenuActionS -> Ref MenuFrameworkS -> Quake ()
+doActionDraw action menuRef = do
+    renderer <- use (globals.gRenderer)
+    menu <- readRef menuRef
+    drawingFunc renderer ((action^.maGeneric.mcX) + (menu^.mfX) + Constants.lColumnOffset) ((action^.maGeneric.mcY) + (menu^.mfY)) (action^.maGeneric.mcName)
+    maybe (return ()) (\f -> f) (action^.maGeneric.mcOwnerDraw)
+  where
+    drawingFunc
+        | (action^.maGeneric.mcFlags) .&. Constants.qmfLeftJustify /= 0 =
+            if (action^.maGeneric.mcFlags) .&. Constants.qmfGrayed /= 0
+                then menuDrawStringDark
+                else menuDrawString
+        | otherwise =
+            if (action^.maGeneric.mcFlags) .&. Constants.qmfGrayed /= 0
+                then menuDrawStringR2LDark
+                else menuDrawStringR2L
+
+separatorDraw :: Ref MenuSeparatorS -> Quake ()
+separatorDraw separatorRef = do
+    separator <- readRef separatorRef
+    maybe separatorError (doSeparatorDraw separator) (separator^.mspGeneric.mcParent)
+  where
+    separatorError = Com.fatalError "Menu.separatorDraw parent is Nothing"
+
+doSeparatorDraw :: MenuSeparatorS -> Ref MenuFrameworkS -> Quake ()
+doSeparatorDraw separator menuRef = do
+    renderer <- use (globals.gRenderer)
+    menu <- readRef menuRef
+    menuDrawStringR2LDark renderer ((separator^.mspGeneric.mcX) + (menu^.mfX)) ((separator^.mspGeneric.mcY) + (menu^.mfY)) (separator^.mspGeneric.mcName)
+
+menuDrawString :: Renderer -> Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawString _ _ _ Nothing = return ()
+menuDrawString renderer x y (Just str) =
+    mapM_ drawChar [0..(B.length str)-1]
+  where
+    drawChar idx = do
+        let ch = ord (BC.index str idx)
+        (renderer^.rRefExport.reDrawChar) (x + idx * 8) y ch
+
+menuDrawStringDark :: Renderer -> Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringDark _ _ _ Nothing = return ()
+menuDrawStringDark renderer x y (Just str) =
+    mapM_ drawChar [0..(B.length str)-1]
+  where
+    drawChar idx = do
+        let ch = ord (BC.index str idx) + 128
+        (renderer^.rRefExport.reDrawChar) (x + idx * 8) y ch
+
+menuDrawStringR2L :: Renderer -> Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringR2L _ _ _ Nothing = return ()
+menuDrawStringR2L renderer x y (Just str) = do
+    mapM_ drawChar [0..(B.length str)-1]
+  where
+    drawChar idx = do
+        let ch = ord (BC.index str ((B.length str) - idx - 1))
+        (renderer^.rRefExport.reDrawChar) (x - idx * 8) y ch
+
+menuDrawStringR2LDark :: Renderer -> Int -> Int -> Maybe B.ByteString -> Quake ()
+menuDrawStringR2LDark _ _ _ Nothing = return ()
+menuDrawStringR2LDark renderer x y (Just str) = do
+    mapM_ drawChar [0..(B.length str)-1]
+  where
+    drawChar idx = do
+        let ch = ord (BC.index str ((B.length str) - idx - 1)) + 128
+        (renderer^.rRefExport.reDrawChar) (x - idx * 8) y ch
+
+fieldKey :: Ref MenuFieldS -> Int -> Quake Bool
+fieldKey fieldRef key
+    | ord k > 127 = return False
+    | otherwise = error "Menu.fieldKey" -- TODO -- support pasting from the clipboard
+  where
+      k | key == KeyConstants.kKpSlash      = '/'
+        | key == KeyConstants.kKpMinus      = '-'
+        | key == KeyConstants.kKpPlus       = '+'
+        | key == KeyConstants.kKpHome       = '7'
+        | key == KeyConstants.kKpUpArrow    = '8'
+        | key == KeyConstants.kKpPgUp       = '9'
+        | key == KeyConstants.kKpLeftArrow  = '4'
+        | key == KeyConstants.kKp5          = '5'
+        | key == KeyConstants.kKpRightArrow = '6'
+        | key == KeyConstants.kKpEnd        = '1'
+        | key == KeyConstants.kKpDownArrow  = '2'
+        | key == KeyConstants.kKpPgDn       = '3'
+        | key == KeyConstants.kKpIns        = '0'
+        | key == KeyConstants.kKpDel        = '.'
+        | otherwise                         = chr key
+
+menuSelectItem :: Ref MenuFrameworkS -> Quake Bool
+menuSelectItem = error "Menu.menuSelectItem" -- TODO
+
+menuSlideItem :: Ref MenuFrameworkS -> Int -> Quake ()
+menuSlideItem = error "Menu.menuSlideItem" -- TODO

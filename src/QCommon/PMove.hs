@@ -2,13 +2,16 @@ module QCommon.PMove
     ( pMove
     ) where
 
-import           Control.Lens        (use, ix, (^.), (.=), (%=), (+=), (-=), (&), (.~), (%~), (+~))
+import           Control.Lens        (use, ix, (^.), (.=), (%=), (+=), (-=), (&), (.~), (%~), (+~), (-~))
 import           Control.Monad       (when, unless)
 import           Data.Bits           (complement, shiftR, shiftL, (.&.), (.|.))
 import           Data.Int            (Int16)
-import           Data.Maybe          (isJust, isNothing, fromJust)
+import           Data.Maybe          (isJust, isNothing)
+import qualified Data.Vector         as V
+import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import           Linear              (V3(..), dot, norm, normalize, _x, _y, _z)
+import           System.IO.Unsafe    (unsafePerformIO)
 
 import qualified Constants
 import           Game.CPlaneT
@@ -29,6 +32,9 @@ offset = V3 0 (-1) 1
 -- try all single bits first
 jitterBits :: UV.Vector Int
 jitterBits = UV.fromList [ 0, 4, 1, 2, 3, 5, 6, 7 ]
+
+planes :: MV.IOVector (V3 Float)
+planes = unsafePerformIO (V.thaw (V.replicate Constants.maxClipPlanes (V3 0 0 0)))
 
 pMove :: PMoveT -> Quake PMoveT
 pMove pmove = do
@@ -209,7 +215,7 @@ catagorizePosition = do
             checkTraceEntity traceT
             pm' <- use (pMoveGlobals.pmPM)
             when ((pm'^.pmNumTouch) < Constants.maxTouch && isJust (traceT^.tEnt)) $ do
-                pMoveGlobals.pmPM.pmTouchEnts.ix (pm'^.pmNumTouch) .= fromJust (traceT^.tEnt)
+                pMoveGlobals.pmPM.pmTouchEnts.ix (pm'^.pmNumTouch) .= (traceT^.tEnt)
                 pMoveGlobals.pmPM.pmNumTouch += 1
     checkTraceEntity :: TraceT -> Quake ()
     checkTraceEntity traceT
@@ -428,7 +434,102 @@ checkSpecialMovement = do
                     pMoveGlobals.pmPM.pmState.pmsPMTime .= -1 -- was 255
 
 stepSlideMove :: Quake ()
-stepSlideMove = error "PMove.stepSlideMove" -- TODO
+stepSlideMove = do
+    (startO, startV) <- getStartOriginAndVelocity
+    stepSlideMove_
+    (downO, downV) <- getDownOriginAndVelocity
+    let V3 a b c = startO
+        up = V3 a b (c + fromIntegral Constants.stepSize)
+    traceT <- do
+        pm <- use (pMoveGlobals.pmPM)
+        (pm^.pmTrace) up (pm^.pmMins) (pm^.pmMaxs) up
+    -- can't step up
+    unless (traceT^.tAllSolid) $ do
+        -- try sliding above
+        pMoveGlobals.pmPML.pmlOrigin .= up
+        pMoveGlobals.pmPML.pmlVelocity .= startV
+        stepSlideMove_
+        -- push down the final amount
+        pm <- use (pMoveGlobals.pmPM)
+        pml <- use (pMoveGlobals.pmPML)
+        let V3 a' b' c' = pml^.pmlOrigin
+            down = V3 a' b' (c' - fromIntegral Constants.stepSize)
+        traceT' <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) down
+        unless (traceT'^.tAllSolid) $
+            pMoveGlobals.pmPML.pmlOrigin .= (traceT'^.tEndPos)
+        up' <- fmap (^.pmlOrigin) (use (pMoveGlobals.pmPML))
+        -- decide which one went farther
+        let downDist = ((downO^._x) - (startO^._x)) * ((downO^._x) - (startO^._x)) + ((downO^._y) - (startO^._y)) * ((downO^._y) - (startO^._y))
+            upDist = ((up'^._x) - (startO^._x)) * ((up'^._x) - (startO^._x)) + ((up'^._y) - (startO^._y)) * ((up'^._y) - (startO^._y))
+        if downDist > upDist || (traceT'^.tPlane.cpNormal._z) < Constants.minStepNormal
+            then do
+                pMoveGlobals.pmPML.pmlOrigin .= downO
+                pMoveGlobals.pmPML.pmlVelocity .= downV
+            else do
+                -- Special case
+                -- if we were walking along a plane, then we need to copy the Z over
+                pMoveGlobals.pmPML.pmlVelocity._z .= (downV^._z)
+  where
+    getStartOriginAndVelocity = do
+        pml <- use (pMoveGlobals.pmPML)
+        return (pml^.pmlOrigin, pml^.pmlVelocity)
+    getDownOriginAndVelocity = do
+        pml <- use (pMoveGlobals.pmPML)
+        return (pml^.pmlOrigin, pml^.pmlVelocity)
+
+stepSlideMove_ :: Quake ()
+stepSlideMove_ = do
+    pml <- use (pMoveGlobals.pmPML)
+    let primalVelocity = pml^.pmlVelocity
+        timeLeft = pml^.pmlFrameTime
+    done <- slideMove timeLeft primalVelocity 0 0 4
+    unless done $ do
+        time <- use $ pMoveGlobals.pmPM.pmState.pmsPMTime
+        when (time /= 0) $
+            pMoveGlobals.pmPML.pmlVelocity .= primalVelocity
+
+slideMove :: Float -> V3 Float -> Int -> Int -> Int -> Quake Bool
+slideMove timeLeft primalVelocity numPlanes idx maxIdx
+    | idx >= maxIdx = return False
+    | otherwise = do
+        pm <- use (pMoveGlobals.pmPM)
+        pml <- use (pMoveGlobals.pmPML)
+        let end = (pml^.pmlOrigin) + fmap (* timeLeft) (pml^.pmlVelocity)
+        traceT <- (pm^.pmTrace) (pml^.pmlOrigin) (pm^.pmMins) (pm^.pmMaxs) end
+        doSlideMove pm traceT
+  where
+    doSlideMove :: PMoveT -> TraceT -> Quake Bool
+    doSlideMove pm traceT
+        | traceT^.tAllSolid = do -- entity is trapped in another solid
+            pMoveGlobals.pmPML.pmlVelocity._z .= 0 -- don't build up falling damage
+            return True
+        | otherwise = do
+            numPlanes' <- getNumPlanes traceT
+            proceedSlideMove pm traceT numPlanes'
+    getNumPlanes :: TraceT -> Quake Int
+    getNumPlanes traceT
+        | (traceT^.tFraction) > 0 = do -- actually covered some distance
+            pMoveGlobals.pmPML.pmlOrigin .= (traceT^.tEndPos)
+            return 0
+        | otherwise = return numPlanes
+    proceedSlideMove pm traceT numPlanes'
+        | traceT^.tFraction == 1 = return False
+        | otherwise = do
+            -- save entity for contact
+            when ((pm^.pmNumTouch) < Constants.maxTouch && isJust (traceT^.tEnt)) $ do
+                pMoveGlobals.pmPM.pmTouchEnts.ix (pm^.pmNumTouch) .= (traceT^.tEnt)
+                pMoveGlobals.pmPM.pmNumTouch += 1
+            slideAlongPlane primalVelocity numPlanes' (timeLeft - timeLeft * (traceT^.tFraction))
+
+slideAlongPlane :: V3 Float -> Int -> Float -> Quake Bool
+slideAlongPlane primalVelocity numPlanes timeLeft
+    | numPlanes >= Constants.maxClipPlanes = do
+        -- this shouldn't really happen
+        v3o <- use (globals.gVec3Origin)
+        pMoveGlobals.pmPML.pmlVelocity .= v3o
+        return False
+    | otherwise = do
+        undefined -- TODO
 
 checkJump :: PMoveT -> Quake ()
 checkJump pm
@@ -475,13 +576,7 @@ handleFriction = do
             pm <- use (pMoveGlobals.pmPM)
             f <- use (pMoveGlobals.pmFriction)
             stopSpeed <- use (pMoveGlobals.pmStopSpeed)
-            -- apply ground friction
-            let (control, drop)
-                    | isJust (pm^.pmGroundEntity) && isJust (pml^.pmlGroundSurface) && (((fromJust (pml^.pmlGroundSurface))^.csFlags) .&. Constants.surfSlick) == 0 =
-                        let ctrl = if speed < stopSpeed then stopSpeed else speed
-                            drop = ctrl * f * (pml^.pmlFrameTime)
-                        in (ctrl, drop)
-                    | otherwise = (0, 0)
+            let (control, drop) = applyGroundFriction pm pml (pml^.pmlGroundSurface) f speed stopSpeed
             -- apply water friction
             waterFriction <- use (pMoveGlobals.pmWaterFriction)
             let drop' | (pm^.pmWaterLevel) /= 0 && not (pml^.pmlLadder) =
@@ -490,6 +585,13 @@ handleFriction = do
             -- scale the velocity
             let newSpeed = if speed - drop' < 0 then 0 else (speed - drop') / speed
             pMoveGlobals.pmPML.pmlVelocity %= (fmap (* newSpeed))
+    applyGroundFriction _ _ Nothing _ _ _ = (0, 0)
+    applyGroundFriction pm pml (Just groundSurface) f speed stopSpeed
+        | isJust (pm^.pmGroundEntity) && ((groundSurface^.csFlags) .&. Constants.surfSlick) == 0 =
+            let ctrl = if speed < stopSpeed then stopSpeed else speed
+                drop = ctrl * f * (pml^.pmlFrameTime)
+            in (ctrl, drop)
+        | otherwise = (0, 0)
 
 waterMove :: Quake ()
 waterMove = do
@@ -572,7 +674,47 @@ airMove = do
             stepSlideMove
 
 addCurrents :: PMoveT -> PmlT -> V3 Float -> Float -> V3 Float
-addCurrents = error "PMove.addCurrents" -- TODO
+addCurrents pm pml (V3 a b c) waterSpeed =
+    -- account for ladders
+    let wishVel = if (pml^.pmlLadder) && abs(pml^.pmlVelocity._z) <= 200
+                    then let c' | (pm^.pmViewAngles.(Math3D.v3Access Constants.pitch)) <= -15 && (pm^.pmCmd.ucForwardMove) > 0 = 200
+                                | (pm^.pmViewAngles.(Math3D.v3Access Constants.pitch)) >= 15 && (pm^.pmCmd.ucForwardMove) > 0 = -200
+                                | (pm^.pmCmd.ucUpMove) > 0 = 200
+                                | (pm^.pmCmd.ucUpMove) < 0 = -200
+                                | otherwise = 0
+                             -- limit horizontal speed when on a ladder
+                             a' | a < -25 = -25
+                                | a > 25 = 25
+                                | otherwise = a
+                             b' | b < -25 = -25
+                                | b > 25 = 25
+                                | otherwise = b
+                         in V3 a' b' c'
+                    else V3 a b c
+        -- add water currents
+        v = if (pm^.pmWaterType) .&. Constants.maskCurrent /= 0
+              then let va = if (pm^.pmWaterType) .&. Constants.contentsCurrent0 /= 0 then 1 else 0
+                       vb = if (pm^.pmWaterType) .&. Constants.contentsCurrent90 /= 0 then 1 else 0
+                       vc = if (pm^.pmWaterType) .&. Constants.contentsCurrent180 /= 0 then -1 else 0
+                       vd = if (pm^.pmWaterType) .&. Constants.contentsCurrent270 /= 0 then -1 else 0
+                       ve = if (pm^.pmWaterType) .&. Constants.contentsCurrentUp /= 0 then 1 else 0
+                       vf = if (pm^.pmWaterType) .&. Constants.contentsCurrentDown /= 0 then -1 else 0
+                   in V3 (va + vc) (vb + vd) (ve + vf)
+              else V3 0 0 0
+        s = if (pm^.pmWaterLevel) == 1 && isJust (pm^.pmGroundEntity) then waterSpeed / 2 else waterSpeed
+        wishVel' = wishVel + fmap (* s) v
+        -- add conveyor belt velocities
+        v' = if isJust (pm^.pmGroundEntity)
+               then let va = if (pml^.pmlGroundContents) .&. Constants.contentsCurrent0 /= 0 then 1 else 0
+                        vb = if (pml^.pmlGroundContents) .&. Constants.contentsCurrent90 /= 0 then 1 else 0
+                        vc = if (pml^.pmlGroundContents) .&. Constants.contentsCurrent180 /= 0 then -1 else 0
+                        vd = if (pml^.pmlGroundContents) .&. Constants.contentsCurrent270 /= 0 then -1 else 0
+                        ve = if (pml^.pmlGroundContents) .&. Constants.contentsCurrentUp /= 0 then 1 else 0
+                        vf = if (pml^.pmlGroundContents) .&. Constants.contentsCurrentDown /= 0 then -1 else 0
+                    in V3 (va + vc) (vb + vd) (ve + vf)
+               else V3 0 0 0
+        wishVel'' = wishVel' + fmap (* 100) v'
+    in wishVel''
 
 -- Handles user intended acceleration
 accelerate :: V3 Float -> Float -> Float -> Quake ()
