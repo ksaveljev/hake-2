@@ -11,13 +11,14 @@ import qualified Game.Cmd           as Cmd
 import qualified QCommon.CBuf       as CBuf
 import qualified QCommon.CM         as CM
 import qualified QCommon.Com        as Com
-import qualified QCommon.CVarShared as CVar
 import qualified QCommon.PMove      as PMove
 import qualified Server.SVGame      as SVGame
 import qualified Server.SVInit      as SVInit
 import qualified Server.SVSend      as SVSend
 import qualified Server.SVWorld     as SVWorld
 import           Types
+
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 makeLenses ''GameImportT
 

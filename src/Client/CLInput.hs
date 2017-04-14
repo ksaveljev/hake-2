@@ -181,7 +181,34 @@ kLookUp :: XCommandT
 kLookUp = XCommandT "CLInput.kLookUp" (inputKeyUp (clientGlobals.cgInKLook))
 
 inputKeyDown :: Lens' QuakeState KButtonT -> Quake ()
-inputKeyDown = error "CLInput.inputKeyDown" -- TODO
+inputKeyDown buttonLens = do
+    b <- use buttonLens
+    c <- Cmd.argv 1
+    let k | B.length c > 0 = Lib.atoi c
+          | otherwise = -1 -- typed manually at the console for continuous down
+    unless ((b^.kbDown._1) == k || (b^.kbDown._2) == k) $ do -- repeating key
+        done <- checkIfDone b k
+        unless done $ do
+            unless ((b^.kbState) .&. 1 /= 0) $ do -- unless still down
+                -- save timestamp
+                t <- Cmd.argv 2
+                let downtime = Lib.atoi t
+                buttonLens.kbDownTime .= fromIntegral downtime
+                when (downtime == 0) $ do
+                    frameTime <- use (globals.gSysFrameTime)
+                    buttonLens.kbDownTime .= fromIntegral (frameTime - 100)
+                buttonLens.kbState %= (.|. 3) -- down + impulse down
+  where
+    checkIfDone b k
+        | (b^.kbDown._1) == 0 = do
+            buttonLens.kbDown._1 .= k
+            return False
+        | (b^.kbDown._2) == 0 = do
+            buttonLens.kbDown._2 .= k
+            return False
+        | otherwise = do
+            Com.printf "Three keys down for a button!\n"
+            return True
 
 inputKeyUp :: Lens' QuakeState KButtonT -> Quake ()
 inputKeyUp buttonLens = do

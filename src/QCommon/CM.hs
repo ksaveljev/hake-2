@@ -14,6 +14,7 @@ module QCommon.CM
     , pointLeafNum
     , setAreaPortalState
     , transformedPointContents
+    , writePortalState
     ) where
 
 import           Control.Lens                    (Lens', use, (.=), (%=), (+=), (^.), (&), (.~))
@@ -55,6 +56,7 @@ import           Types
 import           Util.Binary                     (encode)
 import qualified Util.Lib                        as Lib
 import qualified Util.Math3D                     as Math3D
+import qualified Util.QuakeFile                  as QuakeFile
 
 nullV3 :: V3 Float
 nullV3 = V3 0 0 0
@@ -721,3 +723,11 @@ transformedPointContents p headNode origin angles = do
     return ((mapLeafs V.! idx)^.clContents)
   where
     pL = p - origin
+
+writePortalState :: QuakeFile -> Quake ()
+writePortalState saveFile = do
+    portalOpen <- use (cmGlobals.cmPortalOpen)
+    io (UV.mapM_ writePortal portalOpen) -- IMPROVE: catch exception?
+  where 
+    writePortal True = QuakeFile.writeInt saveFile 1
+    writePortal False = QuakeFile.writeInt saveFile 0

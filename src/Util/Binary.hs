@@ -10,11 +10,16 @@ module Util.Binary
     , getV3Int16
     , getV4Float
     , getWord162
+    , putBool
+    , putFloat
+    , putInt
+    , putInt16
     ) where
 
 import           Control.Monad.State.Strict (runStateT)
 import           Data.Binary.Get            (Get, getWord16le, getWord32le, getWord8)
-import           Data.Binary.IEEE754        (getFloat32le)
+import           Data.Binary.IEEE754        (getFloat32le, putFloat32le)
+import           Data.Binary.Put            (Put, putWord8, putWord32le, putWord16le)
 import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as BC
 import           Data.Int                   (Int8, Int16, Int32)
@@ -68,3 +73,16 @@ getMany getA = go
 
 getWord162 :: Get (Word16, Word16)
 getWord162 = (,) <$> getWord16le <*> getWord16le
+
+putInt :: Int -> Put
+putInt = putWord32le <$> fromIntegral
+
+putInt16 :: Int16 -> Put
+putInt16 = putWord16le <$> fromIntegral
+
+putBool :: Bool -> Put
+putBool True = putWord8 1
+putBool False = putWord8 0
+
+putFloat :: Float -> Put
+putFloat = putFloat32le

@@ -1,5 +1,6 @@
 module Game.GameUtil
-    ( freeEdict
+    ( clearEdict
+    , freeEdict
     , freeEdictA
     , inFront
     , killBox
@@ -24,6 +25,11 @@ import           QuakeRef
 import           QuakeState
 import           Types
 import qualified Util.Math3D           as Math3D
+
+clearEdict :: Ref EdictT -> Quake ()
+clearEdict edictRef = do
+    edict <- readRef edictRef
+    writeRef edictRef (newEdictT (edict^.eIndex))
 
 freeEdict :: Ref EdictT -> Quake ()
 freeEdict edictRef = do

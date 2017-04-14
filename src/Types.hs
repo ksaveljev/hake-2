@@ -57,6 +57,26 @@ data QuakeState = QuakeState
     , _kbdGlobals            :: KBDGlobals
     , _netChannelGlobals     :: NetChannelGlobals
     , _glfwbGlobals          :: GLFWbGlobals
+    , _mBerserkGlobals       :: MBerserkGlobals
+    , _mBoss2Globals         :: MBoss2Globals
+    , _mBoss31Globals        :: MBoss31Globals
+    , _mBoss32Globals        :: MBoss32Globals
+    , _mBrainGlobals         :: MBrainGlobals
+    , _mChickGlobals         :: MChickGlobals
+    , _mFlipperGlobals       :: MFlipperGlobals
+    , _mFloatGlobals         :: MFloatGlobals
+    , _mFlyerGlobals         :: MFlyerGlobals
+    , _mGladiatorGlobals     :: MGladiatorGlobals
+    , _mGunnerGlobals        :: MGunnerGlobals
+    , _mHoverGlobals         :: MHoverGlobals
+    , _mInfantryGlobals      :: MInfantryGlobals
+    , _mInsaneGlobals        :: MInsaneGlobals
+    , _mMedicGlobals         :: MMedicGlobals
+    , _mMutantGlobals        :: MMutantGlobals
+    , _mParasiteGlobals      :: MParasiteGlobals
+    , _mSoldierGlobals       :: MSoldierGlobals
+    , _mSuperTankGlobals     :: MSuperTankGlobals
+    , _mTankGlobals          :: MTankGlobals
     }
 
 data Globals = Globals
@@ -567,6 +587,255 @@ data GLFWbGlobals = GLFWbGlobals
     , _glfwbWindowXPos     :: !Int
     , _glfwbWindowYPos     :: !Int
     , _glfwbKBDChan        :: Maybe (TChan GLFWKBDEvent)
+    }
+
+data MBerserkGlobals = MBerserkGlobals
+    { _mBerserkSoundPain   :: Int
+    , _mBerserkSoundDie    :: Int
+    , _mBerserkSoundIdle   :: Int
+    , _mBerserkSoundPunch  :: Int
+    , _mBerserkSoundSight  :: Int
+    , _mBerserkSoundSearch :: Int
+    }
+
+data MBoss2Globals = MBoss2Globals
+    { _mb2SoundPain1   :: Int
+    , _mb2SoundPain2   :: Int
+    , _mb2SoundPain3   :: Int
+    , _mb2SoundDeath   :: Int
+    , _mb2SoundSearch1 :: Int
+    }
+
+data MBoss31Globals = MBoss31Globals
+    { _mb31SoundPain1     :: Int
+    , _mb31SoundPain2     :: Int
+    , _mb31SoundPain3     :: Int
+    , _mb31SoundIdle      :: Int
+    , _mb31SoundDeath     :: Int
+    , _mb31SoundSearch1   :: Int
+    , _mb31SoundSearch2   :: Int
+    , _mb31SoundSearch3   :: Int
+    , _mb31SoundAttack1   :: Int
+    , _mb31SoundAttack2   :: Int
+    , _mb31SoundFireGun   :: Int
+    , _mb31SoundStepLeft  :: Int
+    , _mb31SoundStepRight :: Int
+    , _mb31SoundDeathHit  :: Int
+    }
+
+data MBoss32Globals = MBoss32Globals
+    { _mb32SoundPain4        :: Int
+    , _mb32SoundPain5        :: Int
+    , _mb32SoundPain6        :: Int
+    , _mb32SoundDeath        :: Int
+    , _mb32SoundStepLeft     :: Int
+    , _mb32SoundStepRight    :: Int
+    , _mb32SoundAttackBfg    :: Int
+    , _mb32SoundBrainSplorch :: Int
+    , _mb32SoundPreRailGun   :: Int
+    , _mb32SoundPopUp        :: Int
+    , _mb32SoundTaunt1       :: Int
+    , _mb32SoundTaunt2       :: Int
+    , _mb32SoundTaunt3       :: Int
+    , _mb32SoundHit          :: Int
+    }
+
+data MBrainGlobals = MBrainGlobals
+    { _mBrainSoundChestOpen        :: Int
+    , _mBrainSoundTentaclesExtend  :: Int
+    , _mBrainSoundTentaclesRetract :: Int
+    , _mBrainSoundDeath            :: Int
+    , _mBrainSoundIdle1            :: Int
+    , _mBrainSoundIdle2            :: Int
+    , _mBrainSoundIdle3            :: Int
+    , _mBrainSoundPain1            :: Int
+    , _mBrainSoundPain2            :: Int
+    , _mBrainSoundSight            :: Int
+    , _mBrainSoundSearch           :: Int
+    , _mBrainSoundMelee1           :: Int
+    , _mBrainSoundMelee2           :: Int
+    , _mBrainSoundMelee3           :: Int
+    }
+
+data MChickGlobals = MChickGlobals
+    { _mChickSoundMissilePrelaunch :: Int
+    , _mChickSoundMissileLaunch    :: Int
+    , _mChickSoundMeleeSwing       :: Int
+    , _mChickSoundMeleeHit         :: Int
+    , _mChickSoundMissileReload    :: Int
+    , _mChickSoundDeath1           :: Int
+    , _mChickSoundDeath2           :: Int
+    , _mChickSoundFallDown         :: Int
+    , _mChickSoundIdle1            :: Int
+    , _mChickSoundIdle2            :: Int
+    , _mChickSoundPain1            :: Int
+    , _mChickSoundPain2            :: Int
+    , _mChickSoundPain3            :: Int
+    , _mChickSoundSight            :: Int
+    , _mChickSoundSearch           :: Int
+    }
+
+data MFlipperGlobals = MFlipperGlobals
+    { _mFlipperSoundChomp  :: Int
+    , _mFlipperSoundAttack :: Int
+    , _mFlipperSoundPain1  :: Int
+    , _mFlipperSoundPain2  :: Int
+    , _mFlipperSoundDeath  :: Int
+    , _mFlipperSoundIdle   :: Int
+    , _mFlipperSoundSearch :: Int
+    , _mFlipperSoundSight  :: Int
+    }
+
+data MFloatGlobals = MFloatGlobals
+    { _mFloatSoundAttack2 :: Int
+    , _mFloatSoundAttack3 :: Int
+    , _mFloatSoundDeath1  :: Int
+    , _mFloatSoundIdle    :: Int
+    , _mFloatSoundPain1   :: Int
+    , _mFloatSoundPain2   :: Int
+    , _mFloatSoundSight   :: Int
+    }
+
+data MFlyerGlobals = MFlyerGlobals
+    { _mFlyerNextMove     :: Int
+    , _mFlyerSoundSight   :: Int
+    , _mFlyerSoundIdle    :: Int
+    , _mFlyerSoundPain1   :: Int
+    , _mFlyerSoundPain2   :: Int
+    , _mFlyerSoundSlash   :: Int
+    , _mFlyerSoundSproing :: Int
+    , _mFlyerSoundDie     :: Int
+    }
+
+data MGladiatorGlobals = MGladiatorGlobals
+    { _mGladiatorSoundPain1        :: Int
+    , _mGladiatorSoundPain2        :: Int
+    , _mGladiatorSoundDie          :: Int
+    , _mGladiatorSoundGun          :: Int
+    , _mGladiatorSoundCleaverSwing :: Int
+    , _mGladiatorSoundCleaverHit   :: Int
+    , _mGladiatorSoundCleaverMiss  :: Int
+    , _mGladiatorSoundIdle         :: Int
+    , _mGladiatorSoundSearch       :: Int
+    , _mGladiatorSoundSight        :: Int
+    }
+
+data MGunnerGlobals = MGunnerGlobals
+    { _mGunnerSoundPain   :: Int
+    , _mGunnerSoundPain2  :: Int
+    , _mGunnerSoundDeath  :: Int
+    , _mGunnerSoundIdle   :: Int
+    , _mGunnerSoundOpen   :: Int
+    , _mGunnerSoundSearch :: Int
+    , _mGunnerSoundSight  :: Int
+    }
+
+data MHoverGlobals = MHoverGlobals
+    { _mHoverSoundPain1   :: Int
+    , _mHoverSoundPain2   :: Int
+    , _mHoverSoundDeath1  :: Int
+    , _mHoverSoundDeath2  :: Int
+    , _mHoverSoundSight   :: Int
+    , _mHoverSoundSearch1 :: Int
+    , _mHoverSoundSearch2 :: Int
+    }
+
+data MInfantryGlobals = MInfantryGlobals
+    { _miSoundPain1      :: !Int
+    , _miSoundPain2      :: !Int
+    , _miSoundDie1       :: !Int
+    , _miSoundDie2       :: !Int
+    , _miSoundGunShot    :: !Int
+    , _miSoundWeaponCock :: !Int
+    , _miSoundPunchSwing :: !Int
+    , _miSoundPunchHit   :: !Int
+    , _miSoundSight      :: !Int
+    , _miSoundSearch     :: !Int
+    , _miSoundIdle       :: !Int
+    }
+
+data MInsaneGlobals = MInsaneGlobals
+    { _mInsaneSoundFist   :: Int
+    , _mInsaneSoundShake  :: Int
+    , _mInsaneSoundMoan   :: Int
+    , _mInsaneSoundScream :: UV.Vector Int
+    }
+
+data MMedicGlobals = MMedicGlobals
+    { _mMedicSoundIdle1       :: Int
+    , _mMedicSoundPain1       :: Int
+    , _mMedicSoundPain2       :: Int
+    , _mMedicSoundDie         :: Int
+    , _mMedicSoundSight       :: Int
+    , _mMedicSoundSearch      :: Int
+    , _mMedicSoundHookLaunch  :: Int
+    , _mMedicSoundHookHit     :: Int
+    , _mMedicSoundHookHeal    :: Int
+    , _mMedicSoundHookRetract :: Int
+    }
+
+data MMutantGlobals = MMutantGlobals
+    { _mMutantSoundSwing  :: Int
+    , _mMutantSoundHit    :: Int
+    , _mMutantSoundHit2   :: Int
+    , _mMutantSoundDeath  :: Int
+    , _mMutantSoundIdle   :: Int
+    , _mMutantSoundPain1  :: Int
+    , _mMutantSoundPain2  :: Int
+    , _mMutantSoundSight  :: Int
+    , _mMutantSoundSearch :: Int
+    , _mMutantSoundStep1  :: Int
+    , _mMutantSoundStep2  :: Int
+    , _mMutantSoundStep3  :: Int
+    , _mMutantSoundThud   :: Int
+    }
+
+data MParasiteGlobals = MParasiteGlobals
+    { _mParasiteSoundPain1   :: Int
+    , _mParasiteSoundPain2   :: Int
+    , _mParasiteSoundDie     :: Int
+    , _mParasiteSoundLaunch  :: Int
+    , _mParasiteSoundImpact  :: Int
+    , _mParasiteSoundSuck    :: Int
+    , _mParasiteSoundReelIn  :: Int
+    , _mParasiteSoundSight   :: Int
+    , _mParasiteSoundTap     :: Int
+    , _mParasiteSoundScratch :: Int
+    , _mParasiteSoundSearch  :: Int
+    }
+
+data MSoldierGlobals = MSoldierGlobals
+    { _msSoundIdle       :: Int
+    , _msSoundSight1     :: Int
+    , _msSoundSight2     :: Int
+    , _msSoundPainLight  :: Int
+    , _msSoundPain       :: Int
+    , _msSoundPainSS     :: Int
+    , _msSoundDeathLight :: Int
+    , _msSoundDeath      :: Int
+    , _msSoundDeathSS    :: Int
+    , _msSoundCock       :: Int
+    }
+
+data MSuperTankGlobals = MSuperTankGlobals
+    { _mSuperTankSoundPain1   :: Int
+    , _mSuperTankSoundPain2   :: Int
+    , _mSuperTankSoundPain3   :: Int
+    , _mSuperTankSoundDeath   :: Int
+    , _mSuperTankSoundSearch1 :: Int
+    , _mSuperTankSoundSearch2 :: Int
+    , _mSuperTankTreadSound   :: Int
+    }
+
+data MTankGlobals = MTankGlobals
+    { _mTankSoundThud   :: Int
+    , _mTankSoundPain   :: Int
+    , _mTankSoundIdle   :: Int
+    , _mTankSoundDie    :: Int
+    , _mTankSoundStep   :: Int
+    , _mTankSoundSight  :: Int
+    , _mTankSoundWindUp :: Int
+    , _mTankSoundStrike :: Int
     }
 
 data CinematicsT = CinematicsT

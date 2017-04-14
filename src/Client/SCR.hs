@@ -11,6 +11,7 @@ module Client.SCR
     , playCinematic
     , runCinematic
     , runConsole
+    , stopCinematic
     , touchPics
     , updateScreen
     ) where

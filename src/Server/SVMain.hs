@@ -399,7 +399,33 @@ svcInfo :: Quake ()
 svcInfo = error "SVMain.svcInfo" -- TODO
 
 svcGetChallenge :: NetAdrT -> Quake ()
-svcGetChallenge = error "SVMain.svcGetChallenge" -- TODO
+svcGetChallenge adr = do
+    challenges <- use (svGlobals.svServerStatic.ssChallenges)
+    (i, oldest) <- challengeExists challenges 0 0x7FFFFFFF 0 Constants.maxChallenges
+    doGetChallenge challenges i oldest
+  where
+    doGetChallenge challenges i oldest
+        | i == Constants.maxChallenges = do
+            -- overwrite the oldest
+            r <- Lib.rand
+            curTime <- Timer.getCurTime
+            svGlobals.svServerStatic.ssChallenges.ix oldest .= ChallengeT adr (fromIntegral r .&. 0x7FFFF) curTime
+            -- send it back
+            NetChannel.outOfBandPrint Constants.nsServer adr ("challenge " `B.append` encode ((challenges V.! oldest)^.chChallenge))
+        | otherwise =
+            -- send it back
+            NetChannel.outOfBandPrint Constants.nsServer adr ("challenge " `B.append` encode ((challenges V.! i)^.chChallenge))
+    challengeExists challenges oldest oldestTime idx maxIdx
+        | idx >= maxIdx = return (idx, oldest)
+        | otherwise = do
+            let challenge = challenges V.! idx
+            if NET.compareBaseAdr adr (challenge^.chAdr)
+                then
+                    return (idx, oldest)
+                else 
+                    if (challenge^.chTime) < oldestTime
+                        then challengeExists challenges idx (challenge^.chTime) (idx + 1) maxIdx
+                        else challengeExists challenges oldest oldestTime (idx + 1) maxIdx
 
 svcDirectConnect :: NetAdrT -> Quake ()
 svcDirectConnect adr = do

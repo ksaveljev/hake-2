@@ -6,7 +6,7 @@ module Server.SVInit
     , svMap
     ) where
 
-import           Control.Lens          (use, zoom, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~))
+import           Control.Lens          (use, ix, (^.), (.=), (+=), (%=), (&), (.~), (%~))
 import           Control.Monad         (void, when, (>=>))
 import           Data.Bits             ((.|.))
 import qualified Data.ByteString       as B
@@ -27,6 +27,7 @@ import qualified QCommon.CM            as CM
 import qualified QCommon.Com           as Com
 import qualified QCommon.CVar          as CVar
 import           QCommon.CVarVariables
+import qualified QCommon.MSG           as MSG
 import qualified QCommon.SZ            as SZ
 import           QuakeRef
 import           QuakeState
@@ -115,7 +116,34 @@ spawnServerBasedOnType finalLevel spawnPoint attractLoop loadGame
     len = B.length finalLevel
 
 findIndex :: Maybe B.ByteString -> Int -> Int -> Bool -> Quake Int
-findIndex = error "SVInit.findIndex" -- TODO
+findIndex Nothing _ _ _ = return 0
+findIndex (Just name) start maxIdx create
+    | B.length name == 0 = return 0
+    | otherwise = do
+        configStrings <- use (svGlobals.svServer.sConfigStrings)
+        case findConfigString configStrings 1 of
+          (True, idx) -> return idx
+          (False, idx) -> doCreate idx
+  where
+    doCreate idx
+        | not create = return 0
+        | otherwise = do
+            when (idx == maxIdx) $
+                Com.comError Constants.errDrop "*Index: overflow"
+            svGlobals.svServer.sConfigStrings %= (V.// [(start + idx, name)])
+            state <- use (svGlobals.svServer.sState)
+            when (state /= Constants.ssLoading) $ do
+                SZ.clear (svGlobals.svServer.sMulticast)
+                MSG.writeCharI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcConfigString)
+                MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral (start + idx))
+                MSG.writeString (svGlobals.svServer.sMulticast) name
+                origin <- use (globals.gVec3Origin)
+                SVSend.multicast origin Constants.multicastAllR
+            return idx
+    findConfigString configStrings i
+      | i >= maxIdx || configStrings V.! (start + i) == "" = (False, i)
+      | configStrings V.! (start + i) == name = (True, i)
+      | otherwise = findConfigString configStrings (i + 1)
 
 modelIndex :: Maybe B.ByteString -> Quake Int
 modelIndex name = findIndex name Constants.csModels Constants.maxModels True

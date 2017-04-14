@@ -1,5 +1,6 @@
 module QCommon.FS
     ( canRead
+    , createPath
     , developerSearchPath
     , execAutoexec
     , fileLength
@@ -30,21 +31,23 @@ import           System.Directory
 import           System.IO                  (Handle, IOMode(ReadMode), SeekMode(AbsoluteSeek), hSeek)
 
 import qualified Constants
+import qualified QCommon.CBuf               as CBuf
 import qualified Game.Cmd                   as Cmd
 import           Game.CVarT
-import qualified QCommon.Com                as Com
-import qualified QCommon.CVarShared         as CVar
+import           QCommon.CVarVariables
 import           QCommon.DPackHeaderT
 import           QCommon.FileLinkT
 import           QCommon.FSShared
 import           QCommon.PackFileT
 import           QCommon.PackT
 import           QCommon.SearchPathT
-import           QCommon.Shared
 import           QuakeState
 import           Types
 import           Util.Binary                (encode)
 import qualified Util.Lib                   as Lib
+
+import {-# SOURCE #-} qualified QCommon.Com  as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]
 initialCommands = [("path", Just pathF), ("link", Just linkF), ("dir", Just dirF)] 
@@ -97,19 +100,6 @@ linkF = XCommandT "FS.linkF" $ error "FS.linkF" -- TODO
 
 dirF :: XCommandT
 dirF = XCommandT "FS.dirF" $ error "FS.dirF" -- TODO
-
-createPath :: B.ByteString -> Quake ()
-createPath path =
-    maybe (return ()) proceedCreation ('/' `BC.elemIndexEnd` path)
-  where
-    proceedCreation idx = do
-        let filePath = BC.unpack (B.take idx path)
-        exists <- io (createDir filePath)
-        unless exists $
-            Com.printf (B.concat ["can't create path \"", path, "\n"])
-    createDir filePath = do
-        createDirectoryIfMissing True filePath
-        doesDirectoryExist filePath
 
 addGameDirectory :: B.ByteString -> Quake ()
 addGameDirectory dir = do
@@ -201,3 +191,19 @@ findPath (x:xs)
     | "xatrix" `BC.isInfixOf` (x^.spFilename) = 1
     | "rogue" `BC.isInfixOf` (x^.spFilename) = 2
     | otherwise = findPath xs
+
+execAutoexec :: Quake ()
+execAutoexec = do
+    name <- autoexecFileName =<< use (fsGlobals.fsUserDir)
+    autoexec =<< io (doesFileExist (BC.unpack name))
+  where
+    autoexecFileName dir
+        | not (B.null dir) = return (dir `B.append` "/autoexec.cfg")
+        | otherwise = do
+            baseDir <- fsBaseDirCVar
+            return (B.concat [baseDir^.cvString, "/", Constants.baseDirName, "/autoexec.cfg"])
+    autoexec False = return ()
+    autoexec True = CBuf.addText "exec autoexec.cfg\n"
+
+setGameDir :: B.ByteString -> Quake ()
+setGameDir = error "FS.setGameDir" -- TODO

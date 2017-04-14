@@ -17,6 +17,7 @@ import           Control.Lens          ((^.), (.=), (%=), (+=), (&), (.~))
 import           Control.Monad         (unless, when, void)
 import qualified Data.ByteString       as B
 import qualified Data.Vector           as Vector
+import           Linear                (V4(..))
 import           System.IO             (Handle, IOMode(..), SeekMode(..))
 import           System.IO             (hSeek, hSetFileSize)
 
@@ -34,6 +35,7 @@ import qualified Client.Console        as Console
 import qualified Client.Key            as Key
 import qualified Client.Menu           as Menu
 import           Client.RefDefT
+import           Client.RefExportT
 import qualified Client.SCR            as SCR
 import qualified Client.V              as V
 import qualified Client.VID            as VID
@@ -54,7 +56,9 @@ import qualified QCommon.NetChannel    as NetChannel
 import           QCommon.NetChanT
 import           QCommon.SizeBufT
 import qualified QCommon.SZ            as SZ
+import           QCommon.XCommandT     (runXCommandT)
 import           QuakeState
+import           Render.Renderer
 import qualified Sound.S               as S
 import qualified Sys.IN                as IN
 import qualified Sys.NET               as NET
@@ -597,7 +601,38 @@ fixUpGender :: Quake ()
 fixUpGender = error "CL.fixUpGender" -- TODO
 
 disconnect :: Quake ()
-disconnect = error "CL.disconnect" -- TODO
+disconnect = do
+    cl <- use (globals.gCl)
+    cls <- use (globals.gCls)
+    unless ((cls^.csState) == Constants.caDisconnected) $ do
+        timeDemo <- fmap (^.cvValue) timeDemoCVar
+        when (timeDemo /= 0) $ do
+            ms <- Timer.milliseconds
+            let time = fromIntegral (ms - (cl^.csTimeDemoStart)) :: Float
+            when (time > 0) $
+                Com.printf (B.concat [encode (cl^.csTimeDemoFrames), " frames, ", encode (time / 1000.0), " seconds: ", encode (fromIntegral (cl^.csTimeDemoFrames) * 1000.0 / time), " fps\n"])
+        globals.gCl.csRefDef.rdBlend .= V4 0 0 0 0
+        renderer <- use (globals.gRenderer)
+        (renderer^.rRefExport.reCinematicSetPalette) Nothing
+        Menu.forceMenuOff
+        globals.gCls.csConnectTime .= 0
+        SCR.stopCinematic
+        when (cls^.csDemoRecording) $
+            runXCommandT stopF
+        -- send a disconnect message to the server
+        let fin = B.pack [fromIntegral Constants.clcStringCmd] `B.append` "disconnect"
+        NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
+        NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
+        NetChannel.transmit (globals.gCls.csNetChan) (B.length fin) fin
+        clearState
+        -- stop download
+        maybe (return ()) stopDownload (cls^.csDownload)
+        globals.gCls.csState .= Constants.caDisconnected
+  where
+    stopDownload handle = do
+        Lib.fClose handle
+        globals.gCls.csDownload .= Nothing
+
 
 writeDemoMessage :: Quake ()
 writeDemoMessage = error "CL.writeDemoMessage" -- TODO

@@ -18,14 +18,14 @@ import           Client.RefExportT
 import           Client.VidDefT
 import           Client.VRectT
 import           Game.CVarT
-import qualified QCommon.CVar          as CVar
 import           QCommon.CVarVariables
 import           QuakeState
 import           Render.Renderer
 import           Types
 import           Util.Binary           (encode)
 
-import {-# SOURCE #-} qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com  as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 sbNums1 :: V.Vector B.ByteString
 sbNums1 = V.fromList

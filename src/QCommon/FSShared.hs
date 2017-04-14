@@ -1,5 +1,6 @@
 module QCommon.FSShared
     ( canRead
+    , createPath
     , gameDir
     , fileLength
     , fOpenFile
@@ -8,7 +9,7 @@ module QCommon.FSShared
     ) where
 
 import           Control.Lens             (use, (.=), (^.), (%=), (&), (.~))
-import           Control.Monad            (when)
+import           Control.Monad            (when, unless)
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
 import           Data.Char                (toLower)
@@ -214,3 +215,16 @@ gameDir = do
     userDir <- use (fsGlobals.fsUserDir)
     -- IMPROVE: decide if fsUserDir should be Maybe B.ByteString...
     return (if not (B.null userDir) then userDir else Constants.baseDirName)
+
+createPath :: B.ByteString -> Quake ()
+createPath path =
+    maybe (return ()) proceedCreation ('/' `BC.elemIndexEnd` path)
+  where
+    proceedCreation idx = do
+        let filePath = BC.unpack (B.take idx path)
+        exists <- io (createDir filePath)
+        unless exists $
+            Com.printf (B.concat ["can't create path \"", path, "\n"])
+    createDir filePath = do
+        createDirectoryIfMissing True filePath
+        doesDirectoryExist filePath

@@ -1,11 +1,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Game.GameSave
     ( initGame
+    , writeGame
+    , writeLevel
     ) where
 
-import           Control.Lens          (use, (.=), (^.))
+import           Control.Lens          (use, (.=), (^.), (&), (.~))
+import           Control.Monad         (unless)
 import           Data.Bits             ((.|.))
 import qualified Data.ByteString       as B
+import           Data.Foldable         (traverse_)
 import qualified Data.Vector           as V
 
 import qualified Constants
@@ -14,9 +18,12 @@ import           Game.EdictT
 import qualified Game.GameItems        as GameItems
 import           Game.GameLocalsT
 import           Game.GClientT
+import qualified Game.PlayerClient     as PlayerClient
+import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
 import           QuakeState
 import           Types
+import qualified Util.QuakeFile        as QuakeFile
 
 initialCVars :: [(B.ByteString, B.ByteString, Int)]
 initialCVars =
@@ -74,3 +81,22 @@ initializeCVars :: Quake ()
 initializeCVars = do
     cvar <- use (gameBaseGlobals.gbGameImport.giCVar)
     mapM_ (\(name, val, flags) -> cvar name val flags) initialCVars
+
+writeLevel :: B.ByteString -> Quake ()
+writeLevel = error "GameSave.writeLevel" -- TODO
+
+writeGame :: B.ByteString -> Bool -> Quake ()
+writeGame fileName autoSave = do
+    unless autoSave $
+        PlayerClient.saveClientData
+    qf <- QuakeFile.open fileName
+    maybe writeGameError doWriteGame qf
+  where
+    writeGameError = Com.fatalError "GameSave.writeGame QuakeFile is Nothing"
+    doWriteGame qf = do
+        gameLocals <- use (gameBaseGlobals.gbGame)
+        io (QuakeFile.writeGameLocals qf (gameLocals & glAutosaved .~ autoSave))
+        gameBaseGlobals.gbGame.glAutosaved .= False
+        clients <- use (gameBaseGlobals.gbGame.glClients)
+        io (traverse_ (QuakeFile.writeGClient qf) clients)
+        QuakeFile.close qf

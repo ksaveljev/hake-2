@@ -8,6 +8,7 @@ module QCommon.Com
     , initializeArgv
     , parse
     , printf
+    , println
     , quit
     ) where
 
@@ -68,6 +69,9 @@ printf msg = do
     checkLogFile (Just logFile)
         | (logFile^.cvValue) /= 0 = error "Com.printf#checkLogFile" -- TODO
         | otherwise = return ()
+
+println :: B.ByteString -> Quake ()
+println str = printf (str `B.append` "\n") -- TODO
 
 dprintf :: B.ByteString -> Quake ()
 dprintf str = io (B.putStr str) -- TODO: use printf $ str -- memory is going crazy here, need optimizations

@@ -2,6 +2,7 @@
 module Client.Menu
     ( addToServerList
     , draw
+    , forceMenuOff
     , initialize
     , keyDown
     , menuAddItem
@@ -2087,7 +2088,32 @@ fieldKey fieldRef key
         | otherwise                         = chr key
 
 menuSelectItem :: Ref MenuFrameworkS -> Quake Bool
-menuSelectItem = error "Menu.menuSelectItem" -- TODO
+menuSelectItem menuRef = do
+    menuItemRef <- menuItemAtCursor menuRef
+    maybe (return False) enterItem menuItemRef
+  where
+    enterItem itemRef = do
+        item <- menuItemCommon itemRef
+        doEnterItem itemRef item
+    doEnterItem itemRef item
+        | (item^.mcType) == Constants.mtypeField = do
+            let MenuFieldRef fieldRef = itemRef
+            fieldDoEnter fieldRef
+        | (item^.mcType) == Constants.mtypeAction = do
+            let MenuActionRef actionRef = itemRef
+            actionDoEnter actionRef
+            return True
+        | otherwise = return False
 
 menuSlideItem :: Ref MenuFrameworkS -> Int -> Quake ()
 menuSlideItem = error "Menu.menuSlideItem" -- TODO
+
+fieldDoEnter :: Ref MenuFieldS -> Quake Bool
+fieldDoEnter fieldRef = do
+    field <- readRef fieldRef
+    maybe (return False) (\f -> f >> return True) (field^.mflGeneric.mcCallback)
+
+actionDoEnter :: Ref MenuActionS -> Quake ()
+actionDoEnter actionRef = do
+    action <- readRef actionRef
+    maybe (return ()) (\f -> f) (action^.maGeneric.mcCallback)

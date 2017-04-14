@@ -29,13 +29,13 @@ import qualified Client.SCRShared             as SCR
 import           Client.VidDefT
 import qualified Constants
 import qualified Game.Cmd                     as Cmd
-import qualified QCommon.CVar                 as CVar
 import           QuakeState
 import           Render.Renderer
 import           Types
 import           Util.Unsafe
 
-import {-# SOURCE #-} qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com  as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 checkResize :: VidDefT -> Quake ()
 checkResize vidDef = do

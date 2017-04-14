@@ -6,8 +6,8 @@ module QCommon.SZ
     , write
     ) where
 
-import           Control.Lens     (ASetter', Lens', Traversal', preuse, (.=), (%=), (^.), (+=), (&), (.~))
-import           Control.Monad    (when, unless)
+import           Control.Lens     (ASetter', Lens', Traversal', use, preuse, (.=), (%=), (^.), (+=), (&), (.~))
+import           Control.Monad    (when, unless, void)
 import qualified Data.ByteString  as B
 
 import           QCommon.SizeBufT
@@ -62,4 +62,21 @@ clear bufLens =
                         & sbOverflowed .~ False)
 
 printSB :: Lens' QuakeState SizeBufT -> B.ByteString -> Quake ()
-printSB = error "SZ.print" -- TODO
+printSB sizeBufLens str = do
+    Com.dprintf (B.concat ["SZ.print():<", str, ">\n"])
+    let len = B.length str + 1
+    buf <- use sizeBufLens
+    doPrint buf len
+  where
+    doPrint buf len
+        | (buf^.sbCurSize) /= 0 && ((buf^.sbData) `B.index` ((buf^.sbCurSize) - 1)) /= 0 = do
+            -- no trailing 0
+            idx <- getSpace sizeBufLens len
+            sizeBufLens.sbData .= B.concat [B.take idx (buf^.sbData), str, "\0"]
+        | (buf^.sbCurSize) /= 0 = do
+            -- write over trailing 0
+            idx <- getSpace sizeBufLens len
+            sizeBufLens.sbData .= B.concat [B.take (idx - 1) (buf^.sbData), str, "\0"]
+        | otherwise = do
+            void (getSpace sizeBufLens len)
+            sizeBufLens.sbData .= str `B.append` "\0"

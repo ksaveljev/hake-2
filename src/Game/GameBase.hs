@@ -14,7 +14,6 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
 import           Data.Maybe             (isJust)
-import           Linear                 (V3(..))
 
 import qualified Client.M               as M
 import qualified Constants
@@ -36,7 +35,6 @@ import           QuakeState
 import qualified Server.SV              as SV
 import qualified Server.SVWorld         as SVWorld
 import           Types
-import qualified Util.Math3D            as Math3D
 import           Util.Binary            (encode)
 
 findByClass :: EdictT -> B.ByteString -> Bool

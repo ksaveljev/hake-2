@@ -2,6 +2,7 @@
 module Util.Lib
     ( atof
     , atoi
+    , atov
     , crandom
     , fOpen
     , fOpenBinary
@@ -37,6 +38,16 @@ atoi :: B.ByteString -> Int
 atoi str
     | B.null str = 0
     | otherwise = fromMaybe 0 (readMaybe (BC.unpack str)) -- IMPROVE?
+
+-- IMPROVE
+atov :: B.ByteString -> V3 Float
+atov str =
+    let strres = BC.split ' ' str
+        len = length strres
+        a = if len > 0 then atof (head strres) else 0
+        b = if len > 1 then atof (head (tail strres)) else 0
+        c = if len > 2 then atof (head (tail (tail strres))) else 0
+    in V3 a b c
 
 fOpenCommon :: (FilePath -> IOMode -> IO Handle) -> B.ByteString -> IOMode -> Quake (Maybe Handle)
 fOpenCommon f name mode = io (tryToOpenFile f name mode)

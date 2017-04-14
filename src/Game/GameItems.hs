@@ -18,6 +18,8 @@ module Game.GameItems
     , pickupPack
     , pickupPowerArmor
     , pickupPowerup
+    , precacheItem
+    , setItemNames
     , spawnItem
     , spItemHealth
     , spItemHealthLarge
@@ -37,7 +39,7 @@ import           Data.Bits             (complement, shiftR, (.&.), (.|.))
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (toLower)
-import           Data.Maybe            (fromMaybe)
+import           Data.Maybe            (fromMaybe, isJust)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
 import           Linear                (V3(..), _z)
@@ -971,5 +973,72 @@ spItemHealthSmall :: Ref EdictT -> Quake ()
 spItemHealthSmall = error "GameItems.spItemHealthSmall" -- TODO
 
 initItems :: Quake ()
-initItems =
-  gameBaseGlobals.gbGame.glNumItems .= V.length GameItemsList.itemList -- TODO; jake2 has -1 here...
+initItems = gameBaseGlobals.gbGame.glNumItems .= V.length GameItemsList.itemList -- TODO; jake2 has -1 here...
+
+setItemNames :: Quake ()
+setItemNames = do
+    numItems <- use (gameBaseGlobals.gbGame.glNumItems)
+    mapM_ setConfigString [1..numItems-1]
+    findItem "Jacket Armor" >>= getRef >>= (gameItemsGlobals.giJacketArmorIndex .=)
+    findItem "Combat Armor" >>= getRef >>= (gameItemsGlobals.giCombatArmorIndex .=)
+    findItem "Body Armor"   >>= getRef >>= (gameItemsGlobals.giBodyArmorIndex   .=)
+    findItem "Power Screen" >>= getRef >>= (gameItemsGlobals.giPowerScreenIndex .=)
+    findItem "Power Shield" >>= getRef >>= (gameItemsGlobals.giPowerShieldIndex .=)
+  where
+    setConfigString idx = do
+        item <- readRef (Ref idx)
+        maybe configStringError (doSetConfigString idx) (item^.giPickupName)
+    configStringError = Com.fatalError "GameItems.setItemNames item^.giPickupName is Nothing"
+    doSetConfigString idx pickupName = do
+        configString <- use (gameBaseGlobals.gbGameImport.giConfigString)
+        configString (Constants.csItems + idx) pickupName
+    getRef Nothing = do
+        Com.fatalError "GameItems.setItemNames required item not found"
+        return (Ref (-1))
+    getRef (Just ref) = return ref
+
+precacheItem :: Maybe (Ref GItemT) -> Quake ()
+precacheItem Nothing = return ()
+precacheItem (Just itemRef) = do
+      gameImport <- use (gameBaseGlobals.gbGameImport)
+      let soundIndex = gameImport^.giSoundIndex
+          modelIndex = gameImport^.giModelIndex
+          imageIndex = gameImport^.giImageIndex
+      item <- readRef itemRef
+      when (isJust (item^.giPickupSound)) $
+          void (soundIndex (item^.giPickupSound))
+      when (isJust (item^.giWorldModel)) $
+          void (modelIndex (item^.giWorldModel))
+      when (isJust (item^.giViewModel)) $
+          void (modelIndex (item^.giViewModel))
+      when (isJust (item^.giIcon)) $
+          void (imageIndex (item^.giIcon))
+      maybe (return ()) precacheAmmo (item^.giAmmo)
+      when (B.length (item^.giPrecaches) > 0) $
+          mapM_ (precacheToken (item^.giPrecaches)) (BC.split ' ' (item^.giPrecaches))
+  where
+    precacheAmmo ammo
+        | B.length ammo > 0 = do
+            ammoRef <- findItem ammo
+            when (ammoRef /= Just itemRef ) $
+                precacheItem ammoRef
+        | otherwise = return ()
+    precacheToken fullPrecachesString token
+        | B.length token >= Constants.maxQPath || B.length token < 5 = do
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            (gameImport^.giError) ("PrecacheItem: it.classname has bad precache string: " `B.append` fullPrecachesString)
+        | "md2" `BC.isSuffixOf` token = do
+            modelIndex <- use (gameBaseGlobals.gbGameImport.giModelIndex)
+            void (modelIndex (Just token))
+        | "sp2" `BC.isSuffixOf` token = do
+            modelIndex <- use (gameBaseGlobals.gbGameImport.giModelIndex)
+            void (modelIndex (Just token))
+        | "wav" `BC.isSuffixOf` token = do
+            soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+            void (soundIndex (Just token))
+        | "pcx" `BC.isSuffixOf` token = do
+            imageIndex <- use (gameBaseGlobals.gbGameImport.giImageIndex)
+            void (imageIndex (Just token))
+        | otherwise = do
+            err <- use (gameBaseGlobals.gbGameImport.giError)
+            err ("PrecacheItem: bad precache string: " `B.append` token)

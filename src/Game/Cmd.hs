@@ -30,7 +30,6 @@ import qualified Constants
 import           Game.CmdAliasT
 import qualified QCommon.CBufShared      as CBuf
 import           QCommon.CmdFunctionT
-import qualified QCommon.CVarShared      as CVar
 import qualified QCommon.FSShared        as FS
 import qualified QCommon.MSG             as MSG
 import           QCommon.NetChanT
@@ -40,7 +39,8 @@ import           QuakeState
 import           Types
 import           Util.Binary             (encode)
 
-import {-# SOURCE #-} qualified QCommon.Com as Com
+import {-# SOURCE #-} qualified QCommon.Com  as Com
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 aliasLoopCount :: Int
 aliasLoopCount = 16
@@ -161,7 +161,7 @@ listF :: XCommandT
 listF = XCommandT "Cmd.listF" $ error "Cmd.listF" -- TODO
 
 waitF :: XCommandT
-waitF = XCommandT "Cmd.waitF" $ error "Cmd.waitF" -- TODO
+waitF = XCommandT "Cmd.waitF" (globals.gCmdWait .= True)
 
 argc :: Quake Int
 argc = use (cmdGlobals.cgCmdArgc)

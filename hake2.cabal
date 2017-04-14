@@ -22,6 +22,8 @@ executable hake2
                      , cryptohash
                      , data-binary-ieee754
                      , directory
+                     , filemanip
+                     , filepath
                      , GLFW-b
                      , lens
                      , linear
@@ -67,7 +69,6 @@ executable hake2
                      Globals
                      QCommon.CBuf
                      QCommon.CVar
-                     QCommon.CVarShared
                      QCommon.Com
                      QCommon.ComGlobals
                      QCommon.FS
@@ -103,7 +104,6 @@ executable hake2
                      QCommon.PackT
                      QCommon.SZ
                      QCommon.SearchPathT
-                     QCommon.Shared
                      Util.Binary
                      Util.Math3D
                      Client.BeamT
@@ -296,3 +296,45 @@ executable hake2
                      Render.GLFWbGlobals
                      Client.CLTEntShared
                      Client.KeyFuncT
+                     Game.Monsters.MBerserkGlobals
+                     Game.Monsters.MBoss2Globals
+                     Game.Monsters.MBoss31Globals
+                     Game.Monsters.MBoss32Globals
+                     Game.Monsters.MBrainGlobals
+                     Game.Monsters.MChickGlobals
+                     Game.Monsters.MFlipperGlobals
+                     Game.Monsters.MFloatGlobals
+                     Game.Monsters.MFlyerGlobals
+                     Game.Monsters.MGladiatorGlobals
+                     Game.Monsters.MGunnerGlobals
+                     Game.Monsters.MHoverGlobals
+                     Game.Monsters.MInfantryGlobals
+                     Game.Monsters.MInsaneGlobals
+                     Game.Monsters.MMedicGlobals
+                     Game.Monsters.MMutantGlobals
+                     Game.Monsters.MParasiteGlobals
+                     Game.Monsters.MSoldierGlobals
+                     Game.Monsters.MSuperTankGlobals
+                     Game.Monsters.MTankGlobals
+                     Game.MMoveT
+                     Game.Monsters.MActor
+                     Game.Monsters.MBerserk
+                     Game.Monsters.MBoss2
+                     Game.Monsters.MBoss3
+                     Game.Monsters.MBoss31
+                     Game.Monsters.MBrain
+                     Game.Monsters.MChick
+                     Game.Monsters.MFlipper
+                     Game.Monsters.MFloat
+                     Game.Monsters.MFlyer
+                     Game.Monsters.MGladiator
+                     Game.Monsters.MGunner
+                     Game.Monsters.MHover
+                     Game.Monsters.MInfantry
+                     Game.Monsters.MInsane
+                     Game.Monsters.MMedic
+                     Game.Monsters.MMutant
+                     Game.Monsters.MParasite
+                     Game.Monsters.MSoldier
+                     Game.Monsters.MSuperTank
+                     Game.Monsters.MTank

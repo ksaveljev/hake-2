@@ -4,6 +4,7 @@ module Game.PlayerClient
     , clientConnect
     , clientThink
     , clientUserInfoChanged
+    , initBodyQue
     , saveClientData
     , spInfoPlayerCoop
     , spInfoPlayerDeathmatch
@@ -11,7 +12,7 @@ module Game.PlayerClient
     , spInfoPlayerStart
     ) where
 
-import           Control.Lens           (use, ix, (^.), (&), (.~))
+import           Control.Lens           (use, ix, (^.), (.=), (&), (.~))
 import           Control.Monad          (when)
 import           Data.Bits              ((.&.), (.|.))
 import qualified Data.ByteString        as B
@@ -24,6 +25,7 @@ import           Game.EdictT
 import qualified Game.GameItems         as GameItems
 import           Game.GameLocalsT
 import qualified Game.GameSVCmds        as GameSVCmds
+import qualified Game.GameUtil          as GameUtil
 import           Game.GClientT
 import qualified Game.Info              as Info
 import           Game.LevelLocalsT
@@ -206,3 +208,12 @@ clientBegin = error "PlayerClient.clientBegin" -- TODO
 
 clientThink :: Ref EdictT -> UserCmdT -> Quake ()
 clientThink = error "PlayerClient.clientThink" -- TODO
+
+initBodyQue :: Quake ()
+initBodyQue = do
+    gameBaseGlobals.gbLevel.llBodyQue .= 0
+    mapM_ spawnBodyQue [0..Constants.bodyQueueSize-1]
+  where
+    spawnBodyQue _ = do
+        bodyRef <- GameUtil.spawn
+        modifyRef bodyRef (\v -> v & eClassName .~ "bodyque")

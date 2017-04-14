@@ -11,14 +11,14 @@ import           System.Exit       (exitSuccess)
 
 import           Client.RefExportT
 import           Game.CVarT
-import qualified QCommon.CVar      as CVar
 import           QuakeState
 import           Render.Renderer
 import           Sys.KBD
 import qualified Sys.Timer         as Timer
 import           Types
 
-import {-# SOURCE #-} qualified Client.CL as CL
+import {-# SOURCE #-} qualified Client.CL    as CL
+import {-# SOURCE #-} qualified QCommon.CVar as CVar
 
 consoleOutput :: B.ByteString -> Quake ()
 consoleOutput msg = do
