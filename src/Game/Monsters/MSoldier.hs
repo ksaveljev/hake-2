@@ -5,7 +5,8 @@ module Game.Monsters.MSoldier
   ) where
 
 import           Control.Lens          (use, (^.), (.=), (&), (.~))
-import           Control.Monad         (void)
+import           Control.Monad         (void, when)
+import qualified Data.Vector           as V
 import           Linear                (V3(..))
 
 import qualified Constants
@@ -14,16 +15,171 @@ import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameAI           as GameAI
 import qualified Game.GameUtil         as GameUtil
+import           Game.MMoveT
 import           Game.MonsterInfoT
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib              as Lib
 
 import {-# SOURCE #-} Game.GameImportT
 
 modelScale :: Float
 modelScale = 1.20000
+
+frameAttak101 :: Int
+frameAttak101 = 0
+
+frameAttak102 :: Int
+frameAttak102 = 1
+
+frameAttak110 :: Int
+frameAttak110 = 9
+
+frameAttak112 :: Int
+frameAttak112 = 11
+
+frameAttak201 :: Int
+frameAttak201 = 12
+
+frameAttak204 :: Int
+frameAttak204 = 15
+
+frameAttak216 :: Int
+frameAttak216 = 27
+
+frameAttak218 :: Int
+frameAttak218 = 29
+
+frameAttak301 :: Int
+frameAttak301 = 30
+
+frameAttak303 :: Int
+frameAttak303 = 32
+
+frameAttak309 :: Int
+frameAttak309 = 38
+
+frameAttak401 :: Int
+frameAttak401 = 39
+
+frameAttak406 :: Int
+frameAttak406 = 44
+
+frameDuck01 :: Int
+frameDuck01 = 45
+
+frameDuck05 :: Int
+frameDuck05 = 49
+
+framePain101 :: Int
+framePain101 = 50
+
+framePain105 :: Int
+framePain105 = 54
+
+framePain201 :: Int
+framePain201 = 55
+
+framePain207 :: Int
+framePain207 = 61
+
+framePain301 :: Int
+framePain301 = 62
+
+framePain318 :: Int
+framePain318 = 79
+
+framePain401 :: Int
+framePain401 = 80
+
+framePain417 :: Int
+framePain417  = 96
+
+frameRun01 :: Int
+frameRun01 = 97
+
+frameRun02 :: Int
+frameRun02 = 98
+
+frameRun03 :: Int
+frameRun03 = 99
+
+frameRun08 :: Int
+frameRun08 = 104
+
+frameRuns01 :: Int
+frameRuns01 = 109
+
+frameRuns03 :: Int
+frameRuns03 = 111
+
+frameRuns14 :: Int
+frameRuns14 = 122
+
+frameStand101 :: Int
+frameStand101 = 146
+
+frameStand130 :: Int
+frameStand130 = 175
+
+frameStand301 :: Int
+frameStand301 = 176
+
+frameStand322 :: Int
+frameStand322 = 197
+
+frameStand339 :: Int
+frameStand339 = 214
+
+frameWalk101 :: Int
+frameWalk101 = 215
+
+frameWalk133 :: Int
+frameWalk133 = 247
+
+frameWalk209 :: Int
+frameWalk209 = 256
+
+frameWalk218 :: Int
+frameWalk218 = 265
+
+frameDeath101 :: Int
+frameDeath101 = 272
+
+frameDeath136 :: Int
+frameDeath136 = 307
+
+frameDeath201 :: Int
+frameDeath201 = 308
+
+frameDeath235 :: Int
+frameDeath235 = 342
+
+frameDeath301 :: Int
+frameDeath301 = 343
+
+frameDeath345 :: Int
+frameDeath345 = 387
+
+frameDeath401 :: Int
+frameDeath401 = 388
+
+frameDeath453 :: Int
+frameDeath453 = 440
+
+frameDeath501 :: Int
+frameDeath501 = 441
+
+frameDeath524 :: Int
+frameDeath524 = 464
+
+frameDeath601 :: Int
+frameDeath601 = 465
+
+frameDeath610 :: Int
+frameDeath610 = 474
 
 spMonsterSoldier :: EntThink
 spMonsterSoldier = error "MSoldier.spMonsterSoldier" -- TODO
@@ -92,7 +248,18 @@ soldierDie :: EntDie
 soldierDie = error "MSoldier.soldierDie" -- TODO
 
 soldierStand :: EntThink
-soldierStand = error "MSoldier.soldierStand" -- TODO
+soldierStand = EntThink "soldier_stand" $ \selfRef -> do
+    self <- readRef selfRef
+    r <- Lib.randomF
+    modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just (getNextMove r (self^.eMonsterInfo.miCurrentMove)))
+    return True
+  where
+    getNextMove r Nothing
+        | r < 0.8   = soldierMoveStand1
+        | otherwise = soldierMoveStand3
+    getNextMove r (Just move)
+        | (move^.mmId) == "soldierMoveStand3" || r < 0.8 = soldierMoveStand1
+        | otherwise                                     = soldierMoveStand3
 
 soldierWalk :: EntThink
 soldierWalk = error "MSoldier.soldierWalk" -- TODO
@@ -108,3 +275,41 @@ soldierAttack = error "MSoldier.soldierAttack" -- TODO
 
 soldierSight :: EntInteract
 soldierSight = error "MSoldier.soldierSight" -- TODO
+
+soldierIdle :: EntThink
+soldierIdle = EntThink "soldier_idle" $ \selfRef -> do
+    r <- Lib.randomF
+    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+    soundIdle <- use (mSoldierGlobals.msSoundIdle)
+    when (r > 0.8) $
+        sound (Just selfRef) Constants.chanVoice soundIdle 1 Constants.attnIdle 0
+    return True
+
+soldierCock :: EntThink
+soldierCock = EntThink "soldier_cock" $ \selfRef -> do
+    self <- readRef selfRef
+    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+    soundCock <- use (mSoldierGlobals.msSoundCock)
+    sound (Just selfRef) Constants.chanWeapon soundCock 1 (getAttn (self^.eEntityState.esFrame)) 0
+    return True
+  where
+    getAttn frame
+        | frame == frameStand322 = Constants.attnIdle
+        | otherwise              = Constants.attnNorm
+
+soldierFramesStand1 :: V.Vector MFrameT
+soldierFramesStand1 = V.fromList $
+    [ MFrameT (Just GameAI.aiStand) 0 (Just soldierIdle) ]
+    ++ replicate 29 (MFrameT (Just GameAI.aiStand) 0 Nothing)
+
+soldierMoveStand1 :: MMoveT
+soldierMoveStand1 = MMoveT "soldierMoveStand1" frameStand101 frameStand130 soldierFramesStand1 (Just soldierStand)
+
+soldierFramesStand3 :: V.Vector MFrameT
+soldierFramesStand3 = V.fromList $
+    replicate 21 (MFrameT (Just GameAI.aiStand) 0 Nothing)
+    ++ [ MFrameT (Just GameAI.aiStand) 0 (Just soldierCock) ]
+    ++ replicate 17 (MFrameT (Just GameAI.aiStand) 0 Nothing)
+
+soldierMoveStand3 :: MMoveT
+soldierMoveStand3 = MMoveT "soldierMoveStand3" frameStand301 frameStand339 soldierFramesStand3 (Just soldierStand)

@@ -9,13 +9,15 @@ module Game.GameAI
     , walkMonsterStart
     ) where
 
-import           Control.Lens      (use, (^.), (.=))
+import           Control.Lens      (use, (^.), (.=), (&), (.~))
+import           Control.Monad     (void)
 import           Data.Bits         ((.&.))
 
 import qualified Constants
 import           Game.EdictT
 import           Game.GameLocalsT
 import           Game.LevelLocalsT
+import qualified Game.Monster      as Monster
 import           QuakeRef
 import           QuakeState
 import           Types
@@ -56,7 +58,13 @@ aiWalk :: AI
 aiWalk = error "GameAI.aiWalk" -- TODO
 
 walkMonsterStart :: EntThink
-walkMonsterStart = error "GameAI.walkMonsterStart" -- TODO
+walkMonsterStart = EntThink "walkmonster_start" $ \edictRef -> do
+    modifyRef edictRef (\v -> v & eThink .~ Just walkMonsterStartGo)
+    void (Monster.monsterStart edictRef)
+    return True
+
+walkMonsterStartGo :: EntThink
+walkMonsterStartGo = error "GameAI.walkMonsterStartGo" -- TODO
 
 aiMove :: AI
 aiMove = error "GameAI.aiMove" -- TODO

@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module QCommon.CM
     ( areasConnected
+    , boxLeafNums
     , boxTrace
     , clusterPHS
     , clusterPVS
@@ -30,6 +31,7 @@ import           Linear                          (V3(..), dot, _x, _y, _z)
 import           System.IO                       (Handle)
 
 import qualified Constants
+import           Game.CModelT
 import           Game.MapSurfaceT
 import           Game.TraceT
 import           QCommon.CAreaT
@@ -676,6 +678,12 @@ boxTrace start end mins maxs headNode brushMask = do
 
 testInLeaf :: Int -> Quake ()
 testInLeaf = error "CM.testInLeaf" -- TODO
+
+-- fills in a list of all the leafs touched
+boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
+boxLeafNums mins maxs list listSize topnode = do
+    cmodel <- readRef (Ref 0)
+    boxLeafNumsHeadnode mins maxs list listSize (cmodel^.cmHeadNode) topnode
 
 boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
 boxLeafNumsHeadnode = error "CM.boxLeafNumsHeadnode" -- TODO

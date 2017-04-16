@@ -4,14 +4,18 @@ module Game.GameUtil
     , freeEdictA
     , inFront
     , killBox
+    , mCheckAttack
     , megaHealthThink
+    , monsterUse
     , spawn
     , useTargets
     , validateSelectedItem
     ) where
 
 import           Control.Lens          (use, (^.), (+=), (&), (.~))
-import           Control.Monad         (when)
+import           Control.Monad         (when, unless)
+import           Data.Bits             ((.&.))
+import           Data.Maybe            (isNothing, isJust)
 import           Linear                (dot, normalize)
 
 import qualified Constants
@@ -20,6 +24,7 @@ import           Game.EdictT
 import           Game.EntityStateT
 import           Game.GameLocalsT
 import           Game.LevelLocalsT
+import           Game.MonsterInfoT
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
@@ -104,3 +109,18 @@ useTargets = error "GameUtil.useTargets" -- TODO
 
 killBox :: Ref EdictT -> Quake Bool
 killBox = error "GameUtil.killBox" -- TODO
+
+monsterUse :: EntUse
+monsterUse = EntUse "monster_use" $ \selfRef _ (Just activatorRef) -> do
+    self <- readRef selfRef
+    activator <- readRef activatorRef
+    let done = isJust (self^.eEnemy) || (self^.eHealth) <= 0 || ((activator^.eFlags) .&. Constants.flNoTarget) /= 0 || (isNothing (activator^.eClient) && ((activator^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy) == 0)
+    unless done $ do
+        modifyRef selfRef (\v -> v & eEnemy .~ Just activatorRef)
+        foundTarget selfRef
+
+foundTarget :: Ref EdictT -> Quake ()
+foundTarget = error "GameUtil.foundTarget" -- TODO
+
+mCheckAttack :: EntThink
+mCheckAttack = error "GameUtil.mCheckAttack" -- TODO

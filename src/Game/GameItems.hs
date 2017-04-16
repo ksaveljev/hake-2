@@ -6,6 +6,7 @@ module Game.GameItems
     , dropGeneral
     , dropPowerArmor
     , findItem
+    , findItemByClassname
     , initItems
     , jacketArmorInfo
     , pickupAdrenaline
@@ -1042,3 +1043,17 @@ precacheItem (Just itemRef) = do
         | otherwise = do
             err <- use (gameBaseGlobals.gbGameImport.giError)
             err ("PrecacheItem: bad precache string: " `B.append` token)
+
+findItemByClassname :: B.ByteString -> Quake (Maybe (Ref GItemT))
+findItemByClassname className = do
+    numItems <- use (gameBaseGlobals.gbGame.glNumItems)
+    items <- use (gameBaseGlobals.gbItemList)
+    return (searchByClassName items (BC.map toLower className) 1 numItems)
+  where
+    searchByClassName items classNameLower idx maxIdx
+        | idx >= maxIdx = Nothing
+        | otherwise =
+            let item = items V.! idx
+            in if classNameLower == BC.map toLower (item^.giClassName)
+                   then Just (Ref idx)
+                   else searchByClassName items classNameLower (idx + 1) maxIdx
