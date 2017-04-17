@@ -17,8 +17,10 @@ module QCommon.MSG
     , writeByteI
     , writeCharI
     , writeDeltaUserCmd
+    , writeDir
     , writeInt
     , writeLong
+    , writePos
     , writeShort
     , writeString
     ) where
@@ -34,7 +36,7 @@ import           Data.Int                (Int8, Int16, Int32)
 import qualified Data.Vector             as V
 import qualified Data.Vector.Unboxed     as UV
 import           Data.Word               (Word8, Word16, Word32)
-import           Linear                  (V3(..), _x, _y, _z)
+import           Linear                  (V3(..), dot, _x, _y, _z)
 
 import qualified Constants
 import           Game.UserCmdT
@@ -76,6 +78,32 @@ writeString :: Traversal' QuakeState SizeBufT -> B.ByteString -> Quake ()
 writeString sizeBufLens str = do
     SZ.write sizeBufLens str (B.length str)
     writeByteI sizeBufLens 0
+
+writePos :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
+writePos sizeBufLens pos = do
+    writeShort sizeBufLens (truncate ((pos^._x) * 8))
+    writeShort sizeBufLens (truncate ((pos^._y) * 8))
+    writeShort sizeBufLens (truncate ((pos^._z) * 8))
+
+writeDir :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
+writeDir sizeBufLens dir = do
+    -- do we need this?
+    {-
+        if (dir == null) {
+            WriteByte(sb, 0);
+            return;
+        }
+    -}
+    let best = calcBest 0 0 0 Constants.numVertexNormals
+    writeByteI sizeBufLens (fromIntegral best)
+  where
+    calcBest bestd best idx maxIdx
+        | idx >= maxIdx = best
+        | otherwise =
+            let d = dot dir (Constants.byteDirs V.! idx)
+            in if d > bestd
+                   then calcBest d idx (idx + 1) maxIdx
+                   else calcBest bestd best (idx + 1) maxIdx
 
 beginReading :: Lens' QuakeState SizeBufT -> Quake ()
 beginReading sizeBufLens = sizeBufLens.sbReadCount .= 0

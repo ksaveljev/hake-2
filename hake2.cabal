@@ -338,3 +338,4 @@ executable hake2
                      Game.Monsters.MSoldier
                      Game.Monsters.MSuperTank
                      Game.Monsters.MTank
+                     Game.Monster

@@ -6,8 +6,13 @@ module Client.Menu
     , initialize
     , keyDown
     , menuAddItem
+    , menuAdjustCursor
     , menuCenter
+    , menuDraw
     , menuMainF
+    , menuSelectItem
+    , menuSlideItem
+    , popMenu
     ) where
 
 import           Control.Applicative       (liftA2)

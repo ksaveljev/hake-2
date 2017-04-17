@@ -11,7 +11,7 @@ module Client.VID
     , shutdown
     ) where
 
-import           Control.Lens          (use, ix, (.=), (%=), (^.), (&), (.~), (-~))
+import           Control.Lens          (use, ix, (.=), (%=), (^.), (&), (.~), (-~), (+~))
 import           Control.Monad         (when, unless, void)
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
@@ -22,6 +22,7 @@ import qualified Graphics.UI.GLFW      as GLFW
 import           Client.ClientStateT
 import           Client.ClientStaticT
 import qualified Client.Console        as Console
+import qualified Client.KeyConstants   as KeyConstants
 import qualified Client.Menu           as Menu
 import           Client.MenuActionS
 import           Client.MenuCommonS
@@ -259,7 +260,21 @@ initialize = do
     checkChanges
 
 menuDrawF :: XCommandT
-menuDrawF = error "VID.menuDrawF" -- TODO
+menuDrawF = XCommandT "VID.menuDraw" $ do
+    vidGlobals.vgCurrentMenu .= Just openGLMenuRef
+    -- draw the banner
+    renderer <- use (globals.gRenderer)
+    picSize <- (renderer^.rRefExport.reDrawGetPicSize) "m_banner_video"
+    maybe picSizeError (doMenuDraw renderer) picSize
+    -- move cursor to a reasonable starting position
+    Menu.menuAdjustCursor openGLMenuRef 1
+    -- draw the menu
+    Menu.menuDraw openGLMenuRef
+  where
+    doMenuDraw renderer (width, _) = do
+        vidDef <- use (globals.gVidDef)
+        (renderer^.rRefExport.reDrawPic) ((vidDef^.vdWidth) `div` 2 - width `div` 2) ((vidDef^.vdHeight) `div` 2 - 110) "m_banner_video"
+    picSizeError = Com.fatalError "VID.menuDrawF picSize is Nothing"
 
 menuInitCVars :: [(B.ByteString, B.ByteString, Int)]
 menuInitCVars =
@@ -476,7 +491,38 @@ setMenuApplyAction =
                                       & maGeneric.mcCallback .~ Just applyChanges)
 
 applyChanges :: Quake ()
-applyChanges = error "VID.applyChanges" -- TODO
+applyChanges = do
+    brightnessSlider <- readRef brightnessSliderRef
+    tqSlider <- readRef tqSliderRef
+    fsBox <- readRef fsBoxRef
+    vSyncBox <- readRef vSyncBoxRef
+    palettedTextureBox <- readRef palettedTextureBoxRef
+    modeList <- readRef modeListRef
+    refList <- readRef refListRef
+    -- invert sense so greater = brighter, and scale to a range of 0.5 to 1.3
+    --
+    -- the original was modified, because on CRTs it was too dark.
+    -- the slider range is [5; 13]
+        -- gamma: [1.1; 0.7]
+    let gamma = 0.4 - ((brightnessSlider^.msCurValue) / 20.0 - 0.25) + 0.7
+        -- modulate: [1.0; 2.6]
+        modulate = (brightnessSlider^.msCurValue) * 0.2
+    CVar.setValueF "vid_gamma" gamma
+    CVar.setValueF "gl_modulate" modulate
+    CVar.setValueF "gl_picmip" (3 - (tqSlider^.msCurValue))
+    CVar.setValueI "vid_fullscreen" (fsBox^.mlCurValue)
+    CVar.setValueI "gl_swapinterval" (vSyncBox^.mlCurValue)
+    -- set always true because of vid_ref or mode changes
+    glSwapIntervalCVar >>= \cvar -> CVar.update (cvar & cvModified .~ True)
+    CVar.setValueI "gl_ext_palettedtexture" (palettedTextureBox^.mlCurValue)
+    CVar.setValueI "gl_mode" (modeList^.mlCurValue)
+    drivers <- use (vidGlobals.vgDrivers)
+    void (CVar.set "vid_ref" (drivers V.! (refList^.mlCurValue)))
+    void (CVar.set "gl_driver" (drivers V.! (refList^.mlCurValue)))
+    glDriverModified <- fmap (^.cvModified) glDriverCVar
+    when glDriverModified $ do
+        vidRefCVar >>= \cvar -> CVar.update (cvar & cvModified .~ True)
+    Menu.forceMenuOff
 
 setOpenGLMenu :: Quake ()
 setOpenGLMenu = do
@@ -494,7 +540,37 @@ setOpenGLMenu = do
     modifyRef openGLMenuRef (\v -> v & mfX -~ 8)
 
 menuKeyF :: KeyFuncT
-menuKeyF = error "VID.menuKeyF" -- TODO
+menuKeyF = KeyFuncT "VID.menuKey" $ \key -> do
+    menuRef <- use (vidGlobals.vgCurrentMenu)
+    maybe menuError (doMenuKey key) menuRef
+  where
+    sound = Just "misc/menu1.wav"
+    menuError = do
+        Com.fatalError "VID.menuKeyF vidGlobals.vgCurrentMenu is Nothing"
+        return Nothing
+    doMenuKey key menuRef
+        | key == KeyConstants.kEscape = do
+            Menu.popMenu
+            return Nothing
+        | key == KeyConstants.kUpArrow = do
+            modifyRef menuRef (\v -> v & mfCursor -~ 1)
+            Menu.menuAdjustCursor menuRef (-1)
+            return sound
+        | key == KeyConstants.kDownArrow = do
+            modifyRef menuRef (\v -> v & mfCursor +~ 1)
+            Menu.menuAdjustCursor menuRef 1
+            return sound
+        | key == KeyConstants.kLeftArrow = do
+            Menu.menuSlideItem menuRef (-1)
+            return sound
+        | key == KeyConstants.kRightArrow = do
+            Menu.menuSlideItem menuRef 1
+            return sound
+        | key == KeyConstants.kEnter = do
+            void (Menu.menuSelectItem menuRef)
+            return sound
+        | otherwise =
+            return sound
 
 newWindow :: Int -> Int -> Quake ()
 newWindow width height = do
@@ -507,7 +583,13 @@ printf printLevel str
     | otherwise = Com.dprintf str
 
 restartF :: XCommandT
-restartF = error "VID.restartF" -- TODO
+restartF = XCommandT "VID.restartF" $ do
+    vidWidth <- fmap (truncate . (^.cvValue)) vidWidthCVar
+    vidHeight <- fmap (truncate . (^.cvValue)) vidHeightCVar
+    vidGlobals.vgVidModes.ix 11 %= (\v -> v & vmWidth .~ vidWidth
+                                            & vmHeight .~ vidHeight)
+    vidRef <- vidRefCVar
+    CVar.update (vidRef & cvModified .~ True)
 
 shutdown :: Quake ()
 shutdown =

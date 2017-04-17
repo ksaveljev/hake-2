@@ -7,6 +7,7 @@ module Game.GameUtil
     , mCheckAttack
     , megaHealthThink
     , monsterUse
+    , range
     , spawn
     , useTargets
     , validateSelectedItem
@@ -16,7 +17,7 @@ import           Control.Lens          (use, (^.), (+=), (&), (.~))
 import           Control.Monad         (when, unless)
 import           Data.Bits             ((.&.))
 import           Data.Maybe            (isNothing, isJust)
-import           Linear                (dot, normalize)
+import           Linear                (dot, normalize, norm)
 
 import qualified Constants
 import           Game.CVarT
@@ -124,3 +125,19 @@ foundTarget = error "GameUtil.foundTarget" -- TODO
 
 mCheckAttack :: EntThink
 mCheckAttack = error "GameUtil.mCheckAttack" -- TODO
+
+{-
+- Returns the range catagorization of an entity reletive to self 0 melee
+- range, will become hostile even if back is turned 1 visibility and
+- infront, or visibility and show hostile 2 infront and show hostile 3 only
+- triggered by damage.
+-}
+range :: EdictT -> EdictT -> Int
+range self other
+    | len < (fromIntegral Constants.meleeDistance) = Constants.rangeMelee
+    | len < 500 = Constants.rangeNear
+    | len < 1000 = Constants.rangeMid
+    | otherwise = Constants.rangeFar
+  where
+    v = (self^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)
+    len = norm v

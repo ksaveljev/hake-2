@@ -1,5 +1,8 @@
 module Game.Monster
-    ( monsterStart
+    ( monsterFireBlaster
+    , monsterFireBullet
+    , monsterFireShotgun
+    , monsterStart
     ) where
 
 import           Control.Lens          (use, (^.), (+=), (&), (.~), (%~))
@@ -7,6 +10,7 @@ import           Control.Monad         (when)
 import           Data.Bits             (complement, (.&.), (.|.))
 import qualified Data.ByteString       as B
 import           Data.Maybe            (isNothing)
+import           Linear                (V3(..))
 
 import qualified Constants
 import           Game.CVarT
@@ -86,3 +90,12 @@ monsterStart edictRef = do
         r <- Lib.rand
         let frame = (move^.mmFirstFrame) + ((fromIntegral r) `div` ((move^.mmLastFrame) - (move^.mmFirstFrame) + 1))
         modifyRef edictRef (\v -> v & eEntityState.esFrame .~ frame)
+
+monsterFireBlaster :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireBlaster = error "Monster.monsterFireBlaster" -- TODO
+
+monsterFireShotgun :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireShotgun = error "Monster.monsterFireShotgun" -- TODO
+
+monsterFireBullet :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
+monsterFireBullet = error "Monster.monsterFireBullet" -- TODO
