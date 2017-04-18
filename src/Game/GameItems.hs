@@ -959,7 +959,79 @@ touchItem :: EntTouch
 touchItem = error "GameItems.touchItem" -- TODO
 
 spawnItem :: Ref EdictT -> Ref GItemT -> Quake ()
-spawnItem = error "GameItems.spawnItem" -- TODO
+spawnItem edictRef itemRef = do
+    precacheItem (Just itemRef)
+    item <- readRef itemRef
+    edict <- readRef edictRef
+    when ((edict^.eSpawnFlags) /= 0 && (edict^.eClassName) == "key_power_cube") $ do
+        modifyRef edictRef (\v -> v & eSpawnFlags .~ 0)
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat [edict^.eClassName, " at ", Lib.vtos (edict^.eEntityState.esOrigin), " has invalid spawnflags set\n"])
+    -- some items will be prevented in deathmatch
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    {-
+    done <- if deathmatchValue /= 0
+              then do
+                dmFlagsValue :: Int <- liftM (truncate . (^.cvValue)) dmFlagsCVar
+
+                let a = if dmFlagsValue .&. Constants.dfNoArmor /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupArmor _ _) -> True
+                                 Just (PickupPowerArmor _ _) -> True
+                                 _ -> False
+                          else False
+
+                    b = if dmFlagsValue .&. Constants.dfNoItems /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupArmor _ _) -> True
+                                 _ -> False
+                          else False
+
+                    c = if dmFlagsValue .&. Constants.dfNoHealth /= 0
+                          then case (item^.giPickup) of
+                                 Just (PickupHealth _ _) -> True
+                                 Just (PickupAdrenaline _ _) -> True
+                                 Just (PickupAncientHead _ _) -> True
+                                 _ -> False
+                          else False
+
+                    d = if dmFlagsValue .&. Constants.dfInfiniteAmmo /= 0
+                          then if (item^.giFlags) == Constants.itAmmo || (edict^.eClassName) == "weapon_bfg"
+                                 then True
+                                 else False
+                          else False
+
+                return $ or [a, b, c, d]
+              else return False
+
+    if done
+      then
+        GameUtil.freeEdict edictRef 
+
+      else do
+        coopValue <- liftM (^.cvValue) coopCVar
+
+        when (coopValue /= 0 && (edict^.eClassName) == "key_power_cube") $ do
+          powerCubes <- use $ gameBaseGlobals.gbLevel.llPowerCubes
+          modifyEdictT edictRef (\v -> v & eSpawnFlags %~ (.|. (1 `shiftL` (8 + powerCubes))))
+          gameBaseGlobals.gbLevel.llPowerCubes += 1
+
+        -- don't let them drop items that stay in a coop game
+        when (coopValue /= 0 && ((item^.giFlags) .&. Constants.itStayCoop) /= 0) $
+          gameBaseGlobals.gbItemList.ix itemIdx.giDrop .= Nothing
+
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+
+        modifyEdictT edictRef (\v -> v & eItem .~ Just gir
+                                       & eNextThink .~ levelTime + 2 * Constants.frameTime
+                                       -- items start after other solids
+                                       & eThink .~ Just dropToFloor
+                                       & eEntityState.esEffects .~ (item^.giWorldModelFlags)
+                                       & eEntityState.esRenderFx .~ Constants.rfGlow)
+
+        when (isJust (edict^.eiModel)) $
+          void (modelIndex (edict^.eiModel))
+          -}
 
 spItemHealth :: Ref EdictT -> Quake ()
 spItemHealth = error "GameItems.spItemHealth" -- TODO
@@ -971,7 +1043,23 @@ spItemHealthMega :: Ref EdictT -> Quake ()
 spItemHealthMega = error "GameItems.spItemHealthMega" -- TODO
 
 spItemHealthSmall :: Ref EdictT -> Quake ()
-spItemHealthSmall = error "GameItems.spItemHealthSmall" -- TODO
+spItemHealthSmall edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    dmflags <- fmap (truncate . (^.cvValue)) dmFlagsCVar :: Quake Int
+    doSpawnItemHealthSmall deathmatch dmflags
+  where
+    doSpawnItemHealthSmall deathmatch dmflags
+        | deathmatch /= 0 && (dmflags .&. Constants.dfNoHealth) /= 0 =
+            GameUtil.freeEdict edictRef 
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eiModel .~ Just "models/items/healing/stimpack/tris.md2"
+                                        & eCount .~ 2)
+            spawnHealthItem =<< findItem "Health"
+            modifyRef edictRef (\v -> v & eStyle .~ Constants.healthIgnoreMax)
+            soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+            void (soundIndex (Just "items/s_health.wav"))
+    spawnHealthItem Nothing = Com.fatalError "GameItems.spItemHealthSmall findItem 'Health' returned Nothing"
+    spawnHealthItem (Just itemRef) = spawnItem edictRef itemRef
 
 initItems :: Quake ()
 initItems = gameBaseGlobals.gbGame.glNumItems .= V.length GameItemsList.itemList -- TODO; jake2 has -1 here...

@@ -18,7 +18,7 @@ module QCommon.CM
     , writePortalState
     ) where
 
-import           Control.Lens                    (Lens', use, (.=), (%=), (+=), (^.), (&), (.~))
+import           Control.Lens                    (Lens', use, ix, (.=), (%=), (+=), (^.), (&), (.~), _1, _2)
 import           Control.Monad                   (void, unless, when)
 import           Data.Binary.Get                 (runGet, getWord16le)
 import           Data.Bits                       (shiftR, (.&.), (.|.))
@@ -36,6 +36,7 @@ import           Game.MapSurfaceT
 import           Game.TraceT
 import           QCommon.CAreaT
 import           QCommon.CLeafT
+import           QCommon.CNodeT
 import qualified QCommon.Com                     as Com
 import qualified QCommon.CVar                    as CVar
 import qualified QCommon.FSShared                as FS
@@ -686,7 +687,42 @@ boxLeafNums mins maxs list listSize topnode = do
     boxLeafNumsHeadnode mins maxs list listSize (cmodel^.cmHeadNode) topnode
 
 boxLeafNumsHeadnode :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
-boxLeafNumsHeadnode = error "CM.boxLeafNumsHeadnode" -- TODO
+boxLeafNumsHeadnode mins maxs list listSize headnode topnode = do
+    cmGlobals.cmLeafCount .= 0
+    cmGlobals.cmLeafTopNode .= (-1)
+    boxLeafNumsR mins maxs list listSize headnode
+    leafCount <- use (cmGlobals.cmLeafCount)
+    leafTopNode <- use (cmGlobals.cmLeafTopNode)
+    return (maybe (leafCount, Nothing) (\v -> (leafCount, Just (leafTopNode : tail v))) topnode)
+
+boxLeafNumsR :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Int -> Quake ()
+boxLeafNumsR mins maxs leafList leafMaxCount nodenum
+    | nodenum < 0 = do
+        leafCount <- use (cmGlobals.cmLeafCount)
+        updateLeafCount leafCount
+    | otherwise = do
+        node <- readRef (Ref nodenum)
+        maybe planeError (doBoxLeafNumsR node) (node^.cnPlane)
+  where
+    updateLeafCount leafCount
+        | leafCount >= leafMaxCount =
+            Com.dprintf "CM_BoxLeafnums_r: overflow\n"
+        | otherwise = do
+            leafList.ix leafCount .= (-1) - nodenum
+            cmGlobals.cmLeafCount += 1
+    planeError = Com.fatalError "CM.boxLeafNumsR node^.cnPlane is Nothing"
+    doBoxLeafNumsR node planeRef = do
+        p <- readRef planeRef
+        proceedBoxLeafNumsR node (Math3D.boxOnPlaneSide mins maxs p)
+    proceedBoxLeafNumsR node s
+        | s == 1 = boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
+        | s == 2 = boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
+        | otherwise = do
+            leafTopNode <- use (cmGlobals.cmLeafTopNode)
+            when (leafTopNode == -1) $ do
+                cmGlobals.cmLeafTopNode .= nodenum
+            boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._1)
+            boxLeafNumsR mins maxs leafList leafMaxCount (node^.cnChildren._2)
 
 recursiveHullCheck :: Int -> Float -> Float -> V3 Float -> V3 Float -> Quake ()
 recursiveHullCheck = error "CM.recursiveHullCheck" -- TODO

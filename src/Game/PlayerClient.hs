@@ -16,6 +16,8 @@ import           Control.Lens           (use, ix, (^.), (.=), (&), (.~))
 import           Control.Monad          (when, unless)
 import           Data.Bits              ((.&.), (.|.))
 import qualified Data.ByteString        as B
+import qualified Data.ByteString.Char8  as BC
+import           Data.Char              (toLower)
 
 import qualified Constants
 import           Game.ClientPersistantT
@@ -61,7 +63,24 @@ updateClient coop idx edict
         | otherwise = client^.gcPers.cpScore
 
 spInfoPlayerCoop :: Ref EdictT -> Quake ()
-spInfoPlayerCoop = error "PlayerClient.spInfoPlayerCoop" -- TODO
+spInfoPlayerCoop edictRef = do
+    coop <- fmap (^.cvValue) coopCVar
+    doInfoPlayerCoop coop
+  where
+    names = [ "jail2", "jail4", "mine1", "mine2", "mine3", "mine4" , "lab"
+            , "boss1", "fact3", "biggun", "space", "command", "power2", "strike" ]
+    doInfoPlayerCoop coop
+        | coop == 0 = GameUtil.freeEdict edictRef
+        | otherwise = do
+            mapName <- fmap (BC.map toLower) (use (gameBaseGlobals.gbLevel.llMapName))
+            when (any (== mapName) names) $ do
+                -- invoke one of our gross, ugly, disgusting hacks
+                levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+                modifyRef edictRef (\v -> v & eThink .~ Just spFixCoopSpots
+                                            & eNextThink .~ levelTime + Constants.frameTime)
+
+spFixCoopSpots :: EntThink
+spFixCoopSpots = error "PlayerClient.spFixCoopSpots" -- TODO
 
 spInfoPlayerDeathmatch :: Ref EdictT -> Quake ()
 spInfoPlayerDeathmatch = error "PlayerClient.spInfoPlayerDeathmatch" -- TODO
