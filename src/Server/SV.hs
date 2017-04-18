@@ -1,5 +1,6 @@
 module Server.SV
-    ( physicsNoClip
+    ( moveStep
+    , physicsNoClip
     , physicsNone
     , physicsPusher
     , physicsStep
@@ -9,7 +10,7 @@ module Server.SV
 import           Control.Lens      (use, (^.), (.=), (.~), (+~), (&))
 import           Control.Monad     (when, void, unless)
 import           Data.Bits         ((.&.))
-import           Linear            (V3, _x, _y, _z)
+import           Linear            (V3(..), _x, _y, _z)
 
 import qualified Constants
 import           Game.EdictT
@@ -128,3 +129,6 @@ proceedRunThink edictRef edict levelTime
 
 push :: Ref EdictT -> V3 Float -> V3 Float -> Quake Bool
 push = error "SV.push" -- TODO
+
+moveStep :: Ref EdictT -> V3 Float -> Bool -> Quake Bool
+moveStep = error "SV.moveStep" -- TODO

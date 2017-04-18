@@ -1,10 +1,13 @@
 module Game.PlayerTrail
-    ( initialize
+    ( add
+    , initialize
+    , lastSpot
     ) where
 
 import           Control.Lens          ((.=), (^.), (&), (.~))
 import           Control.Monad         (when, replicateM)
 import qualified Data.Vector           as V
+import           Linear                (V3(..))
 
 import           Game.CVarT
 import           Game.EdictT
@@ -32,3 +35,9 @@ initTrail = do
     edictRef <- GameUtil.spawn
     modifyRef edictRef (\v -> v & eClassName .~ "player_trail")
     return edictRef
+
+add :: V3 Float -> Quake ()
+add = error "PlayerTrail.add" -- TODO
+
+lastSpot :: Quake (Ref EdictT)
+lastSpot = error "PlayerTrail.lastSpot" -- TODO

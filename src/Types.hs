@@ -117,7 +117,7 @@ data Globals = Globals
     , _gVec3Origin       :: V3 Float
     , _gRnd              :: StdGen
     , _gChatTeam         :: !Bool
-    , _gChatBuffer       :: B.ByteString -- IMPROVE ?
+    , _gChatBuffer       :: B.ByteString -- IMPROVE
     }
 
 data ComGlobals = ComGlobals

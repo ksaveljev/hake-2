@@ -74,8 +74,9 @@ initGame = do
         gameBaseGlobals.gbGEdicts .= edicts -- TODO: this is not correct
     setMaxClients maxClients =
         gameBaseGlobals.gbGame.glMaxClients .= truncate (maxClients^.cvValue)
-    createClients maxClients =
+    createClients maxClients = do
         gameBaseGlobals.gbGame.glClients .= V.generate maxClients newGClientT
+        gameBaseGlobals.gbNumEdicts .= maxClients + 1
 
 initializeCVars :: Quake ()
 initializeCVars = do

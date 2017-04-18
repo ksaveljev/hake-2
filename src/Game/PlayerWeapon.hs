@@ -1,6 +1,7 @@
 module Game.PlayerWeapon
     ( dropWeapon
     , pickupWeapon
+    , thinkWeapon
     , useWeapon
     , weaponBFG
     , weaponBlaster
@@ -70,3 +71,6 @@ weaponRailgun = error "PlayerWeapon.weaponRailgun" -- TODO
 
 weaponBFG :: EntThink
 weaponBFG = error "PlayerWeapon.weaponBFG" -- TODO
+
+thinkWeapon :: Ref EdictT -> Quake ()
+thinkWeapon = error "PlayerWeapon.thinkWeapon" -- TODO

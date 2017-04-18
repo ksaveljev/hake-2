@@ -11,13 +11,14 @@ module Game.GameUtil
     , spawn
     , useTargets
     , validateSelectedItem
+    , visible
     ) where
 
-import           Control.Lens          (use, (^.), (+=), (&), (.~))
+import           Control.Lens          (use, (^.), (+=), (&), (.~), (+~))
 import           Control.Monad         (when, unless)
 import           Data.Bits             ((.&.))
 import           Data.Maybe            (isNothing, isJust)
-import           Linear                (dot, normalize, norm)
+import           Linear                (dot, normalize, norm, _z)
 
 import qualified Constants
 import           Game.CVarT
@@ -26,6 +27,7 @@ import           Game.EntityStateT
 import           Game.GameLocalsT
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
+import           Game.TraceT
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
@@ -66,7 +68,7 @@ spawn = do
     numEdicts <- use (gameBaseGlobals.gbNumEdicts)
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
     edictRef <- findFreeEdict levelTime (maxClients + 1) numEdicts
-    maybe (notFoundRef numEdicts) foundRef edictRef
+    maybe (notFoundRef numEdicts) initRef edictRef
   where
     notFoundRef numEdicts = do
         maxEntities <- use (gameBaseGlobals.gbGame.glMaxEntities)
@@ -74,11 +76,9 @@ spawn = do
             err <- use (gameBaseGlobals.gbGameImport.giError)
             err "ED_Alloc: no free edicts"
         initRef (Ref numEdicts)
-    foundRef edictRef = do
-        gameBaseGlobals.gbNumEdicts += 1
-        initRef edictRef
     initRef edictRef@(Ref idx) = do
         writeRef edictRef (newEdictT idx)
+        gameBaseGlobals.gbNumEdicts += 1
         initEdict edictRef
         return edictRef
 
@@ -141,3 +141,14 @@ range self other
   where
     v = (self^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)
     len = norm v
+
+visible :: Ref EdictT -> Ref EdictT -> Quake Bool
+visible selfRef otherRef = do
+    self <- readRef selfRef
+    other <- readRef otherRef
+    let spot1 = (self^.eEntityState.esOrigin) & _z +~ fromIntegral (self^.eViewHeight)
+        spot2 = (other^.eEntityState.esOrigin) & _z +~ fromIntegral (other^.eViewHeight)
+    v3o <- use (globals.gVec3Origin)
+    trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+    traceT <- trace spot1 (Just v3o) (Just v3o) spot2 (Just selfRef) Constants.maskOpaque
+    return ((traceT^.tFraction) == 1)

@@ -265,7 +265,33 @@ connectF :: XCommandT
 connectF = error "CL.connectF" -- TODO
 
 reconnectF :: XCommandT
-reconnectF = error "CL.reconnectF" -- TODO
+reconnectF = XCommandT "CL.reconnectF" $ do
+    -- ZOID
+    -- if we are downloading, we dont' change! This so we don't suddenly
+    -- stop downloading a map
+    cls <- use (globals.gCls)
+    maybe (reconnect cls) (\_ -> return ()) (cls^.csDownload)
+  where
+    reconnect cls = do
+        S.stopAllSounds
+        doReconnect cls
+    doReconnect cls
+        | (cls^.csState) == Constants.caConnected = do
+            Com.printf "reconnecting...\n"
+            globals.gCls.csState .= Constants.caConnected
+            MSG.writeCharI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+            MSG.writeString (globals.gCls.csNetChan.ncMessage) "new"
+        | not (B.null (cls^.csServerName)) = do
+            setConnectTime cls
+            globals.gCls.csState .= Constants.caConnecting
+            Com.printf "reconnecting...\n"
+        | otherwise = return ()
+    setConnectTime cls
+        | (cls^.csState) >= Constants.caConnected = do
+            disconnect
+            globals.gCls.csConnectTime .= fromIntegral (cls^.csRealTime) - 1500
+        | otherwise =
+            globals.gCls.csConnectTime .= (-99999) -- fire immediately
 
 rconF :: XCommandT
 rconF = error "CL.rconF" -- TODO

@@ -31,7 +31,7 @@ module Client.CLFX
     ) where
 
 import           Control.Lens          (preuse, use, ix)
-import           Control.Lens          ((^.), (%=), (.=), (&), (.~), (%~), (-~))
+import           Control.Lens          ((^.), (%=), (.=), (&), (.~), (%~), (-~), (+~))
 import           Control.Monad         (unless, when)
 import           Data.Bits             (complement, (.&.))
 import qualified Data.ByteString       as B
@@ -72,6 +72,9 @@ particleGravity = 40
 
 instantParticle :: Float
 instantParticle = -10000.0
+
+colorTable :: UV.Vector Int
+colorTable = UV.fromList [ 2 * 8, 13 * 8, 21 * 8, 18 * 8 ]
 
 runDLights :: Quake ()
 runDLights = do
@@ -1106,10 +1109,10 @@ diminishingTrail start end oldRef flags = do
             v2 <- Lib.crandom
             v3 <- Lib.crandom
             updateParticle pRef activeParticles move orgScale velScale time f color o1 o2 o3 v1 v2 v3
-            modifyRef oldRef (\v -> v & ceTrailCount %~ (\v -> if v - 5 < 100 then 100 else v - 5)) 
+            modifyRef oldRef (\v -> v & ceTrailCount %~ (\vv -> if vv - 5 < 100 then 100 else vv - 5)) 
             addDiminishingTrail (p^.cpNext) old vec (move + vec) orgScale velScale (len - 0.5)
         | otherwise = do
-            modifyRef oldRef (\v -> v & ceTrailCount %~ (\v -> if v - 5 < 100 then 100 else v - 5))
+            modifyRef oldRef (\v -> v & ceTrailCount %~ (\vv -> if vv - 5 < 100 then 100 else vv - 5))
             addDiminishingTrail (Just pRef) old vec (move + vec) orgScale velScale (len - 0.5)
     updateParticle pRef activeParticles move orgScale velScale time f color o1 o2 o3 v1 v2 v3
         | flags .&. Constants.efGib /= 0 =
@@ -1202,7 +1205,35 @@ flyParticles origin count = do
             addFlyParticles (p^.cpNext) aVelocities time lTime (idx + 2) maxIdx
 
 flagTrail :: V3 Float -> V3 Float -> Float -> Quake ()
-flagTrail = error "CLFX.flagTrail" -- TODO
+flagTrail start end color = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addFlagTrail freeParticles (fmap (* 5) (normalize (end - start))) start (norm (end - start))
+  where
+    addFlagTrail Nothing _ _ _ = return ()
+    addFlagTrail (Just pRef) vec move len
+        | len <= 0 = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            f <- Lib.randomF
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAccel    .~ V3 0 0 0
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (0.8 + f * 0.2)
+                                    & cpColor    .~ color
+                                    & cpOrg      .~ move + fmap (* 16) (V3 o1 o2 o3)
+                                    & cpVel      .~ fmap (* 5) (V3 v1 v2 v3))
+            addFlagTrail (p^.cpNext) vec (move + vec) (len - 5)
 
 bfgParticles :: EntityT -> Quake ()
 bfgParticles = error "CLFX.bfgParticles" -- TODO
@@ -1214,10 +1245,68 @@ ionRipperTrail :: V3 Float -> V3 Float -> Quake ()
 ionRipperTrail = error "CLFX.ionRipperTrail" -- TODO
 
 particleEffect2 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
-particleEffect2 = error "CLFX.particleEffect2" -- TODO
+particleEffect2 org dir color count = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addParticleEffect2 freeParticles 0
+  where
+    addParticleEffect2 Nothing _ = return ()
+    addParticleEffect2 (Just pRef) idx
+        | idx >= count = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            d <- fmap (\r -> fromIntegral (r .&. 7)) Lib.rand
+            o1 <- Lib.rand
+            o2 <- Lib.rand
+            o3 <- Lib.rand
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            f <- Lib.randomF
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ fromIntegral color
+                                    & cpOrg      .~ org + fmap (fromIntegral . (subtract 4) . (.&. 7)) (V3 o1 o2 o3) + fmap (* d) dir
+                                    & cpVel      .~ fmap (* 20) (V3 v1 v2 v3)
+                                    & cpAccel    .~ V3 0 0 (- particleGravity)
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (0.5 + f * 0.3))
+            addParticleEffect2 (p^.cpNext) (idx + 1)
 
 particleEffect3 :: V3 Float -> V3 Float -> Int -> Int -> Quake ()
-particleEffect3 = error "CLFX.particleEffect3" -- TODO
+particleEffect3 org dir color count = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addParticleEffect3 freeParticles 0
+  where
+    addParticleEffect3 Nothing _ = return ()
+    addParticleEffect3 (Just pRef) idx
+        | idx >= count = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            d <- fmap (\r -> fromIntegral (r .&. 7)) Lib.rand
+            o1 <- Lib.rand
+            o2 <- Lib.rand
+            o3 <- Lib.rand
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            f <- Lib.randomF
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ fromIntegral color
+                                    & cpOrg      .~ org + fmap (fromIntegral . (subtract 4) . (.&. 7)) (V3 o1 o2 o3) + fmap (* d) dir
+                                    & cpVel      .~ fmap (* 20) (V3 v1 v2 v3)
+                                    & cpAccel    .~ V3 0 0 particleGravity
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (0.5 + f * 0.3))
+            addParticleEffect3 (p^.cpNext) (idx + 1)
 
 blasterParticles :: V3 Float -> V3 Float -> Quake ()
 blasterParticles org dir = do
@@ -1297,10 +1386,97 @@ explosionParticles org = do
             addExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 bfgExplosionParticles :: V3 Float -> Quake ()
-bfgExplosionParticles = error "CLFX.bfgExplosionParticles" -- TODO
+bfgExplosionParticles org = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addBfgExplosionParticles freeParticles 0 (256 :: Int)
+  where
+    addBfgExplosionParticles Nothing _ _ = return ()
+    addBfgExplosionParticles (Just pRef) idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            r <- Lib.rand
+            o1 <- Lib.rand
+            o2 <- Lib.rand
+            o3 <- Lib.rand
+            v1 <- Lib.rand
+            v2 <- Lib.rand
+            v3 <- Lib.rand
+            f <- Lib.randomF
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles 
+                                    & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ 0xD0 + fromIntegral (r .&. 7)
+                                    & cpOrg      .~ org + fmap (\vv -> fromIntegral ((vv `mod` 32) - 16)) (V3 o1 o2 o3)
+                                    & cpVel      .~ fmap (\vv -> fromIntegral ((vv `mod` 384) - 192)) (V3 v1 v2 v3)
+                                    & cpAccel    .~ V3 0 0 (- particleGravity)
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-0.8) / (0.5 + f * 0.3))
+            addBfgExplosionParticles (p^.cpNext) (idx + 1) maxIdx
 
 bubbleTrail :: V3 Float -> V3 Float -> Quake ()
-bubbleTrail = error "CLFX.bubbleTrail" -- TODO
+bubbleTrail start end = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addBubbleTrail freeParticles (fmap (* 32) (normalize (end - start))) start 0 (norm (end - start))
+  where
+    addBubbleTrail Nothing _ _ _ _ = return ()
+    addBubbleTrail (Just pRef) vec move idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            r <- Lib.rand
+            f <- Lib.randomF
+            o1 <- Lib.crandom
+            o2 <- Lib.crandom
+            o3 <- Lib.crandom
+            v1 <- Lib.crandom
+            v2 <- Lib.crandom
+            v3 <- Lib.crandom
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles 
+                                    & cpTime     .~ fromIntegral time
+                                    & cpAccel    .~ V3 0 0 0
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-1.0) / (1.0 + f * 0.2)
+                                    & cpColor    .~ 4 + fromIntegral (r .&. 7)
+                                    & cpOrg      .~ move + fmap (* 2) (V3 o1 o2 o3)
+                                    & cpVel      .~ ((fmap (* 5) (V3 v1 v2 v3)) & _z +~ 6))
+            addBubbleTrail (p^.cpNext) vec (move + vec) (idx + 32) maxIdx
 
 bigTeleportParticles :: V3 Float -> Quake ()
-bigTeleportParticles = error "CLFX.bigTeleportParticles" -- TODO
+bigTeleportParticles org = do
+    freeParticles <- use (clientGlobals.cgFreeParticles)
+    addBigTeleportParticles freeParticles 0 (4096 :: Int)
+  where
+    addBigTeleportParticles Nothing _ _ = return ()
+    addBigTeleportParticles (Just pRef) idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            p <- readRef pRef
+            activeParticles <- use (clientGlobals.cgActiveParticles)
+            clientGlobals.cgFreeParticles .= (p^.cpNext)
+            clientGlobals.cgActiveParticles .= Just pRef
+            time <- use (globals.gCl.csTime)
+            color <- fmap (\r -> fromIntegral (colorTable UV.! (fromIntegral r .&. 3))) Lib.rand 
+            angle <- fmap (\r -> pi * 2 * fromIntegral (r .&. 1023) / 1023.0) Lib.rand 
+            dist <- fmap (\r -> fromIntegral (r .&. 31)) Lib.rand 
+            o <- Lib.rand
+            v1 <- Lib.rand
+            v2 <- Lib.rand
+            v3 <- Lib.rand
+            f <- Lib.randomF
+            modifyRef pRef (\v -> v & cpNext     .~ activeParticles
+                                    & cpTime     .~ fromIntegral time
+                                    & cpColor    .~ color
+                                    & cpOrg      .~ V3 ((org^._x) + (cos angle) * dist) ((org^._y) + (sin angle) * dist) ((org^._z) + 8 + fromIntegral (o `mod` 90))
+                                    & cpVel      .~ V3 ((cos angle) * (70 + fromIntegral (v1 .&. 63))) ((sin angle) * (70 + fromIntegral (v2 .&. 63))) ((-100) + fromIntegral (v3 .&. 31))
+                                    & cpAccel    .~ V3 ((-100) * (cos angle)) ((-100) * (sin angle)) (particleGravity * 4)
+                                    & cpAlpha    .~ 1.0
+                                    & cpAlphaVel .~ (-0.3) / (0.5 + f * 0.3))
+            addBigTeleportParticles (p^.cpNext) (idx + 1) maxIdx

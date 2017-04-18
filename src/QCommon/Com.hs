@@ -77,7 +77,7 @@ dprintf :: B.ByteString -> Quake ()
 dprintf str = io (B.putStr str) -- TODO: use printf $ str -- memory is going crazy here, need optimizations
 
 fatalError :: B.ByteString -> Quake ()
-fatalError = error "Com.fatalError" -- TODO
+fatalError msg = error ("Com.fatalError: " ++ BC.unpack msg) -- TODO
 
 comError :: Int -> B.ByteString -> Quake ()
 comError _ msg = error ("Com.comError: " ++ BC.unpack msg) -- TODO

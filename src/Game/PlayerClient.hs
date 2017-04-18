@@ -13,7 +13,7 @@ module Game.PlayerClient
     ) where
 
 import           Control.Lens           (use, ix, (^.), (.=), (&), (.~))
-import           Control.Monad          (when)
+import           Control.Monad          (when, unless)
 import           Data.Bits              ((.&.), (.|.))
 import qualified Data.ByteString        as B
 
@@ -22,6 +22,7 @@ import           Game.ClientPersistantT
 import           Game.ClientRespawnT
 import           Game.CVarT
 import           Game.EdictT
+import           Game.EntityStateT
 import qualified Game.GameItems         as GameItems
 import           Game.GameLocalsT
 import qualified Game.GameSVCmds        as GameSVCmds
@@ -30,6 +31,8 @@ import           Game.GClientT
 import qualified Game.Info              as Info
 import           Game.LevelLocalsT
 import           Game.PlayerStateT
+import qualified Game.PlayerTrail       as PlayerTrail
+import qualified Game.PlayerWeapon      as PlayerWeapon
 import qualified QCommon.Com            as Com
 import           QCommon.CVarVariables
 import           QuakeRef
@@ -70,7 +73,50 @@ spInfoPlayerStart :: Ref EdictT -> Quake ()
 spInfoPlayerStart = error "PlayerClient.spInfoPlayerStart" -- TODO
 
 clientBeginServerFrame :: Ref EdictT -> Quake ()
-clientBeginServerFrame = error "PlayerClient.clientBeginServerFrame" -- TODO
+clientBeginServerFrame edictRef = do
+    intermissionTime <- use (gameBaseGlobals.gbLevel.llIntermissionTime)
+    unless (intermissionTime /= 0) $ do
+        let (Ref tmpIdx) = edictRef
+        io (putStrLn ("tmpIdx = " ++ show tmpIdx))
+        edict <- readRef edictRef
+        maybe clientError doBeginServerFrame (edict^.eClient)
+  where
+    clientError = Com.fatalError "PlayerClient.clientBeginServerFrame edict^.eClient is Nothing"
+    doBeginServerFrame gClientRef = do
+        gClient <- readRef gClientRef
+        deathmatch <- fmap (^.cvValue) deathmatchCVar
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        proceedServerFrame gClientRef gClient deathmatch levelTime
+    proceedServerFrame gClientRef gClient deathmatch levelTime
+        | deathmatch /= 0 && (gClient^.gcPers.cpSpectator) /= (gClient^.gcResp.crSpectator) && (levelTime - gClient^.gcRespawnTime) >= 5 =
+            spectatorRespawn edictRef
+        | otherwise = do
+            runWeaponAnimations gClientRef gClient
+            edict <- readRef edictRef
+            serverFrame edict gClientRef gClient deathmatch levelTime
+    serverFrame edict gClientRef gClient deathmatch levelTime
+        | (edict^.eDeadFlag) /= 0 =
+            -- wait for any button just going down
+            when (levelTime > (gClient^.gcRespawnTime)) $ do
+                -- in deathmatch, only wait for attach button
+                let buttonMask | deathmatch /= 0 = Constants.buttonAttack
+                               | otherwise       = -1
+                dmFlags <- fmap (truncate . (^.cvValue)) dmFlagsCVar
+                when ((gClient^.gcLatchedButtons) .&. buttonMask /= 0 || (deathmatch /= 0 && (dmFlags .&. Constants.dfForceRespawn) /= 0)) $ do
+                    respawn edictRef
+                    modifyRef gClientRef (\v -> v & gcLatchedButtons .~ 0)
+        | otherwise = do
+            -- add player trail so monsters can follow
+            when (deathmatch /= 0) $ do
+                lastSpotRef <- PlayerTrail.lastSpot
+                visible <- GameUtil.visible edictRef lastSpotRef
+                unless visible $
+                    PlayerTrail.add (edict^.eEntityState.esOldOrigin)
+            modifyRef gClientRef (\v -> v & gcLatchedButtons .~ 0)
+    -- run weapon animations if it hasn't been done by a ucmd_t
+    runWeaponAnimations gClientRef gClient
+        | not (gClient^.gcWeaponThunk) && not (gClient^.gcResp.crSpectator) = PlayerWeapon.thinkWeapon edictRef
+        | otherwise = modifyRef gClientRef (\v -> v & gcWeaponThunk .~ False)
 
 clientConnect :: Ref EdictT -> B.ByteString -> Quake (Bool, B.ByteString)
 clientConnect edictRef userInfo = do
@@ -217,3 +263,9 @@ initBodyQue = do
     spawnBodyQue _ = do
         bodyRef <- GameUtil.spawn
         modifyRef bodyRef (\v -> v & eClassName .~ "bodyque")
+
+spectatorRespawn :: Ref EdictT -> Quake ()
+spectatorRespawn = error "PlayerClient.spectatorRespawn" -- TODO
+
+respawn :: Ref EdictT -> Quake ()
+respawn = error "PlayerClient.respawn" -- TODO
