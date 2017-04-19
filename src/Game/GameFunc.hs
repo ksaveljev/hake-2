@@ -18,6 +18,7 @@ module Game.GameFunc
 import           Control.Lens      (use, (^.), (%=), (&), (.~), (%~))
 import           Control.Monad     (unless, when, void)
 import           Data.Bits         (complement, (.|.), (.&.))
+import qualified Data.ByteString   as B
 import           Data.Maybe        (isJust, isNothing)
 import           Linear            (V3(..), _x, _y, _z)
 
@@ -33,6 +34,7 @@ import qualified QCommon.Com       as Com
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib          as Lib
 
 import {-# SOURCE #-} Game.GameImportT
 
@@ -266,7 +268,35 @@ spFuncRotating :: EntThink
 spFuncRotating = error "GameFunc.spFuncRotating" -- TODO
 
 spFuncTimer :: Ref EdictT -> Quake ()
-spFuncTimer = error "GameFunc.spFuncTimer" -- TODO
+spFuncTimer edictRef = do
+    edict <- readRef edictRef
+    when ((edict^.eWait) == 0) $
+        modifyRef edictRef (\v -> v & eWait .~ 1)
+    modifyRef edictRef (\v -> v & eUse .~ Just funcTimerUse
+                                & eThink .~ Just funcTimerThink)
+    when ((edict^.eRandom) >= (edict^.eWait)) $ do
+        modifyRef edictRef (\v -> v & eRandom .~ (edict^.eWait) - Constants.frameTime)
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat ["func_timer at ", Lib.vtos (edict^.eEntityState.esOrigin), " has random >= wait\n"])
+    when (((edict^.eSpawnFlags) .&. 1) /= 0) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        pauseTime <- use (gameBaseGlobals.gbSpawnTemp.stPauseTime)
+        cr <- Lib.crandom
+        modifyRef edictRef (\v -> v & eNextThink .~ levelTime + 1 + pauseTime + (edict^.eDelay) + (edict^.eWait) + cr * (edict^.eRandom)
+                                    & eActivator .~ Just edictRef)
+    modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
+
+funcTimerUse :: EntUse
+funcTimerUse = error "GameFunc.funcTimerUse" -- TODO
+
+funcTimerThink :: EntThink
+funcTimerThink = EntThink "func_timer_think" $ \edictRef -> do
+    edict <- readRef edictRef
+    GameUtil.useTargets edictRef (edict^.eActivator)
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    r <- Lib.crandom
+    modifyRef edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eWait) + r * (edict^.eRandom))
+    return True
 
 spFuncTrain :: Ref EdictT -> Quake ()
 spFuncTrain = error "GameFunc.spFuncTrain" -- TODO

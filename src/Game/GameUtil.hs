@@ -17,7 +17,9 @@ module Game.GameUtil
 import           Control.Lens          (use, (^.), (+=), (&), (.~), (+~))
 import           Control.Monad         (when, unless)
 import           Data.Bits             ((.&.))
-import           Data.Maybe            (isNothing, isJust)
+import qualified Data.ByteString.Char8 as BC
+import           Data.Char             (toLower)
+import           Data.Maybe            (isNothing, isJust, fromJust)
 import           Linear                (dot, normalize, norm, _z)
 
 import qualified Constants
@@ -28,11 +30,14 @@ import           Game.GameLocalsT
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
 import           Game.TraceT
+import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
 import qualified Util.Math3D           as Math3D
+
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 
 clearEdict :: Ref EdictT -> Quake ()
 clearEdict edictRef = do
@@ -106,7 +111,85 @@ inFront self other =
     in dot' > 0.3
 
 useTargets :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
-useTargets = error "GameUtil.useTargets" -- TODO
+useTargets edictRef activatorRef = do
+    edict <- readRef edictRef
+    doUseTargets edict
+  where
+    doUseTargets edict
+        | (edict^.eDelay) /= 0 = do
+            -- create a temp object to fire at a later time
+            tmpRef <- spawn
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            when (isNothing activatorRef) $ do
+                dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+                dprintf "Think_Delay with no activator\n"
+            modifyRef tmpRef (\v -> v & eClassName .~ "DelayedUse"
+                                      & eNextThink .~ levelTime + (edict^.eDelay)
+                                      & eThink .~ Just thinkDelay
+                                      & eActivator .~ activatorRef
+                                      & eMessage .~ (edict^.eMessage)
+                                      & eTarget .~ (edict^.eTarget)
+                                      & eKillTarget .~ (edict^.eKillTarget))
+        | otherwise =
+            maybe activatorError (proceedUseTargets edict) activatorRef
+    activatorError = Com.fatalError "GameUtil.useTargets activatorRef is Nothing"
+    proceedUseTargets edict activatorRef = do
+        activator <- readRef activatorRef
+        printMessage edict activatorRef activator (edict^.eMessage)
+        done <- maybe (return False) (killKillTargets Nothing) (edict^.eKillTarget)
+        unless done $ do
+            maybe (return ()) (fireTargets (BC.map toLower (edict^.eClassName)) Nothing GameBase.findByTarget) (edict^.eTarget)
+    printMessage _ _ _ Nothing = return ()
+    printMessage edict activatorRef activator (Just message)
+        | ((activator^.eSvFlags) .&. Constants.svfMonster) == 0 = do
+            centerPrintf <- use (gameBaseGlobals.gbGameImport.giCenterPrintf)
+            centerPrintf activatorRef message
+            playSound activatorRef edict
+        | otherwise = return ()
+    playSound activatorRef edict
+        | (edict^.eNoiseIndex) /= 0 = do
+            sound <- use (gameBaseGlobals.gbGameImport.giSound)
+            sound (Just activatorRef) Constants.chanAuto (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+        | otherwise = do
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            talkIdx <- (gameImport^.giSoundIndex) (Just "misc/talk1.wav")
+            (gameImport^.giSound) (Just activatorRef) Constants.chanAuto talkIdx 1 Constants.attnNorm 0
+    killKillTargets entRef killTarget = do
+        nextRef <- GameBase.gFind entRef GameBase.findByTarget killTarget
+        maybe (return False) (checkTarget killTarget) nextRef
+    checkTarget killTarget newRef = do
+        freeEdict newRef
+        edict <- readRef edictRef
+        proceedKillTargets newRef edict killTarget
+    proceedKillTargets newRef edict killTarget
+        | edict^.eInUse = killKillTargets (Just newRef) killTarget
+        | otherwise = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf "entity was removed while using killtargets\n"
+            return True
+    -- TODO: refactor this, just an old copy, too tired to do it now
+    fireTargets edictClassName ref findBy targetName = do
+        foundRef <- GameBase.gFind ref findBy targetName
+        when (isJust foundRef) $ do
+            let Just foundEdictRef = foundRef
+            foundEdict <- readRef foundEdictRef
+            -- doors fire area portals in a specific way
+            let foundEdictClassName = BC.map toLower (foundEdict^.eClassName)
+            if foundEdictClassName == "func_areaportal" && (any (== edictClassName) ["func_door", "func_door_rotating"])
+                then
+                    fireTargets edictClassName foundRef findBy targetName
+                else do
+                    dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+                    if foundEdictRef == edictRef
+                        then
+                            dprintf "WARNING: Entity used iteself.\n"
+                        else
+                            when (isJust (foundEdict^.eUse)) $
+                                entUse (fromJust $ foundEdict^.eUse) foundEdictRef (Just edictRef) activatorRef
+                    edict <- readRef edictRef
+                    if not (edict^.eInUse)
+                        then dprintf "entity was removed while using targets\n"
+                        else fireTargets edictClassName foundRef findBy targetName
 
 killBox :: Ref EdictT -> Quake Bool
 killBox = error "GameUtil.killBox" -- TODO
@@ -152,3 +235,10 @@ visible selfRef otherRef = do
     trace <- use (gameBaseGlobals.gbGameImport.giTrace)
     traceT <- trace spot1 (Just v3o) (Just v3o) spot2 (Just selfRef) Constants.maskOpaque
     return ((traceT^.tFraction) == 1)
+
+thinkDelay :: EntThink
+thinkDelay = EntThink "Think_Delay" $ \edictRef -> do
+    edict <- readRef edictRef
+    useTargets edictRef (edict^.eActivator)
+    freeEdict edictRef
+    return True

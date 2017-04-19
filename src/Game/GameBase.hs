@@ -1,5 +1,6 @@
 module Game.GameBase
     ( findByClass
+    , findByTarget
     , getGameApi
     , gFind
     , runFrame
@@ -39,6 +40,12 @@ import           Util.Binary            (encode)
 
 findByClass :: EdictT -> B.ByteString -> Bool
 findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
+
+findByTarget :: EdictT -> B.ByteString -> Bool
+findByTarget e s = doFindByTarget (e^.eTargetName)
+  where
+    doFindByTarget Nothing = False
+    doFindByTarget (Just targetName) = (BC.map toLower targetName) == (BC.map toLower s)
 
 getGameApi :: GameImportT -> Quake ()
 getGameApi imp = gameBaseGlobals.gbGameImport .= (imp & giPointContents .~ SVWorld.pointContents)

@@ -536,7 +536,42 @@ miscSatelliteDishThink = EntThink "misc_satellite_dish_think" $ \selfRef -> do
             modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1)
 
 spMiscStroggShip :: Ref EdictT -> Quake ()
-spMiscStroggShip = error "GameMisc.spMiscStroggShip" -- TODO
+spMiscStroggShip edictRef = do
+    edict <- readRef edictRef
+{-
+    let dprintf = gameImport^.giDprintf
+        modelIndex = gameImport^.giModelIndex
+        linkEntity = gameImport^.giLinkEntity
+-}
+    maybe (noTarget edict) (targetAvailable edict) (edict^.eTarget)
+  where
+    noTarget edict = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat [edict^.eClassName, " without a target at ", Lib.vtos (edict^.eAbsMin), "\n"])
+        GameUtil.freeEdict edictRef
+    targetAvailable edict _ = do
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        modelIdx <- (gameImport^.giModelIndex) (Just "models/ships/strogg1/tris.md2")
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                    & eSolid .~ Constants.solidNot
+                                    & eEntityState.esModelIndex .~ modelIdx
+                                    & eMins .~ V3 (-16) (-16) 0
+                                    & eMaxs .~ V3 16 16 32
+                                    & eThink .~ Just (GameFunc.funcTrainFind)
+                                    & eNextThink .~ levelTime + Constants.frameTime
+                                    & eUse .~ Just (miscStroggShipUse)
+                                    & eSvFlags %~ (.|. Constants.svfNoClient)
+                                    & eMoveInfo.miAccel .~ (edict^.eSpeed)
+                                    & eMoveInfo.miDecel .~ (edict^.eSpeed)
+                                    & eMoveInfo.miSpeed .~ (edict^.eSpeed))
+        (gameImport^.giLinkEntity) edictRef
+
+miscStroggShipUse :: EntUse
+miscStroggShipUse = EntUse "misc_strogg_ship_use" $ \selfRef otherRef activatorRef -> do
+    modifyRef selfRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+                               & eUse .~ Just GameFunc.trainUse)
+    entUse GameFunc.trainUse selfRef otherRef activatorRef
 
 spMiscTeleporter :: Ref EdictT -> Quake ()
 spMiscTeleporter = error "GameMisc.spMiscTeleporter" -- TODO
