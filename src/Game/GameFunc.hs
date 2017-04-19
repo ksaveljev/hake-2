@@ -1,5 +1,6 @@
 module Game.GameFunc
-    ( spFuncButton
+    ( funcTrainFind
+    , spFuncButton
     , spFuncConveyor
     , spFuncDoor
     , spFuncDoorRotating
@@ -11,26 +12,29 @@ module Game.GameFunc
     , spFuncTrain
     , spFuncWater
     , spTriggerElevator
+    , trainUse
     ) where
 
 import           Control.Lens      (use, (^.), (%=), (&), (.~), (%~))
 import           Control.Monad     (unless, when, void)
 import           Data.Bits         (complement, (.|.), (.&.))
-import           Data.Maybe        (isNothing)
+import           Data.Maybe        (isJust, isNothing)
 import           Linear            (V3(..), _x, _y, _z)
 
 import qualified Constants
 import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameBase     as GameBase
-import {-# SOURCE #-} Game.GameImportT
 import qualified Game.GameUtil     as GameUtil
 import           Game.LevelLocalsT
 import           Game.MoveInfoT
 import           Game.SpawnTempT
+import qualified QCommon.Com       as Com
 import           QuakeRef
 import           QuakeState
 import           Types
+
+import {-# SOURCE #-} Game.GameImportT
 
 trainStartOn :: Int
 trainStartOn = 1
@@ -275,3 +279,42 @@ spTriggerElevator = error "GameFunc.spTriggerElevator" -- TODO
 
 moveCalc :: Ref EdictT -> V3 Float -> EntThink -> Quake ()
 moveCalc = error "GameFunc.moveCalc" -- TODO
+
+trainUse :: EntUse
+trainUse = EntUse "train_use" $ \selfRef _ activatorRef -> do
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
+    self <- readRef selfRef
+    doTrainUse selfRef self
+  where
+    doTrainUse selfRef self
+        | (self^.eSpawnFlags) .&. trainStartOn /= 0 =
+            unless ((self^.eSpawnFlags) .&. trainToggle == 0) $ do
+                modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+                                           & eVelocity .~ V3 0 0 0
+                                           & eNextThink .~ 0)
+        | isJust (self^.eTargetEnt) = trainResume selfRef
+        | otherwise = void (entThink trainNext selfRef)
+
+trainResume :: Ref EdictT -> Quake ()
+trainResume selfRef = do
+    self <- readRef selfRef
+    maybe targetEntError (doTrainResume self) (self^.eTargetEnt)
+  where
+    targetEntError = Com.fatalError "GameFunc.trainResume self^.eTargetEnt is Nothing"
+    doTrainResume self edictRef = do
+        edict <- readRef edictRef
+        let dest = (edict^.eEntityState.esOrigin) - (self^.eMins)
+        modifyRef selfRef (\v -> v & eMoveInfo.miState .~ stateTop
+                                   & eMoveInfo.miStartOrigin .~ (self^.eEntityState.esOrigin)
+                                   & eMoveInfo.miEndOrigin .~ dest)
+        moveCalc selfRef dest trainWait
+        modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+
+trainNext :: EntThink
+trainNext = error "GameFunc.trainNext" -- TODO
+
+trainWait :: EntThink
+trainWait = error "GameFunc.trainWait" -- TODO
+
+funcTrainFind :: EntThink
+funcTrainFind = error "GameFunc.funcTrainFind" -- TODO

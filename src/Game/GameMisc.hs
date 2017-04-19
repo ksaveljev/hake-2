@@ -50,10 +50,12 @@ import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameBase         as GameBase
 import qualified Game.GameCombat       as GameCombat
+import qualified Game.GameFunc         as GameFunc
 import qualified Game.GameUtil         as GameUtil
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
 import           Game.MoveInfoT
+import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
@@ -62,6 +64,9 @@ import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
+startOff :: Int
+startOff = 1
+
 spFuncAreaPortal :: EntThink
 spFuncAreaPortal = EntThink "sp_func_areaportal" $ \edictRef -> do
     modifyRef edictRef (\v -> v & eUse .~ Just useAreaPortal
@@ -69,7 +74,62 @@ spFuncAreaPortal = EntThink "sp_func_areaportal" $ \edictRef -> do
     return True
 
 spFuncClock :: Ref EdictT -> Quake ()
-spFuncClock = error "GameMisc.spFuncClock" -- TODO
+spFuncClock selfRef = do
+    self <- readRef selfRef
+    doSpawnFuncClock self
+  where
+    doSpawnFuncClock self
+        | isNothing (self^.eTarget) = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat [self^.eClassName, " with no target at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
+            GameUtil.freeEdict selfRef
+        | (self^.eSpawnFlags) .&. 2 /= 0 && (self^.eCount) == 0 = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat [self^.eClassName, " with no count at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
+            GameUtil.freeEdict selfRef
+        | otherwise = do
+            when ((self^.eSpawnFlags) .&. 1 /= 0 && (self^.eCount) == 0) $
+                modifyRef selfRef (\v -> v & eCount .~ 60 * 60)
+            funcClockReset selfRef
+            modifyRef selfRef (\v -> v & eMessage .~ Just B.empty
+                                       & eThink .~ Just funcClockThink)
+            updateSelf =<< readRef selfRef
+    updateSelf self
+        | (self^.eSpawnFlags) .&. 4 /= 0 =
+            modifyRef selfRef (\v -> v & eUse .~ Just funcClockUse)
+        | otherwise = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef selfRef (\v -> v & eNextThink .~ levelTime + 1)
+
+funcClockReset :: Ref EdictT -> Quake ()
+funcClockReset selfRef = do
+    self <- readRef selfRef
+    doReset self
+  where
+    doReset self
+        | (self^.eSpawnFlags) .&. 1 /= 0 =
+            modifyRef selfRef (\v -> v & eActivator .~ Nothing
+                                       & eHealth .~ 0
+                                       & eWait .~ fromIntegral (self^.eCount))
+        | otherwise =
+            modifyRef selfRef (\v -> v & eActivator .~ Nothing
+                                       & eHealth .~ (self^.eCount)
+                                       & eWait .~ 0)
+
+funcClockThink :: EntThink
+funcClockThink = error "GameMisc.funcClockThink" -- TODO
+
+funcClockUse :: EntUse
+funcClockUse = EntUse "func_clock_use" $ \selfRef _ activatorRef -> do
+    self <- readRef selfRef
+    when ((self^.eSpawnFlags) .&. 8 == 0) $
+        modifyRef selfRef (\v -> v & eUse .~ Nothing)
+    when (isNothing (self^.eActivator)) $ do
+        modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
+        maybe thinkError (doThink selfRef) (self^.eThink)
+  where
+    thinkError = Com.fatalError "GameMisc.funcClockUse self^.eThink is Nothing"
+    doThink selfRef think = void (entThink think selfRef)
 
 spFuncExplosive :: Ref EdictT -> Quake ()
 spFuncExplosive = error "GameMisc.spFuncExplosive" -- TODO
@@ -90,7 +150,37 @@ spInfoNull :: Ref EdictT -> Quake ()
 spInfoNull = GameUtil.freeEdict
 
 spLight :: Ref EdictT -> Quake ()
-spLight = error "GameMisc.spLight" -- TODO
+spLight edictRef = do
+    -- no targeted lights in deathmatch, because they cause global messages
+    edict <- readRef edictRef
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawnLight edict deathmatch
+  where
+    doSpawnLight edict deathmatch
+        | isNothing (edict^.eTargetName) || deathmatch /= 0 =
+            GameUtil.freeEdict edictRef
+        | otherwise =
+            when ((edict^.eStyle) >= 32) $ do
+                modifyRef edictRef (\v -> v & eUse .~ Just lightUse)
+                configString <- use (gameBaseGlobals.gbGameImport.giConfigString)
+                configString (Constants.csLights + (edict^.eStyle)) (lightStyle edict)
+    lightStyle edict
+        | (edict^.eSpawnFlags) .&. startOff /= 0 = "a"
+        | otherwise                              = "m"
+
+lightUse :: EntUse
+lightUse = EntUse "light_use" $ \selfRef _ _ -> do
+    self <- readRef selfRef
+    configString <- use (gameBaseGlobals.gbGameImport.giConfigString)
+    doLightUse selfRef self configString
+  where
+    doLightUse selfRef self configString
+        | (self^.eSpawnFlags) .&. startOff /= 0 = do
+            void (configString (Constants.csLights + (self^.eStyle)) "m")
+            modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement startOff)))
+        | otherwise = do
+            void (configString (Constants.csLights + (self^.eStyle)) "a")
+            modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. startOff))
 
 spLightMine1 :: Ref EdictT -> Quake ()
 spLightMine1 edictRef = do
@@ -169,9 +259,8 @@ miscBlackHoleUse = EntUse "misc_blackhole_use" $ \edictRef _ _ ->
 
 miscBlackHoleThink :: EntThink
 miscBlackHoleThink = EntThink "misc_blackhole_think" $ \selfRef -> do
-    self <- readRef selfRef
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
-    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\v -> if v + 1 < 19 then v + 1 else 0)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\vv -> if vv + 1 < 19 then vv + 1 else 0)
                                & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
@@ -241,7 +330,7 @@ spMiscEasterChick edictRef = do
 miscEasterChickThink :: EntThink
 miscEasterChickThink = EntThink "misc_easterchick_think" $ \selfRef -> do
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
-    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\v -> if v + 1 < 247 then v + 1 else 208)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\vv -> if vv + 1 < 247 then vv + 1 else 208)
                                & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
@@ -264,7 +353,7 @@ spMiscEasterChick2 edictRef = do
 miscEasterChick2Think :: EntThink
 miscEasterChick2Think = EntThink "misc_easterchick2_think" $ \selfRef -> do
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
-    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\v -> if v + 1 < 287 then v + 1 else 248)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\vv -> if vv + 1 < 287 then vv + 1 else 248)
                                & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
@@ -287,7 +376,7 @@ spMiscEasterTank edictRef = do
 miscEasterTankThink :: EntThink
 miscEasterTankThink = EntThink " misc_eastertank_think" $ \selfRef -> do
     levelTime <- use (gameBaseGlobals.gbLevel.llTime)
-    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\v -> if v + 1 < 293 then v + 1 else 254)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame %~ (\vv -> if vv + 1 < 293 then vv + 1 else 254)
                                & eNextThink .~ levelTime + Constants.frameTime)
     return True
 
@@ -414,7 +503,37 @@ spMiscGibLeg edictRef = do
     linkEntity edictRef
 
 spMiscSatelliteDish :: Ref EdictT -> Quake ()
-spMiscSatelliteDish = error "GameMisc.spMiscSatelliteDish" -- TODO
+spMiscSatelliteDish edictRef = do
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    modelIdx <- (gameImport^.giModelIndex) (Just "models/objects/satellite/tris.md2")
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+                                & eSolid .~ Constants.solidBbox
+                                & eMins .~ V3 (-64) (-64) 0
+                                & eMaxs .~ V3 64 64 128
+                                & eEntityState.esModelIndex .~ modelIdx
+                                & eUse .~ Just miscSatelliteDishUse)
+    (gameImport^.giLinkEntity) edictRef
+
+miscSatelliteDishUse :: EntUse
+miscSatelliteDishUse = EntUse "misc_satellite_dish_use" $ \selfRef _ _ -> do
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modifyRef selfRef (\v -> v & eEntityState.esFrame .~ 0
+                               & eThink .~ Just miscSatelliteDishThink
+                               & eNextThink .~ levelTime + Constants.frameTime)
+
+miscSatelliteDishThink :: EntThink
+miscSatelliteDishThink = EntThink "misc_satellite_dish_think" $ \selfRef -> do
+    self <- readRef selfRef
+    doThink selfRef self
+    return True
+  where
+    doThink selfRef self 
+        | (self^.eEntityState.esFrame) + 1 < 38 = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1
+                                       & eNextThink .~ levelTime + Constants.frameTime)
+        | otherwise =
+            modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1)
 
 spMiscStroggShip :: Ref EdictT -> Quake ()
 spMiscStroggShip = error "GameMisc.spMiscStroggShip" -- TODO
@@ -435,7 +554,40 @@ spMiscTeleporterDest = EntThink "SP_misc_teleporter_dest" $ \edictRef -> do
     return True
 
 spMiscViper :: Ref EdictT -> Quake ()
-spMiscViper = error "GameMisc.spMiscViper" -- TODO
+spMiscViper edictRef = do
+    edict <- readRef edictRef
+    doSpawnMiscViper edict
+  where
+    doSpawnMiscViper edict
+        | isNothing (edict^.eTarget) = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat ["misc_viper without a target at ", Lib.vtos (edict^.eAbsMin), "\n"])
+            GameUtil.freeEdict edictRef
+        | otherwise = do
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            modelIdx <- (gameImport^.giModelIndex) (Just "models/ships/viper/tris.md2")
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            let speed = if (edict^.eSpeed) == 0 then 300 else edict^.eSpeed
+            modifyRef edictRef (\v -> v & eSpeed .~ speed
+                                        & eMoveType .~ Constants.moveTypePush
+                                        & eSolid .~ Constants.solidNot
+                                        & eEntityState.esModelIndex .~ modelIdx
+                                        & eMins .~ V3 (-16) (-16) 0
+                                        & eMaxs .~ V3 16 16 32
+                                        & eThink .~ Just GameFunc.funcTrainFind
+                                        & eNextThink .~ levelTime + Constants.frameTime
+                                        & eUse .~ Just miscViperUse
+                                        & eSvFlags %~ (.|. Constants.svfNoClient)
+                                        & eMoveInfo.miAccel .~ speed
+                                        & eMoveInfo.miDecel .~ speed
+                                        & eMoveInfo.miSpeed .~ speed)
+            (gameImport^.giLinkEntity) edictRef
+
+miscViperUse :: EntUse
+miscViperUse = EntUse "misc_viper_use" $ \selfRef otherRef activatoRef -> do
+    modifyRef selfRef (\v -> v & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+                               & eUse .~ Just GameFunc.trainUse)
+    entUse (GameFunc.trainUse) selfRef otherRef activatoRef
 
 spMiscViperBomb :: Ref EdictT -> Quake ()
 spMiscViperBomb selfRef = do
@@ -446,7 +598,7 @@ spMiscViperBomb selfRef = do
                                & eMins .~ V3 (-8) (-8) (-8)
                                & eMaxs .~ V3 8 8 8
                                & eEntityState.esModelIndex .~ modelIdx
-                               & eDmg %~ (\v -> if v == 0 then 1000 else v)
+                               & eDmg %~ (\vv -> if vv == 0 then 1000 else vv)
                                & eUse .~ Just miscViperBombUse
                                & eSvFlags %~ (.|. Constants.svfNoClient))
     linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
@@ -505,7 +657,59 @@ becomeExplosion2 selfRef = do
     GameUtil.freeEdict selfRef
 
 spMonsterCommanderBody :: Ref EdictT -> Quake ()
-spMonsterCommanderBody = error "GameMisc.spMonsterCommanderBody" -- TODO
+spMonsterCommanderBody selfRef = do
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modelIdx <- (gameImport^.giModelIndex) (Just "models/monsters/commandr/tris.md2")
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+                               & eSolid .~ Constants.solidBbox
+                               & eiModel .~ Just "models/monsters/commandr/tris.md2"
+                               & eEntityState.esModelIndex .~ modelIdx
+                               & eMins .~ V3 (-32) (-32) 0
+                               & eMaxs .~ V3 32 32 48
+                               & eUse .~ Just commanderBodyUse
+                               & eTakeDamage .~ Constants.damageYes
+                               & eFlags .~ Constants.flGodMode
+                               & eEntityState.esRenderFx %~ (.|. Constants.rfFrameLerp))
+    (gameImport^.giLinkEntity) selfRef
+    void ((gameImport^.giSoundIndex) (Just "tank/thud.wav"))
+    void ((gameImport^.giSoundIndex) (Just "tank/pain.wav"))
+    modifyRef selfRef (\v -> v & eThink .~ Just commanderBodyDrop
+                               & eNextThink .~ levelTime + 5 * Constants.frameTime)
+
+commanderBodyUse :: EntUse
+commanderBodyUse = EntUse "commander_body_use" $ \selfRef _ _ -> do
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    soundIdx <- (gameImport^.giSoundIndex) (Just "tank/pain.wav")
+    modifyRef selfRef (\v -> v & eThink .~ Just commanderBodyThink
+                               & eNextThink .~ levelTime + Constants.frameTime)
+    (gameImport^.giSound) (Just selfRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+
+commanderBodyThink :: EntThink
+commanderBodyThink = EntThink "commander_body_think" $ \selfRef -> do
+    doThink selfRef =<< readRef selfRef
+    self <- readRef selfRef
+    when ((self^.eEntityState.esFrame) + 1 == 22) $ do
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        soundIdx <- (gameImport^.giSoundIndex) (Just "tank/thud.wav")
+        (gameImport^.giSound) (Just selfRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+    return True
+  where
+    doThink selfRef self
+        | (self^.eEntityState.esFrame) + 1 < 24 = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1
+                                       & eNextThink .~ levelTime + Constants.frameTime)
+        | otherwise =
+            modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1
+                                       & eNextThink .~ 0)
+
+commanderBodyDrop :: EntThink
+commanderBodyDrop = EntThink "commander_body_drop" $ \selfRef -> do
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeToss
+                               & eEntityState.esOrigin._z +~ 2)
+    return True
 
 spPathCorner :: Ref EdictT -> Quake ()
 spPathCorner edictRef = do

@@ -295,7 +295,7 @@ parseEdict edictRef entities idx = do
         err <- use (gameBaseGlobals.gbGameImport.giError)
         err "ED_ParseEntity: EOF without closing brace"
         return (finalIdx, initial)
-    proceedParse2 initial finalIdx token anotherToken = do
+    proceedParse2 _ finalIdx token anotherToken = do
         when (anotherToken == "}") $ do
             err <- use (gameBaseGlobals.gbGameImport.giError)
             err "ED_ParseEntity: closing brace without data"
@@ -732,7 +732,7 @@ spWorldSpawn = EntThink "SP_worldspawn" $ \edictRef -> do
   where
     setLevelName configString (Just msg)
         | B.length msg > 0 = do
-            configString Constants.csName msg
+            void (configString Constants.csName msg)
             gameBaseGlobals.gbLevel.llLevelName .= msg
         | otherwise = setDefaultName
     setLevelName _ Nothing = setDefaultName
