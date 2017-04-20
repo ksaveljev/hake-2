@@ -1,5 +1,6 @@
 module Game.GameMisc
-    ( spFuncAreaPortal
+    ( becomeExplosion1
+    , spFuncAreaPortal
     , spFuncClock
     , spFuncExplosive
     , spFuncObject
@@ -40,17 +41,17 @@ import           Control.Lens          (use, (^.), (&), (.~), (%~), (+~))
 import           Control.Monad         (replicateM_, unless, when, void)
 import           Data.Bits             (complement, xor, (.|.), (.&.))
 import qualified Data.ByteString       as B
-import           Data.Maybe            (isNothing)
+import           Data.Maybe            (isJust, isNothing)
 import           Linear                (V3(..), _y, _z)
 
 import qualified Client.M              as M
 import qualified Constants
+import           Game.CPlaneT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameBase         as GameBase
 import qualified Game.GameCombat       as GameCombat
-import qualified Game.GameFunc         as GameFunc
 import qualified Game.GameUtil         as GameUtil
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
@@ -63,6 +64,8 @@ import           Types
 import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
+
+import {-# SOURCE #-} qualified Game.GameFunc as GameFunc
 
 startOff :: Int
 startOff = 1
@@ -132,13 +135,200 @@ funcClockUse = EntUse "func_clock_use" $ \selfRef _ activatorRef -> do
     doThink selfRef think = void (entThink think selfRef)
 
 spFuncExplosive :: Ref EdictT -> Quake ()
-spFuncExplosive = error "GameMisc.spFuncExplosive" -- TODO
+spFuncExplosive edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawnFuncExplosive deathmatch
+  where
+    doSpawnFuncExplosive deathmatch
+        | deathmatch /= 0 = -- auto-remove for deathmatch
+            GameUtil.freeEdict edictRef
+        | otherwise = do
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush)
+            void ((gameImport^.giModelIndex) (Just "models/objects/debris1/tris.md2"))
+            void ((gameImport^.giModelIndex) (Just "models/objects/debris2/tris.md2"))
+            edict <- readRef edictRef
+            (gameImport^.giSetModel) edictRef (edict^.eiModel)
+            setSolid edict
+            when ((edict^.eSpawnFlags) .&. 2 /= 0) $
+                modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+            when ((edict^.eSpawnFlags) .&. 4 /= 0) $
+                modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
+            updatedEdict <- readRef edictRef
+            checkEdictUse updatedEdict (updatedEdict^.eUse)
+            (gameImport^.giLinkEntity) edictRef
+    setSolid edict
+        | (edict^.eSpawnFlags) .&. 1 /= 0 =
+            modifyRef edictRef (\v -> v & eSvFlags %~ (.|. Constants.svfNoClient)
+                                        & eSolid .~ Constants.solidNot
+                                        & eUse .~ Just funcExplosiveSpawn)
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eSolid .~ Constants.solidBsp)
+            when (isJust (edict^.eTargetName)) $
+                modifyRef edictRef (\v -> v & eUse .~ Just funcExplosiveUse)
+    checkEdictUse _ (Just (EntUse "func_explosive_use" _)) = return ()
+    checkEdictUse edict _ = do
+        when ((edict^.eHealth) == 0) $
+            modifyRef edictRef (\v -> v & eHealth .~ 100)
+        modifyRef edictRef (\v -> v & eDie .~ Just funcExplosiveExplode
+                                    & eTakeDamage .~ Constants.damageYes)
+
+funcExplosiveSpawn :: EntUse
+funcExplosiveSpawn = EntUse "func_explosive_spawn" $ \selfRef _ _ -> do
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp
+                               & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+                               & eUse .~ Nothing)
+    void (GameUtil.killBox selfRef)
+    linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+    linkEntity selfRef
+
+funcExplosiveUse :: EntUse
+funcExplosiveUse = EntUse "func_explosive_use" $ \selfRef otherRef _ -> do
+    self <- readRef selfRef
+    v3o <- use (globals.gVec3Origin)
+    maybe otherError (doFuncExplosiveUse selfRef self v3o) otherRef
+  where
+    otherError = Com.fatalError "GameMisc.funcExplosiveUse otherRef is Nothing"
+    doFuncExplosiveUse selfRef self v3o otherRef =
+        entDie funcExplosiveExplode selfRef selfRef otherRef (self^.eHealth) v3o
+
+funcExplosiveExplode :: EntDie
+funcExplosiveExplode = error "GameMisc.funcExplosiveExplode" -- TODO
 
 spFuncObject :: Ref EdictT -> Quake ()
-spFuncObject = error "GameMisc.spFuncObject" -- TODO
+spFuncObject selfRef = do
+    self <- readRef selfRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giSetModel) selfRef (self^.eiModel)
+    doSpawnFuncObject selfRef self
+    (gameImport^.giLinkEntity) selfRef
+
+doSpawnFuncObject :: Ref EdictT -> EdictT -> Quake ()
+doSpawnFuncObject selfRef self
+    | (self^.eSpawnFlags) == 0 = do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        modifyRef selfRef (\v -> v & eMins .~ mins
+                                   & eMaxs .~ maxs
+                                   & eDmg .~ dmg
+                                   & eEntityState.esEffects .~ effects'
+                                   & eClipMask .~ Constants.maskMonsterSolid
+                                   & eSolid .~ Constants.solidBsp
+                                   & eMoveType .~ Constants.moveTypePush
+                                   & eThink .~ Just funcObjectRelease
+                                   & eNextThink .~ levelTime + 2 * Constants.frameTime)
+    | otherwise =
+        modifyRef selfRef (\v -> v & eMins .~ mins
+                                   & eMaxs .~ maxs
+                                   & eDmg .~ dmg
+                                   & eEntityState.esEffects .~ effects'
+                                   & eClipMask .~ Constants.maskMonsterSolid
+                                   & eSolid .~ Constants.solidNot
+                                   & eMoveType .~ Constants.moveTypePush
+                                   & eUse .~ Just funcObjectUse
+                                   & eSvFlags %~ (.|. Constants.svfNoClient))
+  where
+    mins = fmap (+ 1) (self^.eMins)
+    maxs = fmap (subtract 1) (self^.eMaxs)
+    dmg = if (self^.eDmg) == 0 then 100 else self^.eDmg
+    effects = if (self^.eSpawnFlags) .&. 2 /= 0 then (self^.eEntityState.esEffects) .|. Constants.efAnimAll else self^.eEntityState.esEffects
+    effects' = if (self^.eSpawnFlags) .&. 4 /= 0 then (self^.eEntityState.esEffects) .|. Constants.efAnimAllFast else effects
+
+funcObjectRelease :: EntThink
+funcObjectRelease = EntThink "func_object_release" $ \selfRef -> do
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeToss
+                               & eTouch .~ Just funcObjectTouch)
+    return True
+
+funcObjectUse :: EntUse
+funcObjectUse = EntUse "func_object_use" $ \selfRef _ _ -> do
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp
+                               & eSvFlags %~ (.&. (complement Constants.svfNoClient))
+                               & eUse .~ Nothing)
+    void (GameUtil.killBox selfRef)
+    void (entThink funcObjectRelease selfRef)
+
+funcObjectTouch :: EntTouch
+funcObjectTouch = EntTouch "func_object_touch" $ \selfRef otherRef plane _ -> do
+    -- TODO: jake2 checks if (plane == null)
+    self <- readRef selfRef
+    other <- readRef otherRef
+    unless ((plane^.cpNormal._z) < 1.0 || (other^.eTakeDamage) == Constants.damageNo) $ do
+        v3o <- use (globals.gVec3Origin)
+        GameCombat.damage otherRef selfRef selfRef v3o (self^.eEntityState.esOrigin) v3o (self^.eDmg) 1 0 Constants.modCrush
 
 spFuncWall :: Ref EdictT -> Quake ()
-spFuncWall = error "GameMisc.spFuncWall" -- TODO
+spFuncWall edictRef = do
+    setEdictModel =<< readRef edictRef
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush)
+    updateEdictEffects
+    isAWall <- checkWall
+    doSpawnFuncWall isAWall
+  where
+    setEdictModel edict = do
+        setModel <- use (gameBaseGlobals.gbGameImport.giSetModel)
+        setModel edictRef (edict^.eiModel)
+    doSpawnFuncWall isAWall
+        | isAWall = do
+            -- just a wall
+            modifyRef edictRef (\v -> v & eSolid .~ Constants.solidBsp)
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+        | otherwise = do
+            -- it must be TRIGGER_SPAWN
+            checkTriggerSpawn
+            -- yell if the spawnflags are odd
+            checkOddSpawnFlags
+            modifyRef edictRef (\v -> v & eUse .~ Just funcWallUse)
+            edict <- readRef edictRef
+            setSolid edict
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+    setSolid edict
+        | (edict^.eSpawnFlags) .&. 4 /= 0 =
+            modifyRef edictRef (\v -> v & eSolid .~ Constants.solidBsp)
+        | otherwise =
+            modifyRef edictRef (\v -> v & eSolid .~ Constants.solidNot
+                                        & eSvFlags %~ (.|. Constants.svfNoClient))
+    updateEdictEffects = do
+        edict <- readRef edictRef
+        when ((edict^.eSpawnFlags) .&. 8 /= 0) $
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAll))
+        when ((edict^.eSpawnFlags) .&. 16 /= 0) $
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efAnimAllFast))
+    checkWall = do
+        edict <- readRef edictRef
+        return ((edict^.eSpawnFlags) .&. 7 == 0)
+    checkTriggerSpawn = do
+        edict <- readRef edictRef
+        when ((edict^.eSpawnFlags) .&. 1 == 0) $ do
+          dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+          dprintf "func_wall missing TRIGGER_SPAWN\n"
+          modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. 1))
+    checkOddSpawnFlags = do
+        edict <- readRef edictRef
+        when ((edict^.eSpawnFlags) .&. 4 /= 0 && (edict^.eSpawnFlags) .&. 2 == 0) $ do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf "func_wall START_ON without TOGGLE\n"
+            modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. 2))
+
+funcWallUse :: EntUse
+funcWallUse = EntUse "func_wall_use" $ \selfRef _ _ -> do
+    self <- readRef selfRef
+    setSolid selfRef self
+    linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+    linkEntity selfRef
+    updatedSelf <- readRef selfRef
+    when ((updatedSelf^.eSpawnFlags) .&. 2 == 0) $
+        modifyRef selfRef (\v -> v & eUse .~ Nothing)
+  where
+    setSolid selfRef self
+        | (self^.eSolid) == Constants.solidNot = do
+            modifyRef selfRef (\v -> v & eSolid .~ Constants.solidBsp
+                                       & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+            void (GameUtil.killBox selfRef)
+        | otherwise =
+            modifyRef selfRef (\v -> v & eSolid .~ Constants.solidNot
+                                       & eSvFlags %~ (.|. Constants.svfNoClient))
 
 spInfoNotNull :: Ref EdictT -> Quake ()
 spInfoNotNull edictRef = do
@@ -679,18 +869,6 @@ miscViperBombTouch = EntTouch "misc_viper_bomb_touch" $ \selfRef _ _ _ -> do
     GameCombat.radiusDamage selfRef selfRef (fromIntegral (self^.eDmg)) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modBomb
     becomeExplosion2 selfRef
 
-becomeExplosion2 :: Ref EdictT -> Quake ()
-becomeExplosion2 selfRef = do
-    self <- readRef selfRef
-    writeByte <- use (gameBaseGlobals.gbGameImport.giWriteByte)
-    writePosition <- use (gameBaseGlobals.gbGameImport.giWritePosition)
-    multicast <- use (gameBaseGlobals.gbGameImport.giMulticast)
-    writeByte Constants.svcTempEntity
-    writeByte Constants.teExplosion2
-    writePosition (self^.eEntityState.esOrigin)
-    multicast (self^.eEntityState.esOrigin) Constants.multicastPvs
-    GameUtil.freeEdict selfRef
-
 spMonsterCommanderBody :: Ref EdictT -> Quake ()
 spMonsterCommanderBody selfRef = do
     gameImport <- use (gameBaseGlobals.gbGameImport)
@@ -909,3 +1087,23 @@ useAreaPortal = EntUse "use_areaportal" $ \edictRef _ _ -> do
     edict <- readRef edictRef
     setAreaPortalState <- use (gameBaseGlobals.gbGameImport.giSetAreaPortalState)
     setAreaPortalState (edict^.eStyle) ((edict^.eCount) /= 0)
+
+becomeExplosion1 :: Ref EdictT -> Quake ()
+becomeExplosion1 selfRef = do
+    self <- readRef selfRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giWriteByte) Constants.svcTempEntity
+    (gameImport^.giWriteByte) Constants.teExplosion1
+    (gameImport^.giWritePosition) (self^.eEntityState.esOrigin)
+    (gameImport^.giMulticast) (self^.eEntityState.esOrigin) Constants.multicastPvs
+    GameUtil.freeEdict selfRef
+
+becomeExplosion2 :: Ref EdictT -> Quake ()
+becomeExplosion2 selfRef = do
+    self <- readRef selfRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giWriteByte) Constants.svcTempEntity
+    (gameImport^.giWriteByte) Constants.teExplosion2
+    (gameImport^.giWritePosition) (self^.eEntityState.esOrigin)
+    (gameImport^.giMulticast) (self^.eEntityState.esOrigin) Constants.multicastPvs
+    GameUtil.freeEdict selfRef

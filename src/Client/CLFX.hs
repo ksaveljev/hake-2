@@ -2,6 +2,7 @@ module Client.CLFX
     ( addDLights
     , addLightStyles
     , addParticles
+    , allocDLight
     , bfgExplosionParticles
     , bfgParticles
     , bigTeleportParticles
@@ -14,12 +15,14 @@ module Client.CLFX
     , explosionParticles
     , flagTrail
     , flyEffect
+    , instantParticle
     , ionRipperTrail
     , parseMuzzleFlash
     , parseMuzzleFlash2
     , particleEffect
     , particleEffect2
     , particleEffect3
+    , particleGravity
     , railTrail
     , rocketTrail
     , runDLights

@@ -5,6 +5,7 @@ module Util.Math3D
     , boxOnPlaneSide
     , calcFov
     , lerpAngles
+    , makeNormalVectors
     , projectSource
     , rotatePointAroundVector
     , shortToAngle
@@ -13,7 +14,7 @@ module Util.Math3D
     , v3Access
     ) where
 
-import           Control.Lens        (Const, (^.))
+import           Control.Lens        (Const, (^.), (&), (%~))
 import           Data.Bits           ((.&.), (.|.))
 import           Data.Int            (Int16)
 import qualified Data.Vector         as V
@@ -241,3 +242,13 @@ vectorYaw vec
   where
     pitchAccess = v3Access Constants.pitch
     yawAccess = v3Access Constants.yaw
+
+makeNormalVectors :: V3 Float -> (V3 Float, V3 Float)
+makeNormalVectors forward =
+        -- this rotate and negate guarantees a vector
+        -- not colinear with the original
+    let right = forward & _x %~ negate
+        d = right `dot` forward
+        right' = normalize (right + fmap (* (-d)) forward)
+        up = right' `cross` forward
+    in (right', up)
