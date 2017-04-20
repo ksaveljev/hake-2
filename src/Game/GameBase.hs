@@ -15,6 +15,7 @@ import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
 import           Data.Maybe             (isJust)
+import           Linear                 (V3(..))
 
 import qualified Client.M               as M
 import qualified Constants
@@ -37,6 +38,19 @@ import qualified Server.SV              as SV
 import qualified Server.SVWorld         as SVWorld
 import           Types
 import           Util.Binary            (encode)
+import qualified Util.Math3D            as Math3D
+
+vecUp :: V3 Float
+vecUp = V3 0 (-1) 0
+
+moveDirUp :: V3 Float
+moveDirUp = V3 0 0 1
+
+vecDown :: V3 Float
+vecDown = V3 0 (-2) 0
+
+moveDirDown :: V3 Float
+moveDirDown = V3 0 0 (-1)
 
 findByClass :: EdictT -> B.ByteString -> Bool
 findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
@@ -208,7 +222,15 @@ endDMLevel :: Quake ()
 endDMLevel = error "GameBase.endDMLevel" -- TODO
 
 setMoveDir :: Ref EdictT -> EdictT -> Quake ()
-setMoveDir = error "GameBase.setMoveDir" -- TODO
+setMoveDir edictRef edict =
+    modifyRef edictRef (\v -> v & eEntityState.esAngles .~ V3 0 0 0
+                                & eMoveDir .~ moveDir)
+  where
+    angles = edict^.eEntityState.esAngles
+    moveDir | angles == vecUp = moveDirUp
+            | angles == vecDown = moveDirDown
+            | otherwise = let (forward, _, _) = Math3D.angleVectors angles True False False
+                          in forward
 
 shutdownGame :: Quake ()
 shutdownGame = do

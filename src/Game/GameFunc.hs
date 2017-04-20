@@ -544,7 +544,53 @@ funcTimerThink = EntThink "func_timer_think" $ \edictRef -> do
     return True
 
 spFuncTrain :: Ref EdictT -> Quake ()
-spFuncTrain = error "GameFunc.spFuncTrain" -- TODO
+spFuncTrain edictRef = do
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+{-
+    let setModel = gameImport^.giSetModel
+        soundIndex = gameImport^.giSoundIndex
+        linkEntity = gameImport^.giLinkEntity
+        dprintf = gameImport^.giDprintf
+-}
+    modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypePush
+                                & eEntityState.esAngles .~ V3 0 0 0
+                                & eBlocked .~ Just trainBlocked
+                                & eSolid .~ Constants.solidBsp)
+    edict <- readRef edictRef
+    setDamage edict
+    (gameImport^.giSetModel) edictRef (edict^.eiModel)
+    noise <- use (gameBaseGlobals.gbSpawnTemp.stNoise)
+    when (isJust noise) $ do
+        noiseIdx <- (gameImport^.giSoundIndex) noise
+        modifyRef edictRef (\v -> v & eMoveInfo.miSoundMiddle .~ noiseIdx)
+    let speed = if (edict^.eSpeed) == 0 then 100 else edict^.eSpeed
+    modifyRef edictRef (\v -> v & eSpeed .~ speed
+                                & eMoveInfo.miSpeed .~ speed
+                                & eMoveInfo.miAccel .~ speed
+                                & eMoveInfo.miDecel .~ speed
+                                & eUse .~ Just trainUse)
+    (gameImport^.giLinkEntity) edictRef
+    setTarget =<< readRef edictRef
+  where
+    setDamage edict
+        | (edict^.eSpawnFlags) .&. trainBlockStops /= 0 =
+            modifyRef edictRef (\v -> v & eDmg .~ 0)
+        | otherwise =
+            when ((edict^.eDmg) == 0) $
+                modifyRef edictRef (\v -> v & eDmg .~ 100)
+    setTarget edict
+        | isJust (edict^.eTarget) = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            -- start trains on the second frame, to make sure their targets
+            -- have had a chance to spawn
+            modifyRef edictRef (\v -> v & eThink .~ Just funcTrainFind
+                                        & eNextThink .~ levelTime + Constants.frameTime)
+        | otherwise = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat ["func_train without a target at ", Lib.vtos (edict^.eAbsMin), "\n"])
+
+trainBlocked :: EntBlocked
+trainBlocked = error "GameFunc.trainBlocked" -- TODO
 
 spFuncWater :: Ref EdictT -> Quake ()
 spFuncWater = error "GameFunc.spFuncWater" -- TODO

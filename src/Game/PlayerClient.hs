@@ -13,11 +13,12 @@ module Game.PlayerClient
     ) where
 
 import           Control.Lens           (use, ix, (^.), (.=), (&), (.~))
-import           Control.Monad          (when, unless)
+import           Control.Monad          (when, unless, void)
 import           Data.Bits              ((.&.), (.|.))
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
+import           Linear                 (V3(..), _y)
 
 import qualified Constants
 import           Game.ClientPersistantT
@@ -27,6 +28,7 @@ import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameItems         as GameItems
 import           Game.GameLocalsT
+import qualified Game.GameMisc          as GameMisc
 import qualified Game.GameSVCmds        as GameSVCmds
 import qualified Game.GameUtil          as GameUtil
 import           Game.GClientT
@@ -83,13 +85,48 @@ spFixCoopSpots :: EntThink
 spFixCoopSpots = error "PlayerClient.spFixCoopSpots" -- TODO
 
 spInfoPlayerDeathmatch :: Ref EdictT -> Quake ()
-spInfoPlayerDeathmatch = error "PlayerClient.spInfoPlayerDeathmatch" -- TODO
+spInfoPlayerDeathmatch edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawn deathmatch
+  where
+    doSpawn deathmatch
+        | deathmatch == 0 = GameUtil.freeEdict edictRef
+        | otherwise = void (entThink GameMisc.spMiscTeleporterDest edictRef)
 
 spInfoPlayerIntermission :: Quake ()
-spInfoPlayerIntermission = error "PlayerClient.spInfoPlayerIntermission" -- TODO
+spInfoPlayerIntermission = return ()
 
 spInfoPlayerStart :: Ref EdictT -> Quake ()
-spInfoPlayerStart = error "PlayerClient.spInfoPlayerStart" -- TODO
+spInfoPlayerStart edictRef = do
+    coop <- fmap (^.cvValue) coopCVar
+    unless (coop == 0) $ do
+        mapName <- fmap (BC.map toLower) (use (gameBaseGlobals.gbLevel.llMapName))
+        when (mapName == "security") $ do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            -- invoke one of our gross, ugly, disgusting hacks
+            modifyRef edictRef (\v -> v & eThink .~ Just spCreateCoopSpots
+                                        & eNextThink .~ levelTime + Constants.frameTime)
+
+spCreateCoopSpots :: EntThink
+spCreateCoopSpots = EntThink "SP_CreateCoopSpots" $ \selfRef -> do
+    mapName <- use (gameBaseGlobals.gbLevel.llMapName)
+    when (BC.map toLower mapName == "security") $ do
+        spotRef1 <- GameUtil.spawn
+        modifyRef spotRef1 (\v -> v & eClassName .~ "info_player_coop"
+                                    & eEntityState.esOrigin .~ V3 (188 - 64) (-164) 80
+                                    & eTargetName .~ Just "jail3"
+                                    & eEntityState.esAngles._y .~ 90)
+        spotRef2 <- GameUtil.spawn
+        modifyRef spotRef2 (\v -> v & eClassName .~ "info_player_coop"
+                                    & eEntityState.esOrigin .~ V3 (188 + 64) (-164) 80
+                                    & eTargetName .~ Just "jail3"
+                                    & eEntityState.esAngles._y .~ 90)
+        spotRef3 <- GameUtil.spawn
+        modifyRef spotRef3 (\v -> v & eClassName .~ "info_player_coop"
+                                    & eEntityState.esOrigin .~ V3 (188 + 128) (-164) 80
+                                    & eTargetName .~ Just "jail3"
+                                    & eEntityState.esAngles._y .~ 90)
+    return True
 
 clientBeginServerFrame :: Ref EdictT -> Quake ()
 clientBeginServerFrame edictRef = do

@@ -50,7 +50,6 @@ import           Game.CPlaneT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
-import qualified Game.GameBase         as GameBase
 import qualified Game.GameCombat       as GameCombat
 import qualified Game.GameUtil         as GameUtil
 import           Game.LevelLocalsT
@@ -65,6 +64,7 @@ import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 import {-# SOURCE #-} qualified Game.GameFunc as GameFunc
 
 startOff :: Int

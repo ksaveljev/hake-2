@@ -242,7 +242,7 @@ itemList = V.fromList
              Nothing
              0
              -- precache
-             "weapons/chngnu1a.wav weapons/chngnl1a.wav weapons/machgf3b.wav` weapons/chngnd1a.wav"
+             "weapons/chngnu1a.wav weapons/chngnl1a.wav weapons/machgf3b.wav weapons/chngnd1a.wav"
              -- index
              11
     

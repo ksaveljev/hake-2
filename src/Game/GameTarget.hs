@@ -106,10 +106,68 @@ targetExplosionExplode = EntThink "target_explosion_explode" $ \selfRef -> do
                                 Constants.modExplosive
 
 spTargetGoal :: Ref EdictT -> Quake ()
-spTargetGoal = error "GameTarget.spTargetGoal" -- TODO
+spTargetGoal edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawnTargetGoal deathmatch
+  where
+    doSpawnTargetGoal deathmatch
+        | deathmatch /= 0 = -- auto-remove for deathmatch
+            GameUtil.freeEdict edictRef
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eUse .~ Just useTargetGoal)
+            noise <- getNoise
+            soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+            noiseIdx <- soundIndex noise
+            modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient
+                                        & eNoiseIndex .~ noiseIdx)
+            gameBaseGlobals.gbLevel.llTotalGoals += 1
+    getNoise = do
+        noise <- (use $ gameBaseGlobals.gbSpawnTemp.stNoise) 
+        maybe (return (Just "misc/secret.wav")) (return . Just) noise
+
+useTargetGoal :: EntUse
+useTargetGoal = EntUse "use_target_goal" $ \edictRef _ activatorRef -> do
+    edict <- readRef edictRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giSound) (Just edictRef) Constants.chanVoice (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+    gameBaseGlobals.gbLevel.llFoundGoals += 1
+    level <- use (gameBaseGlobals.gbLevel)
+    when ((level^.llFoundGoals) == (level^.llTotalGoals)) $
+        (gameImport^.giConfigString) Constants.csCdTrack "0"
+    GameUtil.useTargets edictRef activatorRef
+    GameUtil.freeEdict edictRef
 
 spTargetHelp :: Ref EdictT -> Quake ()
-spTargetHelp = error "GameTarget.spTargetHelp" -- TODO
+spTargetHelp edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawnTargetHelp deathmatch
+  where
+    doSpawnTargetHelp deathmatch
+        | deathmatch /= 0 = -- auto-remove for deathmatch
+            GameUtil.freeEdict edictRef
+        | otherwise = do
+            edict <- readRef edictRef
+            maybe (noMessage edict) (\_ -> updateEdict) (edict^.eMessage)
+    noMessage edict = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat [edict^.eClassName, " with no message at ", Lib.vtos (edict^.eEntityState.esOrigin), "\n"])
+        GameUtil.freeEdict edictRef
+    updateEdict =
+        modifyRef edictRef (\v -> v & eUse .~ Just useTargetHelp)
+
+useTargetHelp :: EntUse
+useTargetHelp = EntUse "Use_Target_Help" $ \edictRef _ _ -> do
+    edict <- readRef edictRef
+    maybe messageError (setHelpMessage (edict^.eSpawnFlags)) (edict^.eMessage)
+    gameBaseGlobals.gbGame.glHelpChanged += 1
+  where
+    messageError = Com.fatalError "GameTarget.useTargetHelp edict^.eMessage is Nothing"
+    setHelpMessage :: Int -> B.ByteString -> Quake ()
+    setHelpMessage spawnFlags msg
+        | spawnFlags .&. 1 /= 0 =
+            gameBaseGlobals.gbGame.glHelpMessage1 .= msg
+        | otherwise =
+            gameBaseGlobals.gbGame.glHelpMessage2 .= msg
 
 spTargetLaser :: Ref EdictT -> Quake ()
 spTargetLaser = error "GameTarget.spTargetLaser" -- TODO
@@ -118,7 +176,38 @@ spTargetLightRamp :: Ref EdictT -> Quake ()
 spTargetLightRamp = error "GameTarget.spTargetLightRamp" -- TODO
 
 spTargetSecret :: Ref EdictT -> Quake ()
-spTargetSecret = error "GameTarget.spTargetSecret" -- TODO
+spTargetSecret edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doSpawnTargetSecret deathmatch
+  where
+    doSpawnTargetSecret deathmatch
+        | deathmatch /= 0 = -- auto-remove for deathmatch
+            GameUtil.freeEdict edictRef
+        | otherwise = do
+            gameBaseGlobals.gbSpawnTemp.stNoise %= checkNoise
+            noise <- use (gameBaseGlobals.gbSpawnTemp.stNoise)
+            soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+            noiseIndex <- soundIndex noise
+            modifyRef edictRef (\v -> v & eNoiseIndex .~ noiseIndex
+                                        & eUse .~ Just useTargetSecret
+                                        & eSvFlags .~ Constants.svfNoClient)
+            gameBaseGlobals.gbLevel.llTotalSecrets += 1
+            -- map bug hack
+            edict <- readRef edictRef
+            mapName <- fmap (BC.map toLower) (use (gameBaseGlobals.gbLevel.llMapName))
+            when ("mine3" == mapName && (edict^.eEntityState.esOrigin) == V3 280 (-2048) (-624)) $
+                modifyRef edictRef (\v -> v & eMessage .~ Just "You have found a secret area.")
+    checkNoise Nothing = Just "misc/secret.wav"
+    checkNoise noise = noise
+
+useTargetSecret :: EntUse
+useTargetSecret = EntUse "use_target_secret" $ \edictRef _ activatorRef -> do
+    edict <- readRef edictRef
+    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+    sound (Just edictRef) Constants.chanVoice (edict^.eNoiseIndex) 1 Constants.attnNorm 0
+    gameBaseGlobals.gbLevel.llFoundSecrets += 1
+    GameUtil.useTargets edictRef activatorRef
+    GameUtil.freeEdict edictRef
 
 spTargetSpawner :: Ref EdictT -> Quake ()
 spTargetSpawner = error "GameTarget.spTargetSpawner" -- TODO
@@ -161,7 +250,31 @@ useTargetSpeaker :: EntUse
 useTargetSpeaker = error "GameTarget.useTargetSpeaker" -- TODO
 
 spTargetSplash :: Ref EdictT -> Quake ()
-spTargetSplash = error "GameTarget.spTargetSplash" -- TODO
+spTargetSplash edictRef = do
+    modifyRef edictRef (\v -> v & eUse .~ Just useTargetSplash)
+    GameBase.setMoveDir edictRef =<< readRef edictRef
+    edict <- readRef edictRef
+    when ((edict^.eCount) == 0) $
+        modifyRef edictRef (\v -> v & eCount .~ 32)
+    modifyRef edictRef (\v -> v & eSvFlags .~ Constants.svfNoClient)
+
+useTargetSplash :: EntUse
+useTargetSplash = EntUse "use_target_splash" $ \selfRef _ activatorRef -> do
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    self <- readRef selfRef
+    (gameImport^.giWriteByte) (fromIntegral Constants.svcTempEntity)
+    (gameImport^.giWriteByte) (fromIntegral Constants.teSplash)
+    (gameImport^.giWriteByte) (fromIntegral (self^.eCount))
+    (gameImport^.giWritePosition) (self^.eEntityState.esOrigin)
+    (gameImport^.giWriteDir) (self^.eMoveDir)
+    (gameImport^.giWriteByte) (fromIntegral (self^.eSounds))
+    (gameImport^.giMulticast) (self^.eEntityState.esOrigin) Constants.multicastPvs
+    when ((self^.eDmg) /= 0) $
+        maybe activatorError (doRadiusDamage selfRef self) activatorRef
+  where
+    activatorError = Com.fatalError "GameTarget.useTargetSplash activatorRef is Nothing"
+    doRadiusDamage selfRef self activatorRef =
+        GameCombat.radiusDamage selfRef activatorRef (fromIntegral (self^.eDmg)) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modSplash
 
 spTargetTempEntity :: Ref EdictT -> Quake ()
 spTargetTempEntity = error "GameTarget.spTargetTempEntity" -- TODO
