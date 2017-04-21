@@ -3,6 +3,8 @@ module Game.Monster
     , monsterFireBullet
     , monsterFireShotgun
     , monsterStart
+    , monsterStartGo
+    , monsterTriggeredStart
     ) where
 
 import           Control.Lens          (use, (^.), (+=), (&), (.~), (%~))
@@ -22,6 +24,7 @@ import           Game.LevelLocalsT
 import           Game.MMoveT
 import           Game.MonsterInfoT
 import           Game.SpawnTempT
+import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
@@ -99,3 +102,21 @@ monsterFireShotgun = error "Monster.monsterFireShotgun" -- TODO
 
 monsterFireBullet :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
 monsterFireBullet = error "Monster.monsterFireBullet" -- TODO
+
+monsterStartGo :: Ref EdictT -> Quake ()
+monsterStartGo = error "Monster.monsterSTartGo" -- TODO
+
+monsterTriggeredStart :: EntThink
+monsterTriggeredStart = EntThink "monster_triggered_start" $ \selfRef -> do
+    self <- readRef selfRef
+    when ((self^.eIndex) == 312) $
+        Com.printf "monster_triggered_start\n"
+    modifyRef selfRef (\v -> v & eSolid .~ Constants.solidNot
+                               & eMoveType .~ Constants.moveTypeNone
+                               & eSvFlags %~ (.|. Constants.svfNoClient)
+                               & eNextThink .~ 0
+                               & eUse .~ Just monsterTriggeredSpawnUse)
+    return True
+
+monsterTriggeredSpawnUse :: EntUse
+monsterTriggeredSpawnUse = error "Monster.monsterTriggeredSpawnUse" -- TODO

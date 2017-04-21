@@ -10,17 +10,22 @@ module Game.GameAI
     ) where
 
 import           Control.Lens      (use, (^.), (.=), (&), (.~))
-import           Control.Monad     (void)
+import           Control.Monad     (void, when)
 import           Data.Bits         ((.&.))
+import qualified Data.ByteString   as B
+import           Data.Maybe        (isJust)
 
+import qualified Client.M          as M
 import qualified Constants
 import           Game.EdictT
+import           Game.EntityStateT
 import           Game.GameLocalsT
 import           Game.LevelLocalsT
 import qualified Game.Monster      as Monster
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib          as Lib
 
 aiCharge :: AI
 aiCharge = error "GameAI.aiCharge" -- TODO
@@ -64,11 +69,30 @@ walkMonsterStart = EntThink "walkmonster_start" $ \edictRef -> do
     return True
 
 walkMonsterStartGo :: EntThink
-walkMonsterStartGo = error "GameAI.walkMonsterStartGo" -- TODO
+walkMonsterStartGo = EntThink "walkmonster_start_go" $ \selfRef -> do
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    self <- readRef selfRef
+    when ((self^.eSpawnFlags) .&. 2 == 0 && levelTime < 1) $ do
+        void (entThink M.dropToFloor selfRef)
+        updatedSelf <- readRef selfRef
+        when (isJust (updatedSelf^.eGroundEntity)) $ do
+          ok <- M.walkMove selfRef 0 0
+          when (not ok) $ do
+              finalSelf <- readRef selfRef
+              dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+              dprintf (B.concat [finalSelf^.eClassName, " in solid at ", Lib.vtos (finalSelf^.eEntityState.esOrigin), "\n"])
+    updatedSelf <- readRef selfRef
+    when ((updatedSelf^.eYawSpeed) == 0) $
+        modifyRef selfRef (\v -> v & eYawSpeed .~ 40)
+    modifyRef selfRef (\v -> v & eViewHeight .~ 25)
+    Monster.monsterStartGo selfRef
+    finalSelf <- readRef selfRef
+    when ((finalSelf^.eSpawnFlags) .&. 2 /= 0) $
+        void (entThink Monster.monsterTriggeredStart selfRef)
+    return True
 
 aiMove :: AI
 aiMove = error "GameAI.aiMove" -- TODO
 
 flyMonsterStart :: EntThink
-flyMonsterStart = EntThink "flymonster_start" $ \selfRef -> do
-    undefined -- TODO
+flyMonsterStart = error "GameAI.flyMonsterStart" -- TODO

@@ -137,6 +137,15 @@ instance QuakeRef UserCmdT where
     writeRef (Ref idx) item =
         globals.gCl.csCmds.ix idx .= item
 
+instance QuakeRef MapSurfaceT where
+    readRef (Ref idx) = do
+        surfaces <- use (cmGlobals.cmMapSurfaces)
+        return (surfaces V.! idx)
+    modifyRef (Ref idx) f =
+        cmGlobals.cmMapSurfaces.ix idx %= f
+    writeRef (Ref idx) item =
+        cmGlobals.cmMapSurfaces.ix idx .= item
+
 instance QuakeRef CBrushT where
     readRef (Ref idx) = do
         brushes <- use (cmGlobals.cmMapBrushes)

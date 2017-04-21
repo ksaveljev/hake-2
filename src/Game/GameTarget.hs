@@ -51,7 +51,24 @@ spTargetBlaster :: Ref EdictT -> Quake ()
 spTargetBlaster = error "GameTarget.spTargetBlaster" -- TODO
 
 spTargetChangeLevel :: Ref EdictT -> Quake ()
-spTargetChangeLevel = error "GameTarget.spTargetChangeLevel" -- TODO
+spTargetChangeLevel edictRef = do
+    edict <- readRef edictRef
+    maybe (noMap edict) (doSpawnTargetChangeLevel edict) (edict^.eMap)
+  where
+    noMap edict = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat ["target_changelevel with no map at ", Lib.vtos (edict^.eEntityState.esOrigin), "\n"])
+        GameUtil.freeEdict edictRef
+    doSpawnTargetChangeLevel edict edictMap = do
+        -- ugly hack because *SOMEBODY* screwed up their map
+        mapName <- fmap (BC.map toLower) (use (gameBaseGlobals.gbLevel.llMapName))
+        when (mapName == "fact1" && BC.map toLower edictMap == "fact3") $
+            modifyRef edictRef (\v -> v & eMap .~ Just "fact3$secret1")
+        modifyRef edictRef (\v -> v & eUse .~ Just useTargetChangeLevel
+                                    & eSvFlags .~ Constants.svfNoClient)
+
+useTargetChangeLevel :: EntUse
+useTargetChangeLevel = error "GameTarget.useTargetChangeLevel" -- TODO
 
 spTargetCrossLevelTarget :: Ref EdictT -> Quake ()
 spTargetCrossLevelTarget = error "GameTarget.spTargetCrossLevelTarget" -- TODO

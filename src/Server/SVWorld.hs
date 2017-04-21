@@ -23,17 +23,93 @@ import           Game.CModelT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.LinkT
+import           Game.TraceT
 import qualified QCommon.CM          as CM
 import qualified QCommon.Com         as Com
 import           QuakeRef
 import           QuakeState
 import           Server.AreaNodeT
+import           Server.MoveClipT
 import           Server.ServerT
 import           Types
 import           Util.Binary         (encode)
+import qualified Util.Math3D         as Math3D
 
 areaEdicts :: V3 Float -> V3 Float -> Lens' QuakeState (V.Vector (Ref EdictT)) -> Int -> Int -> Quake Int
-areaEdicts = error "SVWorld.areaEdicts" -- TODO
+areaEdicts mins maxs listLens maxCount areaType = do
+    list <- use listLens
+    svGlobals.svAreaMins .= mins
+    svGlobals.svAreaMaxs .= maxs
+    svGlobals.svAreaList .= list
+    svGlobals.svAreaCount .= 0
+    svGlobals.svAreaMaxCount .= maxCount
+    svGlobals.svAreaType .= areaType
+    areaEdictsR (Just (Ref 0))
+    updatedList <- use (svGlobals.svAreaList)
+    listLens .= updatedList
+    areaCount <- use (svGlobals.svAreaCount)
+    return areaCount
+
+areaEdictsR :: Maybe (Ref AreaNodeT) -> Quake ()
+areaEdictsR Nothing =
+    Com.fatalError "SVWorld.areaEdictsR nodeRef is Nothing"
+areaEdictsR (Just nodeRef) = do
+    areaType <- use (svGlobals.svAreaType)
+    node <- readRef nodeRef
+    -- touch linked edicts
+    let linkRef | areaType == Constants.areaSolid = node^.anSolidEdicts
+                | otherwise                       = node^.anTriggerEdicts
+    link <- readRef linkRef
+    findTouching linkRef (link^.lNext)
+    -- if not terminal node
+    unless ((node^.anAxis) == -1) $ do
+        -- recurse down both sides
+        areaMaxs <- use (svGlobals.svAreaMaxs)
+        areaMins <- use (svGlobals.svAreaMins)
+        when ((areaMaxs^.(Math3D.v3Access (node^.anAxis))) > node^.anDist) $
+            areaEdictsR (node^.anChildren._1)
+        when ((areaMins^.(Math3D.v3Access (node^.anAxis))) < node^.anDist) $
+            areaEdictsR (node^.anChildren._2)
+
+findTouching :: Ref LinkT -> Maybe (Ref LinkT) -> Quake ()
+findTouching _ Nothing =
+    Com.fatalError "SVWorld.areaEdictsR findTouching linkRef is Nothing"
+findTouching startRef (Just linkRef)
+    | startRef == linkRef = return ()
+    | otherwise = do
+        link <- readRef linkRef
+        doFindTouching link (link^.lEdict)
+  where
+    doFindTouching _ Nothing =
+        Com.fatalError "SVWorld.areaEdictsR link^.lEdict is Nothing"
+    doFindTouching link (Just edictRef) = do
+        edict <- readRef edictRef
+        areaMaxs <- use (svGlobals.svAreaMaxs)
+        areaMins <- use (svGlobals.svAreaMins)
+        areaCount <- use (svGlobals.svAreaCount)
+        areaMaxCount <- use (svGlobals.svAreaMaxCount)
+        proceedFindTouching link edict areaMins areaMaxs areaCount areaMaxCount
+    proceedFindTouching link edict areaMins areaMaxs areaCount areaMaxCount
+        | (edict^.eSolid) == Constants.solidNot =
+            findTouching startRef (link^.lNext)
+        | notTouching edict areaMins areaMaxs =
+            findTouching startRef (link^.lNext)
+        | areaCount == areaMaxCount = do
+            Com.printf "SV_areaEdicts: MAXCOUNT\n"
+            return ()
+        | otherwise = do
+            svGlobals.svAreaList.ix areaCount .= Ref (edict^.eIndex)
+            svGlobals.svAreaCount += 1
+            findTouching startRef (link^.lNext)
+    notTouching edict mins maxs =
+        let absmin = edict^.eAbsMin
+            absmax = edict^.eAbsMax
+        in (absmin^._x) > (maxs^._x) ||
+           (absmin^._y) > (maxs^._y) ||
+           (absmin^._z) > (maxs^._z) ||
+           (absmax^._x) < (mins^._x) ||
+           (absmax^._y) < (mins^._y) ||
+           (absmax^._z) < (mins^._z)
 
 clearWorld :: Quake ()
 clearWorld = do
@@ -194,10 +270,69 @@ setHeadNode edictRef topnode idx maxIdx
             nextNode
 
 pointContents :: V3 Float -> Quake Int
-pointContents = error "SVWorld.pointContents" -- TODO
+pointContents p = do
+    -- get base contents from world
+    models <- use (svGlobals.svServer.sModels)
+    let cmodelRef = models V.! 1
+    cModel <- readRef cmodelRef
+    contents <- CM.pointContents p (cModel^.cmHeadNode)
+    -- or in contents from all the other entities
+    num <- areaEdicts p p (svGlobals.svTouch) Constants.maxEdicts Constants.areaSolid
+    collectContents contents 0 num
+  where
+    collectContents :: Int -> Int -> Int -> Quake Int
+    collectContents contents idx maxIdx
+        | idx >= maxIdx = return contents
+        | otherwise = do
+            touchList <- use (svGlobals.svTouch)
+            let edictRef = touchList V.! idx
+            edict <- readRef edictRef
+            -- might intersect, so do an exact clip
+            headNode <- hullForEntity edict
+            when ((edict^.eSolid) /= Constants.solidBsp) $
+                return () -- TODO: find out why this is here
+            c2 <- CM.transformedPointContents p headNode (edict^.eEntityState.esOrigin) (edict^.eEntityState.esAngles)
+            collectContents (contents .|. c2) (idx + 1) maxIdx
 
 trace :: V3 Float -> Maybe (V3 Float) -> Maybe (V3 Float) -> V3 Float -> Maybe (Ref EdictT) -> Int -> Quake TraceT
-trace = error "SVWorld.trace" -- TODO
+trace start maybeMins maybeMaxs end passEdict contentMask = do
+    v3o <- use (globals.gVec3Origin)
+    let mins = maybe v3o id maybeMins
+        maxs = maybe v3o id maybeMaxs
+    -- clip to world
+    boxTraceT <- CM.boxTrace start end mins maxs 0 contentMask
+    doTrace boxTraceT mins maxs
+  where
+    doTrace boxTraceT mins maxs
+        | (boxTraceT^.tFraction) == 0 = -- blocked by the world
+            return (boxTraceT & tEnt .~ Just worldRef)
+        | otherwise = do
+            -- create the bounding box of the entire move
+            let (boxMins, boxMaxs) = traceBounds start mins maxs end
+                clip = newMoveClipT & mcTrace       .~ (boxTraceT & tEnt .~ Just worldRef)
+                                    & mcContentMask .~ contentMask
+                                    & mcStart       .~ start
+                                    & mcEnd         .~ end
+                                    & mcMins        .~ mins
+                                    & mcMaxs        .~ maxs
+                                    & mcPassEdict   .~ passEdict
+                                    & mcMins2       .~ mins
+                                    & mcMaxs2       .~ maxs
+                                    & mcBoxMins     .~ boxMins
+                                    & mcBoxMaxs     .~ boxMaxs
+            -- clip to other solid entities
+            finalClip <- clipMoveToEntities clip
+            return (finalClip^.mcTrace)
+
+traceBounds :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
+traceBounds start mins maxs end =
+    let minsa = if (end^._x) > (start^._x) then (start^._x) + (mins^._x) - 1 else (end^._x) + (mins^._x) - 1
+        minsb = if (end^._y) > (start^._y) then (start^._y) + (mins^._y) - 1 else (end^._y) + (mins^._y) - 1
+        minsc = if (end^._z) > (start^._z) then (start^._z) + (mins^._z) - 1 else (end^._z) + (mins^._z) - 1
+        maxsa = if (end^._x) > (start^._x) then (end^._x) + (maxs^._x) + 1 else (start^._x) + (maxs^._x) + 1
+        maxsb = if (end^._y) > (start^._y) then (end^._y) + (maxs^._y) + 1 else (start^._y) + (maxs^._y) + 1
+        maxsc = if (end^._z) > (start^._z) then (end^._z) + (maxs^._z) + 1 else (start^._z) + (maxs^._z) + 1
+    in (V3 minsa minsb minsc, V3 maxsa maxsb maxsc)
 
 unlinkEdict :: Ref EdictT -> Quake ()
 unlinkEdict edictRef = do
@@ -268,3 +403,91 @@ insertLinkBefore linkRef beforeRef = do
   where
     linkError = Com.fatalError "SVWorld.insertLinkBefore before^.lPrev is Nothing"
     setBeforeNext prevRef = modifyRef prevRef (\v -> v & lNext .~ Just linkRef)
+
+clipMoveToEntities :: MoveClipT -> Quake MoveClipT
+clipMoveToEntities initialClip = do
+    num <- areaEdicts (initialClip^.mcBoxMins) (initialClip^.mcBoxMaxs) (svGlobals.svTouchList) Constants.maxEdicts Constants.areaSolid
+    -- be careful, it is possible to have an entity in this
+    -- list removed before we get to it (killtriggered)
+    tryClipping 0 num initialClip
+
+tryClipping :: Int -> Int -> MoveClipT -> Quake MoveClipT
+tryClipping idx maxIdx clip
+    | idx >= maxIdx = return clip
+    | otherwise = do
+        touchList <- use (svGlobals.svTouchList)
+        let touchRef = touchList V.! idx
+        touchEdict <- readRef touchRef
+        (done, skip) <- shouldSkip touchRef touchEdict
+        proceedTryClipping touchRef touchEdict done skip
+  where
+    proceedTryClipping touchRef touchEdict done skip
+        | done = return clip
+        | skip = tryClipping (idx + 1) maxIdx clip
+        | otherwise = do
+            -- might intersect, so do an exact clip
+            headNode <- hullForEntity touchEdict
+            v3o <- use (globals.gVec3Origin)
+            let angles | (touchEdict^.eSolid) /= Constants.solidBsp = v3o -- boxes don't rotate
+                       | otherwise                                  = touchEdict^.eEntityState.esAngles
+            traceT <- getTrace touchEdict headNode angles
+            let updatedClip | (traceT^.tAllSolid) || (traceT^.tStartSolid) || (traceT^.tFraction) < clip^.mcTrace.tFraction =
+                                let traceT' = traceT & tEnt .~ Just touchRef
+                                in if clip^.mcTrace.tStartSolid
+                                     then clip & mcTrace .~ (traceT' & tStartSolid .~ True)
+                                     else clip & mcTrace .~ traceT'
+                            | traceT^.tStartSolid = clip & (mcTrace.tStartSolid) .~ True
+                            | otherwise = clip
+            tryClipping (idx + 1) maxIdx updatedClip
+    shouldSkip touchRef touchEdict
+        | (touchEdict^.eSolid) == Constants.solidNot = return (False, True)
+        | (Just touchRef) == (clip^.mcPassEdict) = return (False, True)
+        | clip^.mcTrace.tAllSolid = return (True, False)
+        | ((clip^.mcContentMask) .&. Constants.contentsDeadMonster == 0) && ((touchEdict^.eSvFlags) .&. Constants.svfDeadMonster /= 0) = return (False, True)
+        | isJust (clip^.mcPassEdict) = checkClip touchRef touchEdict
+        | otherwise = return (False, False)
+    checkClip touchRef touchEdict
+        | (touchEdict^.eOwner) == (clip^.mcPassEdict) = return (False, True) -- don't clip against own missiles
+        | otherwise = do
+            maybe passEdictError (proceedPassEdict touchRef) (clip^.mcPassEdict)
+    passEdictError = do
+        Com.fatalError "SVWorld.clipMoveToEntities#checkClip clip^.mcPassEdict is Nothing"
+        return (False, False)
+    proceedPassEdict touchRef passEdictRef = do
+        passEdict <- readRef passEdictRef
+        if passEdict^.eOwner == (Just touchRef)
+            then return (False, True) -- don't clip against owner
+            else return (False, False)
+    getTrace touchEdict headNode angles
+        | (touchEdict^.eSvFlags) .&. Constants.svfMonster /= 0 =
+            CM.transformedBoxTrace (clip^.mcStart)
+                                   (clip^.mcEnd)
+                                   (clip^.mcMins2)
+                                   (clip^.mcMaxs2)
+                                   headNode
+                                   (clip^.mcContentMask)
+                                   (touchEdict^.eEntityState.esOrigin)
+                                   angles
+        | otherwise =
+            CM.transformedBoxTrace (clip^.mcStart)
+                                   (clip^.mcEnd)
+                                   (clip^.mcMins)
+                                   (clip^.mcMaxs)
+                                   headNode
+                                   (clip^.mcContentMask)
+                                   (touchEdict^.eEntityState.esOrigin)
+                                   angles
+
+hullForEntity :: EdictT -> Quake Int
+hullForEntity edict -- decide which clipping hull to use, based on the size
+    | (edict^.eSolid) == Constants.solidBsp = do
+        -- explicit hulls in the BSP model
+        models <- use (svGlobals.svServer.sModels)
+        let modelRef@(Ref modelIdx) = models V.! (edict^.eEntityState.esModelIndex)
+        when (modelIdx == -1) $
+            Com.comError Constants.errFatal "MOVETYPE_PUSH with a non bsp model"
+        model <- readRef modelRef
+        return (model^.cmHeadNode)
+    | otherwise =
+        -- create a temp hull from bounding box sizes
+        CM.headnodeForBox (edict^.eMins) (edict^.eMaxs)

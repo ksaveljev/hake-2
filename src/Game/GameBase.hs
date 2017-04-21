@@ -1,21 +1,24 @@
 module Game.GameBase
-    ( findByClass
+    ( clipVelocity
+    , findByClass
     , findByTarget
     , getGameApi
     , gFind
     , runFrame
     , setMoveDir
     , shutdownGame
+    , touchTriggers
     ) where
 
 import           Control.Lens           (use, (^.), (.=), (+=), (%=), (&), (.~))
-import           Control.Monad          (when, void, (>=>))
+import           Control.Monad          (when, unless, void, (>=>))
 import           Data.Bits              ((.&.), (.|.))
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
 import           Data.Maybe             (isJust)
-import           Linear                 (V3(..))
+import qualified Data.Vector            as V
+import           Linear                 (V3(..), dot, _z)
 
 import qualified Client.M               as M
 import qualified Constants
@@ -51,6 +54,9 @@ vecDown = V3 0 (-2) 0
 
 moveDirDown :: V3 Float
 moveDirDown = V3 0 0 (-1)
+
+stopEpsilon :: Float
+stopEpsilon = 0.1
 
 findByClass :: EdictT -> B.ByteString -> Bool
 findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
@@ -241,3 +247,43 @@ readEdict :: Int -> Quake (Ref EdictT, EdictT) -- TODO: duplicate with something
 readEdict idx = do
     edict <- readRef (Ref idx)
     return (Ref idx, edict)
+
+touchTriggers :: Ref EdictT -> Quake ()
+touchTriggers edictRef = do
+    edict <- readRef edictRef
+    -- dead things don't activate triggers!
+    unless ((isJust (edict^.eClient) || (edict^.eSvFlags) .&. Constants.svfMonster /= 0) && (edict^.eHealth <= 0)) $ do
+      boxEdicts <- use (gameBaseGlobals.gbGameImport.giBoxEdicts)
+      num <- boxEdicts (edict^.eAbsMin) (edict^.eAbsMax) (gameBaseGlobals.gbTouch) Constants.maxEdicts Constants.areaTriggers
+      -- be careful, it is possible to have an entity in this
+      -- list removed before we got to it (killtriggered)
+      touchEdicts edictRef 0 num
+
+touchEdicts :: Ref EdictT -> Int -> Int -> Quake ()
+touchEdicts edictRef idx maxIdx
+    | idx >= maxIdx = return ()
+    | otherwise = do
+        edicts <- use (gameBaseGlobals.gbTouch)
+        let hitRef = edicts V.! idx
+        hit <- readRef hitRef
+        doTouchEdicts hitRef hit (hit^.eTouch)
+  where
+    doTouchEdicts _ _ Nothing =
+        touchEdicts edictRef (idx + 1) maxIdx
+    doTouchEdicts hitRef hit (Just hitTouch)
+        | not (hit^.eInUse) =
+            touchEdicts edictRef (idx + 1) maxIdx
+        | otherwise = do
+            dummyPlane <- use (gameBaseGlobals.gbDummyPlane)
+            entTouch hitTouch hitRef edictRef dummyPlane Nothing
+
+clipVelocity :: V3 Float -> V3 Float -> Float -> (Int, V3 Float)
+clipVelocity v3in normal overbounce =
+    let isBlocked | normal^._z > 0  = 1 -- floor
+                  | normal^._z == 0 = 2 -- step
+                  | otherwise       = 0
+        backoff = (dot v3in normal) * overbounce
+        change = fmap (* backoff) normal
+        out = v3in - change
+        v3out = fmap (\v -> if v > (-stopEpsilon) && v < stopEpsilon then 0 else v) out
+    in (isBlocked, v3out)

@@ -1,12 +1,14 @@
 module Client.M
-    ( checkGround
+    ( checkBottom
+    , checkGround
     , dropToFloor
+    , flyCheck
     , walkMove
     ) where
 
-import           Control.Lens      (use, (^.), (&), (.~), (-~), (+~))
+import           Control.Lens      (use, (^.), (&), (.~), (-~), (+~), (%~))
 import           Control.Monad     (when, unless)
-import           Data.Bits         ((.&.), (.|.))
+import           Data.Bits         (complement, (.&.), (.|.))
 import           Data.Maybe        (isNothing)
 import           Linear            (V3(..), _z)
 
@@ -14,12 +16,14 @@ import qualified Constants
 import           Game.CPlaneT
 import           Game.EdictT
 import           Game.EntityStateT
+import           Game.LevelLocalsT
 import           Game.TraceT
 import qualified QCommon.Com       as Com
 import           QuakeRef
 import           QuakeState
 import qualified Server.SV         as SV
 import           Types
+import qualified Util.Lib          as Lib
 
 checkGround :: Ref EdictT -> Quake ()
 checkGround edictRef = do
@@ -114,3 +118,36 @@ catagorizePosition edictRef = do
                 cont'' <- pointContents point''
                 when (cont'' .&. Constants.maskWater /= 0) $
                     modifyRef edictRef (\v -> v & eWaterLevel .~ 3)
+
+flyCheck :: EntThink
+flyCheck = EntThink "m_fly_check" $ \edictRef -> do
+    edict <- readRef edictRef
+    f <- Lib.randomF
+    unless ((edict^.eWaterLevel /= 0) || f > 0.5) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        nf <- Lib.randomF
+        modifyRef edictRef (\v -> v & eThink .~ Just fliesOn
+                                    & eNextThink .~ levelTime + 5 + 10 * nf)
+    return True
+
+fliesOn :: EntThink
+fliesOn = EntThink "m_flies_on" $ \edictRef -> do
+    edict <- readRef edictRef
+    unless ((edict^.eWaterLevel) /= 0) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+        soundIdx <- soundIndex (Just "infantry/inflies1.wav")
+        modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efFlies)
+                                    & eEntityState.esSound .~ soundIdx
+                                    & eThink .~ Just fliesOff
+                                    & eNextThink .~ levelTime + 60)
+    return True
+
+fliesOff :: EntThink
+fliesOff = EntThink "m_fliesoff" $ \edictRef -> do
+    modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement Constants.efFlies))
+                                & eEntityState.esSound .~ 0)
+    return True
+
+checkBottom :: Ref EdictT -> Quake Bool
+checkBottom = error "M.checkBottom" -- TODO
