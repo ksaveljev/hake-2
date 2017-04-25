@@ -33,12 +33,12 @@ import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
-import qualified Server.SVInit         as SVInit
 import qualified Server.SVSend         as SVSend
 import qualified Sys.NET               as NET
 import           Types
 import qualified Util.QuakeFile        as QuakeFile
 
+import {-# SOURCE #-} qualified Server.SVInit as SVInit
 import {-# SOURCE #-} qualified Server.SVMain as SVMain
 
 initialCommands :: [(B.ByteString, Maybe XCommandT)]

@@ -1,6 +1,7 @@
 module Game.Monster
     ( monsterFireBlaster
     , monsterFireBullet
+    , monsterFireRocket
     , monsterFireShotgun
     , monsterStart
     , monsterStartGo
@@ -120,3 +121,6 @@ monsterTriggeredStart = EntThink "monster_triggered_start" $ \selfRef -> do
 
 monsterTriggeredSpawnUse :: EntUse
 monsterTriggeredSpawnUse = error "Monster.monsterTriggeredSpawnUse" -- TODO
+
+monsterFireRocket :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireRocket = error "Monster.monsterFireRocket" -- TODO

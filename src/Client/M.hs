@@ -6,11 +6,11 @@ module Client.M
     , walkMove
     ) where
 
-import           Control.Lens      (use, (^.), (&), (.~), (-~), (+~), (%~))
+import           Control.Lens      (use, (^.), (+=), (&), (.~), (-~), (+~), (%~))
 import           Control.Monad     (when, unless)
 import           Data.Bits         (complement, (.&.), (.|.))
 import           Data.Maybe        (isNothing)
-import           Linear            (V3(..), _z)
+import           Linear            (V3(..), _x, _y, _z)
 
 import qualified Constants
 import           Game.CPlaneT
@@ -149,5 +149,68 @@ fliesOff = EntThink "m_fliesoff" $ \edictRef -> do
                                 & eEntityState.esSound .~ 0)
     return True
 
+-- TODO: old implementation, needs some refactoring
 checkBottom :: Ref EdictT -> Quake Bool
-checkBottom = error "M.checkBottom" -- TODO
+checkBottom edictRef = do
+    edict <- readRef edictRef
+    let mins = (edict^.eEntityState.esOrigin) + (edict^.eMins)
+        maxs = (edict^.eEntityState.esOrigin) + (edict^.eMaxs)
+    -- if all of the points under the corners are solid world, don't bother
+    -- with the tougher checks
+    -- the corners must be within 16 of the midpoint
+    done <- doChecks ((mins^._z) - 1) mins maxs 0 2 0 2
+    maybe gotOutEasy return done
+  where
+    doChecks c mins maxs x maxX y maxY
+        | x >= maxX = return Nothing
+        | y >= maxY = doChecks c mins maxs (x + 1) maxX 0 maxY
+        | otherwise = do
+            let a = if x /= 0 then maxs^._x else mins^._x
+                b = if y /= 0 then maxs^._y else mins^._y
+                start = V3 a b c
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            contents <- (gameImport^.giPointContents) start
+            if contents /= Constants.contentsSolid
+                then do
+                    gameBaseGlobals.gbCNo += 1
+                    -- check it for real
+                    let a' = ((mins^._x) + (maxs^._x)) * 0.5
+                        b' = ((mins^._y) + (maxs^._y)) * 0.5
+                        start' = V3 a' b' (mins^._z)
+                        stop' = V3 a' b' ((mins^._z) - 2 * (fromIntegral Constants.stepSize))
+                    v3o <- use (globals.gVec3Origin)
+                    traceT <- (gameImport^.giTrace) start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
+                    if (traceT^.tFraction) == 1
+                        then
+                            return (Just False)
+                        else do
+                            let mid = traceT^.tEndPos._z
+                                bottom = traceT^.tEndPos._z
+                            -- the corners must be withing 16 of the midpoint
+                            done <- checkCorners mins maxs start' stop' mid bottom 0 2 0 2
+                            case done of
+                                Just _ -> return done
+                                Nothing -> do
+                                    gameBaseGlobals.gbCYes += 1
+                                    return (Just True)
+                else
+                    doChecks c mins maxs x maxX (y + 1) maxY
+    checkCorners mins maxs start stop mid bottom x maxX y maxY
+        | x >= maxX = return Nothing
+        | y >= maxY = checkCorners mins maxs start stop mid bottom (x + 1) maxX 0 maxY
+        | otherwise = do
+            let a = if x /= 0 then maxs^._x else mins^._x
+                b = if y /= 0 then maxs^._y else mins^._y
+                start' = V3 a b (start^._z)
+                stop' = V3 a b (stop^._z)
+            v3o <- use (globals.gVec3Origin)
+            trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+            traceT <- trace start' (Just v3o) (Just v3o) stop' (Just edictRef) Constants.maskMonsterSolid
+            let bottom' | (traceT^.tFraction) /= 1 && (traceT^.tEndPos._z) > bottom = traceT^.tEndPos._z
+                        | otherwise                                                 = bottom
+            if (traceT^.tFraction) == 1 || mid - (traceT^.tEndPos._z) > fromIntegral Constants.stepSize
+                then return (Just False)
+                else checkCorners mins maxs start' stop' mid bottom' x maxX (y + 1) maxY
+    gotOutEasy = do
+        gameBaseGlobals.gbCYes += 1
+        return True

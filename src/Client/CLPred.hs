@@ -6,7 +6,7 @@ module Client.CLPred
 
 import           Control.Lens          (preuse, use, ix, (^.), (.=), (&), (.~))
 import           Control.Monad         (when, unless)
-import           Data.Bits             ((.&.), (.|.))
+import           Data.Bits             (shiftR, (.&.), (.|.))
 import           Data.Int              (Int8, Int16)
 import qualified Data.Vector           as V
 import qualified Data.Vector.Unboxed   as UV
@@ -125,7 +125,44 @@ clipMoveToEntities start mins maxs end t = do
     doClipMoveToEntities traceT idx maxIdx
         | idx >= maxIdx = return traceT
         | otherwise = do
-            error "CLPred.clipMoveToEntities" -- TODO
+            parseEntities <- use (globals.gCl.csFrame.fParseEntities)
+            playerNum <- use (globals.gCl.csPlayerNum)
+            entityStates <- use (globals.gClParseEntities)
+            let num = (parseEntities + idx) .&. (Constants.maxParseEntities - 1)
+            proceedClipMoveToEntities traceT (entityStates V.! num) playerNum idx maxIdx
+    proceedClipMoveToEntities traceT entityState playerNum idx maxIdx
+        | (entityState^.esSolid) == 0 || (entityState^.esNumber) == (playerNum + 1) =
+            doClipMoveToEntities traceT (idx + 1) maxIdx
+        | otherwise = do
+            headNodeAndAngles <- getHeadNodeAndAngles entityState
+            maybe (doClipMoveToEntities traceT (idx + 1) maxIdx)
+                  (continueClipMoveToEntities traceT entityState idx maxIdx)
+                  headNodeAndAngles
+    getHeadNodeAndAngles entityState
+        | (entityState^.esSolid) == 31 = do -- special value for bmodel
+            modelClips <- use (globals.gCl.csModelClip)
+            maybe (return Nothing) (getModelHeadNodeAndAngles entityState) (modelClips V.! (entityState^.esModelIndex))
+        | otherwise = do
+            let x = 8 * ((entityState^.esSolid) .&. 31)
+                zd = 8 * (((entityState^.esSolid) `shiftR` 5) .&. 31)
+                zu = 8 * (((entityState^.esSolid) `shiftR` 10) .&. 63) - 32
+                bmins = V3 (-x) (-x) (-zd)
+                bmaxs = V3 x x zu
+            headNode <- CM.headnodeForBox (fmap fromIntegral bmins) (fmap fromIntegral bmaxs)
+            angles <- use (globals.gVec3Origin) -- boxes don't rotate
+            return (Just (headNode, angles))
+    getModelHeadNodeAndAngles entityState modelRef = do
+        model <- readRef modelRef
+        return (Just (model^.cmHeadNode, entityState^.esAngles))
+    continueClipMoveToEntities traceT entityState idx maxIdx (headNode, angles)
+        | (traceT^.tAllSolid) = return traceT
+        | otherwise = do
+            traceT' <- CM.transformedBoxTrace start end mins maxs headNode Constants.maskPlayerSolid (entityState^.esOrigin) angles
+            doClipMoveToEntities (updateTraceT entityState traceT traceT') (idx + 1) maxIdx
+    updateTraceT entityState traceT traceT'
+        | (traceT'^.tAllSolid) || (traceT'^.tStartSolid) || (traceT'^.tFraction) < (traceT^.tFraction) =
+            traceT' & tEnt .~ (entityState^.esSurroundingEnt) -- TODO make sure this one is ok (jake2 has some copy mechanism here which doesn't copy everything from TraceT to TraceT
+        | otherwise = traceT & tStartSolid .~ True
 
 predPMPointContents :: V3 Float -> Quake Int
 predPMPointContents point = do

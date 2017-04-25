@@ -9,7 +9,7 @@ module Server.SV
 
 import           Control.Lens          (use, (^.), (.=), (&), (.~), (+~), (-~), (%~))
 import           Control.Monad         (when, void, unless)
-import           Data.Bits             ((.&.), (.|.))
+import           Data.Bits             (complement, (.&.), (.|.))
 import           Data.Maybe            (isJust, isNothing)
 import qualified Data.Vector           as V
 import           Linear                (V3(..), cross, dot, _x, _y, _z)
@@ -20,6 +20,7 @@ import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.LevelLocalsT
+import           Game.MonsterInfoT
 import           Game.TraceT
 import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
@@ -230,7 +231,164 @@ push :: Ref EdictT -> V3 Float -> V3 Float -> Quake Bool
 push = error "SV.push" -- TODO
 
 moveStep :: Ref EdictT -> V3 Float -> Bool -> Quake Bool
-moveStep = error "SV.moveStep" -- TODO
+moveStep edictRef move relink = do
+    edict <- readRef edictRef
+    doMoveStep edictRef edict move relink
+
+doMoveStep :: Ref EdictT -> EdictT -> V3 Float -> Bool -> Quake Bool
+doMoveStep edictRef edict move relink
+    | (edict^.eFlags) .&. (Constants.flSwim .|. Constants.flFly) /= 0 = -- flying monsters don't step up
+        -- try one move with vertical motion, then one without
+        moveStepFlyingMonster edictRef move relink 0 2
+    | otherwise = do
+        trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+        traceT <- trace newOrg
+                        (Just (edict^.eMins))
+                        (Just (edict^.eMaxs))
+                        end
+                        (Just edictRef)
+                        Constants.maskMonsterSolid
+        checkAllSolid traceT
+            >>= checkStartSolid traceT
+            >>= checkWaterLevel
+            >>= checkFraction
+            >>= checkBottom
+            >>= moveIsOk
+  where
+    stepSize
+        | (edict^.eMonsterInfo.miAIFlags) .&. Constants.aiNoStep == 0 = fromIntegral Constants.stepSize
+        | otherwise                                                   = 1
+    newOrg = ((edict^.eEntityState.esOrigin) + move) & _z +~ stepSize
+    end = newOrg & _z -~ (stepSize * 2)
+    checkAllSolid traceT
+        | traceT^.tAllSolid = return (Just False)
+        | otherwise         = return Nothing
+    checkStartSolid traceT Nothing
+        | traceT^.tStartSolid = do
+            trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+            traceT' <- trace (newOrg & _z -~ stepSize)
+                             (Just (edict^.eMins))
+                             (Just (edict^.eMaxs))
+                             end
+                             (Just edictRef)
+                             Constants.maskMonsterSolid
+            return (if (traceT'^.tAllSolid) || (traceT'^.tStartSolid) then (traceT', Just False) else (traceT', Nothing))
+        | otherwise = return (traceT, Nothing)
+    checkStartSolid traceT result = return (traceT, result)
+    checkWaterLevel (traceT, Nothing)
+        | (edict^.eWaterLevel) == 0 = do
+            pointContents <- use (gameBaseGlobals.gbGameImport.giPointContents)
+            contents <- pointContents ((traceT^.tEndPos) & _z +~ (edict^.eMins._z + 1))
+            return (if contents .&. Constants.maskWater /= 0 then (traceT, Just False) else (traceT, Nothing))
+        | otherwise = return (traceT, Nothing)
+    checkWaterLevel result = return result
+    checkFraction (traceT, Nothing)
+        | (traceT^.tFraction) == 1 && (edict^.eFlags) .&. Constants.flPartialGround /= 0 = do
+            modifyRef edictRef (\v -> v & eEntityState.esOrigin +~ move)
+            doRelink
+            modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing)
+            return (traceT, Just True)
+        | (traceT^.tFraction) == 1 = return (traceT, Just False) -- walked off an edge
+        | otherwise = return (traceT, Nothing)
+    checkFraction result = return result
+    checkBottom (traceT, Nothing) = do
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+        hasBottom <- M.checkBottom edictRef
+        doCheckBottom hasBottom traceT
+    checkBottom result = return result
+    doCheckBottom hasBottom traceT
+        | (not hasBottom) && (edict^.eFlags) .&. Constants.flPartialGround /= 0 = do
+            doRelink
+            return (traceT, Just True)
+        | not hasBottom = do
+            modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (edict^.eEntityState.esOrigin))
+            return (traceT, Just False)
+        | otherwise = return (traceT, Nothing)
+    moveIsOk (traceT, Nothing) = do
+        when ((edict^.eFlags) .&. Constants.flPartialGround /= 0) $
+            modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flPartialGround)))
+        updateGroundEntity traceT (traceT^.tEnt)
+        doRelink
+        return True
+    moveIsOk (_, Just result) = return result
+    doRelink
+        | relink = do
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+            GameBase.touchTriggers edictRef
+        | otherwise = return ()
+    updateGroundEntity _ Nothing = Com.fatalError "SV.moveStep traceT^.tEnt is Nothing"
+    updateGroundEntity traceT (Just entRef) = do
+        ent <- readRef entRef
+        modifyRef edictRef (\v -> v & eGroundEntity .~ traceT^.tEnt
+                                    & eGroundEntityLinkCount .~ (ent^.eLinkCount))
+
+moveStepFlyingMonster :: Ref EdictT -> V3 Float -> Bool -> Int -> Int -> Quake Bool
+moveStepFlyingMonster edictRef move relink idx maxIdx
+    | idx >= maxIdx = return False
+    | otherwise = do
+        edict <- readRef edictRef
+        newOrg <- getNewOrg edict (edict^.eEnemy)
+        trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+        traceT <- trace (edict^.eEntityState.esOrigin)
+                        (Just (edict^.eMins))
+                        (Just (edict^.eMaxs))
+                        newOrg
+                        (Just edictRef)
+                        Constants.maskMonsterSolid
+        checkFlyMonsters edict traceT
+            >>= checkSwimMonsters edict traceT
+            >>= checkFraction traceT
+            >>= checkEnemy edict
+  where
+    defaultNewOrg edict = (edict^.eEntityState.esOrigin) + move
+    getNewOrg edict Nothing = return (defaultNewOrg edict)
+    getNewOrg edict (Just enemyRef)
+        | idx == 0 = do
+            when (isNothing (edict^.eGoalEntity)) $
+                modifyRef edictRef (\v -> v & eGoalEntity .~ (edict^.eEnemy))
+            goalEntity <- readGoalEntity (edict^.eGoalEntity) enemyRef
+            return (doGetNewOrg edict goalEntity ((edict^.eEntityState.esOrigin._z) - (goalEntity^.eEntityState.esOrigin._z)))
+        | otherwise = return (defaultNewOrg edict)
+    readGoalEntity Nothing enemyRef = readRef enemyRef
+    readGoalEntity (Just goalEntityRef) _ = readRef goalEntityRef
+    doGetNewOrg edict goalEntity dz
+        | isJust (goalEntity^.eClient) = getClientNewOrg (defaultNewOrg edict) edict dz
+        | otherwise = getNonClientNewOrg (defaultNewOrg edict) dz
+    getClientNewOrg newOrg edict dz
+        | dz > 40 = newOrg & _z -~ 8
+        | (not (((edict^.eFlags) .&. Constants.flSwim /= 0) && ((edict^.eWaterLevel) < 2))) && (dz < 30) = newOrg & _z +~ 8
+        | otherwise = newOrg
+    getNonClientNewOrg newOrg dz
+        | dz > 8    = newOrg & _z -~ 8
+        | dz > 0    = newOrg & _z -~ dz
+        | dz < (-8) = newOrg & _z +~ 8
+        | otherwise = newOrg & _z +~ dz
+    checkFlyMonsters edict traceT
+        | ((edict^.eFlags) .&. Constants.flFly /= 0) && (edict^.eWaterLevel) == 0 = do
+            pointContents <- use (gameBaseGlobals.gbGameImport.giPointContents)
+            contents <- pointContents ((traceT^.tEndPos) & _z +~ (edict^.eMins._z + 1))
+            return (if (contents .&. Constants.maskWater /= 0) then Just False else Nothing)
+        | otherwise = return Nothing
+    checkSwimMonsters edict traceT Nothing
+        | ((edict^.eFlags) .&. Constants.flSwim /= 0) && (edict^.eWaterLevel) < 2 = do
+            pointContents <- use (gameBaseGlobals.gbGameImport.giPointContents)
+            contents <- pointContents ((traceT^.tEndPos) & _z +~ (edict^.eMins._z + 1))
+            return (if (contents .&. Constants.maskWater == 0) then Just False else Nothing)
+        | otherwise = return Nothing
+    checkSwimMonsters _ _ result = return result
+    checkFraction traceT Nothing = do
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+        when relink $ do
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+            GameBase.touchTriggers edictRef
+        return (Just True)
+    checkFraction _ result = return result
+    checkEnemy edict Nothing
+        | isNothing (edict^.eEnemy) = return False
+        | otherwise = moveStepFlyingMonster edictRef move relink (idx + 1) maxIdx
+    checkEnemy _ (Just result) = return result
 
 addRotationalFriction :: Ref EdictT -> Quake ()
 addRotationalFriction = error "SV.addRotationalFriction" -- TODO
