@@ -1,6 +1,7 @@
 module Game.Monster
     ( monsterFireBlaster
     , monsterFireBullet
+    , monsterFireGrenade
     , monsterFireRocket
     , monsterFireShotgun
     , monsterStart
@@ -102,11 +103,17 @@ monsterStart edictRef = do
 monsterFireBlaster :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Quake ()
 monsterFireBlaster = error "Monster.monsterFireBlaster" -- TODO
 
+monsterFireGrenade :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireGrenade = error "Monster.monsterFireGrenade" -- TODO
+
 monsterFireShotgun :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Int -> Quake ()
 monsterFireShotgun = error "Monster.monsterFireShotgun" -- TODO
 
 monsterFireBullet :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Int -> Int -> Quake ()
 monsterFireBullet = error "Monster.monsterFireBullet" -- TODO
+
+monsterFireRocket :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireRocket = error "Monster.monsterFireRocket" -- TODO
 
 monsterStartGo :: Ref EdictT -> Quake ()
 monsterStartGo selfRef = do

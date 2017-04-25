@@ -13,7 +13,6 @@ import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameAI           as GameAI
-import {-# SOURCE #-} Game.GameImportT
 import qualified Game.GameMisc         as GameMisc
 import qualified Game.GameUtil         as GameUtil
 import qualified Game.GameWeapon       as GameWeapon
