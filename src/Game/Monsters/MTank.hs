@@ -521,7 +521,21 @@ tankDoAttackRocket = EntThink "tank_doattack_rocket" $ \selfRef -> do
     return True
 
 tankReFireRocket :: EntThink
-tankReFireRocket = error "MTank.tankReFireRocket" -- TODO
+tankReFireRocket = EntThink "tank_refire_rocket" $ \selfRef -> do
+    self <- readRef selfRef
+    skill <- fmap (^.cvValue) skillCVar
+    maybe enemyError (doTankReFireRocket selfRef skill) (self^.eEnemy)
+    return True
+  where
+    enemyError = Com.fatalError "MTank.tankReFireRocket self^.eEnemy is Nothing"
+    doTankReFireRocket selfRef skill enemyRef = do
+        enemy <- readRef enemyRef
+        visible <- GameUtil.visible selfRef enemyRef
+        r <- Lib.randomF
+        modifyRef selfRef (\v -> v & eMonsterInfo.miCurrentMove .~ Just (currentMove skill visible (enemy^.eHealth) r))
+    currentMove skill visible enemyHealth r
+        | skill >= 2 && visible && enemyHealth > 0 && r <= 0.4 = tankMoveAttackFireRocket
+        | otherwise                                         = tankMoveAttackPostRocket
 
 tankFramesAttackStrike :: V.Vector MFrameT
 tankFramesAttackStrike = V.fromList -- IMPROVE

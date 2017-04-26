@@ -205,9 +205,6 @@ monsterTriggeredStart = EntThink "monster_triggered_start" $ \selfRef -> do
 monsterTriggeredSpawnUse :: EntUse
 monsterTriggeredSpawnUse = error "Monster.monsterTriggeredSpawnUse" -- TODO
 
-monsterFireRocket :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
-monsterFireRocket = error "Monster.monsterFireRocket" -- TODO
-
 monsterThink :: EntThink
 monsterThink = EntThink "monster_think" $ \selfRef -> do
     M.moveFrame selfRef
