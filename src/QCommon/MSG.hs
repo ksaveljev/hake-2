@@ -14,6 +14,7 @@ module QCommon.MSG
     , readShort
     , readString
     , readStringLine
+    , writeByteF
     , writeByteI
     , writeCharI
     , writeDeltaUserCmd
@@ -51,6 +52,9 @@ writeByteI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeByteI sizeBufLens c = SZ.write sizeBufLens (B.pack [c']) 1
   where
     c' = fromIntegral (c .&. 0xFF) :: Word8
+
+writeByteF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeByteF sizeBufLens c = writeByteI sizeBufLens (truncate c)
 
 writeCharI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeCharI = writeByteI

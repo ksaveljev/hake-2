@@ -1,9 +1,11 @@
 module Game.GameBase
-    ( clipVelocity
+    ( addPointToBounds
+    , clipVelocity
     , findByClass
     , findByTarget
     , getGameApi
     , gFind
+    , pickTarget
     , runFrame
     , setMoveDir
     , shutdownGame
@@ -18,7 +20,7 @@ import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
 import           Data.Maybe             (isJust)
 import qualified Data.Vector            as V
-import           Linear                 (V3(..), dot, _z)
+import           Linear                 (V3(..), dot, _x, _y, _z)
 
 import qualified Client.M               as M
 import qualified Constants
@@ -41,6 +43,7 @@ import qualified Server.SV              as SV
 import qualified Server.SVWorld         as SVWorld
 import           Types
 import           Util.Binary            (encode)
+import qualified Util.Lib               as Lib
 import qualified Util.Math3D            as Math3D
 
 vecUp :: V3 Float
@@ -58,6 +61,9 @@ moveDirDown = V3 0 0 (-1)
 stopEpsilon :: Float
 stopEpsilon = 0.1
 
+maxChoices :: Int
+maxChoices = 8
+
 findByClass :: EdictT -> B.ByteString -> Bool
 findByClass e s = BC.map toLower (e^.eClassName) == BC.map toLower s
 
@@ -71,7 +77,23 @@ getGameApi :: GameImportT -> Quake ()
 getGameApi imp = gameBaseGlobals.gbGameImport .= (imp & giPointContents .~ SVWorld.pointContents)
 
 gFind :: Maybe (Ref EdictT) -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe (Ref EdictT))
-gFind = error "GameBase.gFind" -- TODO
+gFind ref findBy targetName = do
+    numEdicts <- use (gameBaseGlobals.gbNumEdicts)
+    findEdict findBy targetName entRef (Ref numEdicts)
+  where
+    entRef = maybe worldRef (\(Ref idx) -> Ref (idx + 1)) ref
+
+findEdict :: (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Ref EdictT -> Ref EdictT -> Quake (Maybe (Ref EdictT))
+findEdict findBy targetName edictRef@(Ref idx) maxEdictRef@(Ref maxIdx)
+    | idx >= maxIdx = return Nothing
+    | otherwise = do
+        edict <- readRef edictRef
+        checkEdict edict
+  where
+    checkEdict edict
+        | not (edict^.eInUse)     = findEdict findBy targetName (Ref (idx + 1)) maxEdictRef
+        | findBy edict targetName = return (Just edictRef)
+        | otherwise               = findEdict findBy targetName (Ref (idx + 1)) maxEdictRef
 
 runFrame :: Quake ()
 runFrame = do
@@ -287,3 +309,38 @@ clipVelocity v3in normal overbounce =
         out = v3in - change
         v3out = fmap (\v -> if v > (-stopEpsilon) && v < stopEpsilon then 0 else v) out
     in (isBlocked, v3out)
+
+pickTarget :: Maybe B.ByteString -> Quake (Maybe (Ref EdictT))
+pickTarget Nothing = do
+    dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+    dprintf "G_PickTarget called with null targetname\n"
+    return Nothing
+pickTarget (Just targetName) = do
+    (foundRefs, numChoices) <- searchForTargets Nothing findByTarget [] 0
+    doPickTarget foundRefs numChoices
+  where
+    searchForTargets targetRef findBy foundRefs num
+        | num >= maxChoices = return (foundRefs, num)
+        | otherwise = do
+            foundRef <- gFind targetRef findBy targetName
+            maybe (return (foundRefs, num))
+                  (\edictRef -> searchForTargets foundRef findBy (edictRef : foundRefs) (num + 1))
+                  foundRef
+    doPickTarget foundRefs numChoices
+        | numChoices == 0 = do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat ["G_PickTarget: target ", targetName, " not found\n"])
+            return Nothing
+        | otherwise = do
+            r <- Lib.rand
+            return (Just (foundRefs !! (fromIntegral r `mod` numChoices)))
+
+addPointToBounds :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
+addPointToBounds v mins maxs =
+    let mina = min (v^._x) (mins^._x)
+        minb = min (v^._y) (mins^._y)
+        minc = min (v^._z) (mins^._z)
+        maxa = max (v^._x) (maxs^._x)
+        maxb = max (v^._y) (maxs^._y)
+        maxc = max (v^._z) (maxs^._z)
+    in (V3 mina minb minc, V3 maxa maxb maxc)

@@ -1,9 +1,13 @@
 module Client.M
-    ( checkBottom
+    ( catagorizePosition
+    , checkBottom
     , checkGround
     , dropToFloor
     , flyCheck
+    , moveFrame
+    , setEffects
     , walkMove
+    , worldEffects
     ) where
 
 import           Control.Lens      (use, (^.), (+=), (&), (.~), (-~), (+~), (%~))
@@ -214,3 +218,12 @@ checkBottom edictRef = do
     gotOutEasy = do
         gameBaseGlobals.gbCYes += 1
         return True
+
+setEffects :: Ref EdictT -> Quake ()
+setEffects = error "M.setEffects" -- TODO
+
+worldEffects :: Ref EdictT -> Quake ()
+worldEffects = error "M.worldEffects" -- TODO
+
+moveFrame :: Ref EdictT -> Quake ()
+moveFrame = error "M.moveFrame" -- TODO

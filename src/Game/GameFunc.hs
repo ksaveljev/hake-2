@@ -43,8 +43,6 @@ import           Types
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
-import {-# SOURCE #-} Game.GameImportT
-
 trainStartOn :: Int
 trainStartOn = 1
 
@@ -638,13 +636,135 @@ trainWait :: EntThink
 trainWait = error "GameFunc.trainWait" -- TODO
 
 funcTrainFind :: EntThink
-funcTrainFind = error "GameFunc.funcTrainFind" -- TODO
+funcTrainFind = EntThink "func_train_find" $ \selfRef -> do
+    self <- readRef selfRef
+    doFuncTrainFind selfRef self (self^.eTarget)
+    return True
+  where
+    doFuncTrainFind _ _ Nothing = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf "train_find: no target\n"
+    doFuncTrainFind selfRef self (Just targetName) = do
+        entRef <- GameBase.pickTarget (Just targetName)
+        maybe (targetNotFound targetName) (proceedFuncTrainFind selfRef self) entRef
+    targetNotFound targetName = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat ["train_find: target ", targetName, " not found\n"])
+    proceedFuncTrainFind selfRef self entRef = do
+        ent <- readRef entRef
+        modifyRef selfRef (\v -> v & eTarget .~ (ent^.eTarget)
+                                   & eEntityState.esOrigin .~ ((ent^.eEntityState.esOrigin) - (self^.eMins)))
+        linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+        linkEntity selfRef
+        -- if not triggered, start immediately
+        when (isNothing (self^.eTargetName)) $
+            modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+        updatedSelf <- readRef selfRef
+        when ((updatedSelf^.eSpawnFlags) .&. trainStartOn /= 0) $ do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+                                       & eThink .~ Just trainNext
+                                       & eActivator .~ Just selfRef)
 
 doorBlocked :: EntBlocked
 doorBlocked = error "GameFunc.doorBlocked" -- TODO
 
 doorUse :: EntUse
-doorUse = error "GameFunc.doorUse" -- TODO
+doorUse = EntUse "door_use" $ \selfRef _ activatorRef -> do
+    self <- readRef selfRef
+    unless ((self^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+        done <- checkIfDone selfRef self activatorRef
+        unless done $ do
+            triggerPairedDoors activatorRef (Just selfRef)
+  where
+    checkIfDone selfRef self activatorRef
+        | (self^.eSpawnFlags) .&. Constants.doorToggle /= 0 =
+            if (self^.eMoveInfo.miState) == Constants.stateUp || (self^.eMoveInfo.miState) == Constants.stateTop
+                then do
+                    triggerPairedDoors activatorRef (Just selfRef)
+                    return True
+                else return False
+        | otherwise = return False
+    triggerPairedDoors _ Nothing = return ()
+    triggerPairedDoors activatorRef (Just edictRef) = do
+      edict <- readRef edictRef
+      modifyRef edictRef (\v -> v & eMessage .~ Nothing
+                                  & eTouch .~ Nothing)
+      doorGoUp edictRef activatorRef
+      triggerPairedDoors activatorRef (edict^.eTeamChain)
+
+doorGoUp :: Ref EdictT -> Maybe (Ref EdictT) -> Quake ()
+doorGoUp selfRef activatorRef = do
+    self <- readRef selfRef
+    unless ((self^.eMoveInfo.miState) == Constants.stateUp) $
+        checkTopState self
+  where
+    checkTopState self
+        | (self^.eMoveInfo.miState) == Constants.stateTop = do
+            when ((self^.eMoveInfo.miWait) >= 0) $ do
+                levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+                modifyRef selfRef (\v -> v & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
+        | otherwise = do
+            when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+                when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
+                    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+                    sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+                modifyRef selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
+            modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateUp)
+            doMoveCalc selfRef self
+            GameUtil.useTargets selfRef activatorRef
+            doorUseAreaPortals selfRef True
+    doMoveCalc selfRef self
+        | (self^.eClassName) == "func_door" = moveCalc selfRef (self^.eMoveInfo.miEndOrigin) doorHitTop
+        | (self^.eClassName) == "func_door_rotating" = angleMoveCalc selfRef doorHitTop
+        | otherwise = return ()
+
+doorHitTop :: EntThink
+doorHitTop = EntThink "door_hit_top" $ \selfRef -> do
+    self <- readRef selfRef
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+        when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
+            sound <- use (gameBaseGlobals.gbGameImport.giSound)
+            sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop)
+    when ((self^.eSpawnFlags) .&. Constants.doorToggle == 0 && (self^.eMoveInfo.miWait) >= 0) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        modifyRef selfRef (\v -> v & eThink .~ Just doorGoDown
+                                   & eNextThink .~ levelTime + (self^.eMoveInfo.miWait))
+    return True
+
+doorGoDown :: EntThink
+doorGoDown = EntThink "door_go_down" $ \selfRef -> do
+    self <- readRef selfRef
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+        when ((self^.eMoveInfo.miSoundStart) /= 0) $ do
+            sound <- use (gameBaseGlobals.gbGameImport.giSound)
+            sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ self^.eMoveInfo.miSoundMiddle)
+    when ((self^.eMaxHealth) /= 0) $ do
+        modifyRef selfRef (\v -> v & eTakeDamage .~ Constants.damageYes
+                                   & eHealth .~ self^.eMaxHealth)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateDown)
+    doMoveCalc selfRef self
+    return True
+  where
+    doMoveCalc selfRef self
+        | (self^.eClassName) == "func_door" = moveCalc selfRef (self^.eMoveInfo.miStartOrigin) doorHitBottom
+        | (self^.eClassName) == "func_door_rotating" = angleMoveCalc selfRef doorHitBottom
+        | otherwise = return ()
+
+doorHitBottom :: EntThink
+doorHitBottom = EntThink "door_hit_bottom" $ \selfRef -> do
+    self <- readRef selfRef
+    when ((self^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+        when ((self^.eMoveInfo.miSoundEnd) /= 0) $ do
+            sound <- use (gameBaseGlobals.gbGameImport.giSound)
+            sound (Just selfRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (self^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+        modifyRef selfRef (\v -> v & eEntityState.esSound .~ 0)
+    modifyRef selfRef (\v -> v & eMoveInfo.miState .~ Constants.stateBottom)
+    doorUseAreaPortals selfRef False
+    return True
 
 doorKilled :: EntDie
 doorKilled = error "GameFunc.doorKilled" -- TODO
@@ -653,10 +773,77 @@ doorTouch :: EntTouch
 doorTouch = error "GameFunc.doorTouch" -- TODO
 
 thinkCalcMoveSpeed :: EntThink
-thinkCalcMoveSpeed = error "GameFunc.thinkCalcMoveSpeed" -- TODO
+thinkCalcMoveSpeed = EntThink "think_calc_movespeed" $ \edictRef -> do
+    edict <- readRef edictRef
+    unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+        minDist <- findSmallestDistance (edict^.eTeamChain) (abs (edict^.eMoveInfo.miDistance))
+        adjustSpeeds (Just edictRef) (minDist / (edict^.eMoveInfo.miSpeed))
+    return True
+  where
+    findSmallestDistance Nothing minDist = return minDist
+    findSmallestDistance (Just entRef) minDist = do
+        ent <- readRef entRef
+        findSmallestDistance (ent^.eTeamChain) (min (abs (ent^.eMoveInfo.miDistance)) minDist)
+    adjustSpeeds Nothing _ = return ()
+    adjustSpeeds (Just entRef) time = do
+        ent <- readRef entRef
+        let newspeed = (abs (ent^.eMoveInfo.miSpeed)) / time
+            ratio = newspeed / (ent^.eMoveInfo.miSpeed)
+            accel = if (ent^.eMoveInfo.miAccel) == (ent^.eMoveInfo.miSpeed)
+                        then newspeed
+                        else (ent^.eMoveInfo.miAccel) * ratio
+            decel = if (ent^.eMoveInfo.miDecel) == (ent^.eMoveInfo.miSpeed)
+                        then newspeed
+                        else (ent^.eMoveInfo.miDecel) * ratio
+        modifyRef entRef (\v -> v & eMoveInfo.miAccel .~ accel
+                                  & eMoveInfo.miDecel .~ decel
+                                  & eMoveInfo.miSpeed .~ newspeed)
+        adjustSpeeds (ent^.eTeamChain) time
 
 thinkSpawnDoorTrigger :: EntThink
-thinkSpawnDoorTrigger = error "GameFunc.thinkSpawnDoorTrigger" -- TODO
+thinkSpawnDoorTrigger = EntThink "think_spawn_door_trigger" $ \edictRef -> do
+    edict <- readRef edictRef
+    unless ((edict^.eFlags) .&. Constants.flTeamSlave /= 0) $ do
+        (mins, maxs) <- teamChainAddPointToBound (edict^.eTeamChain) (edict^.eMins) (edict^.eMaxs)
+        otherRef <- GameUtil.spawn
+        modifyRef otherRef (\v -> v & eMins .~ ((V3 (-60) (-60) 0) + mins)
+                                    & eMaxs .~ ((V3 60 60 0) + maxs)
+                                    & eOwner .~ Just edictRef
+                                    & eSolid .~ Constants.solidTrigger
+                                    & eMoveType .~ Constants.moveTypeNone
+                                    & eTouch .~ Just touchDoorTrigger)
+        linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+        linkEntity otherRef
+        when ((edict^.eSpawnFlags) .&. Constants.doorStartOpen /= 0) $
+            doorUseAreaPortals edictRef True
+        void (entThink thinkCalcMoveSpeed edictRef)
+    return True
+  where
+    teamChainAddPointToBound Nothing mins maxs = return (mins, maxs)
+    teamChainAddPointToBound (Just otherRef) mins maxs = do
+        other <- readRef otherRef
+        let (mins', maxs') = GameBase.addPointToBounds (other^.eAbsMin) mins maxs
+            (mins'', maxs'') = GameBase.addPointToBounds (other^.eAbsMax) mins' maxs'
+        teamChainAddPointToBound (other^.eTeamChain) mins'' maxs''
+
+touchDoorTrigger :: EntTouch
+touchDoorTrigger = EntTouch "touch_door_trigger" $ \selfRef otherRef _ _ -> do
+    self <- readRef selfRef
+    other <- readRef otherRef
+    maybe ownerError (doTouchDoorTrigger selfRef self otherRef other) (self^.eOwner)
+  where
+    ownerError = Com.fatalError "GameFunc.touchDoorTrigger self^.eOwner is Nothing"
+    doTouchDoorTrigger selfRef self otherRef other ownerRef = do
+        owner <- readRef ownerRef
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        unless (shouldSkip self other owner levelTime) $ do
+            modifyRef selfRef (\v -> v & eTouchDebounceTime .~ levelTime + 1)
+            entUse doorUse ownerRef (Just otherRef) (Just otherRef)
+    shouldSkip self other owner levelTime =
+        (other^.eHealth) <= 0 
+            || ((other^.eSvFlags) .&. Constants.svfMonster == 0 && isNothing (other^.eClient))
+            || ((owner^.eSpawnFlags) .&. Constants.doorNoMonster /= 0 && (other^.eSvFlags) .&. Constants.svfMonster /= 0)
+            || levelTime < (self^.eTouchDebounceTime)
 
 doorSecretBlocked :: EntBlocked
 doorSecretBlocked = EntBlocked "door_secret_blocked" $ \selfRef otherRef -> do
@@ -862,3 +1049,6 @@ platHitBottom = EntThink "plat_hit_bottom" $ \edictRef -> do
 
 touchPlatCenter :: EntTouch
 touchPlatCenter = error "GameFunc.touchPlatCenter" -- TODO
+
+angleMoveCalc :: Ref EdictT -> EntThink -> Quake ()
+angleMoveCalc = error "GameFunc.angleMoveCalc" -- TODO

@@ -207,7 +207,94 @@ checkVelocity edictRef edict = do
         | otherwise   = v
 
 physicsToss :: Ref EdictT -> Quake ()
-physicsToss = error "SV.physicsToss" -- TODO
+physicsToss edictRef = do
+    void (runThink edictRef)
+    flags <- fmap (^.eFlags) (readRef edictRef)
+    unless (flags .&. Constants.flTeamSlave /= 0) $ do
+        onGround <- checkGroundEntity
+        unless onGround $ do
+            oldOrigin <- fmap (^.eEntityState.esOrigin) (readRef edictRef)
+            checkVelocity edictRef =<< readRef edictRef
+            moveType <- fmap (^.eMoveType) (readRef edictRef)
+            addGravityBasedOnMoveType moveType
+            moveAngles
+            move <- moveOrigin
+            traceT <- pushEntity edictRef move
+            inUse <- fmap (^.eInUse) (readRef edictRef)
+            when inUse $ do
+                when ((traceT^.tFraction) < 1) $ do
+                    velocity <- fmap (^.eVelocity) (readRef edictRef)
+                    let backoff = if moveType == Constants.moveTypeBounce then 1.5 else 1
+                        (_, out) = GameBase.clipVelocity velocity (traceT^.tPlane.cpNormal) backoff
+                    modifyRef edictRef (\v -> v & eVelocity .~ out)
+                    stopIfOnGround moveType traceT
+                (wasInWater, isInWater) <- checkWaterTransition
+                modifyRef edictRef (\v -> v & eWaterLevel .~ (if isInWater then 1 else 0))
+                playWaterSound oldOrigin wasInWater isInWater
+                edict <- readRef edictRef
+                moveTeamSlaves (edict^.eEntityState.esOrigin) (edict^.eTeamChain)
+  where
+    checkGroundEntity = do
+        velocity <- fmap (^.eVelocity) (readRef edictRef)
+        when ((velocity^._z) > 0) $
+            modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing)
+        edict <- readRef edictRef
+        maybe (return False) (\groundEntityRef -> doCheckGroundEntity =<< readRef groundEntityRef) (edict^.eGroundEntity)
+    doCheckGroundEntity groundEntity
+        | not (groundEntity^.eInUse) = do
+            modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing)
+            return False
+        | otherwise = return True
+    addGravityBasedOnMoveType moveType =
+        when (moveType /= Constants.moveTypeFly && moveType /= Constants.moveTypeFlyMissile) $
+            addGravity edictRef
+    moveAngles = do
+        edict <- readRef edictRef
+        modifyRef edictRef (\v -> v & eEntityState.esAngles .~ ((edict^.eEntityState.esAngles) + fmap (* Constants.frameTime) (edict^.eAVelocity)))
+    moveOrigin = do
+        edict <- readRef edictRef
+        return (fmap (* Constants.frameTime) (edict^.eVelocity))
+    stopIfOnGround moveType traceT =
+        when ((traceT^.tPlane.cpNormal._z) > 0.7) $ do
+            velocity <- fmap (^.eVelocity) (readRef edictRef)
+            when ((velocity^._z) < 60 || moveType /= Constants.moveTypeBounce) $ do
+              linkCount <- getLinkCount (traceT^.tEnt)
+              origin <- use (globals.gVec3Origin)
+              modifyRef edictRef (\v -> v & eGroundEntity .~ (traceT^.tEnt)
+                                          & eGroundEntityLinkCount .~ linkCount
+                                          & eVelocity .~ origin
+                                          & eAVelocity .~ origin)
+    getLinkCount Nothing = do
+        Com.fatalError "SV.physicsToss#stopIfOnGround traceT^.tEnt is Nothing"
+        return 0
+    getLinkCount (Just traceRef) = fmap (^.eLinkCount) (readRef traceRef)
+    checkWaterTransition = do
+        edict <- readRef edictRef
+        pointContents <- use (gameBaseGlobals.gbGameImport.giPointContents)
+        newWaterType <- pointContents (edict^.eEntityState.esOrigin)
+        let wasInWater = (edict^.eWaterType) .&. Constants.maskWater /= 0
+            isInWater  = newWaterType .&. Constants.maskWater /= 0
+        return (wasInWater, isInWater)
+    playWaterSound oldOrigin wasInWater isInWater = do
+        edict <- readRef edictRef
+        soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+        hitWav <- soundIndex (Just "misc/h2ohit1.wav")
+        doPlayWaterSound edict hitWav oldOrigin wasInWater isInWater
+    doPlayWaterSound edict hitWav oldOrigin wasInWater isInWater
+        | not wasInWater && isInWater = do
+            positionedSound <- use (gameBaseGlobals.gbGameImport.giPositionedSound)
+            positionedSound (Just oldOrigin) edictRef Constants.chanAuto hitWav 1 1 0
+        | wasInWater && not isInWater = do
+            positionedSound <- use (gameBaseGlobals.gbGameImport.giPositionedSound)
+            positionedSound (Just (edict^.eEntityState.esOrigin)) edictRef Constants.chanAuto hitWav 1 1 0
+        | otherwise = return ()
+    moveTeamSlaves _ Nothing = return ()
+    moveTeamSlaves origin (Just slaveRef) = do
+        modifyRef slaveRef (\v -> v & eEntityState.esOrigin .~ origin)
+        linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+        linkEntity slaveRef
+        teamChain <- fmap (^.eTeamChain) (readRef slaveRef)
+        moveTeamSlaves origin teamChain
 
 -- Runs thinking code for this frame if necessary.
 runThink :: Ref EdictT -> Quake Bool
@@ -541,3 +628,44 @@ impact edictRef traceT =
             dummyPlane <- use (gameBaseGlobals.gbDummyPlane)
             entTouch traceTouch traceRef edictRef dummyPlane Nothing
         | otherwise = return ()
+
+pushEntity :: Ref EdictT -> V3 Float -> Quake TraceT
+pushEntity edictRef pushV3 = do
+    edict <- readRef edictRef
+    traceT <- tryToPush (edict^.eEntityState.esOrigin) ((edict^.eEntityState.esOrigin) + pushV3)
+    inUse <- fmap (^.eInUse) (readRef edictRef)
+    when inUse $
+        GameBase.touchTriggers edictRef
+    return traceT
+  where
+    tryToPush start end = do
+        edict <- readRef edictRef
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        traceT <- (gameImport^.giTrace) start
+                                        (Just (edict^.eMins))
+                                        (Just (edict^.eMaxs))
+                                        end
+                                        (Just edictRef)
+                                        (mask (edict^.eClipMask))
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (traceT^.tEndPos))
+        (gameImport^.giLinkEntity) edictRef
+        checkTrace start end traceT
+    checkTrace start end traceT
+        | (traceT^.tFraction) /= 1.0 = do
+            impact edictRef traceT
+            edict <- readRef edictRef
+            maybe (traceError traceT) (\traceRef -> checkPushedEntity start end traceT edict =<< readRef traceRef) (traceT^.tEnt)
+        | otherwise = return traceT
+    traceError traceT = do
+        Com.fatalError "SV.pushEntity#checkTrace traceT^.tEnt is Nothing"
+        return traceT
+    checkPushedEntity start end traceT edict traceEdict
+        | not (traceEdict^.eInUse) && (edict^.eInUse) = do
+            modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ start)
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+            tryToPush start end
+        | otherwise = return traceT
+    mask clipMask
+        | clipMask /= 0 = clipMask
+        | otherwise = Constants.maskSolid

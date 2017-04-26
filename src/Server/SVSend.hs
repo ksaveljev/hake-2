@@ -12,7 +12,7 @@ import           Control.Exception     (IOException, handle)
 import           Control.Lens          (use, ix, (.=), (^.))
 import           Control.Monad         (when, unless, void, (>=>))
 import           Data.Binary.Get       (runGet)
-import           Data.Bits             (shiftR, shiftL, (.&.))
+import           Data.Bits             (shiftR, shiftL, (.&.), (.|.))
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Lazy  as BL
 import           Linear                (V3(..))
@@ -57,7 +57,47 @@ broadcastPrintf :: Int -> B.ByteString -> Quake ()
 broadcastPrintf = error "SVSend.broadcastPrintf" -- TODO
 
 startSound :: Maybe (V3 Float) -> Ref EdictT -> Int -> Int -> Float -> Float -> Float -> Quake ()
-startSound = error "SVSend.startSound" -- TODO
+startSound maybeOrigin edictRef channel soundIdx volume attenuation timeOfs = do
+    when (volume < 0 || volume > 1) $
+        Com.fatalError ("SV_StartSound: volume = " `B.append` encode volume)
+    when (attenuation < 0 || attenuation > 4) $
+        Com.fatalError ("SV_StartSound: attenuation = " `B.append` encode attenuation)
+    when (timeOfs < 0 || timeOfs > 0.255) $
+        Com.fatalError ("SV_StartSound: timeofs = " `B.append` encode timeOfs)
+    edict <- readRef edictRef
+    let (usePHS, updatedChannel) | channel .&. 8 /= 0 = (False, channel .&. 7)
+                                 | otherwise = (True, channel)
+        sendChan = ((edict^.eIndex) `shiftL` 3) .|. (updatedChannel .&. 7)
+        flags = composeFlags edict
+        origin = maybe (getEdictOrigin edict) id maybeOrigin
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral Constants.svcSound)
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral flags)
+    MSG.writeByteI (svGlobals.svServer.sMulticast) (fromIntegral soundIdx)
+    when (flags .&. Constants.sndVolume /= 0) $
+        MSG.writeByteF (svGlobals.svServer.sMulticast) (volume * 255)
+    when (flags .&. Constants.sndAttenuation /= 0) $
+        MSG.writeByteF (svGlobals.svServer.sMulticast) (attenuation * 64)
+    when (flags .&. Constants.sndOffset /= 0) $
+        MSG.writeByteF (svGlobals.svServer.sMulticast) (timeOfs * 1000)
+    when (flags .&. Constants.sndEnt /= 0) $
+        MSG.writeShort (svGlobals.svServer.sMulticast) (fromIntegral sendChan)
+    when (flags .&. Constants.sndPos /= 0) $
+        MSG.writePos (svGlobals.svServer.sMulticast) origin
+    let usePHS' = if attenuation == Constants.attnNone then False else usePHS
+    if updatedChannel .&. Constants.chanReliable /= 0
+      then multicast origin (if usePHS' then Constants.multicastPhsR else Constants.multicastAllR)
+      else multicast origin (if usePHS' then Constants.multicastPhs else Constants.multicastAll)
+  where
+    composeFlags edict =
+      let a = if volume /= Constants.defaultSoundPacketVolume then Constants.sndVolume else 0
+          b = if attenuation /= Constants.defaultSoundPacketAttenuation then Constants.sndAttenuation else 0
+          c = if (edict^.eSvFlags) .&. Constants.svfNoClient /= 0 || (edict^.eSolid) == Constants.solidBsp then Constants.sndPos else 0
+          d = Constants.sndEnt
+          e = if timeOfs /= 0 then Constants.sndOffset else 0
+      in (a .|. b .|. c .|. d .|. e)
+    getEdictOrigin edict
+        | (edict^.eSolid) == Constants.solidBsp = (edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs))
+        | otherwise = edict^.eEntityState.esOrigin
 
 multicast :: V3 Float -> Int -> Quake ()
 multicast origin to = do

@@ -15,7 +15,8 @@ import           Control.Lens      (use, (^.), (.=), (%=), (&), (.~), (%~), (-~)
 import           Control.Monad     (when, unless)
 import           Data.Bits         (complement, (.&.), (.|.))
 import qualified Data.ByteString   as B
-import           Linear            (_y, _z)
+import           Data.Maybe        (isJust)
+import           Linear            (dot, _y, _z)
 
 import qualified Constants
 import qualified Game.GameBase     as GameBase
@@ -30,6 +31,7 @@ import           QuakeState
 import           Types
 import           Util.Binary       (encode)
 import qualified Util.Lib          as Lib
+import qualified Util.Math3D       as Math3D
 
 spTriggerAlways :: Ref EdictT -> Quake ()
 spTriggerAlways edictRef = do
@@ -103,7 +105,24 @@ multiTrigger :: Ref EdictT -> Quake ()
 multiTrigger = error "GameTrigger.multiTrigger" -- TODO
 
 touchMulti :: EntTouch
-touchMulti = error "GameTrigger.touchMulti" -- TODO
+touchMulti = EntTouch "Touch_Multi" $ \edictRef otherRef _ _ -> do
+    edict <- readRef edictRef
+    other <- readRef otherRef
+    unless (checkSpawnFlags edict other) $ do
+        v3o <- use (globals.gVec3Origin)
+        unless (checkMoveDir edict other v3o) $ do
+            modifyRef edictRef (\v -> v & eActivator .~ Just otherRef)
+            multiTrigger edictRef
+  where
+    checkSpawnFlags edict other
+        | isJust (other^.eClient) = (edict^.eSpawnFlags) .&. 2 /= 0
+        | (other^.eSvFlags) .&. Constants.svfMonster /= 0 = (edict^.eSpawnFlags) .&. 1 == 0
+        | otherwise = True
+    checkMoveDir edict other v3o
+        | (edict^.eMoveDir) /= v3o =
+            let (forward, _, _) = Math3D.angleVectors (other^.eEntityState.esAngles) True False False
+            in dot forward (edict^.eMoveDir) < 0
+        | otherwise = False
 
 spTriggerOnce :: Ref EdictT -> Quake ()
 spTriggerOnce edictRef = do
