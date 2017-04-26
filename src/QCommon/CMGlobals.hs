@@ -8,6 +8,7 @@ import qualified Data.ByteString                 as B
 import qualified Data.Vector                     as V
 import qualified Data.Vector.Unboxed             as UV
 import           Linear                          (V3(..))
+import           System.IO.Unsafe                (unsafePerformIO)
 
 import qualified Constants
 import           Game.MapSurfaceT                (newMapSurfaceT)
@@ -34,7 +35,7 @@ initialCMGlobals = CMGlobals
     , _cmNumTexInfo      = 0
     , _cmMapSurfaces     = V.replicate (Constants.maxMapTexInfo + 1) newMapSurfaceT
     , _cmNumPlanes       = 0
-    , _cmMapPlanes       = V.replicate (Constants.maxMapPlanes + 6) newCPlaneT
+    , _cmMapPlanes       = unsafePerformIO (V.thaw (V.replicate (Constants.maxMapPlanes + 6) newCPlaneT))
     , _cmNumNodes        = 0
     , _cmMapNodes        = V.replicate (Constants.maxMapNodes + 6) newCNodeT
     , _cmNumLeafs        = 1

@@ -338,7 +338,8 @@ loadPlanes buf lump = do
     Com.dprintf (B.concat [" numplanes=", encode count, "\n"])
     cmGlobals.cmNumPlanes .= count
     -- TODO: skipped the debugLoadMap part, should probably introduce it at some point
-    cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) readDPlanes))
+    V.imapM_ (\idx p -> writeRef (Ref idx) (toCPlane p)) readDPlanes
+    --cmGlobals.cmMapPlanes %= (\v -> V.update v (V.imap (\i p -> (i, toCPlane p)) readDPlanes))
   where
     count = (lump^.lFileLen) `div` dPlaneTSize
     checkLump = do

@@ -26,9 +26,9 @@ instance QuakeRef EdictT where
     modifyRef (Ref idx) f = do
         edicts <- use (gameBaseGlobals.gbGEdicts)
         io (MV.modify edicts f idx)
-    writeRef (Ref idx) edict = do
+    writeRef (Ref idx) item = do
         edicts <- use (gameBaseGlobals.gbGEdicts)
-        io (MV.write edicts idx edict)
+        io (MV.write edicts idx item)
 
 instance QuakeRef GClientT where
     readRef (Ref idx) = do
@@ -36,8 +36,8 @@ instance QuakeRef GClientT where
         return (gClients V.! idx)
     modifyRef (Ref idx) f =
         gameBaseGlobals.gbGame.glClients.ix idx %= f
-    writeRef (Ref idx) gClient =
-        gameBaseGlobals.gbGame.glClients.ix idx .= gClient
+    writeRef (Ref idx) item =
+        gameBaseGlobals.gbGame.glClients.ix idx .= item
 
 instance QuakeRef GItemT where
     readRef (Ref idx) = do
@@ -54,8 +54,8 @@ instance QuakeRef ClientT where
         return (clients V.! idx)
     modifyRef (Ref idx) f =
         svGlobals.svServerStatic.ssClients.ix idx %= f
-    writeRef (Ref idx) client =
-        svGlobals.svServerStatic.ssClients.ix idx .= client
+    writeRef (Ref idx) item =
+        svGlobals.svServerStatic.ssClients.ix idx .= item
 
 instance QuakeRef MenuFrameworkS where
     readRef (Ref idx) = do
@@ -176,11 +176,13 @@ instance QuakeRef CNodeT where
 instance QuakeRef CPlaneT where
     readRef (Ref idx) = do
         planes <- use (cmGlobals.cmMapPlanes)
-        return (planes V.! idx)
-    modifyRef (Ref idx) f =
-        cmGlobals.cmMapPlanes.ix idx %= f
-    writeRef (Ref idx) item =
-        cmGlobals.cmMapPlanes.ix idx .= item
+        io (MV.read planes idx)
+    modifyRef (Ref idx) f = do
+        planes <- use (cmGlobals.cmMapPlanes)
+        io (MV.modify planes f idx)
+    writeRef (Ref idx) item = do
+        planes <- use (cmGlobals.cmMapPlanes)
+        io (MV.write planes idx item)
 
 instance QuakeRef CLeafT where
     readRef (Ref idx) = do
