@@ -22,7 +22,7 @@ import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (toLower)
 import           Data.Maybe            (isJust, isNothing)
-import           Linear                (V3(..), dot, _x, _y, _z)
+import           Linear                (V3(..), dot, norm, normalize, _x, _y, _z)
 
 import qualified Constants
 import           Game.CVarT
@@ -597,7 +597,28 @@ spTriggerElevator :: EntThink
 spTriggerElevator = error "GameFunc.spTriggerElevator" -- TODO
 
 moveCalc :: Ref EdictT -> V3 Float -> EntThink -> Quake ()
-moveCalc = error "GameFunc.moveCalc" -- TODO
+moveCalc edictRef dest func = do
+    modifyRef edictRef (\v -> v & eVelocity .~ V3 0 0 0)
+    edict <- readRef edictRef
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    let dir = dest - (edict^.eEntityState.esOrigin)
+    modifyRef edictRef (\v -> v & eMoveInfo.miDir .~ normalize dir
+                                & eMoveInfo.miRemainingDistance .~ norm dir
+                                & eMoveInfo.miEndFunc .~ Just func)
+    doMoveCalc edict levelTime
+  where
+    doMoveCalc edict levelTime
+        | (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miAccel) && (edict^.eMoveInfo.miSpeed) == (edict^.eMoveInfo.miDecel) = do
+            currentEntity <- use (gameBaseGlobals.gbLevel.llCurrentEntity)
+            let comparedEntity = if (edict^.eFlags) .&. Constants.flTeamSlave /= 0 then edict^.eTeamMaster else Just edictRef
+            if currentEntity == comparedEntity
+                then void (entThink moveBegin edictRef)
+                else modifyRef edictRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime
+                                                 & eThink .~ Just moveBegin)
+        | otherwise =
+            modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ 0
+                                        & eThink .~ Just thinkAccelMove
+                                        & eNextThink .~ levelTime + Constants.frameTime)
 
 trainUse :: EntUse
 trainUse = EntUse "train_use" $ \selfRef _ activatorRef -> do
@@ -1052,3 +1073,137 @@ touchPlatCenter = error "GameFunc.touchPlatCenter" -- TODO
 
 angleMoveCalc :: Ref EdictT -> EntThink -> Quake ()
 angleMoveCalc = error "GameFunc.angleMoveCalc" -- TODO
+
+moveBegin :: EntThink
+moveBegin = EntThink "move_begin" $ \edictRef -> do
+    edict <- readRef edictRef
+    doMoveBegin edictRef edict
+    return True
+  where
+    doMoveBegin edictRef edict
+        | (edict^.eMoveInfo.miSpeed) * Constants.frameTime >= (edict^.eMoveInfo.miRemainingDistance) =
+            void (entThink moveFinal edictRef)
+        | otherwise = do
+            let velocity = fmap (* (edict^.eMoveInfo.miSpeed)) (edict^.eMoveInfo.miDir)
+                frames = floor (((edict^.eMoveInfo.miRemainingDistance) / (edict^.eMoveInfo.miSpeed)) / Constants.frameTime) :: Int
+                framesF = fromIntegral frames :: Float
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef edictRef (\v -> v & eVelocity .~ velocity
+                                        & eMoveInfo.miRemainingDistance -~ framesF * (edict^.eMoveInfo.miSpeed) * Constants.frameTime
+                                        & eNextThink .~ levelTime + (framesF * Constants.frameTime)
+                                        & eThink .~ Just moveFinal)
+
+moveFinal :: EntThink
+moveFinal = EntThink "move_final" $ \edictRef -> do
+    edict <- readRef edictRef
+    doMoveFinal edictRef edict
+    return True
+  where
+    doMoveFinal edictRef edict
+        | (edict^.eMoveInfo.miRemainingDistance) == 0 =
+            void (entThink moveDone edictRef)
+        | otherwise = do
+            let velocity = fmap (* ((edict^.eMoveInfo.miRemainingDistance) / Constants.frameTime)) (edict^.eMoveInfo.miDir)
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef edictRef (\v -> v & eVelocity .~ velocity
+                                        & eThink .~ Just moveDone
+                                        & eNextThink .~ levelTime + Constants.frameTime)
+
+moveDone :: EntThink
+moveDone = EntThink "move_done" $ \edictRef -> do
+    modifyRef edictRef (\v -> v & eVelocity .~ V3 0 0 0)
+    edict <- readRef edictRef
+    maybe endError (thinkEnd edictRef) (edict^.eMoveInfo.miEndFunc)
+    return True
+  where
+    endError = Com.fatalError "GameFunc.moveDone edict^.eMoveInfo.miEndFunc is Nothing"
+    thinkEnd edictRef endF = void (entThink endF edictRef)
+
+thinkAccelMove :: EntThink
+thinkAccelMove = EntThink "think_accelmove" $ \edictRef -> do
+    edict <- readRef edictRef
+    modifyRef edictRef (\v -> v & eMoveInfo.miRemainingDistance -~ (edict^.eMoveInfo.miCurrentSpeed))
+    when ((edict^.eMoveInfo.miCurrentSpeed) == 0) $ -- starting or blocked
+        platCalcAcceleratedMove edictRef
+    platAccelerate edictRef
+    -- will the entire move complete on next frame?
+    checkMoveComplete edictRef =<< readRef edictRef
+    return True
+  where
+    checkMoveComplete edictRef edict
+        | (edict^.eMoveInfo.miRemainingDistance) <= (edict^.eMoveInfo.miCurrentSpeed) =
+            void (entThink moveFinal edictRef)
+        | otherwise = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef edictRef (\v -> v & eVelocity .~ fmap (* ((edict^.eMoveInfo.miCurrentSpeed) * 10)) (edict^.eMoveInfo.miDir)
+                                        & eNextThink .~ levelTime + Constants.frameTime
+                                        & eThink .~ Just thinkAccelMove)
+
+platAccelerate :: Ref EdictT -> Quake ()
+platAccelerate edictRef = do
+    edict <- readRef edictRef
+    doPlatAccelerate edictRef (edict^.eMoveInfo)
+  where
+    doPlatAccelerate edictRef moveInfo
+          -- are we decelerating?
+        | (moveInfo^.miRemainingDistance) <= (moveInfo^.miDecelDistance) =
+            when ((moveInfo^.miRemainingDistance) < (moveInfo^.miDecelDistance)) $
+              if (moveInfo^.miNextSpeed) /= 0
+                  then modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miNextSpeed)
+                                                   & eMoveInfo.miNextSpeed .~ 0)
+                  else when ((moveInfo^.miCurrentSpeed) > (moveInfo^.miDecel)) $
+                           modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed -~ (moveInfo^.miDecel))
+          -- are we at full speed and need to start decelerating during this move?
+        | (moveInfo^.miCurrentSpeed) == (moveInfo^.miMoveSpeed) && (moveInfo^.miRemainingDistance) - (moveInfo^.miCurrentSpeed) < (moveInfo^.miDecelDistance) = do
+            let p1Distance = (moveInfo^.miRemainingDistance) - (moveInfo^.miDecelDistance)
+                p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / (moveInfo^.miMoveSpeed)))
+                distance = p1Distance + p2Distance
+            modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miMoveSpeed)
+                                        & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
+          -- are we accelerating?
+        | (moveInfo^.miCurrentSpeed) < (moveInfo^.miSpeed) = do
+            let oldSpeed = moveInfo^.miCurrentSpeed
+                -- figure simple acceleration up to move_speed
+                speed = (moveInfo^.miCurrentSpeed) + (moveInfo^.miAccel)
+                currentSpeed = if speed > (moveInfo^.miSpeed) then moveInfo^.miSpeed else speed
+            modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ currentSpeed)
+            -- are we accelerating throughout this entire move?
+            unless ((moveInfo^.miRemainingDistance) - currentSpeed >= (moveInfo^.miDecelDistance)) $ do
+                -- during this move we will accelerate from current_speed to
+                -- move_speed and cross over the decel_distance; figure the
+                -- average speed for the entire move
+                let p1Distance = (moveInfo^.miRemainingDistance) - (moveInfo^.miDecelDistance)
+                    p1Speed = (oldSpeed + (moveInfo^.miMoveSpeed)) / 2.0
+                    p2Distance = (moveInfo^.miMoveSpeed) * (1.0 - (p1Distance / p1Speed))
+                    distance = p1Distance + p2Distance
+                modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (p1Speed * (p1Distance / distance)) + ((moveInfo^.miMoveSpeed) * (p2Distance / distance))
+                                            & eMoveInfo.miNextSpeed .~ (moveInfo^.miMoveSpeed) - (moveInfo^.miDecel) * (p2Distance / distance))
+          -- we are at constant velocity (move_speed)
+        | otherwise = return ()
+
+platCalcAcceleratedMove :: Ref EdictT -> Quake ()
+platCalcAcceleratedMove edictRef = do
+    setMoveSpeed
+    edict <- readRef edictRef
+    doPlatCalcAcceleratedMove (edict^.eMoveInfo)
+  where
+    doPlatCalcAcceleratedMove moveInfo
+        | (moveInfo^.miRemainingDistance) < (moveInfo^.miAccel) =
+            modifyRef edictRef (\v -> v & eMoveInfo.miCurrentSpeed .~ (moveInfo^.miRemainingDistance))
+        | otherwise = do
+            let accelDist = accelerationDistance (moveInfo^.miSpeed) (moveInfo^.miAccel)
+                decelDist = accelerationDistance (moveInfo^.miSpeed) (moveInfo^.miDecel)
+            if (moveInfo^.miRemainingDistance) - accelDist - decelDist < 0
+                then do
+                    let f = ((moveInfo^.miAccel) + (moveInfo^.miDecel)) / ((moveInfo^.miAccel) * (moveInfo^.miDecel))
+                        moveSpeed = (-2 + sqrt (4 - 4 * f * (-2 * (moveInfo^.miRemainingDistance)))) / (2 * f)
+                        decelDist' = accelerationDistance moveSpeed (moveInfo^.miDecel)
+                    modifyRef edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ moveSpeed
+                                                   & eMoveInfo.miDecelDistance .~ decelDist')
+                else do
+                    modifyRef edictRef (\v -> v & eMoveInfo.miDecelDistance .~ decelDist)
+    accelerationDistance target rate = target * ((target / rate) + 1) / 2
+    setMoveSpeed = do
+        edict <- readRef edictRef
+        modifyRef edictRef (\v -> v & eMoveInfo.miMoveSpeed .~ (edict^.eMoveInfo.miSpeed))
+

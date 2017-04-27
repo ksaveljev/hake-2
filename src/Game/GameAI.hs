@@ -9,23 +9,28 @@ module Game.GameAI
     , walkMonsterStart
     ) where
 
-import           Control.Lens      (use, (^.), (.=), (&), (.~))
+import           Control.Lens      (use, (^.), (.=), (&), (.~), (%~))
 import           Control.Monad     (void, when)
-import           Data.Bits         ((.&.))
+import           Data.Bits         (complement, (.&.), (.|.))
 import qualified Data.ByteString   as B
 import           Data.Maybe        (isJust)
+import           Linear            (_y)
 
 import qualified Client.M          as M
 import qualified Constants
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.GameLocalsT
+import qualified Game.GameUtil     as GameUtil
 import           Game.LevelLocalsT
 import qualified Game.Monster      as Monster
+import           Game.MonsterInfoT
+import qualified QCommon.Com       as Com
 import           QuakeRef
 import           QuakeState
 import           Types
 import qualified Util.Lib          as Lib
+import qualified Util.Math3D       as Math3D
 
 aiCharge :: AI
 aiCharge = error "GameAI.aiCharge" -- TODO
@@ -57,10 +62,68 @@ lookThroughClients maxClients start check = do
         | otherwise = lookThroughClients maxClients start check'
 
 aiStand :: AI
-aiStand = error "GameAI.aiStand" -- TODO
+aiStand = AI "ai_stand" $ \selfRef dist -> do
+    when (dist /= 0) $ do
+        self <- readRef selfRef
+        void (M.walkMove selfRef (self^.eEntityState.esAngles._y) dist)
+    checkAIStandGround selfRef
+        >>= checkFindTarget selfRef
+        >>= checkPauseTime selfRef
+        >>= tryToIdle selfRef
+  where
+    checkAIStandGround selfRef = do
+        self <- readRef selfRef
+        doCheckAIStandGround selfRef self
+    doCheckAIStandGround selfRef self
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiStandGround /= 0 = do
+              maybe (void (GameUtil.findTarget selfRef)) (hasEnemy selfRef self) (self^.eEnemy)
+              return True
+        | otherwise = return False
+    hasEnemy selfRef self enemyRef = do
+        enemy <- readRef enemyRef
+        let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
+            idealYaw = Math3D.vectorYaw v
+        modifyRef selfRef (\v -> v & eIdealYaw .~ idealYaw)
+        when ((self^.eEntityState.esAngles._y) /= idealYaw && (self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $ do
+            modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround))))
+            maybe runError (\runF -> void (entThink runF selfRef)) (self^.eMonsterInfo.miRun)
+        M.changeYaw selfRef
+        void (aiCheckAttack selfRef 0)
+    checkFindTarget _ True = return True
+    checkFindTarget selfRef _ = GameUtil.findTarget selfRef
+    checkPauseTime _ True = return True
+    checkPauseTime selfRef _ = do
+        self <- readRef selfRef
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        doCheckPauseTime selfRef self levelTime
+    doCheckPauseTime selfRef self levelTime
+        | levelTime > (self^.eMonsterInfo.miPauseTime) = do
+            maybe walkError (\walkF -> void (entThink walkF selfRef)) (self^.eMonsterInfo.miWalk)
+            return True
+        | otherwise = return False
+    tryToIdle _ True = return ()
+    tryToIdle selfRef _ = do
+      self <- readRef selfRef
+      levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+      doTryToIdle selfRef self levelTime (self^.eMonsterInfo.miIdle)
+    doTryToIdle _ _ _ Nothing = return ()
+    doTryToIdle selfRef self levelTime (Just idleF) =
+        when ((self^.eSpawnFlags) .&. 1 == 0 && levelTime > (self^.eMonsterInfo.miIdleTime)) $ do
+            rf <- Lib.randomF
+            if (self^.eMonsterInfo.miIdleTime) /= 0
+                then do
+                    void (entThink idleF selfRef)
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + 15 + rf * 15)
+                else do
+                    modifyRef selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + rf * 15)
+    runError = Com.fatalError "GameAI.aiStand#hasEnemy self^.eMonsterInfo.miRun is Nothing"
+    walkError = Com.fatalError "GameAI.aiStand#doCheckPauseTime self^.eMonsterInfo.miWalk is Nothing"
 
 aiWalk :: AI
 aiWalk = error "GameAI.aiWalk" -- TODO
+
+aiCheckAttack :: Ref EdictT -> Float -> Quake Bool
+aiCheckAttack = error "GameAI.aiCheckAttack" -- TODO
 
 walkMonsterStart :: EntThink
 walkMonsterStart = EntThink "walkmonster_start" $ \edictRef -> do

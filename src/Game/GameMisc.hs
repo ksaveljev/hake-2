@@ -944,7 +944,61 @@ spPathCorner edictRef = do
 
 pathCornerTouch :: EntTouch
 pathCornerTouch = EntTouch "path_corner_touch" $ \selfRef otherRef _ _ -> do
-    error "GameMisc.pathCornerTouch" -- TODO
+    done <- shouldReturn selfRef otherRef
+    unless done $ do
+        saveTarget selfRef otherRef
+        target <- pickTarget selfRef
+        nextTarget <- maybe (return Nothing) (\t -> pickNextTarget t otherRef) target
+        modifyRef otherRef (\v -> v & eGoalEntity .~ nextTarget
+                                    & eMoveTarget .~ nextTarget)
+        self <- readRef selfRef
+        doPathCornerTouch selfRef self otherRef
+  where
+    shouldReturn selfRef otherRef = do
+      other <- readRef otherRef
+      return ((other^.eMoveTarget) /= (Just selfRef) || isJust (other^.eEnemy))
+    saveTarget selfRef otherRef = do
+      self <- readRef selfRef
+      modifyRef selfRef (\v -> v & eTarget .~ (self^.ePathTarget))
+      GameUtil.useTargets selfRef (Just otherRef)
+      modifyRef selfRef (\v -> v & eTarget .~ (self^.eTarget))
+    pickTarget selfRef = do
+      self <- readRef selfRef
+      maybe (return Nothing) (\_ -> GameBase.pickTarget (self^.eTarget)) (self^.eTarget)
+    pickNextTarget edictRef otherRef = do
+      edict <- readRef edictRef
+      doPickNextTarget edictRef edict otherRef
+    doPickNextTarget edictRef edict otherRef
+        | (edict^.eSpawnFlags) .&. 1 /= 0 = do
+            other <- readRef otherRef
+            let vv = (edict^.eEntityState.esOrigin) & _z +~ ((edict^.eMins._z) - (other^.eMins._z))
+            modifyRef otherRef (\v -> v & eEntityState.esOrigin .~ vv)
+            next <- GameBase.pickTarget (edict^.eTarget)
+            modifyRef otherRef (\v -> v & eEntityState.esEvent .~ Constants.evOtherTeleport)
+            return next
+        | otherwise =
+            return (Just edictRef)
+    doPathCornerTouch selfRef self otherRef
+        | (self^.eWait) /= 0 = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            other <- readRef otherRef
+            modifyRef otherRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + (self^.eWait))
+            doStand otherRef (other^.eMonsterInfo.miStand)
+        | otherwise = do
+            other <- readRef otherRef
+            maybe (noMoveTarget otherRef other) (\_ -> hasMoveTarget otherRef other) (other^.eMoveTarget)
+    noMoveTarget otherRef other = do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        modifyRef otherRef (\v -> v & eMonsterInfo.miPauseTime .~ levelTime + 100000000)
+        doStand otherRef (other^.eMonsterInfo.miStand)
+    hasMoveTarget otherRef other =
+        maybe goalEntityError (proceedHasMoveTarget otherRef other) (other^.eGoalEntity)
+    doStand otherRef Nothing = Com.fatalError "GameMisc.pathCornerTouch#doStand standF is Nothing"
+    doStand otherRef (Just standF) = void (entThink standF otherRef)
+    goalEntityError = Com.fatalError "GameMisc.pathCornerTouch#hasMoveTarget other^.eGoalEntity is Nothing"
+    proceedHasMoveTarget otherRef other goalRef = do
+        goal <- readRef goalRef
+        modifyRef otherRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw ((goal^.eEntityState.esOrigin) - (other^.eEntityState.esOrigin)))
 
 spPointCombat :: Ref EdictT -> Quake ()
 spPointCombat edictRef = do

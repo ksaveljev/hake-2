@@ -1,5 +1,6 @@
 module Game.GameUtil
     ( clearEdict
+    , findTarget
     , freeEdict
     , freeEdictA
     , inFront
@@ -242,3 +243,6 @@ thinkDelay = EntThink "Think_Delay" $ \edictRef -> do
     useTargets edictRef (edict^.eActivator)
     freeEdict edictRef
     return True
+
+findTarget :: Ref EdictT -> Quake Bool
+findTarget = error "GameUtil.findTarget" -- TODO

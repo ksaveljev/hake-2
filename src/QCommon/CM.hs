@@ -36,6 +36,7 @@ import           System.IO                       (Handle)
 import qualified Constants
 import           Game.CModelT
 import           Game.CPlaneT
+import           Game.CVarT
 import           Game.MapSurfaceT
 import           Game.TraceT
 import           QCommon.CAreaT
@@ -45,6 +46,7 @@ import           QCommon.CLeafT
 import           QCommon.CNodeT
 import qualified QCommon.Com                     as Com
 import qualified QCommon.CVar                    as CVar
+import           QCommon.CVarVariables
 import qualified QCommon.FSShared                as FS
 import           QCommon.LumpT
 import           QCommon.TexInfoT
@@ -78,10 +80,26 @@ nullSurface :: MapSurfaceT
 nullSurface = newMapSurfaceT
 
 setAreaPortalState :: Int -> Bool -> Quake ()
-setAreaPortalState = error "CM.setAreaPortalState" -- TODO
+setAreaPortalState portalNum open = do
+    numAreaPortals <- use (cmGlobals.cmNumAreaPortals)
+    when (portalNum > numAreaPortals) $
+        Com.comError Constants.errDrop "areaportal > numareaportals"
+    cmGlobals.cmPortalOpen.ix portalNum .= open
+    floodAreaConnections
 
 areasConnected :: Int -> Int -> Quake Bool
-areasConnected = error "CM.areasConnected" -- TODO
+areasConnected area1 area2 = do
+    noAreas <- fmap (^.cvValue) mapNoAreasCVar
+    checkAreasConnected noAreas
+  where
+    checkAreasConnected noAreas
+        | noAreas /= 0 = return True
+        | otherwise = do
+            numAreas <- use (cmGlobals.cmNumAreas)
+            when (area1 > numAreas || area2 > numAreas) $
+                Com.comError Constants.errDrop "area > numareas"
+            mapAreas <- use (cmGlobals.cmMapAreas)
+            return (((mapAreas V.! area1)^.caFloodNum) == ((mapAreas V.! area2)^.caFloodNum))
 
 loadMap :: B.ByteString -> Bool -> [Int] -> Quake (Ref CModelT, [Int]) -- return model ref (cmGlobals.cmMapCModels) and checksum
 loadMap name clientLoad checksum = do
@@ -187,23 +205,25 @@ floodAreaConnections = do
     cmGlobals.cmFloodValid += 1
     floodValid <- use (cmGlobals.cmFloodValid)
     numAreas <- use (cmGlobals.cmNumAreas)
-    areas <- use (cmGlobals.cmMapAreas)
-    V.ifoldM_ (flood floodValid) 0 (V.take numAreas areas)
-
-flood :: Int -> Int -> Int -> CAreaT -> Quake Int
-flood floodValid floodNum idx area
-    | idx == 0 = return floodNum -- area 0 is not used
-    | (area^.caFloodValid) == floodValid = return floodNum
-    | otherwise = do
-        floodAreaR (Ref idx) floodValid (floodNum + 1)
-        return (floodNum + 1)
+    flood floodValid 1 (numAreas - 1) 0
+  where
+    flood floodValid idx maxIdx floodNum
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            area <- readRef (Ref idx)
+            if (area^.caFloodValid) == floodValid
+                then
+                    flood floodValid (idx + 1) maxIdx floodNum
+                else do
+                    floodAreaR (Ref idx) floodValid (floodNum + 1)
+                    flood floodValid (idx + 1) maxIdx (floodNum + 1)
 
 floodAreaR :: Ref CAreaT -> Int -> Int -> Quake ()
 floodAreaR areaRef floodValid floodNum = recFlood =<< readRef areaRef
   where
     recFlood area
         | (area^.caFloodValid) == floodValid =
-            when ((area^.caFloodNum) == floodNum) $
+            unless ((area^.caFloodNum) == floodNum) $
                 Com.comError Constants.errDrop "FloodArea_r: reflooded"
         | otherwise = do
             modifyRef areaRef (\v -> v & caFloodNum .~ floodNum

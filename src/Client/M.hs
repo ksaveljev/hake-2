@@ -1,5 +1,6 @@
 module Client.M
     ( catagorizePosition
+    , changeYaw
     , checkBottom
     , checkGround
     , dropToFloor
@@ -11,9 +12,10 @@ module Client.M
     ) where
 
 import           Control.Lens      (use, (^.), (+=), (&), (.~), (-~), (+~), (%~))
-import           Control.Monad     (when, unless)
+import           Control.Monad     (when, unless, void)
 import           Data.Bits         (complement, (.&.), (.|.))
 import           Data.Maybe        (isNothing)
+import qualified Data.Vector       as V
 import           Linear            (V3(..), _x, _y, _z)
 
 import qualified Constants
@@ -21,6 +23,9 @@ import           Game.CPlaneT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.LevelLocalsT
+import           Game.MFrameT
+import           Game.MMoveT
+import           Game.MonsterInfoT
 import           Game.TraceT
 import qualified QCommon.Com       as Com
 import           QuakeRef
@@ -28,6 +33,7 @@ import           QuakeState
 import qualified Server.SV         as SV
 import           Types
 import qualified Util.Lib          as Lib
+import qualified Util.Math3D       as Math3D
 
 checkGround :: Ref EdictT -> Quake ()
 checkGround edictRef = do
@@ -226,4 +232,70 @@ worldEffects :: Ref EdictT -> Quake ()
 worldEffects = error "M.worldEffects" -- TODO
 
 moveFrame :: Ref EdictT -> Quake ()
-moveFrame = error "M.moveFrame" -- TODO
+moveFrame selfRef = do
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modifyRef selfRef (\v -> v & eNextThink .~ levelTime + Constants.frameTime)
+    self <- readRef selfRef
+    maybe moveError (doMoveFrame self) (self^.eMonsterInfo.miCurrentMove)
+  where
+    moveError = Com.fatalError "M.moveFrame self^.eMonsterInfo.miCurrentMove is Nothing"
+    doMoveFrame self move = do
+        done <- shouldReturn self move
+        unless done $ do
+            updatedSelf <- readRef selfRef
+            maybe moveError (proceedMoveFrame updatedSelf) (updatedSelf^.eMonsterInfo.miCurrentMove)
+    shouldReturn self move
+        | (self^.eMonsterInfo.miNextFrame) /= 0 && (self^.eMonsterInfo.miNextFrame) >= (move^.mmFirstFrame) && (self^.eMonsterInfo.miNextFrame) <= (move^.mmLastFrame) = do
+            modifyRef selfRef (\v -> v & eEntityState.esFrame .~ (self^.eMonsterInfo.miNextFrame)
+                                       & eMonsterInfo.miNextFrame .~ 0)
+            return False
+        | otherwise = do
+            done <- checkShouldReturn self move (move^.mmEndFunc)
+            proceedShouldReturn done
+    checkShouldReturn _ _ Nothing = return False
+    checkShouldReturn self move (Just endF)
+        | (self^.eEntityState.esFrame) == move^.mmLastFrame = do
+            void (entThink endF selfRef)
+            updatedSelf <- readRef selfRef
+            return ((updatedSelf^.eSvFlags) .&. Constants.svfDeadMonster /= 0)
+        | otherwise = return False
+    proceedShouldReturn done
+        | done = return True
+        | otherwise = do
+            self <- readRef selfRef
+            maybe moveError (updateFrame self) (self^.eMonsterInfo.miCurrentMove)
+            return False
+    updateFrame self move
+        | (self^.eEntityState.esFrame) < (move^.mmFirstFrame) || (self^.eEntityState.esFrame) > (move^.mmLastFrame) =
+            modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiHoldFrame))
+                                       & eEntityState.esFrame .~ (move^.mmFirstFrame))
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0 && (self^.eEntityState.esFrame) + 1 > (move^.mmLastFrame) =
+            modifyRef selfRef (\v -> v & eEntityState.esFrame .~ (move^.mmFirstFrame))
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0 =
+            modifyRef selfRef (\v -> v & eEntityState.esFrame +~ 1)
+        | otherwise = return ()
+    proceedMoveFrame self move = do
+        let index = (self^.eEntityState.esFrame) - (move^.mmFirstFrame)
+            frame = (move^.mmFrame) V.! index
+        maybe (return ()) (aiMove self frame) (frame^.mfAI)
+        maybe (return ()) (\thinkF -> void (entThink thinkF selfRef)) (frame^.mfThink)
+    aiMove self frame aiF
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiHoldFrame == 0 =
+            aiAi aiF selfRef ((frame^.mfDist) * (self^.eMonsterInfo.miScale))
+        | otherwise = aiAi aiF selfRef 0
+
+changeYaw :: Ref EdictT -> Quake ()
+changeYaw edictRef = do
+    edict <- readRef edictRef
+    let current = Math3D.angleMod (edict^.eEntityState.esAngles._y)
+        ideal = edict^.eIdealYaw
+    unless (current == ideal) $ do
+        let move = ideal - current
+            speed = edict^.eYawSpeed
+            move' = if ideal > current
+                        then if move >= 180 then move - 360 else move
+                        else if move <= -180 then move + 360 else move
+            move'' = if move' > 0
+                         then if move' > speed then speed else move'
+                         else if move' < -speed then -speed else move'
+        modifyRef edictRef (\v -> v & eEntityState.esAngles._y .~ Math3D.angleMod (current + move''))

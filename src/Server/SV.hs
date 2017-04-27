@@ -7,7 +7,7 @@ module Server.SV
     , physicsToss
     ) where
 
-import           Control.Lens          (use, (^.), (.=), (&), (.~), (+~), (-~), (%~))
+import           Control.Lens          (use, (^.), (.=), (+=), (-=), (&), (.~), (+~), (-~), (%~))
 import           Control.Monad         (when, void, unless)
 import           Data.Bits             (complement, (.&.), (.|.))
 import           Data.Maybe            (isJust, isNothing)
@@ -19,14 +19,20 @@ import           Game.CPlaneT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
+import           Game.GClientT
 import           Game.LevelLocalsT
+import           Game.LinkT
 import           Game.MonsterInfoT
+import           Game.PlayerStateT
+import           Game.PMoveStateT
+import           Game.PushedT
 import           Game.TraceT
 import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Math3D           as Math3D
 
 import {-# SOURCE #-} qualified Client.M      as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
@@ -315,7 +321,150 @@ proceedRunThink edictRef edict levelTime
     doThink f = void (entThink f edictRef)
 
 push :: Ref EdictT -> V3 Float -> V3 Float -> Quake Bool
-push = error "SV.push" -- TODO
+push pusherRef move amove = do
+    v3o <- use (globals.gVec3Origin)
+    let updatedMove = fmap clampMove move
+        (forward, right, up) = Math3D.angleVectors (v3o - amove) True True True
+    (mins, maxs) <- findPusherBoundingBox updatedMove
+    savePusherPosition
+    movePusherToFinalPosition updatedMove
+    numEdicts <- use (gameBaseGlobals.gbNumEdicts)
+    done <- checkForSolidEntities (shouldSkip maxs mins) updatedMove (figureMovement forward right up) 1 numEdicts
+    doPush done
+  where
+    doPush done
+        | done = return False
+        | otherwise = do
+            pushedP <- use (gameBaseGlobals.gbPushedP)
+            checkTriggerTouch (pushedP - 1) 0
+            return True
+    clampMove v =
+        let temp = v * 8
+            temp' = fromIntegral (truncate (if temp > 0 then temp + 0.5 else temp - 0.5) :: Int) :: Float
+        in temp' * 0.125
+    findPusherBoundingBox updatedMove = do
+      pusher <- readRef pusherRef
+      return ((pusher^.eAbsMin) + updatedMove, (pusher^.eAbsMax) + updatedMove)
+    savePusherPosition = do
+      pushedP <- use (gameBaseGlobals.gbPushedP)
+      pusher <- readRef pusherRef
+      modifyRef (Ref pushedP) (\v -> v & pEnt    .~ Just pusherRef
+                                       & pOrigin .~ (pusher^.eEntityState.esOrigin)
+                                       & pAngles .~ (pusher^.eEntityState.esAngles))
+      maybe (return ()) (proceedSavePusherPosition pushedP) (pusher^.eClient)
+      gameBaseGlobals.gbPushedP += 1
+    proceedSavePusherPosition pushedP clientRef = do
+        deltaAngles <- fmap (^.gcPlayerState.psPMoveState.pmsDeltaAngles) (readRef clientRef)
+        modifyRef (Ref pushedP) (\v -> v & pDeltaYaw .~ fromIntegral (deltaAngles^._y))
+    movePusherToFinalPosition updatedMove = do
+      modifyRef pusherRef (\v -> v & eEntityState.esOrigin %~ (+ updatedMove)
+                                   & eEntityState.esAngles %~ (+ amove))
+      linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+      linkEntity pusherRef
+    checkForSolidEntities shouldSkip' updatedMove figureMovement' idx maxIdx -- IMPROVE: old code, should be refactored
+        | idx >= maxIdx = return False
+        | otherwise = do
+            skip <- shouldSkip' (Ref idx)
+            if not skip
+                then do
+                    pusherMoveType <- fmap (^.eMoveType) (readRef pusherRef)
+                    edictGroundEntity <- fmap (^.eGroundEntity) (readRef (Ref idx))
+                    nextEntity <- if pusherMoveType == Constants.moveTypePush || edictGroundEntity == Just pusherRef
+                                    then do
+                                      moveEntity (Ref idx)
+                                      tryMovingContactedEntity updatedMove (Ref idx)
+                                      figureMovement' (Ref idx)
+                                      nullifyGroundEntity (Ref idx)
+                                      block <- testEntityPosition (Ref idx)
+                                      if not block
+                                          then do
+                                              linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+                                              linkEntity (Ref idx)
+                                              return True
+                                          else do
+                                              modifyRef (Ref idx) (\v -> v & eEntityState.esOrigin -~ updatedMove)
+                                              block' <- testEntityPosition (Ref idx)
+                                              if not block'
+                                                  then do
+                                                      gameBaseGlobals.gbPushedP -= 1
+                                                      return True
+                                                  else return False
+                                    else return False
+                    if nextEntity
+                        then 
+                            checkForSolidEntities shouldSkip' updatedMove figureMovement' (idx + 1) maxIdx
+                        else do
+                            gameBaseGlobals.gbObstacle .= Just (Ref idx)
+                            pushedP <- use (gameBaseGlobals.gbPushedP)
+                            moveBackEntity (pushedP - 1) 0
+                            return True
+                else 
+                  checkForSolidEntities shouldSkip' updatedMove figureMovement' (idx + 1) maxIdx
+    moveBackEntity idx minIdx
+        | idx >= minIdx = do
+            p <- readRef (Ref idx)
+            maybe edictError (doMoveBackEntity p) (p^.pEnt)
+        | otherwise = return ()
+    edictError = Com.fatalError "SV.push#moveBackEntity p^.pEnt is Nothing"
+    doMoveBackEntity p edictRef = do
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ (p^.pOrigin)
+                                    & eEntityState.esAngles .~ (p^.pAngles))
+        clientRef <- fmap (^.eClient) (readRef edictRef)
+        maybe (return ()) (updateClientDeltaAngles p) clientRef
+        linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+        linkEntity edictRef
+    updateClientDeltaAngles p clientRef =
+        modifyRef clientRef (\v -> v & gcPlayerState.psPMoveState.pmsDeltaAngles._y .~ truncate (p^.pDeltaYaw))
+    nullifyGroundEntity edictRef = do
+        edict <- readRef edictRef
+        when ((edict^.eGroundEntity) /= Just pusherRef) $
+            modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing)
+    figureMovement forward right up edictRef = do
+        edictOrigin <- fmap (^.eEntityState.esOrigin) (readRef edictRef)
+        pusherOrigin <- fmap (^.eEntityState.esOrigin) (readRef pusherRef)
+        let org = edictOrigin - pusherOrigin
+            org2 = V3 (dot org forward) (dot org right) (dot org up)
+            move2 = org2 - org
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin +~ move2)
+    tryMovingContactedEntity updatedMove edictRef = do
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin +~ updatedMove)
+        clientRef <- fmap (^.eClient) (readRef edictRef)
+        maybe (return ()) updateClientDeltaAngles2 clientRef
+    updateClientDeltaAngles2 clientRef =
+        modifyRef clientRef (\v -> v & gcPlayerState.psPMoveState.pmsDeltaAngles._y +~ (truncate (amove^._y)))
+    moveEntity edictRef = do
+        pushedP <- use (gameBaseGlobals.gbPushedP)
+        entityState <- fmap (^.eEntityState) (readRef edictRef)
+        modifyRef (Ref pushedP) (\v -> v & pEnt    .~ Just edictRef
+                                         & pOrigin .~ (entityState^.esOrigin)
+                                         & pAngles .~ (entityState^.esAngles))
+        gameBaseGlobals.gbPushedP += 1
+    shouldSkip maxs mins edictRef = do
+      edict <- readRef edictRef
+      linked <- isLinkedAnywhere (edict^.eArea)
+      checkShouldSkip maxs mins edictRef edict linked
+    checkShouldSkip maxs mins edictRef edict linked
+        | not (edict^.eInUse) = return True
+        | any (== (edict^.eMoveType)) [Constants.moveTypePush, Constants.moveTypeStop, Constants.moveTypeNone, Constants.moveTypeNoClip] = return True
+        | not linked = return True
+        | (edict^.eGroundEntity) /= Just edictRef = do
+            -- see if the ent needs to be tested
+            let absmin = edict^.eAbsMin
+                absmax = edict^.eAbsMax
+            if absmin^._x >= maxs^._x || absmin^._y >= maxs^._y || absmin^._z >= maxs^._z ||
+               absmax^._x <= mins^._x || absmax^._y <= mins^._y || absmax^._z <= mins^._z
+                then return True
+                else fmap not (testEntityPosition edictRef)
+        | otherwise = return False
+    isLinkedAnywhere linkRef = do
+      link <- readRef linkRef
+      return (isJust (link^.lPrev))
+    checkTriggerTouch idx minIdx
+        | idx >= minIdx = do
+            edictRef <- fmap (^.pEnt) (readRef (Ref idx))
+            maybe edictError2 GameBase.touchTriggers edictRef
+        | otherwise = return ()
+    edictError2 = Com.fatalError "SV.push#checkTriggerTouch edictRef is Nothing"
 
 moveStep :: Ref EdictT -> V3 Float -> Bool -> Quake Bool
 moveStep edictRef move relink = do
@@ -669,3 +818,16 @@ pushEntity edictRef pushV3 = do
     mask clipMask
         | clipMask /= 0 = clipMask
         | otherwise = Constants.maskSolid
+
+testEntityPosition :: Ref EdictT -> Quake Bool
+testEntityPosition edictRef = do
+    edict <- readRef edictRef
+    let mask = if (edict^.eClipMask) /= 0 then edict^.eClipMask else Constants.maskSolid
+    trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+    traceT <- trace (edict^.eEntityState.esOrigin)
+                    (Just (edict^.eMins))
+                    (Just (edict^.eMaxs))
+                    (edict^.eEntityState.esOrigin)
+                    (Just edictRef)
+                    mask
+    return (traceT^.tStartSolid)

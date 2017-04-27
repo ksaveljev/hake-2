@@ -48,6 +48,15 @@ instance QuakeRef GItemT where
     writeRef (Ref idx) item =
         gameBaseGlobals.gbItemList.ix idx .= item
 
+instance QuakeRef PushedT where
+    readRef (Ref idx) = do
+        pushed <- use (gameBaseGlobals.gbPushed)
+        return (pushed V.! idx)
+    modifyRef (Ref idx) f =
+        gameBaseGlobals.gbPushed.ix idx %= f
+    writeRef (Ref idx) item =
+        gameBaseGlobals.gbPushed.ix idx .= item
+
 instance QuakeRef ClientT where
     readRef (Ref idx) = do
         clients <- use (svGlobals.svServerStatic.ssClients)
