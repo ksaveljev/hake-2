@@ -1,10 +1,13 @@
 module Server.SV
-    ( moveStep
+    ( closeEnough
+    , moveStep
+    , newChaseDir
     , physicsNoClip
     , physicsNone
     , physicsPusher
     , physicsStep
     , physicsToss
+    , stepDirection
     ) where
 
 import           Control.Lens          (use, (^.), (.=), (+=), (-=), (&), (.~), (+~), (-~), (%~))
@@ -32,10 +35,14 @@ import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
 import {-# SOURCE #-} qualified Client.M      as M
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
+
+diNoDir :: Float
+diNoDir = -1
 
 physicsPusher :: Ref EdictT -> Quake ()
 physicsPusher edictRef = do
@@ -831,3 +838,134 @@ testEntityPosition edictRef = do
                     (Just edictRef)
                     mask
     return (traceT^.tStartSolid)
+
+closeEnough :: Ref EdictT -> Ref EdictT -> Float -> Quake Bool
+closeEnough edictRef goalRef dist = do
+    edict <- readRef edictRef
+    goal <- readRef goalRef
+    checkIfCloseEnough edict goal
+  where
+    checkIfCloseEnough edict goal
+        | (goal^.eAbsMin._x) > (edict^.eAbsMax._x) + dist = return False
+        | (goal^.eAbsMin._y) > (edict^.eAbsMax._y) + dist = return False
+        | (goal^.eAbsMin._z) > (edict^.eAbsMax._z) + dist = return False
+        | (goal^.eAbsMax._x) < (edict^.eAbsMin._x) - dist = return False
+        | (goal^.eAbsMax._y) < (edict^.eAbsMin._y) - dist = return False
+        | (goal^.eAbsMax._z) < (edict^.eAbsMin._z) - dist = return False
+        | otherwise                                       = return True
+
+stepDirection :: Ref EdictT -> Float -> Float -> Quake Bool
+stepDirection edictRef yaw dist = do
+    modifyRef edictRef (\v -> v & eIdealYaw .~ yaw)
+    M.changeYaw edictRef
+    let yaw' = yaw * pi  * 2 / 360
+        move = V3 ((cos yaw') * dist) ((sin yaw') * dist) 0
+    oldOrigin <- fmap (^.eEntityState.esOrigin) (readRef edictRef)
+    moveDone <- moveStep edictRef move False
+    doStepDirection oldOrigin moveDone
+  where
+    doStepDirection oldOrigin moveDone
+        | moveDone = do
+            edict <- readRef edictRef
+            let delta = (edict^.eEntityState.esAngles._y) - (edict^.eIdealYaw)
+            when (delta > 45 && delta < 315) $ -- not turned far enough, so don't take the step
+                modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ oldOrigin)
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+            GameBase.touchTriggers edictRef
+            return True
+        | otherwise = do
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity edictRef
+            GameBase.touchTriggers edictRef
+            return False
+
+newChaseDir :: Ref EdictT -> Maybe (Ref EdictT) -> Float -> Quake ()
+newChaseDir actorRef maybeEnemyRef dist =
+    maybe (Com.dprintf "SV_NewChaseDir without enemy!\n") getNewChaseDir maybeEnemyRef
+  where
+    getNewChaseDir enemyRef = do
+        actor <- readRef actorRef
+        enemy <- readRef enemyRef
+        let tmp = truncate ((actor^.eIdealYaw) / 45) :: Int
+            oldDir = Math3D.angleMod (fromIntegral (tmp * 45))
+            turnAround = Math3D.angleMod (oldDir - 180)
+            deltaX = (enemy^.eEntityState.esOrigin._x) - (actor^.eEntityState.esOrigin._x)
+            deltaY = (enemy^.eEntityState.esOrigin._y) - (actor^.eEntityState.esOrigin._y)
+            a | deltaX > 10 = 0
+              | deltaX < -10 = 180
+              | otherwise = diNoDir
+            b | deltaY < -10 = 270
+              | deltaY > 10 = 90
+              | otherwise = diNoDir
+            d = V3 0 a b
+        maybeTDir <- tryDirectRoute turnAround d
+        maybe (return ()) (\_ -> tryOtherDirections actorRef dist oldDir turnAround deltaX deltaY d) maybeTDir
+    tryDirectRoute turnAround d
+      | (d^._y) /= diNoDir && (d^._z) /= diNoDir = do
+          let tdir = if (d^._y) == 0
+                         then if (d^._z) == 90 then 45 else 315
+                         else if (d^._z) == 90 then 135 else 215
+          if tdir /= turnAround
+              then do
+                  v <- stepDirection actorRef tdir dist
+                  return (if v then Just tdir else Nothing)
+              else
+                  return Nothing
+      | otherwise = return Nothing
+
+tryOtherDirections :: Ref EdictT -> Float -> Float -> Float -> Float -> Float -> V3 Float -> Quake ()
+tryOtherDirections actorRef dist oldDir turnAround deltaX deltaY d = do
+    r <- Lib.rand
+    let d' = if (r .&. 3) .&. 1 /= 0 || abs deltaY > abs deltaX
+                 then V3 (d^._x) (d^._z) (d^._y)
+                 else d
+    if (d'^._y) /= diNoDir && (d'^._y) /= turnAround
+        then do
+            ok <- stepDirection actorRef (d'^._y) dist
+            unless ok (tryD2Direction d')
+        else do
+            tryD2Direction d'
+  where 
+    tryD2Direction d'
+        | (d'^._z) /= diNoDir && (d'^._z) /= turnAround = do
+            ok <- stepDirection actorRef (d'^._z) dist
+            unless ok tryOldDirDirection
+        | otherwise = tryOldDirDirection
+    tryOldDirDirection
+        | oldDir /= diNoDir = do
+            ok <- stepDirection actorRef oldDir dist
+            unless ok (determineSearchDirection =<< Lib.rand)
+        | otherwise = determineSearchDirection =<< Lib.rand
+    determineSearchDirection r
+        | r .&. 1 /= 0 = do
+            ok <- tryFromBeginning 0 315
+            unless ok tryTurnAroundDirection
+        | otherwise = do
+            ok <- tryFromEnd 315 0
+            unless ok tryTurnAroundDirection
+    tryFromBeginning tdir maxTDir
+        | tdir > maxTDir = return False
+        | tdir /= turnAround = do
+            ok <- stepDirection actorRef tdir dist
+            if ok then return True else tryFromBeginning (tdir + 45) maxTDir
+        | otherwise = tryFromBeginning (tdir + 45) maxTDir
+    tryFromEnd tdir minTDir
+        | tdir < 0 = return False
+        | tdir /= turnAround = do
+            ok <- stepDirection actorRef tdir dist
+            if ok then return True else tryFromEnd (tdir - 45) minTDir
+        | otherwise = tryFromEnd (tdir - 45) minTDir
+    tryTurnAroundDirection
+        | turnAround /= diNoDir = do
+            ok <- stepDirection actorRef turnAround dist
+            unless ok $ cannotMove
+        | otherwise = cannotMove
+    cannotMove = do
+        modifyRef actorRef (\v -> v & eIdealYaw .~ oldDir) -- can't move
+        ok <- M.checkBottom actorRef
+        unless ok $ fixCheckBottom actorRef
+
+fixCheckBottom :: Ref EdictT -> Quake ()
+fixCheckBottom edictRef =
+    modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flPartialGround))

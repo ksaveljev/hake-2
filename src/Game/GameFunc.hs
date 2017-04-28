@@ -651,7 +651,57 @@ trainResume selfRef = do
         modifyRef selfRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
 
 trainNext :: EntThink
-trainNext = error "GameFunc.trainNext" -- TODO
+trainNext = EntThink "train_next" $ \edictRef -> do
+    entRef <- pickNextTarget edictRef True
+    maybe (return ()) (doTrainNext edictRef) entRef
+    return True
+  where
+    doTrainNext edictRef entRef = do
+        edict <- readRef edictRef
+        ent <- readRef entRef
+        modifyRef edictRef (\v -> v & eMoveInfo.miWait .~ (ent^.eMoveInfo.miWait)
+                                    & eTargetEnt .~ (Just entRef))
+        when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+            when ((edict^.eMoveInfo.miSoundStart) /= 0) $ do
+                sound <- use (gameBaseGlobals.gbGameImport.giSound)
+                sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundStart) 1 Constants.attnStatic 0
+            modifyRef edictRef (\v -> v & eEntityState.esSound .~ (edict^.eMoveInfo.miSoundMiddle))
+        let dest = (ent^.eEntityState.esOrigin) - (edict^.eMins)
+        modifyRef edictRef (\v -> v & eMoveInfo.miState .~ Constants.stateTop
+                                    & eMoveInfo.miStartOrigin .~ (edict^.eEntityState.esOrigin)
+                                    & eMoveInfo.miEndOrigin .~ dest)
+        moveCalc edictRef dest trainWait
+        modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. trainStartOn))
+    pickNextTarget selfRef first = do
+        self <- readRef selfRef
+        doPickNextTarget selfRef self first (self^.eTarget)
+    doPickNextTarget _ _ _ Nothing = return Nothing
+    doPickNextTarget selfRef self first (Just target) = do
+        entRef <- GameBase.pickTarget (self^.eTarget)
+        proceedPickNextTarget selfRef self first target entRef
+    proceedPickNextTarget selfRef self first target Nothing = do
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat ["train_next: bad target ", target, "\n"])
+        return Nothing
+    proceedPickNextTarget selfRef self first _ (Just entRef) = do -- IMPROVE: needs refactoring
+        ent <- readRef entRef
+        modifyRef selfRef (\v -> v & eTarget .~ (ent^.eTarget))
+        if (ent^.eSpawnFlags) .&. 1 /= 0
+          then
+            if not first
+              then do
+                dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+                dprintf $ "connected teleport path_corner, see " `B.append` (ent^.eClassName) `B.append` " at " `B.append` (Lib.vtos (ent^.eEntityState.esOrigin)) `B.append` "\n"
+                return Nothing
+              else do
+                let origin = ((ent^.eEntityState.esOrigin) - (self^.eMins))
+                modifyRef selfRef (\v -> v & eEntityState.esOrigin .~ origin
+                                           & eEntityState.esOldOrigin .~ origin
+                                           & eEntityState.esEvent .~ Constants.evOtherTeleport)
+                linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+                linkEntity selfRef
+                pickNextTarget selfRef False
+          else return (Just entRef)
 
 trainWait :: EntThink
 trainWait = error "GameFunc.trainWait" -- TODO
@@ -1142,9 +1192,9 @@ thinkAccelMove = EntThink "think_accelmove" $ \edictRef -> do
 platAccelerate :: Ref EdictT -> Quake ()
 platAccelerate edictRef = do
     edict <- readRef edictRef
-    doPlatAccelerate edictRef (edict^.eMoveInfo)
+    doPlatAccelerate (edict^.eMoveInfo)
   where
-    doPlatAccelerate edictRef moveInfo
+    doPlatAccelerate moveInfo
           -- are we decelerating?
         | (moveInfo^.miRemainingDistance) <= (moveInfo^.miDecelDistance) =
             when ((moveInfo^.miRemainingDistance) < (moveInfo^.miDecelDistance)) $

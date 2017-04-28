@@ -6,6 +6,7 @@ module Client.M
     , dropToFloor
     , flyCheck
     , moveFrame
+    , moveToGoal
     , setEffects
     , walkMove
     , worldEffects
@@ -22,6 +23,7 @@ import qualified Constants
 import           Game.CPlaneT
 import           Game.EdictT
 import           Game.EntityStateT
+import qualified Game.GameCombat   as GameCombat
 import           Game.LevelLocalsT
 import           Game.MFrameT
 import           Game.MMoveT
@@ -226,10 +228,110 @@ checkBottom edictRef = do
         return True
 
 setEffects :: Ref EdictT -> Quake ()
-setEffects = error "M.setEffects" -- TODO
+setEffects edictRef = do
+    modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.&. (complement (Constants.efColorShell .|. Constants.efPowerScreen)))
+                                & eEntityState.esRenderFx %~ (.&. (complement (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue))))
+    edict <- readRef edictRef
+    when ((edict^.eMonsterInfo.miAIFlags) .&. Constants.aiResurrecting /= 0) $ do
+        modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                    & eEntityState.esRenderFx %~ (.|. Constants.rfShellRed))
+    unless ((edict^.eHealth) <= 0) $ do
+        levelTime <- use $ gameBaseGlobals.gbLevel.llTime
+        when ((edict^.ePowerArmorTime) > levelTime) $
+            doSetEffects edict
+  where
+    doSetEffects edict
+        | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorScreen =
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
+        | (edict^.eMonsterInfo.miPowerArmorType) == Constants.powerArmorShield =
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                        & eEntityState.esRenderFx %~ (.|. Constants.rfShellGreen))
+        | otherwise = return ()
 
 worldEffects :: Ref EdictT -> Quake ()
-worldEffects = error "M.worldEffects" -- TODO
+worldEffects edictRef = do
+    checkWaterDamage
+    edict <- readRef edictRef
+    doWorldEffects edict
+  where
+    doWorldEffects edict
+        | edict^.eWaterLevel == 0 = do
+            when ((edict^.eFlags) .&. Constants.flInWater /= 0) $ do
+                gameImport <- use $ gameBaseGlobals.gbGameImport
+                soundIdx <- (gameImport^.giSoundIndex) (Just "player/watr_out.wav")
+                (gameImport^.giSound) (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
+                modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flInWater)))
+        | otherwise = do
+            checkLava
+            checkSlime
+            checkInWater
+    checkWaterDamage = do
+        edict <- readRef edictRef
+        when ((edict^.eHealth) > 0) $ do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            if (edict^.eFlags) .&. Constants.flSwim == 0
+                then checkNoSwimDamage edict levelTime
+                else checkSwimDamage edict levelTime
+    checkNoSwimDamage edict levelTime
+        | (edict^.eWaterLevel) < 3 =
+            modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 12)
+        | (edict^.eAirFinished) < levelTime =
+            when ((edict^.ePainDebounceTime) < levelTime) $ do
+                let dmg = 2 + 2 * floor (levelTime - (edict^.eAirFinished)) :: Int
+                    dmg' = min 15 dmg
+                v3o <- use (globals.gVec3Origin)
+                GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+                modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+        | otherwise = return ()
+    checkSwimDamage edict levelTime
+        | (edict^.eWaterLevel) > 0 =
+            modifyRef edictRef (\v -> v & eAirFinished .~ levelTime + 9)
+        | (edict^.eAirFinished) < levelTime =
+            -- suffocate!
+            when ((edict^.ePainDebounceTime) < levelTime) $ do
+                let dmg = 2 + 2 * floor (levelTime - (edict^.eAirFinished)) :: Int
+                    dmg' = min 15 dmg
+                v3o <- use (globals.gVec3Origin)
+                GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o dmg' 0 Constants.damageNoArmor Constants.modWater
+                modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+        | otherwise = return ()
+    checkLava = do
+        edict <- readRef edictRef
+        when ((edict^.eWaterType) .&. Constants.contentsLava /= 0 && (edict^.eFlags) .&. Constants.flImmuneLava == 0) $ do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            when ((edict^.eDamageDebounceTime) < levelTime) $ do
+                v3o <- use (globals.gVec3Origin)
+                GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (10 * (edict^.eWaterLevel)) 0 0 Constants.modLava
+    checkSlime = do
+        edict <- readRef edictRef
+        when ((edict^.eWaterType) .&. Constants.contentsSlime /= 0 && (edict^.eFlags) .&. Constants.flImmuneSlime == 0) $ do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            when ((edict^.eDamageDebounceTime) < levelTime) $ do
+                v3o <- use (globals.gVec3Origin)
+                GameCombat.damage edictRef worldRef worldRef v3o (edict^.eEntityState.esOrigin) v3o (4 * (edict^.eWaterLevel)) 0 0 Constants.modSlime
+    checkInWater = do
+        edict <- readRef edictRef
+        when ((edict^.eFlags) .&. Constants.flInWater == 0) $ do
+            when ((edict^.eSvFlags) .&. Constants.svfDeadMonster == 0) $ do
+                soundFile <- pickSoundFile edict
+                maybe (return ()) playInWaterSound soundFile
+            modifyRef edictRef (\v -> v & eFlags %~ (.|. Constants.flInWater)
+                                        & eDamageDebounceTime .~ 0)
+    pickSoundFile edict
+        | (edict^.eWaterType) .&. Constants.contentsLava /= 0 = do
+            r <- Lib.randomF
+            if r <= 0.5
+                then return (Just "player/lava1.wav")
+                else return (Just "player/lava2.wav")
+        | (edict^.eWaterType) .&. Constants.contentsSlime /= 0 =
+            return (Just "player/watr_in.wav")
+        | (edict^.eWaterType) .&. Constants.contentsWater /= 0 =
+            return (Just "player/watr_in.wav")
+        | otherwise = return Nothing
+    playInWaterSound soundFile = do
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        soundIdx <- (gameImport^.giSoundIndex) (Just soundFile)
+        (gameImport^.giSound) (Just edictRef) Constants.chanBody soundIdx 1 Constants.attnNorm 0
 
 moveFrame :: Ref EdictT -> Quake ()
 moveFrame selfRef = do
@@ -299,3 +401,25 @@ changeYaw edictRef = do
                          then if move' > speed then speed else move'
                          else if move' < -speed then -speed else move'
         modifyRef edictRef (\v -> v & eEntityState.esAngles._y .~ Math3D.angleMod (current + move''))
+
+moveToGoal :: Ref EdictT -> Float -> Quake ()
+moveToGoal edictRef dist = do
+    edict <- readRef edictRef
+    let skip = isNothing (edict^.eGroundEntity) && ((edict^.eFlags) .&. (Constants.flFly .|. Constants.flSwim) == 0)
+    -- if the next step hits the enemy, return immediately
+    skip' <- maybe (return False) (\enemyRef -> SV.closeEnough edictRef enemyRef dist) (edict^.eEnemy)
+    unless (skip || skip') $ do
+        updatedEdict <- readRef edictRef
+        r <- Lib.rand
+        setChaseDirOrDirection updatedEdict r
+  where
+    setChaseDirOrDirection edict r
+        | r .&. 3 == 1 =
+            when (edict^.eInUse) $
+                SV.newChaseDir edictRef (edict^.eGoalEntity) dist
+        | otherwise = do
+            v <- SV.stepDirection edictRef (edict^.eIdealYaw) dist
+            unless v $ do
+                updatedEdict <- readRef edictRef
+                when (updatedEdict^.eInUse) $
+                    SV.newChaseDir edictRef (updatedEdict^.eGoalEntity) dist

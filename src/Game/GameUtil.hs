@@ -15,14 +15,15 @@ module Game.GameUtil
     , visible
     ) where
 
-import           Control.Lens          (use, (^.), (+=), (&), (.~), (+~))
-import           Control.Monad         (when, unless)
-import           Data.Bits             ((.&.))
+import           Control.Lens          (use, (^.), (+=), (&), (.~), (+~), (%~))
+import           Control.Monad         (when, unless, void)
+import           Data.Bits             (complement, (.&.), (.|.))
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (toLower)
 import           Data.Maybe            (isNothing, isJust, fromJust)
 import           Linear                (dot, normalize, norm, _z)
 
+import qualified Client.M              as M
 import qualified Constants
 import           Game.CVarT
 import           Game.EdictT
@@ -245,4 +246,128 @@ thinkDelay = EntThink "Think_Delay" $ \edictRef -> do
     return True
 
 findTarget :: Ref EdictT -> Quake Bool
-findTarget = error "GameUtil.findTarget" -- TODO
+findTarget selfRef = do
+    self <- readRef selfRef
+    doFindTarget self
+  where
+    doFindTarget self
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiGoodGuy /= 0 = return False
+        | otherwise = checkCombatPoint self
+    checkCombatPoint self
+        | (self^.eMonsterInfo.miAIFlags) .&. Constants.aiCombatPoint /= 0 = return False
+        | otherwise = checkHearNoise self =<< use (gameBaseGlobals.gbLevel)
+    checkHearNoise self level
+        | (level^.llSightEntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 == 0 =
+            maybe sightEntityError (doCheckHearNoise self) (level^.llSightEntity)
+        | (level^.llSoundEntityFrameNum) >= ((level^.llFrameNum) - 1) =
+            maybe soundEntityError (\se -> checkClientInUse se True) (level^.llSoundEntity)
+        | isJust (self^.eEnemy) && (level^.llSound2EntityFrameNum) >= ((level^.llFrameNum) - 1) && (self^.eSpawnFlags) .&. 1 /= 0 =
+            maybe sound2EntityError (\s2e -> checkClientInUse s2e True) (level^.llSound2Entity)
+        | otherwise = maybe (return False) (\clientRef -> checkClientInUse clientRef False) (level^.llSightClient)
+    sightEntityError = do
+        Com.fatalError "GameUtil.findTarget#checkHearNoise level^.llSightEntity is Nothing"
+        return False
+    soundEntityError = do
+        Com.fatalError "GameUtil.findTarget#checkHearNoise level^.llSoundEntity is Nothing"
+        return False
+    sound2EntityError = do
+        Com.fatalError "GameUtil.findTarget#checkHearNoise level^.llSound2Entity is Nothing"
+        return False
+    doCheckHearNoise self clientRef = do
+        client <- readRef clientRef
+        if (client^.eEnemy) == (self^.eEnemy)
+            then return False
+            else checkClientInUse clientRef False
+    checkClientInUse clientRef heardIt = do
+        client <- readRef clientRef
+        if not (client^.eInUse)
+            then return False
+            else checkClientFlags clientRef client heardIt
+    checkClientFlags clientRef client heardIt
+        | isJust (client^.eClient) && (client^.eFlags) .&. Constants.flNoTarget /= 0 = return False
+        | isJust (client^.eClient) = actBasedOnHeardIt clientRef heardIt
+        | (client^.eSvFlags) .&. Constants.svfMonster /= 0 = maybe (return False) (doCheckClientFlags clientRef heardIt) (client^.eEnemy)
+        | heardIt = maybe ownerError (doCheckClientFlags clientRef heardIt) (client^.eOwner)
+        | otherwise = return False
+    ownerError = do
+        Com.fatalError "GameUtil.findTarget#checkClientFlags client^.eOwner is Nothing"
+        return False
+    doCheckClientFlags clientRef heardIt entRef = do
+        ent <- readRef entRef
+        if (ent^.eFlags) .&. Constants.flNoTarget /= 0
+            then return False
+            else actBasedOnHeardIt clientRef heardIt
+    actBasedOnHeardIt clientRef heardIt = do
+        self <- readRef selfRef
+        client <- readRef clientRef
+        vis <- visible selfRef clientRef
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        if not heardIt
+            then didntHear clientRef client self (range self client) vis levelTime
+            else didHear clientRef client self vis
+    didntHear clientRef client self r vis levelTime
+        | r == Constants.rangeFar || (client^.eLightLevel) <= 5 || not vis = return False
+        | r == Constants.rangeNear && fromIntegral (client^.eShowHostile) < levelTime && not (inFront self client) = return False
+        | r == Constants.rangeMid && not (inFront self client) = return False
+        | Just clientRef == (self^.eEnemy) = return True -- JDC false
+        | otherwise = do
+            modifyRef selfRef (\v -> v & eEnemy .~ Just clientRef)
+            if (client^.eClassName) /= "player_noise"
+                then do
+                  modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement Constants.aiSoundTarget)))
+                  maybe (proceedDidntHear client) (\_ -> finishFindTarget) (client^.eClient)
+                else
+                  finishFindTarget
+    proceedDidntHear client = do
+        modifyRef selfRef (\v -> v & eEnemy .~ (client^.eEnemy))
+        maybe enemyError finishDidntHear (client^.eEnemy)
+    enemyError = do
+        Com.fatalError "GameUtil.findTarget#proceedDidntHear client^.eEnemy is Nothing"
+        return False
+    finishDidntHear enemyRef = do
+        enemy <- readRef enemyRef
+        maybe unsetEnemy (\_ -> finishFindTarget) (enemy^.eClient)
+    unsetEnemy = do
+        modifyRef selfRef (\v -> v & eEnemy .~ Nothing)
+        return False
+    didHear clientRef client self vis
+        | (self^.eSpawnFlags) .&. 1 /= 0 && not vis = return False
+        | otherwise = do
+            inPHS <- use (gameBaseGlobals.gbGameImport.giInPHS)
+            v <- inPHS (self^.eEntityState.esOrigin) (client^.eEntityState.esOrigin)
+            proceedDidHear clientRef client self v ((client^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
+    proceedDidHear clientRef client self v temp
+        | not v = return False
+        | norm temp > 1000 = return False
+        | otherwise = do
+            done <- checkAreasConnected self client
+            finishDidHear clientRef self done temp
+    finishDidHear clientRef self done temp
+        | done = return False
+        | otherwise = do
+            modifyRef selfRef (\vv -> vv & eIdealYaw .~ Math3D.vectorYaw temp)
+            M.changeYaw selfRef
+            modifyRef selfRef (\vv -> vv & eMonsterInfo.miAIFlags %~ (.|. Constants.aiSoundTarget))
+            if Just clientRef == (self^.eEnemy)
+              then
+                return True
+              else do
+                modifyRef selfRef (\vv -> vv & eEnemy .~ Just clientRef)
+                finishFindTarget
+    checkAreasConnected self client
+        | (client^.eAreaNum) /= (self^.eAreaNum) = do
+            areasConnected <- use (gameBaseGlobals.gbGameImport.giAreasConnected)
+            connected <- areasConnected (self^.eAreaNum) (client^.eAreaNum)
+            return (not connected)
+        | otherwise =
+            return False
+    finishFindTarget = do
+      foundTarget selfRef
+      self <- readRef selfRef
+      when ((self^.eMonsterInfo.miAIFlags) .&. Constants.aiSoundTarget == 0 && isJust (self^.eMonsterInfo.miSight)) $
+          targetInteraction (self^.eMonsterInfo.miSight) (self^.eEnemy)
+      return True
+    targetInteraction Nothing _ = Com.fatalError "GameUtil.findTarget#finishFindTarget self^.eMonsterInfo.miSight is Nothing"
+    targetInteraction _ Nothing = Com.fatalError "GameUtil.findTarget#finishFindTarget self^.eEnemy is Nothing"
+    targetInteraction (Just sightF) (Just enemyRef) = -- IMPROVE: are we sure eEnemy is Just ?
+          void (entInteract sightF selfRef enemyRef)

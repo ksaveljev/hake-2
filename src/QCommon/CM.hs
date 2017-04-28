@@ -255,10 +255,48 @@ leafCluster leafNum = do
     fmap (^.clCluster) (readRef (Ref leafNum))
 
 clusterPHS :: Int -> Quake B.ByteString
-clusterPHS = error "CM.clusterPHS" -- TODO
+clusterPHS cluster
+    | cluster == -1 = do
+        numClusters <- use (cmGlobals.cmNumClusters)
+        let num = (numClusters + 7) `shiftR` 3
+            empty = B.replicate num 0
+        return (empty `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - num) 0)
+    | otherwise = do
+        bitOfs <- use (cmGlobals.cmMapVis.dvBitOfs)
+        let access = if Constants.dvisPhs == 0 then _1 else _2
+            offset = (bitOfs V.! cluster)^.access
+        mapVisibility <- use (cmGlobals.cmMapVisibility)
+        res <- decompressVis mapVisibility offset
+        return (res `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - (B.length res)) 0)
 
 clusterPVS :: Int -> Quake B.ByteString
 clusterPVS = error "CM.clusterPVS" -- TODO
+
+decompressVis :: B.ByteString -> Int -> Quake B.ByteString
+decompressVis mapVisibility offset = do
+    numClusters <- use (cmGlobals.cmNumClusters)
+    numVisibility <- use (cmGlobals.cmNumVisibility)
+    let row = (numClusters + 7) `shiftR` 3
+    -- no vis info, so make all visible
+    if mapVisibility == "" || numVisibility == 0
+        then return (B.replicate row 0xFF)
+        else decompress row (fromIntegral offset) 0 ""
+  where 
+    -- IMPROVE: performance? is it needed? are we decompressing often?
+    decompress row inp outp acc -- IMPROVE: old implementation, needs refactoring
+        | outp >= row = return acc
+        | otherwise = do
+            let b = B.index mapVisibility inp
+            if b /= 0
+              then decompress row (inp + 1) (outp + 1) (acc `B.snoc` b)
+              else do
+                let c = fromIntegral $ B.index mapVisibility (inp + 1)
+                c' <- if outp + c > row
+                        then do
+                          Com.dprintf "warning: Vis decompression overrun\n"
+                          return $ row - outp
+                        else return c
+                decompress row (inp + 2) (outp + c') (acc `B.append` (B.replicate c' 0))
 
 loadSurfaces :: BL.ByteString -> LumpT -> Quake ()
 loadSurfaces buf lump = do

@@ -10,7 +10,7 @@ module Game.GameAI
     ) where
 
 import           Control.Lens      (use, (^.), (.=), (&), (.~), (%~))
-import           Control.Monad     (void, when)
+import           Control.Monad     (void, when, unless)
 import           Data.Bits         (complement, (.&.), (.|.))
 import qualified Data.ByteString   as B
 import           Data.Maybe        (isJust)
@@ -120,7 +120,25 @@ aiStand = AI "ai_stand" $ \selfRef dist -> do
     walkError = Com.fatalError "GameAI.aiStand#doCheckPauseTime self^.eMonsterInfo.miWalk is Nothing"
 
 aiWalk :: AI
-aiWalk = error "GameAI.aiWalk" -- TODO
+aiWalk = AI "ai_walk" $ \selfRef dist -> do
+    M.moveToGoal selfRef dist
+    found <- GameUtil.findTarget selfRef
+    unless found $ do
+        self <- readRef selfRef
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        doWalk selfRef self levelTime (self^.eMonsterInfo.miSearch)
+  where
+    doWalk _ _ _ Nothing = return ()
+    doWalk selfRef self levelTime (Just searchF)
+        | levelTime > (self^.eMonsterInfo.miIdleTime) = do
+          r <- Lib.randomF
+          if (self^.eMonsterInfo.miIdleTime) /= 0
+              then do
+                  void (entThink searchF selfRef)
+                  modifyRef selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + 15 + r * 15)
+              else
+                  modifyRef selfRef (\v -> v & eMonsterInfo.miIdleTime .~ levelTime + r * 15)
+        | otherwise = return ()
 
 aiCheckAttack :: Ref EdictT -> Float -> Quake Bool
 aiCheckAttack = error "GameAI.aiCheckAttack" -- TODO

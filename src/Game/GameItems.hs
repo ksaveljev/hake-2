@@ -50,13 +50,13 @@ import           Game.ClientPersistantT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
-import {-# SOURCE #-} qualified Game.GameItemsList as GameItemsList
 import           Game.GameLocalsT
 import qualified Game.GameUtil         as GameUtil
 import           Game.GClientT
 import           Game.GItemArmorT
 import           Game.GItemT
 import           Game.LevelLocalsT
+import           Game.PlayerStateT
 import           Game.TraceT
 import qualified QCommon.Com           as Com
 import           QCommon.CVarVariables
@@ -65,6 +65,8 @@ import           QuakeState
 import           Types
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
+
+import {-# SOURCE #-} qualified Game.GameItemsList as GameItemsList
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo = GItemArmorT
@@ -954,7 +956,70 @@ dropMakeTouchableF edictRef = do
                                         & eThink .~ Just GameUtil.freeEdictA)
 
 touchItem :: EntTouch
-touchItem = error "GameItems.touchItem" -- TODO
+touchItem = EntTouch "touch_item" $ \edictRef otherRef _ _ -> do
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    done <- shouldReturn edictRef otherRef
+    unless done $ do
+        taken <- runItemInteract edictRef otherRef
+        edict <- readRef edictRef
+        other <- readRef otherRef
+        when taken $ do
+            otherClientRef <- maybe clientError return (other^.eClient)
+            modifyRef otherClientRef (\v -> v & gcBonusAlpha .~ 0.25)
+            itemRef <- maybe itemError return (edict^.eItem)
+            item <- readRef itemRef
+            icon <- (gameImport^.giImageIndex) (item^.giIcon)
+            time <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef otherClientRef (\v -> v & gcPlayerState.psStats.ix (Constants.statPickupIcon) .~ fromIntegral icon
+                                              & gcPlayerState.psStats.ix (Constants.statPickupString) .~ fromIntegral (Constants.csItems + (item^.giIndex))
+                                              & gcPickupMsgTime .~ time + 3)
+            when (isJust (item^.giUse)) $ do
+                modifyRef otherClientRef (\v -> v & gcPers.cpSelectedItem .~ (item^.giIndex)
+                                                  & gcPlayerState.psStats.ix (Constants.statSelectedItem) .~ fromIntegral (item^.giIndex))
+            playPickupItemSound gameImport otherRef edict item (item^.giPickup)
+        when ((edict^.eSpawnFlags) .&. Constants.itemTargetsUsed == 0) $ do
+            GameUtil.useTargets edictRef (Just otherRef)
+            modifyRef edictRef (\v -> v & eSpawnFlags %~ (.|. Constants.itemTargetsUsed))
+        when taken $ do
+            coop <- fmap (^.cvValue) coopCVar
+            itemRef <- maybe itemError return (edict^.eItem)
+            itemFlags <- fmap (^.giFlags) (readRef itemRef)
+            updatedEdict <- readRef edictRef
+            when (not (coop /= 0 && (itemFlags .&. Constants.itStayCoop) /= 0) || ((updatedEdict^.eSpawnFlags) .&. (Constants.droppedItem .|. Constants.droppedPlayerItem)) /= 0) $ do
+                if (updatedEdict^.eFlags) .&. Constants.flRespawn /= 0
+                    then modifyRef edictRef (\v -> v & eFlags %~ (.&. (complement Constants.flRespawn)))
+                    else GameUtil.freeEdict edictRef
+  where 
+    clientError = do
+        Com.fatalError "GameItems.touchItem other^.eClient is Nothing"
+        return (Ref (-1))
+    itemError = do
+        Com.fatalError "GameItems.touchItem edict^.eItem is Nothing"
+        return (Ref (-1))
+    shouldReturn edictRef otherRef = do
+        edict <- readRef edictRef
+        other <- readRef otherRef
+        itemRef <- maybe itemError return (edict^.eItem)
+        pickupF <- fmap (^.giPickup) (readRef itemRef)
+        return (isNothing (other^.eClient) || (other^.eHealth) < 1 || isNothing pickupF)
+    runItemInteract edictRef otherRef = do
+        edict <- readRef edictRef
+        itemRef <- maybe itemError return (edict^.eItem)
+        Just pickupF <- fmap (^.giPickup) (readRef itemRef) -- TODO: improve, refactor
+        entInteract pickupF edictRef otherRef
+    playPickupItemSound _ _ _ _ Nothing = return ()
+    playPickupItemSound gameImport otherRef edict item (Just pickupF)
+        | entInteractId pickupF == "pickup_health" = do
+            soundIdx <- (gameImport^.giSoundIndex) (Just (getSoundFile (edict^.eCount)))
+            (gameImport^.giSound) (Just otherRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
+        | otherwise = do
+            pickupSound <- (gameImport^.giSoundIndex) (item^.giPickupSound)
+            (gameImport^.giSound) (Just otherRef) Constants.chanItem pickupSound 1 Constants.attnNorm 0
+    getSoundFile count
+        | count == 2  = "items/s_health.wav"
+        | count == 10 = "items/n_health.wav"
+        | count == 25 = "items/l_health.wav"
+        | otherwise   = "items/m_health.wav"
 
 spawnItem :: Ref EdictT -> Ref GItemT -> Quake ()
 spawnItem edictRef itemRef = do
