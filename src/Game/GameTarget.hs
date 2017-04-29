@@ -264,7 +264,20 @@ spTargetSpeaker edictRef = do
         (gameImport^.giLinkEntity) edictRef
 
 useTargetSpeaker :: EntUse
-useTargetSpeaker = error "GameTarget.useTargetSpeaker" -- TODO
+useTargetSpeaker = EntUse "Use_Target_Speaker" $ \edictRef _ _ -> do
+    edict <- readRef edictRef
+    doUseTargetSpeaker edictRef edict
+  where
+    doUseTargetSpeaker edictRef edict
+        | (edict^.eSpawnFlags) .&. 3 /= 0 = -- looping sound toggles
+            modifyRef edictRef (\v -> v & eEntityState.esSound .~ (if (edict^.eEntityState.esSound) /= 0 then 0 else edict^.eNoiseIndex))
+        | otherwise = do -- normal sound
+            let chan | (edict^.eSpawnFlags) .&. 4 /= 0 = Constants.chanVoice .|. Constants.chanReliable
+                     | otherwise                       = Constants.chanVoice
+            -- use a positioned_sound, because this entity won't normally be
+            -- sent to any clients because it is invisible
+            positionedSound <- use (gameBaseGlobals.gbGameImport.giPositionedSound)
+            positionedSound (Just (edict^.eEntityState.esOrigin)) edictRef chan (edict^.eNoiseIndex) (edict^.eVolume) (edict^.eAttenuation) 0
 
 spTargetSplash :: Ref EdictT -> Quake ()
 spTargetSplash edictRef = do

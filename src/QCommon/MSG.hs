@@ -17,6 +17,7 @@ module QCommon.MSG
     , writeByteF
     , writeByteI
     , writeCharI
+    , writeDeltaEntity
     , writeDeltaUserCmd
     , writeDir
     , writeInt
@@ -27,7 +28,7 @@ module QCommon.MSG
     ) where
 
 import           Control.Lens            (Traversal', Lens', use, (^.), (.=), (+=), (%=))
-import           Control.Monad           (when)
+import           Control.Monad           (when, unless)
 import           Data.Bits               (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Builder as BB
@@ -40,6 +41,7 @@ import           Data.Word               (Word8, Word16, Word32)
 import           Linear                  (V3(..), dot, _x, _y, _z)
 
 import qualified Constants
+import           Game.EntityStateT
 import           Game.UserCmdT
 import           QCommon.SizeBufT
 import qualified QCommon.SZ              as SZ
@@ -88,6 +90,12 @@ writePos sizeBufLens pos = do
     writeShort sizeBufLens (truncate ((pos^._x) * 8))
     writeShort sizeBufLens (truncate ((pos^._y) * 8))
     writeShort sizeBufLens (truncate ((pos^._z) * 8))
+
+writeCoord :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeCoord sizeBufLens f = writeShort sizeBufLens (truncate (f * 8))
+
+writeAngle :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeAngle sizeBufLens f = writeByteI sizeBufLens ((truncate (f * 256 / 360)) .&. 255)
 
 writeDir :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
 writeDir sizeBufLens dir = do
@@ -298,3 +306,129 @@ readDir sizeBufLens = do
     when (b >= Constants.numVertexNormals) $
         Com.comError Constants.errDrop "MSG_ReadDir: out of range"
     return (Constants.byteDirs V.! b)
+
+writeDeltaEntity :: EntityStateT -> EntityStateT -> Traversal' QuakeState SizeBufT -> Bool -> Bool -> Quake ()
+writeDeltaEntity from to sizeBufLens force newEntity = do
+    when ((to^.esNumber) == 0) $
+        Com.fatalError "Unset entity number"
+    when ((to^.esNumber) >= Constants.maxEdicts) $
+        Com.fatalError "Entity number >= MAX_EDICTS"
+    let a = if (to^.esNumber) >= 256 then Constants.uNumber16 else 0 -- number8 is implicit otherwise
+        b = if (to^.esOrigin._x) /= (from^.esOrigin._x) then Constants.uOrigin1 else 0
+        c = if (to^.esOrigin._y) /= (from^.esOrigin._y) then Constants.uOrigin2 else 0
+        d = if (to^.esOrigin._z) /= (from^.esOrigin._z) then Constants.uOrigin3 else 0
+        e = if (to^.esAngles._x) /= (from^.esAngles._x) then Constants.uAngle1 else 0
+        f = if (to^.esAngles._y) /= (from^.esAngles._y) then Constants.uAngle2 else 0
+        g = if (to^.esAngles._z) /= (from^.esAngles._z) then Constants.uAngle3 else 0
+        h = if (to^.esSkinNum) /= (from^.esSkinNum) then skinNumValue else 0
+        i = if (to^.esFrame) /= (from^.esFrame) then frameValue else 0
+        j = if (to^.esEffects) /= (from^.esEffects) then effectsValue else 0
+        k = if (to^.esRenderFx) /= (from^.esRenderFx) then renderFxValue else 0
+        l = if (to^.esSolid) /= (from^.esSolid) then Constants.uSolid else 0
+        -- event is not delta compressed, just 0 compressed
+        m = if (to^.esEvent) /= 0 then Constants.uEvent else 0
+        n = if (to^.esModelIndex) /= (from^.esModelIndex) then Constants.uModel else 0
+        o = if (to^.esModelIndex2) /= (from^.esModelIndex2) then Constants.uModel2 else 0
+        p = if (to^.esModelIndex3) /= (from^.esModelIndex3) then Constants.uModel3 else 0
+        q = if (to^.esModelIndex4) /= (from^.esModelIndex4) then Constants.uModel4 else 0
+        r = if (to^.esSound) /= (from^.esSound) then Constants.uSound else 0
+        s = if newEntity || (to^.esRenderFx) .&. Constants.rfBeam /= 0 then Constants.uOldOrigin else 0
+        bits = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h .|. i .|. j .|. k .|. l .|. m .|. n .|. o .|. p .|. q .|. r .|. s
+    unless (bits == 0 && not force) $ do
+        let finalBits | bits .&. 0xFF000000 /= 0 = bits .|. Constants.uMoreBits3 .|. Constants.uMoreBits2 .|. Constants.uMoreBits1
+                      | bits .&. 0x00FF0000 /= 0 = bits .|. Constants.uMoreBits2 .|. Constants.uMoreBits1
+                      | bits .&. 0x0000FF00 /= 0 = bits .|. Constants.uMoreBits1
+                      | otherwise                = bits
+        writeByteI sizeBufLens (finalBits .&. 255)
+        writeFinaBits finalBits
+        if finalBits .&. Constants.uNumber16 /= 0
+            then writeShort sizeBufLens (to^.esNumber)
+            else writeByteI sizeBufLens (to^.esNumber)
+        when (finalBits .&. Constants.uModel /= 0) $
+            writeByteI sizeBufLens (to^.esModelIndex)
+        when (finalBits .&. Constants.uModel2 /= 0) $
+            writeByteI sizeBufLens (to^.esModelIndex2)
+        when (finalBits .&. Constants.uModel3 /= 0) $
+            writeByteI sizeBufLens (to^.esModelIndex3)
+        when (finalBits .&. Constants.uModel4 /= 0) $
+            writeByteI sizeBufLens (to^.esModelIndex4)
+        when (finalBits .&. Constants.uFrame8 /= 0) $
+            writeByteI sizeBufLens (to^.esFrame)
+        when (finalBits .&. Constants.uFrame16 /= 0) $
+            writeShort sizeBufLens (to^.esFrame)
+        writeSkin finalBits
+        writeEffects finalBits
+        writeRenderFx finalBits
+        when (finalBits .&. Constants.uOrigin1 /= 0) $
+            writeCoord sizeBufLens (to^.esOrigin._x)
+        when (finalBits .&. Constants.uOrigin2 /= 0) $
+            writeCoord sizeBufLens (to^.esOrigin._y)
+        when (finalBits .&. Constants.uOrigin3 /= 0) $
+            writeCoord sizeBufLens (to^.esOrigin._z)
+        when (finalBits .&. Constants.uAngle1 /= 0) $
+            writeAngle sizeBufLens (to^.esAngles._x)
+        when (finalBits .&. Constants.uAngle2 /= 0) $
+            writeAngle sizeBufLens (to^.esAngles._y)
+        when (finalBits .&. Constants.uAngle3 /= 0) $
+            writeAngle sizeBufLens (to^.esAngles._z)
+        when (finalBits .&. Constants.uOldOrigin /= 0) $ do
+            writeCoord sizeBufLens (to^.esOldOrigin._x)
+            writeCoord sizeBufLens (to^.esOldOrigin._y)
+            writeCoord sizeBufLens (to^.esOldOrigin._z)
+        when (finalBits .&. Constants.uSound /= 0) $
+            writeByteI sizeBufLens (to^.esSound)
+        when (finalBits .&. Constants.uEvent /= 0) $
+            writeByteI sizeBufLens (to^.esEvent)
+        when (finalBits .&. Constants.uSolid /= 0) $
+            writeShort sizeBufLens (to^.esSolid)
+  where
+    skinNumValue
+        | (to^.esSkinNum) < 256     = Constants.uSkin8
+        | (to^.esSkinNum) < 0x10000 = Constants.uSkin16
+        | otherwise                 = Constants.uSkin8 .|. Constants.uSkin16
+    frameValue
+        | (to^.esFrame) < 256 = Constants.uFrame8
+        | otherwise           = Constants.uFrame16
+    effectsValue
+        | (to^.esEffects) < 256    = Constants.uEffects8
+        | (to^.esEffects) < 0x8000 = Constants.uEffects16
+        | otherwise                = Constants.uEffects8 .|. Constants.uEffects16
+    renderFxValue
+        | (to^.esRenderFx) < 256    = Constants.uRenderFx8
+        | (to^.esRenderFx) < 0x8000 = Constants.uRenderFx16
+        | otherwise                 = Constants.uRenderFx8 .|. Constants.uRenderFx16
+    writeFinaBits finalBits
+        | finalBits .&. 0xFF000000 /= 0 = do
+            writeByteI sizeBufLens ((finalBits `shiftR`  8) .&. 0xFF)
+            writeByteI sizeBufLens ((finalBits `shiftR` 16) .&. 0xFF)
+            writeByteI sizeBufLens ((finalBits `shiftR` 24) .&. 0xFF)
+        | finalBits .&. 0x00FF0000 /= 0 = do
+            writeByteI sizeBufLens ((finalBits `shiftR`  8) .&. 0xFF)
+            writeByteI sizeBufLens ((finalBits `shiftR` 16) .&. 0xFF)
+        | finalBits .&. 0x0000FF00 /= 0 = do
+            writeByteI sizeBufLens ((finalBits `shiftR` 8) .&. 0xFF)
+        | otherwise = return ()
+    writeSkin finalBits
+        | finalBits .&. Constants.uSkin8 /= 0 && finalBits .&. Constants.uSkin16 /= 0 = -- used for laser colors
+            writeInt sizeBufLens (to^.esSkinNum)
+        | finalBits .&. Constants.uSkin8 /= 0 =
+            writeByteI sizeBufLens (to^.esSkinNum)
+        | finalBits .&. Constants.uSkin16 /= 0 =
+            writeShort sizeBufLens (to^.esSkinNum)
+        | otherwise = return ()
+    writeEffects finalBits
+        | finalBits .&. (Constants.uEffects8 .|. Constants.uEffects16) == (Constants.uEffects8 .|. Constants.uEffects16) =
+            writeInt sizeBufLens (to^.esEffects)
+        | finalBits .&. Constants.uEffects8 /= 0 =
+            writeByteI sizeBufLens (to^.esEffects)
+        | finalBits .&. Constants.uEffects16 /= 0 =
+            writeShort sizeBufLens (to^.esEffects)
+        | otherwise = return ()
+    writeRenderFx finalBits
+        | finalBits .&. (Constants.uRenderFx8 .|. Constants.uRenderFx16) == (Constants.uRenderFx8 .|. Constants.uRenderFx16) =
+            writeInt sizeBufLens (to^.esRenderFx)
+        | finalBits .&. Constants.uRenderFx8 /= 0 =
+            writeByteI sizeBufLens (to^.esRenderFx)
+        | finalBits .&. Constants.uRenderFx16 /= 0 =
+            writeShort sizeBufLens (to^.esRenderFx)
+        | otherwise = return ()

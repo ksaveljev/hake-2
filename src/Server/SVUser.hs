@@ -46,6 +46,9 @@ maxStringCmds = 8
 nullCmd :: UserCmdT
 nullCmd = newUserCmdT
 
+nullState :: EntityStateT
+nullState = newEntityStateT Nothing
+
 uCmds :: V.Vector UCmdT
 uCmds = V.fromList
     [ UCmdT "new" newF
@@ -212,10 +215,98 @@ doNew clientRef@(Ref clientIdx) client state
     messageLens = svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage
 
 configStringsF :: XCommandT
-configStringsF = error "SVUser.configStringsF" -- TODO
+configStringsF = XCommandT "SVUser.configStringsF" $ do
+    clientRef <- use (svGlobals.svClient)
+    maybe clientError doConfigStrings clientRef
+  where
+    clientError = Com.fatalError "SVUser.configStringsF clientRef is Nothing"
+    doConfigStrings clientRef = do
+        client <- readRef clientRef
+        Com.dprintf (B.concat ["Configstrings() from ", client^.cName, "\n"])
+        processConfigStrings clientRef client
+    processConfigStrings clientRef client
+        | (client^.cState) /= Constants.csConnected =
+            Com.printf "configstrings not valid -- already spawned\n"
+        | otherwise = do
+            -- handle the case of a level changing while a client was connecting
+            v1 <- Cmd.argv 1
+            spawnCount <- use (svGlobals.svServerStatic.ssSpawnCount)
+            proceedConfigStrings clientRef v1 spawnCount
+    proceedConfigStrings clientRef@(Ref clientIdx) v1 spawnCount
+        | Lib.atoi v1 /= spawnCount = do
+            Com.printf "SV_Configstrings_f from different level\n"
+            runXCommandT newF
+        | otherwise = do
+            v2 <- Cmd.argv 2
+            -- write a packet full of data
+            configStrings <- use (svGlobals.svServer.sConfigStrings)
+            start <- writeConfigStringsPacket configStrings clientRef (Lib.atoi v2)
+            -- send next command
+            if start == Constants.maxConfigStrings
+                then do
+                    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                    MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (B.concat ["cmd baselines ", encode spawnCount, " 0\n"]);
+                else do
+                    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                    MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (B.concat ["cmd configstrings ", encode spawnCount, " ", encode start, "\n"])
+    writeConfigStringsPacket configStrings clientRef@(Ref clientIdx) start = do
+        curSize <- fmap (^.cNetChan.ncMessage.sbCurSize) (readRef clientRef)
+        if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxConfigStrings
+            then do
+                when (B.length (configStrings V.! start) /= 0) $ do
+                    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcConfigString
+                    MSG.writeShort (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) start
+                    MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (configStrings V.! start)
+                writeConfigStringsPacket configStrings clientRef (start + 1)
+            else
+                return start
 
 baselinesF :: XCommandT
-baselinesF = error "SVUser.baselinesF" -- TODO
+baselinesF = XCommandT "SVUser.baselinesF" $ do
+    clientRef <- use (svGlobals.svClient)
+    maybe clientError doBaselines clientRef
+  where
+    clientError = Com.fatalError "SVUser.configStringsF clientRef is Nothing"
+    doBaselines clientRef = do
+        client <- readRef clientRef
+        Com.dprintf (B.concat ["Baselines() from ", client^.cName, "\n"])
+        processBaselines clientRef client
+    processBaselines clientRef client
+        | (client^.cState) /= Constants.csConnected =
+            Com.printf "baselines not valid -- already spawned\n"
+        | otherwise = do
+            -- handle the case of a level changing while a client was connecting
+            v1 <- Cmd.argv 1
+            spawnCount <- use (svGlobals.svServerStatic.ssSpawnCount)
+            proceedBaselines clientRef v1 spawnCount
+    proceedBaselines clientRef@(Ref clientIdx) v1 spawnCount
+        | Lib.atoi v1 /= spawnCount = do
+            Com.printf "SV_Baselines_f from different level\n"
+            runXCommandT newF
+        | otherwise = do
+            v2 <- Cmd.argv 2
+            -- write a packet full of data
+            baselines <- use (svGlobals.svServer.sBaselines)
+            start <- writeBaselinePacket baselines clientRef (Lib.atoi v2)
+            -- send next command
+            if start == Constants.maxEdicts
+                then do
+                    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                    MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (B.concat ["precache ", encode spawnCount, "\n"])
+                else do
+                    MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcStuffText
+                    MSG.writeString (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) (B.concat ["cmd baselines ", encode spawnCount, " ", encode start, "\n"])
+    writeBaselinePacket baselines clientRef@(Ref clientIdx) start = do
+      curSize <- fmap (^.cNetChan.ncMessage.sbCurSize) (readRef clientRef)
+      if curSize < Constants.maxMsgLen `div` 2 && start < Constants.maxEdicts
+          then do
+              let base = baselines V.! start
+              when ((base^.esModelIndex) /= 0 || (base^.esSound) /= 0 || (base^.esEffects) /= 0) $ do
+                  MSG.writeByteI (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) Constants.svcSpawnBaseline
+                  MSG.writeDeltaEntity nullState base (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan.ncMessage) True True
+              writeBaselinePacket baselines clientRef (start + 1)
+          else
+              return start
 
 beginF :: XCommandT
 beginF = XCommandT "SVUser.beginF" $ do

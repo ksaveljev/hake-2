@@ -704,7 +704,51 @@ trainNext = EntThink "train_next" $ \edictRef -> do
           else return (Just entRef)
 
 trainWait :: EntThink
-trainWait = error "GameFunc.trainWait" -- TODO
+trainWait = EntThink "train_wait" $ \edictRef -> do
+    done <- checkPathTarget edictRef
+    unless done $ do
+        edict <- readRef edictRef
+        doTrainWait edictRef edict
+    return True
+  where
+    doTrainWait edictRef edict
+        | edict^.eMoveInfo.miWait /= 0 = do
+            updateNextThink edictRef edict
+            when ((edict^.eFlags) .&. Constants.flTeamSlave == 0) $ do
+                when ((edict^.eMoveInfo.miSoundEnd) /= 0) $ do
+                    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+                    sound (Just edictRef) (Constants.chanNoPhsAdd + Constants.chanVoice) (edict^.eMoveInfo.miSoundEnd) 1 Constants.attnStatic 0
+                modifyRef edictRef (\v -> v & eEntityState.esSound .~ 0)
+        | otherwise = void (entThink trainNext edictRef)
+    updateNextThink edictRef edict
+        | edict^.eMoveInfo.miWait > 0 = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef edictRef (\v -> v & eNextThink .~ levelTime + (edict^.eMoveInfo.miWait)
+                                        & eThink .~ Just trainNext)
+        | (edict^.eSpawnFlags) .&. trainToggle /= 0 = do
+            void (entThink trainNext edictRef)
+            modifyRef edictRef (\v -> v & eSpawnFlags %~ (.&. (complement trainStartOn))
+                                        & eVelocity .~ V3 0 0 0
+                                        & eNextThink .~ 0)
+        | otherwise = return ()
+    checkPathTarget edictRef = do
+        edict <- readRef edictRef
+        maybe targetEntError (doCheckPathTarget edictRef edict) (edict^.eTargetEnt)
+    targetEntError = do
+        Com.fatalError "GameFunc.trainWait#checkPathTarget edict^.eTargetEnt is Nothing"
+        return False
+    doCheckPathTarget edictRef edict targetRef = do
+        target <- readRef targetRef
+        if isJust (target^.ePathTarget)
+            then do
+                let saveTarget = target^.eTarget
+                modifyRef targetRef (\v -> v & eTarget .~ (target^.ePathTarget))
+                GameUtil.useTargets targetRef (edict^.eActivator)
+                modifyRef targetRef (\v -> v & eTarget .~ saveTarget)
+                -- make sure we didn't get killed by a killtarget
+                updatedEdict <- readRef edictRef
+                return (not (updatedEdict^.eInUse))
+            else return False
 
 funcTrainFind :: EntThink
 funcTrainFind = EntThink "func_train_find" $ \selfRef -> do
