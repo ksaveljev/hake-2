@@ -2,6 +2,7 @@ module Game.PlayerWeapon
     ( changeWeapon
     , dropWeapon
     , pickupWeapon
+    , playerNoise
     , thinkWeapon
     , useWeapon
     , weaponBFG
@@ -20,6 +21,7 @@ module Game.PlayerWeapon
 import           Control.Lens           (use, (^.), (&), (.~))
 import           Control.Monad          (when, unless)
 import           Data.Bits              (shiftL, (.&.), (.|.))
+import           Linear                 (V3)
 
 import qualified Constants
 import           Game.ClientPersistantT
@@ -161,3 +163,6 @@ changeWeapon edictRef = do
 
 weaponGrenadeFire :: Ref EdictT -> Bool -> Quake ()
 weaponGrenadeFire = error "PlayerWeapon.weaponGrenadeFire" -- TODO
+
+playerNoise :: Ref EdictT -> V3 Float -> Int -> Quake ()
+playerNoise = error "PlayerWeapon.playerNoise" -- TODO
