@@ -9,6 +9,7 @@ module QCommon.Com
     , parse
     , printf
     , quit
+    , stripExtension
     ) where
 
 import qualified Data.ByteString as B
@@ -26,3 +27,4 @@ initializeArgv :: [String] -> Quake ()
 parse :: B.ByteString -> Int -> Int -> Quake (Maybe B.ByteString, Int)
 printf :: B.ByteString -> Quake ()
 quit :: Quake ()
+stripExtension :: B.ByteString -> B.ByteString

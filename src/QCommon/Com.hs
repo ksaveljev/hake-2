@@ -10,6 +10,7 @@ module QCommon.Com
     , printf
     , println
     , quit
+    , stripExtension
     ) where
 
 import           Control.Lens          (use, (.=), (^.), (%=))
@@ -143,3 +144,6 @@ quit = do
   where
     closeLogFile Nothing = return ()
     closeLogFile (Just fileHandle) = Lib.fClose fileHandle
+
+stripExtension :: B.ByteString -> B.ByteString
+stripExtension str = maybe str (\idx -> B.take idx str) ('.' `BC.elemIndexEnd` str)

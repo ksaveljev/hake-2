@@ -11,62 +11,82 @@ module Client.CL
     , writeDemoMessage
     ) where
 
-import           Control.Concurrent    (threadDelay)
-import           Control.Lens          (preuse, use, ix)
-import           Control.Lens          ((^.), (.=), (%=), (+=), (&), (.~))
-import           Control.Monad         (unless, when, void)
-import qualified Data.ByteString       as B
-import qualified Data.Vector           as Vector
-import           Linear                (V4(..))
-import           System.IO             (Handle, IOMode(..), SeekMode(..))
-import           System.IO             (hSeek, hSetFileSize)
+import           Control.Concurrent       (threadDelay)
+import           Control.Lens             (preuse, use, ix)
+import           Control.Lens             ((^.), (.=), (%=), (+=), (&), (.~))
+import           Control.Monad            (unless, when, void)
+import           Data.Binary.Get          (runGet)
+import           Data.Bits                (xor, (.&.))
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Char8    as BC
+import qualified Data.ByteString.Lazy     as BL
+import           Data.Maybe               (fromMaybe)
+import qualified Data.Vector              as Vector
+import           Linear                   (V4(..))
+import           System.IO                (Handle, IOMode(..), SeekMode(..))
+import           System.IO                (hSeek, hSetFileSize)
 
 import           Client.CEntityT
 import           Client.CheatVarT
-import qualified Client.CLFX           as CLFX
+import qualified Client.CLFX              as CLFX
 import           Client.ClientStateT
 import           Client.ClientStaticT
-import qualified Client.CLInput        as CLInput
-import qualified Client.CLParse        as CLParse
-import qualified Client.CLPred         as CLPred
-import qualified Client.CLTEnt         as CLTEnt
-import qualified Client.CLView         as CLView
-import qualified Client.Console        as Console
-import qualified Client.Key            as Key
-import qualified Client.Menu           as Menu
+import qualified Client.CLInput           as CLInput
+import qualified Client.CLParse           as CLParse
+import qualified Client.CLPred            as CLPred
+import qualified Client.CLTEnt            as CLTEnt
+import qualified Client.CLView            as CLView
+import qualified Client.Console           as Console
+import qualified Client.Key               as Key
+import qualified Client.Menu              as Menu
 import           Client.RefDefT
 import           Client.RefExportT
-import qualified Client.SCR            as SCR
-import qualified Client.V              as V
-import qualified Client.VID            as VID
+import qualified Client.SCR               as SCR
+import qualified Client.V                 as V
+import qualified Client.VID               as VID
 import qualified Constants
-import           Data.Bits             ((.|.))
-import qualified Game.Cmd              as Cmd
+import           Data.Bits                ((.|.))
+import qualified Game.Cmd                 as Cmd
 import           Game.CVarT
-import qualified Game.Info             as Info
-import qualified QCommon.CBuf          as CBuf
-import qualified QCommon.CM            as CM
-import qualified QCommon.Com           as Com
-import qualified QCommon.CVar          as CVar
+import qualified Game.Info                as Info
+import           Game.MapSurfaceT
+import qualified QCommon.CBuf             as CBuf
+import qualified QCommon.CM               as CM
+import qualified QCommon.Com              as Com
+import qualified QCommon.CVar             as CVar
 import           QCommon.CVarVariables
-import qualified QCommon.FS            as FS
-import qualified QCommon.MSG           as MSG
+import qualified QCommon.FS               as FS
+import qualified QCommon.MSG              as MSG
 import           QCommon.NetAdrT
-import qualified QCommon.NetChannel    as NetChannel
+import qualified QCommon.NetChannel       as NetChannel
 import           QCommon.NetChanT
+import           QCommon.QFiles.MD2.DMdlT
 import           QCommon.SizeBufT
-import qualified QCommon.SZ            as SZ
-import           QCommon.XCommandT     (runXCommandT)
+import qualified QCommon.SZ               as SZ
+import           QCommon.XCommandT        (runXCommandT)
 import           QuakeState
 import           Render.Renderer
-import qualified Sound.S               as S
-import qualified Sys.IN                as IN
-import qualified Sys.NET               as NET
-import qualified Sys.Sys               as Sys
-import qualified Sys.Timer             as Timer
+import qualified Sound.S                  as S
+import qualified Sys.IN                   as IN
+import qualified Sys.NET                  as NET
+import qualified Sys.Sys                  as Sys
+import qualified Sys.Timer                as Timer
 import           Types
-import           Util.Binary           (encode)
-import qualified Util.Lib              as Lib
+import           Util.Binary              (encode)
+import qualified Util.Lib                 as Lib
+
+playerMult :: Int
+playerMult = 5
+
+-- ENV_CNT is map load, ENV_CNT+1 is first env map
+envCnt :: Int
+envCnt = Constants.csPlayerSkins + Constants.maxClients * playerMult
+
+textureCnt :: Int
+textureCnt = envCnt + 13
+
+envSuf :: Vector.Vector B.ByteString
+envSuf = Vector.fromList [ "rt", "bk", "lf", "ft", "up", "dn" ]
 
 remoteCommandHeader :: B.ByteString
 remoteCommandHeader = B.pack [0xFF, 0xFF, 0xFF, 0xFF]
@@ -673,4 +693,318 @@ clearState = do
     SZ.clear (globals.gCls.csNetChan.ncMessage)
 
 requestNextDownload :: Quake ()
-requestNextDownload = error "CL.requestNextDownload" -- TODO
+requestNextDownload = do
+    state <- use (globals.gCls.csState)
+    when (state == Constants.caConnected) $ do
+        allowDownload <- fmap (^.cvValue) allowDownloadCVar
+        precacheCheck <- use (clientGlobals.cgPrecacheCheck)
+        when (allowDownload == 0 && precacheCheck < envCnt) $
+            clientGlobals.cgPrecacheCheck .= envCnt
+        startWithMap =<< use (clientGlobals.cgPrecacheCheck)
+  where
+    startWithMap precacheCheck
+        | precacheCheck == Constants.csModels = do
+            clientGlobals.cgPrecacheCheck += 2
+            allowDownloadMaps <- fmap (^.cvValue) allowDownloadMapsCVar
+            downloadMap allowDownloadMaps
+        | otherwise = proceedWithModels =<< use (clientGlobals.cgPrecacheCheck)
+    downloadMap allowDownloadMaps
+        | allowDownloadMaps == 0 = do
+            configStrings <- use (globals.gCl.csConfigStrings)
+            fileExists <- CLParse.checkOrDownloadFile (configStrings Vector.! (Constants.csModels + 1))
+            when fileExists $
+                proceedWithModels =<< use (clientGlobals.cgPrecacheCheck)
+        | otherwise = proceedWithModels =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithModels precacheCheck
+        | precacheCheck >= Constants.csModels && precacheCheck < Constants.csModels + Constants.maxModels = do
+            allowDownloadModels <- fmap (^.cvValue) allowDownloadModelsCVar
+            if allowDownloadModels /= 0
+                then do
+                    configStrings <- use (globals.gCl.csConfigStrings)
+                    done <- downloadModels configStrings precacheCheck
+                    unless done finishWithModels
+                else
+                    finishWithModels
+        | otherwise = proceedWithSounds =<< use (clientGlobals.cgPrecacheCheck)
+    downloadModels configStrings precacheCheck
+        | precacheCheck < Constants.csModels + Constants.maxModels && not (B.null (configStrings Vector.! precacheCheck)) =
+            checkWildCardModel (configStrings Vector.! precacheCheck)
+        | otherwise = return False
+    nextModel = do
+        configStrings <- use (globals.gCl.csConfigStrings)
+        downloadModels configStrings =<< use (clientGlobals.cgPrecacheCheck)
+    checkWildCardModel str
+        | BC.head str == '*' || BC.head str == '#' = do
+            clientGlobals.cgPrecacheCheck += 1
+            nextModel
+        | otherwise = checkModelSkin str =<< use (clientGlobals.cgPrecacheModelSkin)
+    checkModelSkin str modelSkin
+        | modelSkin == 0 = do
+            fileExists <- CLParse.checkOrDownloadFile str
+            clientGlobals.cgPrecacheModelSkin .= 1
+            if fileExists
+                then checkModel str =<< use (clientGlobals.cgPrecacheModel)
+                else return True
+        | otherwise = checkModel str =<< use (clientGlobals.cgPrecacheModel)
+    checkModel str Nothing = do
+        model <- FS.loadFile str
+        clientGlobals.cgPrecacheModel .= model
+        maybe couldntLoadModel checkAliasModel model
+    checkModel _ (Just model) =
+        downloadModel (runGet getDMdlT (BL.fromStrict model)) =<< use (clientGlobals.cgPrecacheModelSkin)
+    couldntLoadModel = do
+        clientGlobals.cgPrecacheModelSkin .= 0
+        clientGlobals.cgPrecacheCheck += 1
+        nextModel
+    checkAliasModel model
+        | B.take 4 model /= idAliasHeader = do
+            clientGlobals.cgPrecacheModel .= Nothing
+            clientGlobals.cgPrecacheModelSkin .= 0
+            clientGlobals.cgPrecacheCheck += 1
+            nextModel
+        | otherwise = checkAliasVersion (runGet getDMdlT (BL.fromStrict model))
+    checkAliasVersion pheader
+        | (pheader^.dmVersion) /= Constants.aliasVersion = do
+            clientGlobals.cgPrecacheCheck += 1
+            clientGlobals.cgPrecacheModelSkin .= 0
+            nextModel
+        | otherwise = downloadModel pheader =<< use (clientGlobals.cgPrecacheModelSkin)
+    downloadModel pheader modelSkin
+        | modelSkin - 1 < (pheader^.dmNumSkins) = do
+            model <- use (clientGlobals.cgPrecacheModel)
+            name <- maybe nameError (getModelName pheader modelSkin) model
+            fileExists <- CLParse.checkOrDownloadFile name
+            clientGlobals.cgPrecacheModelSkin += 1
+            if fileExists
+                then downloadModel pheader =<< use (clientGlobals.cgPrecacheModelSkin)
+                else return True
+        | otherwise = finishModel
+    nameError = do
+        Com.fatalError "CL.requestNextDownload#downloadModel model is Nothing"
+        return B.empty
+    getModelName pheader modelSkin model = do
+        let name = B.take (Constants.maxSkinName * (pheader^.dmNumSkins)) (B.drop ((pheader^.dmOfsSkins) + (modelSkin - 1) * Constants.maxSkinName) model)
+            zeroIdx = B.findIndex (== 0) name
+        return (maybe name (\idx -> B.take idx name) zeroIdx)
+    finishModel = do
+        clientGlobals.cgPrecacheModel .= Nothing
+        clientGlobals.cgPrecacheModelSkin .= 0
+        clientGlobals.cgPrecacheCheck += 1
+        configStrings <- use (globals.gCl.csConfigStrings)
+        downloadModels configStrings =<< use (clientGlobals.cgPrecacheCheck)
+    finishWithModels = do
+        clientGlobals.cgPrecacheCheck .= Constants.csSounds
+        proceedWithSounds =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithSounds precacheCheck
+        | precacheCheck >= Constants.csSounds && precacheCheck < Constants.csSounds + Constants.maxSounds = do
+            allowDownloadSounds <- fmap (^.cvValue) allowDownloadSoundsCVar
+            if allowDownloadSounds /= 0
+                then do
+                    when (precacheCheck == Constants.csSounds) $
+                        clientGlobals.cgPrecacheCheck += 1
+                    configStrings <- use (globals.gCl.csConfigStrings)
+                    done <- downloadSounds configStrings =<< use (clientGlobals.cgPrecacheCheck)
+                    unless done finishWithSounds
+                else
+                    finishWithSounds
+        | otherwise = proceedWithImages =<< use (clientGlobals.cgPrecacheCheck)
+    downloadSounds configStrings precacheCheck
+        | precacheCheck < Constants.csSounds + Constants.maxSounds && not (B.null (configStrings Vector.! precacheCheck)) = do
+            let str = configStrings Vector.! precacheCheck
+            clientGlobals.cgPrecacheCheck += 1
+            if BC.head str == '*'
+                then downloadSounds configStrings =<< use (clientGlobals.cgPrecacheCheck)
+                else downloadSound ("sound/" `B.append` str)
+        | otherwise = return False
+    downloadSound name = do
+        fileExists <- CLParse.checkOrDownloadFile name
+        if fileExists
+            then do
+                configStrings <- use (globals.gCl.csConfigStrings)
+                downloadSounds configStrings =<< use (clientGlobals.cgPrecacheCheck)
+            else return True
+    finishWithSounds = do
+        clientGlobals.cgPrecacheCheck .= Constants.csImages
+        proceedWithImages =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithImages precacheCheck
+        | precacheCheck >= Constants.csImages && precacheCheck < Constants.csImages + Constants.maxImages = do
+            when (precacheCheck == Constants.csImages) $
+                clientGlobals.cgPrecacheCheck += 1
+            configStrings <- use (globals.gCl.csConfigStrings)
+            done <- downloadImages configStrings =<< use (clientGlobals.cgPrecacheCheck)
+            unless done finishWithImages
+        | otherwise = proceedWithPlayerSkins =<< use (clientGlobals.cgPrecacheCheck)
+    downloadImages configStrings precacheCheck
+        | precacheCheck < Constants.csImages + Constants.maxImages && not (B.null (configStrings Vector.! precacheCheck)) = do
+            let name = B.concat ["pics/", configStrings Vector.! precacheCheck, ".pcx"]
+            clientGlobals.cgPrecacheCheck += 1
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then downloadImages configStrings =<< use (clientGlobals.cgPrecacheCheck)
+                else return True
+        | otherwise = return False
+    finishWithImages = do
+        clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins
+        proceedWithPlayerSkins =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithPlayerSkins precacheCheck
+        | precacheCheck >= Constants.csPlayerSkins && precacheCheck < Constants.csPlayerSkins + Constants.maxClients * playerMult = do
+            allowDownloadPlayers <- fmap (^.cvValue) allowDownloadPlayersCVar
+            if allowDownloadPlayers /= 0
+                then do
+                    configStrings <- use (globals.gCl.csConfigStrings)
+                    done <- downloadSkins configStrings precacheCheck
+                    unless done finishWithPlayerSkins
+                else
+                    finishWithPlayerSkins
+        | otherwise = proceedWithMap =<< use (clientGlobals.cgPrecacheCheck)
+    downloadSkins configStrings precacheCheck
+        | precacheCheck < Constants.csPlayerSkins + Constants.maxClients * playerMult = do
+            let (i, n) = (precacheCheck - Constants.csPlayerSkins) `quotRem` playerMult
+                str = configStrings Vector.! (Constants.csPlayerSkins + i)
+            downloadSkin i n str
+        | otherwise = return False
+    downloadSkin i n str
+        | B.null str = do
+            clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + (i + 1) * playerMult
+            configStrings <- use (globals.gCl.csConfigStrings)
+            downloadSkins configStrings =<< use (clientGlobals.cgPrecacheCheck)
+        | otherwise = do
+            let indices = BC.findIndices (== '\\') str
+                (pos, pos2) = case indices of
+                                  []      -> (0, fromMaybe (-1) (BC.findIndex (== '/') str))
+                                  [a]     -> (a, fromMaybe (-1) (BC.findIndex (== '/') str))
+                                  (a:b:_) -> (a,b)
+                model = B.drop (pos + 1) (B.take pos2 str)
+                skin = B.drop (pos2 + 1) str
+            done <- startWithModel model skin n i
+            if done
+                then return True
+                else do
+                    configStrings <- use (globals.gCl.csConfigStrings)
+                    downloadSkins configStrings =<< use (clientGlobals.cgPrecacheCheck)
+    startWithModel model skin n i
+        | n == 0 = do
+            let name = B.concat ["players/", model, "/tris.md2"]
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then proceedWithWeaponModel model skin (n + 1) i
+                else do
+                    clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 1
+                    return True
+        | otherwise = proceedWithWeaponModel model skin n i
+    proceedWithWeaponModel model skin n i
+        | n == 1 = do
+            let name = B.concat ["players/", model, "/weapon.md2"]
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then proceedWithWeaponSkin model skin (n + 1) i
+                else do
+                    clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 2
+                    return True
+        | otherwise = proceedWithWeaponSkin model skin n i
+    proceedWithWeaponSkin model skin n i
+        | n == 2 = do
+            let name = B.concat ["players/", model, "/weapon.pcx"]
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then proceedWithSkin model skin (n + 1) i
+                else do
+                    clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 3
+                    return True
+        | otherwise = proceedWithSkin model skin n i
+    proceedWithSkin model skin n i
+        | n == 3 = do
+            let name = B.concat ["players/", model, "/", skin, ".pcx"]
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then proceedWithSkinI model skin (n + 1) i
+                else do
+                    clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 4
+                    return True
+        | otherwise = proceedWithSkinI model skin n i
+    proceedWithSkinI model skin n i
+        | n == 4 = do
+            let name = B.concat ["players/", model, "/", skin, "_i.pcx"]
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then return False
+                else do
+                    clientGlobals.cgPrecacheCheck .= Constants.csPlayerSkins + i * playerMult + 5
+                    return True
+        | otherwise = return False
+    finishWithPlayerSkins = do
+        clientGlobals.cgPrecacheCheck .= envCnt
+        proceedWithMap =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithMap precacheCheck
+        | precacheCheck == envCnt = do
+            clientGlobals.cgPrecacheCheck += 1
+            configStrings <- use (globals.gCl.csConfigStrings)
+            (_, checksum) <- CM.loadMap (configStrings Vector.! (Constants.csModels + 1)) True [0]
+            let mapChecksum = head checksum -- IMPROVE: kinda ugly
+                chk = configStrings Vector.! Constants.csMapChecksum
+            if mapChecksum `xor` Lib.atoi chk /= 0
+                then Com.comError Constants.errDrop
+                                  (B.concat ["Local map version differs from server: ", encode mapChecksum, " != '", chk, "'\n"])
+                else proceedWithSky =<< use (clientGlobals.cgPrecacheCheck)
+        | otherwise = proceedWithSky =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithSky precacheCheck
+        | precacheCheck > envCnt && precacheCheck < textureCnt = do
+            allowDownload <- fmap (^.cvValue) allowDownloadCVar
+            allowDownloadMaps <- fmap (^.cvValue) allowDownloadMapsCVar
+            if allowDownload /= 0 && allowDownloadMaps /= 0
+                then do
+                    configStrings <- use (globals.gCl.csConfigStrings)
+                    done <- downloadSky (configStrings Vector.! Constants.csSky) precacheCheck
+                    unless done finishWithSky
+                else finishWithSky
+        | otherwise = proceedWithPrecacheCheck =<< use (clientGlobals.cgPrecacheCheck)
+    downloadSky skyStr precacheCheck
+        | precacheCheck < textureCnt = do
+            let n = precacheCheck - envCnt - 1
+                name = B.concat ["env/", skyStr, envSuf Vector.! (n `div` 2), if n .&. 1 /= 0 then ".pcx" else ".tga"]
+            clientGlobals.cgPrecacheCheck += 1
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then downloadSky skyStr =<< use (clientGlobals.cgPrecacheCheck)
+                else return True
+        | otherwise = return False
+    finishWithSky = do
+        clientGlobals.cgPrecacheCheck .= textureCnt
+        proceedWithPrecacheCheck =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithPrecacheCheck :: Int -> Quake ()
+    proceedWithPrecacheCheck precacheCheck
+        | precacheCheck == textureCnt = do
+            clientGlobals.cgPrecacheCheck .= textureCnt + 1
+            clientGlobals.cgPrecacheTex .= 0
+            proceedWithTextures =<< use (clientGlobals.cgPrecacheCheck)
+        | otherwise = proceedWithTextures =<< use (clientGlobals.cgPrecacheCheck)
+    proceedWithTextures precacheCheck
+        | precacheCheck == textureCnt + 1 = do
+            allowDownload <- fmap (^.cvValue) allowDownloadCVar
+            allowDownloadMaps <- fmap (^.cvValue) allowDownloadMapsCVar
+            if allowDownload /= 0 && allowDownloadMaps /= 0
+                then do
+                    mapSurfaces <- use (cmGlobals.cmMapSurfaces)
+                    numTexInfo <- use (cmGlobals.cmNumTexInfo)
+                    done <- downloadTextures mapSurfaces numTexInfo =<< use (clientGlobals.cgPrecacheTex)
+                    unless done finishWithTextures
+                else finishWithTextures
+        | otherwise = finishDownloads
+    downloadTextures mapSurfaces numTexInfo precacheTex
+        | precacheTex < numTexInfo = do
+            let name = B.concat ["textures/", fromMaybe B.empty ((mapSurfaces Vector.! precacheTex)^.msRName), ".wal"] -- IMPROVE: is B.empty ok here? maybe an error should be here?
+            clientGlobals.cgPrecacheTex += 1
+            fileExists <- CLParse.checkOrDownloadFile name
+            if fileExists
+                then downloadTextures mapSurfaces numTexInfo =<< use (clientGlobals.cgPrecacheTex)
+                else return True
+        | otherwise = return False
+    finishWithTextures = do
+        clientGlobals.cgPrecacheCheck .= textureCnt + 999
+        finishDownloads
+    finishDownloads = do
+        CLParse.registerSounds
+        CLView.prepRefresh
+        precacheSpawnCount <- use (clientGlobals.cgPrecacheSpawnCount)
+        MSG.writeByteI (globals.gCls.csNetChan.ncMessage) Constants.clcStringCmd
+        MSG.writeString (globals.gCls.csNetChan.ncMessage) (B.concat ["begin ", encode precacheSpawnCount, "\n"])

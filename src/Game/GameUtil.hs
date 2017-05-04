@@ -4,6 +4,7 @@ module Game.GameUtil
     , freeEdict
     , freeEdictA
     , inFront
+    , initEdict
     , killBox
     , mCheckAttack
     , megaHealthThink
@@ -28,6 +29,7 @@ import qualified Constants
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
+import qualified Game.GameCombat       as GameCombat
 import           Game.GameLocalsT
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
@@ -194,7 +196,42 @@ useTargets edictRef activatorRef = do
                         else fireTargets edictClassName foundRef findBy targetName
 
 killBox :: Ref EdictT -> Quake Bool
-killBox = error "GameUtil.killBox" -- TODO
+killBox edictRef = do
+    edict <- readRef edictRef
+    trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+    traceT <- trace (edict^.eEntityState.esOrigin)
+                    (Just (edict^.eMins))
+                    (Just (edict^.eMaxs))
+                    (edict^.eEntityState.esOrigin)
+                    Nothing
+                    Constants.maskPlayerSolid
+    doKillBox edict traceT
+  where
+    doKillBox edict traceT
+        | isNothing (traceT^.tEnt) || (traceT^.tEnt) == Just worldRef = return True
+        | otherwise = do
+            -- nail it
+            v3o <- use (globals.gVec3Origin)
+            maybe traceEntError (proceedKillBox edict v3o) (traceT^.tEnt)
+    traceEntError = do
+        Com.fatalError "GameUtil.killBox traceT^.tEnt is Nothing"
+        return False
+    proceedKillBox edict v3o traceEntRef = do
+        GameCombat.damage traceEntRef
+                          edictRef
+                          edictRef
+                          v3o
+                          (edict^.eEntityState.esOrigin)
+                          v3o
+                          100000
+                          0
+                          Constants.damageNoProtection
+                          Constants.modTelefrag
+        -- if we didnt' kill it, fail
+        traceEnt <- readRef traceEntRef
+        if (traceEnt^.eSolid) /= 0
+            then return False
+            else killBox edictRef
 
 monsterUse :: EntUse
 monsterUse = EntUse "monster_use" $ \selfRef _ (Just activatorRef) -> do

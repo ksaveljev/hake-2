@@ -340,3 +340,4 @@ executable hake2
                      Game.Monsters.MTank
                      Game.Monster
                      Game.PlayerWeapon
+                     Game.MFrameT

@@ -12,13 +12,14 @@ module Game.PlayerClient
     , spInfoPlayerStart
     ) where
 
-import           Control.Lens           (use, ix, (^.), (.=), (&), (.~))
+import           Control.Lens           (use, ix, (^.), (.=), (&), (.~), (+~), (%~))
 import           Control.Monad          (when, unless, void)
-import           Data.Bits              ((.&.), (.|.))
+import           Data.Bits              (complement, (.&.), (.|.))
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
-import           Linear                 (V3(..), _y)
+import           Data.Maybe             (fromMaybe, isNothing)
+import           Linear                 (V3(..), _y, _z)
 
 import qualified Constants
 import           Game.ClientPersistantT
@@ -32,17 +33,24 @@ import qualified Game.GameMisc          as GameMisc
 import qualified Game.GameSVCmds        as GameSVCmds
 import qualified Game.GameUtil          as GameUtil
 import           Game.GClientT
+import           Game.GItemT
 import qualified Game.Info              as Info
 import           Game.LevelLocalsT
+import qualified Game.PlayerHud         as PlayerHud
 import           Game.PlayerStateT
 import qualified Game.PlayerTrail       as PlayerTrail
+import qualified Game.PlayerView        as PlayerView
 import qualified Game.PlayerWeapon      as PlayerWeapon
+import           Game.PMoveStateT
 import qualified QCommon.Com            as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
 import qualified Util.Lib               as Lib
+import qualified Util.Math3D            as Math3D
+
+import {-# SOURCE #-} qualified Game.GameBase as GameBase
 
 saveClientData :: Quake ()
 saveClientData = do
@@ -306,7 +314,50 @@ initClientResp gClientRef = do
                                                                  & crCoopRespawn .~ (gClient^.gcPers)))
 
 clientBegin :: Ref EdictT -> Quake ()
-clientBegin = error "PlayerClient.clientBegin" -- TODO
+clientBegin edictRef = do
+    edict <- readRef edictRef
+    modifyRef edictRef (\v -> v & eClient .~ Just (Ref ((edict^.eIndex) - 1)))
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doClientBegin edict (Ref ((edict^.eIndex) - 1)) deathmatch
+  where
+    doClientBegin edict gClientRef deathmatch
+        | deathmatch /= 0 = clientBeginDeathmatch edictRef
+        | otherwise = do
+            -- if there is already a body waiting for us (a loadgame), just
+            -- take it, otherwise spawn one from scratch
+            if (edict^.eInUse)
+                then do
+                    -- the client has cleared the client side viewangles upon
+                    -- connecting to the server, which is different than the
+                    -- state when the game is saved, so we need to compensate
+                    -- with deltaangles
+                    gClient <- readRef gClientRef
+                    modifyRef gClientRef (\v -> v & gcPlayerState.psPMoveState.pmsDeltaAngles .~ fmap Math3D.angleToShort (gClient^.gcPlayerState.psViewAngles))
+                else do
+                    -- a spawn point will completely reinitialize the entity
+                    -- except for the persistant data that was initialized at
+                    -- ClientConnect() time
+                    GameUtil.initEdict edictRef
+                    modifyRef edictRef (\v -> v & eClassName .~ "player")
+                    initClientResp gClientRef
+                    putClientInServer edictRef
+            intermissionTime <- use (gameBaseGlobals.gbLevel.llIntermissionTime)
+            if intermissionTime /= 0
+                then
+                    PlayerHud.moveClientToIntermission edictRef
+                else do
+                    maxClients <- use (gameBaseGlobals.gbGame.glMaxClients)
+                    when (maxClients > 1) $ do
+                        gameImport <- use (gameBaseGlobals.gbGameImport)
+                        updatedEdict <- readRef edictRef
+                        gClient <- readRef gClientRef
+                        (gameImport^.giWriteByte) Constants.svcMuzzleFlash
+                        (gameImport^.giWriteShort) (updatedEdict^.eIndex)
+                        (gameImport^.giWriteByte) Constants.mzLogin
+                        (gameImport^.giMulticast) (updatedEdict^.eEntityState.esOrigin) Constants.multicastPvs
+                        (gameImport^.giBprintf) Constants.printHigh ((gClient^.gcPers.cpNetName) `B.append` " entered the game\n")
+            -- make sure all view stuff is valid
+            PlayerView.clientEndServerFrame edictRef
 
 clientThink :: Ref EdictT -> UserCmdT -> Quake ()
 clientThink = error "PlayerClient.clientThink" -- TODO
@@ -325,3 +376,192 @@ spectatorRespawn = error "PlayerClient.spectatorRespawn" -- TODO
 
 respawn :: Ref EdictT -> Quake ()
 respawn = error "PlayerClient.respawn" -- TODO
+
+clientBeginDeathmatch :: Ref EdictT -> Quake ()
+clientBeginDeathmatch = error "PlayerClient.clientBeginDeathmatch" -- TODO
+
+putClientInServer :: Ref EdictT -> Quake ()
+putClientInServer edictRef = do
+    -- find a spawn point
+    -- do it before setting health back up, so farthest
+    -- ranging doesn't count this client
+    (spawnOrigin, spawnAngles) <- selectSpawnPoint edictRef
+    edict <- readRef edictRef
+    let gClientRef = Ref ((edict^.eIndex) - 1)
+    -- deathmatch wipes most client data every spawn
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    coop <- fmap (^.cvValue) coopCVar
+    clientRespawn <- getClientRespawn gClientRef deathmatch coop
+    -- clear everything but the persistant data
+    saved <- fmap (^.gcPers) (readRef gClientRef)
+    writeRef gClientRef ((newGClientT ((edict^.eIndex) - 1)) & gcPers .~ saved)
+    when ((saved^.cpHealth) <= 0) $
+        initClientPersistant gClientRef
+    modifyRef gClientRef (\v -> v & gcResp .~ clientRespawn)
+    -- copy some data from the client to the entity
+    fetchClientEntData edictRef
+    -- clear entity values
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modifyRef edictRef (\v -> v & eGroundEntity .~ Nothing
+                                & eClient       .~ Just gClientRef
+                                & eTakeDamage   .~ Constants.damageAim
+                                & eMoveType     .~ Constants.moveTypeWalk
+                                & eViewHeight   .~ 22
+                                & eInUse        .~ True
+                                & eClassName    .~ "player"
+                                & eMass         .~ 200
+                                & eSolid        .~ Constants.solidBbox
+                                & eDeadFlag     .~ Constants.deadNo
+                                & eAirFinished  .~ levelTime + 12
+                                & eClipMask     .~ Constants.maskPlayerSolid
+                                & eiModel       .~ Just "players/male/tris.md2"
+                                & ePain         .~ Just playerPain
+                                & eDie          .~ Just playerDie
+                                & eWaterLevel   .~ 0
+                                & eWaterType    .~ 0
+                                & eFlags        %~ (.&. (complement Constants.flNoKnockback))
+                                & eSvFlags      %~ (.&. (complement Constants.svfDeadMonster))
+                                & eMins         .~ V3 (-16) (-16) (-24)
+                                & eMaxs         .~ V3 16 16 32
+                                & eVelocity     .~ V3 0 0 0)
+    dmFlags <- fmap (truncate . (^.cvValue)) dmFlagsCVar
+    fov <- getFov saved deathmatch dmFlags
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    weaponRef <- getWeaponRef (saved^.cpWeapon)
+    weaponModel <- readRef weaponRef
+    gunIndex <- (gameImport^.giModelIndex) (weaponModel^.giViewModel)
+    -- clear entity state values
+    let updatedSpawnOrigin = spawnOrigin & _z +~ 1 -- make sure off ground
+        angles = V3 0 (spawnAngles^._y) 0
+    modifyRef gClientRef (\v -> v & gcPlayerState                             .~ newPlayerStateT
+                                  & gcPlayerState.psPMoveState.pmsOrigin      .~ fmap (truncate . (* 8)) spawnOrigin
+                                  & gcPlayerState.psFOV                       .~ fromIntegral fov
+                                  & gcPlayerState.psGunIndex                  .~ gunIndex
+                                  & gcPlayerState.psPMoveState.pmsDeltaAngles .~ fmap Math3D.angleToShort (spawnAngles - (clientRespawn^.crCmdAngles))
+                                  & gcPlayerState.psViewAngles                .~ angles
+                                  & gcVAngle                                  .~ angles)
+    modifyRef edictRef (\v -> v & eEntityState.esEffects     .~ 0
+                                & eEntityState.esModelIndex  .~ 255 -- will use the skin specified model
+                                & eEntityState.esModelIndex2 .~ 255 -- custom gun model
+                                -- sknum is player num and weapon number
+                                -- weapon number will be added in changeweapon
+                                & eEntityState.esSkinNum     .~ (edict^.eIndex) - 1
+                                & eEntityState.esFrame       .~ 0
+                                & eEntityState.esOrigin      .~ updatedSpawnOrigin
+                                & eEntityState.esOldOrigin   .~ updatedSpawnOrigin
+                                & eEntityState.esAngles      .~ angles)
+    -- spawn a spectator
+    if saved^.cpSpectator
+      then do
+        modifyRef gClientRef (\v -> v & gcChaseTarget            .~ Nothing
+                                      & gcResp.crSpectator       .~ True
+                                      & gcPlayerState.psGunIndex .~ 0)
+        modifyRef edictRef (\v -> v & eMoveType .~ Constants.moveTypeNoClip
+                                    & eSolid    .~ Constants.solidNot
+                                    & eSvFlags  %~ (.|. Constants.svfNoClient))
+        (gameImport^.giLinkEntity) edictRef
+      else do
+        modifyRef gClientRef (\v -> v & gcResp.crSpectator .~ False)
+        void (GameUtil.killBox edictRef)
+        (gameImport^.giLinkEntity) edictRef
+        -- force the current weapon up
+        modifyRef gClientRef (\v -> v & gcNewWeapon .~ saved^.cpWeapon)
+        PlayerWeapon.changeWeapon edictRef
+  where
+    getClientRespawn gClientRef deathmatch coop
+        | deathmatch /= 0 = do
+           gClient <- readRef gClientRef
+           initClientPersistant gClientRef
+           void (clientUserInfoChanged edictRef (gClient^.gcPers.cpUserInfo))
+           return (gClient^.gcResp)
+        | coop /= 0 = do
+            gClient <- readRef gClientRef
+            let userInfo = gClient^.gcPers.cpUserInfo
+                coopResp = (gClient^.gcResp.crCoopRespawn) & cpGameHelpChanged .~ (gClient^.gcPers.cpGameHelpChanged)
+                                                           & cpHelpChanged .~ (gClient^.gcPers.cpHelpChanged)
+                resp = (gClient^.gcResp) & crCoopRespawn .~ coopResp
+            modifyRef gClientRef (\v -> v & gcPers .~ (resp^.crCoopRespawn))
+            void (clientUserInfoChanged edictRef userInfo)
+            when ((resp^.crScore) > (resp^.crCoopRespawn.cpScore)) $
+                modifyRef gClientRef (\v -> v & gcPers.cpScore .~ (resp^.crScore))
+            return resp
+        | otherwise = return newClientRespawnT
+    getFov saved deathmatch dmFlags
+        | deathmatch /= 0 && (dmFlags .&. Constants.dfFixedFov) /= 0 = return 90
+        | otherwise = do
+            v <- Info.valueForKey (saved^.cpUserInfo) "fov"
+            return (doGetFov (Lib.atoi v))
+    doGetFov fov
+        | fov < 1   = 90
+        | fov > 160 = 160
+        | otherwise = fov
+    getWeaponRef Nothing = do
+        Com.fatalError "PlayerClient.putClientInServer saved^.cpWeapon is Nothing"
+        return (Ref (-1))
+    getWeaponRef (Just weaponRef) = return weaponRef
+
+selectSpawnPoint :: Ref EdictT -> Quake (V3 Float, V3 Float)
+selectSpawnPoint edictRef = do
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    coop <- fmap (^.cvValue) coopCVar
+    spawnPoint <- use (gameBaseGlobals.gbGame.glSpawnPoint)
+    spot <- findSpot deathmatch coop spawnPoint
+    maybe (noSpot spawnPoint) spotFound spot
+  where
+    findSpot deathmatch coop spawnPoint
+        | deathmatch /= 0 = selectDeathmatchSpawnPoint
+        | coop /= 0 = selectCoopSpawnPoint edictRef
+        | otherwise = do
+            -- find a single player start spot
+            spot <- findPlayerStart (BC.map toLower spawnPoint) Nothing
+            maybe (findPlayerSpot spawnPoint) (return . Just) spot
+    findPlayerStart spawnPoint entRef = do
+        es <- GameBase.gFind entRef GameBase.findByClass "info_player_start"
+        maybe (return Nothing) (doFindPlayerStart spawnPoint) es
+    doFindPlayerStart spawnPoint ref = do
+        e <- readRef ref
+        proceedFindPlayerStart spawnPoint ref e
+    proceedFindPlayerStart spawnPoint ref e
+        | B.null spawnPoint && isNothing (e^.eTargetName) = return (Just ref)
+        | B.null spawnPoint || isNothing (e^.eTargetName) = findPlayerStart spawnPoint (Just ref)
+        | spawnPoint == BC.map toLower (fromMaybe "" (e^.eTargetName)) = return (Just ref)
+        | otherwise = findPlayerStart spawnPoint (Just ref) 
+    findPlayerSpot spawnPoint
+        | B.null spawnPoint = GameBase.gFind Nothing GameBase.findByClass "info_player_start"
+        | otherwise = return Nothing
+    noSpot spawnPoint = do
+        err <- use (gameBaseGlobals.gbGameImport.giError)
+        err (B.concat ["Couldn't find spawn point ", spawnPoint, "\n"])
+        return (V3 0 0 0, V3 0 0 0)
+    spotFound entRef = do
+        ent <- readRef entRef
+        let origin = (ent^.eEntityState.esOrigin) & _z +~ 9
+            angles = ent^.eEntityState.esAngles
+        return (origin, angles)
+
+selectDeathmatchSpawnPoint :: Quake (Maybe (Ref EdictT))
+selectDeathmatchSpawnPoint = error "PlayerClient.selectDeathmatchSpawnPoint" -- TODO
+
+selectCoopSpawnPoint :: Ref EdictT -> Quake (Maybe (Ref EdictT))
+selectCoopSpawnPoint = error "PlayerClient.selectCoopSpawnPoint" -- TODO
+
+fetchClientEntData :: Ref EdictT -> Quake ()
+fetchClientEntData edictRef = do
+    coop <- fmap (^.cvValue) coopCVar
+    edict <- readRef edictRef
+    maybe gClientError (doFetchClientEntData coop) (edict^.eClient)
+  where
+    gClientError = Com.fatalError "PlayerClient.fetchClientEntData edict^.eClient is Nothing"
+    doFetchClientEntData coop gClientRef = do
+        gClient <- readRef gClientRef
+        modifyRef edictRef (\v -> v & eHealth .~ gClient^.gcPers.cpHealth
+                                    & eMaxHealth .~ gClient^.gcPers.cpMaxHealth
+                                    & eFlags %~ (.|. (gClient^.gcPers.cpSavedFlags)))
+        when (coop /= 0) $
+            modifyRef gClientRef (\v -> v & gcResp.crScore .~ (gClient^.gcPers.cpScore))
+
+playerPain :: EntPain
+playerPain = error "PlayerClient.playerPain" -- TODO
+
+playerDie :: EntDie
+playerDie = error "PlayerClient.playerDie" -- TODO

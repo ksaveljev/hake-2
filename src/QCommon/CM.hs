@@ -270,7 +270,7 @@ clusterPHS cluster
         return (res `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - (B.length res)) 0)
 
 clusterPVS :: Int -> Quake B.ByteString
-clusterPVS = error "CM.clusterPVS" -- TODO
+clusterPVS = clusterPHS -- TODO: verify this
 
 decompressVis :: B.ByteString -> Int -> Quake B.ByteString
 decompressVis mapVisibility offset = do
@@ -747,7 +747,71 @@ boxTrace start end mins maxs headNode brushMask = do
                 checkLeafs (idx + 1) maxIdx
 
 testInLeaf :: Int -> Quake ()
-testInLeaf = error "CM.testInLeaf" -- TODO
+testInLeaf leafNum = do
+    leaf <- fmap (V.! leafNum) (use (cmGlobals.cmMapLeafs))
+    traceContents <- use (cmGlobals.cmTraceContents)
+    when ((leaf^.clContents) .&. traceContents /= 0) $
+        -- trace line against all brushes in the leaf
+        traceLine (fromIntegral (leaf^.clFirstLeafBrush)) 0 (fromIntegral (leaf^.clNumLeafBrushes))
+  where
+    traceLine firstLeafBrush idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+              checkCount <- use (cmGlobals.cmCheckCount)
+              mapLeafBrushes <- use (cmGlobals.cmMapLeafBrushes)
+              let brushRef = Ref (fromIntegral (mapLeafBrushes UV.! (firstLeafBrush + idx)))
+              brush <- readRef brushRef
+              if (brush^.cbCheckCount) == checkCount
+                  then
+                      traceLine firstLeafBrush (idx + 1) maxIdx
+                  else do
+                      modifyRef brushRef (\v -> v & cbCheckCount .~ checkCount)
+                      traceContents <- use (cmGlobals.cmTraceContents)
+                      if (brush^.cbContents) .&. traceContents == 0
+                          then
+                              traceLine firstLeafBrush (idx + 1) maxIdx
+                          else do
+                              traceMins <- use (cmGlobals.cmTraceMins)
+                              traceMaxs <- use (cmGlobals.cmTraceMaxs)
+                              traceStart <- use (cmGlobals.cmTraceStart)
+                              testBoxInBrush traceMins traceMaxs traceStart (cmGlobals.cmTraceTrace) brush
+                              fraction <- use (cmGlobals.cmTraceTrace.tFraction)
+                              unless (fraction == 0) $
+                                  traceLine firstLeafBrush (idx + 1) maxIdx
+
+testBoxInBrush :: V3 Float -> V3 Float -> V3 Float -> Lens' QuakeState TraceT -> CBrushT -> Quake ()
+testBoxInBrush mins maxs p1 traceLens brush = do
+    unless ((brush^.cbNumSides) == 0) $ do
+        done <- checkIntersection (brush^.cbFirstBrushSide) 0 (brush^.cbNumSides)
+        unless done $ do
+            traceLens %= (\v -> v & tStartSolid .~ True
+                                  & tAllSolid   .~ True
+                                  & tFraction   .~ 0
+                                  & tContents   .~ brush^.cbContents)
+  where
+    checkIntersection firstBrushSide idx maxIdx
+        | idx >= maxIdx = return False
+        | otherwise = do
+              side <- readRef (Ref (firstBrushSide + idx))
+              planeRef <- maybe planeError return (side^.cbsPlane)
+              plane <- readRef planeRef
+              -- FIXME: special case for axial
+              -- general box case
+              -- push the plane out apropriately for mins/maxs
+              -- FIXME: use signbits into 8 way lookup for each mins/maxs
+              let a = if plane^.cpNormal._x < 0 then maxs^._x else mins^._x
+                  b = if plane^.cpNormal._y < 0 then maxs^._y else mins^._y
+                  c = if plane^.cpNormal._z < 0 then maxs^._z else mins^._z
+                  ofs = V3 a b c
+                  dist = (plane^.cpDist) - dot ofs (plane^.cpNormal)
+                  d1 = dot p1 (plane^.cpNormal) - dist
+              -- if completely in front of face, no intersection
+              if d1 > 0
+                  then return True
+                  else checkIntersection firstBrushSide (idx + 1) maxIdx
+    planeError = do
+        Com.fatalError "CM.testBoxInBrush#checkIntersection side^.cbsPlane is Nothing"
+        return (Ref (-1))
 
 -- fills in a list of all the leafs touched
 boxLeafNums :: V3 Float -> V3 Float -> Lens' QuakeState (UV.Vector Int) -> Int -> Maybe [Int] -> Quake (Int, Maybe [Int])
