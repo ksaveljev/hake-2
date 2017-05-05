@@ -2,11 +2,12 @@ module Game.PlayerView
     ( clientEndServerFrame
     ) where
 
-import           Control.Lens          (use, (^.), (.=), (&), (.~), (+~), (%~))
+import           Control.Lens          (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (%~))
 import           Control.Monad         (when, unless)
 import           Data.Bits             (complement, xor, (.&.), (.|.))
-import           Data.Maybe            (isJust)
-import           Linear                (V3(..), dot, _x, _y, _z)
+import qualified Data.ByteString       as B
+import           Data.Maybe            (isJust, isNothing)
+import           Linear                (V3(..), dot, normalize, _x, _y, _z)
 
 import qualified Constants
 import           Game.ClientRespawnT
@@ -14,9 +15,10 @@ import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameCombat       as GameCombat
-import           Game.GameLocalsT
+import qualified Game.GameItems        as GameItems
 import           Game.GClientT
 import           Game.LevelLocalsT
+import qualified Game.Monsters.MPlayer as MPlayer
 import qualified Game.PlayerHud        as PlayerHud
 import           Game.PlayerStateT
 import qualified Game.PlayerWeapon     as PlayerWeapon
@@ -26,10 +28,9 @@ import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import           Util.Binary           (encode)
 import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
-
-import {-# SOURCE #-} Game.GameImportT
 
 clientEndServerFrame :: Ref EdictT -> Quake ()
 clientEndServerFrame edictRef = do
@@ -361,25 +362,356 @@ doWorldEffects edictRef initialEdict
                                       Constants.modSlime
 
 fallingDamage :: Ref EdictT -> Quake ()
-fallingDamage = error "PlayerView.fallingDamage" -- TODO
+fallingDamage edictRef = do
+    edict <- readRef edictRef
+    when ((edict^.eEntityState.esModelIndex) == 255 && (edict^.eMoveType) /= Constants.moveTypeNoClip) $ do
+        gClientRef <- getGClientRef (edict^.eClient)
+        gClient <- readRef gClientRef
+        let delta = fmap (\d -> d * d * 0.0001) (calcDelta edict gClient)
+            delta' = fmap (\d -> checkWaterLevel (edict^.eWaterLevel) d) delta
+        maybe (return ()) (doFallingDamage edict gClientRef) delta'
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.fallingDamage edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    calcDelta edict gClient
+        | gClient^.gcOldVelocity._z < 0 && (edict^.eVelocity._z) > (gClient^.gcOldVelocity._z) && isNothing (edict^.eGroundEntity) =
+            Just (gClient^.gcOldVelocity._z)
+        | isNothing (edict^.eGroundEntity) = Nothing
+        | otherwise = Just ((edict^.eVelocity._z) - (gClient^.gcOldVelocity._z))
+    checkWaterLevel waterLevel delta 
+        | waterLevel == 3 = delta
+        | waterLevel == 2 = delta * 0.25
+        | waterLevel == 1 = delta * 0.5
+        | otherwise = delta
+    doFallingDamage edict gClientRef delta
+        | (edict^.eWaterLevel) == 3 = return () -- never take falling damage if completely underwater
+        | delta < 1 = return ()
+        | delta < 15 = modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
+        | otherwise = do
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef gClientRef (\v -> v & gcFallValue .~ min (delta * 0.5) 40
+                                          & gcFallTime .~ levelTime + Constants.fallTime)
+            proceedFallingDamage edict delta levelTime
+    proceedFallingDamage edict delta levelTime
+        | delta > 30 = do
+            when ((edict^.eHealth) > 0) $
+                modifyRef edictRef (\v -> v & eEntityState.esEvent .~ (if delta > 55 then Constants.evFallFar else Constants.evFall))
+            modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime)
+            deathmatch <- fmap (^.cvValue) deathmatchCVar
+            dmFlags <- fmap (truncate . (^.cvValue)) dmFlagsCVar
+            when (deathmatch == 0 || dmFlags .&. Constants.dfNoFalling == 0) $ do
+                let damage = max 1 (truncate ((delta - 30) / 2) :: Int)
+                v3o <- use (globals.gVec3Origin)
+                GameCombat.damage edictRef
+                                  worldRef
+                                  worldRef
+                                  (V3 0 0 1)
+                                  (edict^.eEntityState.esOrigin)
+                                  v3o
+                                  damage
+                                  0
+                                  0
+                                  Constants.modFalling
+        | otherwise =
+            modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFallShort)
 
 damageFeedback :: Ref EdictT -> Quake ()
-damageFeedback = error "PlayerView.damageFeedback" -- TODO
+damageFeedback playerRef = do
+    player <- readRef playerRef
+    gClientRef <- getGClientRef (player^.eClient)
+    gClient <- readRef gClientRef
+    frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    -- flash the backgrounds behind the status numbers
+    modifyRef gClientRef (\v -> v & gcPlayerState.psStats.ix Constants.statFlashes .~ 0)
+    when ((gClient^.gcDamageBlood) /= 0) $
+        modifyRef gClientRef (\v -> v & gcPlayerState.psStats.ix Constants.statFlashes %~ (.|. 1))
+    when ((gClient^.gcDamageArmor) /= 0 && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $
+        modifyRef gClientRef (\v -> v & gcPlayerState.psStats.ix Constants.statFlashes %~ (.|. 2))
+    -- total points of damage shot at the player this frame
+    let realCount = (gClient^.gcDamageBlood) + (gClient^.gcDamageArmor) + (gClient^.gcDamagePArmor)
+    unless (realCount == 0) $ do -- unless (didn't take any damage)
+        -- start a pain animation if still in the player model
+        when ((gClient^.gcAnimPriority) < Constants.animPain && (player^.eEntityState.esModelIndex) == 255) $ do
+            startPainAnimation gClientRef gClient
+        let count = max realCount 10 -- always make a visible effect
+        -- play an apropriate pain sound
+        when (levelTime > (player^.ePainDebounceTime) && (player^.eFlags) .&. Constants.flGodMode == 0 && truncate (gClient^.gcInvincibleFrameNum) <= frameNum) $ do
+            playPainSound player levelTime
+        -- the total alpha of the blend is always proportional to count
+        when ((gClient^.gcDamageAlpha) < 0) $
+            modifyRef gClientRef (\v -> v & gcDamageAlpha .~ 0)
+        modifyRef gClientRef (\v -> v & gcDamageAlpha +~ fromIntegral count * 0.01)
+        modifyRef gClientRef (\v -> v & gcDamageAlpha %~ (\vv -> min 0.6 (max vv 0.2)))
+        -- the color of the blend will vary based on how much was absorbed by
+        -- different armors
+        modifyRef gClientRef (\v -> v & gcDamageBlend .~ calcDamageBlend gClient realCount)
+        -- calculate view angle kicks
+        let kick = abs (gClient^.gcDamageKnockback)
+        when (kick /= 0 && (player^.eHealth) > 0) $ do -- kick of 0 means no view adjust at all
+            right <- use (gameBaseGlobals.gbRight)
+            forward <- use (gameBaseGlobals.gbForward)
+            let kick' = (fromIntegral kick) * 100 / (fromIntegral (player^.eHealth)) :: Float
+                kick'' = if kick' < fromIntegral count * 0.5
+                             then fromIntegral count * 0.5
+                             else kick'
+                kick''' = min 50 kick''
+                vv = (gClient^.gcDamageFrom) - (player^.eEntityState.esOrigin)
+                vv' = normalize vv
+                side = vv' `dot` right
+                side' = negate (vv' `dot` forward)
+            modifyRef gClientRef (\v -> v & gcVDmgRoll .~ kick''' * side * 0.3
+                                          & gcVDmgPitch .~ kick''' * side' * 0.3
+                                          & gcVDmgTime .~ levelTime + Constants.damageTime)
+        -- clear totals
+        modifyRef gClientRef (\v -> v & gcDamageBlood     .~ 0
+                                      & gcDamageArmor     .~ 0
+                                      & gcDamagePArmor    .~ 0
+                                      & gcDamageKnockback .~ 0)
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.damageFeedback player^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    startPainAnimation gClientRef gClient
+        | (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0 = do
+            modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain1 - 1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameCRPain4)
+        | otherwise = do
+            gameBaseGlobals.gbXxxi %= (\x -> (x + 1) `mod` 3)
+            xxxi <- use (gameBaseGlobals.gbXxxi)
+            case xxxi of
+              0 -> do
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain101 - 1)
+                modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.framePain104)
+              1 -> do
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain201 - 1)
+                modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.framePain204)
+              2 -> do
+                modifyRef playerRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain301 - 1)
+                modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.framePain304)
+              _ -> return ()
+    playPainSound player levelTime = do
+        r <- fmap (\v -> 1 + (v .&. 1)) Lib.rand
+        modifyRef playerRef (\v -> v & ePainDebounceTime .~ levelTime + 0.7)
+        let l | (player^.eHealth) < 25 = 25
+              | (player^.eHealth) < 50 = 50
+              | (player^.eHealth) < 75 = 75
+              | otherwise              = 100 :: Int
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        soundIdx <- (gameImport^.giSoundIndex) (Just (B.concat ["*pain", encode l, "_", encode r, ".wav"]))
+        (gameImport^.giSound) (Just playerRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+    calcDamageBlend gClient realCount =
+        let realCountF = fromIntegral realCount :: Float
+            a = V3 0 0 0 :: V3 Float
+            b | (gClient^.gcDamagePArmor) /= 0 = a + fmap (* (fromIntegral (gClient^.gcDamagePArmor) / realCountF)) (V3 0 1 0)
+              | otherwise = a
+            c | (gClient^.gcDamageArmor) /= 0 = b + fmap (* (fromIntegral (gClient^.gcDamageArmor) / realCountF)) (V3 1 1 1)
+              | otherwise = b
+            d | (gClient^.gcDamageBlood) /= 0 = c + fmap (* (fromIntegral (gClient^.gcDamageBlood) / realCountF)) (V3 1 0 0)
+              | otherwise = c
+        in d
 
+-- TODO: compare this to quake2 original
 calcViewOffset :: Ref EdictT -> Quake ()
-calcViewOffset = error "PlayerView.calcViewOffset" -- TODO
+calcViewOffset edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    gClient <- readRef gClientRef
+    -- if dead, fix the angle and don't add any kick
+    setAngles edict gClientRef gClient
+    bobFracSin <- use (gameBaseGlobals.gbBobFracSin)
+    xyspeed <- use (gameBaseGlobals.gbXYSpeed)
+    bobUpValue <- fmap (^.cvValue) bobUpCVar
+    let bob = min 6 (bobFracSin * xyspeed * bobUpValue)
+        V3 a b c = (V3 0 0 (fromIntegral (edict^.eViewHeight) + bob)) + (gClient^.gcKickOrigin)
+        a' = min 14 (max a (-14))
+        b' = min 14 (max b (-14))
+        c' = min 30 (max c (-22))
+    modifyRef gClientRef (\v -> v & gcPlayerState.psViewOffset .~ V3 a' b' c')
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.calcViewOffset edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    setAngles edict gClientRef gClient
+        | (edict^.eDeadFlag) /= 0 =
+            modifyRef gClientRef (\v -> v & gcPlayerState.psKickAngles .~ V3 0 0 0
+                                          & gcPlayerState.psViewAngles .~ V3 (-15) (gClient^.gcKillerYaw) 40)
+        | otherwise = do
+            -- add angles based on weapon kick
+            let angles = gClient^.gcKickAngles
+            -- add angles based on damage kick
+            angles2 <- addDamageKickAngles gClientRef angles
+            -- add angles based on fall kick
+            angles3 <- addFallKickAngles gClientRef angles2
+            -- add angles based on velocity
+            angles4 <- addVelocityAngles angles3
+            -- add angles based on bob
+            angles5 <- addBobAngles gClientRef angles4
+            modifyRef gClientRef (\v -> v & gcPlayerState.psKickAngles .~ angles5)
+    addDamageKickAngles gClientRef angles = do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        gClient <- readRef gClientRef
+        ratio <- updateRatio gClientRef (((gClient^.gcVDmgTime) - levelTime) / Constants.damageTime)
+        updatedGClient <- readRef gClientRef
+        let angles' = angles & _x %~ (+ (ratio * (updatedGClient^.gcVDmgPitch)))
+            angles'' = angles' & _z %~ (+ (ratio * (updatedGClient^.gcVDmgRoll)))
+        return angles''
+    updateRatio gClientRef ratio
+        | ratio < 0 = do
+            modifyRef gClientRef (\v -> v & gcVDmgPitch .~ 0
+                                          & gcVDmgRoll .~ 0)
+            return 0
+        | otherwise = return ratio
+    addFallKickAngles gClientRef angles = do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        gClient <- readRef gClientRef
+        let ratio = max 0 (((gClient^.gcFallTime) - levelTime) / Constants.fallTime)
+            angles' = angles & _x %~ (+ (ratio * (gClient^.gcFallValue)))
+        return angles'
+    addVelocityAngles angles = do
+        edict <- readRef edictRef
+        runPitch <- fmap (^.cvValue) runPitchCVar
+        runRoll <- fmap (^.cvValue) runRollCVar
+        forward <- use (gameBaseGlobals.gbForward)
+        right <- use (gameBaseGlobals.gbRight)
+        let delta = (edict^.eVelocity) `dot` forward
+            delta' = (edict^.eVelocity) `dot` right
+            angles' = angles & _x %~ (+ (delta * runPitch))
+            angles'' = angles' & _z %~ (+ (delta' * runRoll))
+        return angles''
+    addBobAngles gClientRef angles = do
+        bobFracSin <- use (gameBaseGlobals.gbBobFracSin)
+        bobCycle <- use (gameBaseGlobals.gbBobCycle)
+        xyspeed <- use (gameBaseGlobals.gbXYSpeed)
+        bobPitch <- fmap (^.cvValue) bobPitchCVar
+        bobRoll <- fmap (^.cvValue) bobRollCVar
+        gClient <- readRef gClientRef
+        let delta = bobFracSin * bobPitch * xyspeed
+            delta' = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0
+                         then delta * 6 -- crouching
+                         else delta
+            angles' = angles & _x %~ (+ delta')
+            delta'' = bobFracSin * bobRoll * xyspeed
+            delta''' = if (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0
+                           then delta'' * 6 -- crouching
+                           else delta''
+            delta'''' = if bobCycle .&. 1 /= 0 then negate delta''' else delta'''
+            angles'' = angles' & _z %~ (+ delta'''')
+        return angles''
 
 calcGunOffset :: Ref EdictT -> Quake ()
-calcGunOffset = error "PlayerView.calcGunOffset" -- TODO
+calcGunOffset edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    xyspeed <- use (gameBaseGlobals.gbXYSpeed)
+    bobFracSin <- use (gameBaseGlobals.gbBobFracSin)
+    bobCycle <- use (gameBaseGlobals.gbBobCycle)
+    modifyRef gClientRef (\v -> v & gcPlayerState.psGunAngles._z .~ xyspeed * bobFracSin * 0.005
+                                  & gcPlayerState.psGunAngles._y .~ xyspeed * bobFracSin * 0.01)
+    when (bobCycle .&. 1 /= 0) $
+        modifyRef gClientRef (\v -> v & gcPlayerState.psGunAngles._z %~ negate
+                                      & gcPlayerState.psGunAngles._y %~ negate)
+    modifyRef gClientRef (\v -> v & gcPlayerState.psGunAngles._x .~ xyspeed * bobFracSin * 0.005)
+    -- gun angles from delta movement
+    gClient <- readRef gClientRef
+    setGunAngles gClientRef gClient 0 3
+    forward <- use (gameBaseGlobals.gbForward)
+    right <- use (gameBaseGlobals.gbRight)
+    up <- use (gameBaseGlobals.gbUp)
+    gunX <- fmap (^.cvValue) gunXCVar
+    gunY <- fmap (^.cvValue) gunYCVar
+    gunZ <- fmap (^.cvValue) gunZCVar
+    let offset = getGunOffset forward right up (V3 0 0 0) gunX gunY gunZ 0 3
+    modifyRef gClientRef (\v -> v & gcPlayerState.psGunOffset .~ offset)
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.calcGunOffset edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    setGunAngles gClientRef gClient idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            let delta = (gClient^.gcOldViewAngles.(Math3D.v3Access idx)) - (gClient^.gcPlayerState.psViewAngles.(Math3D.v3Access idx))
+                delta' = if delta > 180 then delta - 360 else delta
+                delta'' = if delta' < -180 then delta' + 360 else delta'
+                delta''' = if delta'' > 45 then 45 else delta''
+                delta'''' = if delta''' < -45 then -45 else delta'''
+            when (idx == Constants.yaw) $
+                modifyRef gClientRef (\v -> v & gcPlayerState.psGunAngles._z +~ 0.1 * delta'''')
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunAngles.(if idx == 0 then _x else (if idx == 1 then _y else _z)) +~ 0.2 * delta'''')
+            setGunAngles gClientRef gClient (idx + 1) maxIdx
+    getGunOffset forward right up acc gunX gunY gunZ idx maxIdx
+        | idx >= maxIdx = acc
+        | otherwise =
+            let a = (forward^.(Math3D.v3Access idx)) * gunY
+                b = (right^.(Math3D.v3Access idx)) * gunX
+                c = (up^.(Math3D.v3Access idx)) * (negate gunZ)
+                V3 a' b' c' = acc
+            in getGunOffset forward right up (V3 (a + a') (b + b') (c + c')) gunX gunY gunZ (idx + 1) maxIdx
 
 calcBlend :: Ref EdictT -> Quake ()
-calcBlend = error "PlayerView.calcBlend" -- TODO
+calcBlend edictRef = io (putStrLn "PlayerView.calcBlend IMPLEMENT ME!") -- TODO
 
 setClientEvent :: Ref EdictT -> Quake ()
-setClientEvent = error "PlayerView.setClientEvent" -- TODO
+setClientEvent edictRef = do
+    edict <- readRef edictRef
+    unless ((edict^.eEntityState.esEvent) /= 0) $ do
+        xyspeed <- use (gameBaseGlobals.gbXYSpeed)
+        when (isJust (edict^.eGroundEntity) && xyspeed > 225) $ do
+            currentClientRef <- getCurrentClientRef =<< use (gameBaseGlobals.gbCurrentClient)
+            bobTime <- fmap (^.gcBobTime) (readRef currentClientRef)
+            bobMove <- use (gameBaseGlobals.gbBobMove)
+            bobCycle <- use (gameBaseGlobals.gbBobCycle)
+            when (truncate (bobTime + bobMove) /= bobCycle) $
+                modifyRef edictRef (\v -> v & eEntityState.esEvent .~ Constants.evFootstep)
+  where
+    getCurrentClientRef Nothing = do
+        Com.fatalError "PlayerView.setClientEvent current client is Nothing"
+        return (Ref (-1))
+    getCurrentClientRef (Just clientRef) = return clientRef
 
 setClientEffects :: Ref EdictT -> Quake ()
-setClientEffects = error "PlayerView.setClientEffects" -- TODO
+setClientEffects edictRef = do
+    modifyRef edictRef (\v -> v & eEntityState.esEffects .~ 0
+                                & eEntityState.esRenderFx .~ 0)
+    edict <- readRef edictRef
+    intermissionTime <- use (gameBaseGlobals.gbLevel.llIntermissionTime)
+    unless ((edict^.eHealth) <= 0 || intermissionTime /= 0) $ do
+        levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+        when ((edict^.ePowerArmorTime) > levelTime) $ do
+            paType <- GameItems.powerArmorType edictRef
+            updateEffects paType
+        gClientRef <- getGClientRef (edict^.eClient)
+        gClient <- readRef gClientRef
+        frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+        when (truncate (gClient^.gcQuadFrameNum) > frameNum) $ do
+            let remaining = truncate (gClient^.gcQuadFrameNum) - frameNum
+            when (remaining > 30 || (remaining .&. 4) /= 0) $
+                modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efQuad))
+        when (truncate (gClient^.gcInvincibleFrameNum) > frameNum) $ do
+            let remaining = truncate (gClient^.gcInvincibleFrameNum) - frameNum
+            when (remaining > 30 || (remaining .&. 4) /= 0) $
+                modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPent))
+        -- show cheaters!!!
+        when ((edict^.eFlags) .&. Constants.flGodMode /= 0) $ do
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                      & eEntityState.esRenderFx %~ (.|. (Constants.rfShellRed .|. Constants.rfShellGreen .|. Constants.rfShellBlue)))
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.setClientEffects edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    updateEffects paType
+        | paType == Constants.powerArmorScreen =
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efPowerScreen))
+        | paType == Constants.powerArmorShield =
+            modifyRef edictRef (\v -> v & eEntityState.esEffects %~ (.|. Constants.efColorShell)
+                                        & eEntityState.esRenderFx %~ (.|. Constants.rfShellGreen))
+        | otherwise = return ()
 
 setClientSound :: Ref EdictT -> Quake ()
 setClientSound = error "PlayerView.setClientSound" -- TODO

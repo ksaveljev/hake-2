@@ -19,6 +19,7 @@ module Game.GameItems
     , pickupPack
     , pickupPowerArmor
     , pickupPowerup
+    , powerArmorType
     , precacheItem
     , setItemNames
     , spawnItem
@@ -1309,3 +1310,6 @@ useItem = EntUse "use_item" $ \edictRef _ _ -> do
                                 & eTouch .~ touch)
     linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
     linkEntity edictRef
+
+powerArmorType :: Ref EdictT -> Quake Int
+powerArmorType = error "GameItems.powerArmorType" -- TODO
