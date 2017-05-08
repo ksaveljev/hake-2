@@ -7,6 +7,7 @@ module QCommon.CM
     , clusterPVS
     , entityString
     , headnodeForBox
+    , headNodeVisible
     , inlineModel
     , leafArea
     , leafCluster
@@ -17,19 +18,22 @@ module QCommon.CM
     , setAreaPortalState
     , transformedBoxTrace
     , transformedPointContents
+    , writeAreaBits
     , writePortalState
     ) where
 
-import           Control.Lens                    (Lens', use, ix, (.=), (%=), (+=), (^.), (&), (.~), _1, _2)
+import           Control.Lens                    (Lens', Traversal', use, preuse, ix, (.=), (%=), (+=), (^.), (&), (.~), _1, _2)
 import           Control.Monad                   (void, unless, when)
 import           Data.Binary.Get                 (runGet, getWord16le)
-import           Data.Bits                       (shiftR, (.&.), (.|.))
+import           Data.Bits                       (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Maybe                      (fromJust)
 import qualified Data.Vector                     as V
+import qualified Data.Vector.Storable            as SV
 import qualified Data.Vector.Unboxed             as UV
+import           Data.Word                       (Word8)
 import           Linear                          (V3(..), dot, _x, _y, _z)
 import           System.IO                       (Handle)
 
@@ -1146,3 +1150,42 @@ headnodeForBox mins maxs = do
     modifyRef (Ref (numPlanes + 10)) (\v -> v & cpDist .~ mins^._z)
     modifyRef (Ref (numPlanes + 11)) (\v -> v & cpDist .~ - (mins^._z))
     return boxHeadNode
+
+headNodeVisible :: Int -> UV.Vector Word8 -> Quake Bool
+headNodeVisible nodeNum visbits
+    | nodeNum < 0 = do
+        mapLeafs <- use (cmGlobals.cmMapLeafs)
+        let leafNum = -1 - nodeNum
+            cluster = (mapLeafs V.! leafNum)^.clCluster
+        if cluster == -1
+            then return False
+            else return ((visbits UV.! (cluster `shiftR` 3)) .&. (1 `shiftL` (cluster .&. 7)) /= 0)
+    | otherwise = do
+        mapNodes <- use $ cmGlobals.cmMapNodes
+        let node = mapNodes V.! nodeNum
+        v <- headNodeVisible (node^.cnChildren._1) visbits
+        if v then return True else headNodeVisible (node^.cnChildren._2) visbits
+
+-- IMPROVE: begs for performance improvement?
+writeAreaBits :: Traversal' QuakeState (SV.Vector Word8) -> Int -> Quake Int
+writeAreaBits bufferLens area = do
+    numAreas <- use (cmGlobals.cmNumAreas)
+    noAreasValue <- fmap (^.cvValue) mapNoAreasCVar
+    let bytes = (numAreas + 7) `shiftR` 3
+    if noAreasValue /= 0
+        then
+            bufferLens %= \buffer -> (SV.replicate bytes 255) SV.++ (SV.drop bytes buffer)
+        else do
+            mapAreas <- use (cmGlobals.cmMapAreas)
+            Just buffer <- preuse bufferLens
+            let buffer' = (SV.replicate bytes 0) SV.++ (SV.drop bytes buffer)
+                floodNum = (mapAreas V.! area)^.caFloodNum
+            bufferLens .= constructAreaBits floodNum mapAreas buffer' 0 numAreas
+    return bytes
+  where
+    constructAreaBits floodNum mapAreas buffer idx maxIdx
+        | idx >= maxIdx = buffer
+        | ((mapAreas V.! idx)^.caFloodNum) == floodNum || area == 0 =
+            constructAreaBits floodNum mapAreas (buffer SV.// [(idx `shiftR` 3, (buffer SV.! (idx `shiftR` 3)) .|. (1 `shiftL` (fromIntegral idx .&. 7)))]) (idx + 1) maxIdx
+        | otherwise =
+            constructAreaBits floodNum mapAreas buffer (idx + 1) maxIdx

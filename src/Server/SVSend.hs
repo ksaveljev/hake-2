@@ -9,7 +9,7 @@ module Server.SVSend
     ) where
 
 import           Control.Exception     (IOException, handle)
-import           Control.Lens          (use, ix, (.=), (^.))
+import           Control.Lens          (use, ix, (.=), (^.), (&), (.~))
 import           Control.Monad         (when, unless, void, (>=>))
 import           Data.Binary.Get       (runGet)
 import           Data.Bits             (shiftR, shiftL, (.&.), (.|.))
@@ -36,6 +36,7 @@ import           QuakeState
 import           Server.ClientT
 import           Server.ServerStaticT
 import           Server.ServerT
+import qualified Server.SVEnts         as SVEnts
 import qualified Server.SVUser         as SVUser
 import qualified Sys.Timer             as Timer
 import           Types
@@ -268,4 +269,33 @@ rateDrop clientRef = doRateDrop =<< readRef clientRef
         | otherwise = error "SVSend.rateDrop" -- TODO
 
 sendClientDatagram :: Ref ClientT -> Quake Bool
-sendClientDatagram = error "SVSend.sendClientDatagram" -- TODO
+sendClientDatagram clientRef@(Ref clientIdx) = do
+    SVEnts.buildClientFrame clientRef
+    SZ.initialize (svGlobals.svMsg) B.empty Constants.maxMsgLen
+    svGlobals.svMsg.sbAllowOverflow .= True
+    -- send over all the relevant entity_state_t
+    -- and the player_state_t
+    SVEnts.writeFrameToClient clientRef (svGlobals.svMsg)
+    -- copy the accumulated multicast datagram
+    -- for this client out to the message
+    -- it is necessary for this to be after the WriteEntities
+    -- so that entity references will be current
+    client <- readRef clientRef
+    if client^.cDatagram.sbOverflowed
+        then Com.printf (B.concat ["WARNING: datagram overflowed for ", client^.cName, "\n"])
+        else SZ.write (svGlobals.svMsg) (client^.cDatagram.sbData) (client^.cDatagram.sbCurSize)
+    SZ.clear (svGlobals.svServerStatic.ssClients.ix clientIdx.cDatagram)
+    checkOverflow client =<< use (svGlobals.svMsg)
+    -- send the datagram
+    msg <- use (svGlobals.svMsg)
+    NetChannel.transmit (svGlobals.svServerStatic.ssClients.ix clientIdx.cNetChan) (msg^.sbCurSize) (msg^.sbData)
+    -- record the size for rate estimation
+    frameNum <- use (svGlobals.svServer.sFrameNum)
+    modifyRef clientRef (\v -> v & cMessageSize.ix (frameNum `mod` Constants.rateMessages) .~ (msg^.sbCurSize))
+    return True
+  where
+    checkOverflow client msg =
+        when (msg^.sbOverflowed) $ do -- must have room left for the packet header
+            Com.printf (B.concat ["WARNING: msg overflowed for ", client^.cName, "\n"])
+            SZ.clear (svGlobals.svMsg)
+

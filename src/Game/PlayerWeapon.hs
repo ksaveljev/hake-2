@@ -18,8 +18,8 @@ module Game.PlayerWeapon
     , weaponSuperShotgun
     ) where
 
-import           Control.Lens           (use, (^.), (&), (.~))
-import           Control.Monad          (when, unless)
+import           Control.Lens           (use, (^.), (.=), (&), (.~))
+import           Control.Monad          (when, unless, void)
 import           Data.Bits              (shiftL, (.&.), (.|.))
 import           Linear                 (V3)
 
@@ -85,7 +85,29 @@ weaponBFG :: EntThink
 weaponBFG = error "PlayerWeapon.weaponBFG" -- TODO
 
 thinkWeapon :: Ref EdictT -> Quake ()
-thinkWeapon = error "PlayerWeapon.thinkWeapon" -- TODO
+thinkWeapon edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    -- if just died, put the weapon away
+    when ((edict^.eHealth) < 1) $ do
+        modifyRef gClientRef (\v -> v & gcNewWeapon .~ Nothing)
+        changeWeapon edictRef
+    -- call active weapon think routine
+    gClient <- readRef gClientRef
+    maybe (return ()) (doThinkWeapon gClient) (gClient^.gcPers.cpWeapon)
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerWeapon.thinkWeapon edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    doThinkWeapon gClient weaponRef = do
+        weapon <- readRef weaponRef
+        maybe (return ()) (proceedThinkWeapon gClient) (weapon^.giWeaponThink)
+    proceedThinkWeapon gClient thinkF = do
+        frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+        gameBaseGlobals.gbIsQuad .= (truncate (gClient^.gcQuadFrameNum) > frameNum)
+        gameBaseGlobals.gbIsSilenced .= if (gClient^.gcSilencerShots) /= 0 then Constants.mzSilenced else 0
+        void (entThink thinkF edictRef)
 
 changeWeapon :: Ref EdictT -> Quake ()
 changeWeapon edictRef = do

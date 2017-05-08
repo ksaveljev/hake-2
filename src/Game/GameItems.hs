@@ -1,12 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Game.GameItems
-    ( bodyArmorInfo
+    ( armorIndex
+    , bodyArmorInfo
     , combatArmorInfo
     , dropAmmo
     , dropGeneral
     , dropPowerArmor
     , findItem
     , findItemByClassname
+    , getItemByIndex
     , initItems
     , jacketArmorInfo
     , pickupAdrenaline
@@ -1312,4 +1314,27 @@ useItem = EntUse "use_item" $ \edictRef _ _ -> do
     linkEntity edictRef
 
 powerArmorType :: Ref EdictT -> Quake Int
-powerArmorType = error "GameItems.powerArmorType" -- TODO
+powerArmorType edictRef = do
+    edict <- readRef edictRef
+    getPowerArmorType edict (edict^.eClient)
+  where
+    getPowerArmorType _ Nothing = return Constants.powerArmorNone
+    getPowerArmorType edict (Just gClientRef) = do
+        gClient <- readRef gClientRef
+        powerShieldRef <- use (gameItemsGlobals.giPowerShieldIndex)
+        powerScreenRef <- use (gameItemsGlobals.giPowerScreenIndex)
+        powerShield <- readRef powerShieldRef
+        powerScreen <- readRef powerScreenRef
+        return (doGetPowerArmorType edict gClient powerShield powerScreen)
+    doGetPowerArmorType edict gClient powerShield powerScreen
+        | (edict^.eFlags) .&. Constants.flPowerArmor == 0               = Constants.powerArmorNone
+        | (gClient^.gcPers.cpInventory) UV.! (powerShield^.giIndex) > 0 = Constants.powerArmorShield
+        | (gClient^.gcPers.cpInventory) UV.! (powerScreen^.giIndex) > 0 = Constants.powerArmorScreen
+        | otherwise                                                     = Constants.powerArmorNone
+
+getItemByIndex :: Int -> Quake (Maybe GItemT)
+getItemByIndex idx = do
+    numItems <- use (gameBaseGlobals.gbGame.glNumItems)
+    if idx == 0 || idx >= numItems
+        then return Nothing
+        else fmap Just (readRef (Ref idx))

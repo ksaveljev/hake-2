@@ -2,35 +2,38 @@ module Game.PlayerView
     ( clientEndServerFrame
     ) where
 
-import           Control.Lens          (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (%~))
-import           Control.Monad         (when, unless)
-import           Data.Bits             (complement, xor, (.&.), (.|.))
-import qualified Data.ByteString       as B
-import           Data.Maybe            (isJust, isNothing)
-import           Linear                (V3(..), dot, normalize, _x, _y, _z)
+import           Control.Lens           (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (-~), (%~))
+import           Control.Monad          (when, unless)
+import           Data.Bits              (complement, xor, (.&.), (.|.))
+import qualified Data.ByteString        as B
+import           Data.Maybe             (isJust, isNothing)
+import           Linear                 (V3(..), dot, normalize, _x, _y, _z)
 
 import qualified Constants
+import           Game.ClientPersistantT
 import           Game.ClientRespawnT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
-import qualified Game.GameCombat       as GameCombat
-import qualified Game.GameItems        as GameItems
+import qualified Game.GameCombat        as GameCombat
+import qualified Game.GameItems         as GameItems
+import           Game.GameLocalsT
 import           Game.GClientT
+import           Game.GItemT
 import           Game.LevelLocalsT
-import qualified Game.Monsters.MPlayer as MPlayer
-import qualified Game.PlayerHud        as PlayerHud
+import qualified Game.Monsters.MPlayer  as MPlayer
+import qualified Game.PlayerHud         as PlayerHud
 import           Game.PlayerStateT
-import qualified Game.PlayerWeapon     as PlayerWeapon
+import qualified Game.PlayerWeapon      as PlayerWeapon
 import           Game.PMoveStateT
-import qualified QCommon.Com           as Com
+import qualified QCommon.Com            as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
-import           Util.Binary           (encode)
-import qualified Util.Lib              as Lib
-import qualified Util.Math3D           as Math3D
+import           Util.Binary            (encode)
+import qualified Util.Lib               as Lib
+import qualified Util.Math3D            as Math3D
 
 clientEndServerFrame :: Ref EdictT -> Quake ()
 clientEndServerFrame edictRef = do
@@ -714,10 +717,124 @@ setClientEffects edictRef = do
         | otherwise = return ()
 
 setClientSound :: Ref EdictT -> Quake ()
-setClientSound = error "PlayerView.setClientSound" -- TODO
+setClientSound edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    checkHelpChanged gClientRef
+    -- help beep (no more than three times)
+    helpBeep gClientRef
+    setSound gClientRef
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.setClientSound edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    checkHelpChanged gClientRef = do
+        gClient <- readRef gClientRef
+        helpChanged <- use (gameBaseGlobals.gbGame.glHelpChanged)
+        when ((gClient^.gcPers.cpGameHelpChanged) /= helpChanged) $ do
+            modifyRef gClientRef (\v -> v & gcPers.cpGameHelpChanged .~ helpChanged
+                                          & gcPers.cpHelpChanged .~ 1)
+    helpBeep gClientRef = do
+        gClient <- readRef gClientRef
+        frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+        when ((gClient^.gcPers.cpHelpChanged) /= 0 && (gClient^.gcPers.cpHelpChanged) <= 3 && (frameNum .&. 63) == 0) $ do
+            modifyRef gClientRef (\v -> v & gcPers.cpHelpChanged +~ 1)
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            soundIdx <- (gameImport^.giSoundIndex) (Just "misc/pc_up.wav")
+            (gameImport^.giSound) (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnStatic 0
+    setSound gClientRef = do
+        gClient <- readRef gClientRef
+        weapon <- getWeapon (gClient^.gcPers.cpWeapon)
+        edict <- readRef edictRef
+        soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+        soundIdx <- getSoundIndex edict gClient weapon soundIndex
+        modifyRef edictRef (\v -> v & eEntityState.esSound .~ soundIdx)
+    getWeapon Nothing = return ""
+    getWeapon (Just weaponRef) = do
+        weapon <- readRef weaponRef
+        return (weapon^.giClassName)
+    getSoundIndex :: EdictT -> GClientT -> B.ByteString -> (Maybe B.ByteString -> Quake Int) -> Quake Int
+    getSoundIndex edict gClient weapon soundIndex
+        | (edict^.eWaterLevel) /= 0 && (edict^.eWaterType) .&. (Constants.contentsLava .|. Constants.contentsSlime) /= 0 =
+            use (gameBaseGlobals.gbSndFry)
+        | weapon == "weapon_railgun" = soundIndex (Just "weapons/rg_hum.wav")
+        | weapon == "weapon_bfg" = soundIndex (Just "weapons/bfg_hum.wav")
+        | (gClient^.gcWeaponSound) /= 0 = return (gClient^.gcWeaponSound)
+        | otherwise = return 0
 
 setClientFrame :: Ref EdictT -> Quake ()
-setClientFrame = error "PlayerView.setClientFrame" -- TODO
+setClientFrame edictRef = do
+    edict <- readRef edictRef
+    -- only when we are in the player model
+    when ((edict^.eEntityState.esModelIndex) == 255) $ do
+        gClientRef <- getGClientRef (edict^.eClient)
+        gClient <- readRef gClientRef
+        xyspeed <- use (gameBaseGlobals.gbXYSpeed)
+        let duck = (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0
+            run = xyspeed /= 0
+            skip = checkSkip edict gClient duck run
+        done <- if skip then return False else checkIfDone edict gClientRef gClient
+        unless done $ do
+            -- return to either a running or standing frame
+            modifyRef gClientRef (\v -> v & gcAnimPriority .~ Constants.animBasic
+                                          & gcAnimDuck     .~ duck
+                                          & gcAnimRun      .~ run)
+            doSetClientFrame gClientRef edict run duck
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerView.setClientFrame edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    doSetClientFrame gClientRef edict run duck
+        | isNothing (edict^.eGroundEntity) = do
+            modifyRef gClientRef (\v -> v & gcAnimPriority .~ Constants.animJump
+                                          & gcAnimEnd      .~ MPlayer.frameJump2)
+            when ((edict^.eEntityState.esFrame) /= MPlayer.frameJump2) $
+                modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump1)
+        | run && duck = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRWalk1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameCRWalk6)
+        | run = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameRun1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameRun6)
+        | duck = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRStnd01)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameCRStnd19)
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameStand01)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameStand40)
+    checkSkip edict gClient duck run =
+        let a = duck /= (gClient^.gcAnimDuck) && (gClient^.gcAnimPriority) < Constants.animDeath
+            b = run /= (gClient^.gcAnimRun) && (gClient^.gcAnimPriority) == Constants.animBasic
+            c = isNothing (edict^.eGroundEntity) && (gClient^.gcAnimPriority) <= Constants.animWave
+        in a || b || c
+    checkIfDone edict gClientRef gClient
+        | (gClient^.gcAnimPriority) == Constants.animReverse =
+            if (edict^.eEntityState.esFrame) > (gClient^.gcAnimEnd)
+                then do
+                    modifyRef edictRef (\v -> v & eEntityState.esFrame -~ 1)
+                    return True
+                else
+                    checkDeath edict gClientRef gClient
+        | otherwise =
+            if (edict^.eEntityState.esFrame) < (gClient^.gcAnimEnd) -- continue an animation
+                then do
+                    modifyRef edictRef (\v -> v & eEntityState.esFrame +~ 1)
+                    return True
+                else
+                    checkDeath edict gClientRef gClient
+    checkDeath edict gClientRef gClient
+        | (gClient^.gcAnimPriority) == Constants.animDeath = return True -- stay there
+        | otherwise = checkJump edict gClientRef gClient
+    checkJump edict gClientRef gClient
+        | (gClient^.gcAnimPriority) == Constants.animJump && isNothing (edict^.eGroundEntity) = return True -- stay there
+        | (gClient^.gcAnimPriority) == Constants.animJump = do
+            modifyRef gClientRef (\v -> v & gcAnimPriority .~ Constants.animWave
+                                          & gcAnimEnd .~ MPlayer.frameJump6)
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameJump3)
+            return True
+        | otherwise = return False
 
 calcRoll :: V3 Float -> V3 Float -> Quake Float
 calcRoll angles velocity = do
