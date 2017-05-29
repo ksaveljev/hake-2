@@ -5,12 +5,15 @@ module Server.SVEnts
     , writeFrameToClient
     ) where
 
-import           Control.Lens         (Lens', Traversal', use, ix, (.=), (+=), (^.), (&), (.~))
-import           Control.Monad        (when)
-import           Data.Bits            (shiftL, shiftR, (.&.))
-import qualified Data.ByteString      as B
-import qualified Data.Vector.Unboxed  as UV
-import           Linear               (V3(..), norm)
+import           Control.Lens             (Lens', Traversal', use, ix, (.=), (+=), (^.), (&), (.~))
+import           Control.Monad            (when)
+import           Data.Bits                (shiftL, shiftR, (.&.), (.|.))
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Internal as BI
+import qualified Data.Vector              as V
+import qualified Data.Vector.Storable     as SV
+import qualified Data.Vector.Unboxed      as UV
+import           Linear                   (V3(..), norm)
 
 import qualified Constants
 import           Game.EdictT
@@ -18,8 +21,10 @@ import           Game.EntityStateT
 import           Game.GClientT
 import           Game.PlayerStateT
 import           Game.PMoveStateT
-import qualified QCommon.CM           as CM
-import qualified QCommon.Com          as Com
+import qualified QCommon.CM               as CM
+import qualified QCommon.Com              as Com
+import qualified QCommon.MSG              as MSG
+import qualified QCommon.SZ               as SZ
 import           QuakeRef
 import           QuakeState
 import           Server.ClientFrameT
@@ -154,7 +159,76 @@ recordDemoMessage = do
     doRecordDemoMessage demoFile = error "SVEnts.recordDemoMessage" -- TODO
 
 writeFrameToClient :: Ref ClientT -> Lens' QuakeState SizeBufT -> Quake ()
-writeFrameToClient = error "SVEnts.writeFrameToClient" -- TODO
+writeFrameToClient clientRef@(Ref clientIdx) sizeBufLens = do
+    client <- readRef clientRef
+    frameNum <- use (svGlobals.svServer.sFrameNum)
+    let frameIdx = frameNum .&. Constants.updateMask
+        frame = (client^.cFrames) V.! frameIdx
+        (oldFrame, lastFrame)
+            | (client^.cLastFrame) <= 0 = (Nothing, -1) -- client is asking for a retransmit
+            | frameNum - (client^.cLastFrame) >= Constants.updateBackup - 3 = (Nothing, -1) -- client hasn't gotten a good message through in a long time
+            | otherwise = (Just ((client^.cFrames) V.! ((client^.cLastFrame) .&. Constants.updateMask)), client^.cLastFrame)
+    MSG.writeByteI sizeBufLens Constants.svcFrame
+    MSG.writeLong sizeBufLens frameNum
+    MSG.writeLong sizeBufLens lastFrame -- what we are delta'ing from
+    MSG.writeByteI sizeBufLens (client^.cSurpressCount) -- rate dropped packets
+    modifyRef clientRef (\v -> v & cSurpressCount .~ 0)
+    -- send over the areabits
+    MSG.writeByteI sizeBufLens (frame^.cfAreaBytes)
+    let (ptr, n) = SV.unsafeToForeignPtr0 (frame^.cfAreaBits)
+        areaBits = BI.PS ptr 0 n
+    SZ.write sizeBufLens areaBits (frame^.cfAreaBytes)
+    -- delta encode the playerstate
+    writePlayerStateToClient oldFrame frame sizeBufLens
+    -- delta encode the entities
+    emitPacketEntities oldFrame frame sizeBufLens
+
+writePlayerStateToClient :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+writePlayerStateToClient = error "SVEnts.writePlayerStateToClient" -- TODO
+
+emitPacketEntities :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
+emitPacketEntities = error "SVEnts.emitPacketEntities" -- TODO
 
 fatPVS :: V3 Float -> Quake ()
-fatPVS = error "SVEnts.fatPVS" -- TODO
+fatPVS org = do
+    (count, _) <- CM.boxLeafNums mins maxs (svGlobals.svLeafsTmp) 64 Nothing
+    when (count < 1) $
+        Com.fatalError "SV_FatPVS: count < 1"
+    longs <- fmap (\numClusters -> (numClusters + 31) `shiftR` 5) (use (cmGlobals.cmNumClusters))
+    -- convert leafs to clusters
+    leafs <- use (svGlobals.svLeafsTmp)
+    clusters <- UV.generateM count (\idx -> CM.leafCluster (leafs UV.! idx))
+    pvs <- CM.clusterPVS (clusters UV.! 0)
+    fatPVS <- use (svGlobals.svFatPVS)
+    -- System.arraycopy(CM.CM_ClusterPVS(leafs[0]), 0, SV_ENTS.fatpvs, 0, longs << 2);
+    let updatedFatPVS = UV.generate (UV.length fatPVS) (updateFatPVS pvs fatPVS (longs * 4))
+    newFatPVS <- calcNewFatPVS updatedFatPVS clusters longs 1 count
+    svGlobals.svFatPVS .= newFatPVS
+  where
+    mins = fmap (subtract 8) org
+    maxs = fmap (+ 8) org
+    updateFatPVS pvs fatPVS longs idx
+        | idx < longs = pvs `B.index` idx
+        | otherwise = fatPVS UV.! idx
+    calcNewFatPVS fatPVS clusters longs i count -- TODO: most likely needs refactoring (code wise and performance wise)
+        | i >= count = return fatPVS
+        | otherwise = do
+            let j = getJ clusters 0 i
+            if j /= i
+                then calcNewFatPVS fatPVS clusters longs (i + 1) count -- already have the cluster we want
+                else do
+                    src <- CM.clusterPVS (clusters UV.! i)
+                    let updates = constructFatPVSUpdates fatPVS src 0 0 longs []
+                    calcNewFatPVS (fatPVS UV.// updates) clusters longs (i + 1) count
+    getJ clusters i j
+        | j >= i = j
+        | (clusters UV.! i) == (clusters UV.! j) = j
+        | otherwise = getJ clusters i (j + 1)
+    constructFatPVSUpdates fatPVS src k j longs acc
+        | j >= longs = acc
+        | otherwise =
+            constructFatPVSUpdates fatPVS src (k + 4) (j + 1) longs ((k + 0, (fatPVS UV.! (k + 0)) .|. (src `B.index` (k + 0))) 
+                                                                   : (k + 1, (fatPVS UV.! (k + 1)) .|. (src `B.index` (k + 1)))
+                                                                   : (k + 2, (fatPVS UV.! (k + 2)) .|. (src `B.index` (k + 2)))
+                                                                   : (k + 3, (fatPVS UV.! (k + 3)) .|. (src `B.index` (k + 3))) 
+                                                                   : acc)
