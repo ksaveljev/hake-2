@@ -12,13 +12,14 @@ module Game.PlayerClient
     , spInfoPlayerStart
     ) where
 
-import           Control.Lens           (use, ix, (^.), (.=), (&), (.~), (+~), (%~))
+import           Control.Lens           (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (%~))
 import           Control.Monad          (when, unless, void)
 import           Data.Bits              (complement, (.&.), (.|.))
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
-import           Data.Maybe             (fromMaybe, isNothing)
+import           Data.Maybe             (fromMaybe, isNothing, isJust)
+import qualified Data.Vector            as V
 import           Linear                 (V3(..), _y, _z)
 
 import qualified Constants
@@ -27,6 +28,7 @@ import           Game.ClientRespawnT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
+import qualified Game.GameChase         as GameChase
 import qualified Game.GameItems         as GameItems
 import           Game.GameLocalsT
 import qualified Game.GameMisc          as GameMisc
@@ -42,6 +44,8 @@ import qualified Game.PlayerTrail       as PlayerTrail
 import qualified Game.PlayerView        as PlayerView
 import qualified Game.PlayerWeapon      as PlayerWeapon
 import           Game.PMoveStateT
+import           Game.PMoveT
+import           Game.UserCmdT
 import qualified QCommon.Com            as Com
 import           QCommon.CVarVariables
 import           QuakeRef
@@ -360,7 +364,155 @@ clientBegin edictRef = do
             PlayerView.clientEndServerFrame edictRef
 
 clientThink :: Ref EdictT -> UserCmdT -> Quake ()
-clientThink = error "PlayerClient.clientThink" -- TODO
+clientThink edictRef ucmd = do
+    gameBaseGlobals.gbLevel.llCurrentEntity .= Just edictRef
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    gClient <- readRef gClientRef
+    intermissionTime <- use (gameBaseGlobals.gbLevel.llIntermissionTime)
+    doClientThink intermissionTime gClientRef
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerClient.clientThink edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    doClientThink intermissionTime gClientRef
+        | intermissionTime /= 0 = do
+            modifyRef gClientRef (\v -> v & gcPlayerState.psPMoveState.pmsPMType .~ Constants.pmFreeze)
+            -- can exit intermission after five seconds
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            when (levelTime > intermissionTime + 5 && (fromIntegral (ucmd^.ucButtons) .&. Constants.buttonAny /= 0)) $
+                gameBaseGlobals.gbLevel.llExitIntermission .= True
+        | otherwise = do
+            gClient <- readRef gClientRef
+            clientGlobals.cgPMPassEnt .= Just edictRef
+            maybe (noChaseTarget gClientRef) (setCmdAngles gClientRef) (gClient^.gcChaseTarget)
+            updateButtons gClientRef
+            -- save light level the player is standing on for monster sighting AI
+            modifyRef edictRef (\v -> v & eLightLevel .~ fromIntegral (ucmd^.ucLightLevel))
+            -- fire weapon from final position if needed
+            fireWeaponIfNeeded gClientRef
+            spectatorThink gClientRef
+            -- update chase cam if being followed
+            maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+            updateChaseCamera 1 maxClients
+    setCmdAngles gClientRef _ =
+        modifyRef gClientRef (\v -> v & gcResp.crCmdAngles .~ fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles))
+    noChaseTarget gClientRef = do
+        updatePMTypeAndGravity gClientRef =<< readRef edictRef
+        gameImport <- use (gameBaseGlobals.gbGameImport)
+        edict <- readRef edictRef
+        gClient <- readRef gClientRef
+        let pointContents = gameImport^.giPointContents
+            pMove = gameImport^.giPMove
+            linkEntity = gameImport^.giLinkEntity
+            pmoveState = (gClient^.gcPlayerState.psPMoveState) & pmsOrigin .~ fmap (truncate . (* 8)) (edict^.eEntityState.esOrigin)
+                                                               & pmsVelocity .~ fmap (truncate . (* 8)) (edict^.eVelocity)
+            snapInitial = (gClient^.gcOldPMove) == pmoveState
+        -- perform a pmove
+        pm <- pMove (newPMoveT & pmState         .~ pmoveState
+                               & pmCmd           .~ ucmd
+                               & pmTrace         .~ defaultTrace
+                               & pmPointContents .~ pointContents
+                               & pmSnapInitial   .~ snapInitial)
+        -- save results of pmove
+        modifyRef gClientRef (\v -> v & gcPlayerState.psPMoveState .~ (pm^.pmState)
+                                      & gcOldPMove .~ (pm^.pmState)
+                                      & gcResp.crCmdAngles .~ fmap (Math3D.shortToAngle . fromIntegral) (ucmd^.ucAngles))
+        modifyRef edictRef (\v -> v & eEntityState.esOrigin .~ fmap ((* 0.125) . fromIntegral) (pm^.pmState.pmsOrigin)
+                                    & eVelocity .~ fmap ((* 0.125) . fromIntegral) (pm^.pmState.pmsVelocity)
+                                    & eMins .~ (pm^.pmMins)
+                                    & eMaxs .~ (pm^.pmMaxs))
+        playJumpSound pm =<< readRef edictRef
+        modifyRef edictRef (\v -> v & eViewHeight .~ truncate (pm^.pmViewHeight)
+                                    & eWaterLevel .~ (pm^.pmWaterLevel)
+                                    & eWaterType .~ (pm^.pmWaterType)
+                                    & eGroundEntity .~ (pm^.pmGroundEntity))
+        maybe (return ()) updateGroundEntityLinkCount (pm^.pmGroundEntity)
+        updateViewAngles gClientRef pm =<< readRef edictRef
+        linkEntity edictRef
+        touchTriggers =<< readRef edictRef
+        -- touch other objects
+        touchOtherObjects pm 0 (pm^.pmNumTouch)
+    updatePMTypeAndGravity gClientRef edict = do
+        let pmType | (edict^.eMoveType) == Constants.moveTypeNoClip = Constants.pmSpectator
+                   | (edict^.eEntityState.esModelIndex) /= 255      = Constants.pmGib
+                   | (edict^.eDeadFlag) /= 0                        = Constants.pmDead
+                   | otherwise                                      = Constants.pmNormal
+        gravity <- fmap (^.cvValue) svGravityCVar
+        modifyRef gClientRef (\v -> v & gcPlayerState.psPMoveState.pmsPMType .~ pmType
+                                      & gcPlayerState.psPMoveState.pmsGravity .~ truncate gravity)
+    playJumpSound pm edict = do
+        when (isJust (edict^.eGroundEntity) && isNothing (pm^.pmGroundEntity) && (pm^.pmCmd.ucUpMove) >= 10 && (pm^.pmWaterLevel) == 0) $ do
+            gameImport <- use (gameBaseGlobals.gbGameImport)
+            soundIdx <- (gameImport^.giSoundIndex) (Just "*jump1.wav")
+            (gameImport^.giSound) (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+            PlayerWeapon.playerNoise edictRef (edict^.eEntityState.esOrigin) Constants.pNoiseSelf
+    updateGroundEntityLinkCount groundEntityRef = do
+        groundEntity <- readRef groundEntityRef
+        modifyRef edictRef (\v -> v & eGroundEntityLinkCount .~ (groundEntity^.eLinkCount))
+    updateViewAngles gClientRef pm edict
+        | (edict^.eDeadFlag) /= 0 = do
+            gClient <- readRef gClientRef
+            modifyRef gClientRef (\v -> v & gcPlayerState.psViewAngles .~ V3 (-15) (gClient^.gcKillerYaw) 40)
+        | otherwise =
+            modifyRef gClientRef (\v -> v & gcVAngle .~ (pm^.pmViewAngles)
+                                          & gcPlayerState.psViewAngles .~ (pm^.pmViewAngles))
+    touchTriggers edict =
+        when ((edict^.eMoveType) /= Constants.moveTypeNoClip) $
+            GameBase.touchTriggers edictRef
+    touchOtherObjects pm idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            let Just otherRef = (pm^.pmTouchEnts) V.! idx -- TODO: FIX THIS!
+                duplicated = checkIfDuplicated pm (Just otherRef) 0 idx
+            unless duplicated $ do
+                other <- readRef otherRef
+                maybe (return ()) (touchObject otherRef) (other^.eTouch)
+            touchOtherObjects pm (idx + 1) maxIdx
+    touchObject otherRef touchF = do
+        dummyPlane <- use (gameBaseGlobals.gbDummyPlane)
+        entTouch touchF otherRef edictRef dummyPlane Nothing
+    checkIfDuplicated pm ref idx maxIdx
+        | idx >= maxIdx = False
+        | otherwise = let otherRef = (pm^.pmTouchEnts) V.! idx
+                      in ref == otherRef || checkIfDuplicated pm ref (idx + 1) maxIdx
+    updateChaseCamera idx maxIdx
+        | idx > maxIdx = return ()
+        | otherwise = do
+            other <- readRef (Ref idx)
+            when (other^.eInUse) $ do
+                maybe otherGClientError (checkChaseCam idx) (other^.eClient)
+            updateChaseCamera (idx + 1) maxIdx
+    otherGClientError = Com.fatalError "PlayerClient.clientThink#updateChaseCam other^.eClient is Nothing"
+    checkChaseCam idx gClientRef = do
+        gClient <- readRef gClientRef
+        when ((gClient^.gcChaseTarget) == Just edictRef) $
+            GameChase.updateChaseCam (Ref idx)
+    updateButtons gClientRef = do
+        gClient <- readRef gClientRef
+        modifyRef gClientRef (\v -> v & gcOldButtons .~ (gClient^.gcButtons)
+                                      & gcButtons .~ fromIntegral (ucmd^.ucButtons)
+                                      & gcLatchedButtons .~ (gClient^.gcLatchedButtons) .|. (fromIntegral (ucmd^.ucButtons) .&. (complement (gClient^.gcButtons))))
+    spectatorThink gClientRef = do
+        gClient <- readRef gClientRef
+        when (gClient^.gcResp.crSpectator) $
+            error "PlayerClient.clientThink#spectatorThink" -- TODO
+    fireWeaponIfNeeded gClientRef = do
+        gClient <- readRef gClientRef
+        when ((gClient^.gcLatchedButtons) .&. Constants.buttonAttack /= 0) $
+            if gClient^.gcResp.crSpectator
+                then do
+                    modifyRef gClientRef (\v -> v & gcLatchedButtons .~ 0)
+                    case gClient^.gcChaseTarget of
+                        Just _ ->
+                            modifyRef gClientRef (\v -> v & gcChaseTarget .~ Nothing
+                                                          & gcPlayerState.psPMoveState.pmsPMFlags %~ (.&. (complement Constants.pmfNoPrediction)))
+                        Nothing -> GameChase.getChaseTarget edictRef
+                else
+                    unless (gClient^.gcWeaponThunk) $ do
+                        modifyRef gClientRef (\v -> v & gcWeaponThunk .~ True)
+                        PlayerWeapon.thinkWeapon edictRef
 
 initBodyQue :: Quake ()
 initBodyQue = do
@@ -565,3 +717,16 @@ playerPain = error "PlayerClient.playerPain" -- TODO
 
 playerDie :: EntDie
 playerDie = error "PlayerClient.playerDie" -- TODO
+
+defaultTrace :: V3 Float -> V3 Float -> V3 Float -> V3 Float -> Quake TraceT
+defaultTrace start mins maxs end = do
+    edictRef <- use (clientGlobals.cgPMPassEnt)
+    doDefaultTrace edictRef
+  where
+    doDefaultTrace Nothing = do
+        Com.fatalError "PlayerClient.defaultTrace clientGlobals.cgPMPassEnt is Nothing"
+        error "PlayerClient.defaultTrace" -- TODO: return something more valid
+    doDefaultTrace (Just edictRef) = do
+        edict <- readRef edictRef
+        trace <- use (gameBaseGlobals.gbGameImport.giTrace)
+        trace start (Just mins) (Just maxs) end (Just edictRef) (if (edict^.eHealth) > 0 then Constants.maskPlayerSolid else Constants.maskDeadSolid)

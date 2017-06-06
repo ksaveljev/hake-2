@@ -14,8 +14,11 @@ module QCommon.MSG
     , readShort
     , readString
     , readStringLine
+    , writeAngle
+    , writeAngle16
     , writeByteF
     , writeByteI
+    , writeCharF
     , writeCharI
     , writeDeltaEntity
     , writeDeltaUserCmd
@@ -61,6 +64,9 @@ writeByteF sizeBufLens c = writeByteI sizeBufLens (truncate c)
 writeCharI :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeCharI = writeByteI
 
+writeCharF :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeCharF = writeByteF
+
 writeInt :: Traversal' QuakeState SizeBufT -> Int -> Quake ()
 writeInt sizeBufLens v =  do -- IMPROVE ?
     let v' = fromIntegral v :: Word32
@@ -96,6 +102,9 @@ writeCoord sizeBufLens f = writeShort sizeBufLens (truncate (f * 8))
 
 writeAngle :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
 writeAngle sizeBufLens f = writeByteI sizeBufLens ((truncate (f * 256 / 360)) .&. 255)
+
+writeAngle16 :: Traversal' QuakeState SizeBufT -> Float -> Quake ()
+writeAngle16 sizeBufLens f = writeShort sizeBufLens (fromIntegral (Math3D.angleToShort f))
 
 writeDir :: Traversal' QuakeState SizeBufT -> V3 Float -> Quake ()
 writeDir sizeBufLens dir = do

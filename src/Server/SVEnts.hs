@@ -10,12 +10,14 @@ import           Control.Monad            (when)
 import           Data.Bits                (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as BI
+import           Data.Maybe               (fromJust)
 import qualified Data.Vector              as V
 import qualified Data.Vector.Storable     as SV
 import qualified Data.Vector.Unboxed      as UV
-import           Linear                   (V3(..), norm)
+import           Linear                   (V3(..), norm, _x, _y, _z, _w)
 
 import qualified Constants
+import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.GClientT
@@ -23,6 +25,7 @@ import           Game.PlayerStateT
 import           Game.PMoveStateT
 import qualified QCommon.CM               as CM
 import qualified QCommon.Com              as Com
+import           QCommon.CVarVariables
 import qualified QCommon.MSG              as MSG
 import qualified QCommon.SZ               as SZ
 import           QuakeRef
@@ -184,10 +187,156 @@ writeFrameToClient clientRef@(Ref clientIdx) sizeBufLens = do
     emitPacketEntities oldFrame frame sizeBufLens
 
 writePlayerStateToClient :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
-writePlayerStateToClient = error "SVEnts.writePlayerStateToClient" -- TODO
+writePlayerStateToClient from to sizeBufLens = do
+    let ps = to^.cfPlayerState
+        ops = maybe newPlayerStateT (^.cfPlayerState) from
+        a = if (ps^.psPMoveState.pmsPMType) /= (ops^.psPMoveState.pmsPMType)
+                then Constants.psMType else 0
+        b = if (ps^.psPMoveState.pmsOrigin) /= (ops^.psPMoveState.pmsOrigin)
+                then Constants.psMOrigin else 0
+        c = if (ps^.psPMoveState.pmsVelocity) /= (ops^.psPMoveState.pmsVelocity)
+                then Constants.psMVelocity else 0
+        d = if (ps^.psPMoveState.pmsPMTime) /= (ops^.psPMoveState.pmsPMTime)
+                then Constants.psMTime else 0
+        e = if (ps^.psPMoveState.pmsPMFlags) /= (ops^.psPMoveState.pmsPMFlags)
+                then Constants.psMFlags else 0
+        f = if (ps^.psPMoveState.pmsGravity) /= (ops^.psPMoveState.pmsGravity)
+                then Constants.psMGravity else 0
+        g = if (ps^.psPMoveState.pmsDeltaAngles) /= (ops^.psPMoveState.pmsDeltaAngles)
+                then Constants.psMDeltaAngles else 0
+        h = if (ps^.psViewAngles) /= (ops^.psViewAngles)
+                then Constants.psViewAngles else 0
+        i = if (ps^.psViewOffset) /= (ops^.psViewOffset)
+                then Constants.psViewOffset else 0
+        j = if (ps^.psKickAngles) /= (ops^.psKickAngles)
+                then Constants.psKickAngles else 0
+        k = if (ps^.psBlend) /= (ops^.psBlend)
+                then Constants.psBlend else 0
+        l = if (ps^.psFOV) /= (ops^.psFOV)
+                then Constants.psFov else 0
+        m = if (ps^.psRDFlags) /= (ops^.psRDFlags)
+                then Constants.psRdFlags else 0
+        n = if (ps^.psGunFrame) /= (ops^.psGunFrame)
+                then Constants.psWeaponFrame else 0
+        o = Constants.psWeaponIndex
+        pflags = a .|. b .|. c .|. d .|. e .|. f .|. g .|. h .|. i .|. j .|. k .|. l .|. m .|. n .|. o
+    MSG.writeByteI sizeBufLens Constants.svcPlayerInfo
+    MSG.writeShort sizeBufLens pflags
+    -- write the pmove_state_t
+    when (pflags .&. Constants.psMType /= 0) $
+        MSG.writeByteI sizeBufLens (ps^.psPMoveState.pmsPMType)
+    when (pflags .&. Constants.psMOrigin /= 0) $ do
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsOrigin._x))
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsOrigin._y))
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsOrigin._z))
+    when (pflags .&. Constants.psMVelocity /= 0) $ do
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsVelocity._x))
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsVelocity._y))
+        MSG.writeShort sizeBufLens (fromIntegral (ps^.psPMoveState.pmsVelocity._z))
+    when (pflags .&. Constants.psMTime /= 0) $
+        MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMTime)
+    when (pflags .&. Constants.psMFlags /= 0) $
+        MSG.writeByteI sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsPMFlags)
+    when (pflags .&. Constants.psMGravity /= 0) $
+        MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsGravity)
+    when (pflags .&. Constants.psMDeltaAngles /= 0) $ do
+        MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._x)
+        MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._y)
+        MSG.writeShort sizeBufLens (fromIntegral $ ps^.psPMoveState.pmsDeltaAngles._z)
+    when (pflags .&. Constants.psViewOffset /= 0) $ do
+        MSG.writeCharF sizeBufLens ((ps^.psViewOffset._x) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psViewOffset._y) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psViewOffset._z) * 4)
+    when (pflags .&. Constants.psViewAngles /= 0) $ do
+        MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._x)
+        MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._y)
+        MSG.writeAngle16 sizeBufLens (ps^.psViewAngles._z)
+    when (pflags .&. Constants.psKickAngles /= 0) $ do
+        MSG.writeCharF sizeBufLens ((ps^.psKickAngles._x) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psKickAngles._y) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psKickAngles._z) * 4)
+    when (pflags .&. Constants.psWeaponIndex /= 0) $
+        MSG.writeByteI sizeBufLens (ps^.psGunIndex)
+    when (pflags .&. Constants.psWeaponFrame /= 0) $ do
+        MSG.writeByteI sizeBufLens (ps^.psGunFrame)
+        MSG.writeCharF sizeBufLens ((ps^.psGunOffset._x) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psGunOffset._y) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psGunOffset._z) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psGunAngles._x) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psGunAngles._y) * 4)
+        MSG.writeCharF sizeBufLens ((ps^.psGunAngles._z) * 4)
+    when (pflags .&. Constants.psBlend /= 0) $ do
+        MSG.writeByteF sizeBufLens ((ps^.psBlend._x) * 255)
+        MSG.writeByteF sizeBufLens ((ps^.psBlend._y) * 255)
+        MSG.writeByteF sizeBufLens ((ps^.psBlend._z) * 255)
+        MSG.writeByteF sizeBufLens ((ps^.psBlend._w) * 255)
+    when (pflags .&. Constants.psFov /= 0) $
+        MSG.writeByteF sizeBufLens (ps^.psFOV)
+    when (pflags .&. Constants.psRdFlags /= 0) $
+        MSG.writeByteI sizeBufLens (ps^.psRDFlags)
+    -- send stats
+    let statbits = calcStatBits ps ops 0 0 Constants.maxStats
+    MSG.writeLong sizeBufLens statbits
+    writeStats ps statbits 0 Constants.maxStats
+  where
+    calcStatBits ps ops statbits idx maxIdx
+        | idx >= maxIdx = statbits
+        | otherwise = if ((ps^.psStats) UV.! idx) /= ((ops^.psStats) UV.! idx)
+                          then calcStatBits ps ops (statbits .|. (1 `shiftL` idx)) (idx + 1) maxIdx
+                          else calcStatBits ps ops statbits (idx + 1) maxIdx
+    writeStats ps statbits idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            when (statbits .&. (1 `shiftL` idx) /= 0) $
+                MSG.writeShort sizeBufLens (fromIntegral $ (ps^.psStats) UV.! idx)
+            writeStats ps statbits (idx + 1) maxIdx
 
+-- TODO: this begs for refactoring
 emitPacketEntities :: Maybe ClientFrameT -> ClientFrameT -> Lens' QuakeState SizeBufT -> Quake ()
-emitPacketEntities = error "SVEnts.emitPacketEntities" -- TODO
+emitPacketEntities from to sizeBufLens = do
+    let fromNumEntities = maybe 0 (^.cfNumEntities) from
+    MSG.writeByteI sizeBufLens Constants.svcPacketEntities
+    maxClients <- fmap (truncate . (^.cvValue)) maxClientsCVar
+    numClientEntities <- use (svGlobals.svServerStatic.ssNumClientEntities)
+    sendEntities maxClients numClientEntities fromNumEntities Nothing Nothing 0 0
+    MSG.writeShort sizeBufLens 0 -- end of packetentities
+  where
+    sendEntities maxClients numClientEntities fromNumEntites oldEnt newEnt oldIndex newIndex
+        | newIndex >= (to^.cfNumEntities) && oldIndex >= fromNumEntites = return ()
+        | otherwise = do
+            clientEntities <- use (svGlobals.svServerStatic.ssClientEntities)
+            (newEnt', newNum) <- if newIndex >= (to^.cfNumEntities)
+                                     then return (newEnt, 9999)
+                                     else do
+                                         let idx = ((to^.cfFirstEntity) + newIndex) `mod` numClientEntities
+                                             newEnt' = clientEntities V.! idx
+                                         return (Just newEnt', newEnt'^.esNumber)
+            (oldEnt', oldNum) <- if oldIndex >= fromNumEntites
+                                     then return (oldEnt, 9999)
+                                     else do
+                                         let idx = ((fromJust from^.cfFirstEntity) + oldIndex) `mod` numClientEntities
+                                             oldEnt' = clientEntities V.! idx
+                                         return (Just oldEnt', oldEnt'^.esNumber)
+            case () of
+                _ | newNum == oldNum -> do
+                      MSG.writeDeltaEntity (fromJust oldEnt') (fromJust newEnt') sizeBufLens False (((fromJust newEnt')^.esNumber) <= maxClients)
+                      sendEntities maxClients numClientEntities fromNumEntites oldEnt' newEnt' (oldIndex + 1) (newIndex + 1)
+                  | newNum < oldNum -> do
+                      baselines <- use (svGlobals.svServer.sBaselines)
+                      let baseline = baselines V.! newNum
+                      MSG.writeDeltaEntity baseline (fromJust newEnt') sizeBufLens True True
+                      sendEntities maxClients numClientEntities fromNumEntites oldEnt' newEnt' oldIndex (newIndex + 1)
+                  | newNum > oldNum -> do
+                      let bits = if oldNum >= 256
+                                     then Constants.uRemove .|. Constants.uNumber16 .|. Constants.uMoreBits1
+                                     else Constants.uRemove
+                      MSG.writeByteI sizeBufLens (bits .&. 255)
+                      when (bits .&. 0x0000FF00 /= 0) $
+                          MSG.writeByteI sizeBufLens ((bits `shiftR` 8) .&. 255)
+                      if bits .&. Constants.uNumber16 /= 0
+                          then MSG.writeShort sizeBufLens oldNum
+                          else MSG.writeByteI sizeBufLens oldNum
+                      sendEntities maxClients numClientEntities fromNumEntites oldEnt' newEnt' (oldIndex + 1) newIndex
 
 fatPVS :: V3 Float -> Quake ()
 fatPVS org = do
