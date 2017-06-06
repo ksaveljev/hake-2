@@ -23,6 +23,7 @@ module Game.GameItems
     , pickupPowerup
     , powerArmorType
     , precacheItem
+    , selectNextItem
     , setItemNames
     , spawnItem
     , spItemHealth
@@ -54,7 +55,6 @@ import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import           Game.GameLocalsT
-import qualified Game.GameUtil         as GameUtil
 import           Game.GClientT
 import           Game.GItemArmorT
 import           Game.GItemT
@@ -70,6 +70,7 @@ import qualified Util.Lib              as Lib
 import qualified Util.Math3D           as Math3D
 
 import {-# SOURCE #-} qualified Game.GameItemsList as GameItemsList
+import {-# SOURCE #-} qualified Game.GameUtil      as GameUtil
 
 jacketArmorInfo :: GItemArmorT
 jacketArmorInfo = GItemArmorT
@@ -1338,3 +1339,6 @@ getItemByIndex idx = do
     if idx == 0 || idx >= numItems
         then return Nothing
         else fmap Just (readRef (Ref idx))
+
+selectNextItem :: Ref EdictT -> Int -> Quake ()
+selectNextItem = error "GameItems.selectNextItem" -- TODO

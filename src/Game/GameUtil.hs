@@ -16,30 +16,34 @@ module Game.GameUtil
     , visible
     ) where
 
-import           Control.Lens          (use, (^.), (+=), (&), (.~), (+~), (%~))
-import           Control.Monad         (when, unless, void)
-import           Data.Bits             (complement, (.&.), (.|.))
-import qualified Data.ByteString.Char8 as BC
-import           Data.Char             (toLower)
-import           Data.Maybe            (isNothing, isJust, fromJust)
-import           Linear                (dot, normalize, norm, _z)
+import           Control.Lens           (use, (^.), (+=), (&), (.~), (+~), (%~))
+import           Control.Monad          (when, unless, void)
+import           Data.Bits              (complement, (.&.), (.|.))
+import qualified Data.ByteString.Char8  as BC
+import           Data.Char              (toLower)
+import           Data.Maybe             (isNothing, isJust, fromJust)
+import qualified Data.Vector.Unboxed    as UV
+import           Linear                 (dot, normalize, norm, _z)
 
-import qualified Client.M              as M
+import qualified Client.M               as M
 import qualified Constants
+import           Game.ClientPersistantT
 import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
-import qualified Game.GameCombat       as GameCombat
+import qualified Game.GameCombat        as GameCombat
+import qualified Game.GameItems         as GameItems
 import           Game.GameLocalsT
+import           Game.GClientT
 import           Game.LevelLocalsT
 import           Game.MonsterInfoT
 import           Game.TraceT
-import qualified QCommon.Com           as Com
+import qualified QCommon.Com            as Com
 import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
-import qualified Util.Math3D           as Math3D
+import qualified Util.Math3D            as Math3D
 
 import {-# SOURCE #-} qualified Game.GameBase as GameBase
 
@@ -66,7 +70,17 @@ freeEdictA = EntThink "G_FreeEdictA" $ \edictRef -> do
     return False
 
 validateSelectedItem :: Ref EdictT -> Quake ()
-validateSelectedItem = error "GameUtil.validateSelectedItem" -- TODO
+validateSelectedItem edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    gClient <- readRef gClientRef
+    unless ((gClient^.gcPers.cpInventory) UV.! (gClient^.gcPers.cpSelectedItem) /= 0) $
+        GameItems.selectNextItem edictRef (-1)
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "GameUtil.validateSelectedItem edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
 
 megaHealthThink :: EntThink
 megaHealthThink = error "GameUtil.megaHealthThink" -- TODO

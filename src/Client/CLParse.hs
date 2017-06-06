@@ -3,6 +3,7 @@ module Client.CLParse
     ( checkOrDownloadFile
     , downloadF
     , loadClientInfo
+    , parseClientInfo
     , parseServerMessage
     , registerSounds
     ) where
@@ -15,7 +16,7 @@ import           Data.Bits             (shiftR, (.&.))
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Vector           as V
-import           System.IO             (IOMode(ReadWriteMode), hFileSize, hClose)
+import           System.IO             (IOMode(ReadWriteMode), hFileSize)
 
 import           Client.CEntityT
 import qualified Client.CLEnts         as CLEnts

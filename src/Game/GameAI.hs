@@ -33,7 +33,20 @@ import qualified Util.Lib          as Lib
 import qualified Util.Math3D       as Math3D
 
 aiCharge :: AI
-aiCharge = error "GameAI.aiCharge" -- TODO
+aiCharge = AI "ai_charge" $ \selfRef dist -> do
+    self <- readRef selfRef
+    enemyRef <- getEnemyRef (self^.eEnemy)
+    enemy <- readRef enemyRef
+    modifyRef selfRef (\v -> v & eIdealYaw .~ Math3D.vectorYaw ((enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)))
+    M.changeYaw selfRef
+    when (dist /= 0) $ do
+        updatedSelf <- readRef selfRef
+        void (M.walkMove selfRef (updatedSelf^.eEntityState.esAngles._y) dist)
+  where
+    getEnemyRef Nothing = do
+        Com.fatalError "GameAI.aiCharge self^.eEnemy is Nothing"
+        return (Ref (-1))
+    getEnemyRef (Just enemyRef) = return enemyRef
 
 aiRun :: AI
 aiRun = error "GameAI.aiRun" -- TODO
@@ -81,8 +94,7 @@ aiStand = AI "ai_stand" $ \selfRef dist -> do
         | otherwise = return False
     hasEnemy selfRef self enemyRef = do
         enemy <- readRef enemyRef
-        let v = (enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin)
-            idealYaw = Math3D.vectorYaw v
+        let idealYaw = Math3D.vectorYaw ((enemy^.eEntityState.esOrigin) - (self^.eEntityState.esOrigin))
         modifyRef selfRef (\v -> v & eIdealYaw .~ idealYaw)
         when ((self^.eEntityState.esAngles._y) /= idealYaw && (self^.eMonsterInfo.miAIFlags) .&. Constants.aiTempStandGround /= 0) $ do
             modifyRef selfRef (\v -> v & eMonsterInfo.miAIFlags %~ (.&. (complement (Constants.aiStandGround .|. Constants.aiTempStandGround))))
@@ -176,4 +188,23 @@ aiMove :: AI
 aiMove = error "GameAI.aiMove" -- TODO
 
 flyMonsterStart :: EntThink
-flyMonsterStart = error "GameAI.flyMonsterStart" -- TODO
+flyMonsterStart = EntThink "flymonster_start" $ \selfRef -> do
+    modifyRef selfRef (\v -> v & eFlags %~ (\a -> a .|. Constants.flFly)
+                               & eThink .~ Just flyMonsterStartGo)
+    void (Monster.monsterStart selfRef)
+    return True
+
+flyMonsterStartGo :: EntThink
+flyMonsterStartGo = EntThink "flymonster_start_go" $ \selfRef -> do
+    ok <- M.walkMove selfRef 0 0
+    unless ok $ do
+        self <- readRef selfRef
+        dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+        dprintf (B.concat [self^.eClassName, " in solid at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
+    modifyRef selfRef (\v -> v & eYawSpeed %~ (\a -> if a == 0 then 20 else a)
+                               & eViewHeight .~ 25)
+    Monster.monsterStartGo selfRef
+    self <- readRef selfRef
+    when ((self^.eSpawnFlags) .&. 2 /= 0) $
+        void (entThink Monster.monsterTriggeredStart selfRef)
+    return True

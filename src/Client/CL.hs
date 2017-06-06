@@ -248,7 +248,19 @@ pingServersF :: XCommandT
 pingServersF = error "CL.pingServersF" -- TODO
 
 skinsF :: XCommandT
-skinsF = error "CL.skinsF" -- TODO
+skinsF = XCommandT "CL.skinsF" $ do
+    configStrings <- use (globals.gCl.csConfigStrings)
+    loadOrDownload configStrings 0 Constants.maxClients
+  where
+    loadOrDownload configStrings idx maxIdx
+        | idx >= maxIdx = return ()
+        | B.null (configStrings Vector.! (Constants.csPlayerSkins + idx)) = -- TODO: jake compares to NULL here
+            loadOrDownload configStrings (idx + 1) maxIdx
+        | otherwise = do
+            Com.printf (B.concat ["client ", encode idx, ": ", configStrings Vector.! (Constants.csPlayerSkins + idx), "\n"])
+            SCR.updateScreen
+            Sys.sendKeyEvents -- pump message loop
+            CLParse.parseClientInfo idx
 
 userInfoF :: XCommandT
 userInfoF = XCommandT "CL.userInfoF" $ do

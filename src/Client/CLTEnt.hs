@@ -899,7 +899,47 @@ processSustain = do
         Com.fatalError "CLTEnt.processSustain sustain^.clsThink is Nothing"
 
 parseBeam :: Ref ModelT -> Quake Int
-parseBeam = error "CLTEnt.parseBeam" -- TODO
+parseBeam modelRef = do
+    ent <- MSG.readShort (globals.gNetMessage)
+    start <- MSG.readPos (globals.gNetMessage)
+    end <- MSG.readPos (globals.gNetMessage)
+    ok <- updateBeam ent start end 0 Constants.maxBeams
+    unless ok $
+        Com.printf "beam list overflow!\n"
+    return ent
+  where
+    updateBeam ent start end idx maxIdx
+        | idx >= maxIdx = findFreeBeam ent start end 0 Constants.maxBeams
+        | otherwise = do
+            beam <- readRef (Ref idx)
+            if (beam^.bEntity) == ent
+                then do
+                    time <- use (globals.gCl.csTime)
+                    modifyRef (Ref idx) (\v -> v & bEntity  .~ ent
+                                                 & bModel   .~ Just modelRef
+                                                 & bEndTime .~ time + 200
+                                                 & bStart   .~ start
+                                                 & bEnd     .~ end
+                                                 & bOffset  .~ V3 0 0 0)
+                    return True
+                else
+                    updateBeam ent start end (idx + 1) maxIdx
+    findFreeBeam ent start end idx maxIdx
+        | idx >= maxIdx = return False
+        | otherwise = do
+            beam <- readRef (Ref idx)
+            time <- use (globals.gCl.csTime)
+            if isNothing (beam^.bModel) || (beam^.bEndTime) < time
+                then do
+                    modifyRef (Ref idx) (\v -> v & bEntity  .~ ent
+                                                 & bModel   .~ Just modelRef
+                                                 & bEndTime .~ time + 200
+                                                 & bStart   .~ start
+                                                 & bEnd     .~ end
+                                                 & bOffset  .~ V3 0 0 0)
+                    return True
+                else
+                    findFreeBeam ent start end (idx + 1) maxIdx
 
 parseBeam2 :: Ref ModelT -> Quake Int
 parseBeam2 = error "CLTEnt.parseBeam2" -- TODO
@@ -920,4 +960,26 @@ parsePlayerBeam :: Ref ModelT -> Quake Int
 parsePlayerBeam = error "CLTEnt.parsePlayerBeam" -- TODO
 
 parseLaser :: Int -> Quake ()
-parseLaser = error "CLTEnt.parseLaser" -- TODO
+parseLaser colors = do
+    start <- MSG.readPos (globals.gNetMessage)
+    end <- MSG.readPos (globals.gNetMessage)
+    time <- use (globals.gCl.csTime)
+    updateLaser time start end 0 Constants.maxLasers
+  where
+    updateLaser time start end idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            laser <- readRef (Ref idx)
+            if (laser^.lEndTime) < time
+                then do
+                  r <- Lib.rand
+                  io $ modifyIORef' (laser^.lEnt) (\v -> v & enFlags    .~ Constants.rfTranslucent .|. Constants.rfBeam
+                                                           & eOrigin    .~ start
+                                                           & eOldOrigin .~ end
+                                                           & eAlpha     .~ 0.3
+                                                           & eSkinNum   .~ (colors `shiftR` fromIntegral ((r `mod` 4) * 8)) .&. 0xFF
+                                                           & eModel     .~ Nothing
+                                                           & eFrame     .~ 4)
+                  modifyRef (Ref idx) (\v -> v & lEndTime .~ time + 100)
+                else
+                  updateLaser time start end (idx + 1) maxIdx
