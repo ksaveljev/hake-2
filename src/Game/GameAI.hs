@@ -6,6 +6,7 @@ module Game.GameAI
     , aiStand
     , aiWalk
     , flyMonsterStart
+    , swimMonsterStart
     , walkMonsterStart
     ) where
 
@@ -203,6 +204,23 @@ flyMonsterStartGo = EntThink "flymonster_start_go" $ \selfRef -> do
         dprintf (B.concat [self^.eClassName, " in solid at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
     modifyRef selfRef (\v -> v & eYawSpeed %~ (\a -> if a == 0 then 20 else a)
                                & eViewHeight .~ 25)
+    Monster.monsterStartGo selfRef
+    self <- readRef selfRef
+    when ((self^.eSpawnFlags) .&. 2 /= 0) $
+        void (entThink Monster.monsterTriggeredStart selfRef)
+    return True
+
+swimMonsterStart :: EntThink
+swimMonsterStart = EntThink "swimmonster_start" $ \selfRef -> do
+    modifyRef selfRef (\v -> v & eFlags %~ (\a -> a .|. Constants.flSwim)
+                               & eThink .~ Just swimMonsterStartGo)
+    void (Monster.monsterStart selfRef)
+    return True
+
+swimMonsterStartGo :: EntThink
+swimMonsterStartGo = EntThink "swimmonster_start_go" $ \selfRef -> do
+    modifyRef selfRef (\v -> v & eYawSpeed %~ (\a -> if a == 0 then 20 else a)
+                               & eViewHeight .~ 10)
     Monster.monsterStartGo selfRef
     self <- readRef selfRef
     when ((self^.eSpawnFlags) .&. 2 /= 0) $

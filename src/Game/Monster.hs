@@ -2,6 +2,7 @@ module Game.Monster
     ( monsterFireBlaster
     , monsterFireBullet
     , monsterFireGrenade
+    , monsterFireRailgun
     , monsterFireRocket
     , monsterFireShotgun
     , monsterStart
@@ -216,3 +217,6 @@ monsterThink = EntThink "monster_think" $ \selfRef -> do
     M.worldEffects selfRef
     M.setEffects selfRef
     return True
+
+monsterFireRailgun :: Ref EdictT -> V3 Float -> V3 Float -> Int -> Int -> Int -> Quake ()
+monsterFireRailgun = error "Monster.monsterFireRailgun" -- TODO

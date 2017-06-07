@@ -19,7 +19,7 @@ module Game.GameTarget
 import           Control.Applicative   ((<|>))
 import           Control.Lens          (use, (^.), (.=), (%=), (+=), (&), (.~), (%~))
 import           Control.Monad         (when, void)
-import           Data.Bits             ((.&.), (.|.))
+import           Data.Bits             (complement, (.&.), (.|.))
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Char             (toLower)
@@ -48,7 +48,25 @@ import {-# SOURCE #-}           Game.GameImportT
 import {-# SOURCE #-} qualified Game.GameSpawn        as GameSpawn
 
 spTargetBlaster :: Ref EdictT -> Quake ()
-spTargetBlaster = error "GameTarget.spTargetBlaster" -- TODO
+spTargetBlaster selfRef = do
+    GameBase.setMoveDir selfRef =<< readRef selfRef
+    soundIndex <- use (gameBaseGlobals.gbGameImport.giSoundIndex)
+    soundIdx <- soundIndex (Just "weapons/laser2.wav")
+    modifyRef selfRef (\v -> v & eUse .~ Just useTargetBlaster
+                               & eNoiseIndex .~ soundIdx
+                               & eDmg %~ (\d -> if d == 0 then 15 else d)
+                               & eSpeed %~ (\s -> if s == 0 then 1000 else s)
+                               & eSvFlags .~ Constants.svfNoClient)
+
+useTargetBlaster :: EntUse
+useTargetBlaster = EntUse "use_target_blaster" $ \selfRef _ _ -> do
+    self <- readRef selfRef
+    let effect | (self^.eSpawnFlags) .&. 2 /= 0 = 0
+               | (self^.eSpawnFlags) .&. 1 /= 0 = Constants.efHyperblaster
+               | otherwise                      = Constants.efBlaster
+    GameWeapon.fireBlaster selfRef (self^.eEntityState.esOrigin) (self^.eMoveDir) (self^.eDmg) (truncate (self^.eSpeed)) Constants.efBlaster (Constants.modTargetBlaster /= 0) -- True
+    sound <- use (gameBaseGlobals.gbGameImport.giSound)
+    sound (Just selfRef) Constants.chanVoice (self^.eNoiseIndex) 1 Constants.attnNorm 0
 
 spTargetChangeLevel :: Ref EdictT -> Quake ()
 spTargetChangeLevel edictRef = do
@@ -71,13 +89,60 @@ useTargetChangeLevel :: EntUse
 useTargetChangeLevel = error "GameTarget.useTargetChangeLevel" -- TODO
 
 spTargetCrossLevelTarget :: Ref EdictT -> Quake ()
-spTargetCrossLevelTarget = error "GameTarget.spTargetCrossLevelTarget" -- TODO
+spTargetCrossLevelTarget selfRef = do
+    self <- readRef selfRef
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    let delay = if (self^.eDelay) == 0 then 1 else self^.eDelay
+    modifyRef selfRef (\v -> v & eDelay .~ delay
+                               & eSvFlags .~ Constants.svfNoClient
+                               & eThink .~ Just targetCrossLevelTargetThink
+                               & eNextThink .~ levelTime + delay)
+
+targetCrossLevelTargetThink :: EntThink
+targetCrossLevelTargetThink = EntThink "target_crosslevel_target_think" $ \selfRef -> do
+    self <- readRef selfRef
+    serverFlags <- use (gameBaseGlobals.gbGame.glServerFlags)
+    when ((self^.eSpawnFlags) == (serverFlags .&. Constants.sflCrossTriggerMask .&. (self^.eSpawnFlags))) $ do
+        GameUtil.useTargets selfRef (Just selfRef)
+        GameUtil.freeEdict selfRef
+    return True
 
 spTargetCrossLevelTrigger :: Ref EdictT -> Quake ()
-spTargetCrossLevelTrigger = error "GameTarget.spTargetCrossLevelTrigger" -- TODO
+spTargetCrossLevelTrigger selfRef =
+    modifyRef selfRef (\v -> v & eSvFlags .~ Constants.svfNoClient
+                               & eUse .~ Just triggerCrossLevelTriggerUse)
+
+triggerCrossLevelTriggerUse :: EntUse
+triggerCrossLevelTriggerUse = EntUse "trigger_crosslevel_trigger_use" $ \selfRef _ _ -> do
+    self <- readRef selfRef
+    gameBaseGlobals.gbGame.glServerFlags %= (.|. (self^.eSpawnFlags))
+    GameUtil.freeEdict selfRef
 
 spTargetEarthquake :: Ref EdictT -> Quake ()
-spTargetEarthquake = error "GameTarget.spTargetEarthquake" -- TODO
+spTargetEarthquake selfRef = do
+    self <- readRef selfRef
+    gameImport <- use $ gameBaseGlobals.gbGameImport
+    when (isNothing (self^.eTargetName)) $
+        (gameImport^.giDprintf) (B.concat ["untargeted ", self^.eClassName, " at ", Lib.vtos (self^.eEntityState.esOrigin), "\n"])
+    noiseIndex <- (gameImport^.giSoundIndex) (Just "world/quake.wav")
+    modifyRef selfRef (\v -> v & eCount %~ (\c -> if c == 0 then 5 else c)
+                               & eSpeed %~ (\s -> if s == 0 then 200 else s)
+                               & eSvFlags %~ (.|. Constants.svfNoClient)
+                               & eThink .~ Just targetEarthquakeThink
+                               & eUse .~ Just targetEarthquakeUse
+                               & eNoiseIndex .~ noiseIndex)
+
+targetEarthquakeThink :: EntThink
+targetEarthquakeThink = error "GameTarget.targetEarthquakeThink" -- TODO
+
+targetEarthquakeUse :: EntUse
+targetEarthquakeUse = EntUse "target_earthquake_use" $ \selfRef _ activatorRef -> do
+    self <- readRef selfRef
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modifyRef selfRef (\v -> v & eTimeStamp .~ levelTime + fromIntegral (self^.eCount)
+                               & eNextThink .~ levelTime + Constants.frameTime
+                               & eActivator .~ activatorRef
+                               & eLastMoveTime .~ 0)
 
 spTargetExplosion :: Ref EdictT -> Quake ()
 spTargetExplosion edictRef =
@@ -187,7 +252,81 @@ useTargetHelp = EntUse "Use_Target_Help" $ \edictRef _ _ -> do
             gameBaseGlobals.gbGame.glHelpMessage2 .= msg
 
 spTargetLaser :: Ref EdictT -> Quake ()
-spTargetLaser = error "GameTarget.spTargetLaser" -- TODO
+spTargetLaser selfRef = do
+    -- let everything else get spawned before we start firing
+    levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+    modifyRef selfRef (\v -> v & eThink .~ Just targetLaserStart
+                               & eNextThink .~ levelTime + 1)
+
+targetLaserStart :: EntThink
+targetLaserStart = EntThink "target_laser_start" $ \selfRef -> do
+    self <- readRef selfRef
+        -- set the beam diameter
+    let frame | (self^.eSpawnFlags) .&. 64 /= 0 = 16
+              | otherwise                       = 4
+        -- set the color
+        skinNum | (self^.eSpawnFlags) .&.  2 /= 0 = 0xF2F2F0F0
+                | (self^.eSpawnFlags) .&.  4 /= 0 = 0xD0D1D2D3
+                | (self^.eSpawnFlags) .&.  8 /= 0 = 0xF3F3F1F1
+                | (self^.eSpawnFlags) .&. 16 /= 0 = 0xDCDDDEDF
+                | (self^.eSpawnFlags) .&. 32 /= 0 = 0xE0E1E2E3
+                | otherwise                       = self^.eEntityState.esSkinNum
+    modifyRef selfRef (\v -> v & eMoveType .~ Constants.moveTypeNone
+                               & eSolid .~ Constants.solidNot
+                               & eEntityState.esRenderFx %~ (.|. (Constants.rfBeam .|. Constants.rfTranslucent))
+                               & eEntityState.esModelIndex .~ 1 -- must be non-zero
+                               & eEntityState.esFrame .~ frame
+                               & eEntityState.esSkinNum .~ skinNum)
+    when (isNothing (self^.eEnemy)) $
+        maybe (noTarget selfRef) (hasTarget selfRef self) (self^.eTarget)
+    modifyRef selfRef (\v -> v & eUse .~ Just targetLaserUse
+                               & eThink .~ Just targetLaserThink
+                               & eDmg %~ (\d -> if d == 0 then 1 else d)
+                               & eMins .~ V3 (-8) (-8) (-8)
+                               & eMaxs .~ V3 8 8 8)
+    linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+    linkEntity selfRef
+    laserOnOff selfRef =<< readRef selfRef
+    return True
+  where
+    noTarget selfRef = GameBase.setMoveDir selfRef =<< readRef selfRef
+    hasTarget selfRef self target = do
+        foundTarget <- GameBase.gFind Nothing GameBase.findByTarget target
+        when (isNothing foundTarget) $ do
+            dprintf <- use (gameBaseGlobals.gbGameImport.giDprintf)
+            dprintf (B.concat [self^.eClassName, " at ", Lib.vtos (self^.eEntityState.esOrigin), ": ", target, " is a bad target\n"])
+        modifyRef selfRef (\v -> v & eEnemy .~ foundTarget)
+    laserOnOff selfRef self
+        | (self^.eSpawnFlags) .&. 1 /= 0 = targetLaserOn selfRef
+        | otherwise                      = targetLaserOff selfRef
+
+targetLaserUse :: EntUse
+targetLaserUse = EntUse "target_laser_use" $ \selfRef _ activatorRef -> do
+    modifyRef selfRef (\v -> v & eActivator .~ activatorRef)
+    self <- readRef selfRef
+    laserOnOff selfRef self
+  where
+    laserOnOff selfRef self
+        | (self^.eSpawnFlags) .&. 1 /= 0 = targetLaserOff selfRef
+        | otherwise                      = targetLaserOn selfRef
+
+targetLaserThink :: EntThink
+targetLaserThink = error "GameTarget.targetLaserThink" -- TODO
+
+targetLaserOn :: Ref EdictT -> Quake ()
+targetLaserOn selfRef = do
+    self <- readRef selfRef
+    let activator = fromMaybe selfRef (self^.eActivator)
+    modifyRef selfRef (\v -> v & eActivator .~ Just activator
+                               & eSpawnFlags %~ (.|. 0x80000001)
+                               & eSvFlags %~ (.&. (complement Constants.svfNoClient)))
+    void (entThink targetLaserThink selfRef)
+
+targetLaserOff :: Ref EdictT -> Quake ()
+targetLaserOff selfRef =
+    modifyRef selfRef (\v -> v & eSpawnFlags %~ (.&. (complement 1))
+                               & eSvFlags %~ (.|. Constants.svfNoClient)
+                               & eNextThink .~ 0)
 
 spTargetLightRamp :: Ref EdictT -> Quake ()
 spTargetLightRamp = error "GameTarget.spTargetLightRamp" -- TODO
@@ -227,7 +366,35 @@ useTargetSecret = EntUse "use_target_secret" $ \edictRef _ activatorRef -> do
     GameUtil.freeEdict edictRef
 
 spTargetSpawner :: Ref EdictT -> Quake ()
-spTargetSpawner = error "GameTarget.spTargetSpawner" -- TODO
+spTargetSpawner selfRef = do
+    modifyRef selfRef (\v -> v & eUse .~ Just useTargetSpawner
+                               & eSvFlags .~ Constants.svfNoClient)
+    self <- readRef selfRef
+    when ((self^.eSpeed) /= 0) $ do
+        GameBase.setMoveDir selfRef self
+        modifyRef selfRef (\v -> v & eMoveDir %~ fmap (* (self^.eSpeed)))
+
+useTargetSpawner :: EntUse
+useTargetSpawner = EntUse "use_target_spawner" $ \selfRef _ _ -> do
+    self <- readRef selfRef
+    className <- getClassName (self^.eTarget)
+    edictRef <- GameUtil.spawn
+    modifyRef edictRef (\v -> v & eClassName .~ className
+                                & eEntityState.esOrigin .~ (self^.eEntityState.esOrigin)
+                                & eEntityState.esAngles .~ (self^.eEntityState.esAngles))
+    GameSpawn.callSpawn edictRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giUnlinkEntity) edictRef
+    void (GameUtil.killBox edictRef)
+    (gameImport^.giLinkEntity) edictRef
+    updatedSelf <- readRef selfRef
+    when ((updatedSelf^.eSpeed) /= 0) $
+        modifyRef edictRef (\v -> v & eVelocity .~ (updatedSelf^.eMoveDir))
+  where
+    getClassName Nothing = do
+        Com.fatalError "GameTarget.useTargetSpawner self^.eTarget is Nothing"
+        return B.empty
+    getClassName (Just target) = do return target
 
 spTargetSpeaker :: Ref EdictT -> Quake ()
 spTargetSpeaker edictRef = do
@@ -307,4 +474,13 @@ useTargetSplash = EntUse "use_target_splash" $ \selfRef _ activatorRef -> do
         GameCombat.radiusDamage selfRef activatorRef (fromIntegral (self^.eDmg)) Nothing (fromIntegral (self^.eDmg) + 40) Constants.modSplash
 
 spTargetTempEntity :: Ref EdictT -> Quake ()
-spTargetTempEntity = error "GameTarget.spTargetTempEntity" -- TODO
+spTargetTempEntity edictRef = modifyRef edictRef (\v -> v & eUse .~ Just useTargetTEnt)
+
+useTargetTEnt :: EntUse
+useTargetTEnt = EntUse "Use_Target_Tent" $ \edictRef _ _ -> do
+    edict <- readRef edictRef
+    gameImport <- use (gameBaseGlobals.gbGameImport)
+    (gameImport^.giWriteByte) Constants.svcTempEntity
+    (gameImport^.giWriteByte) (edict^.eStyle)
+    (gameImport^.giWritePosition) (edict^.eEntityState.esOrigin)
+    (gameImport^.giMulticast) (edict^.eEntityState.esOrigin) Constants.multicastPvs
