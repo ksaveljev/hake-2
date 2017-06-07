@@ -729,7 +729,7 @@ proceedPickupHealth edictRef edict otherRef other
 findItem :: B.ByteString -> Quake (Maybe (Ref GItemT))
 findItem pickupName = do
     items <- use (gameBaseGlobals.gbItemList)
-    maybe notFound (return . Just . Ref) (search items)
+    maybe notFound (return . Just . Ref . (+ 1)) (search items)
   where
     search items = V.findIndex searchByName (V.drop 1 items)
     name = BC.map toLower pickupName
