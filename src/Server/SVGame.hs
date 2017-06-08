@@ -19,6 +19,7 @@ module Server.SVGame
 
 import           Control.Lens          (use, ix, (^.), (.=), (&), (.~))
 import           Control.Monad         (unless, when)
+import           Data.Bits             (shiftR, shiftL, (.&.))
 import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
 import           Linear                (V3)
@@ -108,7 +109,18 @@ setModel edictRef name@(Just modelName) = do
         SVWorld.linkEdict edictRef
 
 inPHS :: V3 Float -> V3 Float -> Quake Bool
-inPHS = error "SVGame.inPHS" -- TODO
+inPHS p1 p2 = do
+    leafNum <- CM.pointLeafNum p1
+    cluster <- CM.leafCluster leafNum
+    area1 <- CM.leafArea leafNum
+    mask <- CM.clusterPHS cluster
+    leafNum' <- CM.pointLeafNum p2
+    cluster' <- CM.leafCluster leafNum'
+    area2 <- CM.leafArea leafNum'
+    case () of
+        _ | cluster' == -1 -> return False
+          | (mask `B.index` (cluster' `shiftR` 3)) .&. (1 `shiftL` (cluster' .&. 7)) == 0 -> return False -- more than one bounce away
+          | otherwise -> CM.areasConnected area1 area2
 
 unicast :: Ref EdictT -> Bool -> Quake ()
 unicast edictRef reliable = do

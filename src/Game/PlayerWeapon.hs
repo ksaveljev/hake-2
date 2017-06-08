@@ -18,9 +18,10 @@ module Game.PlayerWeapon
     , weaponSuperShotgun
     ) where
 
-import           Control.Lens           (use, (^.), (.=), (&), (.~), (+~))
+import           Control.Lens           (use, (^.), (.=), (%=), (&), (.~), (+~), (-~), (%~))
 import           Control.Monad          (when, unless, void)
-import           Data.Bits              (shiftL, (.&.), (.|.))
+import           Data.Bits              (complement, shiftL, (.&.), (.|.))
+import           Data.Maybe             (isJust, isNothing)
 import qualified Data.Vector.Unboxed    as UV
 import           Linear                 (V3(..))
 
@@ -30,7 +31,7 @@ import           Game.CVarT
 import           Game.EdictT
 import           Game.EntityStateT
 import qualified Game.GameItems         as GameItems
-import qualified Game.GameWeapon        as GameWeapon
+import qualified Game.GameUtil          as GameUtil
 import           Game.GClientT
 import           Game.GItemT
 import           Game.LevelLocalsT
@@ -42,7 +43,10 @@ import           QCommon.CVarVariables
 import           QuakeRef
 import           QuakeState
 import           Types
+import qualified Util.Lib               as Lib
 import qualified Util.Math3D            as Math3D
+
+import {-# SOURCE #-} qualified Game.GameWeapon as GameWeapon
 
 useWeapon :: ItemUse
 useWeapon = ItemUse "PlayerWeapon.useWeapon" useWeaponF
@@ -244,10 +248,190 @@ weaponGrenadeFire :: Ref EdictT -> Bool -> Quake ()
 weaponGrenadeFire = error "PlayerWeapon.weaponGrenadeFire" -- TODO
 
 playerNoise :: Ref EdictT -> V3 Float -> Int -> Quake ()
-playerNoise = error "PlayerWeapon.playerNoise" -- TODO
+playerNoise whoRef noiseLocation noiseType = do
+    who <- readRef whoRef
+    gClientRef <- getGClientRef (who^.eClient)
+    gClient <- readRef gClientRef
+    deathmatch <- fmap (^.cvValue) deathmatchCVar
+    doPlayerNoise gClientRef gClient who deathmatch
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerWeapon.playerNoise who^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    doPlayerNoise gClientRef gClient who deathmatch
+        | noiseType == Constants.pNoiseWeapon && (gClient^.gcSilencerShots) > 0 =
+            modifyRef gClientRef (\v -> v & gcSilencerShots -~ 1)
+        | deathmatch /= 0 || (who^.eFlags) .&. Constants.flNoTarget /= 0 =
+            return ()
+        | otherwise = do
+            when (isNothing (who^.eMyNoise)) $
+                spawnNoises
+            frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+            Just noiseRef <- getNoiseRef frameNum =<< readRef whoRef -- IMPROVE: looks bad really
+            noise <- readRef noiseRef
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            modifyRef noiseRef (\v -> v & eEntityState.esOrigin .~ noiseLocation
+                                        & eAbsMin .~ (noiseLocation - (noise^.eMaxs))
+                                        & eAbsMax .~ (noiseLocation + (noise^.eMaxs))
+                                        & eTeleportTime .~ levelTime)
+            linkEntity <- use (gameBaseGlobals.gbGameImport.giLinkEntity)
+            linkEntity noiseRef
+    spawnNoises = do
+        noiseRef <- GameUtil.spawn
+        modifyRef noiseRef (\v -> v & eClassName .~ "player_noise"
+                                    & eMins .~ V3 (-8) (-8) (-8)
+                                    & eMaxs .~ V3 8 8 8
+                                    & eOwner .~ Just whoRef
+                                    & eSvFlags .~ Constants.svfNoClient)
+        anotherNoiseRef <- GameUtil.spawn
+        modifyRef anotherNoiseRef (\v -> v & eClassName .~ "player_noise"
+                                           & eMins .~ V3 (-8) (-8) (-8)
+                                           & eMaxs .~ V3 8 8 8
+                                           & eOwner .~ Just whoRef
+                                           & eSvFlags .~ Constants.svfNoClient)
+        modifyRef whoRef (\v -> v & eMyNoise .~ Just noiseRef
+                                  & eMyNoise2 .~ Just anotherNoiseRef)
+    getNoiseRef :: Int -> EdictT -> Quake (Maybe (Ref EdictT))
+    getNoiseRef frameNum who
+        | noiseType == Constants.pNoiseSelf || noiseType == Constants.pNoiseWeapon = do
+            gameBaseGlobals.gbLevel %= (\v -> v & llSoundEntity .~ (who^.eMyNoise)
+                                                & llSoundEntityFrameNum .~ frameNum)
+            return (who^.eMyNoise)
+        | otherwise = do
+            gameBaseGlobals.gbLevel %= (\v -> v & llSound2Entity .~ (who^.eMyNoise2)
+                                                & llSound2EntityFrameNum .~ frameNum)
+            return (who^.eMyNoise2)
 
 weaponGeneric :: Ref EdictT -> Int -> Int -> Int -> Int -> UV.Vector Int -> UV.Vector Int -> EntThink -> Quake ()
-weaponGeneric = error "PlayerWeapon.weaponGeneric" -- TODO
+weaponGeneric edictRef frameActiveLast frameFireLast frameIdleLast frameDeactivateLast pauseFrames fireFrames fire = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    gClient <- readRef gClientRef
+    doWeaponGeneric edict gClientRef gClient
+  where
+    frameFireFirst = frameActiveLast + 1
+    frameIdleFirst = frameFireLast + 1
+    frameDeactivateFirst = frameIdleLast + 1
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerWeapon.weaponGeneric edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    doWeaponGeneric edict gClientRef gClient
+        | (edict^.eDeadFlag) /= 0 || (edict^.eEntityState.esModelIndex) /= 255 =
+            return ()
+        | (gClient^.gcWeaponState) == Constants.weaponDropping =
+            weaponDropping gClientRef gClient
+        | (gClient^.gcWeaponState) == Constants.weaponActivating =
+            updateGunFrame gClientRef gClient
+        | isJust (gClient^.gcNewWeapon) && (gClient^.gcWeaponState) /= Constants.weaponFiring = do
+            modifyRef gClientRef (\v -> v & gcWeaponState .~ Constants.weaponDropping
+                                          & gcPlayerState.psGunFrame .~ frameDeactivateFirst)
+            when (frameDeactivateLast - frameDeactivateFirst < 4) $ do
+                modifyRef gClientRef (\v -> v & gcAnimPriority .~ Constants.animReverse)
+                setPainFrame gClientRef gClient
+        | otherwise = do
+            done <- checkWeaponReady gClientRef gClient
+            unless done $ do
+              when ((gClient^.gcWeaponState) == Constants.weaponFiring) $ do
+                  idx <- checkFireFrames gClientRef 0
+                  when (fireFrames UV.! idx == 0) $
+                      modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame +~ 1)
+                  gunFrame <- fmap (^.gcPlayerState.psGunFrame) (readRef gClientRef)
+                  when (gunFrame == frameIdleFirst + 1) $
+                      modifyRef gClientRef (\v -> v & gcWeaponState .~ Constants.weaponReady)
+    weaponDropping gClientRef gClient
+        | (gClient^.gcPlayerState.psGunFrame) == frameDeactivateLast =
+            changeWeapon edictRef
+        | frameDeactivateLast - (gClient^.gcPlayerState.psGunFrame) == 4 = do
+            modifyRef gClientRef (\v -> v & gcAnimPriority .~ Constants.animReverse)
+            setPainFrame gClientRef gClient
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame +~ 1)
+        | otherwise =
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame +~ 1)
+    setPainFrame gClientRef gClient
+        | (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0 = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRPain4 + 1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameCRPain1)
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.framePain304 + 1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.framePain301)
+    updateGunFrame gClientRef gClient
+        | (gClient^.gcPlayerState.psGunFrame) == frameActiveLast =
+            modifyRef gClientRef (\v -> v & gcWeaponState .~ Constants.weaponReady
+                                          & gcPlayerState.psGunFrame .~ frameIdleFirst)
+        | otherwise =
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame +~ 1)
+    checkWeaponReady gClientRef gClient
+        | (gClient^.gcWeaponState) == Constants.weaponReady = weaponReady gClientRef gClient
+        | otherwise = return False
+    weaponReady gClientRef gClient
+        | ((gClient^.gcLatchedButtons) .|. (gClient^.gcButtons)) .&. Constants.buttonAttack /= 0 = do
+            modifyRef gClientRef (\v -> v & gcLatchedButtons %~ (.&. (complement Constants.buttonAttack)))
+            weaponRef <- getWeaponRef (gClient^.gcPers.cpWeapon)
+            weapon <- readRef weaponRef
+            fireWeapon gClientRef gClient weapon
+            return False
+        | (gClient^.gcPlayerState.psGunFrame) == frameIdleLast = do
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame .~ frameIdleFirst)
+            return True
+        | otherwise = do
+            -- TODO: do we need this?
+            -- if (pause_frames != null) {
+            done <- checkPauseFrames gClient 0
+            unless done $
+                modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame +~ 1)
+            return True
+    getWeaponRef Nothing = do
+        Com.fatalError "PlayerWeapon.weaponGeneric#weaponReady gClient^.gcPers.cpWeapon is Nothing"
+        return (Ref (-1))
+    getWeaponRef (Just weaponRef) = return weaponRef
+    setAttackFrame gClientRef gClient
+        | (gClient^.gcPlayerState.psPMoveState.pmsPMFlags) .&. Constants.pmfDucked /= 0 = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameCRAttack1 - 1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameCRAttack9)
+        | otherwise = do
+            modifyRef edictRef (\v -> v & eEntityState.esFrame .~ MPlayer.frameAttack1 - 1)
+            modifyRef gClientRef (\v -> v & gcAnimEnd .~ MPlayer.frameAttack8)
+    fireWeapon gClientRef gClient weapon
+        | (gClient^.gcAmmoIndex) == 0 || ((gClient^.gcPers.cpInventory) UV.! (gClient^.gcAmmoIndex)) >= (weapon^.giQuantity) = do
+            modifyRef gClientRef (\v -> v & gcPlayerState.psGunFrame .~ frameFireFirst
+                                          & gcWeaponState .~ Constants.weaponFiring
+                                          & gcAnimPriority .~ Constants.animAttack)
+            setAttackFrame gClientRef gClient
+        | otherwise = do
+            edict <- readRef edictRef
+            levelTime <- use (gameBaseGlobals.gbLevel.llTime)
+            when (levelTime >= (edict^.ePainDebounceTime)) $ do
+                gameImport <- use (gameBaseGlobals.gbGameImport)
+                soundIdx <- (gameImport^.giSoundIndex) (Just "weapons/noammo.wav")
+                (gameImport^.giSound) (Just edictRef) Constants.chanVoice soundIdx 1 Constants.attnNorm 0
+                modifyRef edictRef (\v -> v & ePainDebounceTime .~ levelTime + 1)
+            noAmmoWeaponChange edictRef
+    checkFireFrames gClientRef idx
+        | fireFrames UV.! idx == 0 = return idx
+        | otherwise = do
+            gClient <- readRef gClientRef
+            if (gClient^.gcPlayerState.psGunFrame) == fireFrames UV.! idx
+                then do
+                    frameNum <- use (gameBaseGlobals.gbLevel.llFrameNum)
+                    when (truncate (gClient^.gcQuadFrameNum) > frameNum) $ do
+                      gameImport <- use (gameBaseGlobals.gbGameImport)
+                      soundIdx <- (gameImport^.giSoundIndex) (Just "items/damage3.wav")
+                      (gameImport^.giSound) (Just edictRef) Constants.chanItem soundIdx 1 Constants.attnNorm 0
+                    void (entThink fire edictRef)
+                    return idx
+                else
+                    checkFireFrames gClientRef (idx + 1)
+    checkPauseFrames gClient idx
+        | pauseFrames UV.! idx == 0 = return False
+        | (gClient^.gcPlayerState.psGunFrame) == pauseFrames UV.! idx = do
+            r <- Lib.rand
+            if r .&. 15 /= 0
+                then return True
+                else checkPauseFrames gClient (idx + 1)
+        | otherwise =
+            checkPauseFrames gClient (idx + 1)
 
 projectSource :: GClientT -> V3 Float -> V3 Float -> V3 Float -> V3 Float -> V3 Float
 projectSource client point distance forward right =
@@ -256,3 +440,75 @@ projectSource client point distance forward right =
                   | (client^.gcPers.cpHand) == Constants.centerHanded = V3 a 0 c
                   | otherwise = distance
     in Math3D.projectSource point distance' forward right
+
+noAmmoWeaponChange :: Ref EdictT -> Quake ()
+noAmmoWeaponChange edictRef = do
+    edict <- readRef edictRef
+    gClientRef <- getGClientRef (edict^.eClient)
+    gClient <- readRef gClientRef
+    weaponRef <- checkSlugsAndRailgun gClient
+    modifyRef gClientRef (\v -> v & gcNewWeapon .~ weaponRef)
+  where
+    getGClientRef Nothing = do
+        Com.fatalError "PlayerWeapon.noAmmoWeaponChange edict^.eClient is Nothing"
+        return (Ref (-1))
+    getGClientRef (Just gClientRef) = return gClientRef
+    getItem Nothing = do
+        Com.fatalError "PlayerWeapon.noAmmoWeaponChange getItem on Nothing"
+        error "PlayerWeapon.noAmmoWeaponChange" -- TODO: return something more related
+    getItem (Just itemRef) = readRef itemRef
+    checkSlugsAndRailgun gClient = do
+        slugsRef <- GameItems.findItem "slugs"
+        railgunRef <- GameItems.findItem "railgun"
+        slugs <- getItem slugsRef
+        railgun <- getItem railgunRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (slugs^.giIndex) /= 0 && inventory UV.! (railgun^.giIndex) /= 0
+            then return railgunRef
+            else checkCellsAndHyperblaster gClient
+    checkCellsAndHyperblaster gClient = do
+        cellsRef <- GameItems.findItem "cells"
+        hyperblasterRef <- GameItems.findItem "hyperblaster"
+        cells <- getItem cellsRef
+        hyperblaster <- getItem hyperblasterRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (cells^.giIndex) /= 0 && inventory UV.! (hyperblaster^.giIndex) /= 0
+            then return hyperblasterRef
+            else checkBulletsAndChaingun gClient
+    checkBulletsAndChaingun gClient = do
+        bulletsRef <- GameItems.findItem "bullets"
+        chaingunRef <- GameItems.findItem "chaingun"
+        bullets <- getItem bulletsRef
+        chaingun <- getItem chaingunRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (bullets^.giIndex) /= 0 && inventory UV.! (chaingun^.giIndex) /= 0
+            then return chaingunRef
+            else checkBulletsAndMachinegun gClient
+    checkBulletsAndMachinegun gClient = do
+        bulletsRef <- GameItems.findItem "bullets"
+        machinegunRef <- GameItems.findItem "machinegun"
+        bullets <- getItem bulletsRef
+        machinegun <- getItem machinegunRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (bullets^.giIndex) /= 0 && inventory UV.! (machinegun^.giIndex) /= 0
+            then return machinegunRef
+            else checkShellsAndSuperShotgun gClient
+    checkShellsAndSuperShotgun gClient = do
+        shellsRef <- GameItems.findItem "shells"
+        superShotgunRef <- GameItems.findItem "super shotgun"
+        shells <- getItem shellsRef
+        superShotgun <- getItem superShotgunRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (shells^.giIndex) > 1 && inventory UV.! (superShotgun^.giIndex) /= 0
+            then return superShotgunRef
+            else checkShellsAndShotgun gClient
+    checkShellsAndShotgun gClient = do
+        shellsRef <- GameItems.findItem "shells"
+        shotgunRef <- GameItems.findItem "shotgun"
+        blasterRef <- GameItems.findItem "blaster"
+        shells <- getItem shellsRef
+        shotgun <- getItem shotgunRef
+        let inventory = gClient^.gcPers.cpInventory
+        if inventory UV.! (shells^.giIndex) /= 0 && inventory UV.! (shotgun^.giIndex) /= 0
+            then return shotgunRef
+            else return blasterRef

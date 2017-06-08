@@ -267,7 +267,7 @@ clusterPHS cluster
         return (empty `B.append` B.replicate (Constants.maxMapLeafs `div` 8 - num) 0)
     | otherwise = do
         bitOfs <- use (cmGlobals.cmMapVis.dvBitOfs)
-        let access = if Constants.dvisPhs == 0 then _1 else _2
+        let access = if Constants.dvisPvs == 0 then _1 else _2
             offset = (bitOfs V.! cluster)^.access
         mapVisibility <- use (cmGlobals.cmMapVisibility)
         res <- decompressVis mapVisibility offset

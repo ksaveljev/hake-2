@@ -3,6 +3,7 @@ module Game.GameBase
     , clipVelocity
     , findByClass
     , findByTarget
+    , findRadius
     , getGameApi
     , gFind
     , pickTarget
@@ -20,7 +21,7 @@ import qualified Data.ByteString.Char8  as BC
 import           Data.Char              (toLower)
 import           Data.Maybe             (isJust)
 import qualified Data.Vector            as V
-import           Linear                 (V3(..), dot, _x, _y, _z)
+import           Linear                 (V3(..), dot, norm, _x, _y, _z)
 
 import qualified Client.M               as M
 import qualified Constants
@@ -344,3 +345,22 @@ addPointToBounds v mins maxs =
         maxb = max (v^._y) (maxs^._y)
         maxc = max (v^._z) (maxs^._z)
     in (V3 mina minb minc, V3 maxa maxb maxc)
+
+findRadius :: Maybe (Ref EdictT) -> V3 Float -> Float -> Quake (Maybe (Ref EdictT))
+findRadius fromRef org rad = do
+    let edictIdx = maybe 0 (\(Ref idx) -> idx + 1) fromRef
+    numEdicts <- use (gameBaseGlobals.gbNumEdicts)
+    doFindRadius edictIdx numEdicts
+  where
+    doFindRadius edictIdx numEdicts
+      | edictIdx >= numEdicts = return Nothing
+      | otherwise = do
+          edict <- readRef (Ref edictIdx)
+          case () of
+              _ | not (edict^.eInUse) -> doFindRadius (edictIdx + 1) numEdicts
+                | (edict^.eSolid) == Constants.solidNot -> doFindRadius (edictIdx + 1) numEdicts
+                | otherwise -> do
+                    let eorg = org - ((edict^.eEntityState.esOrigin) + fmap (* 0.5) ((edict^.eMins) + (edict^.eMaxs)))
+                    if norm eorg > rad
+                        then doFindRadius (edictIdx + 1) numEdicts
+                        else return (Just (Ref edictIdx))

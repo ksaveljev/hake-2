@@ -3,6 +3,7 @@ module Game.GameBase
     , clipVelocity
     , findByClass
     , findByTarget
+    , findRadius
     , getGameApi
     , gFind
     , pickTarget
@@ -21,6 +22,7 @@ addPointToBounds :: V3 Float -> V3 Float -> V3 Float -> (V3 Float, V3 Float)
 clipVelocity :: V3 Float -> V3 Float -> Float -> (Int, V3 Float)
 findByClass :: EdictT -> B.ByteString -> Bool
 findByTarget :: EdictT -> B.ByteString -> Bool
+findRadius :: Maybe (Ref EdictT) -> V3 Float -> Float -> Quake (Maybe (Ref EdictT))
 getGameApi :: GameImportT -> Quake ()
 gFind :: Maybe (Ref EdictT) -> (EdictT -> B.ByteString -> Bool) -> B.ByteString -> Quake (Maybe (Ref EdictT))
 pickTarget :: Maybe B.ByteString -> Quake (Maybe (Ref EdictT))
