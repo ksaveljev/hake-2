@@ -10,6 +10,7 @@ module Render.Fast.Warp
 import           Control.Applicative   (Const)
 import           Control.Lens          (use, ix, (^.), (.=), (%=), (&), (.~), (+~), (-~), _1, _2)
 import           Control.Monad         (when, unless)
+import           Data.Bits             ((.&.))
 import qualified Data.ByteString       as B
 import           Data.IORef            (IORef, readIORef, modifyIORef')
 import qualified Data.Vector           as V
@@ -39,6 +40,9 @@ import           Render.MVertexT
 import           Types
 import           Util.Binary           (encode)
 import qualified Util.Math3D           as Math3D
+
+turbScale :: Float
+turbScale = 256 / (2 * pi)
 
 sideFront :: Int
 sideFront = 0
@@ -82,6 +86,42 @@ skyClip = V.fromList
     , V3   0    1    1
     , V3   1    0    1
     , V3 (-1)   0    1
+    ]
+
+sinV :: UV.Vector Float
+sinV = UV.fromList
+    [           0 ,   0.19633 ,   0.392541 ,   0.588517 ,   0.784137 ,   0.979285 ,    1.17384 ,    1.3677
+    ,     1.56072 ,   1.75281 ,    1.94384 ,     2.1337 ,    2.32228 ,    2.50945 ,    2.69512 ,   2.87916
+    ,     3.06147 ,   3.24193 ,    3.42044 ,    3.59689 ,    3.77117 ,    3.94319 ,    4.11282 ,   4.27998
+    ,     4.44456 ,   4.60647 ,    4.76559 ,    4.92185 ,    5.07515 ,    5.22538 ,    5.37247 ,   5.51632
+    ,     5.65685 ,   5.79398 ,    5.92761 ,    6.05767 ,    6.18408 ,    6.30677 ,    6.42566 ,   6.54068
+    ,     6.65176 ,   6.75883 ,    6.86183 ,     6.9607 ,    7.05537 ,    7.14579 ,    7.23191 ,   7.31368
+    ,     7.39104 ,   7.46394 ,    7.53235 ,    7.59623 ,    7.65552 ,    7.71021 ,    7.76025 ,   7.80562
+    ,     7.84628 ,   7.88222 ,    7.91341 ,    7.93984 ,    7.96148 ,    7.97832 ,    7.99036 ,   7.99759
+    ,           8 ,   7.99759 ,    7.99036 ,    7.97832 ,    7.96148 ,    7.93984 ,    7.91341 ,   7.88222
+    ,     7.84628 ,   7.80562 ,    7.76025 ,    7.71021 ,    7.65552 ,    7.59623 ,    7.53235 ,   7.46394
+    ,     7.39104 ,   7.31368 ,    7.23191 ,    7.14579 ,    7.05537 ,     6.9607 ,    6.86183 ,   6.75883
+    ,     6.65176 ,   6.54068 ,    6.42566 ,    6.30677 ,    6.18408 ,    6.05767 ,    5.92761 ,   5.79398
+    ,     5.65685 ,   5.51632 ,    5.37247 ,    5.22538 ,    5.07515 ,    4.92185 ,    4.76559 ,   4.60647
+    ,     4.44456 ,   4.27998 ,    4.11282 ,    3.94319 ,    3.77117 ,    3.59689 ,    3.42044 ,   3.24193
+    ,     3.06147 ,   2.87916 ,    2.69512 ,    2.50945 ,    2.32228 ,     2.1337 ,    1.94384 ,   1.75281
+    ,     1.56072 ,    1.3677 ,    1.17384 ,   0.979285 ,   0.784137 ,   0.588517 ,   0.392541 ,   0.19633
+    , 9.79717e-16 , (-0.19633), (-0.392541), (-0.588517), (-0.784137), (-0.979285), ( -1.17384), ( -1.3677)
+    ,   (-1.56072), (-1.75281), ( -1.94384), (  -2.1337), ( -2.32228), ( -2.50945), ( -2.69512), (-2.87916)
+    ,   (-3.06147), (-3.24193), ( -3.42044), ( -3.59689), ( -3.77117), ( -3.94319), ( -4.11282), (-4.27998)
+    ,   (-4.44456), (-4.60647), ( -4.76559), ( -4.92185), ( -5.07515), ( -5.22538), ( -5.37247), (-5.51632)
+    ,   (-5.65685), (-5.79398), ( -5.92761), ( -6.05767), ( -6.18408), ( -6.30677), ( -6.42566), (-6.54068)
+    ,   (-6.65176), (-6.75883), ( -6.86183), (  -6.9607), ( -7.05537), ( -7.14579), ( -7.23191), (-7.31368)
+    ,   (-7.39104), (-7.46394), ( -7.53235), ( -7.59623), ( -7.65552), ( -7.71021), ( -7.76025), (-7.80562)
+    ,   (-7.84628), (-7.88222), ( -7.91341), ( -7.93984), ( -7.96148), ( -7.97832), ( -7.99036), (-7.99759)
+    ,   (      -8), (-7.99759), ( -7.99036), ( -7.97832), ( -7.96148), ( -7.93984), ( -7.91341), (-7.88222)
+    ,   (-7.84628), (-7.80562), ( -7.76025), ( -7.71021), ( -7.65552), ( -7.59623), ( -7.53235), (-7.46394)
+    ,   (-7.39104), (-7.31368), ( -7.23191), ( -7.14579), ( -7.05537), (  -6.9607), ( -6.86183), (-6.75883)
+    ,   (-6.65176), (-6.54068), ( -6.42566), ( -6.30677), ( -6.18408), ( -6.05767), ( -5.92761), (-5.79398)
+    ,   (-5.65685), (-5.51632), ( -5.37247), ( -5.22538), ( -5.07515), ( -4.92185), ( -4.76559), (-4.60647)
+    ,   (-4.44456), (-4.27998), ( -4.11282), ( -3.94319), ( -3.77117), ( -3.59689), ( -3.42044), (-3.24193)
+    ,   (-3.06147), (-2.87916), ( -2.69512), ( -2.50945), ( -2.32228), (  -2.1337), ( -1.94384), (-1.75281)
+    ,   (-1.56072), ( -1.3677), ( -1.17384), (-0.979285), (-0.784137), (-0.588517), (-0.392541), (-0.19633)
     ]
 
 warpVerts :: MV.IOVector (V3 Float)
@@ -519,4 +559,35 @@ drawSkyPolygon nump vecs = do
             fastRenderAPIGlobals.frSkyMaxs .= (skyMaxs0', skyMaxs1')
 
 emitWaterPolys :: IORef MSurfaceT -> Quake ()
-emitWaterPolys surfRef = error "Warp.emitWaterPolys" -- TODO
+emitWaterPolys surfRef = do
+    newRefDef <- use (fastRenderAPIGlobals.frNewRefDef)
+    surf <- io (readIORef surfRef)
+    texInfo <- io (readIORef (surf^.msTexInfo))
+    let rdt = newRefDef^.rdTime
+        rdt' = truncate (rdt * 0.5) :: Int
+        scroll = if (texInfo^.mtiFlags) .&. Constants.surfFlowing /= 0
+                     then (-64) * (rdt * 0.5 - fromIntegral rdt')
+                     else 0
+    polygonCache <- use (fastRenderAPIGlobals.frPolygonCache)
+    drawWaterPolys polygonCache scroll rdt (surf^.msPolys)
+  where
+    drawWaterPolys _ _ _ Nothing = return ()
+    drawWaterPolys polygonCache scroll rdt (Just polyRef) = do
+        poly <- readRef polyRef
+        GL.glBegin GL.GL_TRIANGLE_FAN
+        drawPolyVerts polyRef rdt scroll 0 (poly^.glpNumVerts)
+        GL.glEnd
+        drawWaterPolys polygonCache scroll rdt (poly^.glpNext)
+    drawPolyVerts polyRef rdt scroll idx maxIdx
+        | idx >= maxIdx = return ()
+        | otherwise = do
+            os <- Polygon.getPolyS1 polyRef idx
+            ot <- Polygon.getPolyT1 polyRef idx
+            let s = (os + (sinV UV.! ((truncate ((ot * 0.125 + rdt) * turbScale)) .&. 255)) + scroll) * (1.0 / 64)
+                t = (ot + (sinV UV.! ((truncate ((os * 0.125 + rdt) * turbScale)) .&. 255))) * (1.0 / 64)
+            GL.glTexCoord2f (realToFrac s) (realToFrac t)
+            x <- Polygon.getPolyX polyRef idx
+            y <- Polygon.getPolyY polyRef idx
+            z <- Polygon.getPolyZ polyRef idx
+            GL.glVertex3f (realToFrac x) (realToFrac y) (realToFrac z)
+            drawPolyVerts polyRef rdt scroll (idx + 1) maxIdx
